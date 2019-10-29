@@ -1,0 +1,39 @@
+cmake_minimum_required(VERSION 3.11)
+
+project(gatling VERSION 0.1)
+
+set(GATLING_OUTPUT_DIR "${CMAKE_BINARY_DIR}/bin"
+  CACHE PATH "Location of build process output.")
+set(GATLING_EXTERN_DIR "${CMAKE_BINARY_DIR}/extern"
+  CACHE PATH "Location of third-party sources.")
+set(GATLING_ASSET_DIR "${CMAKE_BINARY_DIR}/assets"
+  CACHE PATH "Location of models and textures.")
+set(GATLING_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src"
+  CACHE PATH "Location of the sources root folder.")
+set(GATLING_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake"
+  CACHE PATH "Location of cmake scripts.")
+
+set(GATLING_VERSION_MAJOR 0)
+set(GATLING_VERSION_MINOR 0)
+set(GATLING_VERSION_PATCH 1)
+set(GATLING_VERSION_STRING "${GATLING_VERSION_MAJOR}.${GATLING_VERSION_MINOR}")
+set(GATLING_VERSION_STRING "${GATLING_VERSION_STRING}.${GATLING_VERSION_PATCH}")
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${GATLING_CMAKE_DIR}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}")
+
+include(cmake/Gatling.cmake)
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ENABLE_IPO)
+if (ENABLE_IPO)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
+
+add_subdirectory(extern)
+add_subdirectory(src)
