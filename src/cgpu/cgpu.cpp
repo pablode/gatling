@@ -21,11 +21,12 @@ struct _gpu_instance
 
 struct _gpu_device
 {
-  VkDevice         logical_device;
-  VkPhysicalDevice physical_device;
-  VkQueue          compute_queue;
-  VkCommandPool    command_pool;
-  VolkDeviceTable  table;
+  VkDevice                    logical_device;
+  VkPhysicalDevice            physical_device;
+  VkQueue                     compute_queue;
+  VkCommandPool               command_pool;
+  VolkDeviceTable             table;
+  cgpu_physical_device_limits limits;
 };
 
 struct _gpu_buffer
@@ -175,46 +176,208 @@ VkMemoryPropertyFlags _cgpu_translate_memory_properties(
 }
 
 VkAccessFlags _cgpu_translate_access_flags(
-  CgpuMemoryAccessFlags access_flags)
+  CgpuMemoryAccessFlags flags)
 {
-  if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ)
+  VkAccessFlags vk_flags = {};
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ)
               == CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ) {
-    return VK_ACCESS_UNIFORM_READ_BIT;
+    vk_flags |= VK_ACCESS_UNIFORM_READ_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_SHADER_READ)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_SHADER_READ)
               == CGPU_MEMORY_ACCESS_FLAG_SHADER_READ) {
-    return VK_ACCESS_SHADER_READ_BIT;
+    vk_flags |= VK_ACCESS_SHADER_READ_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE)
               == CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE) {
-    return VK_ACCESS_SHADER_WRITE_BIT;
+    vk_flags |= VK_ACCESS_SHADER_WRITE_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ)
               == CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ) {
-    return VK_ACCESS_TRANSFER_READ_BIT;
+    vk_flags |= VK_ACCESS_TRANSFER_READ_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE)
               == CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE) {
-    return VK_ACCESS_TRANSFER_WRITE_BIT;
+    vk_flags |= VK_ACCESS_TRANSFER_WRITE_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_HOST_READ)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_HOST_READ)
               == CGPU_MEMORY_ACCESS_FLAG_HOST_READ) {
-    return VK_ACCESS_HOST_READ_BIT;
+    vk_flags |= VK_ACCESS_HOST_READ_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_HOST_WRITE)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_HOST_WRITE)
               == CGPU_MEMORY_ACCESS_FLAG_HOST_WRITE) {
-    return VK_ACCESS_HOST_WRITE_BIT;
+    vk_flags |= VK_ACCESS_HOST_WRITE_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ)
               == CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ) {
-    return VK_ACCESS_MEMORY_READ_BIT;
+    vk_flags |= VK_ACCESS_MEMORY_READ_BIT;
   }
-  else if ((access_flags & CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE)
+  if ((flags & CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE)
               == CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE) {
-    return VK_ACCESS_MEMORY_WRITE_BIT;
+    vk_flags |= VK_ACCESS_MEMORY_WRITE_BIT;
   }
-  return CGPU_MEMORY_ACCESS_FLAG_UNDEFINED;
+  return vk_flags;
 };
+
+CgpuSampleCountFlags _cgpu_translate_sample_count_flags(
+  const VkSampleCountFlags& vk_flags)
+{
+  CgpuSampleCountFlags flags = {};
+  if ((vk_flags & VK_SAMPLE_COUNT_1_BIT)
+        == VK_SAMPLE_COUNT_1_BIT) {
+    flags |= CGPU_SAMPLE_COUNT_FLAG_1;
+  }
+  if ((vk_flags & VK_SAMPLE_COUNT_2_BIT)
+        == VK_SAMPLE_COUNT_2_BIT) {
+    flags |= CGPU_SAMPLE_COUNT_FLAG_2;
+  }
+  if ((vk_flags & VK_SAMPLE_COUNT_4_BIT)
+        == VK_SAMPLE_COUNT_4_BIT) {
+    flags |= CGPU_SAMPLE_COUNT_FLAG_4;
+  }
+  if ((vk_flags & VK_SAMPLE_COUNT_8_BIT)
+        == VK_SAMPLE_COUNT_8_BIT) {
+    flags |= CGPU_SAMPLE_COUNT_FLAG_8;
+  }
+  if ((vk_flags & VK_SAMPLE_COUNT_16_BIT)
+        == VK_SAMPLE_COUNT_16_BIT) {
+    flags |= CGPU_SAMPLE_COUNT_FLAG_16;
+  }
+  if ((vk_flags & VK_SAMPLE_COUNT_32_BIT)
+        == VK_SAMPLE_COUNT_32_BIT) {
+    flags |= CGPU_SAMPLE_COUNT_FLAG_32;
+  }
+  if ((vk_flags & VK_SAMPLE_COUNT_64_BIT)
+        == VK_SAMPLE_COUNT_64_BIT) {
+    flags |= CGPU_SAMPLE_COUNT_FLAG_64;
+  }
+  return flags;
+}
+
+cgpu_physical_device_limits _cgpu_translate_physical_device_limits(
+  const VkPhysicalDeviceLimits& vk_limits)
+{
+  cgpu_physical_device_limits limits = {};
+  limits.maxImageDimension1D = vk_limits.maxImageDimension1D;
+  limits.maxImageDimension2D = vk_limits.maxImageDimension2D;
+  limits.maxImageDimension3D = vk_limits.maxImageDimension3D;
+  limits.maxImageDimensionCube = vk_limits.maxImageDimensionCube;
+  limits.maxImageArrayLayers = vk_limits.maxImageArrayLayers;
+  limits.maxTexelBufferElements = vk_limits.maxTexelBufferElements;
+  limits.maxUniformBufferRange = vk_limits.maxUniformBufferRange;
+  limits.maxStorageBufferRange = vk_limits.maxStorageBufferRange;
+  limits.maxPushConstantsSize = vk_limits.maxPushConstantsSize;
+  limits.maxMemoryAllocationCount = vk_limits.maxMemoryAllocationCount;
+  limits.maxSamplerAllocationCount = vk_limits.maxSamplerAllocationCount;
+  limits.bufferImageGranularity = vk_limits.bufferImageGranularity;
+  limits.sparseAddressSpaceSize = vk_limits.sparseAddressSpaceSize;
+  limits.maxBoundDescriptorSets = vk_limits.maxBoundDescriptorSets;
+  limits.maxPerStageDescriptorSamplers = vk_limits.maxPerStageDescriptorSamplers;
+  limits.maxPerStageDescriptorUniformBuffers = vk_limits.maxPerStageDescriptorUniformBuffers;
+  limits.maxPerStageDescriptorStorageBuffers = vk_limits.maxPerStageDescriptorStorageBuffers;
+  limits.maxPerStageDescriptorSampledImages = vk_limits.maxPerStageDescriptorSampledImages;
+  limits.maxPerStageDescriptorStorageImages = vk_limits.maxPerStageDescriptorStorageImages;
+  limits.maxPerStageDescriptorInputAttachments = vk_limits.maxPerStageDescriptorInputAttachments;
+  limits.maxPerStageResources = vk_limits.maxPerStageResources;
+  limits.maxDescriptorSetSamplers = vk_limits.maxDescriptorSetSamplers;
+  limits.maxDescriptorSetUniformBuffers = vk_limits.maxDescriptorSetUniformBuffers;
+  limits.maxDescriptorSetUniformBuffersDynamic = vk_limits.maxDescriptorSetUniformBuffersDynamic;
+  limits.maxDescriptorSetStorageBuffers = vk_limits.maxDescriptorSetStorageBuffers;
+  limits.maxDescriptorSetStorageBuffersDynamic = vk_limits.maxDescriptorSetStorageBuffersDynamic;
+  limits.maxDescriptorSetSampledImages = vk_limits.maxDescriptorSetSampledImages;
+  limits.maxDescriptorSetStorageImages = vk_limits.maxDescriptorSetStorageImages;
+  limits.maxDescriptorSetInputAttachments = vk_limits.maxDescriptorSetInputAttachments;
+  limits.maxVertexInputAttributes = vk_limits.maxVertexInputAttributes;
+  limits.maxVertexInputBindings = vk_limits.maxVertexInputBindings;
+  limits.maxVertexInputAttributeOffset = vk_limits.maxVertexInputAttributeOffset;
+  limits.maxVertexInputBindingStride = vk_limits.maxVertexInputBindingStride;
+  limits.maxVertexOutputComponents = vk_limits.maxVertexOutputComponents;
+  limits.maxTessellationGenerationLevel = vk_limits.maxTessellationGenerationLevel;
+  limits.maxTessellationPatchSize = vk_limits.maxTessellationPatchSize;
+  limits.maxTessellationControlPerVertexInputComponents = vk_limits.maxTessellationControlPerVertexInputComponents;
+  limits.maxTessellationControlPerVertexOutputComponents = vk_limits.maxTessellationControlPerVertexOutputComponents;
+  limits.maxTessellationControlPerPatchOutputComponents = vk_limits.maxTessellationControlPerPatchOutputComponents;
+  limits.maxTessellationControlTotalOutputComponents = vk_limits.maxTessellationControlTotalOutputComponents;
+  limits.maxTessellationEvaluationInputComponents = vk_limits.maxTessellationEvaluationInputComponents;
+  limits.maxTessellationEvaluationOutputComponents = vk_limits.maxTessellationEvaluationOutputComponents;
+  limits.maxGeometryShaderInvocations = vk_limits.maxGeometryShaderInvocations;
+  limits.maxGeometryInputComponents = vk_limits.maxGeometryInputComponents;
+  limits.maxGeometryOutputComponents = vk_limits.maxGeometryOutputComponents;
+  limits.maxGeometryOutputVertices = vk_limits.maxGeometryOutputVertices;
+  limits.maxGeometryTotalOutputComponents = vk_limits.maxGeometryTotalOutputComponents;
+  limits.maxFragmentInputComponents = vk_limits.maxFragmentInputComponents;
+  limits.maxFragmentOutputAttachments = vk_limits.maxFragmentOutputAttachments;
+  limits.maxFragmentDualSrcAttachments = vk_limits.maxFragmentDualSrcAttachments;
+  limits.maxFragmentCombinedOutputResources = vk_limits.maxFragmentCombinedOutputResources;
+  limits.maxComputeSharedMemorySize = vk_limits.maxComputeSharedMemorySize;
+  limits.maxComputeWorkGroupCount[0] = vk_limits.maxComputeWorkGroupCount[0];
+  limits.maxComputeWorkGroupCount[1] = vk_limits.maxComputeWorkGroupCount[1];
+  limits.maxComputeWorkGroupCount[2] = vk_limits.maxComputeWorkGroupCount[2];
+  limits.maxComputeWorkGroupInvocations = vk_limits.maxComputeWorkGroupInvocations;
+  limits.maxComputeWorkGroupSize[0] = vk_limits.maxComputeWorkGroupSize[0];
+  limits.maxComputeWorkGroupSize[1] = vk_limits.maxComputeWorkGroupSize[1];
+  limits.maxComputeWorkGroupSize[2] = vk_limits.maxComputeWorkGroupSize[2];
+  limits.subPixelPrecisionBits = vk_limits.subPixelPrecisionBits;
+  limits.subTexelPrecisionBits = vk_limits.subTexelPrecisionBits;
+  limits.mipmapPrecisionBits = vk_limits.mipmapPrecisionBits;
+  limits.maxDrawIndexedIndexValue = vk_limits.maxDrawIndexedIndexValue;
+  limits.maxDrawIndirectCount = vk_limits.maxDrawIndirectCount;
+  limits.maxSamplerLodBias = vk_limits.maxSamplerLodBias;
+  limits.maxSamplerAnisotropy = vk_limits.maxSamplerAnisotropy;
+  limits.maxViewports = vk_limits.maxViewports;
+  limits.maxViewportDimensions[0] = vk_limits.maxViewportDimensions[0];
+  limits.maxViewportDimensions[1] = vk_limits.maxViewportDimensions[1];
+  limits.viewportBoundsRange[0] = vk_limits.viewportBoundsRange[0];
+  limits.viewportBoundsRange[1] = vk_limits.viewportBoundsRange[1];
+  limits.viewportSubPixelBits = vk_limits.viewportSubPixelBits;
+  limits.minMemoryMapAlignment = vk_limits.minMemoryMapAlignment;
+  limits.minTexelBufferOffsetAlignment = vk_limits.minTexelBufferOffsetAlignment;
+  limits.minUniformBufferOffsetAlignment = vk_limits.minUniformBufferOffsetAlignment;
+  limits.minStorageBufferOffsetAlignment = vk_limits.minStorageBufferOffsetAlignment;
+  limits.minTexelOffset = vk_limits.minTexelOffset;
+  limits.maxTexelOffset = vk_limits.maxTexelOffset;
+  limits.minTexelGatherOffset = vk_limits.minTexelGatherOffset;
+  limits.maxTexelGatherOffset = vk_limits.maxTexelGatherOffset;
+  limits.minInterpolationOffset = vk_limits.minInterpolationOffset;
+  limits.maxInterpolationOffset = vk_limits.maxInterpolationOffset;
+  limits.subPixelInterpolationOffsetBits = vk_limits.subPixelInterpolationOffsetBits;
+  limits.maxFramebufferWidth = vk_limits.maxFramebufferWidth;
+  limits.maxFramebufferHeight = vk_limits.maxFramebufferHeight;
+  limits.maxFramebufferLayers = vk_limits.maxFramebufferLayers;
+  limits.framebufferColorSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.framebufferColorSampleCounts);
+  limits.framebufferDepthSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.framebufferDepthSampleCounts);
+  limits.framebufferStencilSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.framebufferStencilSampleCounts);
+  limits.framebufferNoAttachmentsSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.framebufferNoAttachmentsSampleCounts);
+  limits.maxColorAttachments = vk_limits.maxColorAttachments;
+  limits.sampledImageColorSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.sampledImageColorSampleCounts);
+  limits.sampledImageIntegerSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.sampledImageIntegerSampleCounts);
+  limits.sampledImageDepthSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.sampledImageDepthSampleCounts);
+  limits.sampledImageStencilSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.sampledImageStencilSampleCounts);
+  limits.storageImageSampleCounts =
+    _cgpu_translate_sample_count_flags(vk_limits.storageImageSampleCounts);
+  limits.maxSampleMaskWords = vk_limits.maxSampleMaskWords;
+  limits.timestampComputeAndGraphics = vk_limits.timestampComputeAndGraphics;
+  limits.timestampPeriod = vk_limits.timestampPeriod;
+  limits.maxClipDistances = vk_limits.maxClipDistances;
+  limits.maxCullDistances = vk_limits.maxCullDistances;
+  limits.maxCombinedClipAndCullDistances = vk_limits.maxCombinedClipAndCullDistances;
+  limits.discreteQueuePriorities = vk_limits.discreteQueuePriorities;
+  limits.pointSizeGranularity = vk_limits.pointSizeGranularity;
+  limits.lineWidthGranularity = vk_limits.lineWidthGranularity;
+  limits.strictLines = vk_limits.strictLines;
+  limits.standardSampleLocations = vk_limits.standardSampleLocations;
+  limits.optimalBufferCopyOffsetAlignment = vk_limits.optimalBufferCopyOffsetAlignment;
+  limits.optimalBufferCopyRowPitchAlignment = vk_limits.optimalBufferCopyRowPitchAlignment;
+  limits.nonCoherentAtomSize = vk_limits.nonCoherentAtomSize;
+  return limits;
+}
 
 VkFormat _cgpu_translate_image_format(
   CgpuImageFormat image_format)
@@ -1120,6 +1283,15 @@ CgpuResult cgpu_create_device(
     &idevice->table,
     idevice->logical_device
   );
+
+  VkPhysicalDeviceProperties device_properties;
+  vkGetPhysicalDeviceProperties(
+    idevice->physical_device,
+    &device_properties
+  );
+
+  idevice->limits =
+    _cgpu_translate_physical_device_limits(device_properties.limits);
 
   return CGPU_OK;
 }
@@ -2429,5 +2601,91 @@ CgpuResult cgpu_submit_command_buffer(
   if (result != VK_SUCCESS) {
     return CGPU_FAIL_UNABLE_TO_SUBMIT_COMMAND_BUFFER;
   }
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_flush_mapped_memory(
+  const cgpu_device& device,
+  const cgpu_buffer& buffer,
+  const uint64_t& byte_offset,
+  const uint64_t& byte_count)
+{
+  _gpu_device* idevice;
+  _gpu_buffer* ibuffer;
+  if (!_cgpu_resolve_handle(device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  if (!_cgpu_resolve_handle(buffer.handle, &ibuffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  VkMappedMemoryRange memory_range = {};
+  memory_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+  memory_range.pNext = nullptr;
+  memory_range.memory = ibuffer->memory;
+  memory_range.offset = byte_offset;
+  memory_range.size =
+    (byte_count == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : byte_count;
+
+  const VkResult result = vkFlushMappedMemoryRanges(
+    idevice->logical_device,
+    1,
+    &memory_range
+  );
+
+  if (result != VK_SUCCESS) {
+    return CGPU_FAIL_UNABLE_TO_INVALIDATE_MEMORY;
+  }
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_invalidate_mapped_memory(
+  const cgpu_device& device,
+  const cgpu_buffer& buffer,
+  const uint64_t& byte_offset,
+  const uint64_t& byte_count)
+{
+  _gpu_device* idevice;
+  _gpu_buffer* ibuffer;
+  if (!_cgpu_resolve_handle(device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  if (!_cgpu_resolve_handle(buffer.handle, &ibuffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  VkMappedMemoryRange memory_range = {};
+  memory_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+  memory_range.pNext = nullptr;
+  memory_range.memory = ibuffer->memory;
+  memory_range.offset = byte_offset;
+  memory_range.size =
+    (byte_count == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : byte_count; // TODO: do this everywhere
+
+  const VkResult result = vkInvalidateMappedMemoryRanges(
+    idevice->logical_device,
+    1,
+    &memory_range
+  );
+
+  if (result != VK_SUCCESS) {
+    return CGPU_FAIL_UNABLE_TO_INVALIDATE_MEMORY;
+  }
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_get_physical_device_limits(
+  const cgpu_device& device,
+  cgpu_physical_device_limits& limits)
+{
+  _gpu_device* idevice;
+  if (!_cgpu_resolve_handle(device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  std::memcpy(
+    &limits,
+    &idevice->limits,
+    sizeof(cgpu_physical_device_limits)
+  );
   return CGPU_OK;
 }

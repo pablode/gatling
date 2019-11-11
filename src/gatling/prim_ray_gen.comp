@@ -1,0 +1,95 @@
+#version 450 core
+
+layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
+
+const uint NUM_SAMPLES = 4;
+const uint IMAGE_WIDTH = 1024;
+const uint IMAGE_HEIGHT = 1024;
+
+struct path_segment
+{
+    vec3 pos;
+    uint out_index;
+    vec3 dir;
+    uint rec_depth;
+};
+
+layout(set=0, binding=0) writeonly buffer OutputBuffer
+{
+    vec4 pixels[];
+};
+
+layout(set=0, binding=3) buffer PathSegmentBuffer
+{
+    uint path_segment_counter;
+    uint pad_0;
+    uint pad_1;
+    uint pad_2;
+    path_segment[] path_segments;
+};
+
+uint wang_hash(uint seed)
+{
+    seed = (seed ^ 61) ^ (seed >> 16);
+    seed *= 9;
+    seed = seed ^ (seed >> 4);
+    seed *= 0x27d4eb2d;
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
+
+uint random_seed;
+
+float random_number_between_0_and_1()
+{
+  random_seed ^= random_seed << 13;
+  random_seed ^= random_seed >> 17;
+  random_seed ^= random_seed << 5;
+  return float(random_seed) * (1.0 / 4294967296.0);
+}
+
+void main()
+{
+  const uint pixel_index =
+    gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 1024;
+
+  if (pixel_index >= 1024 * 1024) {
+      return;
+  }
+  if (pixel_index == 0) {
+    atomicExchange(path_segment_counter, 0);
+  }
+
+  random_seed = wang_hash(pixel_index);
+
+  for (uint s = 0; s < NUM_SAMPLES; ++s)
+  {
+    const float r1 = random_number_between_0_and_1();
+    const float r2 = random_number_between_0_and_1();
+
+    const float u = (gl_GlobalInvocationID.x + r1) / float(IMAGE_WIDTH);
+    const float v = (gl_GlobalInvocationID.y + r2) / float(IMAGE_HEIGHT);
+
+    const vec3 ray_origin = vec3(0.15, 0.115, 0.0);
+
+    const vec3 lower_left_corner = vec3(
+      ray_origin.x - 1.0,
+      ray_origin.y - 2.5,
+      ray_origin.z - 2.5
+    );
+    const vec3 horizontal = vec3(0.0, 0.0, 5.0);
+    const vec3 vertical = vec3(0.0, 5.0, 0.0);
+
+    const vec3 ray_direction =
+      lower_left_corner + u * horizontal + v * vertical;
+
+    const uint sample_index = pixel_index * NUM_SAMPLES + s;
+
+    path_segments[sample_index].pos = ray_origin;
+    path_segments[sample_index].out_index = pixel_index;
+    path_segments[sample_index].dir = ray_direction;
+    path_segments[sample_index].rec_depth = 0;
+
+    pixels[pixel_index] = vec4(0.0, 0.0, 0.0, 1.0);
+  }
+}

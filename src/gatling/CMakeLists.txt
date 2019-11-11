@@ -4,7 +4,8 @@ gatling_add_executable(
   SOURCES_CXX
     main.cpp
   SOURCES_GLSL
-    test.comp
+    prim_ray_gen.comp
+    trace_ray.comp
 )
 
 target_compile_definitions(

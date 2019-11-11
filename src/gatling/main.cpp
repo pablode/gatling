@@ -11,7 +11,11 @@
 typedef enum GatlingResult {
   GATLING_OK = 0,
   GATLING_FAIL_UNABLE_TO_WRITE_OUTPUT_IMAGE = -1,
-  GATLING_FAIL_UNABLE_TO_OPEN_FILE = -2
+  GATLING_FAIL_UNABLE_TO_OPEN_FILE = -2,
+  GATLING_FAIL_UNABLE_TO_CREATE_SHADER = -3,
+  GATLING_FAIL_UNABLE_TO_CREATE_PIPELINE = -4,
+  GATLING_FAIL_UNABLE_TO_DESTROY_SHADER = -5,
+  GATLING_FAIL_UNABLE_TO_DESTROY_PIPELINE = -6
 } GatlingResult;
 
 GatlingResult gatling_save_img(
@@ -66,6 +70,78 @@ GatlingResult gatling_read_file(
   return GATLING_OK;
 }
 
+struct gatling_compute_pipeline
+{
+  cgpu_pipeline pipeline;
+  cgpu_shader shader;
+};
+
+GatlingResult gatling_create_compute_pipeline(
+  const cgpu_device& device,
+  const char* shader_file_path,
+  const std::vector<cgpu_shader_resource_buffer>& shader_resource_buffers,
+  gatling_compute_pipeline& pipeline)
+{
+  std::vector<std::uint8_t> shader_source;
+
+  GatlingResult g_result = gatling_read_file(
+    shader_source,
+    shader_file_path
+  );
+  if (g_result != GATLING_OK) {
+    return g_result;
+  }
+
+  CgpuResult c_result = cgpu_create_shader(
+    device,
+    shader_source.size(),
+    shader_source.data(),
+    pipeline.shader
+  );
+  if (c_result != CGPU_OK) {
+    return GATLING_FAIL_UNABLE_TO_CREATE_PIPELINE;
+  }
+
+  c_result = cgpu_create_pipeline(
+    device,
+    shader_resource_buffers.size(),
+    shader_resource_buffers.data(),
+    0,
+    nullptr,
+    pipeline.shader,
+    "main",
+    pipeline.pipeline
+  );
+  if (c_result != CGPU_OK) {
+    return GATLING_FAIL_UNABLE_TO_CREATE_PIPELINE;
+  }
+
+  return GATLING_OK;
+}
+
+GatlingResult gatling_destroy_compute_pipeline(
+  const cgpu_device& device,
+  const gatling_compute_pipeline& pipeline)
+{
+  CgpuResult c_result = cgpu_destroy_shader(
+    device,
+    pipeline.shader
+  );
+  if (c_result != CGPU_OK) {
+    return GATLING_FAIL_UNABLE_TO_DESTROY_SHADER;
+  }
+
+  c_result = cgpu_destroy_pipeline(
+    device,
+    pipeline.pipeline
+  );
+  if (c_result != CGPU_OK) {
+    return GATLING_FAIL_UNABLE_TO_DESTROY_PIPELINE;
+  }
+
+  return GATLING_OK;
+}
+
 int main(int argc, const char* argv[])
 {
   // Set up instance and device.
@@ -86,26 +162,9 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Load shader.
-  std::vector<std::uint8_t> shader_source;
-  GatlingResult g_result = gatling_read_file(
-    shader_source,
-    "/Users/pablode/Dropbox/Projects/gatling/build/bin/gatling/shaders/test.comp.spv"
-  );
-  assert(g_result == GATLING_OK);
-
-  cgpu_shader shader;
-  c_result = cgpu_create_shader(
-    device,
-    shader_source.size(),
-    shader_source.data(),
-    shader
-  );
-  assert(c_result == CGPU_OK);
-
   // Load scene.
   std::vector<std::uint8_t> scene_data;
-  g_result = gatling_read_file(
+  GatlingResult g_result = gatling_read_file(
     scene_data,
     "/Users/pablode/Dropbox/Projects/gatling/build/test.gsd"
   );
@@ -114,15 +173,25 @@ int main(int argc, const char* argv[])
   // Create input and output buffers.
   const uint32_t image_width = 1024;
   const uint32_t image_height = 1024;
+
   const uint32_t output_buffer_size_in_floats =
     image_width * image_height * 4;
   const uint32_t output_buffer_size_in_bytes =
     image_width * image_height * sizeof(float) * 4;
-  const uint32_t intput_buffer_size_in_bytes =
+
+  const uint32_t input_buffer_size_in_bytes =
     scene_data.size();
+
+  const uint32_t path_segment_buffer_size_in_bytes =
+    (image_width *       // x dim
+      image_height *     // y dim
+      4 *                // sample count
+      sizeof(float) * 8) // path_segment struct size
+      + 16;              // counter in first 4 bytes + padding
 
   cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
+  cgpu_buffer path_segment_buffer;
   cgpu_buffer output_buffer;
   cgpu_buffer staging_buffer_out;
 
@@ -131,7 +200,7 @@ int main(int argc, const char* argv[])
     CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-    intput_buffer_size_in_bytes,
+    input_buffer_size_in_bytes,
     staging_buffer_in
   );
   assert(c_result == CGPU_OK);
@@ -141,8 +210,17 @@ int main(int argc, const char* argv[])
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
       CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    intput_buffer_size_in_bytes,
+    input_buffer_size_in_bytes,
     input_buffer
+  );
+  assert(c_result == CGPU_OK);
+
+  c_result = cgpu_create_buffer(
+    device,
+    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER,
+    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    path_segment_buffer_size_in_bytes,
+    path_segment_buffer
   );
   assert(c_result == CGPU_OK);
 
@@ -193,28 +271,37 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Execute pipeline.
+  // Execute pipelines.
   std::vector<cgpu_shader_resource_buffer> shader_resource_buffers = {
-    { 0, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, output_buffer },
-    { 1, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, input_buffer  },
-    { 2, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, input_buffer  }
+    { 0, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, output_buffer       },
+    { 1, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, input_buffer        },
+    { 2, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, input_buffer        },
+    { 3, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, path_segment_buffer }
   };
 
-  cgpu_pipeline pipeline;
-  c_result = cgpu_create_pipeline(
+  gatling_compute_pipeline pipeline_p1;
+  gatling_compute_pipeline pipeline_p2;
+
+  g_result = gatling_create_compute_pipeline(
     device,
-    shader_resource_buffers.size(),
-    shader_resource_buffers.data(),
-    0,
-    nullptr,
-    shader,
-    "main",
-    pipeline
+    "/Users/pablode/Dropbox/Projects/gatling/build/bin/gatling/shaders/prim_ray_gen.comp.spv",
+    shader_resource_buffers,
+    pipeline_p1
   );
-  assert(c_result == CGPU_OK);
+  assert(g_result == GATLING_OK);
+
+  g_result = gatling_create_compute_pipeline(
+    device,
+    "/Users/pablode/Dropbox/Projects/gatling/build/bin/gatling/shaders/trace_ray.comp.spv",
+    shader_resource_buffers,
+    pipeline_p2
+  );
+  assert(g_result == GATLING_OK);
 
   c_result = cgpu_begin_command_buffer(command_buffer);
   assert(c_result == CGPU_OK);
+
+  // Copy staging buffer to input buffer.
 
   c_result = cgpu_cmd_copy_buffer(
     command_buffer,
@@ -228,7 +315,7 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_1.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_1.buffer = input_buffer;
   buffer_memory_barrier_1.byte_offset = 0;
-  buffer_memory_barrier_1.num_bytes = intput_buffer_size_in_bytes;
+  buffer_memory_barrier_1.num_bytes = input_buffer_size_in_bytes;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -238,7 +325,12 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  c_result = cgpu_cmd_bind_pipeline(command_buffer, pipeline);
+  // Generate primary rays and clear pixels.
+
+  c_result = cgpu_cmd_bind_pipeline(
+    command_buffer,
+    pipeline_p1.pipeline
+  );
   assert(c_result == CGPU_OK);
 
   c_result = cgpu_cmd_dispatch(
@@ -249,17 +341,69 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
+  // Trace rays.
+
   cgpu_buffer_memory_barrier buffer_memory_barrier_2 = {};
   buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
-  buffer_memory_barrier_2.buffer = output_buffer;
+  buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
+  buffer_memory_barrier_2.buffer = path_segment_buffer;
   buffer_memory_barrier_2.byte_offset = 0;
-  buffer_memory_barrier_2.num_bytes = output_buffer_size_in_bytes;
+  buffer_memory_barrier_2.num_bytes = path_segment_buffer_size_in_bytes;
+
+  cgpu_buffer_memory_barrier buffer_memory_barrier_3 = {};
+  buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
+  buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
+  buffer_memory_barrier_3.buffer = output_buffer;
+  buffer_memory_barrier_3.byte_offset = 0;
+  buffer_memory_barrier_3.num_bytes = output_buffer_size_in_bytes;
+
+  cgpu_buffer_memory_barrier buffer_memory_barrier_2_and_3[] = {
+    buffer_memory_barrier_2, buffer_memory_barrier_3
+  };
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
     0, nullptr,
-    1, &buffer_memory_barrier_2,
+    2, buffer_memory_barrier_2_and_3,
+    0, nullptr
+  );
+  assert(c_result == CGPU_OK);
+
+  c_result = cgpu_cmd_bind_pipeline(
+    command_buffer,
+    pipeline_p2.pipeline
+  );
+  assert(c_result == CGPU_OK);
+
+  cgpu_physical_device_limits device_limits;
+  c_result = cgpu_get_physical_device_limits(
+    device,
+    device_limits
+  );
+  assert(c_result == CGPU_OK);
+
+  c_result = cgpu_cmd_dispatch(
+    command_buffer,
+    // TODO: what is the optimal number?
+    device_limits.maxComputeWorkGroupInvocations,
+    1,
+    1
+  );
+  assert(c_result == CGPU_OK);
+
+  // Copy staging buffer to output buffer.
+
+  cgpu_buffer_memory_barrier buffer_memory_barrier_4 = {};
+  buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
+  buffer_memory_barrier_4.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
+  buffer_memory_barrier_4.buffer = output_buffer;
+  buffer_memory_barrier_4.byte_offset = 0;
+  buffer_memory_barrier_4.num_bytes = output_buffer_size_in_bytes;
+
+  c_result = cgpu_cmd_pipeline_barrier(
+    command_buffer,
+    0, nullptr,
+    1, &buffer_memory_barrier_4,
     0, nullptr
   );
   assert(c_result == CGPU_OK);
@@ -327,28 +471,30 @@ int main(int argc, const char* argv[])
     fence
   );
 
-  c_result = cgpu_destroy_pipeline(
-    device,
-    pipeline
-  );
-  assert(c_result == CGPU_OK);
-
   c_result = cgpu_destroy_command_buffer(
     device,
     command_buffer
   );
   assert(c_result == CGPU_OK);
 
-  c_result = cgpu_destroy_shader(device, shader);
-  assert(c_result == CGPU_OK);
+  gatling_destroy_compute_pipeline(
+    device,
+    pipeline_p1
+  );
+  gatling_destroy_compute_pipeline(
+    device,
+    pipeline_p2
+  );
 
-  c_result = cgpu_destroy_buffer(device, input_buffer);
-  assert(c_result == CGPU_OK);
   c_result = cgpu_destroy_buffer(device, staging_buffer_in);
   assert(c_result == CGPU_OK);
-  c_result = cgpu_destroy_buffer(device, staging_buffer_out);
+  c_result = cgpu_destroy_buffer(device, input_buffer);
+  assert(c_result == CGPU_OK);
+  c_result = cgpu_destroy_buffer(device, path_segment_buffer);
   assert(c_result == CGPU_OK);
   c_result = cgpu_destroy_buffer(device, output_buffer);
+  assert(c_result == CGPU_OK);
+  c_result = cgpu_destroy_buffer(device, staging_buffer_out);
   assert(c_result == CGPU_OK);
 
   c_result = cgpu_destroy_device(device);

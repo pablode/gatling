@@ -1,0 +1,172 @@
+#version 450 core
+
+layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
+
+struct path_segment
+{
+    vec3 pos;
+    uint out_index;
+    vec3 dir;
+    uint rec_depth;
+};
+
+layout(set=0, binding=0) writeonly buffer OutputBuffer
+{
+    vec4 pixels[];
+};
+
+layout(set=0, binding=1) readonly buffer IndexBuffer
+{
+    uint indices[];
+};
+
+layout(set=0, binding=2) readonly buffer VertexBuffer
+{
+    vec4 compressed_vertices[];
+};
+
+layout(set=0, binding=3) buffer PathSegmentBuffer
+{
+    uint path_segment_counter;
+    uint pad_0;
+    uint pad_1;
+    uint pad_2;
+    path_segment path_segments[];
+};
+
+const vec4 COLOR_LIGHT_BLUE = vec4(0.5, 0.7, 1.0, 1.0);
+const vec4 COLOR_LIGHT_GRAY = vec4(0.8, 0.8, 0.8, 1.0);
+
+const vec3 LIGHT_POSITION = vec3 (2.0, 5.0, 5.0);
+const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 1.0);
+
+const float EPS = 0.000001;
+
+// Möller-Trumbore triangle intersection.
+bool intersect_triangle(
+    in vec3 ray_origin,
+    in vec3 ray_direction,
+    in vec3 v0, in vec3 v1, in vec3 v2,
+    out float bc_u, out float bc_v, out float t
+) {
+    const vec3 e1 = v1 - v0;
+    const vec3 e2 = v2 - v0;
+    const vec3 p = cross(ray_direction, e2);
+    const float det = dot(e1, p);
+
+    if (abs(det) < EPS) {
+        return false;
+    }
+
+    const float invDet = 1.0 / det;
+
+    const vec3 tvec = ray_origin - v0;
+
+    bc_u = dot(tvec, p) * invDet;
+    if (bc_u < -EPS || (bc_u > (1.0+EPS))) {
+        return false;
+    }
+
+    const vec3 q = cross(tvec, e1);
+    bc_v = dot(ray_direction, q) * invDet;
+
+    if (bc_v < -EPS || (bc_u + bc_v > (1.0+EPS))) {
+        return false;
+    }
+
+    t = dot(e2, q) * invDet;
+
+    return t > EPS;
+}
+
+void handle_ray(const uint ray_index)
+{
+    const path_segment ray = path_segments[ray_index];
+
+    const uint vertex_offset_bytes = indices[0];
+    const uint vertex_count        = indices[1];
+    const uint index_offset_bytes  = indices[2];
+    const uint index_count         = indices[3];
+
+    const uint vertex_offset_vec4s = vertex_offset_bytes / 16;
+    const uint index_offset_uints = index_offset_bytes / 4;
+
+    const float bg_t = gl_GlobalInvocationID.y / 1024.0;
+    const vec4 background_color =
+        (1.0 - bg_t) * COLOR_LIGHT_GRAY + bg_t * COLOR_LIGHT_BLUE;
+
+    vec4 color = background_color;
+
+    float t = 100000.0;
+
+    for (uint i = 0; i < index_count; i += 3)
+    {
+        const uint index_offset = index_offset_uints + i;
+
+        const uint i_0 = indices[index_offset + 0];
+        const uint i_1 = indices[index_offset + 1];
+        const uint i_2 = indices[index_offset + 2];
+
+        const vec4 v0_f1 = compressed_vertices[vertex_offset_vec4s + i_0 * 2 + 0];
+        const vec4 v0_f2 = compressed_vertices[vertex_offset_vec4s + i_0 * 2 + 1];
+        const vec4 v1_f1 = compressed_vertices[vertex_offset_vec4s + i_1 * 2 + 0];
+        const vec4 v1_f2 = compressed_vertices[vertex_offset_vec4s + i_1 * 2 + 1];
+        const vec4 v2_f1 = compressed_vertices[vertex_offset_vec4s + i_2 * 2 + 0];
+        const vec4 v2_f2 = compressed_vertices[vertex_offset_vec4s + i_2 * 2 + 1];
+
+        const vec3 v0_p  = v0_f1.xyz;
+        const vec3 v0_n  = vec3(v0_f1.a, v0_f2.xy);
+        const vec2 v0_uv = v0_f2.zw;
+        const vec3 v1_p  = v1_f1.xyz;
+        const vec3 v1_n  = vec3(v1_f1.a, v1_f2.xy);
+        const vec2 v1_uv = v1_f2.zw;
+        const vec3 v2_p  = v2_f1.xyz;
+        const vec3 v2_n  = vec3(v2_f1.a, v2_f2.xy);
+        const vec2 v2_uv = v2_f2.zw;
+
+        float bc_u, bc_v, t_temp;
+
+        const bool is_hit = intersect_triangle(
+            ray.pos,
+            ray.dir,
+            v0_p, v1_p, v2_p,
+            bc_u, bc_v, t_temp
+        );
+        if (!is_hit) {
+            continue;
+        }
+        if (t_temp <= 0.0 || t_temp >= t) {
+            continue;
+        }
+
+        t = t_temp;
+
+        vec3 normal = normalize(
+            v0_n * (1.0 - bc_u - bc_v) +
+            v1_n * bc_u +
+            v2_n * bc_v
+        );
+
+        color = vec4(abs(normal), 1.0);
+    }
+
+    const uint pixel_index = ray.out_index;
+
+    pixels[pixel_index] += color;
+}
+
+void main()
+{
+    const uint TOTAL_RAY_COUNT = 1024 * 1024 * 4;
+
+    while(true)
+    {
+      const uint ray_index = atomicAdd(path_segment_counter, 1);
+
+      if (ray_index >= TOTAL_RAY_COUNT) {
+        return;
+      }
+
+      handle_ray(ray_index);
+    }
+}
