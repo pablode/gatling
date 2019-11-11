@@ -134,15 +134,17 @@ void main()
 
     for (uint s = 0; s < NUM_SAMPLES; ++s)
     {
-        const vec3 ray_origin = vec3(
-           1.0,
-           -1.0 + 2.0 * (
-               (gl_GlobalInvocationID.y + random_number_between_0_and_1()) / 1024.0),
-           -1.0 + 2.0 * (
-               (gl_GlobalInvocationID.x + random_number_between_0_and_1()) / 1024.0)
-        );
+        const float u = (gl_GlobalInvocationID.x + random_number_between_0_and_1()) / 1024.0;
+        const float v = (gl_GlobalInvocationID.y + random_number_between_0_and_1()) / 1024.0;
 
-        const vec3 ray_direction = vec3(-1.0, 0.0, 0.0);
+        const vec3 ray_origin = vec3(0.15, 0.115, 0.0);
+
+        const vec3 lower_left_corner = vec3(
+            ray_origin.x - 1.0, ray_origin.y - 2.5, ray_origin.z - 2.5);
+        const vec3 horizontal = vec3(0.0, 0.0, 5.0);
+        const vec3 vertical = vec3(0.0, 5.0, 0.0);
+        const vec3 ray_direction =
+            lower_left_corner + u * horizontal + v * vertical;
 
         vec4 sample_color = background_color;
 
@@ -180,7 +182,8 @@ void main()
               bc_u, bc_v, t_temp
               ))
             {
-                if (t_temp < t)
+                if (t_temp > 0.0 &&
+                    t_temp < t)
                 {
                     t = t_temp;
                     vec3 surface_hit = ray_origin + ray_direction * t;
