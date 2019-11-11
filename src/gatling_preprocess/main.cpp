@@ -42,7 +42,6 @@ GpResult gp_load_scene(
     aiProcess_Triangulate |
       aiProcess_FindInvalidData |
       aiProcess_GenSmoothNormals |
-      aiProcess_GenUVCoords |
       aiProcess_ImproveCacheLocality |
       aiProcess_JoinIdenticalVertices |
       aiProcess_TransformUVCoords |
@@ -75,8 +74,8 @@ GpResult gp_load_scene(
         .norm_x = ai_normal.x,
         .norm_y = ai_normal.y,
         .norm_z = ai_normal.z,
-        .t_u = ai_tex_coords.x,
-        .t_v = ai_tex_coords.y
+        .t_u = 0.0,
+        .t_v = 0.0
       });
     }
 
