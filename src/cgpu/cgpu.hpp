@@ -549,36 +549,36 @@ CgpuResult cgpu_initialize(
   const uint32_t& version_patch
   //const uint32_t& required_extension_count,
   //const char** pp_required_extensions
-);
+) noexcept;
 
-CgpuResult cgpu_destroy();
+CgpuResult cgpu_destroy() noexcept;
 
 CgpuResult cgpu_get_device_count(
   uint32_t* p_device_count
-);
+) noexcept;
 
 CgpuResult cgpu_create_device(
   const uint32_t& index,
   const uint32_t& required_extension_count,
   const char** pp_required_extensions,
   cgpu_device& device
-);
+) noexcept;
 
 CgpuResult cgpu_destroy_device(
   const cgpu_device& device
-);
+) noexcept;
 
 CgpuResult cgpu_create_shader(
   const cgpu_device& device,
   const uint32_t& source_size_in_bytes,
   const uint8_t* p_source,
   cgpu_shader& shader
-);
+) noexcept;
 
 CgpuResult cgpu_destroy_shader(
   const cgpu_device& device,
   const cgpu_shader& shader
-);
+) noexcept;
 
 CgpuResult cgpu_create_buffer(
   const cgpu_device& device,
@@ -586,18 +586,18 @@ CgpuResult cgpu_create_buffer(
   const CgpuMemoryPropertyFlags memory_properties,
   const uint32_t& size_in_bytes,
   cgpu_buffer& buffer
-);
+) noexcept;
 
 CgpuResult cgpu_destroy_buffer(
   const cgpu_device& device,
   const cgpu_buffer& buffer
-);
+) noexcept;
 
 CgpuResult cgpu_map_buffer(
   const cgpu_device& device,
   const cgpu_buffer& buffer,
   void** pp_mapped_mem
-);
+) noexcept;
 
 CgpuResult cgpu_map_buffer(
   const cgpu_device& device,
@@ -605,12 +605,12 @@ CgpuResult cgpu_map_buffer(
   const uint32_t& source_byte_offset,
   const uint32_t& byte_count,
   void** pp_mapped_mem
-);
+) noexcept;
 
 CgpuResult cgpu_unmap_buffer(
   const cgpu_device& device,
   const cgpu_buffer& buffer
-);
+) noexcept;
 
 CgpuResult cgpu_create_image(
   const cgpu_device& device,
@@ -620,18 +620,18 @@ CgpuResult cgpu_create_image(
   const CgpuImageUsageFlags usage,
   const CgpuMemoryPropertyFlags memory_properties,
   cgpu_image& image
-);
+) noexcept;
 
 CgpuResult cgpu_destroy_image(
   const cgpu_device& device,
   const cgpu_image& image
-);
+) noexcept;
 
 CgpuResult cgpu_map_image(
   const cgpu_device& device,
   const cgpu_image& image,
   void** pp_mapped_mem
-);
+) noexcept;
 
 CgpuResult cgpu_map_image(
   const cgpu_device& device,
@@ -639,11 +639,11 @@ CgpuResult cgpu_map_image(
   const uint32_t& source_byte_offset,
   const uint32_t& byte_count,
   void** pp_mapped_mem
-);
+) noexcept;
 
 CgpuResult cgpu_unmap_image(
   const cgpu_image& image
-);
+) noexcept;
 
 CgpuResult cgpu_create_pipeline(
   const cgpu_device& device,
@@ -654,26 +654,26 @@ CgpuResult cgpu_create_pipeline(
   const cgpu_shader& shader,
   const char* p_shader_entry_point,
   cgpu_pipeline& pipeline
-);
+) noexcept;
 
 CgpuResult cgpu_destroy_pipeline(
   const cgpu_device& device,
   const cgpu_pipeline& pipeline
-);
+) noexcept;
 
 CgpuResult cgpu_create_command_buffer(
   const cgpu_device& device,
   cgpu_command_buffer& command_buffer
-);
+) noexcept;
 
 CgpuResult cgpu_begin_command_buffer(
   const cgpu_command_buffer& command_buffer
-);
+) noexcept;
 
 CgpuResult cgpu_cmd_bind_pipeline(
   const cgpu_command_buffer& command_buffer,
   const cgpu_pipeline& pipeline
-);
+) noexcept;
 
 CgpuResult cgpu_cmd_copy_buffer(
   const cgpu_command_buffer& command_buffer,
@@ -682,20 +682,20 @@ CgpuResult cgpu_cmd_copy_buffer(
   const cgpu_buffer& destination,
   const uint32_t& destination_byte_offset,
   const uint32_t& byte_count
-);
+) noexcept;
 
 CgpuResult cgpu_cmd_copy_buffer(
   const cgpu_command_buffer& command_buffer,
   const cgpu_buffer& source_buffer,
   const cgpu_buffer& destination_buffer
-);
+) noexcept;
 
 CgpuResult cgpu_cmd_dispatch(
   const cgpu_command_buffer& command_buffer,
   const uint32_t& dim_x,
   const uint32_t& dim_y,
   const uint32_t& dim_z
-);
+) noexcept;
 
 CgpuResult cgpu_cmd_pipeline_barrier(
   const cgpu_command_buffer& command_buffer,
@@ -705,58 +705,58 @@ CgpuResult cgpu_cmd_pipeline_barrier(
   cgpu_buffer_memory_barrier* p_buffer_memory_barriers,
   uint32_t num_image_memory_barriers,
   cgpu_image_memory_barrier* p_image_memory_barriers
-);
+) noexcept;
 
 CgpuResult cgpu_end_command_buffer(
   const cgpu_command_buffer& command_buffer
-);
+) noexcept;
 
 CgpuResult cgpu_destroy_command_buffer(
   const cgpu_device& device,
   const cgpu_command_buffer& command_buffer
-);
+) noexcept;
 
 CgpuResult cgpu_create_fence(
   const cgpu_device& device,
   cgpu_fence& fence
-);
+) noexcept;
 
 CgpuResult cgpu_reset_fence(
   const cgpu_device& device,
   const cgpu_fence& fence
-);
+) noexcept;
 
 CgpuResult cgpu_wait_for_fence(
   const cgpu_device& device,
   const cgpu_fence& fence
-);
+) noexcept;
 
 CgpuResult cgpu_destroy_fence(
   const cgpu_device& device,
   const cgpu_fence& fence
-);
+) noexcept;
 
 CgpuResult cgpu_submit_command_buffer(
   const cgpu_device& device,
   const cgpu_command_buffer& command_buffer,
   const cgpu_fence& fence
-);
+) noexcept;
 
 CgpuResult cgpu_flush_mapped_memory(
   const cgpu_device& device,
   const cgpu_buffer& buffer,
   const uint64_t& byte_offset,
   const uint64_t& byte_count
-);
+) noexcept;
 
 CgpuResult cgpu_invalidate_mapped_memory(
   const cgpu_device& device,
   const cgpu_buffer& buffer,
   const uint64_t& byte_offset,
   const uint64_t& byte_count
-);
+) noexcept;
 
 CgpuResult cgpu_get_physical_device_limits(
   const cgpu_device& device,
   cgpu_physical_device_limits& limits
-);
+) noexcept;

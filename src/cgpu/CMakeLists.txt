@@ -12,6 +12,11 @@ target_include_directories(
   ${GATLING_SOURCE_DIR}
 )
 
+target_compile_options(
+  cgpu PRIVATE
+  -fno-exceptions
+)
+
 target_link_libraries(
   cgpu PRIVATE
   volk
