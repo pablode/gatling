@@ -1,7 +1,7 @@
 
 add_executable(
   gatling_preprocess
-  main.cpp
+  main.c
 )
 
 target_compile_definitions(
