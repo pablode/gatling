@@ -1,6 +1,9 @@
 
 add_executable(
   gatling_preprocess
+  bvh.c
+  bvh.h
+  gp.h
   main.c
 )
 
