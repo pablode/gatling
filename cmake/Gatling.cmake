@@ -6,7 +6,7 @@ function(gatling_add_executable target)
     EXE
     "NON_DEFAULT"
     ""
-    "SOURCES_CXX;SOURCES_GLSL" ${ARGN}
+    "SOURCES_C;SOURCES_GLSL" ${ARGN}
   )
 
   set(target_output_dir "${GATLING_OUTPUT_DIR}/${target}")
@@ -15,7 +15,7 @@ function(gatling_add_executable target)
   file(MAKE_DIRECTORY ${target_output_shader_dir})
 
   add_executable(${target}
-    ${EXE_SOURCES_CXX} ${EXE_UNPARSED_ARGS})
+    ${EXE_SOURCES_C} ${EXE_UNPARSED_ARGS})
 
   set_target_properties(
     gatling PROPERTIES

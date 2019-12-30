@@ -1,8 +1,7 @@
-
 gatling_add_executable(
   gatling
-  SOURCES_CXX
-    main.cpp
+  SOURCES_C
+    main.c
   SOURCES_GLSL
     prim_ray_gen.comp
     trace_ray.comp
