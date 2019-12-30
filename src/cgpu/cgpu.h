@@ -1,9 +1,57 @@
-#pragma once
+#ifndef CGPU_H
+#define CGPU_H
+
+#if defined(CGPU_EXPORT_SYMBOLS) && defined(CGPU_IMPORT_SYMBOLS)
+  #error "Symbols can not be exported and imported at the same time."
+#endif
+
+#if defined(BUILD_SHARED_LIBS)
+  #if defined(_WIN32) && (defined(_MSC_VER) || defined(__MING32__))
+    #if defined(CGPU_EXPORT_SYMBOLS)
+      #define CGPU_API __declspec(dllexport)
+    #elif defined(CGPU_IMPORT_SYMBOLS)
+      #define CGPU_API __declspec(dllimport)
+    #endif
+  #elif defined(_WIN32) && defined(__GNUC__)
+    #if defined(CGPU_EXPORT_SYMBOLS)
+      #define CGPU_API __attribute__((dllexport))
+    #elif defined(CGPU_IMPORT_SYMBOLS)
+      #define CGPU_API __attribute__((dllimport))
+    #endif
+  #elif defined(__GNUC__)
+    #define CGPU_API __attribute__((__visibility__("default")))
+  #endif
+#endif
+
+#ifndef CGPU_API
+  #define CGPU_API
+#endif
+
+#if defined(NDEBUG)
+  #if defined(__GNUC__)
+    #define CGPU_INLINE inline __attribute__((__always_inline__))
+  #elif defined(_MSC_VER)
+    #define CGPU_INLINE __forceinline
+  #else
+    #define CGPU_INLINE inline
+  #endif
+#else
+  #define CGPU_INLINE
+#endif
+
+#if defined(_MSC_VER)
+  #define CGPU_CDECL __cdecl
+#elif defined(__GNUC__) && defined(__i386__) && !defined(__x86_64__)
+  #define CGPU_CDECL __attribute__((__cdecl__))
+#else
+  #define CGPU_CDECL
+#endif
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 
-const uint32_t CGPU_WHOLE_SIZE = ~0u;
+#define CGPU_WHOLE_SIZE (~0ULL)
 
 typedef enum CgpuResult {
   CGPU_OK = 0,
@@ -37,8 +85,7 @@ typedef enum CgpuResult {
 
 typedef uint32_t CgpuBufferUsageFlags;
 
-typedef enum CgpuBufferUsageFlagBits
-{
+typedef enum CgpuBufferUsageFlagBits {
   CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC = 1,
   CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST = 2,
   CGPU_BUFFER_USAGE_FLAG_UNIFORM_BUFFER = 4,
@@ -49,8 +96,7 @@ typedef enum CgpuBufferUsageFlagBits
 
 typedef uint32_t CgpuMemoryPropertyFlags;
 
-typedef enum CgpuMemoryPropertyFlagBits
-{
+typedef enum CgpuMemoryPropertyFlagBits {
   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL = 1,
   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE = 2,
   CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT = 4,
@@ -61,16 +107,14 @@ typedef enum CgpuMemoryPropertyFlagBits
 
 typedef uint32_t CgpuImageUsageFlags;
 
-typedef enum CgpuImageUsageFlagBits
-{
+typedef enum CgpuImageUsageFlagBits {
   CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC = 1,
   CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST = 2,
   CGPU_IMAGE_USAGE_FLAG_SAMPLED = 4,
   CGPU_IMAGE_USAGE_FLAG_STORAGE = 8
 } CgpuImageUsageFlagBits;
 
-typedef enum CgpuImageFormat
-{
+typedef enum CgpuImageFormat {
   CGPU_IMAGE_FORMAT_UNDEFINED = 0,
   CGPU_IMAGE_FORMAT_R4G4_UNORM_PACK8 = 1,
   CGPU_IMAGE_FORMAT_R4G4B4A4_UNORM_PACK16 = 2,
@@ -350,8 +394,7 @@ typedef enum CgpuImageFormat
 
 typedef uint32_t CgpuSampleCountFlags;
 
-typedef enum CgpuSampleCountFlagBits
-{
+typedef enum CgpuSampleCountFlagBits {
   CGPU_SAMPLE_COUNT_FLAG_1 = 1,
   CGPU_SAMPLE_COUNT_FLAG_2 = 2,
   CGPU_SAMPLE_COUNT_FLAG_4 = 4,
@@ -363,8 +406,7 @@ typedef enum CgpuSampleCountFlagBits
 
 typedef uint32_t CgpuShaderResourceUsageFlags;
 
-typedef enum CgpuShaderResourceUsageFlagBits
-{
+typedef enum CgpuShaderResourceUsageFlagBits {
   CGPU_SHADER_RESOURCE_USAGE_FLAG_NONE = 0,
   CGPU_SHADER_RESOURCE_USAGE_FLAG_READ = 1,
   CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE = 2
@@ -385,55 +427,49 @@ typedef enum CgpuMemoryAccessFlagBits {
   CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE = 256
 } CgpuMemoryAccessFlagBits;
 
-struct cgpu_instance       { uint64_t handle; };
-struct cgpu_device         { uint64_t handle; };
-struct cgpu_buffer         { uint64_t handle; };
-struct cgpu_image          { uint64_t handle; };
-struct cgpu_shader         { uint64_t handle; };
-struct cgpu_pipeline       { uint64_t handle; };
-struct cgpu_fence          { uint64_t handle; };
-struct cgpu_command_buffer { uint64_t handle; };
+typedef struct cgpu_instance       { uint64_t handle; } cgpu_instance;
+typedef struct cgpu_device         { uint64_t handle; } cgpu_device;
+typedef struct cgpu_buffer         { uint64_t handle; } cgpu_buffer;
+typedef struct cgpu_image          { uint64_t handle; } cgpu_image;
+typedef struct cgpu_shader         { uint64_t handle; } cgpu_shader;
+typedef struct cgpu_pipeline       { uint64_t handle; } cgpu_pipeline;
+typedef struct cgpu_fence          { uint64_t handle; } cgpu_fence;
+typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
 
-struct cgpu_shader_resource_buffer
-{
+typedef struct cgpu_shader_resource_buffer {
   uint32_t binding;
   CgpuShaderResourceUsageFlags usage;
   cgpu_buffer buffer;
-};
+} cgpu_shader_resource_buffer;
 
-struct cgpu_shader_resource_image
-{
+typedef struct cgpu_shader_resource_image {
   uint32_t binding;
   CgpuShaderResourceUsageFlags usage;
   cgpu_image image;
-};
+} cgpu_shader_resource_image;
 
-struct cgpu_memory_barrier
-{
+typedef struct cgpu_memory_barrier {
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
-};
+} cgpu_memory_barrier;
 
-struct cgpu_buffer_memory_barrier
-{
+typedef struct cgpu_buffer_memory_barrier {
   cgpu_buffer buffer;
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
   uint64_t byte_offset;
   uint64_t num_bytes;
-};
+} cgpu_buffer_memory_barrier;
 
-struct cgpu_image_memory_barrier
-{
+typedef struct cgpu_image_memory_barrier {
   cgpu_image image;
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
   uint32_t baseMipLevel;
   uint32_t levelCount;
-};
+} cgpu_image_memory_barrier;
 
-struct cgpu_physical_device_limits
-{
+typedef struct cgpu_physical_device_limits {
   uint32_t             maxImageDimension1D;
   uint32_t             maxImageDimension2D;
   uint32_t             maxImageDimension3D;
@@ -538,225 +574,208 @@ struct cgpu_physical_device_limits
   uint64_t             optimalBufferCopyOffsetAlignment;
   uint64_t             optimalBufferCopyRowPitchAlignment;
   uint64_t             nonCoherentAtomSize;
-};
+} cgpu_physical_device_limits;
 
-///////////////////////////////////////
-
-CgpuResult cgpu_initialize(
+CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
   const char* p_app_name,
-  const uint32_t& version_major,
-  const uint32_t& version_minor,
-  const uint32_t& version_patch
-  //const uint32_t& required_extension_count,
+  uint32_t version_major,
+  uint32_t version_minor,
+  uint32_t version_patch
+  //uint32_t required_extension_count,
   //const char** pp_required_extensions
-) noexcept;
+);
 
-CgpuResult cgpu_destroy() noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy();
 
-CgpuResult cgpu_get_device_count(
+CGPU_API CgpuResult CGPU_CDECL cgpu_get_device_count(
   uint32_t* p_device_count
-) noexcept;
+);
 
-CgpuResult cgpu_create_device(
-  const uint32_t& index,
-  const uint32_t& required_extension_count,
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_device(
+  uint32_t index,
+  uint32_t required_extension_count,
   const char** pp_required_extensions,
-  cgpu_device& device
-) noexcept;
+  cgpu_device* device
+);
 
-CgpuResult cgpu_destroy_device(
-  const cgpu_device& device
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_device(
+  cgpu_device device
+);
 
-CgpuResult cgpu_create_shader(
-  const cgpu_device& device,
-  const uint32_t& source_size_in_bytes,
-  const uint8_t* p_source,
-  cgpu_shader& shader
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_shader(
+  cgpu_device device,
+  uint64_t source_size_in_bytes,
+  const uint32_t* p_source,
+  cgpu_shader* shader
+);
 
-CgpuResult cgpu_destroy_shader(
-  const cgpu_device& device,
-  const cgpu_shader& shader
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_shader(
+  cgpu_device device,
+  cgpu_shader shader
+);
 
-CgpuResult cgpu_create_buffer(
-  const cgpu_device& device,
-  const CgpuBufferUsageFlags usage,
-  const CgpuMemoryPropertyFlags memory_properties,
-  const uint32_t& size_in_bytes,
-  cgpu_buffer& buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_buffer(
+  cgpu_device device,
+  CgpuBufferUsageFlags usage,
+  CgpuMemoryPropertyFlags memory_properties,
+  uint64_t size_in_bytes,
+  cgpu_buffer* buffer
+);
 
-CgpuResult cgpu_destroy_buffer(
-  const cgpu_device& device,
-  const cgpu_buffer& buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_buffer(
+  cgpu_device device,
+  cgpu_buffer buffer
+);
 
-CgpuResult cgpu_map_buffer(
-  const cgpu_device& device,
-  const cgpu_buffer& buffer,
+CGPU_API CgpuResult CGPU_CDECL cgpu_map_buffer(
+  cgpu_device device,
+  cgpu_buffer buffer,
+  uint64_t source_byte_offset,
+  uint64_t byte_count,
   void** pp_mapped_mem
-) noexcept;
+);
 
-CgpuResult cgpu_map_buffer(
-  const cgpu_device& device,
-  const cgpu_buffer& buffer,
-  const uint32_t& source_byte_offset,
-  const uint32_t& byte_count,
+CGPU_API CgpuResult CGPU_CDECL cgpu_unmap_buffer(
+  cgpu_device device,
+  cgpu_buffer buffer
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_image(
+  cgpu_device device,
+  uint32_t width,
+  uint32_t height,
+  CgpuImageFormat format,
+  CgpuImageUsageFlags usage,
+  CgpuMemoryPropertyFlags memory_properties,
+  cgpu_image* image
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_image(
+  cgpu_device device,
+  cgpu_image image
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_map_image(
+  cgpu_device device,
+  cgpu_image image,
+  uint64_t source_byte_offset,
+  uint64_t byte_count,
   void** pp_mapped_mem
-) noexcept;
+);
 
-CgpuResult cgpu_unmap_buffer(
-  const cgpu_device& device,
-  const cgpu_buffer& buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_unmap_image(
+  cgpu_device device,
+  cgpu_image image
+);
 
-CgpuResult cgpu_create_image(
-  const cgpu_device& device,
-  const uint32_t& width,
-  const uint32_t& height,
-  const CgpuImageFormat format,
-  const CgpuImageUsageFlags usage,
-  const CgpuMemoryPropertyFlags memory_properties,
-  cgpu_image& image
-) noexcept;
-
-CgpuResult cgpu_destroy_image(
-  const cgpu_device& device,
-  const cgpu_image& image
-) noexcept;
-
-CgpuResult cgpu_map_image(
-  const cgpu_device& device,
-  const cgpu_image& image,
-  void** pp_mapped_mem
-) noexcept;
-
-CgpuResult cgpu_map_image(
-  const cgpu_device& device,
-  const cgpu_image& image,
-  const uint32_t& source_byte_offset,
-  const uint32_t& byte_count,
-  void** pp_mapped_mem
-) noexcept;
-
-CgpuResult cgpu_unmap_image(
-  const cgpu_image& image
-) noexcept;
-
-CgpuResult cgpu_create_pipeline(
-  const cgpu_device& device,
-  const uint32_t& shader_resources_buffer_count,
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
+  cgpu_device device,
+  uint32_t num_shader_resources_buffers,
   const cgpu_shader_resource_buffer* p_shader_resources_buffers,
-  const uint32_t& shader_resources_image_count,
+  uint32_t num_shader_resources_images,
   const cgpu_shader_resource_image* p_shader_resources_images,
-  const cgpu_shader& shader,
+  cgpu_shader shader,
   const char* p_shader_entry_point,
-  cgpu_pipeline& pipeline
-) noexcept;
+  cgpu_pipeline* pipeline
+);
 
-CgpuResult cgpu_destroy_pipeline(
-  const cgpu_device& device,
-  const cgpu_pipeline& pipeline
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_pipeline(
+  cgpu_device device,
+  cgpu_pipeline pipeline
+);
 
-CgpuResult cgpu_create_command_buffer(
-  const cgpu_device& device,
-  cgpu_command_buffer& command_buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_command_buffer(
+  cgpu_device device,
+  cgpu_command_buffer* command_buffer
+);
 
-CgpuResult cgpu_begin_command_buffer(
-  const cgpu_command_buffer& command_buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_begin_command_buffer(
+  cgpu_command_buffer command_buffer
+);
 
-CgpuResult cgpu_cmd_bind_pipeline(
-  const cgpu_command_buffer& command_buffer,
-  const cgpu_pipeline& pipeline
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_bind_pipeline(
+  cgpu_command_buffer command_buffer,
+  cgpu_pipeline pipeline
+);
 
-CgpuResult cgpu_cmd_copy_buffer(
-  const cgpu_command_buffer& command_buffer,
-  const cgpu_buffer& source,
-  const uint32_t& source_byte_offset,
-  const cgpu_buffer& destination,
-  const uint32_t& destination_byte_offset,
-  const uint32_t& byte_count
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer(
+  cgpu_command_buffer command_buffer,
+  cgpu_buffer source,
+  uint64_t source_byte_offset,
+  cgpu_buffer destination,
+  uint64_t destination_byte_offset,
+  uint64_t byte_count
+);
 
-CgpuResult cgpu_cmd_copy_buffer(
-  const cgpu_command_buffer& command_buffer,
-  const cgpu_buffer& source_buffer,
-  const cgpu_buffer& destination_buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_dispatch(
+  cgpu_command_buffer command_buffer,
+  uint32_t dim_x,
+  uint32_t dim_y,
+  uint32_t dim_z
+);
 
-CgpuResult cgpu_cmd_dispatch(
-  const cgpu_command_buffer& command_buffer,
-  const uint32_t& dim_x,
-  const uint32_t& dim_y,
-  const uint32_t& dim_z
-) noexcept;
-
-CgpuResult cgpu_cmd_pipeline_barrier(
-  const cgpu_command_buffer& command_buffer,
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_pipeline_barrier(
+  cgpu_command_buffer command_buffer,
   uint32_t num_memory_barriers,
-  cgpu_memory_barrier* p_memory_barriers,
+  const cgpu_memory_barrier* p_memory_barriers,
   uint32_t num_buffer_memory_barriers,
-  cgpu_buffer_memory_barrier* p_buffer_memory_barriers,
+  const cgpu_buffer_memory_barrier* p_buffer_memory_barriers,
   uint32_t num_image_memory_barriers,
-  cgpu_image_memory_barrier* p_image_memory_barriers
-) noexcept;
+  const cgpu_image_memory_barrier* p_image_memory_barriers
+);
 
-CgpuResult cgpu_end_command_buffer(
-  const cgpu_command_buffer& command_buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_end_command_buffer(
+  cgpu_command_buffer command_buffer
+);
 
-CgpuResult cgpu_destroy_command_buffer(
-  const cgpu_device& device,
-  const cgpu_command_buffer& command_buffer
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_command_buffer(
+  cgpu_device device,
+  cgpu_command_buffer command_buffer
+);
 
-CgpuResult cgpu_create_fence(
-  const cgpu_device& device,
-  cgpu_fence& fence
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_fence(
+  cgpu_device device,
+  cgpu_fence* fence
+);
 
-CgpuResult cgpu_reset_fence(
-  const cgpu_device& device,
-  const cgpu_fence& fence
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_reset_fence(
+  cgpu_device device,
+  cgpu_fence fence
+);
 
-CgpuResult cgpu_wait_for_fence(
-  const cgpu_device& device,
-  const cgpu_fence& fence
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_wait_for_fence(
+  cgpu_device device,
+  cgpu_fence fence
+);
 
-CgpuResult cgpu_destroy_fence(
-  const cgpu_device& device,
-  const cgpu_fence& fence
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_fence(
+  cgpu_device device,
+  cgpu_fence fence
+);
 
-CgpuResult cgpu_submit_command_buffer(
-  const cgpu_device& device,
-  const cgpu_command_buffer& command_buffer,
-  const cgpu_fence& fence
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_submit_command_buffer(
+  cgpu_device device,
+  cgpu_command_buffer command_buffer,
+  cgpu_fence fence
+);
 
-CgpuResult cgpu_flush_mapped_memory(
-  const cgpu_device& device,
-  const cgpu_buffer& buffer,
-  const uint64_t& byte_offset,
-  const uint64_t& byte_count
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_flush_mapped_memory(
+  cgpu_device device,
+  cgpu_buffer buffer,
+  uint64_t byte_offset,
+  uint64_t byte_count
+);
 
-CgpuResult cgpu_invalidate_mapped_memory(
-  const cgpu_device& device,
-  const cgpu_buffer& buffer,
-  const uint64_t& byte_offset,
-  const uint64_t& byte_count
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_invalidate_mapped_memory(
+  cgpu_device device,
+  cgpu_buffer buffer,
+  uint64_t byte_offset,
+  uint64_t byte_count
+);
 
-CgpuResult cgpu_get_physical_device_limits(
-  const cgpu_device& device,
-  cgpu_physical_device_limits& limits
-) noexcept;
+CGPU_API CgpuResult CGPU_CDECL cgpu_get_physical_device_limits(
+  cgpu_device device,
+  cgpu_physical_device_limits* limits
+);
+
+#endif

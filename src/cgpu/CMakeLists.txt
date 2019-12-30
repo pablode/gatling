@@ -1,10 +1,11 @@
-
 add_library(
   cgpu
-  cgpu.cpp
-  cgpu.hpp
-  handle_store.cpp
-  handle_store.hpp
+  cgpu.c
+  cgpu.h
+  handle_store.c
+  handle_store.h
+  resource_store.c
+  resource_store.h
 )
 
 target_include_directories(
@@ -14,7 +15,6 @@ target_include_directories(
 
 target_compile_options(
   cgpu PRIVATE
-  -fno-exceptions
 )
 
 target_link_libraries(
