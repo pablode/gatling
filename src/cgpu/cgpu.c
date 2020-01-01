@@ -1916,8 +1916,11 @@ CgpuResult cgpu_create_pipeline(
 
     VkDescriptorBufferInfo* descriptor_buffer_info = &descriptor_buffer_infos[i];
     descriptor_buffer_info->buffer = ibuffer->buffer;
-    descriptor_buffer_info->offset = 0u;
-    descriptor_buffer_info->range = ibuffer->size_in_bytes;
+    descriptor_buffer_info->offset = shader_resource_buffer->offset;
+    descriptor_buffer_info->range =
+      (shader_resource_buffer->count == CGPU_WHOLE_SIZE) ?
+        ibuffer->size_in_bytes - shader_resource_buffer->offset :
+        shader_resource_buffer->count;
 
     VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[num_write_descriptor_sets];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1955,7 +1958,7 @@ CgpuResult cgpu_create_pipeline(
     //descriptor_image_info.imageLayout = 0u;
 
     VkWriteDescriptorSet* write_descriptor_set =
-        &write_descriptor_sets[num_write_descriptor_sets];
+      &write_descriptor_sets[num_write_descriptor_sets];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_descriptor_set->pNext = NULL;
     write_descriptor_set->dstSet = ipipeline->descriptor_set;

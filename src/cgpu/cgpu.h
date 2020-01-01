@@ -441,6 +441,8 @@ typedef struct cgpu_shader_resource_buffer {
   uint32_t binding;
   CgpuShaderResourceUsageFlags usage;
   cgpu_buffer buffer;
+  uint64_t offset;
+  uint64_t count;
 } cgpu_shader_resource_buffer;
 
 typedef struct cgpu_shader_resource_image {
