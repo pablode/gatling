@@ -159,10 +159,30 @@ GatlingResult gatling_destroy_pipeline(
   return GATLING_OK;
 }
 
+void gatling_get_parent_directory(
+  const char* file_path,
+  char* dir_path)
+{
+  char* last_slash = strrchr(file_path, '/');
+  char* last_backslash = strrchr(file_path, '\\');
+  char* last_path_separator =
+      (last_slash > last_backslash) ? last_slash : last_backslash;
+  const uint32_t char_index = last_path_separator - file_path;
+  if (last_path_separator)
+  {
+    memccpy(dir_path, file_path, 1, char_index);
+    dir_path[char_index] = '\0';
+  }
+  else
+  {
+    memccpy(dir_path, file_path, 1, 4096);
+  }
+}
+
 int main(int argc, const char* argv[])
 {
-  if (argc != 2) {
-    printf("Please enter the gatling scene description (gsd) file path.\n");
+  if (argc != 3) {
+    printf("Usage: gatling <scene.gsd> <test.png>\n");
     return 1;
   }
 
@@ -302,11 +322,19 @@ int main(int argc, const char* argv[])
     { 3, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, path_segment_buffer }
   };
 
+  char dir_path[4096];
+  gatling_get_parent_directory(argv[0], dir_path);
+
+  char prim_ray_gen_shader_path[4096];
+  snprintf(prim_ray_gen_shader_path, 4096, "%s/shaders/prim_ray_gen.comp.spv", dir_path);
+  char trace_ray_shader_path[4096];
+  snprintf(trace_ray_shader_path, 4096, "%s/shaders/trace_ray.comp.spv", dir_path);
+
   gatling_pipeline pipeline_p1;
   gatling_pipeline pipeline_p2;
   g_result = gatling_create_pipeline(
     device,
-    "/home/pablode/Dropbox/projects/gatling/build/bin/gatling/shaders/prim_ray_gen.comp.spv",
+    prim_ray_gen_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
     &pipeline_p1
@@ -315,7 +343,7 @@ int main(int argc, const char* argv[])
 
   g_result = gatling_create_pipeline(
     device,
-    "/home/pablode/Dropbox/projects/gatling/build/bin/gatling/shaders/trace_ray.comp.spv",
+    trace_ray_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
     &pipeline_p2
@@ -493,7 +521,7 @@ int main(int argc, const char* argv[])
   g_result = gatling_save_img(
     image_data,
     output_buffer_size_in_floats,
-    "test.png"
+    argv[2]
   );
   assert(g_result == GATLING_OK);
 
@@ -504,6 +532,7 @@ int main(int argc, const char* argv[])
     device,
     fence
   );
+  assert(c_result == CGPU_OK);
 
   c_result = cgpu_destroy_command_buffer(
     device,
