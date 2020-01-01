@@ -14,11 +14,6 @@ target_compile_definitions(
   GATLING_VERSION_PATCH=${GATLING_VERSION_PATCH}
 )
 
-target_include_directories(
-  gatling PRIVATE
-  ${GATLING_SOURCE_DIR}
-)
-
 target_link_libraries(
   gatling PRIVATE
   cgpu

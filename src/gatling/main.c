@@ -1,9 +1,9 @@
-#include <cgpu/cgpu.h>
-
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
+
+#include <cgpu.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"

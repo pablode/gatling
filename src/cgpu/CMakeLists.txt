@@ -1,20 +1,14 @@
 add_library(
   cgpu
-  cgpu.c
-  cgpu.h
-  handle_store.c
-  handle_store.h
-  resource_store.c
-  resource_store.h
+  src/cgpu.c
+  src/handle_store.c
+  src/resource_store.c
 )
 
 target_include_directories(
-  cgpu PRIVATE
-  ${GATLING_SOURCE_DIR}
-)
-
-target_compile_options(
-  cgpu PRIVATE
+  cgpu
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE src
 )
 
 target_link_libraries(

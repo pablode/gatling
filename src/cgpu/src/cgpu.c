@@ -1022,6 +1022,15 @@ CgpuResult cgpu_create_device(
   idevice->physical_device = phys_devices[index];
   free(phys_devices);
 
+  VkPhysicalDeviceProperties device_properties;
+  vkGetPhysicalDeviceProperties(
+    idevice->physical_device,
+    &device_properties
+  );
+
+  idevice->limits =
+    cgpu_translate_physical_device_limits(device_properties.limits);
+
   uint32_t num_device_extensions;
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
@@ -1077,7 +1086,7 @@ CgpuResult cgpu_create_device(
     queue_families
   );
 
-  /* Since ray tracing is a continous, compute-heavy task, we don't need
+  /* Since ray tracing is a continuous, compute-heavy task, we don't need
      to schedule work or translate command buffers very often. Therefore,
      we also don't need async execution and can operate on a single queue. */
   uint32_t queue_family_index = -1;
@@ -1127,6 +1136,11 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_CAN_NOT_CREATE_LOGICAL_DEVICE;
   }
 
+  volkLoadDeviceTable(
+    &idevice->table,
+    idevice->logical_device
+  );
+
   vkGetDeviceQueue(
     idevice->logical_device,
     queue_family_index,
@@ -1158,20 +1172,6 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_CAN_NOT_CREATE_COMMAND_POOL;
   }
 
-  volkLoadDeviceTable(
-    &idevice->table,
-    idevice->logical_device
-  );
-
-  VkPhysicalDeviceProperties device_properties;
-  vkGetPhysicalDeviceProperties(
-    idevice->physical_device,
-    &device_properties
-  );
-
-  idevice->limits =
-      cgpu_translate_physical_device_limits(device_properties.limits);
-
   return CGPU_OK;
 }
 
@@ -1188,6 +1188,7 @@ CgpuResult cgpu_destroy_device(
     idevice->command_pool,
     NULL
   );
+
   vkDestroyDevice(
     idevice->logical_device,
     NULL
@@ -1322,17 +1323,17 @@ CgpuResult cgpu_create_buffer(
     return CGPU_FAIL_UNABLE_TO_CREATE_BUFFER;
   }
 
+  VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
+  vkGetPhysicalDeviceMemoryProperties(
+    idevice->physical_device,
+    &physical_device_memory_properties
+  );
+
   VkMemoryRequirements mem_requirements;
   vkGetBufferMemoryRequirements(
     idevice->logical_device,
     ibuffer->buffer,
     &mem_requirements
-  );
-
-  VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
-  vkGetPhysicalDeviceMemoryProperties(
-    idevice->physical_device,
-    &physical_device_memory_properties
   );
 
   VkMemoryAllocateInfo mem_alloc_info = {};
@@ -1538,17 +1539,17 @@ CgpuResult cgpu_create_image(
     return CGPU_FAIL_UNABLE_TO_CREATE_IMAGE;
   }
 
+  VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
+  vkGetPhysicalDeviceMemoryProperties(
+    idevice->physical_device,
+    &physical_device_memory_properties
+  );
+
   VkMemoryRequirements mem_requirements;
   vkGetImageMemoryRequirements(
     idevice->logical_device,
     iimage->image,
     &mem_requirements
-  );
-
-  VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
-  vkGetPhysicalDeviceMemoryProperties(
-    idevice->physical_device,
-    &physical_device_memory_properties
   );
 
   VkMemoryAllocateInfo mem_alloc_info = {};
