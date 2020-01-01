@@ -1910,6 +1910,10 @@ CgpuResult cgpu_create_pipeline(
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
+    if ((shader_resource_buffer->offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
+      return CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED;
+    }
+
     VkDescriptorBufferInfo* descriptor_buffer_info = &descriptor_buffer_infos[i];
     descriptor_buffer_info->buffer = ibuffer->buffer;
     descriptor_buffer_info->offset = 0u;
