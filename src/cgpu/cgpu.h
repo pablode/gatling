@@ -585,7 +585,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
   //const char** pp_required_extensions
 );
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_destroy();
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy(void);
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_get_device_count(
   uint32_t* p_device_count
