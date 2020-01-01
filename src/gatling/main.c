@@ -8,6 +8,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#define IMAGE_WIDTH 3840
+#define IMAGE_HEIGHT 2160
+#define NUM_SAMPLES 4
+
 typedef enum GatlingResult {
   GATLING_OK = 0,
   GATLING_FAIL_UNABLE_TO_WRITE_OUTPUT_IMAGE = -1,
@@ -35,13 +39,14 @@ GatlingResult gatling_save_img(
 
   stbi_flip_vertically_on_write(true);
 
+  const uint32_t num_components = 4;
   const int result = stbi_write_png(
     file_path,
-    1024,
-    1024,
-    4,
+    IMAGE_WIDTH,
+    IMAGE_HEIGHT,
+    num_components,
     temp_data,
-    1024 * 4
+    IMAGE_WIDTH * num_components
   );
 
   free(temp_data);
@@ -190,20 +195,17 @@ int main(int argc, const char* argv[])
   assert(g_result == GATLING_OK);
 
   // Create input and output buffers.
-  const size_t image_width = 1024;
-  const size_t image_height = 1024;
-
   const size_t output_buffer_size_in_floats =
-    image_width * image_height * 4;
+    IMAGE_WIDTH * IMAGE_HEIGHT * 4;
   const size_t output_buffer_size_in_bytes =
-    image_width * image_height * sizeof(float) * 4;
+    IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(float) * 4;
 
   const size_t input_buffer_size_in_bytes = scene_data_size;
 
   const size_t path_segment_buffer_size_in_bytes =
-    (image_width *         // x dim
-      image_height *       // y dim
-      4 *                  // sample count
+    (IMAGE_WIDTH *         // x dim
+      IMAGE_HEIGHT *       // y dim
+      NUM_SAMPLES *        // sample count
       sizeof(float) * 8) + // path_segment struct size
       16;                  // counter in first 4 bytes + padding
 
@@ -360,8 +362,8 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    1024 / 32,
-    1024 / 32,
+    (IMAGE_WIDTH / 32) + 1,
+    (IMAGE_HEIGHT / 32) + 1,
     1
   );
   assert(c_result == CGPU_OK);
