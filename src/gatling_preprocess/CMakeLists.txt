@@ -4,6 +4,8 @@ add_executable(
   bvh.h
   gp.h
   main.c
+  math.c
+  math.h
 )
 
 target_compile_definitions(

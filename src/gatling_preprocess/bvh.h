@@ -1,43 +1,52 @@
-#pragma once
+#ifndef GP_BVH_H
+#define GP_BVH_H
 
-#include <stdint.h>
+#include <assert.h>
 
 #include "gp.h"
+#include "math.h"
 
 typedef struct gp_bvh_node {
-  float min_x;
-  float min_y;
-  float min_z;
-  uint32_t child_nodes_index_offset;
-  float max_x;
-  float max_y;
-  float max_z;
-  uint32_t leaf_node_count;
+  gp_aabb  left_aabb;          /* 24 bytes */
+  uint32_t left_child_index;   /*  4 bytes */
+  uint32_t left_child_count;   /*  4 bytes */
+  gp_aabb  right_aabb;         /* 24 bytes */
+  uint32_t right_child_index;  /*  4 bytes */
+  uint32_t right_child_count;  /*  4 bytes */
 } gp_bvh_node;
 
+static_assert((sizeof(gp_bvh_node) % 64) == 0, "BVH node should be cache-aligned.");
+
 typedef struct gp_bvh {
+  gp_aabb      aabb;
+  uint32_t     node_count;
   gp_bvh_node* nodes;
-  uint32_t node_count;
-  gp_vertex vertices;
-  uint32_t vertices_count;
+  uint32_t     face_count;
+  gp_face*     faces;
+  uint32_t     vertex_count;
+  gp_vertex*   vertices;
 } gp_bvh;
 
-typedef struct gp_bvh_build_input
-{
-  const gp_vertex* vertices;
-  uint32_t vertices_count;
-  const gp_triangle* triangles;
-  uint32_t triangles_count;
-  // The spatial split factor lies within [0, 1] and denotes the
-  // overlap area to root area ratio which is tolerated without
-  // attempting a spatial split (0.0 = full sbvh, 1.0 = regular BVH).
-  // It is recommended for this value to be close to zero (e.g. 10^-5).
-  // More information can be found in the paper "Spatial Splits in
-  // Bounding Volume Hierarchies" by Stich, Friedrich and Dietrich ('09).
-  float spatial_split_alpha;
-} gp_bvh_build_input;
+typedef struct gp_bvh_build_params {
+  uint32_t   face_count;
+  gp_face*   faces;
+  uint32_t   min_leaf_size;
+  uint32_t   min_mem_fetch_bytes;
+  uint32_t   max_leaf_size;
+  uint32_t   node_batch_size;
+  float      node_traversal_cost;
+  uint32_t   sah_bin_count;
+  uint32_t   tri_batch_size;
+  float      tri_intersection_cost;
+  uint32_t   vertex_count;
+  gp_vertex* vertices;
+} gp_bvh_build_params;
 
 GpResult gp_bvh_build(
-  const gp_bvh_build_input* input,
+  const gp_bvh_build_params* params,
   gp_bvh* bvh
 );
+
+void gp_free_bvh(gp_bvh* bvh);
+
+#endif
