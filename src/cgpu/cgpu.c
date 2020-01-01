@@ -1889,20 +1889,17 @@ CgpuResult cgpu_create_pipeline(
       malloc(sizeof(VkDescriptorBufferInfo) * num_shader_resources_buffers);
   VkDescriptorImageInfo* descriptor_image_infos =
       malloc(sizeof(VkDescriptorImageInfo) * num_shader_resources_images);
+
   const uint32_t num_max_write_descriptor_sets =
       num_shader_resources_buffers + num_shader_resources_images;
   VkWriteDescriptorSet* write_descriptor_sets =
       malloc(sizeof(VkWriteDescriptorSet) * num_max_write_descriptor_sets);
+
   uint32_t num_write_descriptor_sets = 0u;
 
   for (uint32_t i = 0u; i < num_shader_resources_buffers; ++i)
   {
     const cgpu_shader_resource_buffer* shader_resource_buffer = &p_shader_resources_buffers[i];
-
-    const CgpuShaderResourceUsageFlags usage = shader_resource_buffer->usage;
-    if (usage != CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE) {
-      continue;
-    }
 
     cgpu_ibuffer* ibuffer;
     const cgpu_buffer buffer = shader_resource_buffer->buffer;
@@ -1939,11 +1936,6 @@ CgpuResult cgpu_create_pipeline(
   for (uint32_t i = 0u; i < num_shader_resources_images; ++i)
   {
     const cgpu_shader_resource_image* shader_resource_image = &p_shader_resources_images[i];
-
-    const CgpuShaderResourceUsageFlags usage = shader_resource_image->usage;
-    if (usage != CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE) {
-      continue;
-    }
 
     cgpu_iimage* iimage;
     const cgpu_image image = shader_resource_image->image;

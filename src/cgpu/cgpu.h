@@ -405,14 +405,6 @@ typedef enum CgpuSampleCountFlagBits {
   CGPU_SAMPLE_COUNT_FLAG_64 = 64
 } CgpuSampleCountFlagBits;
 
-typedef uint32_t CgpuShaderResourceUsageFlags;
-
-typedef enum CgpuShaderResourceUsageFlagBits {
-  CGPU_SHADER_RESOURCE_USAGE_FLAG_NONE = 0,
-  CGPU_SHADER_RESOURCE_USAGE_FLAG_READ = 1,
-  CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE = 2
-} CgpuShaderResourceUsage;
-
 typedef uint32_t CgpuMemoryAccessFlags;
 
 typedef enum CgpuMemoryAccessFlagBits {
@@ -439,7 +431,6 @@ typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
 
 typedef struct cgpu_shader_resource_buffer {
   uint32_t binding;
-  CgpuShaderResourceUsageFlags usage;
   cgpu_buffer buffer;
   uint64_t offset;
   uint64_t count;
@@ -447,7 +438,6 @@ typedef struct cgpu_shader_resource_buffer {
 
 typedef struct cgpu_shader_resource_image {
   uint32_t binding;
-  CgpuShaderResourceUsageFlags usage;
   cgpu_image image;
 } cgpu_shader_resource_image;
 
