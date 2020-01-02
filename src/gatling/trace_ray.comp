@@ -1,6 +1,60 @@
 #version 450 core
 
+#define FLOAT_MAX 3.402823466e38
+#define FLOAT_MIN 1.175494351e-38f
+
+const uint SAMPLE_COUNT = 1;
+const uint IMAGE_WIDTH = 3840;
+const uint IMAGE_HEIGHT = 2160;
+const uint MSB = (1u << 31u);
+
 layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
+
+/* Unfortunately, 'vertex' as a name leads to issues with MoltenVK. */
+struct face_vertex
+{
+    float pos_x;
+    float pos_y;
+    float pos_z;
+    float norm_x;
+    float norm_y;
+    float norm_z;
+    float u;
+    float v;
+};
+
+struct face
+{
+    uint v_0;
+    uint v_1;
+    uint v_2;
+    uint mat_index;
+};
+
+struct material
+{
+    vec4 color;
+};
+
+struct aabb
+{
+    float min_x;
+    float min_y;
+    float min_z;
+    float max_x;
+    float max_y;
+    float max_z;
+};
+
+struct bvh_node
+{
+    aabb left_aabb;
+    uint left_child_offset;
+    uint left_child_count;
+    aabb right_aabb;
+    uint right_child_offset;
+    uint right_child_count;
+};
 
 struct path_segment
 {
@@ -15,17 +69,7 @@ layout(set=0, binding=0) writeonly buffer OutputBuffer
     vec4 pixels[];
 };
 
-layout(set=0, binding=1) readonly buffer IndexBuffer
-{
-    uint indices[];
-};
-
-layout(set=0, binding=2) readonly buffer VertexBuffer
-{
-    vec4 compressed_vertices[];
-};
-
-layout(set=0, binding=3) buffer PathSegmentBuffer
+layout(set=0, binding=1) buffer BufferPathSegments
 {
     uint path_segment_counter;
     uint pad_0;
@@ -34,27 +78,64 @@ layout(set=0, binding=3) buffer PathSegmentBuffer
     path_segment path_segments[];
 };
 
+layout(set=0, binding=2) readonly buffer BufferHeader
+{
+    uint node_offset;
+    uint node_count;
+    uint face_offset;
+    uint face_count;
+    uint vertex_offset;
+    uint vertex_count;
+    uint material_offset;
+    uint material_count;
+    aabb root_aabb;
+};
+
+layout(set=0, binding=3) readonly buffer BufferBvhNodes
+{
+    bvh_node bvh_nodes[];
+};
+
+layout(set=0, binding=4) readonly buffer BufferFaces
+{
+    face faces[];
+};
+
+layout(set=0, binding=5) readonly buffer BufferVertices
+{
+    face_vertex vertices[];
+};
+
+layout(set=0, binding=6) readonly buffer BufferMaterials
+{
+    material materials[];
+};
+
 const vec4 COLOR_LIGHT_BLUE = vec4(0.5, 0.7, 1.0, 1.0);
 const vec4 COLOR_LIGHT_GRAY = vec4(0.8, 0.8, 0.8, 1.0);
 
 const vec3 LIGHT_POSITION = vec3 (2.0, 5.0, 5.0);
 const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 1.0);
 
-const float EPS = 0.000001;
+const float TRI_EPS = 0.0000001;
 
-// Möller-Trumbore triangle intersection.
+/* Möller-Trumbore triangle intersection. */
 bool intersect_triangle(
-    in vec3 ray_origin,
-    in vec3 ray_direction,
-    in vec3 v0, in vec3 v1, in vec3 v2,
-    out float bc_u, out float bc_v, out float t
-) {
+    in const vec3 ray_origin,
+    in const vec3 ray_direction,
+    in const vec3 v0,
+    in const vec3 v1,
+    in const vec3 v2,
+    out float bc_u,
+    out float bc_v,
+    out float t)
+{
     const vec3 e1 = v1 - v0;
     const vec3 e2 = v2 - v0;
     const vec3 p = cross(ray_direction, e2);
     const float det = dot(e1, p);
 
-    if (abs(det) < EPS) {
+    if (abs(det) < TRI_EPS) {
         return false;
     }
 
@@ -63,101 +144,259 @@ bool intersect_triangle(
     const vec3 tvec = ray_origin - v0;
 
     bc_u = dot(tvec, p) * invDet;
-    if (bc_u < -EPS || (bc_u > (1.0+EPS))) {
+    if (bc_u < 0.0 || bc_u > 1.0) {
         return false;
     }
 
     const vec3 q = cross(tvec, e1);
     bc_v = dot(ray_direction, q) * invDet;
 
-    if (bc_v < -EPS || (bc_u + bc_v > (1.0+EPS))) {
+    if (bc_v < 0.0 || (bc_u + bc_v > 1.0)) {
         return false;
     }
 
     t = dot(e2, q) * invDet;
 
-    return t > EPS;
+    return t > 0.0;
 }
 
-void handle_ray(const uint ray_index)
+// Optimized ray-aabb intersection kernel by Aila et al. '12.
+bool intersect_aabb(
+    in const float t_min,
+    in const float t_max,
+    in const aabb box,
+    in const vec3 inv_dir,
+    in const vec3 ood,
+    out float t)
 {
-    const path_segment ray = path_segments[ray_index];
+    float x0 = box.min_x * inv_dir.x - ood.x;
+    float y0 = box.min_y * inv_dir.y - ood.y;
+    float z0 = box.min_z * inv_dir.z - ood.z;
+    float x1 = box.max_x * inv_dir.x - ood.x;
+    float y1 = box.max_y * inv_dir.y - ood.y;
+    float z1 = box.max_z * inv_dir.z - ood.z;
 
-    const uint vertex_offset_bytes = indices[0];
-    const uint vertex_count        = indices[1];
-    const uint index_offset_bytes  = indices[2];
-    const uint index_count         = indices[3];
+    t = max(max(t_min, min(x0, x1)), max(min(y0, y1), min(z0, z1)));
+    float t_max_box = min(min(t_max, max(x0, x1)), min(max(y0, y1), max(z0, z1)));
 
-    const uint vertex_offset_vec4s = vertex_offset_bytes / 16;
-    const uint index_offset_uints = index_offset_bytes / 4;
+    return t <= t_max_box;
+}
 
-    const float bg_t = gl_GlobalInvocationID.y / 1024.0;
-    const vec4 background_color =
-        (1.0 - bg_t) * COLOR_LIGHT_GRAY + bg_t * COLOR_LIGHT_BLUE;
+struct hit_info
+{
+    float t;
+    uint face_index;
+    float bc_u;
+    float bc_v;
+};
 
-    vec4 color = background_color;
+bool test_leaf(
+    in const path_segment ray,
+    in const float t_max,
+    in const uint tri_offset,
+    in const uint tri_count,
+    out hit_info hit_info)
+{
+    hit_info.t = t_max;
 
-    float t = 100000.0;
+    uint start = tri_offset;
+    uint end   = tri_offset + tri_count;
+    bool found_leaf = false;
 
-    for (uint i = 0; i < index_count; i += 3)
+    for (uint i = start; i < end; ++i)
     {
-        const uint index_offset = index_offset_uints + i;
-
-        const uint i_0 = indices[index_offset + 0];
-        const uint i_1 = indices[index_offset + 1];
-        const uint i_2 = indices[index_offset + 2];
-
-        const vec4 v0_f1 = compressed_vertices[vertex_offset_vec4s + i_0 * 2 + 0];
-        const vec4 v0_f2 = compressed_vertices[vertex_offset_vec4s + i_0 * 2 + 1];
-        const vec4 v1_f1 = compressed_vertices[vertex_offset_vec4s + i_1 * 2 + 0];
-        const vec4 v1_f2 = compressed_vertices[vertex_offset_vec4s + i_1 * 2 + 1];
-        const vec4 v2_f1 = compressed_vertices[vertex_offset_vec4s + i_2 * 2 + 0];
-        const vec4 v2_f2 = compressed_vertices[vertex_offset_vec4s + i_2 * 2 + 1];
-
-        const vec3 v0_p  = v0_f1.xyz;
-        const vec3 v0_n  = vec3(v0_f1.a, v0_f2.xy);
-        const vec2 v0_uv = v0_f2.zw;
-        const vec3 v1_p  = v1_f1.xyz;
-        const vec3 v1_n  = vec3(v1_f1.a, v1_f2.xy);
-        const vec2 v1_uv = v1_f2.zw;
-        const vec3 v2_p  = v2_f1.xyz;
-        const vec3 v2_n  = vec3(v2_f1.a, v2_f2.xy);
-        const vec2 v2_uv = v2_f2.zw;
+        const face face = faces[i];
+        const face_vertex v_0 = vertices[face.v_0];
+        const face_vertex v_1 = vertices[face.v_1];
+        const face_vertex v_2 = vertices[face.v_2];
 
         float bc_u, bc_v, t_temp;
 
         const bool is_hit = intersect_triangle(
             ray.pos,
             ray.dir,
-            v0_p, v1_p, v2_p,
-            bc_u, bc_v, t_temp
+            vec3(v_0.pos_x, v_0.pos_y, v_0.pos_z),
+            vec3(v_1.pos_x, v_1.pos_y, v_1.pos_z),
+            vec3(v_2.pos_x, v_2.pos_y, v_2.pos_z),
+            bc_u,
+            bc_v,
+            t_temp
         );
-        if (!is_hit) {
+        if (!is_hit)
+        {
             continue;
         }
-        if (t_temp <= 0.0 || t_temp >= t) {
+        if (t_temp >= hit_info.t)
+        {
             continue;
         }
 
-        t = t_temp;
-
-        vec3 normal = normalize(
-            v0_n * (1.0 - bc_u - bc_v) +
-            v1_n * bc_u +
-            v2_n * bc_v
-        );
-
-        color = vec4(abs(normal), 1.0);
+        hit_info.t = t_temp;
+        hit_info.face_index = i;
+        hit_info.bc_u = bc_u;
+        hit_info.bc_v = bc_v;
+        found_leaf = true;
     }
 
-    const uint pixel_index = ray.out_index;
+    return found_leaf;
+}
 
-    pixels[pixel_index] += color;
+vec4 get_hit_color(const hit_info hit)
+{
+    face f = faces[hit.face_index];
+    material mat = materials[f.mat_index];
+
+    face_vertex v0 = vertices[f.v_0];
+    face_vertex v1 = vertices[f.v_1];
+    face_vertex v2 = vertices[f.v_2];
+    vec3 v0_n = vec3(v0.norm_x, v0.norm_y, v0.norm_z);
+    vec3 v1_n = vec3(v1.norm_x, v1.norm_y, v1.norm_z);
+    vec3 v2_n = vec3(v2.norm_x, v2.norm_y, v2.norm_z);
+
+    float bc_u = hit.bc_u;
+    float bc_v = hit.bc_v;
+    vec3 normal = normalize(
+        v0_n * (1.0 - bc_u - bc_v) +
+        v1_n * bc_u +
+        v2_n * bc_v
+    );
+
+    return vec4(abs(normal), 1.0);
+}
+
+struct stack_item
+{
+    uint node_index;
+    float t_aabb_min;
+};
+
+void traverse_bvh(in const uint ray_index)
+{
+    const path_segment ray = path_segments[ray_index];
+
+    const float bg_t = float(ray.out_index) / float(IMAGE_HEIGHT * IMAGE_WIDTH);
+    vec4 background_color = (1.0 - bg_t) * COLOR_LIGHT_GRAY + bg_t * COLOR_LIGHT_BLUE;
+
+    vec4 color           =  background_color;
+    float t_triangle_max =         FLOAT_MAX;
+    float t_aabb_min     =               0.0;
+    vec3 inv_dir         =     1.0 / ray.dir;
+    vec3 ood             = ray.pos / ray.dir;
+
+    const bool intersects_root = intersect_aabb(
+        0.0, FLOAT_MAX, root_aabb, inv_dir, ood, t_aabb_min
+    );
+    if (!intersects_root) {
+        pixels[ray.out_index] = color;
+        return;
+    }
+
+    stack_item stack[32];
+    int stack_index = 0;
+
+    stack[0].node_index = 0;
+    stack[0].t_aabb_min = t_aabb_min;
+
+    while(stack_index >= 0)
+    {
+        stack_item item = stack[stack_index];
+        const uint node_index = item.node_index;
+        t_aabb_min = item.t_aabb_min;
+        stack_index--;
+
+        bvh_node node = bvh_nodes[node_index];
+
+        float t_aabb_min_left;
+        const bool hit_left = intersect_aabb(
+            t_aabb_min,
+            t_triangle_max,
+            node.left_aabb,
+            inv_dir,
+            ood,
+            t_aabb_min_left
+        );
+
+        float t_aabb_min_right;
+        const bool hit_right = intersect_aabb(
+            t_aabb_min,
+            t_triangle_max,
+            node.right_aabb,
+            inv_dir,
+            ood,
+            t_aabb_min_right
+        );
+
+        const bool is_left_leaf  = (node.left_child_count  & MSB) == MSB;
+        const bool is_right_leaf = (node.right_child_count & MSB) == MSB;
+
+        if (hit_left)
+        {
+            const uint child_offset = node.left_child_offset;
+
+            if (is_left_leaf)
+            {
+                hit_info hit_info;
+
+                const uint child_count = (node.left_child_count << 1u) >> 1u;
+                const bool has_hit = test_leaf(
+                    ray,
+                    t_triangle_max,
+                    child_offset,
+                    child_count,
+                    hit_info
+                );
+
+                if (has_hit)
+                {
+                    t_triangle_max = hit_info.t;
+                    color = get_hit_color(hit_info);
+                }
+            }
+            else
+            {
+                stack_index++;
+                stack[stack_index].node_index = child_offset;
+                stack[stack_index].t_aabb_min = t_aabb_min_left;
+            }
+        }
+        if (hit_right)
+        {
+            const uint child_offset = node.right_child_offset;
+
+            if (is_right_leaf)
+            {
+                hit_info hit_info;
+
+                const uint child_count = (node.right_child_count << 1u) >> 1u;
+                const bool has_hit = test_leaf(
+                    ray,
+                    t_triangle_max,
+                    child_offset,
+                    child_count,
+                    hit_info
+                );
+
+                if (has_hit)
+                {
+                    t_triangle_max = hit_info.t;
+                    color = get_hit_color(hit_info);
+                }
+            }
+            else
+            {
+                stack_index++;
+                stack[stack_index].node_index = child_offset;
+                stack[stack_index].t_aabb_min = t_aabb_min_right;
+            }
+        }
+    }
+
+    pixels[ray.out_index] = color;
 }
 
 void main()
 {
-    const uint TOTAL_RAY_COUNT = 1024 * 1024 * 4;
+    const uint TOTAL_RAY_COUNT = IMAGE_WIDTH * IMAGE_HEIGHT * SAMPLE_COUNT;
 
     while(true)
     {
@@ -167,6 +406,6 @@ void main()
         return;
       }
 
-      handle_ray(ray_index);
+      traverse_bvh(ray_index);
     }
 }

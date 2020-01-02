@@ -25,7 +25,7 @@ layout(set=0, binding=0) writeonly buffer OutputBuffer
     vec4 pixels[];
 };
 
-layout(set=0, binding=3) buffer PathSegmentBuffer
+layout(set=0, binding=1) buffer PathSegmentBuffer
 {
     uint path_segment_counter;
     uint pad_0;

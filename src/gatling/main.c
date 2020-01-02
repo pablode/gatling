@@ -10,7 +10,7 @@
 
 #define IMAGE_WIDTH 3840
 #define IMAGE_HEIGHT 2160
-#define NUM_SAMPLES 4
+#define NUM_SAMPLES 1
 
 typedef enum GatlingResult {
   GATLING_OK = 0,
@@ -32,9 +32,10 @@ GatlingResult gatling_save_img(
 
   for (size_t i = 0; i < data_size_in_floats; ++i)
   {
-    const float color = data[i];
-    const uint8_t color_quant = (uint8_t) (color * 255.0f);
-    temp_data[i] = color_quant;
+    int32_t color = (int32_t) (data[i]  * 255.0f);
+    if (color < 0)   { color = 0;   }
+    if (color > 255) { color = 255; }
+    temp_data[i] = (uint8_t) color;
   }
 
   stbi_flip_vertically_on_write(true);
@@ -313,13 +314,25 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Execute pipelines.
-  const size_t num_shader_resource_buffers = 4;
+  // Set up pipelines.
+  const uint32_t node_offset     = *((uint32_t*) (scene_data +  0));
+  const uint32_t node_count      = *((uint32_t*) (scene_data +  4));
+  const uint32_t face_offset     = *((uint32_t*) (scene_data +  8));
+  const uint32_t face_count      = *((uint32_t*) (scene_data + 12));
+  const uint32_t vertex_offset   = *((uint32_t*) (scene_data + 16));
+  const uint32_t vertex_count    = *((uint32_t*) (scene_data + 20));
+  const uint32_t material_offset = *((uint32_t*) (scene_data + 24));
+  const uint32_t material_count  = *((uint32_t*) (scene_data + 28));
+
+  const size_t num_shader_resource_buffers = 7;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
-    { 0, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, output_buffer       },
-    { 1, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, input_buffer        }, // TODO
-    { 2, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, input_buffer        },
-    { 3, CGPU_SHADER_RESOURCE_USAGE_FLAG_WRITE, path_segment_buffer }
+    { 0u,       output_buffer,              0u,                 CGPU_WHOLE_SIZE },
+    { 1u, path_segment_buffer,              0u,                 CGPU_WHOLE_SIZE },
+    { 2u,        input_buffer,              0u,                     node_offset },
+    { 3u,        input_buffer,     node_offset,       face_offset - node_offset },
+    { 4u,        input_buffer,     face_offset,     vertex_offset - face_offset },
+    { 5u,        input_buffer,   vertex_offset, material_offset - vertex_offset },
+    { 6u,        input_buffer, material_offset,                 CGPU_WHOLE_SIZE }
   };
 
   char dir_path[4096];
