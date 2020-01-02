@@ -17,6 +17,7 @@ typedef struct cgpu_idevice {
   VkPhysicalDevice            physical_device;
   VkQueue                     compute_queue;
   VkCommandPool               command_pool;
+  VkSampler                   sampler;
   struct VolkDeviceTable      table;
   cgpu_physical_device_limits limits;
 } cgpu_idevice;
@@ -29,6 +30,7 @@ typedef struct cgpu_ibuffer {
 
 typedef struct cgpu_iimage {
   VkImage        image;
+  VkImageView    image_view;
   VkDeviceMemory memory;
   uint64_t       size_in_bytes;
 } cgpu_iimage;
@@ -931,6 +933,7 @@ CgpuResult cgpu_initialize(
   VkInstanceCreateInfo create_info = {};
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   create_info.pNext = NULL;
+  create_info.flags = 0;
   create_info.pApplicationInfo = &app_info;
   create_info.enabledExtensionCount = instance_extension_count;
   create_info.ppEnabledExtensionNames = instance_extensions;
@@ -1112,6 +1115,7 @@ CgpuResult cgpu_create_device(
   queue_create_info.pQueuePriorities = &queue_priority;
 
   VkPhysicalDeviceFeatures device_features = {};
+  device_features.samplerAnisotropy = VK_TRUE;
 
   VkDeviceCreateInfo device_create_info = {};
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -1173,6 +1177,48 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_CAN_NOT_CREATE_COMMAND_POOL;
   }
 
+  VkSamplerCreateInfo sampler_info;
+  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  sampler_info.pNext = NULL;
+  sampler_info.flags = 0;
+  sampler_info.magFilter = VK_FILTER_LINEAR;
+  sampler_info.minFilter = VK_FILTER_LINEAR;
+  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  sampler_info.mipLodBias = 0.0f;
+  sampler_info.anisotropyEnable = VK_TRUE;
+  sampler_info.maxAnisotropy = 16;
+  sampler_info.compareEnable = VK_FALSE;
+  sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+  sampler_info.minLod = 0.0f;
+  sampler_info.maxLod = 0.0f;
+  sampler_info.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
+  sampler_info.unnormalizedCoordinates = VK_FALSE;
+
+  result = idevice->table.vkCreateSampler(
+    idevice->logical_device,
+    &sampler_info,
+    NULL,
+    &idevice->sampler
+  );
+  if (result != VK_SUCCESS)
+  {
+    resource_store_free_handle(&idevice_store, device->handle);
+
+    idevice->table.vkDestroyCommandPool(
+      idevice->logical_device,
+      idevice->command_pool,
+      NULL
+    );
+    idevice->table.vkDestroyDevice(
+      idevice->logical_device,
+      NULL
+    );
+    return CGPU_FAIL_CAN_NOT_CREATE_COMMAND_POOL;
+  }
+
   return CGPU_OK;
 }
 
@@ -1183,6 +1229,12 @@ CgpuResult cgpu_destroy_device(
   if (!cgpu_resolve_device(device.handle, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+
+  idevice->table.vkDestroySampler(
+    idevice->logical_device,
+    idevice->sampler,
+    NULL
+  );
 
   idevice->table.vkDestroyCommandPool(
     idevice->logical_device,
@@ -1595,6 +1647,40 @@ CgpuResult cgpu_create_image(
 
   iimage->size_in_bytes = mem_requirements.size;
 
+  VkImageViewCreateInfo image_view_info;
+  image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  image_view_info.pNext = NULL;
+  image_view_info.flags = 0;
+  image_view_info.image = iimage->image;
+  image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  image_view_info.format = vk_format;
+  image_view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+  image_view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+  image_view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+  image_view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+  image_view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  image_view_info.subresourceRange.baseMipLevel = 0;
+  image_view_info.subresourceRange.levelCount = 1;
+  image_view_info.subresourceRange.baseArrayLayer = 0;
+  image_view_info.subresourceRange.layerCount = 1;
+
+  result = idevice->table.vkCreateImageView(
+    idevice->logical_device,
+    &image_view_info,
+    NULL,
+    &iimage->image_view
+  );
+  if (result != VK_SUCCESS)
+  {
+    resource_store_free_handle(&iimage_store, image->handle);
+
+    idevice->table.vkFreeMemory(
+      idevice->logical_device,
+      iimage->memory,
+      NULL
+    );
+  }
+
   return CGPU_OK;
 }
 
@@ -1611,9 +1697,21 @@ CgpuResult cgpu_destroy_image(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
+  idevice->table.vkDestroyImageView(
+    idevice->logical_device,
+    iimage->image_view,
+    NULL
+  );
+
   idevice->table.vkDestroyImage(
     idevice->logical_device,
     iimage->image,
+    NULL
+  );
+
+  idevice->table.vkFreeMemory(
+    idevice->logical_device,
+    iimage->memory,
     NULL
   );
 
@@ -1946,10 +2044,9 @@ CgpuResult cgpu_create_pipeline(
     }
 
     VkDescriptorImageInfo* descriptor_image_info = &descriptor_image_infos[i];
-    // TODO:
-    //descriptor_image_info.sampler = 0u;
-    //descriptor_image_info.imageView = 0u;
-    //descriptor_image_info.imageLayout = 0u;
+    descriptor_image_info->sampler = idevice->sampler;
+    descriptor_image_info->imageView = iimage->image_view;
+    descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkWriteDescriptorSet* write_descriptor_set =
       &write_descriptor_sets[num_write_descriptor_sets];
@@ -2095,7 +2192,7 @@ CgpuResult cgpu_begin_command_buffer(
   VkCommandBufferBeginInfo command_buffer_begin_info = {};
   command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   command_buffer_begin_info.pNext = NULL;
-  command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // TODO
+  command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
   command_buffer_begin_info.pInheritanceInfo = NULL;
 
   const VkResult result = idevice->table.vkBeginCommandBuffer(
@@ -2237,6 +2334,8 @@ CgpuResult cgpu_cmd_pipeline_barrier(
 
   VkBufferMemoryBarrier* vk_buffer_memory_barriers
     = malloc(num_buffer_memory_barriers * sizeof(VkBufferMemoryBarrier));
+  VkImageMemoryBarrier* vk_image_memory_barriers
+    = malloc(num_image_memory_barriers * sizeof(VkImageMemoryBarrier));
 
   for (uint32_t i = 0u; i < num_buffer_memory_barriers; ++i)
   {
@@ -2259,7 +2358,31 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->size = b_cgpu->num_bytes;
   }
 
-  // TODO: translate image barrier
+  for (uint32_t i = 0u; i < num_image_memory_barriers; ++i)
+  {
+    const cgpu_image_memory_barrier* b_cgpu = &p_image_memory_barriers[i];
+
+    cgpu_iimage* iimage;
+    if (!cgpu_resolve_image(b_cgpu->image.handle, &iimage)) {
+      return CGPU_FAIL_INVALID_HANDLE;
+    }
+
+    VkImageMemoryBarrier* b_vk = &vk_image_memory_barriers[i];
+    b_vk->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    b_vk->pNext = NULL;
+    b_vk->srcAccessMask = cgpu_translate_access_flags(b_cgpu->src_access_flags);
+    b_vk->dstAccessMask = cgpu_translate_access_flags(b_cgpu->dst_access_flags);
+    b_vk->oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    b_vk->newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    b_vk->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b_vk->image = iimage->image;
+    b_vk->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    b_vk->subresourceRange.baseMipLevel = 0;
+    b_vk->subresourceRange.levelCount = 1;
+    b_vk->subresourceRange.baseArrayLayer = 0;
+    b_vk->subresourceRange.layerCount = 1;
+  }
 
   idevice->table.vkCmdPipelineBarrier(
     icommand_buffer->command_buffer,
@@ -2272,12 +2395,13 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     vk_memory_barriers,
     num_buffer_memory_barriers,
     vk_buffer_memory_barriers,
-    0u,//TODO: num_image_memory_barriers,
-    NULL//TODO" const VkImageMemoryBarrier* p_image_memory_barriers
+    num_image_memory_barriers,
+    vk_image_memory_barriers
   );
 
   free(vk_memory_barriers);
   free(vk_buffer_memory_barriers);
+  free(vk_image_memory_barriers);
 
   return CGPU_OK;
 }
