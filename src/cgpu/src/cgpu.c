@@ -51,6 +51,7 @@ typedef struct cgpu_ifence {
 
 typedef struct cgpu_icommand_buffer {
   VkCommandBuffer command_buffer;
+  cgpu_device     device;
 } cgpu_icommand_buffer;
 
 /* Handle and structure storage. */
@@ -1141,7 +1142,7 @@ CgpuResult cgpu_create_device(
     idevice->logical_device
   );
 
-  vkGetDeviceQueue(
+  idevice->table.vkGetDeviceQueue(
     idevice->logical_device,
     queue_family_index,
     0u,
@@ -1154,7 +1155,7 @@ CgpuResult cgpu_create_device(
   pool_info.queueFamilyIndex = queue_family_index;
   pool_info.flags = 0u;
 
-  result = vkCreateCommandPool(
+  result = idevice->table.vkCreateCommandPool(
     idevice->logical_device,
     &pool_info,
     NULL,
@@ -1165,7 +1166,7 @@ CgpuResult cgpu_create_device(
   {
     resource_store_free_handle(&idevice_store, device->handle);
 
-    vkDestroyDevice(
+    idevice->table.vkDestroyDevice(
       idevice->logical_device,
       NULL
     );
@@ -1183,13 +1184,13 @@ CgpuResult cgpu_destroy_device(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  vkDestroyCommandPool(
+  idevice->table.vkDestroyCommandPool(
     idevice->logical_device,
     idevice->command_pool,
     NULL
   );
 
-  vkDestroyDevice(
+  idevice->table.vkDestroyDevice(
     idevice->logical_device,
     NULL
   );
@@ -1222,7 +1223,7 @@ CgpuResult cgpu_create_shader(
   shader_module_create_info.codeSize = source_size_in_bytes;
   shader_module_create_info.pCode = p_source;
 
-  const VkResult result = vkCreateShaderModule(
+  const VkResult result = idevice->table.vkCreateShaderModule(
     idevice->logical_device,
     &shader_module_create_info,
     NULL,
@@ -1249,7 +1250,7 @@ CgpuResult cgpu_destroy_shader(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  vkDestroyShaderModule(
+  idevice->table.vkDestroyShaderModule(
     idevice->logical_device,
     ishader->module,
     NULL
@@ -1312,7 +1313,7 @@ CgpuResult cgpu_create_buffer(
   buffer_info.usage = vk_buffer_usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VkResult result = vkCreateBuffer(
+  VkResult result = idevice->table.vkCreateBuffer(
     idevice->logical_device,
     &buffer_info,
     NULL,
@@ -1330,7 +1331,7 @@ CgpuResult cgpu_create_buffer(
   );
 
   VkMemoryRequirements mem_requirements;
-  vkGetBufferMemoryRequirements(
+  idevice->table.vkGetBufferMemoryRequirements(
     idevice->logical_device,
     ibuffer->buffer,
     &mem_requirements
@@ -1358,7 +1359,7 @@ CgpuResult cgpu_create_buffer(
   }
   mem_alloc_info.memoryTypeIndex = mem_index;
 
-  result = vkAllocateMemory(
+  result = idevice->table.vkAllocateMemory(
     idevice->logical_device,
     &mem_alloc_info,
     NULL,
@@ -1369,7 +1370,7 @@ CgpuResult cgpu_create_buffer(
     return CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY;
   }
 
-  vkBindBufferMemory(
+  idevice->table.vkBindBufferMemory(
     idevice->logical_device,
     ibuffer->buffer,
     ibuffer->memory,
@@ -1394,12 +1395,12 @@ CgpuResult cgpu_destroy_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  vkDestroyBuffer(
+  idevice->table.vkDestroyBuffer(
     idevice->logical_device,
     ibuffer->buffer,
     NULL
   );
-  vkFreeMemory(
+  idevice->table.vkFreeMemory(
     idevice->logical_device,
     ibuffer->memory,
     NULL
@@ -1426,7 +1427,7 @@ CgpuResult cgpu_map_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  const VkResult result = vkMapMemory(
+  const VkResult result = idevice->table.vkMapMemory(
     idevice->logical_device,
     ibuffer->memory,
     source_byte_offset,
@@ -1454,7 +1455,7 @@ CgpuResult cgpu_unmap_buffer(
   if (!cgpu_resolve_buffer(buffer.handle, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  vkUnmapMemory(
+  idevice->table.vkUnmapMemory(
     idevice->logical_device,
     ibuffer->memory
   );
@@ -1528,7 +1529,7 @@ CgpuResult cgpu_create_image(
   image_info.samples = VK_SAMPLE_COUNT_1_BIT;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VkResult result = vkCreateImage(
+  VkResult result = idevice->table.vkCreateImage(
     idevice->logical_device,
     &image_info,
     NULL,
@@ -1546,7 +1547,7 @@ CgpuResult cgpu_create_image(
   );
 
   VkMemoryRequirements mem_requirements;
-  vkGetImageMemoryRequirements(
+  idevice->table.vkGetImageMemoryRequirements(
     idevice->logical_device,
     iimage->image,
     &mem_requirements
@@ -1574,7 +1575,7 @@ CgpuResult cgpu_create_image(
   }
   mem_alloc_info.memoryTypeIndex = mem_index;
 
-  result = vkAllocateMemory(
+  result = idevice->table.vkAllocateMemory(
     idevice->logical_device,
     &mem_alloc_info,
     NULL,
@@ -1585,7 +1586,7 @@ CgpuResult cgpu_create_image(
     return CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY;
   }
 
-  vkBindImageMemory(
+  idevice->table.vkBindImageMemory(
     idevice->logical_device,
     iimage->image,
     iimage->memory,
@@ -1610,7 +1611,7 @@ CgpuResult cgpu_destroy_image(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  vkDestroyImage(
+  idevice->table.vkDestroyImage(
     idevice->logical_device,
     iimage->image,
     NULL
@@ -1637,7 +1638,7 @@ CgpuResult cgpu_map_image(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  const VkResult result = vkMapMemory(
+  const VkResult result = idevice->table.vkMapMemory(
     idevice->logical_device,
     iimage->memory,
     source_byte_offset,
@@ -1665,7 +1666,7 @@ CgpuResult cgpu_unmap_image(
   if (!cgpu_resolve_image(image.handle, &iimage)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  vkUnmapMemory(
+  idevice->table.vkUnmapMemory(
     idevice->logical_device,
     iimage->memory
   );
@@ -1733,7 +1734,7 @@ CgpuResult cgpu_create_pipeline(
   descriptor_set_layout_create_info.bindingCount = num_descriptor_set_bindings;
   descriptor_set_layout_create_info.pBindings = descriptor_set_bindings;
 
-  VkResult result = vkCreateDescriptorSetLayout(
+  VkResult result = idevice->table.vkCreateDescriptorSetLayout(
     idevice->logical_device,
     &descriptor_set_layout_create_info,
     NULL,
@@ -1755,7 +1756,7 @@ CgpuResult cgpu_create_pipeline(
   pipeline_layout_create_info.pushConstantRangeCount = 0u;
   pipeline_layout_create_info.pPushConstantRanges = NULL;
 
-  result = vkCreatePipelineLayout(
+  result = idevice->table.vkCreatePipelineLayout(
     idevice->logical_device,
     &pipeline_layout_create_info,
     NULL,
@@ -1763,7 +1764,7 @@ CgpuResult cgpu_create_pipeline(
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ipipeline_store, pipeline->handle);
-    vkDestroyDescriptorSetLayout(
+    idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
       NULL
@@ -1789,7 +1790,7 @@ CgpuResult cgpu_create_pipeline(
   pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
   pipeline_create_info.basePipelineIndex = 0;
 
-  result = vkCreateComputePipelines(
+  result = idevice->table.vkCreateComputePipelines(
     idevice->logical_device,
     NULL,
     1u,
@@ -1799,12 +1800,12 @@ CgpuResult cgpu_create_pipeline(
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ipipeline_store, pipeline->handle);
-    vkDestroyPipelineLayout(
+    idevice->table.vkDestroyPipelineLayout(
       idevice->logical_device,
       ipipeline->layout,
       NULL
     );
-    vkDestroyDescriptorSetLayout(
+    idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
       NULL
@@ -1823,7 +1824,7 @@ CgpuResult cgpu_create_pipeline(
   descriptor_pool_create_info.pPoolSizes = &descriptor_pool_size;
   descriptor_pool_create_info.maxSets = 1u;
 
-  result = vkCreateDescriptorPool(
+  result = idevice->table.vkCreateDescriptorPool(
     idevice->logical_device,
     &descriptor_pool_create_info,
     NULL,
@@ -1831,17 +1832,17 @@ CgpuResult cgpu_create_pipeline(
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ipipeline_store, pipeline->handle);
-    vkDestroyPipeline(
+    idevice->table.vkDestroyPipeline(
       idevice->logical_device,
       ipipeline->pipeline,
       NULL
     );
-    vkDestroyPipelineLayout(
+    idevice->table.vkDestroyPipelineLayout(
       idevice->logical_device,
       ipipeline->layout,
       NULL
     );
-    vkDestroyDescriptorSetLayout(
+    idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
       NULL
@@ -1856,29 +1857,29 @@ CgpuResult cgpu_create_pipeline(
   descriptor_set_allocate_info.descriptorSetCount = 1u;
   descriptor_set_allocate_info.pSetLayouts = &ipipeline->descriptor_set_layout;
 
-  result = vkAllocateDescriptorSets(
+  result = idevice->table.vkAllocateDescriptorSets(
     idevice->logical_device,
     &descriptor_set_allocate_info,
     &ipipeline->descriptor_set
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ipipeline_store, pipeline->handle);
-    vkDestroyDescriptorPool(
+    idevice->table.vkDestroyDescriptorPool(
       idevice->logical_device,
       ipipeline->descriptor_pool,
       NULL
     );
-    vkDestroyPipeline(
+    idevice->table.vkDestroyPipeline(
       idevice->logical_device,
       ipipeline->pipeline,
       NULL
     );
-    vkDestroyPipelineLayout(
+    idevice->table.vkDestroyPipelineLayout(
       idevice->logical_device,
       ipipeline->layout,
       NULL
     );
-    vkDestroyDescriptorSetLayout(
+    idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
       NULL
@@ -1965,7 +1966,7 @@ CgpuResult cgpu_create_pipeline(
     num_write_descriptor_sets++;
   }
 
-  vkUpdateDescriptorSets(
+  idevice->table.vkUpdateDescriptorSets(
     idevice->logical_device,
     num_write_descriptor_sets,
     write_descriptor_sets,
@@ -1993,22 +1994,22 @@ CgpuResult cgpu_destroy_pipeline(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  vkDestroyDescriptorPool(
+  idevice->table.vkDestroyDescriptorPool(
     idevice->logical_device,
     ipipeline->descriptor_pool,
     NULL
   );
-  vkDestroyPipeline(
+  idevice->table.vkDestroyPipeline(
     idevice->logical_device,
     ipipeline->pipeline,
     NULL
   );
-  vkDestroyPipelineLayout(
+  idevice->table.vkDestroyPipelineLayout(
     idevice->logical_device,
     ipipeline->layout,
     NULL
   );
-  vkDestroyDescriptorSetLayout(
+  idevice->table.vkDestroyDescriptorSetLayout(
     idevice->logical_device,
     ipipeline->descriptor_set_layout,
     NULL
@@ -2034,6 +2035,7 @@ CgpuResult cgpu_create_command_buffer(
   if (!cgpu_resolve_command_buffer(command_buffer->handle, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+  icommand_buffer->device.handle = device.handle;
 
   VkCommandBufferAllocateInfo cmdbuf_alloc_info = {};
   cmdbuf_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -2042,7 +2044,7 @@ CgpuResult cgpu_create_command_buffer(
   cmdbuf_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   cmdbuf_alloc_info.commandBufferCount = 1u;
 
-  const VkResult result = vkAllocateCommandBuffers(
+  const VkResult result = idevice->table.vkAllocateCommandBuffers(
     idevice->logical_device,
     &cmdbuf_alloc_info,
     &icommand_buffer->command_buffer
@@ -2067,7 +2069,7 @@ CgpuResult cgpu_destroy_command_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  vkFreeCommandBuffers(
+  idevice->table.vkFreeCommandBuffers(
     idevice->logical_device,
     idevice->command_pool,
     1u,
@@ -2085,6 +2087,10 @@ CgpuResult cgpu_begin_command_buffer(
   if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
 
   VkCommandBufferBeginInfo command_buffer_begin_info = {};
   command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -2092,7 +2098,7 @@ CgpuResult cgpu_begin_command_buffer(
   command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // TODO
   command_buffer_begin_info.pInheritanceInfo = NULL;
 
-  const VkResult result = vkBeginCommandBuffer(
+  const VkResult result = idevice->table.vkBeginCommandBuffer(
     icommand_buffer->command_buffer,
     &command_buffer_begin_info
   );
@@ -2111,16 +2117,20 @@ CgpuResult cgpu_cmd_bind_pipeline(
   if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline.handle, &ipipeline)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  vkCmdBindPipeline(
+  idevice->table.vkCmdBindPipeline(
     icommand_buffer->command_buffer,
     VK_PIPELINE_BIND_POINT_COMPUTE,
     ipipeline->pipeline
   );
-  vkCmdBindDescriptorSets(
+  idevice->table.vkCmdBindDescriptorSets(
     icommand_buffer->command_buffer,
     VK_PIPELINE_BIND_POINT_COMPUTE,
     ipipeline->layout,
@@ -2145,6 +2155,10 @@ CgpuResult cgpu_cmd_copy_buffer(
   if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
   cgpu_ibuffer* isource_buffer;
   if (!cgpu_resolve_buffer(source_buffer.handle, &isource_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
@@ -2158,7 +2172,7 @@ CgpuResult cgpu_cmd_copy_buffer(
   region.dstOffset = destination_byte_offset;
   region.size = (byte_count == CGPU_WHOLE_SIZE) ?
       isource_buffer->size_in_bytes : byte_count;
-  vkCmdCopyBuffer(
+  idevice->table.vkCmdCopyBuffer(
     icommand_buffer->command_buffer,
     isource_buffer->buffer,
     idestination_buffer->buffer,
@@ -2178,7 +2192,11 @@ CgpuResult cgpu_cmd_dispatch(
   if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  vkCmdDispatch(
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  idevice->table.vkCmdDispatch(
     icommand_buffer->command_buffer,
     dim_x,
     dim_y,
@@ -2198,6 +2216,10 @@ CgpuResult cgpu_cmd_pipeline_barrier(
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2239,7 +2261,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
 
   // TODO: translate image barrier
 
-  vkCmdPipelineBarrier(
+  idevice->table.vkCmdPipelineBarrier(
     icommand_buffer->command_buffer,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
       VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -2267,7 +2289,11 @@ CgpuResult cgpu_end_command_buffer(
   if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  vkEndCommandBuffer(icommand_buffer->command_buffer);
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  idevice->table.vkEndCommandBuffer(icommand_buffer->command_buffer);
   return CGPU_OK;
 }
 
@@ -2292,7 +2318,7 @@ CgpuResult cgpu_create_fence(
   fence_create_info.pNext = NULL;
   fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  const VkResult result = vkCreateFence(
+  const VkResult result = idevice->table.vkCreateFence(
     idevice->logical_device,
     &fence_create_info,
     NULL,
@@ -2317,7 +2343,7 @@ CgpuResult cgpu_destroy_fence(
   if (!cgpu_resolve_fence(fence.handle, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  vkDestroyFence(
+  idevice->table.vkDestroyFence(
     idevice->logical_device,
     ifence->fence,
     NULL
@@ -2338,7 +2364,7 @@ CgpuResult cgpu_reset_fence(
   if (!cgpu_resolve_fence(fence.handle, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  const VkResult result = vkResetFences(
+  const VkResult result = idevice->table.vkResetFences(
     idevice->logical_device,
     1u,
     &ifence->fence
@@ -2361,7 +2387,7 @@ CgpuResult cgpu_wait_for_fence(
   if (!cgpu_resolve_fence(fence.handle, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  const VkResult result = vkWaitForFences(
+  const VkResult result = idevice->table.vkWaitForFences(
     idevice->logical_device,
     1u,
     &ifence->fence,
@@ -2403,7 +2429,7 @@ CgpuResult cgpu_submit_command_buffer(
   submit_info.signalSemaphoreCount = 0u;
   submit_info.pSignalSemaphores = NULL;
 
-  const VkResult result = vkQueueSubmit(
+  const VkResult result = idevice->table.vkQueueSubmit(
     idevice->compute_queue,
     1u,
     &submit_info,
@@ -2439,7 +2465,7 @@ CgpuResult cgpu_flush_mapped_memory(
   memory_range.size =
     (byte_count == CGPU_WHOLE_SIZE) ? ibuffer->size_in_bytes : byte_count;
 
-  const VkResult result = vkFlushMappedMemoryRanges(
+  const VkResult result = idevice->table.vkFlushMappedMemoryRanges(
     idevice->logical_device,
     1u,
     &memory_range
@@ -2474,7 +2500,7 @@ CgpuResult cgpu_invalidate_mapped_memory(
   memory_range.size =
     (byte_count == CGPU_WHOLE_SIZE) ? ibuffer->size_in_bytes : byte_count;
 
-  const VkResult result = vkInvalidateMappedMemoryRanges(
+  const VkResult result = idevice->table.vkInvalidateMappedMemoryRanges(
     idevice->logical_device,
     1,
     &memory_range
