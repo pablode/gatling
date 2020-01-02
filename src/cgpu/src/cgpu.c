@@ -69,26 +69,25 @@ static cgpu_iinstance iinstance;
 
 /* Helper functions. */
 
-#define CGPU_RESOLVE_HANDLE(                                   \
-  RESOURCE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)               \
-CGPU_INLINE bool cgpu_resolve_##RESOURCE_TYPE(                 \
-  uint64_t handle,                                             \
-  IRESOURCE_TYPE** idata)                                      \
-{                                                              \
-  if (!resource_store_get(                                     \
-      &RESOURCE_STORE, handle, (void**) idata)) {              \
-    return false;                                              \
-  }                                                            \
-  return true;                                                 \
+#define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)  \
+CGPU_INLINE bool cgpu_resolve_##RESOURCE_NAME(                                           \
+  HANDLE_TYPE handle,                                                                    \
+  IRESOURCE_TYPE** idata)                                                                \
+{                                                                                        \
+  if (!resource_store_get(                                                               \
+      &RESOURCE_STORE, handle.handle, (void**) idata)) {                                 \
+    return false;                                                                        \
+  }                                                                                      \
+  return true;                                                                           \
 }
 
-CGPU_RESOLVE_HANDLE(device,         cgpu_idevice,         idevice_store        )
-CGPU_RESOLVE_HANDLE(buffer,         cgpu_ibuffer,         ibuffer_store        )
-CGPU_RESOLVE_HANDLE(shader,         cgpu_ishader,         ishader_store        )
-CGPU_RESOLVE_HANDLE(image,          cgpu_iimage,          iimage_store         )
-CGPU_RESOLVE_HANDLE(pipeline,       cgpu_ipipeline,       ipipeline_store      )
-CGPU_RESOLVE_HANDLE(fence,          cgpu_ifence,          ifence_store         )
-CGPU_RESOLVE_HANDLE(command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
+CGPU_RESOLVE_HANDLE(        device,         cgpu_device,         cgpu_idevice,         idevice_store)
+CGPU_RESOLVE_HANDLE(        buffer,         cgpu_buffer,         cgpu_ibuffer,         ibuffer_store)
+CGPU_RESOLVE_HANDLE(        shader,         cgpu_shader,         cgpu_ishader,         ishader_store)
+CGPU_RESOLVE_HANDLE(         image,          cgpu_image,          cgpu_iimage,          iimage_store)
+CGPU_RESOLVE_HANDLE(      pipeline,       cgpu_pipeline,       cgpu_ipipeline,       ipipeline_store)
+CGPU_RESOLVE_HANDLE(         fence,          cgpu_fence,          cgpu_ifence,          ifence_store)
+CGPU_RESOLVE_HANDLE(command_buffer, cgpu_command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
 
 #undef CGPU_RESOLVE_HANDLE
 
@@ -996,7 +995,7 @@ CgpuResult cgpu_create_device(
   p_device->handle = resource_store_create_handle(&idevice_store);
 
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(p_device->handle, &idevice)) {
+  if (!cgpu_resolve_device(*p_device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1282,7 +1281,7 @@ CgpuResult cgpu_destroy_device(
   cgpu_device device)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1314,14 +1313,14 @@ CgpuResult cgpu_create_shader(
   cgpu_shader* p_shader)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
   p_shader->handle = resource_store_create_handle(&ishader_store);
 
   cgpu_ishader* ishader;
-  if (!cgpu_resolve_shader(p_shader->handle, &ishader)) {
+  if (!cgpu_resolve_shader(*p_shader, &ishader)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1352,10 +1351,10 @@ CgpuResult cgpu_destroy_shader(
 {
   cgpu_idevice* idevice;
   cgpu_ishader* ishader;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  if (!cgpu_resolve_shader(shader.handle, &ishader)) {
+  if (!cgpu_resolve_shader(shader, &ishader)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1378,14 +1377,14 @@ CgpuResult cgpu_create_buffer(
   cgpu_buffer* p_buffer)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
   p_buffer->handle = resource_store_create_handle(&ibuffer_store);
 
   cgpu_ibuffer* ibuffer;
-  if (!cgpu_resolve_buffer(p_buffer->handle, &ibuffer)) {
+  if (!cgpu_resolve_buffer(*p_buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1499,11 +1498,11 @@ CgpuResult cgpu_destroy_buffer(
   cgpu_buffer buffer)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
-  if (!cgpu_resolve_buffer(buffer.handle, &ibuffer)) {
+  if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1531,11 +1530,11 @@ CgpuResult cgpu_map_buffer(
   void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
-  if (!cgpu_resolve_buffer(buffer.handle, &ibuffer)) {
+  if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1560,11 +1559,11 @@ CgpuResult cgpu_unmap_buffer(
   cgpu_buffer buffer)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
-  if (!cgpu_resolve_buffer(buffer.handle, &ibuffer)) {
+  if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   idevice->table.vkUnmapMemory(
@@ -1584,14 +1583,14 @@ CgpuResult cgpu_create_image(
   cgpu_image* p_image)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
   p_image->handle = resource_store_create_handle(&iimage_store);
 
   cgpu_iimage* iimage;
-  if (!cgpu_resolve_image(p_image->handle, &iimage)) {
+  if (!cgpu_resolve_image(*p_image, &iimage)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1752,11 +1751,11 @@ CgpuResult cgpu_destroy_image(
   cgpu_image image)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_iimage* iimage;
-  if (!cgpu_resolve_image(image.handle, &iimage)) {
+  if (!cgpu_resolve_image(image, &iimage)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1791,11 +1790,11 @@ CgpuResult cgpu_map_image(
   void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_iimage* iimage;
-  if (!cgpu_resolve_image(image.handle, &iimage)) {
+  if (!cgpu_resolve_image(image, &iimage)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1820,11 +1819,11 @@ CgpuResult cgpu_unmap_image(
   cgpu_image image)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_iimage* iimage;
-  if (!cgpu_resolve_image(image.handle, &iimage)) {
+  if (!cgpu_resolve_image(image, &iimage)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   idevice->table.vkUnmapMemory(
@@ -1845,18 +1844,18 @@ CgpuResult cgpu_create_pipeline(
   cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ishader* ishader;
-  if (!cgpu_resolve_shader(shader.handle, &ishader)) {
+  if (!cgpu_resolve_shader(shader, &ishader)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
   p_pipeline->handle = resource_store_create_handle(&ipipeline_store);
 
   cgpu_ipipeline* ipipeline;
-  if (!cgpu_resolve_pipeline(p_pipeline->handle, &ipipeline)) {
+  if (!cgpu_resolve_pipeline(*p_pipeline, &ipipeline)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2067,7 +2066,7 @@ CgpuResult cgpu_create_pipeline(
 
     cgpu_ibuffer* ibuffer;
     const cgpu_buffer buffer = shader_resource_buffer->buffer;
-    if (!cgpu_resolve_buffer(buffer.handle, &ibuffer)) {
+    if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
@@ -2103,7 +2102,7 @@ CgpuResult cgpu_create_pipeline(
 
     cgpu_iimage* iimage;
     const cgpu_image image = shader_resource_image->image;
-    if (!cgpu_resolve_image(image.handle, &iimage)) {
+    if (!cgpu_resolve_image(image, &iimage)) {
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
@@ -2147,11 +2146,11 @@ CgpuResult cgpu_destroy_pipeline(
   cgpu_pipeline pipeline)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ipipeline* ipipeline;
-  if (!cgpu_resolve_pipeline(pipeline.handle, &ipipeline)) {
+  if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2186,14 +2185,14 @@ CgpuResult cgpu_create_command_buffer(
   cgpu_command_buffer* p_command_buffer)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
   p_command_buffer->handle = resource_store_create_handle(&icommand_buffer_store);
 
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(p_command_buffer->handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(*p_command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   icommand_buffer->device.handle = device.handle;
@@ -2222,11 +2221,11 @@ CgpuResult cgpu_destroy_command_buffer(
   cgpu_command_buffer command_buffer)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2245,11 +2244,11 @@ CgpuResult cgpu_begin_command_buffer(
   cgpu_command_buffer command_buffer)
 {
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2275,15 +2274,15 @@ CgpuResult cgpu_cmd_bind_pipeline(
   cgpu_pipeline pipeline)
 {
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ipipeline* ipipeline;
-  if (!cgpu_resolve_pipeline(pipeline.handle, &ipipeline)) {
+  if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   idevice->table.vkCmdBindPipeline(
@@ -2313,19 +2312,19 @@ CgpuResult cgpu_cmd_copy_buffer(
   uint64_t byte_count)
 {
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ibuffer* isource_buffer;
-  if (!cgpu_resolve_buffer(source_buffer.handle, &isource_buffer)) {
+  if (!cgpu_resolve_buffer(source_buffer, &isource_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ibuffer* idestination_buffer;
-  if (!cgpu_resolve_buffer(destination_buffer.handle, &idestination_buffer)) {
+  if (!cgpu_resolve_buffer(destination_buffer, &idestination_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2353,11 +2352,11 @@ CgpuResult cgpu_cmd_dispatch(
   uint32_t dim_z)
 {
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   idevice->table.vkCmdDispatch(
@@ -2379,11 +2378,11 @@ CgpuResult cgpu_cmd_pipeline_barrier(
   const cgpu_image_memory_barrier* p_image_barriers)
 {
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2409,7 +2408,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     const cgpu_buffer_memory_barrier* b_cgpu = &p_buffer_barriers[i];
 
     cgpu_ibuffer* ibuffer;
-    if (!cgpu_resolve_buffer(b_cgpu->buffer.handle, &ibuffer)) {
+    if (!cgpu_resolve_buffer(b_cgpu->buffer, &ibuffer)) {
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
@@ -2430,7 +2429,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     const cgpu_image_memory_barrier* b_cgpu = &p_image_barriers[i];
 
     cgpu_iimage* iimage;
-    if (!cgpu_resolve_image(b_cgpu->image.handle, &iimage)) {
+    if (!cgpu_resolve_image(b_cgpu->image, &iimage)) {
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
@@ -2477,11 +2476,11 @@ CgpuResult cgpu_end_command_buffer(
   cgpu_command_buffer command_buffer)
 {
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device.handle, &idevice)) {
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   idevice->table.vkEndCommandBuffer(icommand_buffer->command_buffer);
@@ -2493,14 +2492,14 @@ CgpuResult cgpu_create_fence(
   cgpu_fence* p_fence)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
   p_fence->handle = resource_store_create_handle(&ifence_store);
 
   cgpu_ifence* ifence;
-  if (!cgpu_resolve_fence(p_fence->handle, &ifence)) {
+  if (!cgpu_resolve_fence(*p_fence, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2527,11 +2526,11 @@ CgpuResult cgpu_destroy_fence(
   cgpu_fence fence)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
-  if (!cgpu_resolve_fence(fence.handle, &ifence)) {
+  if (!cgpu_resolve_fence(fence, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   idevice->table.vkDestroyFence(
@@ -2548,11 +2547,11 @@ CgpuResult cgpu_reset_fence(
   cgpu_fence fence)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
-  if (!cgpu_resolve_fence(fence.handle, &ifence)) {
+  if (!cgpu_resolve_fence(fence, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   const VkResult result = idevice->table.vkResetFences(
@@ -2571,11 +2570,11 @@ CgpuResult cgpu_wait_for_fence(
   cgpu_fence fence)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
-  if (!cgpu_resolve_fence(fence.handle, &ifence)) {
+  if (!cgpu_resolve_fence(fence, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   const VkResult result = idevice->table.vkWaitForFences(
@@ -2597,15 +2596,15 @@ CgpuResult cgpu_submit_command_buffer(
   cgpu_fence fence)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
-  if (!cgpu_resolve_fence(fence.handle, &ifence)) {
+  if (!cgpu_resolve_fence(fence, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2640,11 +2639,11 @@ CgpuResult cgpu_flush_mapped_memory(
   uint64_t byte_count)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
-  if (!cgpu_resolve_buffer(buffer.handle, &ibuffer)) {
+  if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2675,11 +2674,11 @@ CgpuResult cgpu_invalidate_mapped_memory(
   uint64_t byte_count)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
-  if (!cgpu_resolve_buffer(buffer.handle, &ibuffer)) {
+  if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -2708,7 +2707,7 @@ CgpuResult cgpu_get_physical_device_limits(
   cgpu_physical_device_limits* p_limits)
 {
   cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device.handle, &idevice)) {
+  if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
   memcpy(
