@@ -95,7 +95,7 @@ CGPU_RESOLVE_HANDLE(command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
 static VkMemoryPropertyFlags cgpu_translate_memory_properties(
   CgpuMemoryPropertyFlags memory_properties)
 {
-  VkMemoryPropertyFlags mem_flags = 0;
+  VkMemoryPropertyFlags mem_flags = 0u;
   if ((memory_properties & CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
         == CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL) {
     mem_flags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -126,7 +126,7 @@ static VkMemoryPropertyFlags cgpu_translate_memory_properties(
 static VkAccessFlags cgpu_translate_access_flags(
   CgpuMemoryAccessFlags flags)
 {
-  VkAccessFlags vk_flags = 0;
+  VkAccessFlags vk_flags = 0u;
   if ((flags & CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ)
               == CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ) {
     vk_flags |= VK_ACCESS_UNIFORM_READ_BIT;
@@ -169,7 +169,7 @@ static VkAccessFlags cgpu_translate_access_flags(
 static CgpuSampleCountFlags cgpu_translate_sample_count_flags(
   VkSampleCountFlags vk_flags)
 {
-  CgpuSampleCountFlags flags = 0;
+  CgpuSampleCountFlags flags = 0u;
   if ((vk_flags & VK_SAMPLE_COUNT_1_BIT)
         == VK_SAMPLE_COUNT_1_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_1;
@@ -933,7 +933,7 @@ CgpuResult cgpu_initialize(
   VkInstanceCreateInfo create_info = {};
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   create_info.pNext = NULL;
-  create_info.flags = 0;
+  create_info.flags = 0u;
   create_info.pApplicationInfo = &app_info;
   create_info.enabledExtensionCount = instance_extension_count;
   create_info.ppEnabledExtensionNames = instance_extensions;
@@ -1008,7 +1008,7 @@ CgpuResult cgpu_create_device(
   );
 
   if (num_phys_devices == 0u ||
-      index > (num_phys_devices - 1u))
+      index > (num_phys_devices - 1))
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_NO_DEVICE_AT_INDEX;
@@ -1120,7 +1120,7 @@ CgpuResult cgpu_create_device(
   VkDeviceCreateInfo device_create_info = {};
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_create_info.pNext = NULL;
-  device_create_info.queueCreateInfoCount = 1;
+  device_create_info.queueCreateInfoCount = 1u;
   device_create_info.pQueueCreateInfos = &queue_create_info;
   device_create_info.pEnabledFeatures = &device_features;
   device_create_info.enabledExtensionCount = required_extension_count;
@@ -1180,7 +1180,7 @@ CgpuResult cgpu_create_device(
   VkSamplerCreateInfo sampler_info;
   sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
   sampler_info.pNext = NULL;
-  sampler_info.flags = 0;
+  sampler_info.flags = 0u;
   sampler_info.magFilter = VK_FILTER_LINEAR;
   sampler_info.minFilter = VK_FILTER_LINEAR;
   sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
@@ -1189,7 +1189,7 @@ CgpuResult cgpu_create_device(
   sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
   sampler_info.mipLodBias = 0.0f;
   sampler_info.anisotropyEnable = VK_TRUE;
-  sampler_info.maxAnisotropy = 16;
+  sampler_info.maxAnisotropy = 16.0f;
   sampler_info.compareEnable = VK_FALSE;
   sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
   sampler_info.minLod = 0.0f;
@@ -1545,7 +1545,7 @@ CgpuResult cgpu_create_image(
     vk_image_tiling = VK_IMAGE_TILING_LINEAR;
   }
 
-  VkImageUsageFlags vk_image_usage = 0;
+  VkImageUsageFlags vk_image_usage = 0u;
   if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC)
         == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) {
     vk_image_usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -1650,7 +1650,7 @@ CgpuResult cgpu_create_image(
   VkImageViewCreateInfo image_view_info;
   image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   image_view_info.pNext = NULL;
-  image_view_info.flags = 0;
+  image_view_info.flags = 0u;
   image_view_info.image = iimage->image;
   image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
   image_view_info.format = vk_format;
@@ -1659,10 +1659,10 @@ CgpuResult cgpu_create_image(
   image_view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
   image_view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
   image_view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  image_view_info.subresourceRange.baseMipLevel = 0;
-  image_view_info.subresourceRange.levelCount = 1;
-  image_view_info.subresourceRange.baseArrayLayer = 0;
-  image_view_info.subresourceRange.layerCount = 1;
+  image_view_info.subresourceRange.baseMipLevel = 0u;
+  image_view_info.subresourceRange.levelCount = 1u;
+  image_view_info.subresourceRange.baseArrayLayer = 0u;
+  image_view_info.subresourceRange.layerCount = 1u;
 
   result = idevice->table.vkCreateImageView(
     idevice->logical_device,
@@ -2378,10 +2378,10 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->image = iimage->image;
     b_vk->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    b_vk->subresourceRange.baseMipLevel = 0;
-    b_vk->subresourceRange.levelCount = 1;
-    b_vk->subresourceRange.baseArrayLayer = 0;
-    b_vk->subresourceRange.layerCount = 1;
+    b_vk->subresourceRange.baseMipLevel = 0u;
+    b_vk->subresourceRange.levelCount = 1u;
+    b_vk->subresourceRange.baseArrayLayer = 0u;
+    b_vk->subresourceRange.layerCount = 1u;
   }
 
   idevice->table.vkCmdPipelineBarrier(

@@ -458,8 +458,6 @@ typedef struct cgpu_image_memory_barrier {
   cgpu_image image;
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
-  uint32_t baseMipLevel;
-  uint32_t levelCount;
 } cgpu_image_memory_barrier;
 
 typedef struct cgpu_physical_device_limits {
@@ -574,8 +572,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
   uint32_t version_major,
   uint32_t version_minor,
   uint32_t version_patch
-  //uint32_t required_extension_count,
-  //const char** pp_required_extensions
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_destroy(void);
