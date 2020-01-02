@@ -588,7 +588,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_device(
   uint32_t index,
   uint32_t required_extension_count,
   const char** pp_required_extensions,
-  cgpu_device* device
+  cgpu_device* p_device
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_device(
@@ -599,7 +599,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_shader(
   cgpu_device device,
   uint64_t source_size_in_bytes,
   const uint32_t* p_source,
-  cgpu_shader* shader
+  cgpu_shader* p_shader
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_shader(
@@ -612,7 +612,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_buffer(
   CgpuBufferUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
   uint64_t size_in_bytes,
-  cgpu_buffer* buffer
+  cgpu_buffer* p_buffer
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_buffer(
@@ -640,7 +640,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_image(
   CgpuImageFormat format,
   CgpuImageUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
-  cgpu_image* image
+  cgpu_image* p_image
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_image(
@@ -669,7 +669,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   const cgpu_shader_resource_image* p_shader_resources_images,
   cgpu_shader shader,
   const char* p_shader_entry_point,
-  cgpu_pipeline* pipeline
+  cgpu_pipeline* p_pipeline
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_pipeline(
@@ -679,7 +679,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_pipeline(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_command_buffer(
   cgpu_device device,
-  cgpu_command_buffer* command_buffer
+  cgpu_command_buffer* p_command_buffer
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_begin_command_buffer(
@@ -728,7 +728,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_command_buffer(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_fence(
   cgpu_device device,
-  cgpu_fence* fence
+  cgpu_fence* p_fence
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_reset_fence(
@@ -768,7 +768,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_invalidate_mapped_memory(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_get_physical_device_limits(
   cgpu_device device,
-  cgpu_physical_device_limits* limits
+  cgpu_physical_device_limits* p_limits
 );
 
 #endif
