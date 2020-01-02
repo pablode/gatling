@@ -9,17 +9,11 @@ function(gatling_add_executable target)
     "SOURCES_C;SOURCES_GLSL" ${ARGN}
   )
 
-  set(target_output_dir "${GATLING_OUTPUT_DIR}/${target}")
-  file(MAKE_DIRECTORY ${target_output_dir})
-  set(target_output_shader_dir "${target_output_dir}/shaders")
+  set(target_output_shader_dir "${GATLING_OUTPUT_DIR}/shaders")
   file(MAKE_DIRECTORY ${target_output_shader_dir})
 
   add_executable(${target}
     ${EXE_SOURCES_C} ${EXE_UNPARSED_ARGS})
-
-  set_target_properties(
-    gatling PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${target_output_dir})
 
   foreach(shader ${EXE_SOURCES_GLSL})
     get_filename_component(shader_path_abs ${shader} ABSOLUTE)
