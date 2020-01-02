@@ -187,7 +187,7 @@ int main(int argc, const char* argv[])
     return 1;
   }
 
-  // Set up instance and device.
+  /* Set up instance and device. */
   CgpuResult c_result = cgpu_initialize("gatling", 0, 1, 0);
   assert(c_result == CGPU_OK);
 
@@ -205,7 +205,7 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Load scene.
+  /* Load scene. */
   uint8_t* scene_data;
   size_t scene_data_size;
   GatlingResult g_result = gatling_read_file(
@@ -215,7 +215,7 @@ int main(int argc, const char* argv[])
   );
   assert(g_result == GATLING_OK);
 
-  // Create input and output buffers.
+  /* Create input and output buffers. */
   const size_t output_buffer_size_in_floats =
     IMAGE_WIDTH * IMAGE_HEIGHT * 4;
   const size_t output_buffer_size_in_bytes =
@@ -224,11 +224,11 @@ int main(int argc, const char* argv[])
   const size_t input_buffer_size_in_bytes = scene_data_size;
 
   const size_t path_segment_buffer_size_in_bytes =
-    (IMAGE_WIDTH *         // x dim
-      IMAGE_HEIGHT *       // y dim
-      NUM_SAMPLES *        // sample count
-      sizeof(float) * 8) + // path_segment struct size
-      16;                  // counter in first 4 bytes + padding
+    (IMAGE_WIDTH *         /* x dim */
+      IMAGE_HEIGHT *       /* y dim */
+      NUM_SAMPLES *        /* sample count */
+      sizeof(float) * 8) + /* path_segment struct size */
+      16;                  /* counter in first 4 bytes + padding */
 
   cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
@@ -314,7 +314,7 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Set up pipelines.
+  /* Set up pipelines. */
   const uint32_t node_offset     = *((uint32_t*) (scene_data +  0));
   const uint32_t node_count      = *((uint32_t*) (scene_data +  4));
   const uint32_t face_offset     = *((uint32_t*) (scene_data +  8));
@@ -366,7 +366,7 @@ int main(int argc, const char* argv[])
   c_result = cgpu_begin_command_buffer(command_buffer);
   assert(c_result == CGPU_OK);
 
-  // Copy staging buffer to input buffer.
+  /* Copy staging buffer to input buffer. */
 
   c_result = cgpu_cmd_copy_buffer(
     command_buffer,
@@ -393,7 +393,7 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Generate primary rays and clear pixels.
+  /* Generate primary rays and clear pixels. */
 
   c_result = cgpu_cmd_bind_pipeline(
     command_buffer,
@@ -409,7 +409,7 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Trace rays.
+  /* Trace rays. */
 
   cgpu_buffer_memory_barrier buffer_memory_barrier_2 = {};
   buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
@@ -452,14 +452,14 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    // TODO: what is the optimal number?
+    /* TODO: what is the optimal number? */
     device_limits.maxComputeWorkGroupInvocations,
     1,
     1
   );
   assert(c_result == CGPU_OK);
 
-  // Copy staging buffer to output buffer.
+  /* Copy staging buffer to output buffer. */
 
   cgpu_buffer_memory_barrier buffer_memory_barrier_4 = {};
   buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
@@ -506,7 +506,7 @@ int main(int argc, const char* argv[])
   c_result = cgpu_wait_for_fence(device, fence);
   assert(c_result == CGPU_OK);
 
-  // Read data from gpu.
+  /* Read data from gpu. */
   float* image_data = malloc(output_buffer_size_in_bytes);
 
   c_result = cgpu_map_buffer(
@@ -530,7 +530,7 @@ int main(int argc, const char* argv[])
   );
   assert(c_result == CGPU_OK);
 
-  // Save image.
+  /* Save image. */
   g_result = gatling_save_img(
     image_data,
     output_buffer_size_in_floats,
@@ -538,7 +538,7 @@ int main(int argc, const char* argv[])
   );
   assert(g_result == GATLING_OK);
 
-  // Clean up.
+  /* Clean up. */
   free(image_data);
 
   c_result = cgpu_destroy_fence(

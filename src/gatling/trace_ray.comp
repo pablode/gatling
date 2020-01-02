@@ -160,7 +160,7 @@ bool intersect_triangle(
     return t > 0.0;
 }
 
-// Optimized ray-aabb intersection kernel by Aila et al. '12.
+/* Optimized ray-aabb intersection kernel by Aila et al. '12. */
 bool intersect_aabb(
     in const float t_min,
     in const float t_max,
