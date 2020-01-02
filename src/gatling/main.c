@@ -110,7 +110,7 @@ GatlingResult gatling_create_pipeline(
 
   CgpuResult c_result = cgpu_create_shader(
     device,
-    data_size, // TODO: swap args?
+    data_size,
     data,
     &pipeline->shader
   );
@@ -122,7 +122,7 @@ GatlingResult gatling_create_pipeline(
 
   c_result = cgpu_create_pipeline(
     device,
-    num_shader_resource_buffers, // TOOD: swap args?
+    num_shader_resource_buffers,
     shader_resource_buffers,
     0,
     NULL,
@@ -383,7 +383,7 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_1.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_1.buffer = input_buffer;
   buffer_memory_barrier_1.byte_offset = 0;
-  buffer_memory_barrier_1.num_bytes = input_buffer_size_in_bytes;
+  buffer_memory_barrier_1.byte_count = input_buffer_size_in_bytes;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -416,14 +416,14 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_2.buffer = path_segment_buffer;
   buffer_memory_barrier_2.byte_offset = 0;
-  buffer_memory_barrier_2.num_bytes = path_segment_buffer_size_in_bytes;
+  buffer_memory_barrier_2.byte_count = path_segment_buffer_size_in_bytes;
 
   cgpu_buffer_memory_barrier buffer_memory_barrier_3 = {};
   buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_3.buffer = output_buffer;
   buffer_memory_barrier_3.byte_offset = 0;
-  buffer_memory_barrier_3.num_bytes = output_buffer_size_in_bytes;
+  buffer_memory_barrier_3.byte_count = output_buffer_size_in_bytes;
 
   cgpu_buffer_memory_barrier buffer_memory_barrier_2_and_3[] = {
     buffer_memory_barrier_2, buffer_memory_barrier_3
@@ -466,7 +466,7 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_4.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
   buffer_memory_barrier_4.buffer = output_buffer;
   buffer_memory_barrier_4.byte_offset = 0;
-  buffer_memory_barrier_4.num_bytes = output_buffer_size_in_bytes;
+  buffer_memory_barrier_4.byte_count = output_buffer_size_in_bytes;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,

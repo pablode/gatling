@@ -432,8 +432,8 @@ typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
 typedef struct cgpu_shader_resource_buffer {
   uint32_t binding;
   cgpu_buffer buffer;
-  uint64_t offset;
-  uint64_t count;
+  uint64_t byte_offset;
+  uint64_t byte_count;
 } cgpu_shader_resource_buffer;
 
 typedef struct cgpu_shader_resource_image {
@@ -451,7 +451,7 @@ typedef struct cgpu_buffer_memory_barrier {
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
   uint64_t byte_offset;
-  uint64_t num_bytes;
+  uint64_t byte_count;
 } cgpu_buffer_memory_barrier;
 
 typedef struct cgpu_image_memory_barrier {
@@ -593,7 +593,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_device(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_shader(
   cgpu_device device,
-  uint64_t source_size_in_bytes,
+  uint64_t source_byte_count,
   const uint32_t* p_source,
   cgpu_shader* p_shader
 );
@@ -607,7 +607,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_buffer(
   cgpu_device device,
   CgpuBufferUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
-  uint64_t size_in_bytes,
+  uint64_t byte_count,
   cgpu_buffer* p_buffer
 );
 
@@ -619,7 +619,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_buffer(
 CGPU_API CgpuResult CGPU_CDECL cgpu_map_buffer(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t source_byte_offset,
+  uint64_t byte_offset,
   uint64_t byte_count,
   void** pp_mapped_mem
 );
@@ -647,7 +647,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_image(
 CGPU_API CgpuResult CGPU_CDECL cgpu_map_image(
   cgpu_device device,
   cgpu_image image,
-  uint64_t source_byte_offset,
+  uint64_t byte_offset,
   uint64_t byte_count,
   void** pp_mapped_mem
 );
@@ -659,10 +659,10 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_unmap_image(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   cgpu_device device,
-  uint32_t num_shader_resources_buffers,
-  const cgpu_shader_resource_buffer* p_shader_resources_buffers,
-  uint32_t num_shader_resources_images,
-  const cgpu_shader_resource_image* p_shader_resources_images,
+  uint32_t buffer_resource_count,
+  const cgpu_shader_resource_buffer* p_buffer_resources,
+  uint32_t shader_resource_count,
+  const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
   cgpu_pipeline* p_pipeline
@@ -705,12 +705,12 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_dispatch(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_pipeline_barrier(
   cgpu_command_buffer command_buffer,
-  uint32_t num_memory_barriers,
-  const cgpu_memory_barrier* p_memory_barriers,
-  uint32_t num_buffer_memory_barriers,
-  const cgpu_buffer_memory_barrier* p_buffer_memory_barriers,
-  uint32_t num_image_memory_barriers,
-  const cgpu_image_memory_barrier* p_image_memory_barriers
+  uint32_t barrier_count,
+  const cgpu_memory_barrier* p_barriers,
+  uint32_t buffer_barrier_count,
+  const cgpu_buffer_memory_barrier* p_buffer_barriers,
+  uint32_t image_barrier_count,
+  const cgpu_image_memory_barrier* p_image_barriers
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_end_command_buffer(

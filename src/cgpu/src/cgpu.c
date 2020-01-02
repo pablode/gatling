@@ -1253,7 +1253,7 @@ CgpuResult cgpu_destroy_device(
 
 CgpuResult cgpu_create_shader(
   cgpu_device device,
-  uint64_t source_size_in_bytes,
+  uint64_t source_byte_count,
   const uint32_t* p_source,
   cgpu_shader* p_shader)
 {
@@ -1272,7 +1272,7 @@ CgpuResult cgpu_create_shader(
   VkShaderModuleCreateInfo shader_module_create_info = {};
   shader_module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shader_module_create_info.pNext = NULL;
-  shader_module_create_info.codeSize = source_size_in_bytes;
+  shader_module_create_info.codeSize = source_byte_count;
   shader_module_create_info.pCode = p_source;
 
   const VkResult result = idevice->table.vkCreateShaderModule(
@@ -1317,7 +1317,7 @@ CgpuResult cgpu_create_buffer(
   cgpu_device device,
   CgpuBufferUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
-  uint64_t size_in_bytes,
+  uint64_t byte_count,
   cgpu_buffer* p_buffer)
 {
   cgpu_idevice* idevice;
@@ -1361,7 +1361,7 @@ CgpuResult cgpu_create_buffer(
   VkBufferCreateInfo buffer_info = {};
   buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   buffer_info.pNext = NULL;
-  buffer_info.size = size_in_bytes;
+  buffer_info.size = byte_count;
   buffer_info.usage = vk_buffer_usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -1429,7 +1429,7 @@ CgpuResult cgpu_create_buffer(
     0u
   );
 
-  ibuffer->size_in_bytes = size_in_bytes;
+  ibuffer->size_in_bytes = byte_count;
 
   return CGPU_OK;
 }
@@ -1466,7 +1466,7 @@ CgpuResult cgpu_destroy_buffer(
 CgpuResult cgpu_map_buffer(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t source_byte_offset,
+  uint64_t byte_offset,
   uint64_t byte_count,
   void** pp_mapped_mem)
 {
@@ -1482,7 +1482,7 @@ CgpuResult cgpu_map_buffer(
   const VkResult result = idevice->table.vkMapMemory(
     idevice->logical_device,
     ibuffer->memory,
-    source_byte_offset,
+    byte_offset,
     (byte_count == CGPU_WHOLE_SIZE) ? ibuffer->size_in_bytes : byte_count,
     0u,
     pp_mapped_mem
@@ -1723,7 +1723,7 @@ CgpuResult cgpu_destroy_image(
 CgpuResult cgpu_map_image(
   cgpu_device device,
   cgpu_image image,
-  uint64_t source_byte_offset,
+  uint64_t byte_offset,
   uint64_t byte_count,
   void** pp_mapped_mem)
 {
@@ -1739,7 +1739,7 @@ CgpuResult cgpu_map_image(
   const VkResult result = idevice->table.vkMapMemory(
     idevice->logical_device,
     iimage->memory,
-    source_byte_offset,
+    byte_offset,
     (byte_count == CGPU_WHOLE_SIZE) ? iimage->size_in_bytes : byte_count,
     0u,
     pp_mapped_mem
@@ -1773,10 +1773,10 @@ CgpuResult cgpu_unmap_image(
 
 CgpuResult cgpu_create_pipeline(
   cgpu_device device,
-  uint32_t num_shader_resources_buffers,
-  const cgpu_shader_resource_buffer* p_shader_resources_buffers,
-  uint32_t num_shader_resources_images,
-  const cgpu_shader_resource_image* p_shader_resources_images,
+  uint32_t buffer_resource_count,
+  const cgpu_shader_resource_buffer* p_buffer_resources,
+  uint32_t shader_resource_count,
+  const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
   cgpu_pipeline* p_pipeline)
@@ -1798,13 +1798,13 @@ CgpuResult cgpu_create_pipeline(
   }
 
   const uint32_t num_descriptor_set_bindings =
-      num_shader_resources_buffers + num_shader_resources_images;
+      buffer_resource_count + shader_resource_count;
   VkDescriptorSetLayoutBinding* descriptor_set_bindings =
     malloc(sizeof(VkDescriptorSetLayoutBinding) * num_descriptor_set_bindings);
 
-  for (uint32_t i = 0u; i < num_shader_resources_buffers; ++i)
+  for (uint32_t i = 0u; i < buffer_resource_count; ++i)
   {
-    const cgpu_shader_resource_buffer* shader_resource_buffer = &p_shader_resources_buffers[i];
+    const cgpu_shader_resource_buffer* shader_resource_buffer = &p_buffer_resources[i];
     VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &descriptor_set_bindings[i];
     descriptor_set_layout_binding->binding = shader_resource_buffer->binding;
     descriptor_set_layout_binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1813,11 +1813,11 @@ CgpuResult cgpu_create_pipeline(
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
-  for (uint32_t i = 0u; i < num_shader_resources_images; ++i)
+  for (uint32_t i = 0u; i < shader_resource_count; ++i)
   {
-    const cgpu_shader_resource_image* shader_resource_buffer = &p_shader_resources_images[i];
+    const cgpu_shader_resource_image* shader_resource_buffer = &p_image_resources[i];
     VkDescriptorSetLayoutBinding* descriptor_set_layout_binding =
-        &descriptor_set_bindings[num_shader_resources_buffers + i];
+        &descriptor_set_bindings[buffer_resource_count + i];
     descriptor_set_layout_binding->binding = shader_resource_buffer->binding;
     descriptor_set_layout_binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     descriptor_set_layout_binding->descriptorCount = 1u;
@@ -1986,20 +1986,20 @@ CgpuResult cgpu_create_pipeline(
   }
 
   VkDescriptorBufferInfo* descriptor_buffer_infos =
-      malloc(sizeof(VkDescriptorBufferInfo) * num_shader_resources_buffers);
+      malloc(sizeof(VkDescriptorBufferInfo) * buffer_resource_count);
   VkDescriptorImageInfo* descriptor_image_infos =
-      malloc(sizeof(VkDescriptorImageInfo) * num_shader_resources_images);
+      malloc(sizeof(VkDescriptorImageInfo) * shader_resource_count);
 
   const uint32_t num_max_write_descriptor_sets =
-      num_shader_resources_buffers + num_shader_resources_images;
+      buffer_resource_count + shader_resource_count;
   VkWriteDescriptorSet* write_descriptor_sets =
       malloc(sizeof(VkWriteDescriptorSet) * num_max_write_descriptor_sets);
 
   uint32_t num_write_descriptor_sets = 0u;
 
-  for (uint32_t i = 0u; i < num_shader_resources_buffers; ++i)
+  for (uint32_t i = 0u; i < buffer_resource_count; ++i)
   {
-    const cgpu_shader_resource_buffer* shader_resource_buffer = &p_shader_resources_buffers[i];
+    const cgpu_shader_resource_buffer* shader_resource_buffer = &p_buffer_resources[i];
 
     cgpu_ibuffer* ibuffer;
     const cgpu_buffer buffer = shader_resource_buffer->buffer;
@@ -2007,17 +2007,17 @@ CgpuResult cgpu_create_pipeline(
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
-    if ((shader_resource_buffer->offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
+    if ((shader_resource_buffer->byte_offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
       return CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED;
     }
 
     VkDescriptorBufferInfo* descriptor_buffer_info = &descriptor_buffer_infos[i];
     descriptor_buffer_info->buffer = ibuffer->buffer;
-    descriptor_buffer_info->offset = shader_resource_buffer->offset;
+    descriptor_buffer_info->offset = shader_resource_buffer->byte_offset;
     descriptor_buffer_info->range =
-      (shader_resource_buffer->count == CGPU_WHOLE_SIZE) ?
-        ibuffer->size_in_bytes - shader_resource_buffer->offset :
-        shader_resource_buffer->count;
+      (shader_resource_buffer->byte_count == CGPU_WHOLE_SIZE) ?
+        ibuffer->size_in_bytes - shader_resource_buffer->byte_offset :
+        shader_resource_buffer->byte_count;
 
     VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[num_write_descriptor_sets];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2033,9 +2033,9 @@ CgpuResult cgpu_create_pipeline(
     num_write_descriptor_sets++;
   }
 
-  for (uint32_t i = 0u; i < num_shader_resources_images; ++i)
+  for (uint32_t i = 0u; i < shader_resource_count; ++i)
   {
-    const cgpu_shader_resource_image* shader_resource_image = &p_shader_resources_images[i];
+    const cgpu_shader_resource_image* shader_resource_image = &p_image_resources[i];
 
     cgpu_iimage* iimage;
     const cgpu_image image = shader_resource_image->image;
@@ -2304,12 +2304,12 @@ CgpuResult cgpu_cmd_dispatch(
 
 CgpuResult cgpu_cmd_pipeline_barrier(
   cgpu_command_buffer command_buffer,
-  uint32_t num_memory_barriers,
-  const cgpu_memory_barrier* p_memory_barriers,
-  uint32_t num_buffer_memory_barriers,
-  const cgpu_buffer_memory_barrier* p_buffer_memory_barriers,
-  uint32_t num_image_memory_barriers,
-  const cgpu_image_memory_barrier* p_image_memory_barriers)
+  uint32_t barrier_count,
+  const cgpu_memory_barrier* p_barriers,
+  uint32_t buffer_barrier_count,
+  const cgpu_buffer_memory_barrier* p_buffer_barriers,
+  uint32_t image_barrier_count,
+  const cgpu_image_memory_barrier* p_image_barriers)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer.handle, &icommand_buffer)) {
@@ -2320,11 +2320,11 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkMemoryBarrier* vk_memory_barriers = malloc(num_memory_barriers * sizeof(VkMemoryBarrier));
+  VkMemoryBarrier* vk_memory_barriers = malloc(barrier_count * sizeof(VkMemoryBarrier));
 
-  for (uint32_t i = 0u; i < num_memory_barriers; ++i)
+  for (uint32_t i = 0u; i < barrier_count; ++i)
   {
-    const cgpu_memory_barrier* b_cgpu = &p_memory_barriers[i];
+    const cgpu_memory_barrier* b_cgpu = &p_barriers[i];
     VkMemoryBarrier* b_vk = &vk_memory_barriers[i];
     b_vk->sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     b_vk->pNext = NULL;
@@ -2333,13 +2333,13 @@ CgpuResult cgpu_cmd_pipeline_barrier(
   }
 
   VkBufferMemoryBarrier* vk_buffer_memory_barriers
-    = malloc(num_buffer_memory_barriers * sizeof(VkBufferMemoryBarrier));
+    = malloc(buffer_barrier_count * sizeof(VkBufferMemoryBarrier));
   VkImageMemoryBarrier* vk_image_memory_barriers
-    = malloc(num_image_memory_barriers * sizeof(VkImageMemoryBarrier));
+    = malloc(image_barrier_count * sizeof(VkImageMemoryBarrier));
 
-  for (uint32_t i = 0u; i < num_buffer_memory_barriers; ++i)
+  for (uint32_t i = 0u; i < buffer_barrier_count; ++i)
   {
-    const cgpu_buffer_memory_barrier* b_cgpu = &p_buffer_memory_barriers[i];
+    const cgpu_buffer_memory_barrier* b_cgpu = &p_buffer_barriers[i];
 
     cgpu_ibuffer* ibuffer;
     if (!cgpu_resolve_buffer(b_cgpu->buffer.handle, &ibuffer)) {
@@ -2355,12 +2355,12 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->buffer = ibuffer->buffer;
     b_vk->offset = b_cgpu->byte_offset;
-    b_vk->size = b_cgpu->num_bytes;
+    b_vk->size = b_cgpu->byte_count;
   }
 
-  for (uint32_t i = 0u; i < num_image_memory_barriers; ++i)
+  for (uint32_t i = 0u; i < image_barrier_count; ++i)
   {
-    const cgpu_image_memory_barrier* b_cgpu = &p_image_memory_barriers[i];
+    const cgpu_image_memory_barrier* b_cgpu = &p_image_barriers[i];
 
     cgpu_iimage* iimage;
     if (!cgpu_resolve_image(b_cgpu->image.handle, &iimage)) {
@@ -2391,11 +2391,11 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
       VK_PIPELINE_STAGE_TRANSFER_BIT,
     0u,
-    num_memory_barriers,
+    barrier_count,
     vk_memory_barriers,
-    num_buffer_memory_barriers,
+    buffer_barrier_count,
     vk_buffer_memory_barriers,
-    num_image_memory_barriers,
+    image_barrier_count,
     vk_image_memory_barriers
   );
 
