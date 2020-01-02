@@ -1,10 +1,16 @@
 #version 450 core
 
+#define FLOAT_MIN 1.175494351e-38f
+
 layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
 
-const uint NUM_SAMPLES = 4;
-const uint IMAGE_WIDTH = 1024;
-const uint IMAGE_HEIGHT = 1024;
+const uint NUM_SAMPLES = 1;
+const uint IMAGE_WIDTH = 3840;
+const uint IMAGE_HEIGHT = 2160;
+
+const vec3 CAMERA_ORIGIN = vec3(15.0, 15.0, 15.0);
+const vec3 CAMERA_TARGET = vec3(0.0, 4.0, 3.0);
+const float CAMERA_FOV = radians(50.0);
 
 struct path_segment
 {
@@ -30,11 +36,11 @@ layout(set=0, binding=3) buffer PathSegmentBuffer
 
 uint wang_hash(uint seed)
 {
-    seed = (seed ^ 61) ^ (seed >> 16);
-    seed *= 9;
-    seed = seed ^ (seed >> 4);
-    seed *= 0x27d4eb2d;
-    seed = seed ^ (seed >> 15);
+    seed = (seed ^ 61u) ^ (seed >> 16);
+    seed *= 9u;
+    seed = seed ^ (seed >> 4u);
+    seed *= 0x27d4eb2du;
+    seed = seed ^ (seed >> 15u);
     return seed;
 }
 
@@ -42,54 +48,67 @@ uint random_seed;
 
 float random_number_between_0_and_1()
 {
-  random_seed ^= random_seed << 13;
-  random_seed ^= random_seed >> 17;
-  random_seed ^= random_seed << 5;
+  random_seed ^= random_seed << 13u;
+  random_seed ^= random_seed >> 17u;
+  random_seed ^= random_seed << 5u;
   return float(random_seed) * (1.0 / 4294967296.0);
 }
 
 void main()
 {
   const uint pixel_index =
-    gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * 1024;
+    gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * IMAGE_WIDTH;
 
-  if (pixel_index >= 1024 * 1024) {
+  if (pixel_index >= IMAGE_WIDTH * IMAGE_HEIGHT) {
       return;
   }
-  if (pixel_index == 0) {
-    atomicExchange(path_segment_counter, 0);
+
+  /* Reset the path counter to zero. */
+  if (pixel_index == 0u) {
+    atomicExchange(path_segment_counter, 0u);
   }
 
+  /* Use the pixel index as a base for a randomness seed. */
   random_seed = wang_hash(pixel_index);
 
-  for (uint s = 0; s < NUM_SAMPLES; ++s)
+  /* Generate mulitple rays originating from the camera. */
+  const vec3 camera_forward = normalize(CAMERA_TARGET - CAMERA_ORIGIN);
+  const vec3 camera_right = normalize(cross(camera_forward, vec3(0.0, 1.0, 0.0)));
+  const vec3 camera_up = cross(camera_right, camera_forward);
+  const float aspect_ratio = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
+  const float dist_to_plane = 1.0 / tan(CAMERA_FOV * 0.5);
+
+  for (uint s = 0u; s < NUM_SAMPLES; ++s)
   {
+    /* Find new point on camera plane with random offset. */
     const float r1 = random_number_between_0_and_1();
     const float r2 = random_number_between_0_and_1();
+    const float norm_plane_pos_x = (float(gl_GlobalInvocationID.x) + r1) / float(IMAGE_WIDTH );
+    const float norm_plane_pos_y = (float(gl_GlobalInvocationID.y) + r2) / float(IMAGE_HEIGHT);
 
-    const float u = (gl_GlobalInvocationID.x + r1) / float(IMAGE_WIDTH);
-    const float v = (gl_GlobalInvocationID.y + r2) / float(IMAGE_HEIGHT);
+    /* Convert from [0, 1] to [-1.0, 1.0] range. */
+    const float centered_offset_x = (2.0 * norm_plane_pos_x) - 1.0;
+    const float centered_offset_y = (2.0 * norm_plane_pos_y) - 1.0;
 
-    const vec3 ray_origin = vec3(0.15, 0.115, 0.0);
+    /* Calculate ray properties. */
+    vec3 ray_origin = CAMERA_ORIGIN;
+    vec3 ray_direction =
+      camera_right   * centered_offset_x * aspect_ratio +
+      camera_up      * centered_offset_y +
+      camera_forward * dist_to_plane;
 
-    const vec3 lower_left_corner = vec3(
-      ray_origin.x - 1.0,
-      ray_origin.y - 2.5,
-      ray_origin.z - 2.5
-    );
-    const vec3 horizontal = vec3(0.0, 0.0, 5.0);
-    const vec3 vertical = vec3(0.0, 5.0, 0.0);
-
-    const vec3 ray_direction =
-      lower_left_corner + u * horizontal + v * vertical;
+    /* Beware: a single direction component must not be zero.
+       This is because we often take the inverse of the direction. */
+    ray_direction += vec3(equal(ray_direction, vec3(0.0))) * FLOAT_MIN;
+    ray_direction = normalize(ray_direction);
 
     const uint sample_index = pixel_index * NUM_SAMPLES + s;
-
     path_segments[sample_index].pos = ray_origin;
     path_segments[sample_index].out_index = pixel_index;
     path_segments[sample_index].dir = ray_direction;
     path_segments[sample_index].rec_depth = 0;
-
-    pixels[pixel_index] = vec4(0.0, 0.0, 0.0, 1.0);
   }
+
+  /* We also set the initial pixel color. */
+  pixels[pixel_index] = vec4(0.0, 0.0, 0.0, 1.0);
 }
