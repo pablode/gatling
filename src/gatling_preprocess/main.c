@@ -16,7 +16,13 @@ typedef struct gp_scene {
   uint32_t     material_count;
 } gp_scene;
 
-GpResult gp_load_scene(
+void gp_fail(const char* msg)
+{
+  printf("Gatling encountered a fatal error: %s\n", msg);
+  exit(-1);
+}
+
+void gp_load_scene(
   gp_scene* scene,
   const char* file_path)
 {
@@ -34,8 +40,7 @@ GpResult gp_load_scene(
   if(!ai_scene)
   {
     const char* error_msg = aiGetErrorString();
-    printf("Unable to import scene: %s\n", error_msg);
-    return GP_FAIL_UNABLE_TO_IMPORT_SCENE;
+    gp_fail(error_msg);
   }
 
   uint32_t vertex_count = 0;
@@ -111,13 +116,10 @@ GpResult gp_load_scene(
     .vertices              = vertices
   };
 
-  GpResult gp_result = gp_bvh_build(
+  gp_bvh_build(
     &bvh_params,
     &scene->bvh
   );
-  if (gp_result != GP_OK) {
-    return GP_FAIL_UNABLE_TO_IMPORT_SCENE;
-  }
 
   scene->material_count = ai_scene->mNumMaterials;
   scene->materials =
@@ -140,28 +142,27 @@ GpResult gp_load_scene(
   free(faces);
 
   aiReleaseImport(ai_scene);
-
-  return GP_OK;
 }
 
-GpResult gp_write_file(
+void gp_write_file(
   const uint8_t* data,
   uint32_t data_size_in_bytes,
   const char* file_path)
 {
   FILE *file = fopen(file_path, "wb");
   if (file == NULL) {
-    return GP_FAIL_UNABLE_TO_OPEN_FILE;
+    gp_fail("Unable to open file for writing.");
   }
 
-  fwrite(data, 1, data_size_in_bytes, file);
+  const uint written_size = fwrite(data, 1, data_size_in_bytes, file);
+  if (written_size != !data_size_in_bytes) {
+    gp_fail("Unable to write file.");
+  }
 
   const int close_result = fclose(file);
   if (close_result != 0) {
-    return GP_FAIL_UNABLE_TO_CLOSE_FILE;
+    printf("Unable to close file '%s'.", file_path);
   }
-
-  return GP_OK;
 }
 
 void gp_free_scene(gp_scene* scene)
@@ -184,7 +185,7 @@ uint32_t round_to_buffer_offset_alignment(uint32_t byte_offset)
            required_offset_alignment * required_offset_alignment;
 }
 
-GpResult gp_write_scene(
+void gp_write_scene(
   const gp_scene* scene,
   const char* file_path)
 {
@@ -240,13 +241,11 @@ GpResult gp_write_scene(
     scene->material_count * sizeof(gp_material)
   );
 
-  const GpResult result = gp_write_file(
+  gp_write_file(
     buffer,
     total_size,
     file_path
   );
-
-  return result;
 }
 
 int main(int argc, const char* argv[])
@@ -260,20 +259,16 @@ int main(int argc, const char* argv[])
   const char* file_path_in = argv[1];
   const char* file_path_out = argv[2];
 
-  GpResult gp_result;
-
   gp_scene scene;
-  gp_result = gp_load_scene(
+  gp_load_scene(
     &scene,
     file_path_in
   );
-  assert(gp_result == GP_OK);
 
-  gp_result = gp_write_scene(
+  gp_write_scene(
     &scene,
     file_path_out
   );
-  assert(gp_result == GP_OK);
 
   gp_free_scene(&scene);
 

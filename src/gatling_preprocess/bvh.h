@@ -42,7 +42,7 @@ typedef struct gp_bvh_build_params {
   gp_vertex* vertices;
 } gp_bvh_build_params;
 
-GpResult gp_bvh_build(
+void gp_bvh_build(
   const gp_bvh_build_params* params,
   gp_bvh* bvh
 );

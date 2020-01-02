@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -12,18 +11,27 @@
 #define IMAGE_HEIGHT 2160
 #define NUM_SAMPLES 1
 
-typedef enum GatlingResult {
-  GATLING_OK = 0,
-  GATLING_FAIL_UNABLE_TO_WRITE_OUTPUT_IMAGE = -1,
-  GATLING_FAIL_UNABLE_TO_OPEN_FILE = -2,
-  GATLING_FAIL_UNABLE_TO_CLOSE_FILE = -3,
-  GATLING_FAIL_UNABLE_TO_CREATE_SHADER = -4,
-  GATLING_FAIL_UNABLE_TO_CREATE_PIPELINE = -5,
-  GATLING_FAIL_UNABLE_TO_DESTROY_SHADER = -6,
-  GATLING_FAIL_UNABLE_TO_DESTROY_PIPELINE = -7
-} GatlingResult;
+void gatling_fail(const char* msg)
+{
+  printf("Gatling encountered a fatal error: %s\n", msg);
+  exit(-1);
+}
 
-GatlingResult gatling_save_img(
+void gatling_cgpu_check(CgpuResult result, const char *msg)
+{
+  if (result != CGPU_OK) {
+    gatling_fail(msg);
+  }
+}
+
+void gatling_cgpu_warn(CgpuResult result, const char *msg)
+{
+  if (result != CGPU_OK) {
+    printf("Gatling encountered an error: %s\n", msg);
+  }
+}
+
+void gatling_save_img(
   const float* data,
   size_t data_size_in_floats,
   const char* file_path)
@@ -53,20 +61,18 @@ GatlingResult gatling_save_img(
   free(temp_data);
 
   if (!result) {
-    return GATLING_FAIL_UNABLE_TO_WRITE_OUTPUT_IMAGE;
+    gatling_fail("Unable to save image.");
   }
-
-  return GATLING_OK;
 }
 
-GatlingResult gatling_read_file(
+void gatling_read_file(
   const char* file_path,
   uint8_t** data,
   size_t* data_size)
 {
   FILE *file = fopen(file_path, "rb");
   if (file == NULL) {
-    return GATLING_FAIL_UNABLE_TO_OPEN_FILE;
+    gatling_fail("Unable to open file for reading.");
   }
 
   fseeko(file, 0, SEEK_END);
@@ -76,12 +82,11 @@ GatlingResult gatling_read_file(
   *data = malloc(*data_size);
   fread(*data, 1, *data_size, file);
 
+  /* This is not fatal, but we better log it. */
   const int close_result = fclose(file);
   if (close_result != 0) {
-    return GATLING_FAIL_UNABLE_TO_CLOSE_FILE;
+    printf("Unable to close file '%s'.", file_path);
   }
-
-  return GATLING_OK;
 }
 
 typedef struct gatling_pipeline {
@@ -89,7 +94,7 @@ typedef struct gatling_pipeline {
   cgpu_shader shader;
 } gatling_pipeline;
 
-GatlingResult gatling_create_pipeline(
+void gatling_create_pipeline(
   cgpu_device device,
   const char *shader_file_path,
   cgpu_shader_resource_buffer *shader_resource_buffers,
@@ -99,14 +104,11 @@ GatlingResult gatling_create_pipeline(
   uint32_t* data;
   size_t data_size;
 
-  GatlingResult g_result = gatling_read_file(
+  gatling_read_file(
     shader_file_path,
     (uint8_t**) &data,
     &data_size
   );
-  if (g_result != GATLING_OK) {
-    return g_result;
-  }
 
   CgpuResult c_result = cgpu_create_shader(
     device,
@@ -114,9 +116,7 @@ GatlingResult gatling_create_pipeline(
     data,
     &pipeline->shader
   );
-  if (c_result != CGPU_OK) {
-    return GATLING_FAIL_UNABLE_TO_CREATE_PIPELINE;
-  }
+  gatling_cgpu_check(c_result, "Unable to create shader.");
 
   free(data);
 
@@ -130,14 +130,10 @@ GatlingResult gatling_create_pipeline(
     "main",
     &pipeline->pipeline
   );
-  if (c_result != CGPU_OK) {
-    return GATLING_FAIL_UNABLE_TO_CREATE_PIPELINE;
-  }
-
-  return GATLING_OK;
+  gatling_cgpu_check(c_result, "Unable to create pipeline.");
 }
 
-GatlingResult gatling_destroy_pipeline(
+void gatling_destroy_pipeline(
   cgpu_device device,
   gatling_pipeline pipeline)
 {
@@ -145,19 +141,13 @@ GatlingResult gatling_destroy_pipeline(
     device,
     pipeline.shader
   );
-  if (c_result != CGPU_OK) {
-    return GATLING_FAIL_UNABLE_TO_DESTROY_SHADER;
-  }
+  gatling_cgpu_warn(c_result, "Unable to destroy shader.");
 
   c_result = cgpu_destroy_pipeline(
     device,
     pipeline.pipeline
   );
-  if (c_result != CGPU_OK) {
-    return GATLING_FAIL_UNABLE_TO_DESTROY_PIPELINE;
-  }
-
-  return GATLING_OK;
+  gatling_cgpu_warn(c_result, "Unable to destroy pipeline.");
 }
 
 void gatling_get_parent_directory(
@@ -188,13 +178,19 @@ int main(int argc, const char* argv[])
   }
 
   /* Set up instance and device. */
-  CgpuResult c_result = cgpu_initialize("gatling", 0, 1, 0);
-  assert(c_result == CGPU_OK);
+  CgpuResult c_result = cgpu_initialize(
+    "gatling",
+    GATLING_VERSION_MAJOR,
+    GATLING_VERSION_MINOR,
+    GATLING_VERSION_PATCH
+  );
+  gatling_cgpu_check(c_result, "Unable to initialize cgpu.");
 
   uint32_t device_count;
   c_result = cgpu_get_device_count(&device_count);
-  assert(c_result == CGPU_OK);
-  assert(device_count > 0);
+  if (c_result != CGPU_OK || device_count == 0) {
+    gatling_fail("Unable to find device.");
+  }
 
   cgpu_device device;
   c_result = cgpu_create_device(
@@ -203,17 +199,16 @@ int main(int argc, const char* argv[])
     NULL,
     &device
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create device.");
 
   /* Load scene. */
   uint8_t* scene_data;
   size_t scene_data_size;
-  GatlingResult g_result = gatling_read_file(
+  gatling_read_file(
     argv[1],
     &scene_data,
     &scene_data_size
   );
-  assert(g_result == GATLING_OK);
 
   /* Create input and output buffers. */
   const size_t output_buffer_size_in_floats =
@@ -244,7 +239,7 @@ int main(int argc, const char* argv[])
     input_buffer_size_in_bytes,
     &staging_buffer_in
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create buffer.");
 
   c_result = cgpu_create_buffer(
     device,
@@ -254,7 +249,7 @@ int main(int argc, const char* argv[])
     input_buffer_size_in_bytes,
     &input_buffer
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create buffer.");
 
   c_result = cgpu_create_buffer(
     device,
@@ -263,7 +258,7 @@ int main(int argc, const char* argv[])
     path_segment_buffer_size_in_bytes,
     &path_segment_buffer
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create buffer.");
 
   c_result = cgpu_create_buffer(
     device,
@@ -273,7 +268,7 @@ int main(int argc, const char* argv[])
     output_buffer_size_in_bytes,
     &output_buffer
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create buffer.");
 
   c_result = cgpu_create_buffer(
     device,
@@ -283,7 +278,7 @@ int main(int argc, const char* argv[])
     output_buffer_size_in_bytes,
     &staging_buffer_out
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create buffer.");
 
   void* mapped_mem;
   c_result = cgpu_map_buffer(
@@ -293,7 +288,7 @@ int main(int argc, const char* argv[])
     CGPU_WHOLE_SIZE,
     &mapped_mem
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to map buffer.");
 
   memcpy(
     mapped_mem,
@@ -305,24 +300,20 @@ int main(int argc, const char* argv[])
     device,
     staging_buffer_in
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to unmap buffer.");
 
   cgpu_command_buffer command_buffer;
   c_result = cgpu_create_command_buffer(
     device,
     &command_buffer
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create command buffer.");
 
   /* Set up pipelines. */
   const uint32_t node_offset     = *((uint32_t*) (scene_data +  0));
-  const uint32_t node_count      = *((uint32_t*) (scene_data +  4));
   const uint32_t face_offset     = *((uint32_t*) (scene_data +  8));
-  const uint32_t face_count      = *((uint32_t*) (scene_data + 12));
   const uint32_t vertex_offset   = *((uint32_t*) (scene_data + 16));
-  const uint32_t vertex_count    = *((uint32_t*) (scene_data + 20));
   const uint32_t material_offset = *((uint32_t*) (scene_data + 24));
-  const uint32_t material_count  = *((uint32_t*) (scene_data + 28));
 
   const size_t num_shader_resource_buffers = 7;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
@@ -345,26 +336,24 @@ int main(int argc, const char* argv[])
 
   gatling_pipeline pipeline_p1;
   gatling_pipeline pipeline_p2;
-  g_result = gatling_create_pipeline(
+
+  gatling_create_pipeline(
     device,
     prim_ray_gen_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
     &pipeline_p1
   );
-  assert(g_result == GATLING_OK);
-
-  g_result = gatling_create_pipeline(
+  gatling_create_pipeline(
     device,
     trace_ray_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
     &pipeline_p2
   );
-  assert(g_result == GATLING_OK);
 
   c_result = cgpu_begin_command_buffer(command_buffer);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to begin command buffer.");
 
   /* Copy staging buffer to input buffer. */
 
@@ -376,9 +365,9 @@ int main(int argc, const char* argv[])
     0,
     CGPU_WHOLE_SIZE
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to copy command buffer.");
 
-  cgpu_buffer_memory_barrier buffer_memory_barrier_1 = {};
+  cgpu_buffer_memory_barrier buffer_memory_barrier_1;
   buffer_memory_barrier_1.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE;
   buffer_memory_barrier_1.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_1.buffer = input_buffer;
@@ -391,7 +380,7 @@ int main(int argc, const char* argv[])
     1, &buffer_memory_barrier_1,
     0, NULL
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to set pipeline barriers.");
 
   /* Generate primary rays and clear pixels. */
 
@@ -399,7 +388,7 @@ int main(int argc, const char* argv[])
     command_buffer,
     pipeline_p1.pipeline
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to bind pipeline.");
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
@@ -407,18 +396,18 @@ int main(int argc, const char* argv[])
     (IMAGE_HEIGHT / 32) + 1,
     1
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to dispatch command buffer.");
 
   /* Trace rays. */
 
-  cgpu_buffer_memory_barrier buffer_memory_barrier_2 = {};
+  cgpu_buffer_memory_barrier buffer_memory_barrier_2;
   buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_2.buffer = path_segment_buffer;
   buffer_memory_barrier_2.byte_offset = 0;
   buffer_memory_barrier_2.byte_count = path_segment_buffer_size_in_bytes;
 
-  cgpu_buffer_memory_barrier buffer_memory_barrier_3 = {};
+  cgpu_buffer_memory_barrier buffer_memory_barrier_3;
   buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_3.buffer = output_buffer;
@@ -435,20 +424,20 @@ int main(int argc, const char* argv[])
     2, buffer_memory_barrier_2_and_3,
     0, NULL
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to set pipeline barriers.");
 
   c_result = cgpu_cmd_bind_pipeline(
     command_buffer,
     pipeline_p2.pipeline
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to bind pipeline.");
 
   cgpu_physical_device_limits device_limits;
   c_result = cgpu_get_physical_device_limits(
     device,
     &device_limits
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to query device limits.");
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
@@ -457,11 +446,11 @@ int main(int argc, const char* argv[])
     1,
     1
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to dispatch command buffer.");
 
   /* Copy staging buffer to output buffer. */
 
-  cgpu_buffer_memory_barrier buffer_memory_barrier_4 = {};
+  cgpu_buffer_memory_barrier buffer_memory_barrier_4;
   buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_4.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
   buffer_memory_barrier_4.buffer = output_buffer;
@@ -474,7 +463,7 @@ int main(int argc, const char* argv[])
     1, &buffer_memory_barrier_4,
     0, NULL
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to set pipeline barriers.");
 
   c_result = cgpu_cmd_copy_buffer(
     command_buffer,
@@ -484,27 +473,27 @@ int main(int argc, const char* argv[])
     0,
     CGPU_WHOLE_SIZE
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to copy buffer.");
 
   c_result = cgpu_end_command_buffer(command_buffer);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to end command buffer.");
 
   cgpu_fence fence;
   c_result = cgpu_create_fence(device, &fence);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to create fence.");
 
   c_result = cgpu_reset_fence(device, fence);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to reset fence.");
 
   c_result = cgpu_submit_command_buffer(
     device,
     command_buffer,
     fence
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to submit command buffer.");
 
   c_result = cgpu_wait_for_fence(device, fence);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to wait for fence.");
 
   /* Read data from gpu. */
   float* image_data = malloc(output_buffer_size_in_bytes);
@@ -516,7 +505,7 @@ int main(int argc, const char* argv[])
     CGPU_WHOLE_SIZE,
     &mapped_mem
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to map buffer.");
 
   memcpy(
     image_data,
@@ -528,15 +517,14 @@ int main(int argc, const char* argv[])
     device,
     staging_buffer_out
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_check(c_result, "Unable to unmap buffer.");
 
   /* Save image. */
-  g_result = gatling_save_img(
+  gatling_save_img(
     image_data,
     output_buffer_size_in_floats,
     argv[2]
   );
-  assert(g_result == GATLING_OK);
 
   /* Clean up. */
   free(image_data);
@@ -545,13 +533,13 @@ int main(int argc, const char* argv[])
     device,
     fence
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy fence.");
 
   c_result = cgpu_destroy_command_buffer(
     device,
     command_buffer
   );
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy command buffer.");
 
   gatling_destroy_pipeline(
     device,
@@ -563,21 +551,21 @@ int main(int argc, const char* argv[])
   );
 
   c_result = cgpu_destroy_buffer(device, staging_buffer_in);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
   c_result = cgpu_destroy_buffer(device, input_buffer);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
   c_result = cgpu_destroy_buffer(device, path_segment_buffer);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
   c_result = cgpu_destroy_buffer(device, output_buffer);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
   c_result = cgpu_destroy_buffer(device, staging_buffer_out);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
 
   c_result = cgpu_destroy_device(device);
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy device.");
 
   c_result = cgpu_destroy();
-  assert(c_result == CGPU_OK);
+  gatling_cgpu_warn(c_result, "Unable to destroy cgpu.");
 
   return 0;
 }

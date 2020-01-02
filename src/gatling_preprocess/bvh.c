@@ -241,7 +241,7 @@ static void gp_bvh_build_range(
   range_right->is_leaf = is_right_leaf;
 }
 
-GpResult gp_bvh_build(
+void gp_bvh_build(
   const gp_bvh_build_params* params,
   gp_bvh* bvh)
 {
@@ -388,8 +388,6 @@ GpResult gp_bvh_build(
   /* Free leftovers and we're finished! */
 
   free(face_refs);
-
-  return GP_OK;
 }
 
 void gp_free_bvh(gp_bvh* bvh)

@@ -15,13 +15,6 @@
   #define GP_INLINE
 #endif
 
-typedef enum GpResult {
-  GP_OK = 0,
-  GP_FAIL_UNABLE_TO_OPEN_FILE = -1,
-  GP_FAIL_UNABLE_TO_CLOSE_FILE = -2,
-  GP_FAIL_UNABLE_TO_IMPORT_SCENE = -3
-} GpResult;
-
 typedef struct gp_vertex {
   float pos[3];
   float norm[3];
