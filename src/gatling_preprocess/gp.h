@@ -3,10 +3,16 @@
 
 #include <stdint.h>
 
-#if defined(_MSC_VER)
-#  define GP_INLINE __forceinline
+#if defined(NDEBUG)
+  #if defined(__GNUC__)
+    #define GP_INLINE inline __attribute__((__always_inline__))
+  #elif defined(_MSC_VER)
+    #define GP_INLINE __forceinline
+  #else
+    #define GP_INLINE inline
+  #endif
 #else
-#  define GP_INLINE inline __attribute__((always_inline))
+  #define GP_INLINE
 #endif
 
 typedef enum GpResult {
