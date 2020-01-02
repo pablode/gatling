@@ -19,4 +19,5 @@ target_compile_definitions(
 target_link_libraries(
   gatling_preprocess PRIVATE
   assimp
+  m
 )
