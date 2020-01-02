@@ -914,7 +914,7 @@ CgpuResult cgpu_initialize(
   uint32_t instance_extension_count = 0u;
 #endif
 
-  VkApplicationInfo app_info = {};
+  VkApplicationInfo app_info;
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pNext = NULL;
   app_info.pApplicationName = p_app_name;
@@ -930,15 +930,15 @@ CgpuResult cgpu_initialize(
     version_patch);
   app_info.apiVersion = VK_API_VERSION_1_1;
 
-  VkInstanceCreateInfo create_info = {};
+  VkInstanceCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   create_info.pNext = NULL;
   create_info.flags = 0u;
   create_info.pApplicationInfo = &app_info;
-  create_info.enabledExtensionCount = instance_extension_count;
-  create_info.ppEnabledExtensionNames = instance_extensions;
   create_info.enabledLayerCount = validation_layer_count;
   create_info.ppEnabledLayerNames = validation_layers;
+  create_info.enabledExtensionCount = instance_extension_count;
+  create_info.ppEnabledExtensionNames = instance_extensions;
 
   result = vkCreateInstance(
     &create_info,
@@ -1093,7 +1093,7 @@ CgpuResult cgpu_create_device(
   /* Since ray tracing is a continuous, compute-heavy task, we don't need
      to schedule work or translate command buffers very often. Therefore,
      we also don't need async execution and can operate on a single queue. */
-  uint32_t queue_family_index = -1;
+  int32_t queue_family_index = -1;
   for (uint32_t i = 0u; i < num_queue_families; ++i) {
     const VkQueueFamilyProperties* queue_family = &queue_families[i];
     if (queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) {
@@ -1106,29 +1106,85 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_DEVICE_HAS_NO_COMPUTE_QUEUE_FAMILY;
   }
 
-  VkDeviceQueueCreateInfo queue_create_info = {};
+  VkDeviceQueueCreateInfo queue_create_info;
   queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
   queue_create_info.pNext = NULL;
+  queue_create_info.flags = 0u;
   queue_create_info.queueFamilyIndex = queue_family_index;
   queue_create_info.queueCount = 1u;
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
-  VkPhysicalDeviceFeatures device_features = {};
+  VkPhysicalDeviceFeatures device_features;
+  device_features.robustBufferAccess = VK_FALSE;
+  device_features.fullDrawIndexUint32 = VK_FALSE;
+  device_features.imageCubeArray = VK_FALSE;
+  device_features.independentBlend = VK_FALSE;
+  device_features.geometryShader = VK_FALSE;
+  device_features.tessellationShader = VK_FALSE;
+  device_features.sampleRateShading = VK_FALSE;
+  device_features.dualSrcBlend = VK_FALSE;
+  device_features.logicOp = VK_FALSE;
+  device_features.multiDrawIndirect = VK_FALSE;
+  device_features.drawIndirectFirstInstance = VK_FALSE;
+  device_features.depthClamp = VK_FALSE;
+  device_features.depthBiasClamp = VK_FALSE;
+  device_features.fillModeNonSolid = VK_FALSE;
+  device_features.depthBounds = VK_FALSE;
+  device_features.wideLines = VK_FALSE;
+  device_features.largePoints = VK_FALSE;
+  device_features.alphaToOne = VK_FALSE;
+  device_features.multiViewport = VK_FALSE;
   device_features.samplerAnisotropy = VK_TRUE;
+  device_features.textureCompressionETC2 = VK_FALSE;
+  device_features.textureCompressionASTC_LDR = VK_FALSE;
+  device_features.textureCompressionBC = VK_FALSE;
+  device_features.occlusionQueryPrecise = VK_FALSE;
+  device_features.pipelineStatisticsQuery = VK_FALSE;
+  device_features.vertexPipelineStoresAndAtomics = VK_FALSE;
+  device_features.fragmentStoresAndAtomics = VK_FALSE;
+  device_features.shaderTessellationAndGeometryPointSize = VK_FALSE;
+  device_features.shaderImageGatherExtended = VK_FALSE;
+  device_features.shaderStorageImageExtendedFormats = VK_FALSE;
+  device_features.shaderStorageImageMultisample = VK_FALSE;
+  device_features.shaderStorageImageReadWithoutFormat = VK_FALSE;
+  device_features.shaderStorageImageWriteWithoutFormat = VK_FALSE;
+  device_features.shaderUniformBufferArrayDynamicIndexing = VK_FALSE;
+  device_features.shaderSampledImageArrayDynamicIndexing = VK_FALSE;
+  device_features.shaderStorageBufferArrayDynamicIndexing = VK_FALSE;
+  device_features.shaderStorageImageArrayDynamicIndexing = VK_FALSE;
+  device_features.shaderClipDistance = VK_FALSE;
+  device_features.shaderCullDistance = VK_FALSE;
+  device_features.shaderFloat64 = VK_FALSE;
+  device_features.shaderInt64 = VK_FALSE;
+  device_features.shaderInt16 = VK_FALSE;
+  device_features.shaderResourceResidency = VK_FALSE;
+  device_features.shaderResourceMinLod = VK_FALSE;
+  device_features.sparseBinding = VK_FALSE;
+  device_features.sparseResidencyBuffer = VK_FALSE;
+  device_features.sparseResidencyImage2D = VK_FALSE;
+  device_features.sparseResidencyImage3D = VK_FALSE;
+  device_features.sparseResidency2Samples = VK_FALSE;
+  device_features.sparseResidency4Samples = VK_FALSE;
+  device_features.sparseResidency8Samples = VK_FALSE;
+  device_features.sparseResidency16Samples = VK_FALSE;
+  device_features.sparseResidencyAliased = VK_FALSE;
+  device_features.variableMultisampleRate = VK_FALSE;
+  device_features.inheritedQueries = VK_FALSE;
 
-  VkDeviceCreateInfo device_create_info = {};
+  VkDeviceCreateInfo device_create_info;
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_create_info.pNext = NULL;
+  device_create_info.flags = 0u;
   device_create_info.queueCreateInfoCount = 1u;
   device_create_info.pQueueCreateInfos = &queue_create_info;
-  device_create_info.pEnabledFeatures = &device_features;
-  device_create_info.enabledExtensionCount = required_extension_count;
-  device_create_info.ppEnabledExtensionNames = pp_required_extensions;
   /* These two fields are ignored by up-to-date implementations since
-     nowadays, there is no difference to instance validation layers. */
+   nowadays, there is no difference to instance validation layers. */
   device_create_info.enabledLayerCount = 0u;
   device_create_info.ppEnabledLayerNames = NULL;
+  device_create_info.enabledExtensionCount = required_extension_count;
+  device_create_info.ppEnabledExtensionNames = pp_required_extensions;
+  device_create_info.pEnabledFeatures = &device_features;
 
   VkResult result = vkCreateDevice(
     idevice->physical_device,
@@ -1153,11 +1209,11 @@ CgpuResult cgpu_create_device(
     &idevice->compute_queue
   );
 
-  VkCommandPoolCreateInfo pool_info = {};
+  VkCommandPoolCreateInfo pool_info;
   pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   pool_info.pNext = NULL;
-  pool_info.queueFamilyIndex = queue_family_index;
   pool_info.flags = 0u;
+  pool_info.queueFamilyIndex = queue_family_index;
 
   result = idevice->table.vkCreateCommandPool(
     idevice->logical_device,
@@ -1269,9 +1325,10 @@ CgpuResult cgpu_create_shader(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkShaderModuleCreateInfo shader_module_create_info = {};
+  VkShaderModuleCreateInfo shader_module_create_info;
   shader_module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shader_module_create_info.pNext = NULL;
+  shader_module_create_info.flags = 0u;
   shader_module_create_info.codeSize = source_byte_count;
   shader_module_create_info.pCode = p_source;
 
@@ -1358,12 +1415,15 @@ CgpuResult cgpu_create_buffer(
     vk_buffer_usage |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
   }
 
-  VkBufferCreateInfo buffer_info = {};
+  VkBufferCreateInfo buffer_info;
   buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   buffer_info.pNext = NULL;
+  buffer_info.flags = 0u;
   buffer_info.size = byte_count;
   buffer_info.usage = vk_buffer_usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  buffer_info.queueFamilyIndexCount = 0;
+  buffer_info.pQueueFamilyIndices = NULL;
 
   VkResult result = idevice->table.vkCreateBuffer(
     idevice->logical_device,
@@ -1389,11 +1449,6 @@ CgpuResult cgpu_create_buffer(
     &mem_requirements
   );
 
-  VkMemoryAllocateInfo mem_alloc_info = {};
-  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  mem_alloc_info.pNext = NULL;
-  mem_alloc_info.allocationSize = mem_requirements.size;
-
   const VkMemoryPropertyFlags mem_flags =
       cgpu_translate_memory_properties(memory_properties);
 
@@ -1409,6 +1464,11 @@ CgpuResult cgpu_create_buffer(
     resource_store_free_handle(&ibuffer_store, p_buffer->handle);
     return CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE;
   }
+
+  VkMemoryAllocateInfo mem_alloc_info;
+  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  mem_alloc_info.pNext = NULL;
+  mem_alloc_info.allocationSize = mem_requirements.size;
   mem_alloc_info.memoryTypeIndex = mem_index;
 
   result = idevice->table.vkAllocateMemory(
@@ -1565,21 +1625,24 @@ CgpuResult cgpu_create_image(
 
   const VkFormat vk_format = cgpu_translate_image_format(format);
 
-  VkImageCreateInfo image_info = {};
+  VkImageCreateInfo image_info;
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.pNext = NULL;
+  image_info.flags = 0u;
   image_info.imageType = VK_IMAGE_TYPE_2D;
+  image_info.format = vk_format;
   image_info.extent.width = width;
   image_info.extent.height = height;
   image_info.extent.depth = 1u;
   image_info.mipLevels = 1u;
   image_info.arrayLayers = 1u;
-  image_info.format = vk_format;
-  image_info.tiling = vk_image_tiling;
-  image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  image_info.usage = vk_image_usage;
   image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+  image_info.tiling = vk_image_tiling;
+  image_info.usage = vk_image_usage;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  image_info.queueFamilyIndexCount = 0;
+  image_info.pQueueFamilyIndices = NULL;
+  image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VkResult result = idevice->table.vkCreateImage(
     idevice->logical_device,
@@ -1605,11 +1668,6 @@ CgpuResult cgpu_create_image(
     &mem_requirements
   );
 
-  VkMemoryAllocateInfo mem_alloc_info = {};
-  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  mem_alloc_info.pNext = NULL;
-  mem_alloc_info.allocationSize = mem_requirements.size;
-
   const VkMemoryPropertyFlags mem_flags =
       cgpu_translate_memory_properties(memory_properties);
 
@@ -1625,6 +1683,11 @@ CgpuResult cgpu_create_image(
     resource_store_free_handle(&iimage_store, p_image->handle);
     return CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE;
   }
+
+  VkMemoryAllocateInfo mem_alloc_info;
+  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  mem_alloc_info.pNext = NULL;
+  mem_alloc_info.allocationSize = mem_requirements.size;
   mem_alloc_info.memoryTypeIndex = mem_index;
 
   result = idevice->table.vkAllocateMemory(
@@ -1825,7 +1888,7 @@ CgpuResult cgpu_create_pipeline(
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
-  VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info = {};
+  VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   descriptor_set_layout_create_info.pNext = NULL;
   descriptor_set_layout_create_info.flags = 0u;
@@ -1845,7 +1908,7 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_LAYOUT;
   }
 
-  VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
+  VkPipelineLayoutCreateInfo pipeline_layout_create_info;
   pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipeline_layout_create_info.pNext = NULL;
   pipeline_layout_create_info.flags = 0u;
@@ -1870,7 +1933,7 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_PIPELINE_LAYOUT;
   }
 
-  VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {};
+  VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
   pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_shader_stage_create_info.pNext = NULL;
   pipeline_shader_stage_create_info.flags = 0u;
@@ -1879,7 +1942,7 @@ CgpuResult cgpu_create_pipeline(
   pipeline_shader_stage_create_info.pName = p_shader_entry_point;
   pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
 
-  VkComputePipelineCreateInfo pipeline_create_info = {};
+  VkComputePipelineCreateInfo pipeline_create_info;
   pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
   pipeline_create_info.pNext = NULL;
   pipeline_create_info.flags = VK_PIPELINE_CREATE_DISPATCH_BASE;
@@ -1911,16 +1974,17 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE;
   }
 
-  VkDescriptorPoolSize descriptor_pool_size = {};
+  VkDescriptorPoolSize descriptor_pool_size;
   descriptor_pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   descriptor_pool_size.descriptorCount = num_descriptor_set_bindings;
 
-  VkDescriptorPoolCreateInfo descriptor_pool_create_info = {};
+  VkDescriptorPoolCreateInfo descriptor_pool_create_info;
   descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   descriptor_pool_create_info.pNext = NULL;
+  descriptor_pool_create_info.flags = 0u;
+  descriptor_pool_create_info.maxSets = 1u;
   descriptor_pool_create_info.poolSizeCount = 1u;
   descriptor_pool_create_info.pPoolSizes = &descriptor_pool_size;
-  descriptor_pool_create_info.maxSets = 1u;
 
   result = idevice->table.vkCreateDescriptorPool(
     idevice->logical_device,
@@ -1948,7 +2012,7 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_POOL;
   }
 
-  VkDescriptorSetAllocateInfo descriptor_set_allocate_info = {};
+  VkDescriptorSetAllocateInfo descriptor_set_allocate_info;
   descriptor_set_allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   descriptor_set_allocate_info.pNext = NULL;
   descriptor_set_allocate_info.descriptorPool = ipipeline->descriptor_pool;
@@ -2134,7 +2198,7 @@ CgpuResult cgpu_create_command_buffer(
   }
   icommand_buffer->device.handle = device.handle;
 
-  VkCommandBufferAllocateInfo cmdbuf_alloc_info = {};
+  VkCommandBufferAllocateInfo cmdbuf_alloc_info;
   cmdbuf_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   cmdbuf_alloc_info.pNext = NULL;
   cmdbuf_alloc_info.commandPool = idevice->command_pool;
@@ -2189,7 +2253,7 @@ CgpuResult cgpu_begin_command_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkCommandBufferBeginInfo command_buffer_begin_info = {};
+  VkCommandBufferBeginInfo command_buffer_begin_info;
   command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   command_buffer_begin_info.pNext = NULL;
   command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
@@ -2264,11 +2328,13 @@ CgpuResult cgpu_cmd_copy_buffer(
   if (!cgpu_resolve_buffer(destination_buffer.handle, &idestination_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  VkBufferCopy region = {};
+
+  VkBufferCopy region;
   region.srcOffset = source_byte_offset;
   region.dstOffset = destination_byte_offset;
-  region.size = (byte_count == CGPU_WHOLE_SIZE) ?
-      isource_buffer->size_in_bytes : byte_count;
+  region.size =
+    (byte_count == CGPU_WHOLE_SIZE) ? isource_buffer->size_in_bytes : byte_count;
+
   idevice->table.vkCmdCopyBuffer(
     icommand_buffer->command_buffer,
     isource_buffer->buffer,
@@ -2276,6 +2342,7 @@ CgpuResult cgpu_cmd_copy_buffer(
     1u,
     &region
   );
+
   return CGPU_OK;
 }
 
@@ -2437,7 +2504,7 @@ CgpuResult cgpu_create_fence(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkFenceCreateInfo fence_create_info = {};
+  VkFenceCreateInfo fence_create_info;
   fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   fence_create_info.pNext = NULL;
   fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -2542,7 +2609,7 @@ CgpuResult cgpu_submit_command_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkSubmitInfo submit_info = {};
+  VkSubmitInfo submit_info;
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.pNext = NULL;
   submit_info.waitSemaphoreCount = 0u;
@@ -2616,7 +2683,7 @@ CgpuResult cgpu_invalidate_mapped_memory(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkMappedMemoryRange memory_range = {};
+  VkMappedMemoryRange memory_range;
   memory_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
   memory_range.pNext = NULL;
   memory_range.memory = ibuffer->memory;
