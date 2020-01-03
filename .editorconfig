@@ -15,7 +15,7 @@ indent_style = space
 indent_size = 2
 trim_trailing_whitespace = true
 
-[*.{comp}]
+[*.{comp,glsl}]
 indent_style = space
 indent_size = 4
 trim_trailing_whitespace = true

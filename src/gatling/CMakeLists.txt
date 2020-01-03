@@ -3,8 +3,9 @@ gatling_add_executable(
   SOURCES_C
     main.c
   SOURCES_GLSL
-    prim_ray_gen.comp
-    trace_ray.comp
+    kernel_ray_gen.comp
+    kernel_extend.comp
+    kernel_shade.comp
 )
 
 target_compile_definitions(

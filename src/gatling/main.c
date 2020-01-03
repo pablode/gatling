@@ -201,6 +201,13 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_check(c_result, "Unable to create device.");
 
+  cgpu_physical_device_limits device_limits;
+  c_result = cgpu_get_physical_device_limits(
+    device,
+    &device_limits
+  );
+  gatling_cgpu_check(c_result, "Unable to query device limits.");
+
   /* Load scene. */
   uint8_t* scene_data;
   size_t scene_data_size;
@@ -219,15 +226,23 @@ int main(int argc, const char* argv[])
   const size_t input_buffer_size_in_bytes = scene_data_size;
 
   const size_t path_segment_buffer_size_in_bytes =
-    (IMAGE_WIDTH *         /* x dim */
-      IMAGE_HEIGHT *       /* y dim */
-      NUM_SAMPLES *        /* sample count */
-      sizeof(float) * 8) + /* path_segment struct size */
-      16;                  /* counter in first 4 bytes + padding */
+    IMAGE_WIDTH *   /* x dim */
+    IMAGE_HEIGHT *  /* y dim */
+    NUM_SAMPLES *   /* sample count */
+    32 +            /* path_segment struct byte size */
+    16;             /* counter in first 4 bytes + padding */
+
+  const size_t hit_info_buffer_size_in_bytes =
+    IMAGE_WIDTH *   /* x dim */
+    IMAGE_HEIGHT *  /* y dim */
+    NUM_SAMPLES *   /* sample count */
+    32 +            /* hit_size struct byte size */
+    16;             /* counter in first 4 bytes + padding */
 
   cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
   cgpu_buffer path_segment_buffer;
+  cgpu_buffer hit_info_buffer;
   cgpu_buffer output_buffer;
   cgpu_buffer staging_buffer_out;
 
@@ -257,6 +272,15 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
     path_segment_buffer_size_in_bytes,
     &path_segment_buffer
+  );
+  gatling_cgpu_check(c_result, "Unable to create buffer.");
+
+  c_result = cgpu_create_buffer(
+    device,
+    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER,
+    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    hit_info_buffer_size_in_bytes,
+    &hit_info_buffer
   );
   gatling_cgpu_check(c_result, "Unable to create buffer.");
 
@@ -315,7 +339,7 @@ int main(int argc, const char* argv[])
   const uint32_t vertex_offset   = *((uint32_t*) (scene_data + 16));
   const uint32_t material_offset = *((uint32_t*) (scene_data + 24));
 
-  const size_t num_shader_resource_buffers = 7;
+  const size_t num_shader_resource_buffers = 8;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
     { 0u,       output_buffer,              0u,                 CGPU_WHOLE_SIZE },
     { 1u, path_segment_buffer,              0u,                 CGPU_WHOLE_SIZE },
@@ -323,33 +347,44 @@ int main(int argc, const char* argv[])
     { 3u,        input_buffer,     node_offset,       face_offset - node_offset },
     { 4u,        input_buffer,     face_offset,     vertex_offset - face_offset },
     { 5u,        input_buffer,   vertex_offset, material_offset - vertex_offset },
-    { 6u,        input_buffer, material_offset,                 CGPU_WHOLE_SIZE }
+    { 6u,        input_buffer, material_offset,                 CGPU_WHOLE_SIZE },
+    { 7u,    hit_info_buffer,               0u,                 CGPU_WHOLE_SIZE }
   };
 
   char dir_path[4096];
   gatling_get_parent_directory(argv[0], dir_path);
 
-  char prim_ray_gen_shader_path[4096];
-  snprintf(prim_ray_gen_shader_path, 4096, "%s/shaders/prim_ray_gen.comp.spv", dir_path);
-  char trace_ray_shader_path[4096];
-  snprintf(trace_ray_shader_path, 4096, "%s/shaders/trace_ray.comp.spv", dir_path);
+  char kernel_ray_gen_shader_path[4096];
+  snprintf(kernel_ray_gen_shader_path, 4096, "%s/shaders/kernel_ray_gen.comp.spv", dir_path);
+  char kernel_extend_shader_path[4096];
+  snprintf(kernel_extend_shader_path, 4096, "%s/shaders/kernel_extend.comp.spv", dir_path);
+  char kernel_shade_shader_path[4096];
+  snprintf(kernel_shade_shader_path, 4096, "%s/shaders/kernel_shade.comp.spv", dir_path);
 
-  gatling_pipeline pipeline_p1;
-  gatling_pipeline pipeline_p2;
+  gatling_pipeline pipeline_ray_gen;
+  gatling_pipeline pipeline_extend;
+  gatling_pipeline pipeline_shade;
 
   gatling_create_pipeline(
     device,
-    prim_ray_gen_shader_path,
+    kernel_ray_gen_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
-    &pipeline_p1
+    &pipeline_ray_gen
   );
   gatling_create_pipeline(
     device,
-    trace_ray_shader_path,
+    kernel_extend_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
-    &pipeline_p2
+    &pipeline_extend
+  );
+  gatling_create_pipeline(
+    device,
+    kernel_shade_shader_path,
+    shader_resource_buffers,
+    num_shader_resource_buffers,
+    &pipeline_shade
   );
 
   c_result = cgpu_begin_command_buffer(command_buffer);
@@ -372,7 +407,7 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_1.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_1.buffer = input_buffer;
   buffer_memory_barrier_1.byte_offset = 0;
-  buffer_memory_barrier_1.byte_count = input_buffer_size_in_bytes;
+  buffer_memory_barrier_1.byte_count = CGPU_WHOLE_SIZE;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -386,7 +421,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_bind_pipeline(
     command_buffer,
-    pipeline_p1.pipeline
+    pipeline_ray_gen.pipeline
   );
   gatling_cgpu_check(c_result, "Unable to bind pipeline.");
 
@@ -404,40 +439,65 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_2.buffer = path_segment_buffer;
-  buffer_memory_barrier_2.byte_offset = 0;
-  buffer_memory_barrier_2.byte_count = path_segment_buffer_size_in_bytes;
-
-  cgpu_buffer_memory_barrier buffer_memory_barrier_3;
-  buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
-  buffer_memory_barrier_3.buffer = output_buffer;
-  buffer_memory_barrier_3.byte_offset = 0;
-  buffer_memory_barrier_3.byte_count = output_buffer_size_in_bytes;
-
-  cgpu_buffer_memory_barrier buffer_memory_barrier_2_and_3[] = {
-    buffer_memory_barrier_2, buffer_memory_barrier_3
-  };
+  buffer_memory_barrier_2.byte_offset = 0u;
+  buffer_memory_barrier_2.byte_count = CGPU_WHOLE_SIZE;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
     0, NULL,
-    2, buffer_memory_barrier_2_and_3,
+    1, &buffer_memory_barrier_2,
     0, NULL
   );
   gatling_cgpu_check(c_result, "Unable to set pipeline barriers.");
 
   c_result = cgpu_cmd_bind_pipeline(
     command_buffer,
-    pipeline_p2.pipeline
+    pipeline_extend.pipeline
   );
   gatling_cgpu_check(c_result, "Unable to bind pipeline.");
 
-  cgpu_physical_device_limits device_limits;
-  c_result = cgpu_get_physical_device_limits(
-    device,
-    &device_limits
+  c_result = cgpu_cmd_dispatch(
+    command_buffer,
+    /* TODO: what is the optimal number? */
+    device_limits.maxComputeWorkGroupInvocations,
+    1,
+    1
   );
-  gatling_cgpu_check(c_result, "Unable to query device limits.");
+  gatling_cgpu_check(c_result, "Unable to dispatch command buffer.");
+
+  /* Shade hit points. */
+
+  cgpu_buffer_memory_barrier buffer_memory_barrier_3;
+  buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
+  buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
+  buffer_memory_barrier_3.buffer = hit_info_buffer;
+  buffer_memory_barrier_3.byte_offset = 0u;
+  buffer_memory_barrier_3.byte_count = CGPU_WHOLE_SIZE;
+
+  cgpu_buffer_memory_barrier buffer_memory_barrier_4;
+  buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
+  buffer_memory_barrier_4.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
+  buffer_memory_barrier_4.buffer = output_buffer;
+  buffer_memory_barrier_4.byte_offset = 0u;
+  buffer_memory_barrier_4.byte_count = CGPU_WHOLE_SIZE;
+
+  cgpu_buffer_memory_barrier buffer_memory_barrier_3_and_4[] = {
+    buffer_memory_barrier_3, buffer_memory_barrier_4
+  };
+
+  c_result = cgpu_cmd_pipeline_barrier(
+    command_buffer,
+    0, NULL,
+    2, buffer_memory_barrier_3_and_4,
+    0, NULL
+  );
+  gatling_cgpu_check(c_result, "Unable to set pipeline barriers.");
+
+  c_result = cgpu_cmd_bind_pipeline(
+    command_buffer,
+    pipeline_shade.pipeline
+  );
+  gatling_cgpu_check(c_result, "Unable to bind pipeline.");
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
@@ -450,17 +510,17 @@ int main(int argc, const char* argv[])
 
   /* Copy staging buffer to output buffer. */
 
-  cgpu_buffer_memory_barrier buffer_memory_barrier_4;
-  buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  buffer_memory_barrier_4.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
-  buffer_memory_barrier_4.buffer = output_buffer;
-  buffer_memory_barrier_4.byte_offset = 0;
-  buffer_memory_barrier_4.byte_count = output_buffer_size_in_bytes;
+  cgpu_buffer_memory_barrier buffer_memory_barrier_5;
+  buffer_memory_barrier_5.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
+  buffer_memory_barrier_5.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
+  buffer_memory_barrier_5.buffer = output_buffer;
+  buffer_memory_barrier_5.byte_offset = 0;
+  buffer_memory_barrier_5.byte_count = CGPU_WHOLE_SIZE;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
     0, NULL,
-    1, &buffer_memory_barrier_4,
+    1, &buffer_memory_barrier_5,
     0, NULL
   );
   gatling_cgpu_check(c_result, "Unable to set pipeline barriers.");
@@ -541,18 +601,15 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_warn(c_result, "Unable to destroy command buffer.");
 
-  gatling_destroy_pipeline(
-    device,
-    pipeline_p1
-  );
-  gatling_destroy_pipeline(
-    device,
-    pipeline_p2
-  );
+  gatling_destroy_pipeline(device, pipeline_ray_gen);
+  gatling_destroy_pipeline(device, pipeline_extend);
+  gatling_destroy_pipeline(device, pipeline_shade);
 
   c_result = cgpu_destroy_buffer(device, staging_buffer_in);
   gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
   c_result = cgpu_destroy_buffer(device, input_buffer);
+  gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
+  c_result = cgpu_destroy_buffer(device, hit_info_buffer);
   gatling_cgpu_warn(c_result, "Unable to destroy buffer.");
   c_result = cgpu_destroy_buffer(device, path_segment_buffer);
   gatling_cgpu_warn(c_result, "Unable to destroy buffer.");

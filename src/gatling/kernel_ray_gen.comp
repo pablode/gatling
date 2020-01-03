@@ -4,6 +4,8 @@
 
 layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
 
+#include "common.glsl"
+
 const uint NUM_SAMPLES = 1;
 const uint IMAGE_WIDTH = 3840;
 const uint IMAGE_HEIGHT = 2160;
@@ -11,28 +13,6 @@ const uint IMAGE_HEIGHT = 2160;
 const vec3 CAMERA_ORIGIN = vec3(15.0, 15.0, 15.0);
 const vec3 CAMERA_TARGET = vec3(0.0, 4.0, 3.0);
 const float CAMERA_FOV = radians(50.0);
-
-struct path_segment
-{
-    vec3 pos;
-    uint out_index;
-    vec3 dir;
-    uint rec_depth;
-};
-
-layout(set=0, binding=0) writeonly buffer OutputBuffer
-{
-    vec4 pixels[];
-};
-
-layout(set=0, binding=1) buffer PathSegmentBuffer
-{
-    uint path_segment_counter;
-    uint pad_0;
-    uint pad_1;
-    uint pad_2;
-    path_segment[] path_segments;
-};
 
 uint wang_hash(uint seed)
 {
@@ -63,9 +43,12 @@ void main()
       return;
   }
 
-  /* Reset the path counter to zero. */
-  if (pixel_index == 0u) {
-    atomicExchange(path_segment_counter, 0u);
+  /* Reset counters to zero. */
+  if (pixel_index == 0u)
+  {
+    path_segment_counter = 0u;
+    hit_write_counter = 0u;
+    hit_read_counter = 0u;
   }
 
   /* Use the pixel index as a base for a randomness seed. */
@@ -104,7 +87,7 @@ void main()
 
     const uint sample_index = pixel_index * NUM_SAMPLES + s;
     path_segments[sample_index].pos = ray_origin;
-    path_segments[sample_index].out_index = pixel_index;
+    path_segments[sample_index].pixel_index = pixel_index;
     path_segments[sample_index].dir = ray_direction;
     path_segments[sample_index].rec_depth = 0;
   }

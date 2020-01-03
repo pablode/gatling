@@ -1,0 +1,46 @@
+#version 450 core
+
+layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
+
+#include "common.glsl"
+
+vec4 shade(const hit_info hit)
+{
+    const face face = faces[hit.face_index];
+    const face_vertex v0 = vertices[face.v_0];
+    const face_vertex v1 = vertices[face.v_1];
+    const face_vertex v2 = vertices[face.v_2];
+    const vec3 v0_n = vec3(v0.norm_x, v0.norm_y, v0.norm_z);
+    const vec3 v1_n = vec3(v1.norm_x, v1.norm_y, v1.norm_z);
+    const vec3 v2_n = vec3(v2.norm_x, v2.norm_y, v2.norm_z);
+
+    const float bc_u = hit.bc_u;
+    const float bc_v = hit.bc_v;
+
+    const vec3 normal = normalize(
+        v0_n * (1.0 - bc_u - bc_v) +
+        v1_n * bc_u +
+        v2_n * bc_v
+    );
+
+    const vec4 color = vec4(abs(normal), 1.0);
+
+    return color;
+}
+
+void main()
+{
+    while(true)
+    {
+        const uint hit_index = atomicAdd(hit_read_counter, 1);
+        if (hit_index >= hit_write_counter) {
+            return;
+        }
+
+        const hit_info hit = hits[hit_index];
+
+        const vec4 color = shade(hit);
+
+        pixels[hit.pixel_index] = color;
+    }
+}
