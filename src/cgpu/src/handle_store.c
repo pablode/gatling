@@ -8,7 +8,7 @@ void handle_store_create(
   store->max_index = 0;
   store->free_index_count = 0;
   store->free_index_capacity = 8;
-  store->free_indices= malloc(store->free_index_count * sizeof(uint32_t));
+  store->free_indices= malloc(store->free_index_capacity * sizeof(uint32_t));
   store->version_capacity = 8;
   store->versions = malloc(store->version_capacity * sizeof(uint32_t));
 }
