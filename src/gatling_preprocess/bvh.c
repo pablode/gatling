@@ -12,13 +12,12 @@ typedef struct face_ref {
   uint32_t index;
 } face_ref;
 
-typedef struct bvh_range {
-  uint32_t start;
-  uint32_t count;
-  gp_aabb  aabb;
-  bool     is_leaf;
-  uint32_t node_index;
-} bvh_range;
+typedef struct work_range {
+  face_ref* face_stack;
+  uint32_t  face_count;
+  gp_aabb   aabb;
+  bool      is_leaf;
+} work_range;
 
 typedef struct split_cand {
   float    sah_cost;
@@ -30,21 +29,20 @@ typedef struct split_cand {
 } split_cand;
 
 typedef struct stack_item {
-  bvh_range range;
-  uint32_t  node_index;
+  work_range range;
+  uint32_t   node_index;
 } stack_item;
 
 typedef struct thread_data {
   const gp_bvh_build_params* params;
-  face_ref*                  face_refs;
   gp_aabb*                   reused_bounds;
 } thread_data;
 
 GP_INLINE int gp_bvh_sort_comp_func(
   const void* a, const void* b, uint32_t dim)
 {
-  const face_ref* ref_1 = (face_ref *) a;
-  const face_ref* ref_2 = (face_ref *) b;
+  const face_ref* ref_1 = (face_ref*) a;
+  const face_ref* ref_2 = (face_ref*) b;
   const float aabb_length_1 = ref_1->aabb.min[dim] + ref_1->aabb.max[dim];
   const float aabb_length_2 = ref_2->aabb.min[dim] + ref_2->aabb.max[dim];
   const float aabb_center_diff = aabb_length_2 - aabb_length_1;
@@ -108,13 +106,10 @@ GP_INLINE float gp_calc_node_traversal_cost(
 
 static void gp_bvh_find_split(
   thread_data* thread_data,
-  uint32_t     tri_offset,
-  uint32_t     tri_count,
+  face_ref*    face_stack,
+  uint32_t     face_count,
   split_cand*  split_cand)
 {
-  face_ref* face_refs = thread_data->face_refs;
-  face_ref* base_ref  = &face_refs[tri_offset];
-
   float best_sah_cost  = INFINITY;
   float best_tie_break = INFINITY;
   gp_aabb right_aabb;
@@ -123,14 +118,14 @@ static void gp_bvh_find_split(
   /* Test each axis and sort triangles along it. */
   for (uint32_t dim = 0; dim < 3; ++dim)
   {
-    gp_bvh_sort_references(face_refs + tri_offset, tri_count, dim);
+    gp_bvh_sort_references(face_stack, face_count, dim);
 
     /* Sweep from right to left. */
     gp_aabb_make_smallest(&right_aabb);
 
-    for (uint32_t r = tri_count; r > 0; --r)
+    for (uint32_t r = face_count; r > 0; --r)
     {
-      const face_ref* ref = &base_ref[r];
+      const face_ref* ref = &face_stack[r];
       gp_aabb_merge(&right_aabb, &ref->aabb, &right_aabb);
       thread_data->reused_bounds[r - 1] = right_aabb;
     }
@@ -138,13 +133,13 @@ static void gp_bvh_find_split(
     /* Sweep from left to right. */
     gp_aabb_make_smallest(&left_aabb);
 
-    for (uint32_t l = 1; l < tri_count; ++l)
+    for (uint32_t l = 1; l < face_count; ++l)
     {
-      const face_ref* ref = &base_ref[l - 1];
+      const face_ref* ref = &face_stack[l - 1];
       gp_aabb_merge(&left_aabb, &ref->aabb, &left_aabb);
 
       /* Calculate SAH cost. */
-      const uint32_t r = tri_count - l;
+      const uint32_t r = face_count - l;
       const float area_l = gp_aabb_half_area(&left_aabb);
       const float area_r =
         gp_aabb_half_area(&thread_data->reused_bounds[l - 1]);
@@ -183,23 +178,23 @@ static void gp_bvh_find_split(
 
 static void gp_bvh_build_range(
   thread_data* data,
-  const bvh_range* range,
-  bvh_range* range_left,
-  bvh_range* range_right)
+  const work_range* range,
+  work_range* range_left,
+  work_range* range_right)
 {
   /* Find best split candidate. */
   split_cand split;
   gp_bvh_find_split(
     data,
-    range->start,
-    range->count,
+    range->face_stack,
+    range->face_count,
     &split
   );
 
   /* Sort triangles again in best split dimension. */
   gp_bvh_sort_references(
-    data->face_refs + range->start,
-    range->count,
+    range->face_stack,
+    range->face_count,
     split.dim
   );
 
@@ -231,14 +226,14 @@ static void gp_bvh_build_range(
      split.sah_cost < right_leaf_sah_cost);
 
   /* Set new child ranges. */
-  range_left->start    = range->start;
-  range_left->count    = split.left_tri_count;
-  range_left->aabb     = split.left_aabb;
-  range_left->is_leaf  = is_left_leaf;
-  range_right->start   = range->start + split.left_tri_count;
-  range_right->count   = range->count - split.left_tri_count;
-  range_right->aabb    = split.right_aabb;
-  range_right->is_leaf = is_right_leaf;
+  range_left->face_stack  = range->face_stack;
+  range_left->face_count  = split.left_tri_count;
+  range_left->aabb        = split.left_aabb;
+  range_left->is_leaf     = is_left_leaf;
+  range_right->face_stack = range->face_stack + split.left_tri_count;
+  range_right->face_count = range->face_count - split.left_tri_count;
+  range_right->aabb       = split.right_aabb;
+  range_right->is_leaf    = is_right_leaf;
 }
 
 void gp_bvh_build(
@@ -261,8 +256,7 @@ void gp_bvh_build(
   gp_aabb root_aabb;
   gp_aabb_make_smallest(&root_aabb);
 
-  face_ref *face_refs =
-    (face_ref *) malloc(face_count * sizeof(face_ref));
+  face_ref* face_stack = (face_ref*) malloc(face_count * sizeof(face_ref));
 
   for (uint32_t i = 0; i < face_count; ++i)
   {
@@ -271,7 +265,7 @@ void gp_bvh_build(
     const gp_vertex* v_b = &vertices[face->v_i[1]];
     const gp_vertex* v_c = &vertices[face->v_i[2]];
 
-    face_ref *face_ref = &face_refs[i];
+    face_ref* face_ref = &face_stack[i];
     face_ref->index = i;
 
     gp_aabb_make_from_triangle(
@@ -295,11 +289,11 @@ void gp_bvh_build(
   stack_item* items =
     (stack_item*) malloc(max_item_count * sizeof(stack_item));
 
-  items[0].range.start   = 0;
-  items[0].range.count   = face_count;
-  items[0].range.aabb    = root_aabb;
-  items[0].range.is_leaf = false;
-  items[0].node_index    = 0;
+  items[0].range.face_stack = face_stack;
+  items[0].range.face_count = face_count;
+  items[0].range.aabb       = root_aabb;
+  items[0].range.is_leaf    = false;
+  items[0].node_index       = 0;
 
   /* We want FIFO behaviour to have the BVH level-wise in memory. */
   uint32_t item_read_index  = 0;
@@ -312,7 +306,6 @@ void gp_bvh_build(
 
   thread_data data = {
     .params = params,
-    .face_refs = face_refs,
     .reused_bounds = reused_bounds
   };
 
@@ -338,8 +331,8 @@ void gp_bvh_build(
     node->right_aabb  = item_right.range.aabb;
 
     if (item_left.range.is_leaf) {
-      node->left_child_index = item_left.range.start;
-      node->left_child_count = item_left.range.count;
+      node->left_child_index = item_left.range.face_stack - face_stack;
+      node->left_child_count = item_left.range.face_count;
       node->left_child_count |= (1u << 31u);
     } else {
       node_index++;
@@ -351,8 +344,8 @@ void gp_bvh_build(
     }
 
     if (item_right.range.is_leaf) {
-      node->right_child_index = item_right.range.start;
-      node->right_child_count = item_right.range.count;
+      node->right_child_index = item_right.range.face_stack - face_stack;
+      node->right_child_count = item_right.range.face_count;
       node->right_child_count |= (1u << 31u);
     } else {
       node_index++;
@@ -373,21 +366,18 @@ void gp_bvh_build(
   bvh->nodes = (gp_bvh_node*) realloc(bvh->nodes, bvh->node_count * sizeof(gp_bvh_node));
 
   bvh->vertex_count = vertex_count;
-  bvh->vertices = malloc(vertex_count * sizeof(gp_vertex));
-  memcpy(bvh->vertices, params->vertices, vertex_count * sizeof(gp_vertex));
+  bvh->vertices = malloc(bvh->vertex_count * sizeof(gp_vertex));
+  memcpy(bvh->vertices, params->vertices, bvh->vertex_count * sizeof(gp_vertex));
 
   bvh->face_count = face_count;
-  bvh->faces = malloc(face_count * sizeof(gp_face));
-
+  bvh->faces = malloc(bvh->face_count * sizeof(gp_face));
   for (uint32_t i = 0; i < face_count; ++i)
   {
-    const uint32_t face_index = face_refs[i].index;
+    const uint32_t face_index = face_stack[i].index;
     bvh->faces[i] = params->faces[face_index];
   }
 
-  /* Free leftovers and we're finished! */
-
-  free(face_refs);
+  free(face_stack);
 }
 
 void gp_free_bvh(gp_bvh* bvh)
