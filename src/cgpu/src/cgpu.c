@@ -17,6 +17,7 @@ typedef struct cgpu_idevice {
   VkPhysicalDevice            physical_device;
   VkQueue                     compute_queue;
   VkCommandPool               command_pool;
+  VkQueryPool                 timestamp_pool;
   VkSampler                   sampler;
   struct VolkDeviceTable      table;
   cgpu_physical_device_limits limits;
@@ -1274,6 +1275,42 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_CAN_NOT_CREATE_COMMAND_POOL;
   }
 
+  VkQueryPoolCreateInfo timestamp_pool_info;
+  timestamp_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+  timestamp_pool_info.pNext = NULL;
+  timestamp_pool_info.flags = 0u;
+  timestamp_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+  timestamp_pool_info.queryCount = 32u;
+  timestamp_pool_info.pipelineStatistics = 0u;
+
+  result = idevice->table.vkCreateQueryPool(
+    idevice->logical_device,
+    &timestamp_pool_info,
+    NULL,
+    &idevice->timestamp_pool
+  );
+
+  if (result != VK_SUCCESS)
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+
+    idevice->table.vkDestroySampler(
+      idevice->logical_device,
+      idevice->sampler,
+      NULL
+    );
+    idevice->table.vkDestroyCommandPool(
+      idevice->logical_device,
+      idevice->command_pool,
+      NULL
+    );
+    idevice->table.vkDestroyDevice(
+      idevice->logical_device,
+      NULL
+    );
+    return CGPU_FAIL_UNABLE_TO_CREATE_QUERY_POOL;
+  }
+
   return CGPU_OK;
 }
 
@@ -1285,6 +1322,11 @@ CgpuResult cgpu_destroy_device(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
+  idevice->table.vkDestroyQueryPool(
+    idevice->logical_device,
+    idevice->timestamp_pool,
+    NULL
+  );
   idevice->table.vkDestroySampler(
     idevice->logical_device,
     idevice->sampler,
@@ -2468,6 +2510,88 @@ CgpuResult cgpu_cmd_pipeline_barrier(
   free(vk_memory_barriers);
   free(vk_buffer_memory_barriers);
   free(vk_image_memory_barriers);
+
+  return CGPU_OK;
+}
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_reset_timestamps(
+  cgpu_command_buffer command_buffer,
+  uint32_t offset,
+  uint32_t count)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  idevice->table.vkCmdResetQueryPool(
+    icommand_buffer->command_buffer,
+    idevice->timestamp_pool,
+    offset,
+    count
+  );
+
+  return CGPU_OK;
+}
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_write_timestamp(
+  cgpu_command_buffer command_buffer,
+  uint32_t timestamp_index)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  idevice->table.vkCmdWriteTimestamp(
+    icommand_buffer->command_buffer,
+    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+    idevice->timestamp_pool,
+    timestamp_index
+  );
+
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_cmd_copy_timestamps(
+  cgpu_command_buffer command_buffer,
+  cgpu_buffer buffer,
+  uint32_t offset,
+  uint32_t count,
+  bool wait_until_available)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_ibuffer* ibuffer;
+  if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  idevice->table.vkCmdCopyQueryPoolResults(
+    icommand_buffer->command_buffer,
+    idevice->timestamp_pool,
+    offset,
+    count,
+    ibuffer->buffer,
+    0u,
+    sizeof(uint64_t),
+    VK_QUERY_RESULT_64_BIT | wait_until_available ?
+      VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
+  );
 
   return CGPU_OK;
 }

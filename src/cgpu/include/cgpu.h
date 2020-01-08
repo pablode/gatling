@@ -81,7 +81,8 @@ typedef enum CgpuResult {
   CGPU_FAIL_UNABLE_TO_INITIALIZE_VULKAN = -24,
   CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE = -25,
   CGPU_FAIL_UNABLE_TO_INVALIDATE_MEMORY = -26,
-  CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED = -27
+  CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED = -27,
+  CGPU_FAIL_UNABLE_TO_CREATE_QUERY_POOL = -28
 } CgpuResult;
 
 typedef uint32_t CgpuBufferUsageFlags;
@@ -711,6 +712,25 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_pipeline_barrier(
   const cgpu_buffer_memory_barrier* p_buffer_barriers,
   uint32_t image_barrier_count,
   const cgpu_image_memory_barrier* p_image_barriers
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_reset_timestamps(
+  cgpu_command_buffer command_buffer,
+  uint32_t offset,
+  uint32_t count
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_write_timestamp(
+  cgpu_command_buffer command_buffer,
+  uint32_t timestamp_index
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_timestamps(
+  cgpu_command_buffer command_buffer,
+  cgpu_buffer buffer,
+  uint32_t offset,
+  uint32_t count,
+  bool wait_until_available
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_end_command_buffer(
