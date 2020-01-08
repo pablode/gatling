@@ -155,7 +155,7 @@ void gp_write_file(
   }
 
   const uint written_size = fwrite(data, 1, data_size_in_bytes, file);
-  if (written_size != !data_size_in_bytes) {
+  if (written_size != data_size_in_bytes) {
     gp_fail("Unable to write file.");
   }
 
