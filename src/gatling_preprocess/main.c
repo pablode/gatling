@@ -26,7 +26,10 @@ void gp_load_scene(
   gp_scene* scene,
   const char* file_path)
 {
-  const struct aiScene* ai_scene = aiImportFile(
+  struct aiPropertyStore* props = aiCreatePropertyStore();
+  aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
+
+  const struct aiScene* ai_scene = aiImportFileExWithProperties(
     file_path,
     aiProcess_Triangulate |
       aiProcess_FindInvalidData |
@@ -34,8 +37,13 @@ void gp_load_scene(
       aiProcess_ImproveCacheLocality |
       aiProcess_JoinIdenticalVertices |
       aiProcess_TransformUVCoords |
-      aiProcess_RemoveRedundantMaterials
+      aiProcess_RemoveRedundantMaterials |
+      aiProcess_FindDegenerates,
+      NULL,
+      props
   );
+
+  aiReleasePropertyStore(props);
 
   if(!ai_scene)
   {
@@ -246,6 +254,8 @@ void gp_write_scene(
     total_size,
     file_path
   );
+
+  free(buffer);
 }
 
 int main(int argc, const char* argv[])
