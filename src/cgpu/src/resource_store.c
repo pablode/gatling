@@ -55,6 +55,7 @@ bool resource_store_get(resource_store* store, uint64_t handle, void** object)
   }
 
   const uint32_t object_index = store->item_byte_size * index;
-  *object = (void*) ((char*)store->objects + object_index);
+  uint8_t* objects_ptr = (uint8_t*) store->objects;
+  *object = (void*) (objects_ptr + object_index);
   return true;
 }

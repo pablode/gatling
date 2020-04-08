@@ -84,17 +84,13 @@ static cgpu_iinstance iinstance;
 
 /* Helper functions. */
 
-#define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)  \
-CGPU_INLINE bool cgpu_resolve_##RESOURCE_NAME(                                           \
-  HANDLE_TYPE handle,                                                                    \
-  IRESOURCE_TYPE** idata)                                                                \
-{                                                                                        \
-  if (!resource_store_get(                                                               \
-      &RESOURCE_STORE, handle.handle, (void**) idata)) {                                 \
-    return false;                                                                        \
-  }                                                                                      \
-  return true;                                                                           \
-}
+#define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)   \
+  CGPU_INLINE static bool cgpu_resolve_##RESOURCE_NAME(                                   \
+    HANDLE_TYPE handle,                                                                   \
+    IRESOURCE_TYPE** idata)                                                               \
+  {                                                                                       \
+    return resource_store_get(&RESOURCE_STORE, handle.handle, (void**) idata);            \
+  }
 
 CGPU_RESOLVE_HANDLE(        device,         cgpu_device,         cgpu_idevice,         idevice_store)
 CGPU_RESOLVE_HANDLE(        buffer,         cgpu_buffer,         cgpu_ibuffer,         ibuffer_store)
@@ -103,8 +99,6 @@ CGPU_RESOLVE_HANDLE(         image,          cgpu_image,          cgpu_iimage,  
 CGPU_RESOLVE_HANDLE(      pipeline,       cgpu_pipeline,       cgpu_ipipeline,       ipipeline_store)
 CGPU_RESOLVE_HANDLE(         fence,          cgpu_fence,          cgpu_ifence,          ifence_store)
 CGPU_RESOLVE_HANDLE(command_buffer, cgpu_command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
-
-#undef CGPU_RESOLVE_HANDLE
 
 static VkMemoryPropertyFlags cgpu_translate_memory_properties(
   CgpuMemoryPropertyFlags memory_properties)
@@ -184,32 +178,25 @@ static CgpuSampleCountFlags cgpu_translate_sample_count_flags(
   VkSampleCountFlags vk_flags)
 {
   CgpuSampleCountFlags flags = 0u;
-  if ((vk_flags & VK_SAMPLE_COUNT_1_BIT)
-        == VK_SAMPLE_COUNT_1_BIT) {
+  if ((vk_flags & VK_SAMPLE_COUNT_1_BIT) == VK_SAMPLE_COUNT_1_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_1;
   }
-  if ((vk_flags & VK_SAMPLE_COUNT_2_BIT)
-        == VK_SAMPLE_COUNT_2_BIT) {
+  if ((vk_flags & VK_SAMPLE_COUNT_2_BIT) == VK_SAMPLE_COUNT_2_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_2;
   }
-  if ((vk_flags & VK_SAMPLE_COUNT_4_BIT)
-        == VK_SAMPLE_COUNT_4_BIT) {
+  if ((vk_flags & VK_SAMPLE_COUNT_4_BIT) == VK_SAMPLE_COUNT_4_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_4;
   }
-  if ((vk_flags & VK_SAMPLE_COUNT_8_BIT)
-        == VK_SAMPLE_COUNT_8_BIT) {
+  if ((vk_flags & VK_SAMPLE_COUNT_8_BIT) == VK_SAMPLE_COUNT_8_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_8;
   }
-  if ((vk_flags & VK_SAMPLE_COUNT_16_BIT)
-        == VK_SAMPLE_COUNT_16_BIT) {
+  if ((vk_flags & VK_SAMPLE_COUNT_16_BIT) == VK_SAMPLE_COUNT_16_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_16;
   }
-  if ((vk_flags & VK_SAMPLE_COUNT_32_BIT)
-        == VK_SAMPLE_COUNT_32_BIT) {
+  if ((vk_flags & VK_SAMPLE_COUNT_32_BIT) == VK_SAMPLE_COUNT_32_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_32;
   }
-  if ((vk_flags & VK_SAMPLE_COUNT_64_BIT)
-        == VK_SAMPLE_COUNT_64_BIT) {
+  if ((vk_flags & VK_SAMPLE_COUNT_64_BIT) == VK_SAMPLE_COUNT_64_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_64;
   }
   return flags;
