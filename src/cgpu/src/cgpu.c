@@ -6,6 +6,20 @@
 #include <string.h>
 #include <volk.h>
 
+/* Array and pool allocation limits. */
+
+#define MAX_PHYSICAL_DEVICES 32
+#define MAX_DEVICE_EXTENSIONS 1024
+#define MAX_QUEUE_FAMILIES 64
+#define MAX_TIMESTAMP_QUERIES 32
+#define MAX_DESCRIPTOR_SET_BINDINGS 128
+#define MAX_DESCRIPTOR_BUFFER_INFOS 64
+#define MAX_DESCRIPTOR_IMAGE_INFOS 64
+#define MAX_WRITE_DESCRIPTOR_SETS 128
+#define MAX_BUFFER_MEMORY_BARRIERS 64
+#define MAX_IMAGE_MEMORY_BARRIERS 64
+#define MAX_MEMORY_BARRIERS 128
+
 /* Internal structures. */
 
 typedef struct cgpu_iinstance {
@@ -1014,8 +1028,7 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_NO_DEVICE_AT_INDEX;
   }
 
-  VkPhysicalDevice* phys_devices =
-      malloc(sizeof(VkPhysicalDevice) * num_phys_devices);
+  VkPhysicalDevice phys_devices[MAX_PHYSICAL_DEVICES];
 
   vkEnumeratePhysicalDevices(
     iinstance.instance,
@@ -1024,7 +1037,6 @@ CgpuResult cgpu_create_device(
   );
 
   idevice->physical_device = phys_devices[index];
-  free(phys_devices);
 
   VkPhysicalDeviceProperties device_properties;
   vkGetPhysicalDeviceProperties(
@@ -1043,8 +1055,7 @@ CgpuResult cgpu_create_device(
     NULL
   );
 
-  VkExtensionProperties* device_extensions =
-      malloc(sizeof(VkExtensionProperties) * num_device_extensions);
+  VkExtensionProperties device_extensions[MAX_DEVICE_EXTENSIONS];
 
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
@@ -1067,12 +1078,10 @@ CgpuResult cgpu_create_device(
     }
 
     if (!has_extension) {
-      free(device_extensions);
       resource_store_free_handle(&idevice_store, p_device->handle);
       return CGPU_FAIL_DEVICE_EXTENSION_NOT_SUPPORTED;
     }
   }
-  free(device_extensions);
 
   uint32_t num_queue_families = 0u;
   vkGetPhysicalDeviceQueueFamilyProperties(
@@ -1081,8 +1090,7 @@ CgpuResult cgpu_create_device(
     NULL
   );
 
-  VkQueueFamilyProperties* queue_families =
-      malloc(sizeof(VkQueueFamilyProperties) * num_queue_families);
+  VkQueueFamilyProperties queue_families[MAX_QUEUE_FAMILIES];
 
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
@@ -1100,7 +1108,6 @@ CgpuResult cgpu_create_device(
       queue_family_index = i;
     }
   }
-  free(queue_families);
   if (queue_family_index == -1) {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_DEVICE_HAS_NO_COMPUTE_QUEUE_FAMILY;
@@ -1280,7 +1287,7 @@ CgpuResult cgpu_create_device(
   timestamp_pool_info.pNext = NULL;
   timestamp_pool_info.flags = 0u;
   timestamp_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  timestamp_pool_info.queryCount = 32u;
+  timestamp_pool_info.queryCount = MAX_TIMESTAMP_QUERIES;
   timestamp_pool_info.pipelineStatistics = 0u;
 
   result = idevice->table.vkCreateQueryPool(
@@ -1901,10 +1908,7 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  const uint32_t num_descriptor_set_bindings =
-      buffer_resource_count + shader_resource_count;
-  VkDescriptorSetLayoutBinding* descriptor_set_bindings =
-    malloc(sizeof(VkDescriptorSetLayoutBinding) * num_descriptor_set_bindings);
+  VkDescriptorSetLayoutBinding descriptor_set_bindings[MAX_DESCRIPTOR_SET_BINDINGS];
 
   for (uint32_t i = 0u; i < buffer_resource_count; ++i)
   {
@@ -1929,6 +1933,8 @@ CgpuResult cgpu_create_pipeline(
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
+  const uint32_t num_descriptor_set_bindings = buffer_resource_count + shader_resource_count;
+
   VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   descriptor_set_layout_create_info.pNext = NULL;
@@ -1942,7 +1948,6 @@ CgpuResult cgpu_create_pipeline(
     NULL,
     &ipipeline->descriptor_set_layout
   );
-  free(descriptor_set_bindings);
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
@@ -2090,15 +2095,9 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_ALLOCATE_DESCRIPTOR_SET;
   }
 
-  VkDescriptorBufferInfo* descriptor_buffer_infos =
-      malloc(sizeof(VkDescriptorBufferInfo) * buffer_resource_count);
-  VkDescriptorImageInfo* descriptor_image_infos =
-      malloc(sizeof(VkDescriptorImageInfo) * shader_resource_count);
-
-  const uint32_t num_max_write_descriptor_sets =
-      buffer_resource_count + shader_resource_count;
-  VkWriteDescriptorSet* write_descriptor_sets =
-      malloc(sizeof(VkWriteDescriptorSet) * num_max_write_descriptor_sets);
+  VkDescriptorBufferInfo descriptor_buffer_infos[MAX_DESCRIPTOR_BUFFER_INFOS];
+  VkDescriptorImageInfo descriptor_image_infos[MAX_DESCRIPTOR_IMAGE_INFOS];
+  VkWriteDescriptorSet write_descriptor_sets[MAX_WRITE_DESCRIPTOR_SETS];
 
   uint32_t num_write_descriptor_sets = 0u;
 
@@ -2175,10 +2174,6 @@ CgpuResult cgpu_create_pipeline(
     0u,
     NULL
   );
-
-  free(descriptor_buffer_infos);
-  free(descriptor_image_infos);
-  free(write_descriptor_sets);
 
   return CGPU_OK;
 }
@@ -2428,7 +2423,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkMemoryBarrier* vk_memory_barriers = malloc(barrier_count * sizeof(VkMemoryBarrier));
+  VkMemoryBarrier vk_memory_barriers[MAX_MEMORY_BARRIERS];
 
   for (uint32_t i = 0u; i < barrier_count; ++i)
   {
@@ -2440,10 +2435,8 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->dstAccessMask = cgpu_translate_access_flags(b_cgpu->dst_access_flags);
   }
 
-  VkBufferMemoryBarrier* vk_buffer_memory_barriers
-    = malloc(buffer_barrier_count * sizeof(VkBufferMemoryBarrier));
-  VkImageMemoryBarrier* vk_image_memory_barriers
-    = malloc(image_barrier_count * sizeof(VkImageMemoryBarrier));
+  VkBufferMemoryBarrier vk_buffer_memory_barriers[MAX_BUFFER_MEMORY_BARRIERS];
+  VkImageMemoryBarrier vk_image_memory_barriers[MAX_IMAGE_MEMORY_BARRIERS];
 
   for (uint32_t i = 0u; i < buffer_barrier_count; ++i)
   {
@@ -2506,10 +2499,6 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     image_barrier_count,
     vk_image_memory_barriers
   );
-
-  free(vk_memory_barriers);
-  free(vk_buffer_memory_barriers);
-  free(vk_image_memory_barriers);
 
   return CGPU_OK;
 }
