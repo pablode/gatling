@@ -8,6 +8,11 @@ gatling_add_executable(
     kernel_shade.comp
 )
 
+set_target_properties(
+  gatling PROPERTIES
+  SHADER_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}/shaders"
+)
+
 target_compile_definitions(
   gatling PRIVATE
   GATLING_VERSION_MAJOR=${GATLING_VERSION_MAJOR}
