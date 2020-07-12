@@ -21,7 +21,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}")
 
-include(cmake/Gatling.cmake)
+include(cmake/ShaderLibrary.cmake)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ENABLE_IPO)

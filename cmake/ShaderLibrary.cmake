@@ -19,26 +19,23 @@ define_property(
   FULL_DOCS "The directory where SPIR-V files are written to. Has default value of RUNTIME_OUTPUT_DIRECTORY."
 )
 
-# Define gatling_add_executable function, which takes multiple arguments:
-# SOURCES_C, for all application C source files,
-# SOURCES_GLSL, for all shaders which should be compiled
-# It also respects the SHADER_OUTPUT_DIRECTORY target property.
-function(gatling_add_executable target)
+# The add_shader_library function produces a target which, when built, invokes the
+# GLSL compiler on the given shader files. It provides an INCLUDES section where
+# files can be defined which are included by the shaders. This is necessary since
+# we want to recompile a shader each time included files change. Unfortunately, for
+# now, we can only recompile on a per-target basis. The target property
+# SHADER_OUTPUT_DIRECTORY can be set to define the compilation output directory.
+# It's initialized with the value of CMAKE_RUNTIME_OUTPUT_DIRECTORY.
+function(add_shader_library target)
 
-  # Read arguments, create target and set SHADER_OUTPUT_DIRECTORY default value.
-  cmake_parse_arguments(TARGET_EXE "" "" "SOURCES_C;SOURCES_GLSL" ${ARGN})
+  # Read input args, extract shader file paths and names.
+  cmake_parse_arguments("TARGET" "" "" "INCLUDES" ${ARGN})
 
-  add_executable(${target} ${TARGET_EXE_SOURCES_C} ${TARGET_EXE_UNPARSED_ARGS})
-
-  get_target_property(TARGET_RUNTIME_OUTPUT_DIRECTORY ${target} RUNTIME_OUTPUT_DIRECTORY)
-  set_target_properties(${target} PROPERTIES SHADER_OUTPUT_DIRECTORY ${TARGET_RUNTIME_OUTPUT_DIRECTORY})
-
-  # Get input and output names and paths of soon-to-be-compiled shaders.
   list(APPEND TARGET_SHADERS_INPUT_FILE_PATHS "")
   list(APPEND TARGET_SHADERS_INPUT_FILE_NAMES "")
   list(APPEND TARGET_SHADERS_OUTPUT_FILE_NAMES "")
   list(APPEND TARGET_SHADERS_OUTPUT_FILE_PATHS "")
-  foreach(shader ${TARGET_EXE_SOURCES_GLSL})
+  foreach(shader ${TARGET_UNPARSED_ARGUMENTS})
     get_filename_component(shader_path_abs ${shader} ABSOLUTE)
     get_filename_component(shader_name ${shader} NAME)
     set(spv_file_name "${shader_name}.spv")
@@ -49,14 +46,13 @@ function(gatling_add_executable target)
     list(APPEND TARGET_SHADERS_OUTPUT_FILE_PATHS ${spv_file_path})
   endforeach()
 
-  # Create an intermediate target for compilation dependencies.
-  set(target_shaders "${target}-shaders")
-  add_custom_target(${target_shaders} DEPENDS ${TARGET_SHADERS_OUTPUT_FILE_PATHS})
-  add_dependencies(${target} ${target_shaders})
+  # Create a custom target, set initial value of output directory property.
+  add_custom_target(${target} DEPENDS ${TARGET_SHADERS_OUTPUT_FILE_PATHS})
+  set_target_properties(${target} PROPERTIES SHADER_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
-  # Make sure the path to the shader output directory exists.
+  # Make sure the path to the shader output directory exists when compiling.
   add_custom_command(
-     TARGET ${target_shaders} PRE_BUILD
+     TARGET ${target} PRE_BUILD
      COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_PROPERTY:${target},SHADER_OUTPUT_DIRECTORY>
      VERBATIM
   )
@@ -81,12 +77,14 @@ function(gatling_add_executable target)
       COMMENT "Compiling GLSL shader ${input_name}"
       COMMAND ${CMAKE_GLSL_COMPILER} -o ${output_path} -c ${input_path}
       VERBATIM
+      # Rebuild if an included file changes.
+      DEPENDS ${TARGET_INCLUDES}
     )
 
     # Always copy cached compiled shaders to output dir. Note that although the
     # function name is the same as above, the commands do very different things.
     add_custom_command(
-      TARGET ${target_shaders} POST_BUILD
+      TARGET ${target} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy ${output_path} "$<TARGET_PROPERTY:${target},SHADER_OUTPUT_DIRECTORY>/${output_name}"
       VERBATIM
     )

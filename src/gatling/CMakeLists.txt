@@ -1,16 +1,6 @@
-gatling_add_executable(
+add_executable(
   gatling
-  SOURCES_C
-    main.c
-  SOURCES_GLSL
-    kernel_ray_gen.comp
-    kernel_extend.comp
-    kernel_shade.comp
-)
-
-set_target_properties(
-  gatling PROPERTIES
-  SHADER_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}/shaders"
+  main.c
 )
 
 target_compile_definitions(
@@ -23,4 +13,23 @@ target_compile_definitions(
 target_link_libraries(
   gatling PRIVATE
   cgpu
+)
+
+add_shader_library(
+  gatling-shaders
+  kernel_ray_gen.comp
+  kernel_extend.comp
+  kernel_shade.comp
+  INCLUDES
+    common.glsl
+)
+
+set_target_properties(
+  gatling-shaders PROPERTIES
+  SHADER_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}/shaders"
+)
+
+add_dependencies(
+  gatling
+  gatling-shaders
 )
