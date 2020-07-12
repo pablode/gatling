@@ -75,7 +75,7 @@ function(add_shader_library target)
       MAIN_DEPENDENCY ${input_path}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       COMMENT "Compiling GLSL shader ${input_name}"
-      COMMAND ${CMAKE_GLSL_COMPILER} -o ${output_path} -c ${input_path}
+      COMMAND ${CMAKE_GLSL_COMPILER} --target-env=vulkan1.1 -o ${output_path} -c ${input_path}
       VERBATIM
       # Rebuild if an included file changes.
       DEPENDS ${TARGET_INCLUDES}
