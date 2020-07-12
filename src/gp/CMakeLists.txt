@@ -1,5 +1,5 @@
 add_executable(
-  gatling_preprocess
+  gp
   bvh.c
   bvh.h
   gp.h
@@ -9,7 +9,7 @@ add_executable(
 )
 
 target_compile_definitions(
-  gatling_preprocess PRIVATE
+  gp PRIVATE
   GATLING_VERSION_MAJOR=${GATLING_VERSION_MAJOR}
   GATLING_VERSION_MINOR=${GATLING_VERSION_MINOR}
   GATLING_VERSION_PATCH=${GATLING_VERSION_PATCH}
@@ -17,7 +17,7 @@ target_compile_definitions(
 )
 
 target_link_libraries(
-  gatling_preprocess PRIVATE
+  gp PRIVATE
   assimp
   m
 )

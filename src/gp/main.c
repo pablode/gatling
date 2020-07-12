@@ -262,7 +262,7 @@ int main(int argc, const char* argv[])
 {
   if (argc != 3)
   {
-    printf("Usage: gatling_preprocess <input_file> <output.gsd>\n");
+    printf("Usage: gp <input_file> <output.gsd>\n");
     return EXIT_FAILURE;
   }
 
