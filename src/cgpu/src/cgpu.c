@@ -901,7 +901,7 @@ CgpuResult cgpu_initialize(
 
 #ifndef NDEBUG
   const char* validation_layers[] = {
-      "VK_LAYER_LUNARG_standard_validation"
+      "VK_LAYER_KHRONOS_validation"
   };
   const char* instance_extensions[] = {
       VK_EXT_DEBUG_UTILS_EXTENSION_NAME
