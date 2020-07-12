@@ -17,11 +17,11 @@ target_link_libraries(
 
 add_shader_library(
   gatling-shaders
-  kernel_ray_gen.comp
-  kernel_extend.comp
-  kernel_shade.comp
+  shaders/kernel_ray_gen.comp
+  shaders/kernel_extend.comp
+  shaders/kernel_shade.comp
   INCLUDES
-    common.glsl
+    shaders/common.glsl
 )
 
 set_target_properties(
