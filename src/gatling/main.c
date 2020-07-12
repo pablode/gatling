@@ -1,6 +1,5 @@
 #include <stdint.h>
 #include <stdio.h>
-#include <unistd.h>
 
 #include <cgpu.h>
 
@@ -11,11 +10,11 @@
 #define IMAGE_HEIGHT 2160
 #define NUM_SAMPLES 1
 
-static void gatling_fail(const char* msg)
-{
-  printf("Gatling encountered a fatal error at line %d: %s\n", __LINE__, msg);
-  exit(EXIT_FAILURE);
-}
+#define gatling_fail(msg)                                                         \
+  do {                                                                            \
+    printf("Gatling encountered a fatal error at line %d: %s\n", __LINE__, msg);  \
+    exit(EXIT_FAILURE);                                                           \
+  } while(0)
 
 static void gatling_cgpu_ensure(CgpuResult result)
 {
