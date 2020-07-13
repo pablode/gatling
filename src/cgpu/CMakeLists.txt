@@ -1,5 +1,5 @@
 add_library(
-  cgpu
+  cgpu STATIC
   src/cgpu.c
   src/handle_store.c
   src/resource_store.c

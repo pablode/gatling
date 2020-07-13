@@ -154,7 +154,7 @@ void gp_load_scene(
 
 void gp_write_file(
   const uint8_t* data,
-  uint32_t data_size_in_bytes,
+  uint64_t byte_count,
   const char* file_path)
 {
   FILE *file = fopen(file_path, "wb");
@@ -162,8 +162,8 @@ void gp_write_file(
     gp_fail("Unable to open file for writing.");
   }
 
-  const uint written_size = fwrite(data, 1, data_size_in_bytes, file);
-  if (written_size != data_size_in_bytes) {
+  const uint64_t written_size = fwrite(data, 1, byte_count, file);
+  if (written_size != byte_count) {
     gp_fail("Unable to write file.");
   }
 
