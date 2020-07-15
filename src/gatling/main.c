@@ -285,7 +285,8 @@ int main(int argc, const char* argv[])
     device,
     CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
+      CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
     input_buffer_size_in_bytes,
     &staging_buffer_in
   );
@@ -333,7 +334,8 @@ int main(int argc, const char* argv[])
     device,
     CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
+      CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
     output_buffer_size_in_bytes,
     &staging_buffer_out
   );
@@ -343,7 +345,8 @@ int main(int argc, const char* argv[])
     device,
     CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
+      CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
     32 * sizeof(uint64_t),
     &timestamp_buffer
   );
