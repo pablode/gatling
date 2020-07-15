@@ -1,6 +1,8 @@
 add_executable(
   gatling
   main.c
+  mmap.c
+  mmap.h
 )
 
 target_compile_definitions(

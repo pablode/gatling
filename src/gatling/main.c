@@ -3,6 +3,8 @@
 
 #include <cgpu.h>
 
+#include "mmap.h"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -31,6 +33,25 @@ static void gatling_cgpu_warn(CgpuResult result, const char *msg)
   }
 }
 
+static void gatling_save_img_wfunc(void *context, void *data, int byte_count)
+{
+  gatling_file* file;
+  const char* file_path = (const char*) context;
+  const bool success = gatling_file_create(file_path, byte_count, &file);
+  if (!success) {
+    gatling_fail("Unable to open output file.");
+  }
+
+  void* mapped_mem = gatling_mmap(file, 0, byte_count);
+  if (!mapped_mem) {
+    gatling_fail("Unable to map output file.");
+  }
+  memcpy(mapped_mem, data, byte_count);
+
+  gatling_munmap(file, mapped_mem);
+  gatling_file_close(file);
+}
+
 static void gatling_save_img(
   const float* data,
   size_t data_size_in_floats,
@@ -49,8 +70,10 @@ static void gatling_save_img(
   stbi_flip_vertically_on_write(true);
 
   const uint32_t num_components = 4;
-  const int result = stbi_write_png(
-    file_path,
+
+  const int result = stbi_write_png_to_func(
+    gatling_save_img_wfunc,
+    (void*)file_path,
     IMAGE_WIDTH,
     IMAGE_HEIGHT,
     num_components,
@@ -62,29 +85,6 @@ static void gatling_save_img(
 
   if (!result) {
     gatling_fail("Unable to save image.");
-  }
-}
-
-static void gatling_read_file(
-  const char* file_path,
-  uint8_t** data,
-  size_t* data_size)
-{
-  FILE *file = fopen(file_path, "rb");
-  if (file == NULL) {
-    gatling_fail("Unable to open file for reading.");
-  }
-
-  fseeko(file, 0, SEEK_END);
-  *data_size = ftello(file);
-  fseeko(file, 0, SEEK_SET);
-
-  *data = malloc(*data_size);
-  fread(*data, 1, *data_size, file);
-
-  const int close_result = fclose(file);
-  if (close_result != 0) {
-    printf("Unable to close file '%s'.", file_path);
   }
 }
 
@@ -100,26 +100,35 @@ static void gatling_create_pipeline(
   size_t num_shader_resource_buffers,
   gatling_pipeline *pipeline)
 {
-  uint32_t* data;
-  size_t data_size;
+  gatling_file* file;
+  uint64_t file_size;
 
-  gatling_read_file(
-    shader_file_path,
-    (uint8_t**) &data,
-    &data_size
-  );
+  const bool ok = gatling_file_open(shader_file_path, GATLING_FILE_USAGE_READ, &file);
+  if (!ok) {
+    gatling_fail("Unable to open shader file.");
+  }
+
+  file_size = gatling_file_size(file);
+
+  uint32_t* data = (uint32_t*) gatling_mmap(file, 0, file_size);
+
+  if (!data) {
+    gatling_fail("Unable to map shader file.");
+  }
 
   CgpuResult c_result = cgpu_create_shader(
     device,
-    data_size,
+    file_size,
     data,
     &pipeline->shader
   );
+
+  gatling_munmap(file, data);
+  gatling_file_close(file);
+
   if (c_result != CGPU_OK) {
     gatling_fail("Unable to create shader.");
   }
-
-  free(data);
 
   c_result = cgpu_create_pipeline(
     device,
@@ -224,14 +233,23 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  /* Load scene. */
-  uint8_t* scene_data;
-  size_t scene_data_size;
-  gatling_read_file(
-    argv[1],
-    &scene_data,
-    &scene_data_size
+  /* Map scene file for copying. */
+  gatling_file* scene_file;
+  const bool ok = gatling_file_open(argv[1], GATLING_FILE_USAGE_READ, &scene_file);
+  if (!ok) {
+    gatling_fail("Unable to read scene file.");
+  }
+
+  uint64_t scene_data_size = gatling_file_size(scene_file);
+  uint8_t* mapped_scene_data = (uint8_t*) gatling_mmap(
+    scene_file,
+    0,
+    scene_data_size
   );
+
+  if (!mapped_scene_data) {
+    gatling_fail("Unable to map scene file.");
+  }
 
   /* Create input and output buffers. */
   const size_t output_buffer_size_in_floats =
@@ -331,19 +349,19 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  void* mapped_mem;
+  uint8_t* mapped_staging_mem;
   c_result = cgpu_map_buffer(
     device,
     staging_buffer_in,
     0,
     CGPU_WHOLE_SIZE,
-    &mapped_mem
+    (void*)&mapped_staging_mem
   );
   gatling_cgpu_ensure(c_result);
 
   memcpy(
-    mapped_mem,
-    scene_data,
+    mapped_staging_mem,
+    mapped_scene_data,
     scene_data_size
   );
 
@@ -361,10 +379,14 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
 
   /* Set up pipelines. */
-  const uint32_t node_offset     = *((uint32_t*) (scene_data +  0));
-  const uint32_t face_offset     = *((uint32_t*) (scene_data +  8));
-  const uint32_t vertex_offset   = *((uint32_t*) (scene_data + 16));
-  const uint32_t material_offset = *((uint32_t*) (scene_data + 24));
+  const uint32_t node_offset     = *((uint32_t*) (mapped_scene_data +  0));
+  const uint32_t face_offset     = *((uint32_t*) (mapped_scene_data +  8));
+  const uint32_t vertex_offset   = *((uint32_t*) (mapped_scene_data + 16));
+  const uint32_t material_offset = *((uint32_t*) (mapped_scene_data + 24));
+
+  /* Unmap the scene data since it's been copied. */
+  gatling_munmap(scene_file, mapped_scene_data);
+  gatling_file_close(scene_file);
 
   const size_t num_shader_resource_buffers = 8;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
@@ -665,13 +687,13 @@ int main(int argc, const char* argv[])
     staging_buffer_out,
     0,
     CGPU_WHOLE_SIZE,
-    &mapped_mem
+    (void**)&mapped_staging_mem
   );
   gatling_cgpu_ensure(c_result);
 
   memcpy(
     image_data,
-    mapped_mem,
+    mapped_staging_mem,
     output_buffer_size_in_bytes
   );
 
