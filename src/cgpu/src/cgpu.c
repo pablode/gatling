@@ -1515,6 +1515,7 @@ CgpuResult cgpu_create_buffer(
   }
   if (mem_index == -1) {
     resource_store_free_handle(&ibuffer_store, p_buffer->handle);
+    idevice->table.vkDestroyBuffer(idevice->logical_device, ibuffer->buffer, NULL);
     return CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE;
   }
 
@@ -1532,6 +1533,7 @@ CgpuResult cgpu_create_buffer(
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ibuffer_store, p_buffer->handle);
+    idevice->table.vkDestroyBuffer(idevice->logical_device, ibuffer->buffer, NULL);
     return CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY;
   }
 
@@ -1734,6 +1736,7 @@ CgpuResult cgpu_create_image(
   }
   if (mem_index == -1) {
     resource_store_free_handle(&iimage_store, p_image->handle);
+    idevice->table.vkDestroyImage(idevice->logical_device, iimage->image, NULL);
     return CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE;
   }
 
@@ -1751,6 +1754,7 @@ CgpuResult cgpu_create_image(
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&iimage_store, p_image->handle);
+    idevice->table.vkDestroyImage(idevice->logical_device, iimage->image, NULL);
     return CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY;
   }
 
@@ -1789,7 +1793,7 @@ CgpuResult cgpu_create_image(
   if (result != VK_SUCCESS)
   {
     resource_store_free_handle(&iimage_store, p_image->handle);
-
+    idevice->table.vkDestroyImage(idevice->logical_device, iimage->image, NULL);
     idevice->table.vkFreeMemory(
       idevice->logical_device,
       iimage->memory,
