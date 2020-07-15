@@ -1008,8 +1008,14 @@ CgpuResult cgpu_create_device(
     NULL
   );
 
+  if (num_phys_devices > MAX_PHYSICAL_DEVICES)
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+    return CGPU_FAIL_MAX_PHYSICAL_DEVICES_REACHED;
+  }
+
   if (num_phys_devices == 0u ||
-      index > (num_phys_devices - 1))
+      index >= num_phys_devices)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_NO_DEVICE_AT_INDEX;
@@ -1041,6 +1047,12 @@ CgpuResult cgpu_create_device(
     &num_device_extensions,
     NULL
   );
+
+  if (num_device_extensions > MAX_DEVICE_EXTENSIONS)
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+    return CGPU_FAIL_MAX_DEVICE_EXTENSIONS_REACHED;
+  }
 
   VkExtensionProperties device_extensions[MAX_DEVICE_EXTENSIONS];
 
@@ -1076,6 +1088,12 @@ CgpuResult cgpu_create_device(
     &num_queue_families,
     NULL
   );
+
+  if (num_queue_families > MAX_QUEUE_FAMILIES)
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+    return CGPU_FAIL_MAX_QUEUE_FAMILIES_REACHED;
+  }
 
   VkQueueFamilyProperties queue_families[MAX_QUEUE_FAMILIES];
 
