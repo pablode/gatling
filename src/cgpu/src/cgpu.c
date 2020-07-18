@@ -103,7 +103,7 @@ CGPU_RESOLVE_HANDLE(command_buffer, cgpu_command_buffer, cgpu_icommand_buffer, i
 static VkMemoryPropertyFlags cgpu_translate_memory_properties(
   CgpuMemoryPropertyFlags memory_properties)
 {
-  VkMemoryPropertyFlags mem_flags = 0u;
+  VkMemoryPropertyFlags mem_flags = 0;
   if ((memory_properties & CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
         == CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL) {
     mem_flags |= VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -134,7 +134,7 @@ static VkMemoryPropertyFlags cgpu_translate_memory_properties(
 static VkAccessFlags cgpu_translate_access_flags(
   CgpuMemoryAccessFlags flags)
 {
-  VkAccessFlags vk_flags = 0u;
+  VkAccessFlags vk_flags = 0;
   if ((flags & CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ)
               == CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ) {
     vk_flags |= VK_ACCESS_UNIFORM_READ_BIT;
@@ -177,7 +177,7 @@ static VkAccessFlags cgpu_translate_access_flags(
 static CgpuSampleCountFlags cgpu_translate_sample_count_flags(
   VkSampleCountFlags vk_flags)
 {
-  CgpuSampleCountFlags flags = 0u;
+  CgpuSampleCountFlags flags = 0;
   if ((vk_flags & VK_SAMPLE_COUNT_1_BIT) == VK_SAMPLE_COUNT_1_BIT) {
     flags |= CGPU_SAMPLE_COUNT_FLAG_1;
   }
@@ -906,13 +906,13 @@ CgpuResult cgpu_initialize(
   const char* instance_extensions[] = {
       VK_EXT_DEBUG_UTILS_EXTENSION_NAME
   };
-  uint32_t validation_layer_count = 1u;
-  uint32_t instance_extension_count = 1u;
+  uint32_t validation_layer_count = 1;
+  uint32_t instance_extension_count = 1;
 #else
   const char** validation_layers = NULL;
-  uint32_t validation_layer_count = 0u;
+  uint32_t validation_layer_count = 0;
   const char** instance_extensions = NULL;
-  uint32_t instance_extension_count = 0u;
+  uint32_t instance_extension_count = 0;
 #endif
 
   VkApplicationInfo app_info;
@@ -934,7 +934,7 @@ CgpuResult cgpu_initialize(
   VkInstanceCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   create_info.pNext = NULL;
-  create_info.flags = 0u;
+  create_info.flags = 0;
   create_info.pApplicationInfo = &app_info;
   create_info.enabledLayerCount = validation_layer_count;
   create_info.ppEnabledLayerNames = validation_layers;
@@ -952,13 +952,13 @@ CgpuResult cgpu_initialize(
 
   volkLoadInstance(iinstance.instance);
 
-  resource_store_create(&idevice_store, sizeof(cgpu_idevice), 1u);
-  resource_store_create(&ishader_store, sizeof(cgpu_ishader), 16u);
-  resource_store_create(&ibuffer_store, sizeof(cgpu_ibuffer), 16u);
-  resource_store_create(&iimage_store, sizeof(cgpu_iimage), 64u);
-  resource_store_create(&ipipeline_store, sizeof(cgpu_ipipeline), 8u);
-  resource_store_create(&icommand_buffer_store, sizeof(cgpu_icommand_buffer), 16u);
-  resource_store_create(&ifence_store, sizeof(cgpu_ifence), 8u);
+  resource_store_create(&idevice_store, sizeof(cgpu_idevice), 1);
+  resource_store_create(&ishader_store, sizeof(cgpu_ishader), 16);
+  resource_store_create(&ibuffer_store, sizeof(cgpu_ibuffer), 16);
+  resource_store_create(&iimage_store, sizeof(cgpu_iimage), 64);
+  resource_store_create(&ipipeline_store, sizeof(cgpu_ipipeline), 8);
+  resource_store_create(&icommand_buffer_store, sizeof(cgpu_icommand_buffer), 16);
+  resource_store_create(&ifence_store, sizeof(cgpu_ifence), 8);
 
   return CGPU_OK;
 }
@@ -1014,7 +1014,7 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_MAX_PHYSICAL_DEVICES_REACHED;
   }
 
-  if (num_phys_devices == 0u ||
+  if (num_phys_devices == 0 ||
       index >= num_phys_devices)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
@@ -1063,12 +1063,12 @@ CgpuResult cgpu_create_device(
     device_extensions
   );
 
-  for (uint32_t i = 0u; i < required_extension_count; ++i)
+  for (uint32_t i = 0; i < required_extension_count; ++i)
   {
     const char* required_extension = *(pp_required_extensions + i);
 
     bool has_extension = false;
-    for (uint32_t e = 0u; e < num_device_extensions; ++e) {
+    for (uint32_t e = 0; e < num_device_extensions; ++e) {
       const VkExtensionProperties* extension = &device_extensions[e];
       if (strcmp(extension->extensionName, required_extension) == 0) {
         has_extension = true;
@@ -1082,7 +1082,7 @@ CgpuResult cgpu_create_device(
     }
   }
 
-  uint32_t num_queue_families = 0u;
+  uint32_t num_queue_families = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
     &num_queue_families,
@@ -1107,7 +1107,7 @@ CgpuResult cgpu_create_device(
      to schedule work or translate command buffers very often. Therefore,
      we also don't need async execution and can operate on a single queue. */
   int32_t queue_family_index = -1;
-  for (uint32_t i = 0u; i < num_queue_families; ++i) {
+  for (uint32_t i = 0; i < num_queue_families; ++i) {
     const VkQueueFamilyProperties* queue_family = &queue_families[i];
     if (queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) {
       queue_family_index = i;
@@ -1121,9 +1121,9 @@ CgpuResult cgpu_create_device(
   VkDeviceQueueCreateInfo queue_create_info;
   queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
   queue_create_info.pNext = NULL;
-  queue_create_info.flags = 0u;
+  queue_create_info.flags = 0;
   queue_create_info.queueFamilyIndex = queue_family_index;
-  queue_create_info.queueCount = 1u;
+  queue_create_info.queueCount = 1;
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
@@ -1187,12 +1187,12 @@ CgpuResult cgpu_create_device(
   VkDeviceCreateInfo device_create_info;
   device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   device_create_info.pNext = NULL;
-  device_create_info.flags = 0u;
-  device_create_info.queueCreateInfoCount = 1u;
+  device_create_info.flags = 0;
+  device_create_info.queueCreateInfoCount = 1;
   device_create_info.pQueueCreateInfos = &queue_create_info;
   /* These two fields are ignored by up-to-date implementations since
    nowadays, there is no difference to instance validation layers. */
-  device_create_info.enabledLayerCount = 0u;
+  device_create_info.enabledLayerCount = 0;
   device_create_info.ppEnabledLayerNames = NULL;
   device_create_info.enabledExtensionCount = required_extension_count;
   device_create_info.ppEnabledExtensionNames = pp_required_extensions;
@@ -1217,14 +1217,14 @@ CgpuResult cgpu_create_device(
   idevice->table.vkGetDeviceQueue(
     idevice->logical_device,
     queue_family_index,
-    0u,
+    0,
     &idevice->compute_queue
   );
 
   VkCommandPoolCreateInfo pool_info;
   pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   pool_info.pNext = NULL;
-  pool_info.flags = 0u;
+  pool_info.flags = 0;
   pool_info.queueFamilyIndex = queue_family_index;
 
   result = idevice->table.vkCreateCommandPool(
@@ -1248,7 +1248,7 @@ CgpuResult cgpu_create_device(
   VkSamplerCreateInfo sampler_info;
   sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
   sampler_info.pNext = NULL;
-  sampler_info.flags = 0u;
+  sampler_info.flags = 0;
   sampler_info.magFilter = VK_FILTER_LINEAR;
   sampler_info.minFilter = VK_FILTER_LINEAR;
   sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
@@ -1290,10 +1290,10 @@ CgpuResult cgpu_create_device(
   VkQueryPoolCreateInfo timestamp_pool_info;
   timestamp_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
   timestamp_pool_info.pNext = NULL;
-  timestamp_pool_info.flags = 0u;
+  timestamp_pool_info.flags = 0;
   timestamp_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
   timestamp_pool_info.queryCount = MAX_TIMESTAMP_QUERIES;
-  timestamp_pool_info.pipelineStatistics = 0u;
+  timestamp_pool_info.pipelineStatistics = 0;
 
   result = idevice->table.vkCreateQueryPool(
     idevice->logical_device,
@@ -1381,7 +1381,7 @@ CgpuResult cgpu_create_shader(
   VkShaderModuleCreateInfo shader_module_create_info;
   shader_module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shader_module_create_info.pNext = NULL;
-  shader_module_create_info.flags = 0u;
+  shader_module_create_info.flags = 0;
   shader_module_create_info.codeSize = source_byte_count;
   shader_module_create_info.pCode = p_source;
 
@@ -1442,7 +1442,7 @@ CgpuResult cgpu_create_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkBufferUsageFlags vk_buffer_usage = 0u;
+  VkBufferUsageFlags vk_buffer_usage = 0;
   if ((usage & CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC)
         == CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC) {
     vk_buffer_usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
@@ -1471,7 +1471,7 @@ CgpuResult cgpu_create_buffer(
   VkBufferCreateInfo buffer_info;
   buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   buffer_info.pNext = NULL;
-  buffer_info.flags = 0u;
+  buffer_info.flags = 0;
   buffer_info.size = byte_count;
   buffer_info.usage = vk_buffer_usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -1506,8 +1506,8 @@ CgpuResult cgpu_create_buffer(
       cgpu_translate_memory_properties(memory_properties);
 
   int32_t mem_index = -1;
-  for (uint32_t i = 0u; i < physical_device_memory_properties.memoryTypeCount; ++i) {
-    if ((mem_requirements.memoryTypeBits & (1u << i)) &&
+  for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
+    if ((mem_requirements.memoryTypeBits & (1 << i)) &&
         (physical_device_memory_properties.memoryTypes[i].propertyFlags & mem_flags) == mem_flags) {
       mem_index = i;
       break;
@@ -1541,7 +1541,7 @@ CgpuResult cgpu_create_buffer(
     idevice->logical_device,
     ibuffer->buffer,
     ibuffer->memory,
-    0u
+    0
   );
 
   ibuffer->size_in_bytes = byte_count;
@@ -1599,7 +1599,7 @@ CgpuResult cgpu_map_buffer(
     ibuffer->memory,
     byte_offset,
     (byte_count == CGPU_WHOLE_SIZE) ? ibuffer->size_in_bytes : byte_count,
-    0u,
+    0,
     pp_mapped_mem
   );
 
@@ -1660,7 +1660,7 @@ CgpuResult cgpu_create_image(
     vk_image_tiling = VK_IMAGE_TILING_LINEAR;
   }
 
-  VkImageUsageFlags vk_image_usage = 0u;
+  VkImageUsageFlags vk_image_usage = 0;
   if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC)
         == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) {
     vk_image_usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
@@ -1683,14 +1683,14 @@ CgpuResult cgpu_create_image(
   VkImageCreateInfo image_info;
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.pNext = NULL;
-  image_info.flags = 0u;
+  image_info.flags = 0;
   image_info.imageType = VK_IMAGE_TYPE_2D;
   image_info.format = vk_format;
   image_info.extent.width = width;
   image_info.extent.height = height;
-  image_info.extent.depth = 1u;
-  image_info.mipLevels = 1u;
-  image_info.arrayLayers = 1u;
+  image_info.extent.depth = 1;
+  image_info.mipLevels = 1;
+  image_info.arrayLayers = 1;
   image_info.samples = VK_SAMPLE_COUNT_1_BIT;
   image_info.tiling = vk_image_tiling;
   image_info.usage = vk_image_usage;
@@ -1727,8 +1727,8 @@ CgpuResult cgpu_create_image(
       cgpu_translate_memory_properties(memory_properties);
 
   int32_t mem_index = -1;
-  for (uint32_t i = 0u; i < physical_device_memory_properties.memoryTypeCount; ++i) {
-    if ((mem_requirements.memoryTypeBits & (1u << i)) &&
+  for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
+    if ((mem_requirements.memoryTypeBits & (1 << i)) &&
         (physical_device_memory_properties.memoryTypes[i].propertyFlags & mem_flags) == mem_flags) {
       mem_index = i;
       break;
@@ -1762,7 +1762,7 @@ CgpuResult cgpu_create_image(
     idevice->logical_device,
     iimage->image,
     iimage->memory,
-    0u
+    0
   );
 
   iimage->size_in_bytes = mem_requirements.size;
@@ -1770,7 +1770,7 @@ CgpuResult cgpu_create_image(
   VkImageViewCreateInfo image_view_info;
   image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   image_view_info.pNext = NULL;
-  image_view_info.flags = 0u;
+  image_view_info.flags = 0;
   image_view_info.image = iimage->image;
   image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
   image_view_info.format = vk_format;
@@ -1779,10 +1779,10 @@ CgpuResult cgpu_create_image(
   image_view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
   image_view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
   image_view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  image_view_info.subresourceRange.baseMipLevel = 0u;
-  image_view_info.subresourceRange.levelCount = 1u;
-  image_view_info.subresourceRange.baseArrayLayer = 0u;
-  image_view_info.subresourceRange.layerCount = 1u;
+  image_view_info.subresourceRange.baseMipLevel = 0;
+  image_view_info.subresourceRange.levelCount = 1;
+  image_view_info.subresourceRange.baseArrayLayer = 0;
+  image_view_info.subresourceRange.layerCount = 1;
 
   result = idevice->table.vkCreateImageView(
     idevice->logical_device,
@@ -1861,7 +1861,7 @@ CgpuResult cgpu_map_image(
     iimage->memory,
     byte_offset,
     (byte_count == CGPU_WHOLE_SIZE) ? iimage->size_in_bytes : byte_count,
-    0u,
+    0,
     pp_mapped_mem
   );
 
@@ -1919,25 +1919,25 @@ CgpuResult cgpu_create_pipeline(
 
   VkDescriptorSetLayoutBinding descriptor_set_bindings[MAX_DESCRIPTOR_SET_BINDINGS];
 
-  for (uint32_t i = 0u; i < buffer_resource_count; ++i)
+  for (uint32_t i = 0; i < buffer_resource_count; ++i)
   {
     const cgpu_shader_resource_buffer* shader_resource_buffer = &p_buffer_resources[i];
     VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &descriptor_set_bindings[i];
     descriptor_set_layout_binding->binding = shader_resource_buffer->binding;
     descriptor_set_layout_binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptor_set_layout_binding->descriptorCount = 1u;
+    descriptor_set_layout_binding->descriptorCount = 1;
     descriptor_set_layout_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
-  for (uint32_t i = 0u; i < shader_resource_count; ++i)
+  for (uint32_t i = 0; i < shader_resource_count; ++i)
   {
     const cgpu_shader_resource_image* shader_resource_buffer = &p_image_resources[i];
     VkDescriptorSetLayoutBinding* descriptor_set_layout_binding =
         &descriptor_set_bindings[buffer_resource_count + i];
     descriptor_set_layout_binding->binding = shader_resource_buffer->binding;
     descriptor_set_layout_binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor_set_layout_binding->descriptorCount = 1u;
+    descriptor_set_layout_binding->descriptorCount = 1;
     descriptor_set_layout_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
@@ -1947,7 +1947,7 @@ CgpuResult cgpu_create_pipeline(
   VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   descriptor_set_layout_create_info.pNext = NULL;
-  descriptor_set_layout_create_info.flags = 0u;
+  descriptor_set_layout_create_info.flags = 0;
   descriptor_set_layout_create_info.bindingCount = num_descriptor_set_bindings;
   descriptor_set_layout_create_info.pBindings = descriptor_set_bindings;
 
@@ -1966,10 +1966,10 @@ CgpuResult cgpu_create_pipeline(
   VkPipelineLayoutCreateInfo pipeline_layout_create_info;
   pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipeline_layout_create_info.pNext = NULL;
-  pipeline_layout_create_info.flags = 0u;
-  pipeline_layout_create_info.setLayoutCount = 1u;
+  pipeline_layout_create_info.flags = 0;
+  pipeline_layout_create_info.setLayoutCount = 1;
   pipeline_layout_create_info.pSetLayouts = &ipipeline->descriptor_set_layout;
-  pipeline_layout_create_info.pushConstantRangeCount = 0u;
+  pipeline_layout_create_info.pushConstantRangeCount = 0;
   pipeline_layout_create_info.pPushConstantRanges = NULL;
 
   result = idevice->table.vkCreatePipelineLayout(
@@ -1991,7 +1991,7 @@ CgpuResult cgpu_create_pipeline(
   VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
   pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_shader_stage_create_info.pNext = NULL;
-  pipeline_shader_stage_create_info.flags = 0u;
+  pipeline_shader_stage_create_info.flags = 0;
   pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   pipeline_shader_stage_create_info.module = ishader->module;
   pipeline_shader_stage_create_info.pName = p_shader_entry_point;
@@ -2009,7 +2009,7 @@ CgpuResult cgpu_create_pipeline(
   result = idevice->table.vkCreateComputePipelines(
     idevice->logical_device,
     NULL,
-    1u,
+    1,
     &pipeline_create_info,
     NULL,
     &ipipeline->pipeline
@@ -2036,9 +2036,9 @@ CgpuResult cgpu_create_pipeline(
   VkDescriptorPoolCreateInfo descriptor_pool_create_info;
   descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   descriptor_pool_create_info.pNext = NULL;
-  descriptor_pool_create_info.flags = 0u;
-  descriptor_pool_create_info.maxSets = 1u;
-  descriptor_pool_create_info.poolSizeCount = 1u;
+  descriptor_pool_create_info.flags = 0;
+  descriptor_pool_create_info.maxSets = 1;
+  descriptor_pool_create_info.poolSizeCount = 1;
   descriptor_pool_create_info.pPoolSizes = &descriptor_pool_size;
 
   result = idevice->table.vkCreateDescriptorPool(
@@ -2071,7 +2071,7 @@ CgpuResult cgpu_create_pipeline(
   descriptor_set_allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   descriptor_set_allocate_info.pNext = NULL;
   descriptor_set_allocate_info.descriptorPool = ipipeline->descriptor_pool;
-  descriptor_set_allocate_info.descriptorSetCount = 1u;
+  descriptor_set_allocate_info.descriptorSetCount = 1;
   descriptor_set_allocate_info.pSetLayouts = &ipipeline->descriptor_set_layout;
 
   result = idevice->table.vkAllocateDescriptorSets(
@@ -2108,9 +2108,9 @@ CgpuResult cgpu_create_pipeline(
   VkDescriptorImageInfo descriptor_image_infos[MAX_DESCRIPTOR_IMAGE_INFOS];
   VkWriteDescriptorSet write_descriptor_sets[MAX_WRITE_DESCRIPTOR_SETS];
 
-  uint32_t num_write_descriptor_sets = 0u;
+  uint32_t num_write_descriptor_sets = 0;
 
-  for (uint32_t i = 0u; i < buffer_resource_count; ++i)
+  for (uint32_t i = 0; i < buffer_resource_count; ++i)
   {
     const cgpu_shader_resource_buffer* shader_resource_buffer = &p_buffer_resources[i];
 
@@ -2137,8 +2137,8 @@ CgpuResult cgpu_create_pipeline(
     write_descriptor_set->pNext = NULL;
     write_descriptor_set->dstSet = ipipeline->descriptor_set;
     write_descriptor_set->dstBinding = shader_resource_buffer->binding;
-    write_descriptor_set->dstArrayElement = 0u;
-    write_descriptor_set->descriptorCount = 1u;
+    write_descriptor_set->dstArrayElement = 0;
+    write_descriptor_set->descriptorCount = 1;
     write_descriptor_set->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     write_descriptor_set->pImageInfo = NULL;
     write_descriptor_set->pBufferInfo = descriptor_buffer_info;
@@ -2146,7 +2146,7 @@ CgpuResult cgpu_create_pipeline(
     num_write_descriptor_sets++;
   }
 
-  for (uint32_t i = 0u; i < shader_resource_count; ++i)
+  for (uint32_t i = 0; i < shader_resource_count; ++i)
   {
     const cgpu_shader_resource_image* shader_resource_image = &p_image_resources[i];
 
@@ -2167,8 +2167,8 @@ CgpuResult cgpu_create_pipeline(
     write_descriptor_set->pNext = NULL;
     write_descriptor_set->dstSet = ipipeline->descriptor_set;
     write_descriptor_set->dstBinding = shader_resource_image->binding;
-    write_descriptor_set->dstArrayElement = 0u;
-    write_descriptor_set->descriptorCount = 1u;
+    write_descriptor_set->dstArrayElement = 0;
+    write_descriptor_set->descriptorCount = 1;
     write_descriptor_set->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     write_descriptor_set->pImageInfo = descriptor_image_info;
     write_descriptor_set->pBufferInfo = NULL;
@@ -2180,7 +2180,7 @@ CgpuResult cgpu_create_pipeline(
     idevice->logical_device,
     num_write_descriptor_sets,
     write_descriptor_sets,
-    0u,
+    0,
     NULL
   );
 
@@ -2248,7 +2248,7 @@ CgpuResult cgpu_create_command_buffer(
   cmdbuf_alloc_info.pNext = NULL;
   cmdbuf_alloc_info.commandPool = idevice->command_pool;
   cmdbuf_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cmdbuf_alloc_info.commandBufferCount = 1u;
+  cmdbuf_alloc_info.commandBufferCount = 1;
 
   const VkResult result = idevice->table.vkAllocateCommandBuffers(
     idevice->logical_device,
@@ -2278,7 +2278,7 @@ CgpuResult cgpu_destroy_command_buffer(
   idevice->table.vkFreeCommandBuffers(
     idevice->logical_device,
     idevice->command_pool,
-    1u,
+    1,
     &icommand_buffer->command_buffer
   );
 
@@ -2340,11 +2340,11 @@ CgpuResult cgpu_cmd_bind_pipeline(
     icommand_buffer->command_buffer,
     VK_PIPELINE_BIND_POINT_COMPUTE,
     ipipeline->layout,
-    0u,
-    1u,
+    0,
+    1,
     &ipipeline->descriptor_set,
-    0u,
-    0u
+    0,
+    0
   );
   return CGPU_OK;
 }
@@ -2384,7 +2384,7 @@ CgpuResult cgpu_cmd_copy_buffer(
     icommand_buffer->command_buffer,
     isource_buffer->buffer,
     idestination_buffer->buffer,
-    1u,
+    1,
     &region
   );
 
@@ -2434,7 +2434,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
 
   VkMemoryBarrier vk_memory_barriers[MAX_MEMORY_BARRIERS];
 
-  for (uint32_t i = 0u; i < barrier_count; ++i)
+  for (uint32_t i = 0; i < barrier_count; ++i)
   {
     const cgpu_memory_barrier* b_cgpu = &p_barriers[i];
     VkMemoryBarrier* b_vk = &vk_memory_barriers[i];
@@ -2447,7 +2447,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
   VkBufferMemoryBarrier vk_buffer_memory_barriers[MAX_BUFFER_MEMORY_BARRIERS];
   VkImageMemoryBarrier vk_image_memory_barriers[MAX_IMAGE_MEMORY_BARRIERS];
 
-  for (uint32_t i = 0u; i < buffer_barrier_count; ++i)
+  for (uint32_t i = 0; i < buffer_barrier_count; ++i)
   {
     const cgpu_buffer_memory_barrier* b_cgpu = &p_buffer_barriers[i];
 
@@ -2468,7 +2468,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->size = b_cgpu->byte_count;
   }
 
-  for (uint32_t i = 0u; i < image_barrier_count; ++i)
+  for (uint32_t i = 0; i < image_barrier_count; ++i)
   {
     const cgpu_image_memory_barrier* b_cgpu = &p_image_barriers[i];
 
@@ -2488,10 +2488,10 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->image = iimage->image;
     b_vk->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    b_vk->subresourceRange.baseMipLevel = 0u;
-    b_vk->subresourceRange.levelCount = 1u;
-    b_vk->subresourceRange.baseArrayLayer = 0u;
-    b_vk->subresourceRange.layerCount = 1u;
+    b_vk->subresourceRange.baseMipLevel = 0;
+    b_vk->subresourceRange.levelCount = 1;
+    b_vk->subresourceRange.baseArrayLayer = 0;
+    b_vk->subresourceRange.layerCount = 1;
   }
 
   idevice->table.vkCmdPipelineBarrier(
@@ -2500,7 +2500,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
       VK_PIPELINE_STAGE_TRANSFER_BIT,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
       VK_PIPELINE_STAGE_TRANSFER_BIT,
-    0u,
+    0,
     barrier_count,
     vk_memory_barriers,
     buffer_barrier_count,
@@ -2585,7 +2585,7 @@ CgpuResult cgpu_cmd_copy_timestamps(
     offset,
     count,
     ibuffer->buffer,
-    0u,
+    0,
     sizeof(uint64_t),
     VK_QUERY_RESULT_64_BIT | wait_until_available ?
       VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
@@ -2678,7 +2678,7 @@ CgpuResult cgpu_reset_fence(
   }
   const VkResult result = idevice->table.vkResetFences(
     idevice->logical_device,
-    1u,
+    1,
     &ifence->fence
   );
   if (result != VK_SUCCESS) {
@@ -2701,7 +2701,7 @@ CgpuResult cgpu_wait_for_fence(
   }
   const VkResult result = idevice->table.vkWaitForFences(
     idevice->logical_device,
-    1u,
+    1,
     &ifence->fence,
     VK_TRUE,
     UINT64_MAX
@@ -2733,17 +2733,17 @@ CgpuResult cgpu_submit_command_buffer(
   VkSubmitInfo submit_info;
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.pNext = NULL;
-  submit_info.waitSemaphoreCount = 0u;
+  submit_info.waitSemaphoreCount = 0;
   submit_info.pWaitSemaphores = NULL;
   submit_info.pWaitDstStageMask = NULL;
-  submit_info.commandBufferCount = 1u;
+  submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &icommand_buffer->command_buffer;
-  submit_info.signalSemaphoreCount = 0u;
+  submit_info.signalSemaphoreCount = 0;
   submit_info.pSignalSemaphores = NULL;
 
   const VkResult result = idevice->table.vkQueueSubmit(
     idevice->compute_queue,
-    1u,
+    1,
     &submit_info,
     ifence->fence
   );
@@ -2779,7 +2779,7 @@ CgpuResult cgpu_flush_mapped_memory(
 
   const VkResult result = idevice->table.vkFlushMappedMemoryRanges(
     idevice->logical_device,
-    1u,
+    1,
     &memory_range
   );
 
