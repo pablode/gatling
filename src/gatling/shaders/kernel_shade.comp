@@ -6,10 +6,10 @@ layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
 
 vec4 shade(const hit_info hit)
 {
-    const face face = faces[hit.face_index];
-    const face_vertex v0 = vertices[face.v_0];
-    const face_vertex v1 = vertices[face.v_1];
-    const face_vertex v2 = vertices[face.v_2];
+    const face f = faces[hit.face_index];
+    const vertex v0 = vertices[f.v_0];
+    const vertex v1 = vertices[f.v_1];
+    const vertex v2 = vertices[f.v_2];
     const vec3 v0_n = vec3(v0.norm_x, v0.norm_y, v0.norm_z);
     const vec3 v1_n = vec3(v1.norm_x, v1.norm_y, v1.norm_z);
     const vec3 v2_n = vec3(v2.norm_x, v2.norm_y, v2.norm_z);

@@ -1,8 +1,7 @@
 #ifndef GATLING_SHADER_COMMON
 #define GATLING_SHADER_COMMON
 
-/* Unfortunately, 'vertex' as a name leads to issues with MoltenVK. */
-struct face_vertex
+struct vertex
 {
     float pos_x;
     float pos_y;
@@ -103,7 +102,7 @@ layout(set=0, binding=4) readonly buffer BufferFaces
 
 layout(set=0, binding=5) readonly buffer BufferVertices
 {
-    face_vertex vertices[];
+    vertex vertices[];
 };
 
 layout(set=0, binding=6) readonly buffer BufferMaterials

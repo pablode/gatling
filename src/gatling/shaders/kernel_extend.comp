@@ -98,10 +98,10 @@ bool test_leaf(
 
     for (uint i = start; i < end; ++i)
     {
-        const face face = faces[i];
-        const face_vertex v_0 = vertices[face.v_0];
-        const face_vertex v_1 = vertices[face.v_1];
-        const face_vertex v_2 = vertices[face.v_2];
+        const face f = faces[i];
+        const vertex v_0 = vertices[f.v_0];
+        const vertex v_1 = vertices[f.v_1];
+        const vertex v_2 = vertices[f.v_2];
 
         float bc_u, bc_v, t_temp;
 
