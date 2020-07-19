@@ -38,12 +38,9 @@ struct aabb
 
 struct bvh_node
 {
-    aabb left_aabb;
-    uint left_child_offset;
-    uint left_child_count;
-    aabb right_aabb;
-    uint right_child_offset;
-    uint right_child_count;
+    aabb aabb;
+    uint field1;
+    uint field2;
 };
 
 struct path_segment

@@ -1,21 +1,21 @@
 #ifndef GP_BVH_H
 #define GP_BVH_H
 
-#include <assert.h>
+#include <stdbool.h>
 
 #include "gp.h"
 #include "math.h"
 
 typedef struct gp_bvh_node {
-  gp_aabb  left_aabb;          /* 24 bytes */
-  uint32_t left_child_index;   /*  4 bytes */
-  uint32_t left_child_count;   /*  4 bytes */
-  gp_aabb  right_aabb;         /* 24 bytes */
-  uint32_t right_child_index;  /*  4 bytes */
-  uint32_t right_child_count;  /*  4 bytes */
+  gp_aabb aabb;
+  /* If this node is a leaf, the face offset. Otherwise, the offset
+     to the left child node. */
+  uint32_t field1;
+  /* If the first bit of this field is set, this node is a leaf.
+     The remaining 31 bits encode the number of faces if the node
+     is a leaf or the offset to the right child node, if it's not. */
+  uint32_t field2;
 } gp_bvh_node;
-
-static_assert((sizeof(gp_bvh_node) % 64) == 0, "BVH node should be cache-aligned.");
 
 typedef struct gp_bvh {
   gp_aabb      aabb;
@@ -28,16 +28,14 @@ typedef struct gp_bvh {
 } gp_bvh;
 
 typedef struct gp_bvh_build_params {
+  uint32_t   face_batch_size;
   uint32_t   face_count;
+  float      face_intersection_cost;
   gp_face*   faces;
-  uint32_t   min_leaf_size;
-  uint32_t   min_mem_fetch_bytes;
-  uint32_t   max_leaf_size;
-  uint32_t   node_batch_size;
-  float      node_traversal_cost;
-  uint32_t   sah_bin_count;
-  uint32_t   tri_batch_size;
-  float      tri_intersection_cost;
+  uint32_t   leaf_max_face_count;
+  bool       object_binning_enabled;
+  uint32_t   object_binning_threshold;
+  uint32_t   object_bin_count;
   uint32_t   vertex_count;
   gp_vertex* vertices;
 } gp_bvh_build_params;

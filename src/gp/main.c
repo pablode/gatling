@@ -110,18 +110,16 @@ void gp_load_scene(
   }
 
   const gp_bvh_build_params bvh_params = {
-    .face_count            = face_count,
-    .faces                 = faces,
-    .min_leaf_size         = 1,
-    .min_mem_fetch_bytes   = 32,
-    .max_leaf_size         = 4,
-    .node_batch_size       = 1,
-    .node_traversal_cost   = 1.0f,
-    .sah_bin_count         = 32,
-    .tri_batch_size        = 1,
-    .tri_intersection_cost = 1.2f,
-    .vertex_count          = vertex_count,
-    .vertices              = vertices
+    .face_batch_size          = 1,
+    .face_count               = face_count,
+    .face_intersection_cost   = 1.2f,
+    .faces                    = faces,
+    .leaf_max_face_count      = 4,
+    .object_binning_enabled   = true,
+    .object_binning_threshold = 1024,
+    .object_bin_count         = 16,
+    .vertex_count             = vertex_count,
+    .vertices                 = vertices
   };
 
   gp_bvh_build(

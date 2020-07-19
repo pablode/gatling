@@ -1,272 +1,677 @@
 #include "bvh.h"
-#include "math.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <pthread.h>
+#include <assert.h>
 
-typedef struct face_ref {
+typedef struct gp_bvh_face_ref {
   gp_aabb  aabb;
   uint32_t index;
-} face_ref;
+} gp_bvh_face_ref;
 
-typedef struct work_range {
-  face_ref* face_stack;
-  uint32_t  face_count;
-  gp_aabb   aabb;
-  bool      is_leaf;
-} work_range;
+typedef struct gp_bvh_object_bin {
+  gp_aabb aabb;
+  uint32_t face_count;
+} gp_bvh_object_bin;
 
-typedef struct split_cand {
-  float    sah_cost;
-  uint32_t dim;
-  uint32_t left_tri_count;
-  uint32_t right_tri_count;
-  gp_aabb  left_aabb;
-  gp_aabb  right_aabb;
-} split_cand;
+typedef struct gp_bvh_split_object {
+  float sah_cost;
+  uint32_t axis;
+  float dcentroid;
+  uint32_t face_index;
+} gp_bvh_split_object;
 
-typedef struct stack_item {
-  work_range range;
-  uint32_t   node_index;
-} stack_item;
+typedef struct gp_bvh_split_object_binned {
+  float sah_cost;
+  uint32_t axis;
+  uint32_t bin_index;
+} gp_bvh_split_object_binned;
 
-typedef struct thread_data {
+typedef struct gp_bvh_thread_data {
   const gp_bvh_build_params* params;
-  gp_aabb*                   reused_bounds;
-} thread_data;
+  gp_aabb* reused_aabbs;
+  void*    reused_bins;
+} gp_bvh_thread_data ;
 
-GP_INLINE int gp_bvh_sort_comp_func(
-  const void* a, const void* b, uint32_t dim)
-{
-  const face_ref* ref_1 = (face_ref*) a;
-  const face_ref* ref_2 = (face_ref*) b;
-  const float aabb_length_1 = ref_1->aabb.min[dim] + ref_1->aabb.max[dim];
-  const float aabb_length_2 = ref_2->aabb.min[dim] + ref_2->aabb.max[dim];
-  const float aabb_center_diff = aabb_length_2 - aabb_length_1;
+typedef struct gp_bvh_work_range {
+  gp_bvh_face_ref* stack;
+  int32_t          stack_dir;
+  uint32_t         stack_size;
+  uint32_t         stack_size_limit;
+  gp_aabb          aabb_bounds;
+  gp_aabb          centroid_bounds;
+} gp_bvh_work_range;
 
-  if      (aabb_center_diff > 0.0f)     { return  1; }
-  else if (aabb_center_diff < 0.0f)     { return -1; }
-  else if (ref_1->index > ref_2->index) { return  1; }
-  else if (ref_1->index < ref_2->index) { return -1; }
-  else                                  { return  0; }
-}
+typedef struct gp_bvh_work_job {
+  gp_bvh_work_range range;
+  uint32_t          node_index;
+} gp_bvh_work_job;
 
-static int gp_bvh_sort_comp_func_x(const void* a, const void* b) {
-  return gp_bvh_sort_comp_func(a, b, 0);
-}
-static int gp_bvh_sort_comp_func_y(const void* a, const void* b) {
-  return gp_bvh_sort_comp_func(a, b, 1);
-}
-static int gp_bvh_sort_comp_func_z(const void* a, const void* b) {
-  return gp_bvh_sort_comp_func(a, b, 2);
-}
+#define CLAMP(a, min, max) \
+  (a < min) ? min : ((a > max) ? max : a)
 
-static void gp_bvh_sort_references(face_ref* face,
-  uint32_t tri_count,
-  uint32_t dim)
-{
-  assert(dim < 3);
-  switch (dim) {
-    case 0:
-      qsort(face, tri_count, sizeof(face_ref), gp_bvh_sort_comp_func_x);
-      break;
-    case 1:
-      qsort(face, tri_count, sizeof(face_ref), gp_bvh_sort_comp_func_y);
-      break;
-    case 2:
-      qsort(face, tri_count, sizeof(face_ref), gp_bvh_sort_comp_func_z);
-      break;
+#define GP_BVH_GEN_SORT_CMP_FUNC(AXIS)                                            \
+  GP_INLINE static int gp_bvh_sort_comp_func_##AXIS(                              \
+    const void* a, const void* b)                                                 \
+  {                                                                               \
+    const gp_bvh_face_ref* ref_1 = (gp_bvh_face_ref*) a;                          \
+    const gp_bvh_face_ref* ref_2 = (gp_bvh_face_ref*) b;                          \
+    const float aabb_dcentroid_1 = ref_1->aabb.min[AXIS] + ref_1->aabb.max[AXIS]; \
+    const float aabb_dcentroid_2 = ref_2->aabb.min[AXIS] + ref_2->aabb.max[AXIS]; \
+                                                                                  \
+    if      (aabb_dcentroid_1 > aabb_dcentroid_2) { return  1; }                  \
+    else if (aabb_dcentroid_1 < aabb_dcentroid_2) { return -1; }                  \
+    else if (ref_1->index > ref_2->index)         { return  1; }                  \
+    else if (ref_1->index < ref_2->index)         { return -1; }                  \
+    else {                                                                        \
+      return 0;                                                                   \
+    }                                                                             \
   }
-}
 
-GP_INLINE float gp_calc_tri_intersection_cost(
-  float    base_cost,
+GP_BVH_GEN_SORT_CMP_FUNC(0)
+GP_BVH_GEN_SORT_CMP_FUNC(1)
+GP_BVH_GEN_SORT_CMP_FUNC(2)
+
+GP_INLINE static float gp_bvh_calc_face_intersection_cost(
+  float base_cost,
   uint32_t batch_size,
-  uint32_t num_tris)
+  uint32_t face_count)
 {
-  assert(num_tris > 0);
   const uint32_t rounded_to_batch_size =
-    ((num_tris - 1) / batch_size) * batch_size;
+    ((face_count + batch_size - 1) / batch_size) * batch_size;
   return rounded_to_batch_size * base_cost;
 }
 
-GP_INLINE float gp_calc_node_traversal_cost(
-  float    base_cost,
-  uint32_t batch_size,
-  uint32_t num_nodes)
+static void gp_bvh_find_split_object(
+  const gp_bvh_thread_data* thread_data,
+  const gp_bvh_work_range* range,
+  gp_bvh_split_object* split)
 {
-  assert(num_nodes > 0);
-  const uint32_t rounded_to_batch_size =
-    ((num_nodes - 1) / batch_size) * batch_size;
-  return rounded_to_batch_size * base_cost;
-}
-
-static void gp_bvh_find_split(
-  thread_data* thread_data,
-  face_ref*    face_stack,
-  uint32_t     face_count,
-  split_cand*  split_cand)
-{
-  float best_sah_cost  = INFINITY;
+  float best_sah_cost = INFINITY;
   float best_tie_break = INFINITY;
-  gp_aabb right_aabb;
-  gp_aabb left_aabb;
 
-  /* Test each axis and sort triangles along it. */
-  for (uint32_t dim = 0; dim < 3; ++dim)
+  gp_aabb left_accum;
+  gp_aabb right_accum;
+
+  gp_bvh_face_ref* range_stack_left =
+    (range->stack_dir == 1) ? range->stack : range->stack - (range->stack_size - 1);
+
+  /* Test each axis and sort faces along it. */
+  for (uint32_t axis = 0; axis < 3; ++axis)
   {
-    gp_bvh_sort_references(face_stack, face_count, dim);
+    switch (axis)
+    {
+      case 0:
+        qsort(range_stack_left, range->stack_size, sizeof(gp_bvh_face_ref), gp_bvh_sort_comp_func_0);
+        break;
+      case 1:
+        qsort(range_stack_left, range->stack_size, sizeof(gp_bvh_face_ref), gp_bvh_sort_comp_func_1);
+        break;
+      case 2:
+        qsort(range_stack_left, range->stack_size, sizeof(gp_bvh_face_ref), gp_bvh_sort_comp_func_2);
+        break;
+      default:
+        assert(false);
+    }
 
     /* Sweep from right to left. */
-    gp_aabb_make_smallest(&right_aabb);
+    gp_aabb_make_smallest(&right_accum);
 
-    for (uint32_t r = face_count; r > 0; --r)
+    for (int32_t r = range->stack_size - 1; r > 0; --r)
     {
-      const face_ref* ref = &face_stack[r];
-      gp_aabb_merge(&right_aabb, &ref->aabb, &right_aabb);
-      thread_data->reused_bounds[r - 1] = right_aabb;
+      const gp_bvh_face_ref* ref = &range_stack_left[r];
+      gp_aabb_merge(&right_accum, &ref->aabb, &right_accum);
+      thread_data->reused_aabbs[r - 1] = right_accum;
     }
 
     /* Sweep from left to right. */
-    gp_aabb_make_smallest(&left_aabb);
+    gp_aabb_make_smallest(&left_accum);
 
-    for (uint32_t l = 1; l < face_count; ++l)
+    for (uint32_t l = 1; l < range->stack_size; ++l)
     {
-      const face_ref* ref = &face_stack[l - 1];
-      gp_aabb_merge(&left_aabb, &ref->aabb, &left_aabb);
+      const gp_bvh_face_ref* ref = &range_stack_left[(int32_t)l - 1];
+      gp_aabb_merge(&left_accum, &ref->aabb, &left_accum);
+
+      const uint32_t r = range->stack_size - l;
 
       /* Calculate SAH cost. */
-      const uint32_t r = face_count - l;
-      const float area_l = gp_aabb_half_area(&left_aabb);
-      const float area_r =
-        gp_aabb_half_area(&thread_data->reused_bounds[l - 1]);
+      const float area_l = gp_aabb_half_area(&left_accum);
+      const float area_r = gp_aabb_half_area(&thread_data->reused_aabbs[l - 1]);
+
       const float sah_cost =
-        gp_calc_tri_intersection_cost(
-          thread_data->params->tri_intersection_cost,
-          thread_data->params->tri_batch_size,
+        gp_bvh_calc_face_intersection_cost(
+          thread_data->params->face_intersection_cost,
+          thread_data->params->face_batch_size,
           l
         ) * area_l +
-        gp_calc_tri_intersection_cost(
-          thread_data->params->tri_intersection_cost,
-          thread_data->params->tri_batch_size,
+        gp_bvh_calc_face_intersection_cost(
+          thread_data->params->face_intersection_cost,
+          thread_data->params->face_batch_size,
           r
         ) * area_r;
 
-      /* When SAH is equal, prefer split which is more centered. */
-      const float tie_break = sqrt((float)l) + sqrt((float)r);
-
-      if (sah_cost < best_sah_cost ||
-           (sah_cost == best_sah_cost && tie_break < best_tie_break))
+      /* Abort if cost is higher than best split. */
+      if (sah_cost > best_sah_cost)
       {
-        /* Set new best split candidate. */
-        split_cand->sah_cost = sah_cost;
-        split_cand->dim = dim;
-        split_cand->left_tri_count = l;
-        split_cand->left_aabb = left_aabb;
-        split_cand->right_tri_count = r;
-        split_cand->right_aabb = thread_data->reused_bounds[l - 1];
-
-        best_sah_cost = sah_cost;
-        best_tie_break = tie_break;
+        continue;
       }
+
+      /* When SAH is equal, prefer equal face distribution. */
+      const float tie_break = sqrtf((float)l) + sqrtf((float)r);
+
+      if (sah_cost == best_sah_cost && tie_break > best_tie_break)
+      {
+        continue;
+      }
+
+      /* Set new best split candidate. */
+      const float dcentroid = ref->aabb.min[axis] + ref->aabb.max[axis];
+
+      split->sah_cost = sah_cost;
+      split->axis = axis;
+      split->dcentroid = dcentroid;
+      split->face_index = ref->index;
+
+      best_sah_cost = sah_cost;
+      best_tie_break = tie_break;
     }
   }
 }
 
-static void gp_bvh_build_range(
-  thread_data* data,
-  const work_range* range,
-  work_range* range_left,
-  work_range* range_right)
+static void gp_bvh_find_split_object_binned(
+  const gp_bvh_thread_data* thread_data,
+  const gp_bvh_work_range* range,
+  gp_bvh_split_object_binned* split)
 {
-  /* Find best split candidate. */
-  split_cand split;
-  gp_bvh_find_split(
-    data,
-    range->face_stack,
-    range->face_count,
-    &split
-  );
+  float best_sah_cost = INFINITY;
+  float best_tie_break = INFINITY;
 
-  /* Sort triangles again in best split dimension. */
-  gp_bvh_sort_references(
-    range->face_stack,
-    range->face_count,
-    split.dim
-  );
+  gp_aabb left_accum;
+  gp_aabb right_accum;
 
-  /* Test if childs should be leaves. */
-  const float left_leaf_sah_cost =
-    gp_calc_tri_intersection_cost(
-      data->params->tri_intersection_cost,
-      data->params->tri_batch_size,
-      split.left_tri_count
+  gp_vec3 axis_lengths;
+  gp_vec3_sub(range->centroid_bounds.max, range->centroid_bounds.min, axis_lengths);
+
+  const uint32_t bin_count = thread_data->params->object_bin_count;
+  gp_bvh_object_bin* bins = (gp_bvh_object_bin*) thread_data->reused_bins;
+  gp_aabb* reused_aabbs = (gp_aabb*) thread_data->reused_aabbs;
+
+  /* Test each axis. */
+  for (uint32_t axis = 0; axis < 3; ++axis)
+  {
+    const float axis_length = axis_lengths[axis];
+
+    if (axis_length <= 0.0f) {
+      continue;
+    }
+
+    const float k1 = bin_count / axis_length;
+
+    /* Clear object bins. */
+    for (uint32_t i = 0; i < bin_count; ++i)
+    {
+      gp_bvh_object_bin* bin = &bins[i];
+      gp_aabb_make_smallest(&bin->aabb);
+      bin->face_count = 0;
+    }
+
+    /* Project faces to bins. */
+    for (uint32_t i = 0; i < range->stack_size; ++i)
+    {
+      const gp_bvh_face_ref* ref = &range->stack[(int32_t)i * range->stack_dir];
+
+      const float centroid = (ref->aabb.min[axis] + ref->aabb.max[axis]) * 0.5f;
+
+      const uint32_t bin_index = (uint32_t) CLAMP(
+        (int32_t) (k1 * (centroid - range->centroid_bounds.min[axis])),
+        0,
+        (int32_t) (bin_count - 1)
+      );
+
+      gp_bvh_object_bin* bin = &bins[bin_index];
+      bin->face_count++;
+
+      gp_aabb_merge(&bin->aabb, &ref->aabb, &bin->aabb);
+    }
+
+    /* Sweep from right to left. */
+    gp_aabb_make_smallest(&right_accum);
+
+    for (uint32_t r = bin_count - 1; r > 0; --r)
+    {
+      const gp_bvh_object_bin* bin = &bins[r];
+      gp_aabb_merge(&right_accum, &bin->aabb, &right_accum);
+      reused_aabbs[r - 1] = right_accum;
+    }
+
+    /* Sweep from left to right. */
+    gp_aabb_make_smallest(&left_accum);
+
+    uint32_t left_face_count = 0;
+
+    for (uint32_t l = 1; l < bin_count; ++l)
+    {
+      const gp_bvh_object_bin* bin = &bins[l - 1];
+      gp_aabb_merge(&left_accum, &bin->aabb, &left_accum);
+
+      left_face_count += bin->face_count;
+      const uint32_t right_face_count = range->stack_size - left_face_count;
+
+      /* Calculate SAH cost. */
+      const float area_l = gp_aabb_half_area(&left_accum);
+      const float area_r = gp_aabb_half_area(&reused_aabbs[l - 1]);
+
+      const float sah_cost =
+        gp_bvh_calc_face_intersection_cost(
+          thread_data->params->face_intersection_cost,
+          thread_data->params->face_batch_size,
+          left_face_count
+        ) * area_l +
+        gp_bvh_calc_face_intersection_cost(
+          thread_data->params->face_intersection_cost,
+          thread_data->params->face_batch_size,
+          right_face_count
+        ) * area_r;
+
+      /* Abort if cost is higher than best split. */
+      if (sah_cost > best_sah_cost)
+      {
+        continue;
+      }
+
+      /* When SAH is equal, prefer equal face distribution. */
+      const float tie_break =
+        sqrtf((float)left_face_count) + sqrtf((float)right_face_count);
+
+      if (sah_cost == best_sah_cost && tie_break > best_tie_break)
+      {
+        continue;
+      }
+
+      /* Set new best split candidate. */
+      split->sah_cost = sah_cost;
+      split->axis = axis;
+      split->bin_index = l;
+
+      best_sah_cost = sah_cost;
+      best_tie_break = tie_break;
+    }
+  }
+}
+
+static void gp_bvh_do_split_object(
+  const gp_bvh_split_object* split,
+  const gp_bvh_work_range* range,
+  gp_bvh_work_range* range_left,
+  gp_bvh_work_range* range_right)
+{
+  /* This partitioning algorithm is a little bit special since we
+   * deal with directional ranges. While partitioning, we want both
+   * sides to grow inwards from the range bounds. This is performed
+   * in-place by taking into account the availability of free space.
+   * Left and right face counts are commonly used for partitioning,
+   * but because we don't sort in the first place, we can only rely
+   * on the centroid position. In case of ambiguities, we compare
+   * the referenced face indices. These are unique within a range. */
+
+  /* Range 1 is the side close to the origin of the parent stack.
+   * Range 2 represents the opposite side. */
+
+  gp_bvh_work_range* range1 =
+    range->stack_dir == 1 ? range_left : range_right;
+  gp_bvh_work_range* range2 =
+    range->stack_dir == 1 ? range_right : range_left;
+
+  int32_t range1_index_start = 0;
+  int32_t range1_index_end   = range->stack_size - 1;
+  int32_t range2_index_start = range->stack_size_limit - 1;
+
+  /* Reset child ranges. */
+
+  range1->stack_dir = range->stack_dir;
+  range1->stack = range->stack;
+  range1->stack_size = 0;
+  gp_aabb_make_smallest(&range1->aabb_bounds);
+  gp_aabb_make_smallest(&range1->centroid_bounds);
+
+  range2->stack_dir = range->stack_dir * -1;
+  range2->stack = range->stack + range->stack_dir * range2_index_start;
+  range2->stack_size = 0;
+  gp_aabb_make_smallest(&range2->aabb_bounds);
+  gp_aabb_make_smallest(&range2->centroid_bounds);
+
+  /* Do partitioning. */
+
+  const bool stack_dir_pos = range->stack_dir == +1;
+  const bool stack_dir_neg = range->stack_dir == -1;
+
+  while (range1_index_start <= range1_index_end)
+  {
+    const gp_bvh_face_ref* ref =
+      &range->stack[range1_index_start * range->stack_dir];
+
+    gp_vec3 centroid;
+    gp_vec3_add(ref->aabb.min, ref->aabb.max, centroid);
+
+    const bool is_in_left =
+      (centroid[split->axis] < split->dcentroid) ||
+      (centroid[split->axis] == split->dcentroid && ref->index <= split->face_index);
+
+    const bool is_in_range1 =
+      (stack_dir_pos && is_in_left) || (stack_dir_neg && !is_in_left);
+
+    gp_vec3_muls(centroid, 0.5f, centroid);
+
+    /* Handle face being in the close range. */
+
+    if (is_in_range1)
+    {
+      range1->stack_size++;
+
+      gp_aabb_include(
+        &range1->centroid_bounds, centroid, &range1->centroid_bounds);
+      gp_aabb_merge(&range1->aabb_bounds, &ref->aabb, &range1->aabb_bounds);
+
+      range1_index_start++;
+
+      continue;
+    }
+
+    /* Handle face being in the far range. */
+
+    range2->stack_size++;
+
+    gp_aabb_include(
+      &range2->centroid_bounds, centroid, &range2->centroid_bounds);
+    gp_aabb_merge(&range2->aabb_bounds, &ref->aabb, &range2->aabb_bounds);
+
+    /* Check if there is space left or if we need to swap. */
+    if (range2_index_start != range1_index_end)
+    {
+      range->stack[range2_index_start * range->stack_dir] = *ref;
+      range->stack[range1_index_start * range->stack_dir] =
+        range->stack[range1_index_end * range->stack_dir];
+    }
+    else
+    {
+      const gp_bvh_face_ref tmp =
+        range->stack[range2_index_start * range->stack_dir];
+      range->stack[range2_index_start * range->stack_dir] =
+        range->stack[range1_index_start * range->stack_dir];
+      range->stack[range1_index_start * range->stack_dir] = tmp;
+    }
+
+    range2_index_start--;
+    range1_index_end--;
+  }
+
+  assert(range1->stack_size > 0);
+  assert(range2->stack_size > 0);
+
+  /* Assign stack limits. */
+
+  const int32_t free_face_count = range->stack_size_limit - range->stack_size;
+  const int32_t half_free_face_count = free_face_count / 2;
+  range1->stack_size_limit = range1->stack_size + half_free_face_count;
+  range2->stack_size_limit = range2->stack_size + (free_face_count - half_free_face_count);
+}
+
+static void gp_bvh_do_split_object_binned(
+  const gp_bvh_thread_data* thread_data,
+  const gp_bvh_split_object_binned* split,
+  const gp_bvh_work_range* range,
+  gp_bvh_work_range* range_left,
+  gp_bvh_work_range* range_right)
+{
+  /* See non-binned object splitting for a general algorithm description. */
+
+  gp_bvh_work_range* range1 =
+    range->stack_dir == 1 ? range_left : range_right;
+  gp_bvh_work_range* range2 =
+    range->stack_dir == 1 ? range_right : range_left;
+
+  int32_t range1_index_start = 0;
+  int32_t range1_index_end   = range->stack_size - 1;
+  int32_t range2_index_start = range->stack_size_limit - 1;
+
+  /* Reset child ranges. */
+
+  range1->stack_dir = range->stack_dir;
+  range1->stack = range->stack;
+  range1->stack_size = 0;
+  gp_aabb_make_smallest(&range1->aabb_bounds);
+  gp_aabb_make_smallest(&range1->centroid_bounds);
+
+  range2->stack_dir = range->stack_dir * -1;
+  range2->stack = range->stack + range->stack_dir * range2_index_start;
+  range2->stack_size = 0;
+  gp_aabb_make_smallest(&range2->aabb_bounds);
+  gp_aabb_make_smallest(&range2->centroid_bounds);
+
+  /* Precalculate values. */
+
+  const float axis_length =
+    range->centroid_bounds.max[split->axis] - range->centroid_bounds.min[split->axis];
+
+  const uint32_t bin_count = thread_data->params->object_bin_count;
+
+  const float k1 = bin_count / axis_length;
+
+  const bool stack_dir_pos = range->stack_dir == +1;
+  const bool stack_dir_neg = range->stack_dir == -1;
+
+  /* Do partitioning. */
+
+  while (range1_index_start <= range1_index_end)
+  {
+    /* Determining which side a face is on is done by re-projecting it
+     * to its bin and comparing the bin index to the split bin index.
+     * This should be consistent with the way we found the split - this
+     * way, we don't have any deviations due to floating point math. */
+
+    const gp_bvh_face_ref* ref =
+      &range->stack[range1_index_start * range->stack_dir];
+
+    gp_vec3 centroid;
+    gp_vec3_add(ref->aabb.min, ref->aabb.max, centroid);
+    gp_vec3_muls(centroid, 0.5f, centroid);
+
+    const uint32_t bin_index = (uint32_t) CLAMP(
+      (int32_t) (k1 * (centroid[split->axis] - range->centroid_bounds.min[split->axis])),
+      0,
+      (int32_t) (bin_count - 1)
+    );
+
+    const bool is_in_range1 =
+      (stack_dir_pos && bin_index < split->bin_index) ||
+      (stack_dir_neg && bin_index >= split->bin_index);
+
+    /* Handle face being in the close range. This partitioning algorithm
+     * is essentially the same as in the non-binned object split. */
+
+    if (is_in_range1)
+    {
+      range1->stack_size++;
+
+      gp_aabb_include(
+        &range1->centroid_bounds, centroid, &range1->centroid_bounds);
+      gp_aabb_merge(&range1->aabb_bounds, &ref->aabb, &range1->aabb_bounds);
+
+      range1_index_start++;
+
+      continue;
+    }
+
+    /* Handle face being in the far range. */
+
+    range2->stack_size++;
+
+    gp_aabb_include(
+      &range2->centroid_bounds, centroid, &range2->centroid_bounds);
+    gp_aabb_merge(&range2->aabb_bounds, &ref->aabb, &range2->aabb_bounds);
+
+    /* Check if there is space left or if we need to swap. */
+    if (range2_index_start != range1_index_end)
+    {
+      range->stack[range2_index_start * range->stack_dir] = *ref;
+      range->stack[range1_index_start * range->stack_dir] =
+        range->stack[range1_index_end * range->stack_dir];
+    }
+    else
+    {
+      const gp_bvh_face_ref tmp =
+        range->stack[range2_index_start * range->stack_dir];
+      range->stack[range2_index_start * range->stack_dir] =
+        range->stack[range1_index_start * range->stack_dir];
+      range->stack[range1_index_start * range->stack_dir] = tmp;
+    }
+
+    range2_index_start--;
+    range1_index_end--;
+  }
+
+  assert(range1->stack_size > 0);
+  assert(range2->stack_size > 0);
+
+  /* Assign stack limits. */
+
+  const int32_t free_face_count = range->stack_size_limit - range->stack_size;
+  const int32_t half_free_face_count = free_face_count / 2;
+  range1->stack_size_limit = range1->stack_size + half_free_face_count;
+  range2->stack_size_limit = range2->stack_size + (free_face_count - half_free_face_count);
+}
+
+static bool gp_bvh_build_work_range(
+  const gp_bvh_thread_data* thread_data,
+  const gp_bvh_work_range* range,
+  gp_bvh_work_range* range_left,
+  gp_bvh_work_range* range_right)
+{
+  /* Make a leaf if face count is too low. */
+
+  if (range->stack_size == 1)
+  {
+    return false;
+  }
+
+  /* Check if we want to use binning. */
+
+  const bool is_centroid_bounds_degenerate =
+    (range->centroid_bounds.min[0] == range->centroid_bounds.max[0] &&
+       range->centroid_bounds.min[1] == range->centroid_bounds.max[1]) ||
+    (range->centroid_bounds.min[1] == range->centroid_bounds.max[1] &&
+       range->centroid_bounds.min[2] == range->centroid_bounds.max[2]) ||
+    (range->centroid_bounds.min[2] == range->centroid_bounds.max[2] &&
+       range->centroid_bounds.min[0] == range->centroid_bounds.max[0]);
+
+  const bool should_use_binning =
+    range->stack_size > thread_data->params->object_binning_threshold;
+
+  const bool is_binning_enabled = thread_data->params->object_binning_enabled;
+
+  const bool do_binning =
+    is_binning_enabled &&
+    !is_centroid_bounds_degenerate &&
+    should_use_binning;
+
+  /* Evaluate possible splits. */
+
+  gp_bvh_split_object_binned split_object_binned;
+  split_object_binned.sah_cost = INFINITY;
+
+  gp_bvh_split_object split_object;
+  split_object.sah_cost = INFINITY;
+
+  if (do_binning)
+  {
+    gp_bvh_find_split_object_binned(
+      thread_data,
+      range,
+      &split_object_binned
+    );
+  }
+  else
+  {
+    gp_bvh_find_split_object(
+      thread_data,
+      range,
+      &split_object
+    );
+  }
+
+  const float leaf_sah_cost =
+    gp_bvh_calc_face_intersection_cost(
+      thread_data->params->face_intersection_cost,
+      thread_data->params->face_batch_size,
+      range->stack_size
     )
-    * gp_aabb_half_area(&split.left_aabb);
+    * gp_aabb_half_area(&range->aabb_bounds);
 
-  const float right_leaf_sah_cost =
-    gp_calc_tri_intersection_cost(
-      data->params->tri_intersection_cost,
-      data->params->tri_batch_size,
-      split.right_tri_count
-    )
-    * gp_aabb_half_area(&split.right_aabb);
+  /* Find best split option. */
 
-  const bool is_left_leaf =
-    (split.left_tri_count <= data->params->min_leaf_size) ||
-    (split.left_tri_count <= data->params->max_leaf_size &&
-     split.sah_cost < left_leaf_sah_cost);
+  const float best_sah_cost =
+    fminf(do_binning ? split_object_binned.sah_cost : split_object.sah_cost, leaf_sah_cost);
 
-  const bool is_right_leaf =
-    (split.right_tri_count <= data->params->min_leaf_size) ||
-    (split.right_tri_count <= data->params->max_leaf_size &&
-     split.sah_cost < right_leaf_sah_cost);
+  /* Handle best split option. */
 
-  /* Set new child ranges. */
-  range_left->face_stack  = range->face_stack;
-  range_left->face_count  = split.left_tri_count;
-  range_left->aabb        = split.left_aabb;
-  range_left->is_leaf     = is_left_leaf;
-  range_right->face_stack = range->face_stack + split.left_tri_count;
-  range_right->face_count = range->face_count - split.left_tri_count;
-  range_right->aabb       = split.right_aabb;
-  range_right->is_leaf    = is_right_leaf;
+  const bool fits_in_leaf =
+    range->stack_size <= thread_data->params->leaf_max_face_count;
+
+  if (fits_in_leaf && best_sah_cost == leaf_sah_cost)
+  {
+    return false;
+  }
+
+  if (do_binning)
+  {
+    gp_bvh_do_split_object_binned(
+      thread_data,
+      &split_object_binned,
+      range,
+      range_left,
+      range_right
+    );
+  }
+  else
+  {
+    gp_bvh_do_split_object(
+      &split_object,
+      range,
+      range_left,
+      range_right
+    );
+  }
+
+  return true;
 }
 
 void gp_bvh_build(
   const gp_bvh_build_params* params,
   gp_bvh* bvh)
 {
-  /* Initialize the node array. We allocate memory for the worst case
-     and reallocate later when we know the precise number of nodes. */
+  /* Initialize root work range. */
 
-  const gp_vertex* vertices = params->vertices;
-  const gp_face*      faces = params->faces;
-  uint32_t vertex_count = params->vertex_count;
-  uint32_t face_count   = params->face_count;
+  gp_aabb root_aabb_bounds;
+  gp_aabb root_centroid_bounds;
+  gp_aabb_make_smallest(&root_aabb_bounds);
+  gp_aabb_make_smallest(&root_centroid_bounds);
 
-  bvh->node_count = 0;
-  bvh->nodes = malloc(2 * face_count * sizeof(gp_bvh_node));
+  const uint32_t root_stack_size_limit = params->face_count * 2;
+  gp_bvh_face_ref* root_stack =
+    (gp_bvh_face_ref*) malloc(root_stack_size_limit * sizeof(gp_bvh_face_ref));
 
-  /* Initialize triangle references, their aabbs and the root aabb. */
+  uint32_t root_stack_size = 0;
 
-  gp_aabb root_aabb;
-  gp_aabb_make_smallest(&root_aabb);
-
-  face_ref* face_stack = (face_ref*) malloc(face_count * sizeof(face_ref));
-
-  for (uint32_t i = 0; i < face_count; ++i)
+  for (uint32_t i = 0; i < params->face_count; ++i)
   {
-    const gp_face* face  = &faces[i];
-    const gp_vertex* v_a = &vertices[face->v_i[0]];
-    const gp_vertex* v_b = &vertices[face->v_i[1]];
-    const gp_vertex* v_c = &vertices[face->v_i[2]];
+    const gp_face* face = &params->faces[i];
+    const gp_vertex* v_a = &params->vertices[face->v_i[0]];
+    const gp_vertex* v_b = &params->vertices[face->v_i[1]];
+    const gp_vertex* v_c = &params->vertices[face->v_i[2]];
 
-    face_ref* face_ref = &face_stack[i];
-    face_ref->index = i;
+    gp_bvh_face_ref* face_ref = &root_stack[root_stack_size];
 
     gp_aabb_make_from_triangle(
       v_a->pos,
@@ -274,110 +679,150 @@ void gp_bvh_build(
       v_c->pos,
       &face_ref->aabb
     );
+
+    /* Ignore face if it's degenerate. */
+    if ((face_ref->aabb.min[0] == face_ref->aabb.max[0] &&
+          face_ref->aabb.min[1] == face_ref->aabb.max[1]) ||
+       (face_ref->aabb.min[1] == face_ref->aabb.max[1] &&
+          face_ref->aabb.min[2] == face_ref->aabb.max[2]) ||
+       (face_ref->aabb.min[2] == face_ref->aabb.max[2] &&
+          face_ref->aabb.min[0] == face_ref->aabb.max[0]))
+    {
+      continue;
+    }
+
+    face_ref->index = i;
+
     gp_aabb_merge(
-      &root_aabb,
+      &root_aabb_bounds,
       &face_ref->aabb,
-      &root_aabb
-    );
-  }
-
-  bvh->aabb = root_aabb;
-
-  /* Build BVH using ranges in an iterative fashion. */
-
-  const uint32_t max_item_count = face_count * 2;
-  stack_item* items =
-    (stack_item*) malloc(max_item_count * sizeof(stack_item));
-
-  items[0].range.face_stack = face_stack;
-  items[0].range.face_count = face_count;
-  items[0].range.aabb       = root_aabb;
-  items[0].range.is_leaf    = false;
-  items[0].node_index       = 0;
-
-  /* We want FIFO behaviour to have the BVH level-wise in memory. */
-  uint32_t item_read_index  = 0;
-  uint32_t item_write_index = 1;
-
-  gp_aabb* reused_bounds =
-    (gp_aabb*) malloc(face_count * sizeof(gp_aabb));
-
-  uint32_t node_index = 0;
-
-  thread_data data = {
-    .params = params,
-    .reused_bounds = reused_bounds
-  };
-
-  while (item_read_index != item_write_index)
-  {
-    /* Dequeue range and split it. */
-    const stack_item item = items[item_read_index];
-    ++item_read_index;
-
-    stack_item item_left;
-    stack_item item_right;
-
-    gp_bvh_build_range(
-      &data,
-      &item.range,
-      &item_left.range,
-      &item_right.range
+      &root_aabb_bounds
     );
 
-    /* Make node and enqueue subranges. */
-    gp_bvh_node* node = &bvh->nodes[item.node_index];
-    node->left_aabb   = item_left.range.aabb;
-    node->right_aabb  = item_right.range.aabb;
+    gp_vec3 centroid;
+    gp_vec3_add(face_ref->aabb.max, face_ref->aabb.min, centroid);
+    gp_vec3_muls(centroid, 0.5f, centroid);
 
-    if (item_left.range.is_leaf) {
-      node->left_child_index = item_left.range.face_stack - face_stack;
-      node->left_child_count = item_left.range.face_count;
-      node->left_child_count |= (1u << 31u);
-    } else {
-      node_index++;
-      node->left_child_index = node_index;
-      node->left_child_count = 2;
-      item_left.node_index = node_index;
-      items[item_write_index] = item_left;
-      ++item_write_index;
-    }
+    gp_aabb_include(&root_centroid_bounds, centroid, &root_centroid_bounds);
 
-    if (item_right.range.is_leaf) {
-      node->right_child_index = item_right.range.face_stack - face_stack;
-      node->right_child_count = item_right.range.face_count;
-      node->right_child_count |= (1u << 31u);
-    } else {
-      node_index++;
-      node->right_child_index = node_index;
-      node->right_child_count = 2;
-      item_right.node_index = node_index;
-      items[item_write_index] = item_right;
-      ++item_write_index;
-    }
+    root_stack_size++;
   }
 
-  free(reused_bounds);
-  free(items);
+  /* Set up work range queue. */
 
-  /* Reallocate node memory, copy vertices and faces. */
+  const uint32_t max_job_stack_size = params->face_count * 2;
 
-  bvh->node_count = node_index + 1;
-  bvh->nodes = (gp_bvh_node*) realloc(bvh->nodes, bvh->node_count * sizeof(gp_bvh_node));
+  gp_bvh_work_job* job_stack = (gp_bvh_work_job*)
+    malloc(max_job_stack_size * sizeof(gp_bvh_work_job));
 
-  bvh->vertex_count = vertex_count;
-  bvh->vertices = malloc(bvh->vertex_count * sizeof(gp_vertex));
-  memcpy(bvh->vertices, params->vertices, bvh->vertex_count * sizeof(gp_vertex));
+  job_stack[0].range.stack            = root_stack;
+  job_stack[0].range.stack_dir        = 1;
+  job_stack[0].range.stack_size       = root_stack_size;
+  job_stack[0].range.stack_size_limit = root_stack_size_limit;
+  job_stack[0].range.aabb_bounds      = root_aabb_bounds;
+  job_stack[0].range.centroid_bounds  = root_centroid_bounds;
+  job_stack[0].node_index             = 0;
 
-  bvh->face_count = face_count;
-  bvh->faces = malloc(bvh->face_count * sizeof(gp_face));
-  for (uint32_t i = 0; i < face_count; ++i)
+  int32_t job_stack_size = 1;
+
+  /* Set up bvh. */
+
+  bvh->aabb = root_aabb_bounds;
+
+  bvh->face_count = 0;
+  bvh->faces = malloc(params->face_count * 2 * sizeof(gp_face));
+
+  bvh->vertex_count = params->vertex_count;
+  bvh->vertices = malloc(params->vertex_count * sizeof(gp_vertex));
+  memcpy(bvh->vertices, params->vertices, params->vertex_count * sizeof(gp_vertex));
+
+  bvh->node_count = 1;
+  bvh->nodes = malloc(params->face_count * 4 * sizeof(gp_bvh_node));
+
+  /* Allocate thread-local memory. */
+
+  const uint32_t object_bins_byte_size =
+    params->object_bin_count * sizeof(gp_bvh_object_bin);
+
+  gp_bvh_thread_data thread_data;
+  thread_data.reused_bins = malloc(object_bins_byte_size);
+  thread_data.reused_aabbs = (gp_aabb*)
+    malloc(params->face_count * sizeof(gp_aabb));
+
+  thread_data.params = params;
+
+  /* Perform work until queue is empty. */
+
+  while (job_stack_size > 0)
   {
-    const uint32_t face_index = face_stack[i].index;
-    bvh->faces[i] = params->faces[face_index];
+    job_stack_size--;
+
+    /* Process bvh range. */
+    const gp_bvh_work_job job = job_stack[job_stack_size];
+
+    gp_bvh_work_range left_range;
+    gp_bvh_work_range right_range;
+
+    const bool make_leaf = !gp_bvh_build_work_range(
+      &thread_data,
+      &job.range,
+      &left_range,
+      &right_range
+    );
+
+    gp_bvh_node* node = &bvh->nodes[job.node_index];
+
+    node->aabb = job.range.aabb_bounds;
+
+    /* We did not split the range, make a leaf instead. */
+    if (make_leaf)
+    {
+      node->field1 = bvh->face_count;
+      node->field2 = 0x80000000 | job.range.stack_size;
+
+      /* Resolve face references and write them into the bvh. */
+      for (uint32_t i = 0; i < job.range.stack_size; ++i)
+      {
+        const gp_bvh_face_ref* ref = &job.range.stack[(int32_t)i * job.range.stack_dir];
+        const gp_face* face = &params->faces[ref->index];
+        bvh->faces[bvh->face_count] = *face;
+        bvh->face_count++;
+      }
+
+      continue;
+    }
+
+    /* Otherwise, create two new nodes. */
+    node->field1 = bvh->node_count;
+    bvh->node_count++;
+    node->field2 = bvh->node_count;
+    bvh->node_count++;
+
+    /* Enqueue new subranges. */
+    job_stack[job_stack_size].node_index = node->field1;
+    job_stack[job_stack_size].range = left_range;
+    job_stack_size++;
+
+    job_stack[job_stack_size].node_index = node->field2;
+    job_stack[job_stack_size].range = right_range;
+    job_stack_size++;
   }
 
-  free(face_stack);
+  /* Free memory. */
+
+  free(thread_data.reused_bins);
+  free(thread_data.reused_aabbs);
+
+  free(job_stack);
+  free(root_stack);
+
+  /* Reallocate bvh memory. */
+
+  bvh->nodes = (gp_bvh_node*)
+    realloc(bvh->nodes, bvh->node_count * sizeof(gp_bvh_node));
+
+  bvh->faces = (gp_face*)
+    realloc(bvh->faces, bvh->face_count * sizeof(gp_face));
 }
 
 void gp_free_bvh(gp_bvh* bvh)
@@ -385,10 +830,4 @@ void gp_free_bvh(gp_bvh* bvh)
   free(bvh->nodes);
   free(bvh->faces);
   free(bvh->vertices);
-  bvh->node_count = 0;
-  bvh->nodes = NULL;
-  bvh->face_count = 0;
-  bvh->faces = NULL;
-  bvh->vertex_count = 0;
-  bvh->vertices = NULL;
 }

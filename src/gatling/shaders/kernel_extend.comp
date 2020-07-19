@@ -10,7 +10,6 @@ layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
 const uint SAMPLE_COUNT = 1;
 const uint IMAGE_WIDTH = 3840;
 const uint IMAGE_HEIGHT = 2160;
-const uint MSB = (1u << 31u);
 
 const vec4 COLOR_LIGHT_BLUE = vec4(0.5, 0.7, 1.0, 1.0);
 const vec4 COLOR_LIGHT_GRAY = vec4(0.8, 0.8, 0.8, 1.0);
@@ -40,23 +39,23 @@ bool intersect_triangle(
         return false;
     }
 
-    const float invDet = 1.0 / det;
+    const float inv_det = 1.0 / det;
 
-    const vec3 tvec = ray_origin - v0;
+    const vec3 t_vec = ray_origin - v0;
 
-    bc_u = dot(tvec, p) * invDet;
+    bc_u = dot(t_vec, p) * inv_det;
     if (bc_u < 0.0 || bc_u > 1.0) {
         return false;
     }
 
-    const vec3 q = cross(tvec, e1);
-    bc_v = dot(ray_direction, q) * invDet;
+    const vec3 q = cross(t_vec, e1);
+    bc_v = dot(ray_direction, q) * inv_det;
 
     if (bc_v < 0.0 || (bc_u + bc_v > 1.0)) {
         return false;
     }
 
-    t = dot(e2, q) * invDet;
+    t = dot(e2, q) * inv_det;
 
     return t > 0.0;
 }
@@ -70,15 +69,15 @@ bool intersect_aabb(
     in const vec3 ood,
     out float t)
 {
-    float x0 = box.min_x * inv_dir.x - ood.x;
-    float y0 = box.min_y * inv_dir.y - ood.y;
-    float z0 = box.min_z * inv_dir.z - ood.z;
-    float x1 = box.max_x * inv_dir.x - ood.x;
-    float y1 = box.max_y * inv_dir.y - ood.y;
-    float z1 = box.max_z * inv_dir.z - ood.z;
+    const float x0 = box.min_x * inv_dir.x - ood.x;
+    const float y0 = box.min_y * inv_dir.y - ood.y;
+    const float z0 = box.min_z * inv_dir.z - ood.z;
+    const float x1 = box.max_x * inv_dir.x - ood.x;
+    const float y1 = box.max_y * inv_dir.y - ood.y;
+    const float z1 = box.max_z * inv_dir.z - ood.z;
 
     t = max(max(t_min, min(x0, x1)), max(min(y0, y1), min(z0, z1)));
-    float t_max_box = min(min(t_max, max(x0, x1)), min(max(y0, y1), max(z0, z1)));
+    const float t_max_box = min(min(t_max, max(x0, x1)), min(max(y0, y1), max(z0, z1)));
 
     return t <= t_max_box;
 }
@@ -93,8 +92,8 @@ bool test_leaf(
 {
     t = t_max;
 
-    uint start = tri_offset;
-    uint end   = tri_offset + tri_count;
+    const uint start = tri_offset;
+    const uint end = tri_offset + tri_count;
 
     for (uint i = start; i < end; ++i)
     {
@@ -115,10 +114,12 @@ bool test_leaf(
             bc_v,
             t_temp
         );
+
         if (!is_hit)
         {
             continue;
         }
+
         if (t_temp >= t)
         {
             continue;
@@ -129,9 +130,6 @@ bool test_leaf(
         hit_info.bc_u = bc_u;
         hit_info.bc_v = bc_v;
     }
-
-    hit_info.pixel_index = ray.pixel_index;
-    hit_info.pos = vec4(ray.pos + ray.dir * t, 1.0);
 
     return t != t_max;
 }
@@ -146,124 +144,83 @@ void traverse_bvh(in const uint ray_index)
 {
     const path_segment ray = path_segments[ray_index];
 
-    float t_triangle_max =         FLOAT_MAX;
-    float t_aabb_min     =               0.0;
-    vec3 inv_dir         =     1.0 / ray.dir;
-    vec3 ood             = ray.pos / ray.dir;
+    const vec3 inv_dir = 1.0 / ray.dir;
+    const vec3 ood = ray.pos / ray.dir;
 
-    const bool intersects_root = intersect_aabb(
-        0.0, FLOAT_MAX, root_aabb, inv_dir, ood, t_aabb_min
-    );
-    if (!intersects_root) {
-        return;
-    }
-
-    stack_item stack[32];
+    float t_face_max = FLOAT_MAX;
     int stack_index = 0;
 
+    stack_item stack[32];
     stack[0].node_index = 0;
-    stack[0].t_aabb_min = t_aabb_min;
+    stack[0].t_aabb_min = 0.0;
 
     hit_info hit;
-
     hit_info temp_hit;
+
     float temp_t;
 
     while(stack_index >= 0)
     {
         stack_item item = stack[stack_index];
-        const uint node_index = item.node_index;
-        t_aabb_min = item.t_aabb_min;
         stack_index--;
+
+        const uint node_index = item.node_index;
+        const float t_aabb_min = item.t_aabb_min;
 
         bvh_node node = bvh_nodes[node_index];
 
-        float t_aabb_min_left;
-        const bool hit_left = intersect_aabb(
+        const bool hit_aabb = intersect_aabb(
             t_aabb_min,
-            t_triangle_max,
-            node.left_aabb,
+            t_face_max,
+            node.aabb,
             inv_dir,
             ood,
-            t_aabb_min_left
+            temp_t
         );
 
-        float t_aabb_min_right;
-        const bool hit_right = intersect_aabb(
-            t_aabb_min,
-            t_triangle_max,
-            node.right_aabb,
-            inv_dir,
-            ood,
-            t_aabb_min_right
-        );
-
-        const bool is_left_leaf  = (node.left_child_count  & MSB) == MSB;
-        const bool is_right_leaf = (node.right_child_count & MSB) == MSB;
-
-        if (hit_left)
+        if (!hit_aabb)
         {
-            const uint child_offset = node.left_child_offset;
+            continue;
+        }
 
-            if (is_left_leaf)
-            {
-                const uint child_count = (node.left_child_count << 1u) >> 1u;
-                const bool has_hit = test_leaf(
-                    ray,
-                    t_triangle_max,
-                    child_offset,
-                    child_count,
-                    temp_hit,
-                    temp_t
-                );
+        const bool is_leaf = (node.field2 & 0x80000000) == 0x80000000;
 
-                if (has_hit)
-                {
-                    t_triangle_max = temp_t;
-                    hit = temp_hit;
-                }
-            }
-            else
+        if (is_leaf)
+        {
+            const uint child_offset = node.field1;
+            const uint child_count = node.field2 & 0x7FFFFFFF;
+
+            const bool has_hit = test_leaf(
+                ray,
+                t_face_max,
+                child_offset,
+                child_count,
+                temp_hit,
+                temp_t
+            );
+
+            if (has_hit)
             {
-                stack_index++;
-                stack[stack_index].node_index = child_offset;
-                stack[stack_index].t_aabb_min = t_aabb_min_left;
+                hit = temp_hit;
+                hit.pos = vec4(ray.pos + ray.dir * temp_t, 1.0);
+                t_face_max = temp_t;
             }
         }
-        if (hit_right)
+        else
         {
-            const uint child_offset = node.right_child_offset;
-
-            if (is_right_leaf)
-            {
-                const uint child_count = (node.right_child_count << 1u) >> 1u;
-                const bool has_hit = test_leaf(
-                    ray,
-                    t_triangle_max,
-                    child_offset,
-                    child_count,
-                    temp_hit,
-                    temp_t
-                );
-
-                if (has_hit)
-                {
-                    t_triangle_max = temp_t;
-                    hit = temp_hit;
-                }
-            }
-            else
-            {
-                stack_index++;
-                stack[stack_index].node_index = child_offset;
-                stack[stack_index].t_aabb_min = t_aabb_min_right;
-            }
+            stack_index++;
+            stack[stack_index].node_index = node.field1;
+            stack[stack_index].t_aabb_min = temp_t;
+            stack_index++;
+            stack[stack_index].node_index = node.field2;
+            stack[stack_index].t_aabb_min = temp_t;
         }
     }
 
-    if (t_triangle_max != FLOAT_MAX)
+    if (t_face_max != FLOAT_MAX)
     {
         const uint hit_index = atomicAdd(hit_write_counter, 1);
+        hit.pixel_index = ray.pixel_index;
         hits[hit_index] = hit;
     }
 }
