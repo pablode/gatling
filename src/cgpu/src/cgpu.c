@@ -1001,21 +1001,21 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  uint32_t num_phys_devices;
+  uint32_t phys_device_count;
   vkEnumeratePhysicalDevices(
     iinstance.instance,
-    &num_phys_devices,
+    &phys_device_count,
     NULL
   );
 
-  if (num_phys_devices > MAX_PHYSICAL_DEVICES)
+  if (phys_device_count > MAX_PHYSICAL_DEVICES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_MAX_PHYSICAL_DEVICES_REACHED;
   }
 
-  if (num_phys_devices == 0 ||
-      index >= num_phys_devices)
+  if (phys_device_count == 0 ||
+      index >= phys_device_count)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_NO_DEVICE_AT_INDEX;
@@ -1025,7 +1025,7 @@ CgpuResult cgpu_create_device(
 
   vkEnumeratePhysicalDevices(
     iinstance.instance,
-    &num_phys_devices,
+    &phys_device_count,
     phys_devices
   );
 
@@ -1040,15 +1040,15 @@ CgpuResult cgpu_create_device(
   idevice->limits =
     cgpu_translate_physical_device_limits(device_properties.limits);
 
-  uint32_t num_device_extensions;
+  uint32_t device_ext_count;
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
     NULL,
-    &num_device_extensions,
+    &device_ext_count,
     NULL
   );
 
-  if (num_device_extensions > MAX_DEVICE_EXTENSIONS)
+  if (device_ext_count > MAX_DEVICE_EXTENSIONS)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_MAX_DEVICE_EXTENSIONS_REACHED;
@@ -1059,7 +1059,7 @@ CgpuResult cgpu_create_device(
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
     NULL,
-    &num_device_extensions,
+    &device_ext_count,
     device_extensions
   );
 
@@ -1068,7 +1068,7 @@ CgpuResult cgpu_create_device(
     const char* required_extension = *(pp_required_extensions + i);
 
     bool has_extension = false;
-    for (uint32_t e = 0; e < num_device_extensions; ++e) {
+    for (uint32_t e = 0; e < device_ext_count; ++e) {
       const VkExtensionProperties* extension = &device_extensions[e];
       if (strcmp(extension->extensionName, required_extension) == 0) {
         has_extension = true;
@@ -1082,14 +1082,14 @@ CgpuResult cgpu_create_device(
     }
   }
 
-  uint32_t num_queue_families = 0;
+  uint32_t queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
-    &num_queue_families,
+    &queue_family_count,
     NULL
   );
 
-  if (num_queue_families > MAX_QUEUE_FAMILIES)
+  if (queue_family_count > MAX_QUEUE_FAMILIES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_MAX_QUEUE_FAMILIES_REACHED;
@@ -1099,7 +1099,7 @@ CgpuResult cgpu_create_device(
 
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
-    &num_queue_families,
+    &queue_family_count,
     queue_families
   );
 
@@ -1107,7 +1107,7 @@ CgpuResult cgpu_create_device(
      to schedule work or translate command buffers very often. Therefore,
      we also don't need async execution and can operate on a single queue. */
   int32_t queue_family_index = -1;
-  for (uint32_t i = 0; i < num_queue_families; ++i) {
+  for (uint32_t i = 0; i < queue_family_count; ++i) {
     const VkQueueFamilyProperties* queue_family = &queue_families[i];
     if (queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) {
       queue_family_index = i;
@@ -1942,13 +1942,13 @@ CgpuResult cgpu_create_pipeline(
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
-  const uint32_t num_descriptor_set_bindings = buffer_resource_count + shader_resource_count;
+  const uint32_t desc_set_binding_count = buffer_resource_count + shader_resource_count;
 
   VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   descriptor_set_layout_create_info.pNext = NULL;
   descriptor_set_layout_create_info.flags = 0;
-  descriptor_set_layout_create_info.bindingCount = num_descriptor_set_bindings;
+  descriptor_set_layout_create_info.bindingCount = desc_set_binding_count;
   descriptor_set_layout_create_info.pBindings = descriptor_set_bindings;
 
   VkResult result = idevice->table.vkCreateDescriptorSetLayout(
@@ -2031,7 +2031,7 @@ CgpuResult cgpu_create_pipeline(
 
   VkDescriptorPoolSize descriptor_pool_size;
   descriptor_pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  descriptor_pool_size.descriptorCount = num_descriptor_set_bindings;
+  descriptor_pool_size.descriptorCount = desc_set_binding_count;
 
   VkDescriptorPoolCreateInfo descriptor_pool_create_info;
   descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -2108,7 +2108,7 @@ CgpuResult cgpu_create_pipeline(
   VkDescriptorImageInfo descriptor_image_infos[MAX_DESCRIPTOR_IMAGE_INFOS];
   VkWriteDescriptorSet write_descriptor_sets[MAX_WRITE_DESCRIPTOR_SETS];
 
-  uint32_t num_write_descriptor_sets = 0;
+  uint32_t write_desc_set_count = 0;
 
   for (uint32_t i = 0; i < buffer_resource_count; ++i)
   {
@@ -2132,7 +2132,7 @@ CgpuResult cgpu_create_pipeline(
         ibuffer->size_in_bytes - shader_resource_buffer->byte_offset :
         shader_resource_buffer->byte_count;
 
-    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[num_write_descriptor_sets];
+    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_descriptor_set->pNext = NULL;
     write_descriptor_set->dstSet = ipipeline->descriptor_set;
@@ -2143,7 +2143,7 @@ CgpuResult cgpu_create_pipeline(
     write_descriptor_set->pImageInfo = NULL;
     write_descriptor_set->pBufferInfo = descriptor_buffer_info;
     write_descriptor_set->pTexelBufferView = NULL;
-    num_write_descriptor_sets++;
+    write_desc_set_count++;
   }
 
   for (uint32_t i = 0; i < shader_resource_count; ++i)
@@ -2162,7 +2162,7 @@ CgpuResult cgpu_create_pipeline(
     descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkWriteDescriptorSet* write_descriptor_set =
-      &write_descriptor_sets[num_write_descriptor_sets];
+      &write_descriptor_sets[write_desc_set_count];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_descriptor_set->pNext = NULL;
     write_descriptor_set->dstSet = ipipeline->descriptor_set;
@@ -2173,12 +2173,12 @@ CgpuResult cgpu_create_pipeline(
     write_descriptor_set->pImageInfo = descriptor_image_info;
     write_descriptor_set->pBufferInfo = NULL;
     write_descriptor_set->pTexelBufferView = NULL;
-    num_write_descriptor_sets++;
+    write_desc_set_count++;
   }
 
   idevice->table.vkUpdateDescriptorSets(
     idevice->logical_device,
-    num_write_descriptor_sets,
+    write_desc_set_count,
     write_descriptor_sets,
     0,
     NULL
