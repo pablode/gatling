@@ -235,11 +235,18 @@ void gp_write_scene(
     bvh->face_count * sizeof(gp_face)
   );
 
-  memcpy(
-    buffer + vertex_offset,
-    bvh->vertices,
-    bvh->vertex_count * sizeof(gp_vertex)
-  );
+  for (uint32_t i = 0; i < bvh->vertex_count; ++i)
+  {
+    uint8_t* ptr = &buffer[vertex_offset + i * 32];
+    memcpy(&ptr[ 0], &bvh->vertices[i].pos[0],  4);
+    memcpy(&ptr[ 4], &bvh->vertices[i].pos[1],  4);
+    memcpy(&ptr[ 8], &bvh->vertices[i].pos[2],  4);
+    memcpy(&ptr[12], &bvh->vertices[i].uv[0],   4);
+    memcpy(&ptr[16], &bvh->vertices[i].norm[0], 4);
+    memcpy(&ptr[20], &bvh->vertices[i].norm[1], 4);
+    memcpy(&ptr[24], &bvh->vertices[i].norm[2], 4);
+    memcpy(&ptr[28], &bvh->vertices[i].uv[1],   4);
+  }
 
   memcpy(
     buffer + material_offset,

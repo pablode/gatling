@@ -97,21 +97,17 @@ bool test_leaf(
     for (uint i = start; i < end; ++i)
     {
         const face f = faces[i];
-        const vertex v_0 = vertices[f.v_0];
-        const vertex v_1 = vertices[f.v_1];
-        const vertex v_2 = vertices[f.v_2];
+        const vec3 p0 = vertices[f.v_0].field1.xyz;
+        const vec3 p1 = vertices[f.v_1].field1.xyz;
+        const vec3 p2 = vertices[f.v_2].field1.xyz;
 
         vec2 bc;
         float t_temp;
 
         const bool is_hit = intersect_triangle(
-            ray.origin,
-            ray.dir,
-            vec3(v_0.pos_x, v_0.pos_y, v_0.pos_z),
-            vec3(v_1.pos_x, v_1.pos_y, v_1.pos_z),
-            vec3(v_2.pos_x, v_2.pos_y, v_2.pos_z),
-            bc,
-            t_temp
+            ray.origin, ray.dir,
+            p0, p1, p2,
+            bc, t_temp
         );
 
         if (!is_hit)

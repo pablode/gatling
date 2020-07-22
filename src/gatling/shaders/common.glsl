@@ -3,14 +3,10 @@
 
 struct vertex
 {
-    float pos_x;
-    float pos_y;
-    float pos_z;
-    float norm_x;
-    float norm_y;
-    float norm_z;
-    float u;
-    float v;
+    /* pos.{x, y, z}, tex.u */
+    vec4 field1;
+    /* norm.{x, y, z}, tex.v */
+    vec4 field2;
 };
 
 struct face
