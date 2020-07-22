@@ -98,6 +98,8 @@ static void gatling_create_pipeline(
   const char *shader_file_path,
   cgpu_shader_resource_buffer *shader_resource_buffers,
   size_t num_shader_resource_buffers,
+  const cgpu_specialization_constant* spec_constants,
+  uint32_t spec_const_count,
   gatling_pipeline *pipeline)
 {
   gatling_file* file;
@@ -138,6 +140,8 @@ static void gatling_create_pipeline(
     NULL,
     pipeline->shader,
     "main",
+    spec_constants,
+    spec_const_count,
     &pipeline->pipeline
   );
   gatling_cgpu_ensure(c_result);
@@ -422,6 +426,8 @@ int main(int argc, const char* argv[])
     kernel_ray_gen_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
+    NULL,
+    0,
     &pipeline_ray_gen
   );
   gatling_create_pipeline(
@@ -429,6 +435,8 @@ int main(int argc, const char* argv[])
     kernel_extend_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
+    NULL,
+    0,
     &pipeline_extend
   );
   gatling_create_pipeline(
@@ -436,6 +444,8 @@ int main(int argc, const char* argv[])
     kernel_shade_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
+    NULL,
+    0,
     &pipeline_shade
   );
 
