@@ -26,8 +26,7 @@ bool intersect_triangle(
     in const vec3 v0,
     in const vec3 v1,
     in const vec3 v2,
-    out float bc_u,
-    out float bc_v,
+    out vec2 bc,
     out float t)
 {
     const vec3 e1 = v1 - v0;
@@ -43,15 +42,15 @@ bool intersect_triangle(
 
     const vec3 t_vec = ray_origin - v0;
 
-    bc_u = dot(t_vec, p) * inv_det;
-    if (bc_u < 0.0 || bc_u > 1.0) {
+    bc.x = dot(t_vec, p) * inv_det;
+    if (bc.x < 0.0 || bc.x > 1.0) {
         return false;
     }
 
     const vec3 q = cross(t_vec, e1);
-    bc_v = dot(ray_direction, q) * inv_det;
+    bc.y = dot(ray_direction, q) * inv_det;
 
-    if (bc_v < 0.0 || (bc_u + bc_v > 1.0)) {
+    if (bc.y < 0.0 || (bc.x + bc.y > 1.0)) {
         return false;
     }
 
@@ -102,16 +101,16 @@ bool test_leaf(
         const vertex v_1 = vertices[f.v_1];
         const vertex v_2 = vertices[f.v_2];
 
-        float bc_u, bc_v, t_temp;
+        vec2 bc;
+        float t_temp;
 
         const bool is_hit = intersect_triangle(
-            ray.pos,
+            ray.origin,
             ray.dir,
             vec3(v_0.pos_x, v_0.pos_y, v_0.pos_z),
             vec3(v_1.pos_x, v_1.pos_y, v_1.pos_z),
             vec3(v_2.pos_x, v_2.pos_y, v_2.pos_z),
-            bc_u,
-            bc_v,
+            bc,
             t_temp
         );
 
@@ -127,8 +126,7 @@ bool test_leaf(
 
         t = t_temp;
         hit_info.face_index = i;
-        hit_info.bc_u = bc_u;
-        hit_info.bc_v = bc_v;
+        hit_info.bc = bc;
     }
 
     return t != t_max;
@@ -145,7 +143,7 @@ void traverse_bvh(in const uint ray_index)
     const path_segment ray = path_segments[ray_index];
 
     const vec3 inv_dir = 1.0 / ray.dir;
-    const vec3 ood = ray.pos / ray.dir;
+    const vec3 ood = ray.origin / ray.dir;
 
     float t_face_max = FLOAT_MAX;
     int stack_index = 0;
@@ -202,7 +200,7 @@ void traverse_bvh(in const uint ray_index)
             if (has_hit)
             {
                 hit = temp_hit;
-                hit.pos = vec4(ray.pos + ray.dir * temp_t, 1.0);
+                hit.pos = vec4(ray.origin + ray.dir * temp_t, 1.0);
                 t_face_max = temp_t;
             }
         }

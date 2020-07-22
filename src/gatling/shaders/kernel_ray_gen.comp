@@ -86,7 +86,7 @@ void main()
     ray_direction = normalize(ray_direction);
 
     const uint sample_index = pixel_index * NUM_SAMPLES + s;
-    path_segments[sample_index].pos = ray_origin;
+    path_segments[sample_index].origin = ray_origin;
     path_segments[sample_index].pixel_index = pixel_index;
     path_segments[sample_index].dir = ray_direction;
     path_segments[sample_index].rec_depth = 0;

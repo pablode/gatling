@@ -13,14 +13,12 @@ vec4 shade(const hit_info hit)
     const vec3 v0_n = vec3(v0.norm_x, v0.norm_y, v0.norm_z);
     const vec3 v1_n = vec3(v1.norm_x, v1.norm_y, v1.norm_z);
     const vec3 v2_n = vec3(v2.norm_x, v2.norm_y, v2.norm_z);
-
-    const float bc_u = hit.bc_u;
-    const float bc_v = hit.bc_v;
+    const vec2 bc = hit.bc;
 
     const vec3 normal = normalize(
-        v0_n * (1.0 - bc_u - bc_v) +
-        v1_n * bc_u +
-        v2_n * bc_v
+        v0_n * (1.0 - bc.x - bc.y) +
+        v1_n * bc.x +
+        v2_n * bc.y
     );
 
     const vec4 color = vec4(abs(normal), 1.0);

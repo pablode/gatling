@@ -45,7 +45,7 @@ struct bvh_node
 
 struct path_segment
 {
-    vec3 pos;
+    vec3 origin;
     uint pixel_index;
     vec3 dir;
     uint rec_depth;
@@ -53,11 +53,10 @@ struct path_segment
 
 struct hit_info
 {
-    vec4  pos;
-    float bc_u;
-    float bc_v;
-    uint  pixel_index;
-    uint  face_index;
+    vec4 pos;
+    vec2 bc;
+    uint pixel_index;
+    uint face_index;
 };
 
 layout(set=0, binding=0) writeonly buffer BufferOutput
