@@ -8,9 +8,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#define IMAGE_WIDTH 3840
-#define IMAGE_HEIGHT 2160
-#define NUM_SAMPLES 1
+static uint32_t IMAGE_WIDTH = 3840;
+static uint32_t IMAGE_HEIGHT = 2160;
+static uint32_t SAMPLE_COUNT = 1;
 
 #define gatling_fail(msg)                                                         \
   do {                                                                            \
@@ -266,14 +266,14 @@ int main(int argc, const char* argv[])
   const size_t path_segment_buffer_size_in_bytes =
     IMAGE_WIDTH *   /* x dim */
     IMAGE_HEIGHT *  /* y dim */
-    NUM_SAMPLES *   /* sample count */
+    SAMPLE_COUNT *  /* sample count */
     32 +            /* path_segment struct byte size */
     16;             /* counter in first 4 bytes + padding */
 
   const size_t hit_info_buffer_size_in_bytes =
     IMAGE_WIDTH *   /* x dim */
     IMAGE_HEIGHT *  /* y dim */
-    NUM_SAMPLES *   /* sample count */
+    SAMPLE_COUNT *  /* sample count */
     32 +            /* hit_size struct byte size */
     16;             /* counter in first 4 bytes + padding */
 
@@ -421,24 +421,58 @@ int main(int argc, const char* argv[])
   gatling_pipeline pipeline_extend;
   gatling_pipeline pipeline_shade;
 
-  gatling_create_pipeline(
-    device,
-    kernel_ray_gen_shader_path,
-    shader_resource_buffers,
-    num_shader_resource_buffers,
-    NULL,
-    0,
-    &pipeline_ray_gen
-  );
-  gatling_create_pipeline(
-    device,
-    kernel_extend_shader_path,
-    shader_resource_buffers,
-    num_shader_resource_buffers,
-    NULL,
-    0,
-    &pipeline_extend
-  );
+  {
+    const float camera_origin[3] = { 15.0f, 15.0f, 15.0f };
+    const float camera_target[3] = {  0.0f,  4.0f,  3.0f };
+    const float camera_fov = 0.872665f;
+
+    const cgpu_specialization_constant speccs[] = {
+      { .constant_id = 0, .p_data = (void*) &SAMPLE_COUNT,     .byte_count = 4 },
+      { .constant_id = 1, .p_data = (void*) &IMAGE_WIDTH,      .byte_count = 4 },
+      { .constant_id = 2, .p_data = (void*) &IMAGE_HEIGHT,     .byte_count = 4 },
+      { .constant_id = 3, .p_data = (void*) &camera_origin[0], .byte_count = 4 },
+      { .constant_id = 4, .p_data = (void*) &camera_origin[1], .byte_count = 4 },
+      { .constant_id = 5, .p_data = (void*) &camera_origin[2], .byte_count = 4 },
+      { .constant_id = 6, .p_data = (void*) &camera_target[0], .byte_count = 4 },
+      { .constant_id = 7, .p_data = (void*) &camera_target[1], .byte_count = 4 },
+      { .constant_id = 8, .p_data = (void*) &camera_target[2], .byte_count = 4 },
+      { .constant_id = 9, .p_data = (void*) &camera_fov,       .byte_count = 4 }
+    };
+
+    gatling_create_pipeline(
+      device,
+      kernel_ray_gen_shader_path,
+      shader_resource_buffers,
+      num_shader_resource_buffers,
+      speccs,
+      10,
+      &pipeline_ray_gen
+    );
+  }
+
+  {
+    const uint32_t subgroup_size_x = 32;
+    const uint32_t traversal_stack_size = 32;
+
+    const cgpu_specialization_constant speccs[] = {
+      { .constant_id = 0, .p_data = (void*) &subgroup_size_x,      .byte_count = 4 },
+      { .constant_id = 1, .p_data = (void*) &SAMPLE_COUNT,         .byte_count = 4 },
+      { .constant_id = 2, .p_data = (void*) &IMAGE_WIDTH,          .byte_count = 4 },
+      { .constant_id = 3, .p_data = (void*) &IMAGE_HEIGHT,         .byte_count = 4 },
+      { .constant_id = 4, .p_data = (void*) &traversal_stack_size, .byte_count = 4 }
+    };
+
+    gatling_create_pipeline(
+      device,
+      kernel_extend_shader_path,
+      shader_resource_buffers,
+      num_shader_resource_buffers,
+      speccs,
+      5,
+      &pipeline_extend
+    );
+  }
+
   gatling_create_pipeline(
     device,
     kernel_shade_shader_path,
@@ -537,8 +571,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    /* TODO: what is the optimal number? */
-    device_limits.maxComputeWorkGroupInvocations,
+    ((IMAGE_WIDTH * IMAGE_HEIGHT * SAMPLE_COUNT) / 32) + 1,
     1,
     1
   );

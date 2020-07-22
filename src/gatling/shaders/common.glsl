@@ -1,6 +1,12 @@
 #ifndef GATLING_SHADER_COMMON
 #define GATLING_SHADER_COMMON
 
+#define uint32_t uint
+#define int32_t int
+
+#define FLOAT_MAX 3.402823466e38
+#define FLOAT_MIN 1.175494351e-38f
+
 struct vertex
 {
     /* pos.{x, y, z}, tex.u */

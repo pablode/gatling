@@ -1,22 +1,18 @@
 #version 450 core
 
-layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
-
+#include "extensions.glsl"
 #include "common.glsl"
 
-#define FLOAT_MAX 3.402823466e38
-#define FLOAT_MIN 1.175494351e-38f
-
-const uint SAMPLE_COUNT = 1;
-const uint IMAGE_WIDTH = 3840;
-const uint IMAGE_HEIGHT = 2160;
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+layout(constant_id = 1) const uint32_t SAMPLE_COUNT = 1;
+layout(constant_id = 2) const uint32_t IMAGE_WIDTH = 3840;
+layout(constant_id = 3) const uint32_t IMAGE_HEIGHT = 2160;
+layout(constant_id = 4) const uint32_t MAX_STACK_SIZE = 32;
 
 const vec4 COLOR_LIGHT_BLUE = vec4(0.5, 0.7, 1.0, 1.0);
 const vec4 COLOR_LIGHT_GRAY = vec4(0.8, 0.8, 0.8, 1.0);
-
 const vec3 LIGHT_POSITION = vec3 (2.0, 5.0, 5.0);
 const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 1.0);
-
 const float TRI_EPS = 0.0000001;
 
 /* Möller-Trumbore triangle intersection. */
@@ -144,7 +140,7 @@ void traverse_bvh(in const uint ray_index)
     float t_face_max = FLOAT_MAX;
     int stack_index = 0;
 
-    stack_item stack[32];
+    stack_item stack[MAX_STACK_SIZE];
     stack[0].node_index = 0;
     stack[0].t_aabb_min = 0.0;
 

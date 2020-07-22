@@ -1,18 +1,19 @@
 #version 450 core
 
-#define FLOAT_MIN 1.175494351e-38f
-
-layout(local_size_x=32, local_size_y=32, local_size_z=1) in;
-
+#include "extensions.glsl"
 #include "common.glsl"
 
-const uint NUM_SAMPLES = 1;
-const uint IMAGE_WIDTH = 3840;
-const uint IMAGE_HEIGHT = 2160;
-
-const vec3 CAMERA_ORIGIN = vec3(15.0, 15.0, 15.0);
-const vec3 CAMERA_TARGET = vec3(0.0, 4.0, 3.0);
-const float CAMERA_FOV = radians(50.0);
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(constant_id = 0) const uint32_t SAMPLE_COUNT = 1;
+layout(constant_id = 1) const uint32_t IMAGE_WIDTH = 3840;
+layout(constant_id = 2) const uint32_t IMAGE_HEIGHT = 2160;
+layout(constant_id = 3) const float CAMERA_ORIGIN_X = 15.0;
+layout(constant_id = 4) const float CAMERA_ORIGIN_Y = 15.0;
+layout(constant_id = 5) const float CAMERA_ORIGIN_Z = 15.0;
+layout(constant_id = 6) const float CAMERA_TARGET_X = 0.0;
+layout(constant_id = 7) const float CAMERA_TARGET_Y = 4.0;
+layout(constant_id = 8) const float CAMERA_TARGET_Z = 3.0;
+layout(constant_id = 9) const float CAMERA_FOV = radians(50.0);
 
 uint wang_hash(uint seed)
 {
@@ -44,24 +45,27 @@ void main()
   }
 
   /* Reset counters to zero. */
-  if (pixel_index == 0u)
+  if (pixel_index == 0)
   {
-    path_segment_counter = 0u;
-    hit_write_counter = 0u;
-    hit_read_counter = 0u;
+    path_segment_counter = 0;
+    hit_write_counter = 0;
+    hit_read_counter = 0;
   }
 
   /* Use the pixel index as a base for a randomness seed. */
   random_seed = wang_hash(pixel_index);
 
   /* Generate mulitple rays originating from the camera. */
-  const vec3 camera_forward = normalize(CAMERA_TARGET - CAMERA_ORIGIN);
+  const vec3 camera_origin = vec3(CAMERA_ORIGIN_X, CAMERA_ORIGIN_Y, CAMERA_ORIGIN_Z);
+  const vec3 camera_target = vec3(CAMERA_TARGET_X, CAMERA_TARGET_Y, CAMERA_TARGET_Z);
+  const vec3 camera_forward = normalize(camera_target - camera_origin);
   const vec3 camera_right = normalize(cross(camera_forward, vec3(0.0, 1.0, 0.0)));
   const vec3 camera_up = cross(camera_right, camera_forward);
   const float aspect_ratio = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
   const float dist_to_plane = 1.0 / tan(CAMERA_FOV * 0.5);
 
-  for (uint s = 0u; s < NUM_SAMPLES; ++s)
+  [[unroll]]
+  for (uint s = 0; s < SAMPLE_COUNT; ++s)
   {
     /* Find new point on camera plane with random offset. */
     const float r1 = random_number_between_0_and_1();
@@ -74,7 +78,7 @@ void main()
     const float centered_offset_y = (2.0 * norm_plane_pos_y) - 1.0;
 
     /* Calculate ray properties. */
-    vec3 ray_origin = CAMERA_ORIGIN;
+    vec3 ray_origin = camera_origin;
     vec3 ray_direction =
       camera_right   * centered_offset_x * aspect_ratio +
       camera_up      * centered_offset_y +
@@ -85,7 +89,7 @@ void main()
     ray_direction += vec3(equal(ray_direction, vec3(0.0))) * FLOAT_MIN;
     ray_direction = normalize(ray_direction);
 
-    const uint sample_index = pixel_index * NUM_SAMPLES + s;
+    const uint sample_index = pixel_index * SAMPLE_COUNT + s;
     path_segments[sample_index].origin = ray_origin;
     path_segments[sample_index].pixel_index = pixel_index;
     path_segments[sample_index].dir = ray_direction;
