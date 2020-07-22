@@ -387,6 +387,7 @@ int main(int argc, const char* argv[])
 
   /* Set up pipelines. */
   const uint32_t node_offset     = *((uint32_t*) (mapped_scene_data +  0));
+  const uint32_t node_count      = *((uint32_t*) (mapped_scene_data +  4));
   const uint32_t face_offset     = *((uint32_t*) (mapped_scene_data +  8));
   const uint32_t vertex_offset   = *((uint32_t*) (mapped_scene_data + 16));
   const uint32_t material_offset = *((uint32_t*) (mapped_scene_data + 24));
@@ -452,7 +453,13 @@ int main(int argc, const char* argv[])
 
   {
     const uint32_t subgroup_size_x = 32;
-    const uint32_t traversal_stack_size = 32;
+
+    /* Find smallest possible traversal stack depth. */
+    uint32_t nc = node_count;
+    uint32_t traversal_stack_size = 2; /* + root & leaf */
+    while (nc >>= 1) {
+      ++traversal_stack_size;
+    }
 
     const cgpu_specialization_constant speccs[] = {
       { .constant_id = 0, .p_data = (void*) &subgroup_size_x,      .byte_count = 4 },
