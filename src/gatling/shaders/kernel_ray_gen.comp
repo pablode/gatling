@@ -37,12 +37,12 @@ float random_number_between_0_and_1()
 
 void main()
 {
-  const uint pixel_index =
-    gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * IMAGE_WIDTH;
-
-  if (pixel_index >= IMAGE_WIDTH * IMAGE_HEIGHT) {
+  if (gl_GlobalInvocationID.x >= IMAGE_WIDTH ||
+      gl_GlobalInvocationID.y >= IMAGE_HEIGHT) {
       return;
   }
+
+  const uint pixel_index = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * IMAGE_WIDTH;
 
   /* Reset counters to zero. */
   if (pixel_index == 0)
@@ -70,7 +70,7 @@ void main()
     /* Find new point on camera plane with random offset. */
     const float r1 = random_number_between_0_and_1();
     const float r2 = random_number_between_0_and_1();
-    const float norm_plane_pos_x = (float(gl_GlobalInvocationID.x) + r1) / float(IMAGE_WIDTH );
+    const float norm_plane_pos_x = (float(gl_GlobalInvocationID.x) + r1) / float(IMAGE_WIDTH);
     const float norm_plane_pos_y = (float(gl_GlobalInvocationID.y) + r2) / float(IMAGE_HEIGHT);
 
     /* Convert from [0, 1] to [-1.0, 1.0] range. */
@@ -78,7 +78,7 @@ void main()
     const float centered_offset_y = (2.0 * norm_plane_pos_y) - 1.0;
 
     /* Calculate ray properties. */
-    vec3 ray_origin = camera_origin;
+    const vec3 ray_origin = camera_origin;
     vec3 ray_direction =
       camera_right   * centered_offset_x * aspect_ratio +
       camera_up      * centered_offset_y +

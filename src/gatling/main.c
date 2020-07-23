@@ -18,13 +18,13 @@ static uint32_t SAMPLE_COUNT = 1;
     exit(EXIT_FAILURE);                                                           \
   } while(0)
 
-static void gatling_cgpu_ensure(CgpuResult result)
-{
-  if (result != CGPU_OK) {
-    printf("Gatling encountered a fatal error.");
-    exit(EXIT_FAILURE);
-  }
-}
+#define gatling_cgpu_ensure(result)                                                         \
+  do {                                                                                      \
+    if (result != CGPU_OK) {                                                                \
+      printf("Gatling encountered a fatal CGPU error at line %d: %d\n", __LINE__, result);  \
+      exit(EXIT_FAILURE);                                                                   \
+    }                                                                                       \
+  } while (0)
 
 static void gatling_cgpu_warn(CgpuResult result, const char *msg)
 {
@@ -61,7 +61,7 @@ static void gatling_save_img(
 
   for (size_t i = 0; i < data_size_in_floats; ++i)
   {
-    int32_t color = (int32_t) (data[i]  * 255.0f);
+    int32_t color = (int32_t) (data[i] * 255.0f);
     if (color < 0)   { color = 0;   }
     if (color > 255) { color = 255; }
     temp_data[i] = (uint8_t) color;
@@ -98,8 +98,8 @@ static void gatling_create_pipeline(
   const char *shader_file_path,
   cgpu_shader_resource_buffer *shader_resource_buffers,
   size_t num_shader_resource_buffers,
-  const cgpu_specialization_constant* spec_constants,
   uint32_t spec_const_count,
+  const cgpu_specialization_constant* spec_constants,
   gatling_pipeline *pipeline)
 {
   gatling_file* file;
@@ -140,8 +140,8 @@ static void gatling_create_pipeline(
     NULL,
     pipeline->shader,
     "main",
-    spec_constants,
     spec_const_count,
+    spec_constants,
     &pipeline->pipeline
   );
   gatling_cgpu_ensure(c_result);
@@ -408,15 +408,15 @@ int main(int argc, const char* argv[])
     { 7u,    hit_info_buffer,               0u,                 CGPU_WHOLE_SIZE }
   };
 
-  char dir_path[4096];
+  char dir_path[1024];
   gatling_get_parent_directory(argv[0], dir_path);
 
-  char kernel_ray_gen_shader_path[4096];
-  snprintf(kernel_ray_gen_shader_path, 4096, "%s/shaders/kernel_ray_gen.comp.spv", dir_path);
-  char kernel_extend_shader_path[4096];
-  snprintf(kernel_extend_shader_path, 4096, "%s/shaders/kernel_extend.comp.spv", dir_path);
-  char kernel_shade_shader_path[4096];
-  snprintf(kernel_shade_shader_path, 4096, "%s/shaders/kernel_shade.comp.spv", dir_path);
+  char kernel_ray_gen_shader_path[1152];
+  snprintf(kernel_ray_gen_shader_path, 1152, "%s/shaders/kernel_ray_gen.comp.spv", dir_path);
+  char kernel_extend_shader_path[1152];
+  snprintf(kernel_extend_shader_path, 1152, "%s/shaders/kernel_extend.comp.spv", dir_path);
+  char kernel_shade_shader_path[1152];
+  snprintf(kernel_shade_shader_path, 1152, "%s/shaders/kernel_shade.comp.spv", dir_path);
 
   gatling_pipeline pipeline_ray_gen;
   gatling_pipeline pipeline_extend;
@@ -445,8 +445,8 @@ int main(int argc, const char* argv[])
       kernel_ray_gen_shader_path,
       shader_resource_buffers,
       num_shader_resource_buffers,
-      speccs,
       10,
+      speccs,
       &pipeline_ray_gen
     );
   }
@@ -474,8 +474,8 @@ int main(int argc, const char* argv[])
       kernel_extend_shader_path,
       shader_resource_buffers,
       num_shader_resource_buffers,
-      speccs,
       5,
+      speccs,
       &pipeline_extend
     );
   }
@@ -485,8 +485,8 @@ int main(int argc, const char* argv[])
     kernel_shade_shader_path,
     shader_resource_buffers,
     num_shader_resource_buffers,
-    NULL,
     0,
+    NULL,
     &pipeline_shade
   );
 
@@ -625,8 +625,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    /* TODO: what is the optimal number? */
-    device_limits.maxComputeWorkGroupInvocations,
+    ((IMAGE_WIDTH * IMAGE_HEIGHT * SAMPLE_COUNT) / 32) + 1,
     1,
     1
   );

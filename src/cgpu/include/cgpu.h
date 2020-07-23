@@ -87,7 +87,8 @@ typedef enum CgpuResult {
   CGPU_FAIL_MAX_DEVICE_EXTENSIONS_REACHED = -30,
   CGPU_FAIL_MAX_QUEUE_FAMILIES_REACHED = -31,
   CGPU_FAIL_MAX_SPECIALIZATION_CONSTANTS_REACHED = -32,
-  CGPU_FAIL_MAX_SPECIALIZATION_BUFFER_SIZE_REACHED = -33
+  CGPU_FAIL_MAX_SPECIALIZATION_BUFFER_SIZE_REACHED = -33,
+  CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED = -34
 } CgpuResult;
 
 typedef uint32_t CgpuBufferUsageFlags;
@@ -677,8 +678,8 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
-  const cgpu_specialization_constant* specialization_constants,
   uint32_t specialization_constant_count,
+  const cgpu_specialization_constant* specialization_constants,
   cgpu_pipeline* p_pipeline
 );
 

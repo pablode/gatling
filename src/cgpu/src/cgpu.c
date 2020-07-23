@@ -1901,8 +1901,8 @@ CgpuResult cgpu_create_pipeline(
   const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
-  const cgpu_specialization_constant* specialization_constants,
   uint32_t specialization_constant_count,
+  const cgpu_specialization_constant* specialization_constants,
   cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
@@ -2522,7 +2522,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->buffer = ibuffer->buffer;
     b_vk->offset = b_cgpu->byte_offset;
-    b_vk->size = b_cgpu->byte_count;
+    b_vk->size = (b_cgpu->byte_count == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : b_cgpu->byte_count;
   }
 
   for (uint32_t i = 0; i < image_barrier_count; ++i)
@@ -2623,6 +2623,10 @@ CgpuResult cgpu_cmd_copy_timestamps(
   uint32_t count,
   bool wait_until_available)
 {
+  if ((offset + count) > MAX_TIMESTAMP_QUERIES) {
+    return CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED;
+  }
+
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
