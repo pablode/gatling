@@ -4,9 +4,9 @@
 #include "common.glsl"
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
-layout(constant_id = 0) const uint32_t SAMPLE_COUNT = 1;
-layout(constant_id = 1) const uint32_t IMAGE_WIDTH = 3840;
-layout(constant_id = 2) const uint32_t IMAGE_HEIGHT = 2160;
+layout(constant_id = 0) const uint SAMPLE_COUNT = 1;
+layout(constant_id = 1) const uint IMAGE_WIDTH = 3840;
+layout(constant_id = 2) const uint IMAGE_HEIGHT = 2160;
 layout(constant_id = 3) const float CAMERA_ORIGIN_X = 15.0;
 layout(constant_id = 4) const float CAMERA_ORIGIN_Y = 15.0;
 layout(constant_id = 5) const float CAMERA_ORIGIN_Z = 15.0;
