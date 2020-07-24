@@ -1,1 +1,3 @@
 #extension GL_EXT_control_flow_attributes: require
+#extension GL_KHR_memory_scope_semantics: require
+#pragma use_vulkan_memory_model

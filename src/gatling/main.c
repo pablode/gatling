@@ -10,7 +10,7 @@
 
 static uint32_t IMAGE_WIDTH = 3840;
 static uint32_t IMAGE_HEIGHT = 2160;
-static uint32_t SAMPLE_COUNT = 1;
+static uint32_t SAMPLE_COUNT = 4;
 
 #define gatling_fail(msg)                                                         \
   do {                                                                            \
@@ -219,11 +219,15 @@ int main(int argc, const char* argv[])
     gatling_fail("Unable to find device.");
   }
 
+  const char* device_extensions[] = {
+    "VK_KHR_vulkan_memory_model"
+  };
+
   cgpu_device device;
   c_result = cgpu_create_device(
     0,
-    0,
-    NULL,
+    1,
+    device_extensions,
     &device
   );
   if (c_result != CGPU_OK) {

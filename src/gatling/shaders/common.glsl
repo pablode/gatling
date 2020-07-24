@@ -58,9 +58,9 @@ struct hit_info
     uint face_index;
 };
 
-layout(set=0, binding=0) writeonly buffer BufferOutput
+layout(set=0, binding=0) queuefamilycoherent buffer BufferOutput
 {
-    vec4 pixels[];
+    uint pixels[];
 };
 
 layout(set=0, binding=1) buffer BufferPathSegments

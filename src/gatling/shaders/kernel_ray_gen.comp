@@ -97,5 +97,8 @@ void main()
   }
 
   /* We also set the initial pixel color. */
-  pixels[pixel_index] = vec4(0.0, 0.0, 0.0, 1.0);
+  pixels[pixel_index * 4 + 0] = floatBitsToUint(-0.0);
+  pixels[pixel_index * 4 + 1] = floatBitsToUint(-0.0);
+  pixels[pixel_index * 4 + 2] = floatBitsToUint(-0.0);
+  pixels[pixel_index * 4 + 3] = floatBitsToUint(-0.0);
 }

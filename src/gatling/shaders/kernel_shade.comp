@@ -2,6 +2,7 @@
 
 layout(local_size_x=32, local_size_y=1, local_size_z=1) in;
 
+#include "extensions.glsl"
 #include "common.glsl"
 
 vec4 shade(const hit_info hit)
@@ -23,6 +24,32 @@ vec4 shade(const hit_info hit)
     return color;
 }
 
+void atomic_channel_exchange(uint buffer_index, float value)
+{
+    /* VK_EXT_shader_atomic_float was released a few days ago but
+     * the ecosystem is not mature enough for it to be usable. */
+    uint old, desired;
+    do
+    {
+        old = atomicLoad(
+            pixels[buffer_index],
+            gl_ScopeQueueFamily,
+            gl_StorageSemanticsBuffer,
+            gl_SemanticsAcquire
+        );
+        const float old_f = uintBitsToFloat(old);
+        const float t = (old_f == -0.0) ? 1.0 : 0.5;
+        desired = floatBitsToUint(mix(old_f, value, t));
+    }
+    while (atomicCompSwap(
+                pixels[buffer_index], old, desired,
+                gl_ScopeQueueFamily,
+                gl_StorageSemanticsBuffer,
+                gl_SemanticsAcquire,
+                gl_StorageSemanticsBuffer,
+                gl_SemanticsAcquire) != old);
+}
+
 void main()
 {
     while(true)
@@ -36,6 +63,9 @@ void main()
 
         const vec4 color = shade(hit);
 
-        pixels[hit.pixel_index] = color;
+        atomic_channel_exchange(hit.pixel_index * 4 + 0, color.r);
+        atomic_channel_exchange(hit.pixel_index * 4 + 1, color.g);
+        atomic_channel_exchange(hit.pixel_index * 4 + 2, color.b);
+        atomic_channel_exchange(hit.pixel_index * 4 + 3, color.a);
     }
 }
