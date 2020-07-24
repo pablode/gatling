@@ -6,6 +6,8 @@
 #include <string.h>
 #include <volk.h>
 
+#define MIN_VK_API_VERSION VK_API_VERSION_1_1
+
 /* Array and pool allocation limits. */
 
 #define MAX_PHYSICAL_DEVICES 32
@@ -931,7 +933,7 @@ CgpuResult cgpu_initialize(
     version_major,
     version_minor,
     version_patch);
-  app_info.apiVersion = VK_API_VERSION_1_1;
+  app_info.apiVersion = MIN_VK_API_VERSION;
 
   VkInstanceCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -1038,6 +1040,12 @@ CgpuResult cgpu_create_device(
     idevice->physical_device,
     &device_properties
   );
+
+  if (device_properties.apiVersion < MIN_VK_API_VERSION)
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+    return CGPU_FAIL_VK_VERSION_NOT_SUPPORTED;
+  }
 
   idevice->limits =
     cgpu_translate_physical_device_limits(device_properties.limits);
