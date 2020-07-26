@@ -8,9 +8,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-static uint32_t IMAGE_WIDTH = 3840;
-static uint32_t IMAGE_HEIGHT = 2160;
-static uint32_t SAMPLE_COUNT = 1;
+static uint32_t DEFAULT_IMAGE_WIDTH = 1920;
+static uint32_t DEFAULT_IMAGE_HEIGHT = 1080;
+static uint32_t DEFAULT_SPP = 4;
 
 #define gatling_fail(msg)                                                         \
   do {                                                                            \
@@ -54,12 +54,14 @@ static void gatling_save_img_wfunc(void *context, void *data, int byte_count)
 
 static void gatling_save_img(
   const float* data,
-  size_t data_size_in_floats,
+  size_t float_count,
+  uint32_t image_width,
+  uint32_t image_height,
   const char* file_path)
 {
-  uint8_t* temp_data = malloc(data_size_in_floats);
+  uint8_t* temp_data = malloc(float_count);
 
-  for (size_t i = 0; i < data_size_in_floats; ++i)
+  for (size_t i = 0; i < float_count; ++i)
   {
     int32_t color = (int32_t) (data[i] * 255.0f);
     if (color < 0)   { color = 0;   }
@@ -74,11 +76,11 @@ static void gatling_save_img(
   const int result = stbi_write_png_to_func(
     gatling_save_img_wfunc,
     (void*)file_path,
-    IMAGE_WIDTH,
-    IMAGE_HEIGHT,
+    image_width,
+    image_height,
     num_components,
     temp_data,
-    IMAGE_WIDTH * num_components
+    image_width * num_components
   );
 
   free(temp_data);
@@ -195,12 +197,85 @@ static void gatling_print_timestamp(
   printf("Elapsed time for %s: %.2fms\n", name, elapsed_milliseconds);
 }
 
+typedef struct program_options {
+  const char* input_file;
+  const char* output_file;
+  uint32_t image_width;
+  uint32_t image_height;
+  uint32_t spp;
+} program_options;
+
+void print_usage_and_exit()
+{
+  printf("Usage: gatling <scene.gsd> <test.png> [options]\n");
+  printf("\n");
+  printf("Options:\n");
+  printf("--image-width  [default: %u]\n", DEFAULT_IMAGE_WIDTH);
+  printf("--image-height [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
+  printf("--spp          [default: %u]\n", DEFAULT_SPP);
+  exit(EXIT_FAILURE);
+}
+
+void parse_args(int argc, const char* argv[], program_options* options)
+{
+  if (argc < 3) {
+    print_usage_and_exit();
+  }
+
+  if (strncmp("-", argv[1], 1) == 0 ||
+      strncmp("-", argv[2], 1) == 0) {
+    print_usage_and_exit();
+  }
+
+  options->input_file = argv[1];
+  options->output_file = argv[2];
+  options->image_width = DEFAULT_IMAGE_WIDTH;
+  options->image_height = DEFAULT_IMAGE_HEIGHT;
+  options->spp = DEFAULT_SPP;
+
+  for (uint32_t i = 3; i < argc; ++i)
+  {
+    const char* arg = argv[i];
+
+    if (strncmp("--", arg, 2) != 0) {
+      print_usage_and_exit();
+    }
+
+    char* key_value = strdup(&arg[2]);
+    char* value = key_value;
+    char* key = strsep(&value, "=");
+
+    bool fail = false;
+    if (strcmp(key, "image-width") == 0) {
+      char* endptr;
+      options->image_width = strtol(value, &endptr, 10);
+      fail |= (value == endptr);
+    }
+    else if (strcmp(key, "image-height") == 0) {
+      char* endptr;
+      options->image_height = strtol(value, &endptr, 10);
+      fail |= (value == endptr);
+    }
+    else if (strcmp(key, "spp") == 0) {
+      char* endptr;
+      options->spp = strtol(value, &endptr, 10);
+      fail |= (value == endptr);
+    }
+    else {
+      fail = true;
+    }
+
+    free(key_value);
+    if (fail) {
+      print_usage_and_exit();
+    }
+  }
+}
+
 int main(int argc, const char* argv[])
 {
-  if (argc != 3) {
-    printf("Usage: gatling <scene.gsd> <test.png>\n");
-    return 1;
-  }
+  program_options options;
+  parse_args(argc, argv, &options);
 
   /* Set up instance and device. */
   CgpuResult c_result = cgpu_initialize(
@@ -239,7 +314,7 @@ int main(int argc, const char* argv[])
 
   /* Map scene file for copying. */
   gatling_file* scene_file;
-  const bool ok = gatling_file_open(argv[1], GATLING_FILE_USAGE_READ, &scene_file);
+  const bool ok = gatling_file_open(options.input_file, GATLING_FILE_USAGE_READ, &scene_file);
   if (!ok) {
     gatling_fail("Unable to read scene file.");
   }
@@ -256,26 +331,22 @@ int main(int argc, const char* argv[])
   }
 
   /* Create input and output buffers. */
-  const size_t output_buffer_size_in_floats =
-    IMAGE_WIDTH * IMAGE_HEIGHT * 4;
-  const size_t output_buffer_size_in_bytes =
-    IMAGE_WIDTH * IMAGE_HEIGHT * sizeof(float) * 4;
+  const size_t input_buffer_byte_count = scene_data_size;
 
-  const size_t input_buffer_size_in_bytes = scene_data_size;
+  const size_t output_buffer_byte_count = options.image_width * options.image_height * sizeof(float) * 4;
 
-  const size_t path_segment_buffer_size_in_bytes =
-    IMAGE_WIDTH *   /* x dim */
-    IMAGE_HEIGHT *  /* y dim */
-    SAMPLE_COUNT *  /* sample count */
-    32 +            /* path_segment struct byte size */
-    16;             /* counter in first 4 bytes + padding */
+  const size_t path_seg_struct_byte_count = 32;
+  const size_t path_seg_header_byte_count = 16;
+  const size_t hit_info_struct_byte_count = 32;
+  const size_t hit_info_header_byte_count = 16;
 
-  const size_t hit_info_buffer_size_in_bytes =
-    IMAGE_WIDTH *   /* x dim */
-    IMAGE_HEIGHT *  /* y dim */
-    SAMPLE_COUNT *  /* sample count */
-    32 +            /* hit_size struct byte size */
-    16;             /* counter in first 4 bytes + padding */
+  const size_t path_segment_buffer_byte_count =
+    options.image_width * options.image_height * options.spp * path_seg_struct_byte_count +
+    path_seg_header_byte_count;
+
+  const size_t hit_info_buffer_byte_count =
+    options.image_width * options.image_height * options.spp * hit_info_struct_byte_count +
+    hit_info_header_byte_count;
 
   cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
@@ -291,7 +362,7 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    input_buffer_size_in_bytes,
+    input_buffer_byte_count,
     &staging_buffer_in
   );
   gatling_cgpu_ensure(c_result);
@@ -301,7 +372,7 @@ int main(int argc, const char* argv[])
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
       CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    input_buffer_size_in_bytes,
+    input_buffer_byte_count,
     &input_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -310,7 +381,7 @@ int main(int argc, const char* argv[])
     device,
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    path_segment_buffer_size_in_bytes,
+    path_segment_buffer_byte_count,
     &path_segment_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -319,7 +390,7 @@ int main(int argc, const char* argv[])
     device,
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    hit_info_buffer_size_in_bytes,
+    hit_info_buffer_byte_count,
     &hit_info_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -329,7 +400,7 @@ int main(int argc, const char* argv[])
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
       CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    output_buffer_size_in_bytes,
+    output_buffer_byte_count,
     &output_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -340,7 +411,7 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    output_buffer_size_in_bytes,
+    output_buffer_byte_count,
     &staging_buffer_out
   );
   gatling_cgpu_ensure(c_result);
@@ -428,16 +499,16 @@ int main(int argc, const char* argv[])
     const float camera_fov = 0.872665f;
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id = 0, .p_data = (void*) &SAMPLE_COUNT,     .byte_count = 4 },
-      { .constant_id = 1, .p_data = (void*) &IMAGE_WIDTH,      .byte_count = 4 },
-      { .constant_id = 2, .p_data = (void*) &IMAGE_HEIGHT,     .byte_count = 4 },
-      { .constant_id = 3, .p_data = (void*) &camera_origin[0], .byte_count = 4 },
-      { .constant_id = 4, .p_data = (void*) &camera_origin[1], .byte_count = 4 },
-      { .constant_id = 5, .p_data = (void*) &camera_origin[2], .byte_count = 4 },
-      { .constant_id = 6, .p_data = (void*) &camera_target[0], .byte_count = 4 },
-      { .constant_id = 7, .p_data = (void*) &camera_target[1], .byte_count = 4 },
-      { .constant_id = 8, .p_data = (void*) &camera_target[2], .byte_count = 4 },
-      { .constant_id = 9, .p_data = (void*) &camera_fov,       .byte_count = 4 }
+      { .constant_id = 0, .p_data = (void*) &options.spp,          .byte_count = 4 },
+      { .constant_id = 1, .p_data = (void*) &options.image_width,  .byte_count = 4 },
+      { .constant_id = 2, .p_data = (void*) &options.image_height, .byte_count = 4 },
+      { .constant_id = 3, .p_data = (void*) &camera_origin[0],     .byte_count = 4 },
+      { .constant_id = 4, .p_data = (void*) &camera_origin[1],     .byte_count = 4 },
+      { .constant_id = 5, .p_data = (void*) &camera_origin[2],     .byte_count = 4 },
+      { .constant_id = 6, .p_data = (void*) &camera_target[0],     .byte_count = 4 },
+      { .constant_id = 7, .p_data = (void*) &camera_target[1],     .byte_count = 4 },
+      { .constant_id = 8, .p_data = (void*) &camera_target[2],     .byte_count = 4 },
+      { .constant_id = 9, .p_data = (void*) &camera_fov,           .byte_count = 4 }
     };
 
     gatling_create_pipeline(
@@ -463,9 +534,9 @@ int main(int argc, const char* argv[])
 
     const cgpu_specialization_constant speccs[] = {
       { .constant_id = 0, .p_data = (void*) &subgroup_size_x,      .byte_count = 4 },
-      { .constant_id = 1, .p_data = (void*) &SAMPLE_COUNT,         .byte_count = 4 },
-      { .constant_id = 2, .p_data = (void*) &IMAGE_WIDTH,          .byte_count = 4 },
-      { .constant_id = 3, .p_data = (void*) &IMAGE_HEIGHT,         .byte_count = 4 },
+      { .constant_id = 1, .p_data = (void*) &options.spp,          .byte_count = 4 },
+      { .constant_id = 2, .p_data = (void*) &options.image_width,  .byte_count = 4 },
+      { .constant_id = 3, .p_data = (void*) &options.image_height, .byte_count = 4 },
       { .constant_id = 4, .p_data = (void*) &traversal_stack_size, .byte_count = 4 }
     };
 
@@ -542,8 +613,8 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    (IMAGE_WIDTH / 32) + 1,
-    (IMAGE_HEIGHT / 32) + 1,
+    (options.image_width / 32) + 1,
+    (options.image_height / 32) + 1,
     1
   );
   gatling_cgpu_ensure(c_result);
@@ -578,7 +649,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    ((IMAGE_WIDTH * IMAGE_HEIGHT * SAMPLE_COUNT) / 32) + 1,
+    ((options.image_width * options.image_height * options.spp) / 32) + 1,
     1,
     1
   );
@@ -625,7 +696,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    ((IMAGE_WIDTH * IMAGE_HEIGHT * SAMPLE_COUNT) / 32) + 1,
+    ((options.image_width * options.image_height * options.spp) / 32) + 1,
     1,
     1
   );
@@ -732,7 +803,7 @@ int main(int argc, const char* argv[])
   gatling_print_timestamp("total",         timespan_total,   timestamp_ns_period);
 
   /* Read data from gpu. */
-  float* image_data = malloc(output_buffer_size_in_bytes);
+  float* image_data = malloc(output_buffer_byte_count);
 
   c_result = cgpu_map_buffer(
     device,
@@ -746,7 +817,7 @@ int main(int argc, const char* argv[])
   memcpy(
     image_data,
     mapped_staging_mem,
-    output_buffer_size_in_bytes
+    output_buffer_byte_count
   );
 
   c_result = cgpu_unmap_buffer(
@@ -758,8 +829,10 @@ int main(int argc, const char* argv[])
   /* Save image. */
   gatling_save_img(
     image_data,
-    output_buffer_size_in_floats,
-    argv[2]
+    output_buffer_byte_count / 4,
+    options.image_width,
+    options.image_height,
+    options.output_file
   );
 
   /* Clean up. */
