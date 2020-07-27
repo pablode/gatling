@@ -732,10 +732,6 @@ void gp_bvh_build(
   bvh->face_count = 0;
   bvh->faces = malloc(params->face_count * 2 * sizeof(gp_face));
 
-  bvh->vertex_count = params->vertex_count;
-  bvh->vertices = malloc(params->vertex_count * sizeof(gp_vertex));
-  memcpy(bvh->vertices, params->vertices, params->vertex_count * sizeof(gp_vertex));
-
   bvh->node_count = 1;
   bvh->nodes = malloc(params->face_count * 4 * sizeof(gp_bvh_node));
 
@@ -829,5 +825,4 @@ void gp_free_bvh(gp_bvh* bvh)
 {
   free(bvh->nodes);
   free(bvh->faces);
-  free(bvh->vertices);
 }

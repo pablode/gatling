@@ -23,8 +23,6 @@ typedef struct gp_bvh {
   gp_bvh_node* nodes;
   uint32_t     face_count;
   gp_face*     faces;
-  uint32_t     vertex_count;
-  gp_vertex*   vertices;
 } gp_bvh;
 
 typedef struct gp_bvh_build_params {

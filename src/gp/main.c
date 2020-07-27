@@ -14,6 +14,8 @@ typedef struct gp_scene {
   gp_bvh       bvh;
   gp_material* materials;
   uint32_t     material_count;
+  uint32_t     vertex_count;
+  gp_vertex*   vertices;
 } gp_scene;
 
 void gp_fail(const char* msg)
@@ -109,6 +111,9 @@ void gp_load_scene(
     }
   }
 
+  scene->vertex_count = vertex_count;
+  scene->vertices = vertices;
+
   const gp_bvh_build_params bvh_params = {
     .face_batch_size          = 1,
     .face_count               = face_count,
@@ -144,7 +149,6 @@ void gp_load_scene(
     material->a = ai_color.a;
   }
 
-  free(vertices);
   free(faces);
 
   aiReleaseImport(ai_scene);
@@ -175,6 +179,7 @@ void gp_free_scene(gp_scene* scene)
 {
   gp_free_bvh(&scene->bvh);
   free(scene->materials);
+  free(scene->vertices);
 }
 
 uint32_t round_to_buffer_offset_alignment(uint32_t byte_offset)
@@ -206,7 +211,7 @@ void gp_write_scene(
   const uint32_t vertex_offset =
     round_to_buffer_offset_alignment(face_offset + bvh->face_count * sizeof(gp_face));
   const uint32_t material_offset =
-    round_to_buffer_offset_alignment(vertex_offset + bvh->vertex_count * sizeof(gp_vertex));
+    round_to_buffer_offset_alignment(vertex_offset + scene->vertex_count * sizeof(gp_vertex));
 
   const uint32_t total_size =
     material_offset + scene->material_count * sizeof(gp_material);
@@ -218,7 +223,7 @@ void gp_write_scene(
   memcpy(buffer +  8, &face_offset,             4);
   memcpy(buffer + 12, &bvh->face_count,         4);
   memcpy(buffer + 16, &vertex_offset,           4);
-  memcpy(buffer + 20, &bvh->vertex_count,       4);
+  memcpy(buffer + 20, &scene->vertex_count,     4);
   memcpy(buffer + 24, &material_offset,         4);
   memcpy(buffer + 28, &scene->material_count,   4);
   memcpy(buffer + 32, &bvh->aabb, sizeof(gp_aabb));
@@ -235,17 +240,17 @@ void gp_write_scene(
     bvh->face_count * sizeof(gp_face)
   );
 
-  for (uint32_t i = 0; i < bvh->vertex_count; ++i)
+  for (uint32_t i = 0; i < scene->vertex_count; ++i)
   {
     uint8_t* ptr = &buffer[vertex_offset + i * 32];
-    memcpy(&ptr[ 0], &bvh->vertices[i].pos[0],  4);
-    memcpy(&ptr[ 4], &bvh->vertices[i].pos[1],  4);
-    memcpy(&ptr[ 8], &bvh->vertices[i].pos[2],  4);
-    memcpy(&ptr[12], &bvh->vertices[i].uv[0],   4);
-    memcpy(&ptr[16], &bvh->vertices[i].norm[0], 4);
-    memcpy(&ptr[20], &bvh->vertices[i].norm[1], 4);
-    memcpy(&ptr[24], &bvh->vertices[i].norm[2], 4);
-    memcpy(&ptr[28], &bvh->vertices[i].uv[1],   4);
+    memcpy(&ptr[ 0], &scene->vertices[i].pos[0],  4);
+    memcpy(&ptr[ 4], &scene->vertices[i].pos[1],  4);
+    memcpy(&ptr[ 8], &scene->vertices[i].pos[2],  4);
+    memcpy(&ptr[12], &scene->vertices[i].uv[0],   4);
+    memcpy(&ptr[16], &scene->vertices[i].norm[0], 4);
+    memcpy(&ptr[20], &scene->vertices[i].norm[1], 4);
+    memcpy(&ptr[24], &scene->vertices[i].norm[2], 4);
+    memcpy(&ptr[28], &scene->vertices[i].uv[1],   4);
   }
 
   memcpy(
