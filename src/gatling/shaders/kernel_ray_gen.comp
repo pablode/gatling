@@ -3,17 +3,17 @@
 #include "extensions.glsl"
 #include "common.glsl"
 
-layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
-layout(constant_id = 0) const uint SAMPLE_COUNT = 1;
-layout(constant_id = 1) const uint IMAGE_WIDTH = 3840;
-layout(constant_id = 2) const uint IMAGE_HEIGHT = 2160;
-layout(constant_id = 3) const float CAMERA_ORIGIN_X = 15.0;
-layout(constant_id = 4) const float CAMERA_ORIGIN_Y = 15.0;
-layout(constant_id = 5) const float CAMERA_ORIGIN_Z = 15.0;
-layout(constant_id = 6) const float CAMERA_TARGET_X = 0.0;
-layout(constant_id = 7) const float CAMERA_TARGET_Y = 4.0;
-layout(constant_id = 8) const float CAMERA_TARGET_Z = 3.0;
-layout(constant_id = 9) const float CAMERA_FOV = radians(50.0);
+layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
+layout(constant_id = 2) const uint SAMPLE_COUNT = 1;
+layout(constant_id = 3) const uint IMAGE_WIDTH = 3840;
+layout(constant_id = 4) const uint IMAGE_HEIGHT = 2160;
+layout(constant_id = 5) const float CAMERA_ORIGIN_X = 15.0;
+layout(constant_id = 6) const float CAMERA_ORIGIN_Y = 15.0;
+layout(constant_id = 7) const float CAMERA_ORIGIN_Z = 15.0;
+layout(constant_id = 8) const float CAMERA_TARGET_X = 0.0;
+layout(constant_id = 9) const float CAMERA_TARGET_Y = 4.0;
+layout(constant_id = 10) const float CAMERA_TARGET_Z = 3.0;
+layout(constant_id = 11) const float CAMERA_FOV = radians(50.0);
 
 uint wang_hash(uint seed)
 {

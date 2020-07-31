@@ -89,7 +89,8 @@ typedef enum CgpuResult {
   CGPU_FAIL_MAX_SPECIALIZATION_CONSTANTS_REACHED = -32,
   CGPU_FAIL_MAX_SPECIALIZATION_BUFFER_SIZE_REACHED = -33,
   CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED = -34,
-  CGPU_FAIL_VK_VERSION_NOT_SUPPORTED = -35
+  CGPU_FAIL_VK_VERSION_NOT_SUPPORTED = -35,
+  CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET = -36
 } CgpuResult;
 
 typedef uint32_t CgpuBufferUsageFlags;
@@ -573,6 +574,7 @@ typedef struct cgpu_physical_device_limits {
   uint64_t             optimalBufferCopyOffsetAlignment;
   uint64_t             optimalBufferCopyRowPitchAlignment;
   uint64_t             nonCoherentAtomSize;
+  uint32_t             subgroupSize;
 } cgpu_physical_device_limits;
 
 typedef struct cgpu_specialization_constant {

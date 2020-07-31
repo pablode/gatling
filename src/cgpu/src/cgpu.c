@@ -207,7 +207,8 @@ static CgpuSampleCountFlags cgpu_translate_sample_count_flags(
 }
 
 static cgpu_physical_device_limits cgpu_translate_physical_device_limits(
-  VkPhysicalDeviceLimits vk_limits)
+  VkPhysicalDeviceLimits vk_limits,
+  VkPhysicalDeviceSubgroupProperties vk_subgroup_props)
 {
   cgpu_physical_device_limits limits;
   limits.maxImageDimension1D = vk_limits.maxImageDimension1D;
@@ -330,6 +331,7 @@ static cgpu_physical_device_limits cgpu_translate_physical_device_limits(
   limits.optimalBufferCopyOffsetAlignment = vk_limits.optimalBufferCopyOffsetAlignment;
   limits.optimalBufferCopyRowPitchAlignment = vk_limits.optimalBufferCopyRowPitchAlignment;
   limits.nonCoherentAtomSize = vk_limits.nonCoherentAtomSize;
+  limits.subgroupSize = vk_subgroup_props.subgroupSize;
   return limits;
 }
 
@@ -1035,20 +1037,35 @@ CgpuResult cgpu_create_device(
 
   idevice->physical_device = phys_devices[index];
 
-  VkPhysicalDeviceProperties device_properties;
-  vkGetPhysicalDeviceProperties(
+  VkPhysicalDeviceSubgroupProperties subgroup_properties;
+  subgroup_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  subgroup_properties.pNext = NULL;
+
+  VkPhysicalDeviceProperties2 device_properties;
+  device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  device_properties.pNext = &subgroup_properties;
+
+  vkGetPhysicalDeviceProperties2(
     idevice->physical_device,
     &device_properties
   );
 
-  if (device_properties.apiVersion < MIN_VK_API_VERSION)
+  if (device_properties.properties.apiVersion < MIN_VK_API_VERSION)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     return CGPU_FAIL_VK_VERSION_NOT_SUPPORTED;
   }
 
+  if ((subgroup_properties.supportedStages & VK_QUEUE_COMPUTE_BIT) != VK_QUEUE_COMPUTE_BIT ||
+      (subgroup_properties.supportedOperations & VK_SUBGROUP_FEATURE_BASIC_BIT) != VK_SUBGROUP_FEATURE_BASIC_BIT ||
+      (subgroup_properties.supportedOperations & VK_SUBGROUP_FEATURE_BALLOT_BIT) != VK_SUBGROUP_FEATURE_BALLOT_BIT)
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+    return CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET;
+  }
+
   idevice->limits =
-    cgpu_translate_physical_device_limits(device_properties.limits);
+    cgpu_translate_physical_device_limits(device_properties.properties.limits, subgroup_properties);
 
   uint32_t device_ext_count;
   vkEnumerateDeviceExtensionProperties(

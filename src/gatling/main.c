@@ -503,16 +503,18 @@ int main(int argc, const char* argv[])
     const float camera_fov = 0.872665f;
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id = 0, .p_data = (void*) &options.spp,          .byte_count = 4 },
-      { .constant_id = 1, .p_data = (void*) &options.image_width,  .byte_count = 4 },
-      { .constant_id = 2, .p_data = (void*) &options.image_height, .byte_count = 4 },
-      { .constant_id = 3, .p_data = (void*) &camera_origin[0],     .byte_count = 4 },
-      { .constant_id = 4, .p_data = (void*) &camera_origin[1],     .byte_count = 4 },
-      { .constant_id = 5, .p_data = (void*) &camera_origin[2],     .byte_count = 4 },
-      { .constant_id = 6, .p_data = (void*) &camera_target[0],     .byte_count = 4 },
-      { .constant_id = 7, .p_data = (void*) &camera_target[1],     .byte_count = 4 },
-      { .constant_id = 8, .p_data = (void*) &camera_target[2],     .byte_count = 4 },
-      { .constant_id = 9, .p_data = (void*) &camera_fov,           .byte_count = 4 }
+      { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 },
+      { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 },
+      { .constant_id =  2, .p_data = (void*) &options.spp,                .byte_count = 4 },
+      { .constant_id =  3, .p_data = (void*) &options.image_width,        .byte_count = 4 },
+      { .constant_id =  4, .p_data = (void*) &options.image_height,       .byte_count = 4 },
+      { .constant_id =  5, .p_data = (void*) &camera_origin[0],           .byte_count = 4 },
+      { .constant_id =  6, .p_data = (void*) &camera_origin[1],           .byte_count = 4 },
+      { .constant_id =  7, .p_data = (void*) &camera_origin[2],           .byte_count = 4 },
+      { .constant_id =  8, .p_data = (void*) &camera_target[0],           .byte_count = 4 },
+      { .constant_id =  9, .p_data = (void*) &camera_target[1],           .byte_count = 4 },
+      { .constant_id = 10, .p_data = (void*) &camera_target[2],           .byte_count = 4 },
+      { .constant_id = 11, .p_data = (void*) &camera_fov,                 .byte_count = 4 }
     };
 
     gatling_create_pipeline(
@@ -520,15 +522,13 @@ int main(int argc, const char* argv[])
       kernel_ray_gen_shader_path,
       shader_resource_buffers,
       num_shader_resource_buffers,
-      10,
+      12,
       speccs,
       &pipeline_ray_gen
     );
   }
 
   {
-    const uint32_t subgroup_size_x = 32;
-
     /* Find smallest possible traversal stack depth. */
     uint32_t nc = node_count;
     uint32_t traversal_stack_size = 2; /* + root & leaf */
@@ -537,11 +537,11 @@ int main(int argc, const char* argv[])
     }
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id = 0, .p_data = (void*) &subgroup_size_x,      .byte_count = 4 },
-      { .constant_id = 1, .p_data = (void*) &options.spp,          .byte_count = 4 },
-      { .constant_id = 2, .p_data = (void*) &options.image_width,  .byte_count = 4 },
-      { .constant_id = 3, .p_data = (void*) &options.image_height, .byte_count = 4 },
-      { .constant_id = 4, .p_data = (void*) &traversal_stack_size, .byte_count = 4 }
+      { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 },
+      { .constant_id = 1, .p_data = (void*) &options.spp,                .byte_count = 4 },
+      { .constant_id = 2, .p_data = (void*) &options.image_width,        .byte_count = 4 },
+      { .constant_id = 3, .p_data = (void*) &options.image_height,       .byte_count = 4 },
+      { .constant_id = 4, .p_data = (void*) &traversal_stack_size,       .byte_count = 4 }
     };
 
     gatling_create_pipeline(
@@ -555,15 +555,21 @@ int main(int argc, const char* argv[])
     );
   }
 
-  gatling_create_pipeline(
-    device,
-    kernel_shade_shader_path,
-    shader_resource_buffers,
-    num_shader_resource_buffers,
-    0,
-    NULL,
-    &pipeline_shade
-  );
+  {
+    const cgpu_specialization_constant speccs[] = {
+      { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 }
+    };
+
+    gatling_create_pipeline(
+      device,
+      kernel_shade_shader_path,
+      shader_resource_buffers,
+      num_shader_resource_buffers,
+      1,
+      speccs,
+      &pipeline_shade
+    );
+  }
 
   c_result = cgpu_begin_command_buffer(command_buffer);
   gatling_cgpu_ensure(c_result);
@@ -617,8 +623,8 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    (options.image_width / 32) + 1,
-    (options.image_height / 32) + 1,
+    (options.image_width / device_limits.subgroupSize) + 1,
+    (options.image_height / device_limits.subgroupSize) + 1,
     1
   );
   gatling_cgpu_ensure(c_result);
@@ -653,7 +659,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    ((options.image_width * options.image_height * options.spp) / 32) + 1,
+    ((options.image_width * options.image_height * options.spp) / device_limits.subgroupSize) + 1,
     1,
     1
   );
@@ -700,7 +706,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    ((options.image_width * options.image_height * options.spp) / 32) + 1,
+    ((options.image_width * options.image_height * options.spp) / device_limits.subgroupSize) + 1,
     1,
     1
   );
