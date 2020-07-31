@@ -996,8 +996,6 @@ CgpuResult cgpu_get_device_count(uint32_t* p_device_count)
 
 CgpuResult cgpu_create_device(
   uint32_t index,
-  uint32_t required_extension_count,
-  const char** pp_required_extensions,
   cgpu_device* p_device)
 {
   p_device->handle = resource_store_create_handle(&idevice_store);
@@ -1090,14 +1088,19 @@ CgpuResult cgpu_create_device(
     device_extensions
   );
 
-  for (uint32_t i = 0; i < required_extension_count; ++i)
+  const char* required_exts[] = {
+    "VK_KHR_vulkan_memory_model"
+  };
+  const uint32_t required_ext_count = 1;
+
+  for (uint32_t i = 0; i < required_ext_count; ++i)
   {
-    const char* required_extension = *(pp_required_extensions + i);
+    const char* required_ext = *(required_exts + i);
 
     bool has_extension = false;
     for (uint32_t e = 0; e < device_ext_count; ++e) {
       const VkExtensionProperties* extension = &device_extensions[e];
-      if (strcmp(extension->extensionName, required_extension) == 0) {
+      if (strcmp(extension->extensionName, required_ext) == 0) {
         has_extension = true;
         break;
       }
@@ -1230,8 +1233,8 @@ CgpuResult cgpu_create_device(
    nowadays, there is no difference to instance validation layers. */
   device_create_info.enabledLayerCount = 0;
   device_create_info.ppEnabledLayerNames = NULL;
-  device_create_info.enabledExtensionCount = required_extension_count;
-  device_create_info.ppEnabledExtensionNames = pp_required_extensions;
+  device_create_info.enabledExtensionCount = required_ext_count;
+  device_create_info.ppEnabledExtensionNames = required_exts;
   device_create_info.pEnabledFeatures = NULL;
 
   VkResult result = vkCreateDevice(

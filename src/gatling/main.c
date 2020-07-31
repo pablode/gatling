@@ -294,26 +294,14 @@ int main(int argc, const char* argv[])
     gatling_fail("Unable to find device.");
   }
 
-  const char* device_extensions[] = {
-    "VK_KHR_vulkan_memory_model"
-  };
-
   cgpu_device device;
-  c_result = cgpu_create_device(
-    0,
-    1,
-    device_extensions,
-    &device
-  );
+  c_result = cgpu_create_device(0, &device);
   if (c_result != CGPU_OK) {
     gatling_fail("Unable to create device.");
   }
 
   cgpu_physical_device_limits device_limits;
-  c_result = cgpu_get_physical_device_limits(
-    device,
-    &device_limits
-  );
+  c_result = cgpu_get_physical_device_limits(device, &device_limits);
   gatling_cgpu_ensure(c_result);
 
   /* Map scene file for copying. */

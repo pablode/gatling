@@ -598,8 +598,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_get_device_count(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_device(
   uint32_t index,
-  uint32_t required_extension_count,
-  const char** pp_required_extensions,
   cgpu_device* p_device
 );
 
