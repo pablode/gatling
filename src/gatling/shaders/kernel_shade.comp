@@ -63,9 +63,12 @@ void main()
 
         const vec4 color = shade(hit);
 
-        atomic_channel_exchange(hit.pixel_index * 4 + 0, color.r);
-        atomic_channel_exchange(hit.pixel_index * 4 + 1, color.g);
-        atomic_channel_exchange(hit.pixel_index * 4 + 2, color.b);
-        atomic_channel_exchange(hit.pixel_index * 4 + 3, color.a);
+        /* Reduce pressure per lockstep by selecting the color channel depending on thread id. */
+        const uvec4 offsets = (uvec4(gl_GlobalInvocationID.x) + uvec4(0, 1, 2, 3)) % 4;
+
+        atomic_channel_exchange(hit.pixel_index * 4 + offsets[0], color[offsets[0]]);
+        atomic_channel_exchange(hit.pixel_index * 4 + offsets[1], color[offsets[1]]);
+        atomic_channel_exchange(hit.pixel_index * 4 + offsets[2], color[offsets[2]]);
+        atomic_channel_exchange(hit.pixel_index * 4 + offsets[3], color[offsets[3]]);
     }
 }
