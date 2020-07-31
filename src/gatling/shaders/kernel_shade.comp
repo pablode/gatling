@@ -35,7 +35,7 @@ void atomic_channel_exchange(uint buffer_index, float value)
             pixels[buffer_index],
             gl_ScopeQueueFamily,
             gl_StorageSemanticsBuffer,
-            gl_SemanticsAcquire
+            gl_SemanticsRelaxed
         );
         const float old_f = uintBitsToFloat(old);
         const float t = (old_f == -0.0) ? 1.0 : 0.5;
@@ -45,9 +45,9 @@ void atomic_channel_exchange(uint buffer_index, float value)
                 pixels[buffer_index], old, desired,
                 gl_ScopeQueueFamily,
                 gl_StorageSemanticsBuffer,
-                gl_SemanticsAcquire,
+                gl_SemanticsRelaxed,
                 gl_StorageSemanticsBuffer,
-                gl_SemanticsAcquire) != old);
+                gl_SemanticsRelaxed) != old);
 }
 
 void main()
