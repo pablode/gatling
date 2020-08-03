@@ -246,7 +246,11 @@ void parse_args(int argc, const char* argv[], program_options* options)
     char* key = strsep(&value, "=");
 
     bool fail = false;
-    if (strcmp(key, "image-width") == 0) {
+
+    if (value == NULL) {
+      fail = true;
+    }
+    else if (strcmp(key, "image-width") == 0) {
       char* endptr;
       options->image_width = strtol(value, &endptr, 10);
       fail |= (value == endptr);
