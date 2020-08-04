@@ -24,9 +24,65 @@ void gp_fail(const char* msg)
   exit(-1);
 }
 
-void gp_load_scene(
-  gp_scene* scene,
-  const char* file_path)
+void gp_assimp_add_node_mesh(
+  const struct aiScene* ai_scene, const struct aiNode* ai_node,
+  const struct aiMatrix4x4* ai_parent_transform,
+  uint32_t* face_index, gp_face* faces,
+  uint32_t* vertex_index, gp_vertex* vertices)
+{
+  struct aiMatrix4x4 ai_node_matrix = ai_node->mTransformation;
+  aiMultiplyMatrix4(&ai_node_matrix, ai_parent_transform);
+
+  for (uint32_t m = 0; m < ai_node->mNumMeshes; ++m)
+  {
+    const struct aiMesh* ai_mesh = ai_scene->mMeshes[ai_node->mMeshes[m]];
+
+    for (uint32_t f = 0; f < ai_mesh->mNumFaces; ++f)
+    {
+      const struct aiFace* ai_face = &ai_mesh->mFaces[f];
+      assert(ai_face->mNumIndices == 3);
+
+      struct gp_face* face = &faces[*face_index];
+      face->v_i[0] = (*vertex_index) + ai_face->mIndices[0];
+      face->v_i[1] = (*vertex_index) + ai_face->mIndices[1];
+      face->v_i[2] = (*vertex_index) + ai_face->mIndices[2];
+      face->mat_index = ai_mesh->mMaterialIndex;
+
+      (*face_index)++;
+    }
+
+    for (uint32_t v = 0; v < ai_mesh->mNumVertices; ++v)
+    {
+      struct aiVector3D* ai_position = &ai_mesh->mVertices[v];
+      const struct aiVector3D* ai_normal = &ai_mesh->mNormals[v];
+      const struct aiVector3D* ai_tex_coords = &ai_mesh->mTextureCoords[0][v];
+
+      aiTransformVecByMatrix4(ai_position, &ai_node_matrix);
+
+      struct gp_vertex* vertex = &vertices[*vertex_index];
+      vertex->pos[0] = ai_position->x;
+      vertex->pos[1] = ai_position->y;
+      vertex->pos[2] = ai_position->z;
+      vertex->norm[0] = ai_normal->x;
+      vertex->norm[1] = ai_normal->y;
+      vertex->norm[2] = ai_normal->z;
+      vertex->uv[0] = 0.0f;
+      vertex->uv[1] = 0.0f;
+
+      (*vertex_index)++;
+    }
+  }
+
+  for (uint32_t i = 0; i < ai_node->mNumChildren; ++i)
+  {
+    gp_assimp_add_node_mesh(
+      ai_scene, ai_node->mChildren[i], &ai_node_matrix,
+      face_index, faces, vertex_index, vertices
+    );
+  }
+}
+
+void gp_load_scene(gp_scene* scene, const char* file_path)
 {
   struct aiPropertyStore* props = aiCreatePropertyStore();
   aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
@@ -41,8 +97,8 @@ void gp_load_scene(
       aiProcess_TransformUVCoords |
       aiProcess_RemoveRedundantMaterials |
       aiProcess_FindDegenerates,
-      NULL,
-      props
+    NULL,
+    props
   );
 
   aiReleasePropertyStore(props);
@@ -63,56 +119,22 @@ void gp_load_scene(
     face_count += ai_mesh->mNumFaces;
   }
 
-  gp_vertex* vertices =
-    (gp_vertex*) malloc(vertex_count * sizeof(gp_vertex));
-  gp_face* faces =
-    (gp_face*) malloc(face_count * sizeof(gp_face));
+  gp_vertex* vertices = (gp_vertex*) malloc(vertex_count * sizeof(gp_vertex));
+  gp_face* faces = (gp_face*) malloc(face_count * sizeof(gp_face));
 
-  uint32_t vertex_index = 0;
-  uint32_t face_index = 0;
+  struct aiMatrix4x4 ai_identity_matrix;
+  aiIdentityMatrix4(&ai_identity_matrix);
 
-  for (uint32_t m = 0; m < ai_scene->mNumMeshes; ++m)
-  {
-    const struct aiMesh* ai_mesh = ai_scene->mMeshes[m];
+  vertex_count = 0;
+  face_count = 0;
 
-    for (uint32_t f = 0; f < ai_mesh->mNumFaces; ++f)
-    {
-      const struct aiFace* ai_face = &ai_mesh->mFaces[f];
-      assert(ai_face->mNumIndices == 3);
-
-      struct gp_face* face = &faces[face_index];
-
-      face->v_i[0] = vertex_index + ai_face->mIndices[0];
-      face->v_i[1] = vertex_index + ai_face->mIndices[1];
-      face->v_i[2] = vertex_index + ai_face->mIndices[2];
-      face->mat_index = ai_mesh->mMaterialIndex;
-
-      face_index++;
-    }
-
-    for (uint32_t v = 0; v < ai_mesh->mNumVertices; ++v)
-    {
-      const struct aiVector3D* ai_position = &ai_mesh->mVertices[v];
-      const struct aiVector3D* ai_normal = &ai_mesh->mNormals[v];
-      const struct aiVector3D* ai_tex_coords = &ai_mesh->mTextureCoords[0][v];
-
-      struct gp_vertex* vertex = &vertices[vertex_index];
-
-      vertex->pos[0] = ai_position->x;
-      vertex->pos[1] = ai_position->y;
-      vertex->pos[2] = ai_position->z;
-      vertex->norm[0] = ai_normal->x;
-      vertex->norm[1] = ai_normal->y;
-      vertex->norm[2] = ai_normal->z;
-      vertex->uv[0] = 0.0f;
-      vertex->uv[1] = 0.0f;
-
-      vertex_index++;
-    }
-  }
+  gp_assimp_add_node_mesh(
+    ai_scene, ai_scene->mRootNode, &ai_identity_matrix,
+    &face_count, faces, &vertex_count, vertices
+  );
 
   scene->vertex_count = vertex_count;
-  scene->vertices = vertices;
+  scene->vertices = realloc(vertices, vertex_count * sizeof(gp_vertex));
 
   const gp_bvh_build_params bvh_params = {
     .face_batch_size          = 1,
@@ -123,8 +145,8 @@ void gp_load_scene(
     .object_binning_enabled   = true,
     .object_binning_threshold = 1024,
     .object_bin_count         = 16,
-    .vertex_count             = vertex_count,
-    .vertices                 = vertices
+    .vertex_count             = scene->vertex_count,
+    .vertices                 = scene->vertices
   };
 
   gp_bvh_build(
