@@ -328,27 +328,29 @@ int main(int argc, const char* argv[])
   }
 
   /* Create input and output buffers. */
-  const size_t input_buffer_byte_count = scene_data_size;
+  const uint64_t input_buffer_byte_count = scene_data_size;
 
-  const size_t output_buffer_byte_count = options.image_width * options.image_height * sizeof(float) * 4;
+  const uint64_t output_buffer_byte_count = options.image_width * options.image_height * sizeof(float) * 4;
 
-  const size_t path_seg_struct_byte_count = 32;
-  const size_t path_seg_header_byte_count = 16;
-  const size_t hit_info_struct_byte_count = 32;
-  const size_t hit_info_header_byte_count = 16;
+  const uint64_t path_seg_struct_byte_count = 32;
+  const uint64_t path_seg_header_byte_count = 16;
+  const uint64_t hit_info_struct_byte_count = 32;
+  const uint64_t hit_info_header_byte_count = 16;
 
-  const size_t path_segment_buffer_byte_count =
+  const uint64_t path_segment_buffer_byte_count =
     options.image_width * options.image_height * options.spp * path_seg_struct_byte_count +
     path_seg_header_byte_count;
 
-  const size_t hit_info_buffer_byte_count =
+  const uint64_t hit_info_buffer_byte_count =
     options.image_width * options.image_height * options.spp * hit_info_struct_byte_count +
     hit_info_header_byte_count;
 
+  const uint64_t intermediate_buffer_byte_count =
+    path_segment_buffer_byte_count + hit_info_buffer_byte_count;
+
   cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
-  cgpu_buffer path_segment_buffer;
-  cgpu_buffer hit_info_buffer;
+  cgpu_buffer intermediate_buffer;
   cgpu_buffer output_buffer;
   cgpu_buffer staging_buffer_out;
   cgpu_buffer timestamp_buffer;
@@ -378,17 +380,8 @@ int main(int argc, const char* argv[])
     device,
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    path_segment_buffer_byte_count,
-    &path_segment_buffer
-  );
-  gatling_cgpu_ensure(c_result);
-
-  c_result = cgpu_create_buffer(
-    device,
-    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER,
-    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    hit_info_buffer_byte_count,
-    &hit_info_buffer
+    intermediate_buffer_byte_count,
+    &intermediate_buffer
   );
   gatling_cgpu_ensure(c_result);
 
@@ -472,13 +465,13 @@ int main(int argc, const char* argv[])
 
   const uint32_t num_shader_resource_buffers = 7;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
-    { 0,       output_buffer,              0,                  CGPU_WHOLE_SIZE },
-    { 1, path_segment_buffer,              0,                  CGPU_WHOLE_SIZE },
-    { 2,        input_buffer,     node_offset,       face_offset - node_offset },
-    { 3,        input_buffer,     face_offset,     vertex_offset - face_offset },
-    { 4,        input_buffer,   vertex_offset, material_offset - vertex_offset },
-    { 5,        input_buffer, material_offset,                 CGPU_WHOLE_SIZE },
-    { 6,    hit_info_buffer,               0,                  CGPU_WHOLE_SIZE }
+    { 0,       output_buffer,                             0,                  CGPU_WHOLE_SIZE },
+    { 1, intermediate_buffer,                             0,   path_segment_buffer_byte_count },
+    { 2,        input_buffer,                    node_offset,       face_offset - node_offset },
+    { 3,        input_buffer,                    face_offset,     vertex_offset - face_offset },
+    { 4,        input_buffer,                  vertex_offset, material_offset - vertex_offset },
+    { 5,        input_buffer,                material_offset,                 CGPU_WHOLE_SIZE },
+    { 6, intermediate_buffer, path_segment_buffer_byte_count,      hit_info_buffer_byte_count }
   };
 
   char dir_path[1024];
@@ -648,7 +641,7 @@ int main(int argc, const char* argv[])
   cgpu_buffer_memory_barrier buffer_memory_barrier_2;
   buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
-  buffer_memory_barrier_2.buffer = path_segment_buffer;
+  buffer_memory_barrier_2.buffer = intermediate_buffer;
   buffer_memory_barrier_2.byte_offset = 0u;
   buffer_memory_barrier_2.byte_count = CGPU_WHOLE_SIZE;
 
@@ -684,7 +677,7 @@ int main(int argc, const char* argv[])
   cgpu_buffer_memory_barrier buffer_memory_barrier_3;
   buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
-  buffer_memory_barrier_3.buffer = hit_info_buffer;
+  buffer_memory_barrier_3.buffer = intermediate_buffer;
   buffer_memory_barrier_3.byte_offset = 0u;
   buffer_memory_barrier_3.byte_count = CGPU_WHOLE_SIZE;
 
@@ -882,9 +875,7 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
   c_result = cgpu_destroy_buffer(device, input_buffer);
   gatling_cgpu_ensure(c_result);
-  c_result = cgpu_destroy_buffer(device, hit_info_buffer);
-  gatling_cgpu_ensure(c_result);
-  c_result = cgpu_destroy_buffer(device, path_segment_buffer);
+  c_result = cgpu_destroy_buffer(device, intermediate_buffer);
   gatling_cgpu_ensure(c_result);
   c_result = cgpu_destroy_buffer(device, output_buffer);
   gatling_cgpu_ensure(c_result);
