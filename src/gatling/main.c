@@ -454,17 +454,17 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
 
   /* Set up pipelines. */
-  const uint32_t node_offset     = *((uint32_t*) &mapped_scene_data[ 0]);
-  const uint32_t node_count      = *((uint32_t*) &mapped_scene_data[ 4]);
-  const uint32_t face_offset     = *((uint32_t*) &mapped_scene_data[ 8]);
-  const uint32_t vertex_offset   = *((uint32_t*) &mapped_scene_data[16]);
-  const uint32_t material_offset = *((uint32_t*) &mapped_scene_data[24]);
-  const float aabb_min_x = *((float*) &mapped_scene_data[32]);
-  const float aabb_min_y = *((float*) &mapped_scene_data[36]);
-  const float aabb_min_z = *((float*) &mapped_scene_data[40]);
-  const float aabb_max_x = *((float*) &mapped_scene_data[44]);
-  const float aabb_max_y = *((float*) &mapped_scene_data[48]);
-  const float aabb_max_z = *((float*) &mapped_scene_data[56]);
+  const uint64_t node_offset     = *((uint64_t*) &mapped_scene_data[ 0]);
+  const uint64_t node_count      = *((uint64_t*) &mapped_scene_data[ 8]);
+  const uint64_t face_offset     = *((uint64_t*) &mapped_scene_data[16]);
+  const uint64_t vertex_offset   = *((uint64_t*) &mapped_scene_data[32]);
+  const uint64_t material_offset = *((uint64_t*) &mapped_scene_data[48]);
+  const float aabb_min_x = *((float*) &mapped_scene_data[64]);
+  const float aabb_min_y = *((float*) &mapped_scene_data[68]);
+  const float aabb_min_z = *((float*) &mapped_scene_data[72]);
+  const float aabb_max_x = *((float*) &mapped_scene_data[76]);
+  const float aabb_max_y = *((float*) &mapped_scene_data[80]);
+  const float aabb_max_z = *((float*) &mapped_scene_data[84]);
 
   /* Unmap the scene data since it's been copied. */
   gatling_munmap(scene_file, mapped_scene_data);

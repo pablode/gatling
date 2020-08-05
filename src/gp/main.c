@@ -224,7 +224,7 @@ void gp_write_scene(
 {
   const gp_bvh* bvh = &scene->bvh;
 
-  const uint32_t header_size_in_bytes = 56u;
+  const uint32_t header_size_in_bytes = 88;
 
   const uint32_t node_offset =
     round_to_buffer_offset_alignment(header_size_in_bytes);
@@ -240,15 +240,15 @@ void gp_write_scene(
 
   uint8_t* buffer = malloc(total_size);
 
-  memcpy(buffer +  0, &node_offset,             4);
-  memcpy(buffer +  4, &bvh->node_count,         4);
-  memcpy(buffer +  8, &face_offset,             4);
-  memcpy(buffer + 12, &bvh->face_count,         4);
-  memcpy(buffer + 16, &vertex_offset,           4);
-  memcpy(buffer + 20, &scene->vertex_count,     4);
-  memcpy(buffer + 24, &material_offset,         4);
-  memcpy(buffer + 28, &scene->material_count,   4);
-  memcpy(buffer + 32, &bvh->aabb, sizeof(gp_aabb));
+  memcpy(&buffer[ 0], &node_offset,             8);
+  memcpy(&buffer[ 8], &bvh->node_count,         8);
+  memcpy(&buffer[16], &face_offset,             8);
+  memcpy(&buffer[24], &bvh->face_count,         8);
+  memcpy(&buffer[32], &vertex_offset,           8);
+  memcpy(&buffer[40], &scene->vertex_count,     8);
+  memcpy(&buffer[48], &material_offset,         8);
+  memcpy(&buffer[56], &scene->material_count,   8);
+  memcpy(&buffer[64], &bvh->aabb, sizeof(gp_aabb));
 
   memcpy(
     buffer + node_offset,
