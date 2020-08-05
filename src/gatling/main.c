@@ -454,11 +454,17 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
 
   /* Set up pipelines. */
-  const uint32_t node_offset     = *((uint32_t*) (mapped_scene_data +  0));
-  const uint32_t node_count      = *((uint32_t*) (mapped_scene_data +  4));
-  const uint32_t face_offset     = *((uint32_t*) (mapped_scene_data +  8));
-  const uint32_t vertex_offset   = *((uint32_t*) (mapped_scene_data + 16));
-  const uint32_t material_offset = *((uint32_t*) (mapped_scene_data + 24));
+  const uint32_t node_offset     = *((uint32_t*) &mapped_scene_data[ 0]);
+  const uint32_t node_count      = *((uint32_t*) &mapped_scene_data[ 4]);
+  const uint32_t face_offset     = *((uint32_t*) &mapped_scene_data[ 8]);
+  const uint32_t vertex_offset   = *((uint32_t*) &mapped_scene_data[16]);
+  const uint32_t material_offset = *((uint32_t*) &mapped_scene_data[24]);
+  const float aabb_min_x = *((float*) &mapped_scene_data[32]);
+  const float aabb_min_y = *((float*) &mapped_scene_data[36]);
+  const float aabb_min_z = *((float*) &mapped_scene_data[40]);
+  const float aabb_max_x = *((float*) &mapped_scene_data[44]);
+  const float aabb_max_y = *((float*) &mapped_scene_data[48]);
+  const float aabb_max_z = *((float*) &mapped_scene_data[56]);
 
   /* Unmap the scene data since it's been copied. */
   gatling_munmap(scene_file, mapped_scene_data);
@@ -491,8 +497,22 @@ int main(int argc, const char* argv[])
   gatling_pipeline pipeline_shade;
 
   {
-    const float camera_origin[3] = { 15.0f, 15.0f, 15.0f };
-    const float camera_target[3] = {  0.0f,  4.0f,  3.0f };
+    const float aabb_length[3] = {
+      aabb_max_x - aabb_min_x,
+      aabb_max_y - aabb_min_y,
+      aabb_max_z - aabb_min_z
+    };
+
+    const float camera_target[3] = {
+      (aabb_max_x + aabb_min_x) * 0.5f,
+      (aabb_max_y + aabb_min_y) * 0.5f,
+      (aabb_max_z + aabb_min_z) * 0.5f
+    };
+    const float camera_origin[3] = {
+      camera_target[0] + aabb_length[0],
+      camera_target[1] + aabb_length[1],
+      camera_target[2] + aabb_length[2]
+    };
     const float camera_fov = 0.872665f;
 
     const cgpu_specialization_constant speccs[] = {
