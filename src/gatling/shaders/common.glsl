@@ -72,40 +72,27 @@ layout(set=0, binding=1) buffer BufferPathSegments
     path_segment path_segments[];
 };
 
-layout(set=0, binding=2) readonly buffer BufferHeader
-{
-    uint node_offset;
-    uint node_count;
-    uint face_offset;
-    uint face_count;
-    uint vertex_offset;
-    uint vertex_count;
-    uint material_offset;
-    uint material_count;
-    aabb root_aabb;
-};
-
-layout(set=0, binding=3) readonly buffer BufferBvhNodes
+layout(set=0, binding=2) readonly buffer BufferBvhNodes
 {
     bvh_node bvh_nodes[];
 };
 
-layout(set=0, binding=4) readonly buffer BufferFaces
+layout(set=0, binding=3) readonly buffer BufferFaces
 {
     face faces[];
 };
 
-layout(set=0, binding=5) readonly buffer BufferVertices
+layout(set=0, binding=4) readonly buffer BufferVertices
 {
     vertex vertices[];
 };
 
-layout(set=0, binding=6) readonly buffer BufferMaterials
+layout(set=0, binding=5) readonly buffer BufferMaterials
 {
     material materials[];
 };
 
-layout(set=0, binding=7) buffer BufferHitInfos
+layout(set=0, binding=6) buffer BufferHitInfos
 {
     uint hit_write_counter;
     uint hit_read_counter;

@@ -470,16 +470,15 @@ int main(int argc, const char* argv[])
   gatling_munmap(scene_file, mapped_scene_data);
   gatling_file_close(scene_file);
 
-  const size_t num_shader_resource_buffers = 8;
+  const uint32_t num_shader_resource_buffers = 7;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
-    { 0u,       output_buffer,              0u,                 CGPU_WHOLE_SIZE },
-    { 1u, path_segment_buffer,              0u,                 CGPU_WHOLE_SIZE },
-    { 2u,        input_buffer,              0u,                     node_offset },
-    { 3u,        input_buffer,     node_offset,       face_offset - node_offset },
-    { 4u,        input_buffer,     face_offset,     vertex_offset - face_offset },
-    { 5u,        input_buffer,   vertex_offset, material_offset - vertex_offset },
-    { 6u,        input_buffer, material_offset,                 CGPU_WHOLE_SIZE },
-    { 7u,    hit_info_buffer,               0u,                 CGPU_WHOLE_SIZE }
+    { 0,       output_buffer,              0,                  CGPU_WHOLE_SIZE },
+    { 1, path_segment_buffer,              0,                  CGPU_WHOLE_SIZE },
+    { 2,        input_buffer,     node_offset,       face_offset - node_offset },
+    { 3,        input_buffer,     face_offset,     vertex_offset - face_offset },
+    { 4,        input_buffer,   vertex_offset, material_offset - vertex_offset },
+    { 5,        input_buffer, material_offset,                 CGPU_WHOLE_SIZE },
+    { 6,    hit_info_buffer,               0,                  CGPU_WHOLE_SIZE }
   };
 
   char dir_path[1024];
