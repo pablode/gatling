@@ -277,6 +277,20 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
   }
 }
 
+uint64_t gatling_align_buffer(
+  uint64_t offset_alignment,
+  uint64_t buffer_size,
+  uint64_t* total_size)
+{
+  const uint64_t offset =
+    ((*total_size) + offset_alignment - 1) / offset_alignment
+    * offset_alignment;
+
+  (*total_size) = offset + buffer_size;
+
+  return offset;
+}
+
 int main(int argc, const char* argv[])
 {
   program_options options;
@@ -328,25 +342,47 @@ int main(int argc, const char* argv[])
   }
 
   /* Create input and output buffers. */
-  const uint64_t input_buffer_byte_count = scene_data_size;
+  const uint64_t path_seg_struct_size = 32;
+  const uint64_t hit_info_struct_size = 32;
+  const uint64_t path_seg_header_size = 16;
+  const uint64_t hit_info_header_size = 16;
+  const uint64_t node_struct_size = 32;
+
+  const struct file_header {
+    uint64_t node_buf_offset;
+    uint64_t node_buf_size;
+    uint64_t face_buf_offset;
+    uint64_t face_buf_size;
+    uint64_t vertex_buf_offset;
+    uint64_t vertex_buf_size;
+    uint64_t material_buf_offset;
+    uint64_t material_buf_size;
+    float aabb_min_x;
+    float aabb_min_y;
+    float aabb_min_z;
+    float aabb_max_x;
+    float aabb_max_y;
+    float aabb_max_z;
+  } file_header = *((struct file_header*) &mapped_scene_data[0]);
+
+  uint64_t device_buf_size = 0;
+  const uint64_t offset_align = device_limits.minStorageBufferOffsetAlignment;
+
+  const uint64_t new_node_buf_offset = gatling_align_buffer(offset_align, file_header.node_buf_size, &device_buf_size);
+  const uint64_t new_face_buf_offset = gatling_align_buffer(offset_align, file_header.face_buf_size, &device_buf_size);
+  const uint64_t new_vertex_buf_offset = gatling_align_buffer(offset_align, file_header.vertex_buf_size, &device_buf_size);
+  const uint64_t new_material_buf_offset = gatling_align_buffer(offset_align, file_header.material_buf_size, &device_buf_size);
+
+  const uint64_t prim_ray_count = options.image_width * options.image_height * options.spp;
+
+  const uint64_t path_segment_buf_offset = 0;
+  const uint64_t path_segment_buf_size = prim_ray_count * path_seg_struct_size + path_seg_header_size;
+  const uint64_t hit_info_buf_offset = path_segment_buf_offset + path_segment_buf_size;
+  const uint64_t hit_info_buf_size = prim_ray_count * hit_info_struct_size + hit_info_header_size;
+
+  const uint64_t intermediate_buf_size = path_segment_buf_size + hit_info_buf_size;
 
   const uint64_t output_buffer_byte_count = options.image_width * options.image_height * sizeof(float) * 4;
-
-  const uint64_t path_seg_struct_byte_count = 32;
-  const uint64_t path_seg_header_byte_count = 16;
-  const uint64_t hit_info_struct_byte_count = 32;
-  const uint64_t hit_info_header_byte_count = 16;
-
-  const uint64_t path_segment_buffer_byte_count =
-    options.image_width * options.image_height * options.spp * path_seg_struct_byte_count +
-    path_seg_header_byte_count;
-
-  const uint64_t hit_info_buffer_byte_count =
-    options.image_width * options.image_height * options.spp * hit_info_struct_byte_count +
-    hit_info_header_byte_count;
-
-  const uint64_t intermediate_buffer_byte_count =
-    path_segment_buffer_byte_count + hit_info_buffer_byte_count;
 
   cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
@@ -361,7 +397,7 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    input_buffer_byte_count,
+    device_buf_size,
     &staging_buffer_in
   );
   gatling_cgpu_ensure(c_result);
@@ -371,7 +407,7 @@ int main(int argc, const char* argv[])
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
       CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    input_buffer_byte_count,
+    device_buf_size,
     &input_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -380,7 +416,7 @@ int main(int argc, const char* argv[])
     device,
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    intermediate_buffer_byte_count,
+    intermediate_buf_size,
     &intermediate_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -427,11 +463,14 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  memcpy(
-    mapped_staging_mem,
-    mapped_scene_data,
-    scene_data_size
-  );
+  memcpy(&mapped_staging_mem[new_node_buf_offset],
+         &mapped_scene_data[file_header.node_buf_offset], file_header.node_buf_size);
+  memcpy(&mapped_staging_mem[new_face_buf_offset],
+         &mapped_scene_data[file_header.face_buf_offset], file_header.face_buf_size);
+  memcpy(&mapped_staging_mem[new_vertex_buf_offset],
+         &mapped_scene_data[file_header.vertex_buf_offset], file_header.vertex_buf_size);
+  memcpy(&mapped_staging_mem[new_material_buf_offset],
+         &mapped_scene_data[file_header.material_buf_offset], file_header.material_buf_size);
 
   c_result = cgpu_unmap_buffer(
     device,
@@ -446,32 +485,19 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  /* Set up pipelines. */
-  const uint64_t node_offset     = *((uint64_t*) &mapped_scene_data[ 0]);
-  const uint64_t node_count      = *((uint64_t*) &mapped_scene_data[ 8]);
-  const uint64_t face_offset     = *((uint64_t*) &mapped_scene_data[16]);
-  const uint64_t vertex_offset   = *((uint64_t*) &mapped_scene_data[32]);
-  const uint64_t material_offset = *((uint64_t*) &mapped_scene_data[48]);
-  const float aabb_min_x = *((float*) &mapped_scene_data[64]);
-  const float aabb_min_y = *((float*) &mapped_scene_data[68]);
-  const float aabb_min_z = *((float*) &mapped_scene_data[72]);
-  const float aabb_max_x = *((float*) &mapped_scene_data[76]);
-  const float aabb_max_y = *((float*) &mapped_scene_data[80]);
-  const float aabb_max_z = *((float*) &mapped_scene_data[84]);
-
   /* Unmap the scene data since it's been copied. */
   gatling_munmap(scene_file, mapped_scene_data);
   gatling_file_close(scene_file);
 
   const uint32_t num_shader_resource_buffers = 7;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
-    { 0,       output_buffer,                             0,                  CGPU_WHOLE_SIZE },
-    { 1, intermediate_buffer,                             0,   path_segment_buffer_byte_count },
-    { 2,        input_buffer,                    node_offset,       face_offset - node_offset },
-    { 3,        input_buffer,                    face_offset,     vertex_offset - face_offset },
-    { 4,        input_buffer,                  vertex_offset, material_offset - vertex_offset },
-    { 5,        input_buffer,                material_offset,                 CGPU_WHOLE_SIZE },
-    { 6, intermediate_buffer, path_segment_buffer_byte_count,      hit_info_buffer_byte_count }
+    { 0,       output_buffer,                       0,               CGPU_WHOLE_SIZE },
+    { 1, intermediate_buffer, path_segment_buf_offset,         path_segment_buf_size },
+    { 2,        input_buffer,     new_node_buf_offset,     file_header.node_buf_size },
+    { 3,        input_buffer,     new_face_buf_offset,     file_header.face_buf_size },
+    { 4,        input_buffer,   new_vertex_buf_offset,   file_header.vertex_buf_size },
+    { 5,        input_buffer, new_material_buf_offset, file_header.material_buf_size },
+    { 6, intermediate_buffer,     hit_info_buf_offset,             hit_info_buf_size }
   };
 
   char dir_path[1024];
@@ -490,15 +516,15 @@ int main(int argc, const char* argv[])
 
   {
     const float aabb_length[3] = {
-      aabb_max_x - aabb_min_x,
-      aabb_max_y - aabb_min_y,
-      aabb_max_z - aabb_min_z
+      file_header.aabb_max_x - file_header.aabb_min_x,
+      file_header.aabb_max_y - file_header.aabb_min_y,
+      file_header.aabb_max_z - file_header.aabb_min_z
     };
 
     const float camera_target[3] = {
-      (aabb_max_x + aabb_min_x) * 0.5f,
-      (aabb_max_y + aabb_min_y) * 0.5f,
-      (aabb_max_z + aabb_min_z) * 0.5f
+      (file_header.aabb_max_x + file_header.aabb_min_x) * 0.5f,
+      (file_header.aabb_max_y + file_header.aabb_min_y) * 0.5f,
+      (file_header.aabb_max_z + file_header.aabb_min_z) * 0.5f
     };
     const float camera_origin[3] = {
       camera_target[0] + aabb_length[0],
@@ -535,7 +561,7 @@ int main(int argc, const char* argv[])
 
   {
     /* Find smallest possible traversal stack depth. */
-    uint32_t nc = node_count;
+    uint32_t nc = file_header.node_buf_size / node_struct_size;
     uint32_t traversal_stack_size = 2; /* + root & leaf */
     while (nc >>= 1) {
       ++traversal_stack_size;
@@ -642,8 +668,8 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_2.buffer = intermediate_buffer;
-  buffer_memory_barrier_2.byte_offset = 0u;
-  buffer_memory_barrier_2.byte_count = CGPU_WHOLE_SIZE;
+  buffer_memory_barrier_2.byte_offset = path_segment_buf_offset;
+  buffer_memory_barrier_2.byte_count = path_segment_buf_size;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -678,8 +704,8 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_3.buffer = intermediate_buffer;
-  buffer_memory_barrier_3.byte_offset = 0u;
-  buffer_memory_barrier_3.byte_count = CGPU_WHOLE_SIZE;
+  buffer_memory_barrier_3.byte_offset = hit_info_buf_offset;
+  buffer_memory_barrier_3.byte_count = hit_info_buf_size;
 
   cgpu_buffer_memory_barrier buffer_memory_barrier_4;
   buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;

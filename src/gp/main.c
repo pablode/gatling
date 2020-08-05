@@ -204,67 +204,43 @@ void gp_free_scene(gp_scene* scene)
   free(scene->vertices);
 }
 
-uint32_t round_to_buffer_offset_alignment(uint32_t byte_offset)
-{
-  /* For now, since we upload one buffer and describe offsets into
-   it, we must adhere to the device buffer offset alignment rules
-   (e.g. Vulkan minStorageBufferOffsetAlignment device limit). At
-   a later stage, we will mmap parts of the file and copy them into
-   the GPU buffer with the required device alignment offsets dynamically.
-   64 bytes will cover most discrete GPUs, but not iGPUs in smartphones. */
-  const uint32_t required_offset_alignment = 64u;
-
-  return (byte_offset + required_offset_alignment - 1) /
-           required_offset_alignment * required_offset_alignment;
-}
-
 void gp_write_scene(
   const gp_scene* scene,
   const char* file_path)
 {
   const gp_bvh* bvh = &scene->bvh;
 
-  const uint32_t header_size_in_bytes = 88;
+  const uint64_t header_size = 88;
+  const uint64_t node_buf_offset = header_size;
+  const uint64_t node_buf_size = bvh->node_count * sizeof(gp_bvh_node);
+  const uint64_t face_buf_offset = node_buf_offset + node_buf_size;
+  const uint64_t face_buf_size = bvh->face_count * sizeof(gp_face);
+  const uint64_t vertex_buf_offset = face_buf_offset + face_buf_size;
+  const uint64_t vertex_buf_size = scene->vertex_count * sizeof(gp_vertex);
+  const uint64_t material_buf_offset = vertex_buf_offset + vertex_buf_size;
+  const uint64_t material_buf_size = scene->material_count * sizeof(gp_material);
 
-  const uint32_t node_offset =
-    round_to_buffer_offset_alignment(header_size_in_bytes);
-  const uint32_t face_offset =
-    round_to_buffer_offset_alignment(node_offset + bvh->node_count * sizeof(gp_bvh_node));
-  const uint32_t vertex_offset =
-    round_to_buffer_offset_alignment(face_offset + bvh->face_count * sizeof(gp_face));
-  const uint32_t material_offset =
-    round_to_buffer_offset_alignment(vertex_offset + scene->vertex_count * sizeof(gp_vertex));
+  const uint64_t file_size = material_buf_offset + material_buf_size;
 
-  const uint32_t total_size =
-    material_offset + scene->material_count * sizeof(gp_material);
+  uint8_t* buffer = malloc(file_size);
 
-  uint8_t* buffer = malloc(total_size);
-
-  memcpy(&buffer[ 0], &node_offset,             8);
-  memcpy(&buffer[ 8], &bvh->node_count,         8);
-  memcpy(&buffer[16], &face_offset,             8);
-  memcpy(&buffer[24], &bvh->face_count,         8);
-  memcpy(&buffer[32], &vertex_offset,           8);
-  memcpy(&buffer[40], &scene->vertex_count,     8);
-  memcpy(&buffer[48], &material_offset,         8);
-  memcpy(&buffer[56], &scene->material_count,   8);
+  memcpy(&buffer[ 0], &node_buf_offset,     8);
+  memcpy(&buffer[ 8], &node_buf_size,       8);
+  memcpy(&buffer[16], &face_buf_offset,     8);
+  memcpy(&buffer[24], &face_buf_size,       8);
+  memcpy(&buffer[32], &vertex_buf_offset,   8);
+  memcpy(&buffer[40], &vertex_buf_size,     8);
+  memcpy(&buffer[48], &material_buf_offset, 8);
+  memcpy(&buffer[56], &material_buf_size,   8);
   memcpy(&buffer[64], &bvh->aabb, sizeof(gp_aabb));
 
-  memcpy(
-    buffer + node_offset,
-    bvh->nodes,
-    bvh->node_count * sizeof(gp_bvh_node)
-  );
+  memcpy(&buffer[node_buf_offset], bvh->nodes, node_buf_size);
 
-  memcpy(
-    buffer + face_offset,
-    bvh->faces,
-    bvh->face_count * sizeof(gp_face)
-  );
+  memcpy(&buffer[face_buf_offset], bvh->faces, face_buf_size);
 
   for (uint32_t i = 0; i < scene->vertex_count; ++i)
   {
-    uint8_t* ptr = &buffer[vertex_offset + i * 32];
+    uint8_t* ptr = &buffer[vertex_buf_offset + i * 32];
     memcpy(&ptr[ 0], &scene->vertices[i].pos[0],  4);
     memcpy(&ptr[ 4], &scene->vertices[i].pos[1],  4);
     memcpy(&ptr[ 8], &scene->vertices[i].pos[2],  4);
@@ -275,17 +251,9 @@ void gp_write_scene(
     memcpy(&ptr[28], &scene->vertices[i].uv[1],   4);
   }
 
-  memcpy(
-    buffer + material_offset,
-    scene->materials,
-    scene->material_count * sizeof(gp_material)
-  );
+  memcpy(&buffer[material_buf_offset], scene->materials, material_buf_size);
 
-  gp_write_file(
-    buffer,
-    total_size,
-    file_path
-  );
+  gp_write_file(buffer, file_size, file_path);
 
   free(buffer);
 }
