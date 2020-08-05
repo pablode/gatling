@@ -33,20 +33,20 @@ static void gatling_cgpu_warn(CgpuResult result, const char *msg)
   }
 }
 
-static void gatling_save_img_wfunc(void *context, void *data, int byte_count)
+static void gatling_save_img_wfunc(void *context, void *data, int size)
 {
   gatling_file* file;
   const char* file_path = (const char*) context;
-  const bool success = gatling_file_create(file_path, byte_count, &file);
+  const bool success = gatling_file_create(file_path, size, &file);
   if (!success) {
     gatling_fail("Unable to open output file.");
   }
 
-  void* mapped_mem = gatling_mmap(file, 0, byte_count);
+  void* mapped_mem = gatling_mmap(file, 0, size);
   if (!mapped_mem) {
     gatling_fail("Unable to map output file.");
   }
-  memcpy(mapped_mem, data, byte_count);
+  memcpy(mapped_mem, data, size);
 
   gatling_munmap(file, mapped_mem);
   gatling_file_close(file);
@@ -382,7 +382,7 @@ int main(int argc, const char* argv[])
 
   const uint64_t intermediate_buf_size = path_segment_buf_size + hit_info_buf_size;
 
-  const uint64_t output_buffer_byte_count = options.image_width * options.image_height * sizeof(float) * 4;
+  const uint64_t output_buffer_size = options.image_width * options.image_height * sizeof(float) * 4;
 
   cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
@@ -426,7 +426,7 @@ int main(int argc, const char* argv[])
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
       CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    output_buffer_byte_count,
+    output_buffer_size,
     &output_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -437,7 +437,7 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    output_buffer_byte_count,
+    output_buffer_size,
     &staging_buffer_out
   );
   gatling_cgpu_ensure(c_result);
@@ -534,18 +534,18 @@ int main(int argc, const char* argv[])
     const float camera_fov = 0.872665f;
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 },
-      { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 },
-      { .constant_id =  2, .p_data = (void*) &options.spp,                .byte_count = 4 },
-      { .constant_id =  3, .p_data = (void*) &options.image_width,        .byte_count = 4 },
-      { .constant_id =  4, .p_data = (void*) &options.image_height,       .byte_count = 4 },
-      { .constant_id =  5, .p_data = (void*) &camera_origin[0],           .byte_count = 4 },
-      { .constant_id =  6, .p_data = (void*) &camera_origin[1],           .byte_count = 4 },
-      { .constant_id =  7, .p_data = (void*) &camera_origin[2],           .byte_count = 4 },
-      { .constant_id =  8, .p_data = (void*) &camera_target[0],           .byte_count = 4 },
-      { .constant_id =  9, .p_data = (void*) &camera_target[1],           .byte_count = 4 },
-      { .constant_id = 10, .p_data = (void*) &camera_target[2],           .byte_count = 4 },
-      { .constant_id = 11, .p_data = (void*) &camera_fov,                 .byte_count = 4 }
+      { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
+      { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
+      { .constant_id =  2, .p_data = (void*) &options.spp,                .size = 4 },
+      { .constant_id =  3, .p_data = (void*) &options.image_width,        .size = 4 },
+      { .constant_id =  4, .p_data = (void*) &options.image_height,       .size = 4 },
+      { .constant_id =  5, .p_data = (void*) &camera_origin[0],           .size = 4 },
+      { .constant_id =  6, .p_data = (void*) &camera_origin[1],           .size = 4 },
+      { .constant_id =  7, .p_data = (void*) &camera_origin[2],           .size = 4 },
+      { .constant_id =  8, .p_data = (void*) &camera_target[0],           .size = 4 },
+      { .constant_id =  9, .p_data = (void*) &camera_target[1],           .size = 4 },
+      { .constant_id = 10, .p_data = (void*) &camera_target[2],           .size = 4 },
+      { .constant_id = 11, .p_data = (void*) &camera_fov,                 .size = 4 }
     };
 
     gatling_create_pipeline(
@@ -568,11 +568,11 @@ int main(int argc, const char* argv[])
     }
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 },
-      { .constant_id = 1, .p_data = (void*) &options.spp,                .byte_count = 4 },
-      { .constant_id = 2, .p_data = (void*) &options.image_width,        .byte_count = 4 },
-      { .constant_id = 3, .p_data = (void*) &options.image_height,       .byte_count = 4 },
-      { .constant_id = 4, .p_data = (void*) &traversal_stack_size,       .byte_count = 4 }
+      { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
+      { .constant_id = 1, .p_data = (void*) &options.spp,                .size = 4 },
+      { .constant_id = 2, .p_data = (void*) &options.image_width,        .size = 4 },
+      { .constant_id = 3, .p_data = (void*) &options.image_height,       .size = 4 },
+      { .constant_id = 4, .p_data = (void*) &traversal_stack_size,       .size = 4 }
     };
 
     gatling_create_pipeline(
@@ -588,7 +588,7 @@ int main(int argc, const char* argv[])
 
   {
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .byte_count = 4 }
+      { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 }
     };
 
     gatling_create_pipeline(
@@ -631,8 +631,8 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_1.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE;
   buffer_memory_barrier_1.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_1.buffer = input_buffer;
-  buffer_memory_barrier_1.byte_offset = 0;
-  buffer_memory_barrier_1.byte_count = CGPU_WHOLE_SIZE;
+  buffer_memory_barrier_1.offset = 0;
+  buffer_memory_barrier_1.size = CGPU_WHOLE_SIZE;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -668,8 +668,8 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_2.buffer = intermediate_buffer;
-  buffer_memory_barrier_2.byte_offset = path_segment_buf_offset;
-  buffer_memory_barrier_2.byte_count = path_segment_buf_size;
+  buffer_memory_barrier_2.offset = path_segment_buf_offset;
+  buffer_memory_barrier_2.size = path_segment_buf_size;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -704,15 +704,15 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_3.buffer = intermediate_buffer;
-  buffer_memory_barrier_3.byte_offset = hit_info_buf_offset;
-  buffer_memory_barrier_3.byte_count = hit_info_buf_size;
+  buffer_memory_barrier_3.offset = hit_info_buf_offset;
+  buffer_memory_barrier_3.size = hit_info_buf_size;
 
   cgpu_buffer_memory_barrier buffer_memory_barrier_4;
   buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_4.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
   buffer_memory_barrier_4.buffer = output_buffer;
-  buffer_memory_barrier_4.byte_offset = 0u;
-  buffer_memory_barrier_4.byte_count = CGPU_WHOLE_SIZE;
+  buffer_memory_barrier_4.offset = 0u;
+  buffer_memory_barrier_4.size = CGPU_WHOLE_SIZE;
 
   cgpu_buffer_memory_barrier buffer_memory_barrier_3_and_4[] = {
     buffer_memory_barrier_3, buffer_memory_barrier_4
@@ -751,8 +751,8 @@ int main(int argc, const char* argv[])
   buffer_memory_barrier_5.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   buffer_memory_barrier_5.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
   buffer_memory_barrier_5.buffer = output_buffer;
-  buffer_memory_barrier_5.byte_offset = 0;
-  buffer_memory_barrier_5.byte_count = CGPU_WHOLE_SIZE;
+  buffer_memory_barrier_5.offset = 0;
+  buffer_memory_barrier_5.size = CGPU_WHOLE_SIZE;
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -844,7 +844,7 @@ int main(int argc, const char* argv[])
   gatling_print_timestamp("total",         timespan_total,   timestamp_ns_period);
 
   /* Read data from gpu. */
-  float* image_data = malloc(output_buffer_byte_count);
+  float* image_data = malloc(output_buffer_size);
 
   c_result = cgpu_map_buffer(
     device,
@@ -858,7 +858,7 @@ int main(int argc, const char* argv[])
   memcpy(
     image_data,
     mapped_staging_mem,
-    output_buffer_byte_count
+    output_buffer_size
   );
 
   c_result = cgpu_unmap_buffer(
@@ -870,7 +870,7 @@ int main(int argc, const char* argv[])
   /* Save image. */
   gatling_save_img(
     image_data,
-    output_buffer_byte_count / 4,
+    output_buffer_size / 4,
     options.image_width,
     options.image_height,
     options.output_file

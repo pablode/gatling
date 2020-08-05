@@ -22,7 +22,7 @@
 #define MAX_IMAGE_MEMORY_BARRIERS 64
 #define MAX_MEMORY_BARRIERS 128
 #define MAX_SPECIALIZATION_CONSTANTS 32
-#define MAX_SPECIALIZATION_BUFFER_BYTE_COUNT 1024
+#define MAX_SPECIALIZATION_BUFFER_SIZE 1024
 
 /* Internal structures. */
 
@@ -44,14 +44,14 @@ typedef struct cgpu_idevice {
 typedef struct cgpu_ibuffer {
   VkBuffer       buffer;
   VkDeviceMemory memory;
-  uint64_t       size_in_bytes;
+  uint64_t       size;
 } cgpu_ibuffer;
 
 typedef struct cgpu_iimage {
   VkImage        image;
   VkImageView    image_view;
   VkDeviceMemory memory;
-  uint64_t       size_in_bytes;
+  uint64_t       size;
 } cgpu_iimage;
 
 typedef struct cgpu_ipipeline {
@@ -1401,7 +1401,7 @@ CgpuResult cgpu_destroy_device(
 
 CgpuResult cgpu_create_shader(
   cgpu_device device,
-  uint64_t source_byte_count,
+  uint64_t source_size,
   const uint32_t* p_source,
   cgpu_shader* p_shader)
 {
@@ -1421,7 +1421,7 @@ CgpuResult cgpu_create_shader(
   shader_module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shader_module_create_info.pNext = NULL;
   shader_module_create_info.flags = 0;
-  shader_module_create_info.codeSize = source_byte_count;
+  shader_module_create_info.codeSize = source_size;
   shader_module_create_info.pCode = p_source;
 
   const VkResult result = idevice->table.vkCreateShaderModule(
@@ -1466,7 +1466,7 @@ CgpuResult cgpu_create_buffer(
   cgpu_device device,
   CgpuBufferUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
-  uint64_t byte_count,
+  uint64_t size,
   cgpu_buffer* p_buffer)
 {
   cgpu_idevice* idevice;
@@ -1511,7 +1511,7 @@ CgpuResult cgpu_create_buffer(
   buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   buffer_info.pNext = NULL;
   buffer_info.flags = 0;
-  buffer_info.size = byte_count;
+  buffer_info.size = size;
   buffer_info.usage = vk_buffer_usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   buffer_info.queueFamilyIndexCount = 0;
@@ -1583,7 +1583,7 @@ CgpuResult cgpu_create_buffer(
     0
   );
 
-  ibuffer->size_in_bytes = byte_count;
+  ibuffer->size = size;
 
   return CGPU_OK;
 }
@@ -1620,8 +1620,8 @@ CgpuResult cgpu_destroy_buffer(
 CgpuResult cgpu_map_buffer(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t byte_offset,
-  uint64_t byte_count,
+  uint64_t offset,
+  uint64_t size,
   void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
@@ -1636,8 +1636,8 @@ CgpuResult cgpu_map_buffer(
   const VkResult result = idevice->table.vkMapMemory(
     idevice->logical_device,
     ibuffer->memory,
-    byte_offset,
-    (byte_count == CGPU_WHOLE_SIZE) ? ibuffer->size_in_bytes : byte_count,
+    offset,
+    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size,
     0,
     pp_mapped_mem
   );
@@ -1804,7 +1804,7 @@ CgpuResult cgpu_create_image(
     0
   );
 
-  iimage->size_in_bytes = mem_requirements.size;
+  iimage->size = mem_requirements.size;
 
   VkImageViewCreateInfo image_view_info;
   image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1882,8 +1882,8 @@ CgpuResult cgpu_destroy_image(
 CgpuResult cgpu_map_image(
   cgpu_device device,
   cgpu_image image,
-  uint64_t byte_offset,
-  uint64_t byte_count,
+  uint64_t offset,
+  uint64_t size,
   void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
@@ -1898,8 +1898,8 @@ CgpuResult cgpu_map_image(
   const VkResult result = idevice->table.vkMapMemory(
     idevice->logical_device,
     iimage->memory,
-    byte_offset,
-    (byte_count == CGPU_WHOLE_SIZE) ? iimage->size_in_bytes : byte_count,
+    offset,
+    (size == CGPU_WHOLE_SIZE) ? iimage->size : size,
     0,
     pp_mapped_mem
   );
@@ -2041,7 +2041,7 @@ CgpuResult cgpu_create_pipeline(
   }
 
   VkSpecializationInfo stage_specialization;
-  uint8_t specialization_buffer[MAX_SPECIALIZATION_BUFFER_BYTE_COUNT];
+  uint8_t specialization_buffer[MAX_SPECIALIZATION_BUFFER_SIZE];
   VkSpecializationMapEntry vk_specialization_constants[MAX_SPECIALIZATION_CONSTANTS];
   uint32_t specialization_buffer_size = 0;
 
@@ -2056,7 +2056,7 @@ CgpuResult cgpu_create_pipeline(
       VkSpecializationMapEntry* vk_spec_const = &vk_specialization_constants[i];
       const cgpu_specialization_constant* spec_const = &specialization_constants[i];
 
-      if (specialization_buffer_size + spec_const->byte_count > MAX_SPECIALIZATION_BUFFER_BYTE_COUNT)
+      if (specialization_buffer_size + spec_const->size > MAX_SPECIALIZATION_BUFFER_SIZE)
       {
         resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
         idevice->table.vkDestroyDescriptorSetLayout(
@@ -2069,13 +2069,13 @@ CgpuResult cgpu_create_pipeline(
 
       vk_spec_const->constantID = spec_const->constant_id;
       vk_spec_const->offset = specialization_buffer_size;
-      vk_spec_const->size = spec_const->byte_count;
+      vk_spec_const->size = spec_const->size;
       memcpy(
         (void*)(&specialization_buffer[specialization_buffer_size]),
         spec_const->p_data,
-        spec_const->byte_count
+        spec_const->size
       );
-      specialization_buffer_size += spec_const->byte_count;
+      specialization_buffer_size += spec_const->size;
     }
 
     stage_specialization.dataSize = specialization_buffer_size;
@@ -2214,17 +2214,17 @@ CgpuResult cgpu_create_pipeline(
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
-    if ((shader_resource_buffer->byte_offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
+    if ((shader_resource_buffer->offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
       return CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED;
     }
 
     VkDescriptorBufferInfo* descriptor_buffer_info = &descriptor_buffer_infos[i];
     descriptor_buffer_info->buffer = ibuffer->buffer;
-    descriptor_buffer_info->offset = shader_resource_buffer->byte_offset;
+    descriptor_buffer_info->offset = shader_resource_buffer->offset;
     descriptor_buffer_info->range =
-      (shader_resource_buffer->byte_count == CGPU_WHOLE_SIZE) ?
-        ibuffer->size_in_bytes - shader_resource_buffer->byte_offset :
-        shader_resource_buffer->byte_count;
+      (shader_resource_buffer->size == CGPU_WHOLE_SIZE) ?
+        ibuffer->size - shader_resource_buffer->offset :
+        shader_resource_buffer->size;
 
     VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2446,10 +2446,10 @@ CgpuResult cgpu_cmd_bind_pipeline(
 CgpuResult cgpu_cmd_copy_buffer(
   cgpu_command_buffer command_buffer,
   cgpu_buffer source_buffer,
-  uint64_t source_byte_offset,
+  uint64_t source_offset,
   cgpu_buffer destination_buffer,
-  uint64_t destination_byte_offset,
-  uint64_t byte_count)
+  uint64_t destination_offset,
+  uint64_t size)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2469,10 +2469,10 @@ CgpuResult cgpu_cmd_copy_buffer(
   }
 
   VkBufferCopy region;
-  region.srcOffset = source_byte_offset;
-  region.dstOffset = destination_byte_offset;
+  region.srcOffset = source_offset;
+  region.dstOffset = destination_offset;
   region.size =
-    (byte_count == CGPU_WHOLE_SIZE) ? isource_buffer->size_in_bytes : byte_count;
+    (size == CGPU_WHOLE_SIZE) ? isource_buffer->size : size;
 
   idevice->table.vkCmdCopyBuffer(
     icommand_buffer->command_buffer,
@@ -2558,8 +2558,8 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->buffer = ibuffer->buffer;
-    b_vk->offset = b_cgpu->byte_offset;
-    b_vk->size = (b_cgpu->byte_count == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : b_cgpu->byte_count;
+    b_vk->offset = b_cgpu->offset;
+    b_vk->size = (b_cgpu->size == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : b_cgpu->size;
   }
 
   for (uint32_t i = 0; i < image_barrier_count; ++i)
@@ -2855,8 +2855,8 @@ CgpuResult cgpu_submit_command_buffer(
 CgpuResult cgpu_flush_mapped_memory(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t byte_offset,
-  uint64_t byte_count)
+  uint64_t offset,
+  uint64_t size)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2871,9 +2871,9 @@ CgpuResult cgpu_flush_mapped_memory(
   memory_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
   memory_range.pNext = NULL;
   memory_range.memory = ibuffer->memory;
-  memory_range.offset = byte_offset;
+  memory_range.offset = offset;
   memory_range.size =
-    (byte_count == CGPU_WHOLE_SIZE) ? ibuffer->size_in_bytes : byte_count;
+    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size;
 
   const VkResult result = idevice->table.vkFlushMappedMemoryRanges(
     idevice->logical_device,
@@ -2890,8 +2890,8 @@ CgpuResult cgpu_flush_mapped_memory(
 CgpuResult cgpu_invalidate_mapped_memory(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t byte_offset,
-  uint64_t byte_count)
+  uint64_t offset,
+  uint64_t size)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2906,9 +2906,9 @@ CgpuResult cgpu_invalidate_mapped_memory(
   memory_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
   memory_range.pNext = NULL;
   memory_range.memory = ibuffer->memory;
-  memory_range.offset = byte_offset;
+  memory_range.offset = offset;
   memory_range.size =
-    (byte_count == CGPU_WHOLE_SIZE) ? ibuffer->size_in_bytes : byte_count;
+    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size;
 
   const VkResult result = idevice->table.vkInvalidateMappedMemoryRanges(
     idevice->logical_device,

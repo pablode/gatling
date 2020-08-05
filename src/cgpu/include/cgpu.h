@@ -441,8 +441,8 @@ typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
 typedef struct cgpu_shader_resource_buffer {
   uint32_t binding;
   cgpu_buffer buffer;
-  uint64_t byte_offset;
-  uint64_t byte_count;
+  uint64_t offset;
+  uint64_t size;
 } cgpu_shader_resource_buffer;
 
 typedef struct cgpu_shader_resource_image {
@@ -459,8 +459,8 @@ typedef struct cgpu_buffer_memory_barrier {
   cgpu_buffer buffer;
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
-  uint64_t byte_offset;
-  uint64_t byte_count;
+  uint64_t offset;
+  uint64_t size;
 } cgpu_buffer_memory_barrier;
 
 typedef struct cgpu_image_memory_barrier {
@@ -580,7 +580,7 @@ typedef struct cgpu_physical_device_limits {
 typedef struct cgpu_specialization_constant {
   uint32_t constant_id;
   void* p_data;
-  uint32_t byte_count;
+  uint32_t size;
 } cgpu_specialization_constant;
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
@@ -607,7 +607,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_device(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_shader(
   cgpu_device device,
-  uint64_t source_byte_count,
+  uint64_t source_size,
   const uint32_t* p_source,
   cgpu_shader* p_shader
 );
@@ -621,7 +621,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_buffer(
   cgpu_device device,
   CgpuBufferUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
-  uint64_t byte_count,
+  uint64_t size,
   cgpu_buffer* p_buffer
 );
 
@@ -633,8 +633,8 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_buffer(
 CGPU_API CgpuResult CGPU_CDECL cgpu_map_buffer(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t byte_offset,
-  uint64_t byte_count,
+  uint64_t offset,
+  uint64_t size,
   void** pp_mapped_mem
 );
 
@@ -661,8 +661,8 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_image(
 CGPU_API CgpuResult CGPU_CDECL cgpu_map_image(
   cgpu_device device,
   cgpu_image image,
-  uint64_t byte_offset,
-  uint64_t byte_count,
+  uint64_t offset,
+  uint64_t size,
   void** pp_mapped_mem
 );
 
@@ -706,10 +706,10 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_bind_pipeline(
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer(
   cgpu_command_buffer command_buffer,
   cgpu_buffer source,
-  uint64_t source_byte_offset,
+  uint64_t source_offset,
   cgpu_buffer destination,
-  uint64_t destination_byte_offset,
-  uint64_t byte_count
+  uint64_t destination_offset,
+  uint64_t size
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_dispatch(
@@ -786,15 +786,15 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_submit_command_buffer(
 CGPU_API CgpuResult CGPU_CDECL cgpu_flush_mapped_memory(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t byte_offset,
-  uint64_t byte_count
+  uint64_t offset,
+  uint64_t size
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_invalidate_mapped_memory(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t byte_offset,
-  uint64_t byte_count
+  uint64_t offset,
+  uint64_t size
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_get_physical_device_limits(

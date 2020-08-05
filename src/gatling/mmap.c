@@ -18,12 +18,12 @@
 
 typedef struct gatling_mapped_posix_range {
   void*    addr;
-  uint64_t byte_count;
+  uint64_t size;
 } gatling_mapped_posix_range;
 
 typedef struct gatling_file {
   GatlingFileUsage usage;
-  uint64_t         byte_count;
+  uint64_t         size;
 #if defined(_WIN32)
   HANDLE           file_handle;
   HANDLE           mapping_handle;
@@ -35,7 +35,7 @@ typedef struct gatling_file {
 
 #if defined (_WIN32)
 
-bool gatling_file_create(const char* path, uint64_t byte_count, gatling_file** file)
+bool gatling_file_create(const char* path, uint64_t size, gatling_file** file)
 {
   const DWORD creation_disposition = CREATE_ALWAYS;
   const DWORD desired_access = GENERIC_READ | GENERIC_WRITE;
@@ -59,8 +59,8 @@ bool gatling_file_create(const char* path, uint64_t byte_count, gatling_file** f
   }
 
   const DWORD protection_flags = PAGE_READWRITE;
-  const DWORD maximum_size_low = byte_count & 0x00000000FFFFFFFF;
-  const DWORD maximum_size_high = byte_count >> 32;
+  const DWORD maximum_size_low = size & 0x00000000FFFFFFFF;
+  const DWORD maximum_size_high = size >> 32;
 
   /* "If an application specifies a size for the file mapping object that is
    * larger than the size of the actual named file on disk and if the page
@@ -85,7 +85,7 @@ bool gatling_file_create(const char* path, uint64_t byte_count, gatling_file** f
   (*file)->usage = GATLING_FILE_USAGE_WRITE;
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
-  (*file)->byte_count = byte_count;
+  (*file)->size = size;
 }
 
 bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** file)
@@ -144,8 +144,8 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
     return false;
   }
 
-  uint64_t byte_count;
-  if (!GetFileSizeEx(file_handle, &byte_count)) {
+  uint64_t size;
+  if (!GetFileSizeEx(file_handle, &size)) {
     return false;
   }
 
@@ -153,12 +153,12 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
   (*file)->usage = usage;
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
-  (*file)->byte_count = byte_count;
+  (*file)->size = size;
 }
 
 uint64_t gatling_file_size(gatling_file* file)
 {
-  return file->byte_count;
+  return file->size;
 }
 
 bool gatling_file_close(gatling_file* file)
@@ -171,10 +171,10 @@ bool gatling_file_close(gatling_file* file)
 
 void* gatling_mmap(
   gatling_file* file,
-  uint64_t byte_offset,
-  uint64_t byte_count)
+  uint64_t offset,
+  uint64_t size)
 {
-  if (byte_count == 0) {
+  if (size == 0) {
     return false;
   }
 
@@ -189,15 +189,15 @@ void* gatling_mmap(
     return false;
   }
 
-  const DWORD file_offset_low = byte_offset & 0x00000000FFFFFFFF;
-  const DWORD file_offset_high = byte_offset >> 32;
+  const DWORD file_offset_low = offset & 0x00000000FFFFFFFF;
+  const DWORD file_offset_high = offset >> 32;
 
   LPVOID mapped_addr = MapViewOfFile(
     file->mapping_handle,
     desired_access,
     file_offset_high,
     file_offset_low,
-    byte_count
+    size
   );
 
   return mapped_addr;
@@ -210,7 +210,7 @@ bool gatling_munmap(gatling_file* file, void* addr)
 
 #else
 
-bool gatling_file_create(const char* path, uint64_t byte_count, gatling_file** file)
+bool gatling_file_create(const char* path, uint64_t size, gatling_file** file)
 {
   const int open_flags = O_RDWR | O_CREAT | O_TRUNC;
   const mode_t permission_flags = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -221,7 +221,7 @@ bool gatling_file_create(const char* path, uint64_t byte_count, gatling_file** f
     return false;
   }
 
-  const bool trunc_error = ftruncate(file_descriptor, byte_count);
+  const bool trunc_error = ftruncate(file_descriptor, size);
 
   if (trunc_error) {
     return false;
@@ -265,7 +265,7 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
   (*file) = malloc(sizeof(gatling_file));
   (*file)->usage = usage;
   (*file)->file_descriptor = file_descriptor;
-  (*file)->byte_count = file_stats.st_size;
+  (*file)->size = file_stats.st_size;
   memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(gatling_mapped_posix_range));
 
   return true;
@@ -273,7 +273,7 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
 
 uint64_t gatling_file_size(gatling_file* file)
 {
-  return file->byte_count;
+  return file->size;
 }
 
 bool gatling_file_close(gatling_file* file)
@@ -291,10 +291,10 @@ bool gatling_file_close(gatling_file* file)
 
 void* gatling_mmap(
   gatling_file* file,
-  uint64_t byte_offset,
-  uint64_t byte_count)
+  uint64_t offset,
+  uint64_t size)
 {
-  if (byte_count == 0) {
+  if (size == 0) {
     return false;
   }
 
@@ -324,11 +324,11 @@ void* gatling_mmap(
 
   void* mapped_addr = mmap(
     addr,
-    byte_count,
+    size,
     protection_flags,
     visibility_flags,
     file->file_descriptor,
-    byte_offset
+    offset
   );
 
   if (mapped_addr == MAP_FAILED) {
@@ -336,7 +336,7 @@ void* gatling_mmap(
   }
 
   range->addr = mapped_addr;
-  range->byte_count = byte_count;
+  range->size = size;
 
   return mapped_addr;
 }
@@ -350,7 +350,7 @@ bool gatling_munmap(gatling_file* file, void* addr)
       continue;
     }
     range->addr = NULL;
-    return !munmap(addr, range->byte_count);
+    return !munmap(addr, range->size);
   }
   return false;
 }

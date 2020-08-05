@@ -13,7 +13,7 @@ typedef enum GatlingFileUsage {
 
 bool gatling_file_create(
   const char* path,
-  uint64_t byte_count,
+  uint64_t size,
   gatling_file** file
 );
 
@@ -29,8 +29,8 @@ bool gatling_file_close(gatling_file* file);
 
 void* gatling_mmap(
   gatling_file* file,
-  uint64_t byte_offset,
-  uint64_t byte_count
+  uint64_t offset,
+  uint64_t size
 );
 
 bool gatling_munmap(
