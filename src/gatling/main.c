@@ -205,7 +205,7 @@ typedef struct program_options {
   uint32_t spp;
 } program_options;
 
-void print_usage_and_exit()
+void gatling_print_usage_and_exit()
 {
   printf("Usage: gatling <scene.gsd> <test.png> [options]\n");
   printf("\n");
@@ -216,15 +216,16 @@ void print_usage_and_exit()
   exit(EXIT_FAILURE);
 }
 
-void parse_args(int argc, const char* argv[], program_options* options)
+void gatling_parse_args(int argc, const char* argv[], program_options* options)
 {
   if (argc < 3) {
-    print_usage_and_exit();
+    gatling_print_usage_and_exit();
   }
 
   if (strncmp("-", argv[1], 1) == 0 ||
-      strncmp("-", argv[2], 1) == 0) {
-    print_usage_and_exit();
+      strncmp("-", argv[2], 1) == 0)
+  {
+    gatling_print_usage_and_exit();
   }
 
   options->input_file = argv[1];
@@ -238,7 +239,7 @@ void parse_args(int argc, const char* argv[], program_options* options)
     const char* arg = argv[i];
 
     if (strncmp("--", arg, 2) != 0) {
-      print_usage_and_exit();
+      gatling_print_usage_and_exit();
     }
 
     char* key_value = strdup(&arg[2]);
@@ -271,7 +272,7 @@ void parse_args(int argc, const char* argv[], program_options* options)
 
     free(key_value);
     if (fail) {
-      print_usage_and_exit();
+      gatling_print_usage_and_exit();
     }
   }
 }
@@ -279,7 +280,7 @@ void parse_args(int argc, const char* argv[], program_options* options)
 int main(int argc, const char* argv[])
 {
   program_options options;
-  parse_args(argc, argv, &options);
+  gatling_parse_args(argc, argv, &options);
 
   /* Set up instance and device. */
   CgpuResult c_result = cgpu_initialize(
