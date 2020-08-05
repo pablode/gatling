@@ -2,6 +2,10 @@ add_executable(
   gp
   bvh.c
   bvh.h
+  bvh_collapse.c
+  bvh_collapse.h
+  bvh_compress.c
+  bvh_compress.h
   gp.h
   main.c
   math.c

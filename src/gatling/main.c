@@ -560,19 +560,19 @@ int main(int argc, const char* argv[])
   }
 
   {
-    /* Find smallest possible traversal stack depth. */
-    uint32_t nc = file_header.node_buf_size / node_struct_size;
-    uint32_t traversal_stack_size = 2; /* + root & leaf */
-    while (nc >>= 1) {
-      ++traversal_stack_size;
-    }
+    /* Let's just hardcode this. In the future, we can calculate how many nodes
+     * we need (log8(node_count) * 2) and how many we can fit into shared memory
+     * (via device_limits.maxComputeSharedMemorySize and our workgroup size). */
+    const uint32_t traversal_stack_size = 6;
+    const uint32_t sm_traversal_stack_size = 12;
 
     const cgpu_specialization_constant speccs[] = {
       { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
       { .constant_id = 1, .p_data = (void*) &options.spp,                .size = 4 },
       { .constant_id = 2, .p_data = (void*) &options.image_width,        .size = 4 },
       { .constant_id = 3, .p_data = (void*) &options.image_height,       .size = 4 },
-      { .constant_id = 4, .p_data = (void*) &traversal_stack_size,       .size = 4 }
+      { .constant_id = 4, .p_data = (void*) &traversal_stack_size,       .size = 4 },
+      { .constant_id = 5, .p_data = (void*) &sm_traversal_stack_size,    .size = 4 }
     };
 
     gatling_create_pipeline(
@@ -580,7 +580,7 @@ int main(int argc, const char* argv[])
       kernel_extend_shader_path,
       shader_resource_buffers,
       num_shader_resource_buffers,
-      5,
+      6,
       speccs,
       &pipeline_extend
     );

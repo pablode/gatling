@@ -7,27 +7,27 @@ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 layout(constant_id = 1) const uint SAMPLE_COUNT = 1;
 layout(constant_id = 2) const uint IMAGE_WIDTH = 3840;
 layout(constant_id = 3) const uint IMAGE_HEIGHT = 2160;
-layout(constant_id = 4) const uint MAX_STACK_SIZE = 32;
+layout(constant_id = 4) const uint MAX_STACK_SIZE = 6;
+layout(constant_id = 5) const uint MAX_SM_STACK_SIZE = 12;
 
-const vec4 COLOR_LIGHT_BLUE = vec4(0.5, 0.7, 1.0, 1.0);
-const vec4 COLOR_LIGHT_GRAY = vec4(0.8, 0.8, 0.8, 1.0);
-const vec3 LIGHT_POSITION = vec3 (2.0, 5.0, 5.0);
-const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 1.0);
 const float TRI_EPS = 0.0000001;
 
 /* Möller-Trumbore triangle intersection. */
-bool intersect_triangle(
-    in const vec3 ray_origin,
-    in const vec3 ray_direction,
-    in const vec3 v0,
-    in const vec3 v1,
-    in const vec3 v2,
-    out vec2 bc,
+bool test_face(
+    in const path_segment ray,
+    in const float t_max,
+    in const uint face_index,
+    out hit_info hit_info,
     out float t)
 {
-    const vec3 e1 = v1 - v0;
-    const vec3 e2 = v2 - v0;
-    const vec3 p = cross(ray_direction, e2);
+    const face f = faces[face_index];
+    const vec3 p0 = vertices[f.v_0].field1.xyz;
+    const vec3 p1 = vertices[f.v_1].field1.xyz;
+    const vec3 p2 = vertices[f.v_2].field1.xyz;
+    const vec3 e1 = p1 - p0;
+    const vec3 e2 = p2 - p0;
+
+    const vec3 p = cross(ray.dir, e2);
     const float det = dot(e1, p);
 
     if (abs(det) < TRI_EPS) {
@@ -35,183 +35,232 @@ bool intersect_triangle(
     }
 
     const float inv_det = 1.0 / det;
+    const vec3 tvec = ray.origin - p0;
 
-    const vec3 t_vec = ray_origin - v0;
-
-    bc.x = dot(t_vec, p) * inv_det;
-    if (bc.x < 0.0 || bc.x > 1.0) {
+    const float bc_u = dot(tvec, p) * inv_det;
+    if (bc_u < 0.0 || bc_u > 1.0) {
         return false;
     }
 
-    const vec3 q = cross(t_vec, e1);
-    bc.y = dot(ray_direction, q) * inv_det;
-
-    if (bc.y < 0.0 || (bc.x + bc.y > 1.0)) {
+    const vec3 q = cross(tvec, e1);
+    const float bc_v = dot(ray.dir, q) * inv_det;
+    if (bc_v < 0.0 || (bc_u + bc_v > 1.0)) {
         return false;
     }
 
     t = dot(e2, q) * inv_det;
 
-    return t > 0.0;
-}
-
-/* Optimized ray-aabb intersection kernel by Aila et al. '12. */
-bool intersect_aabb(
-    in const float t_min,
-    in const float t_max,
-    in const aabb box,
-    in const vec3 inv_dir,
-    in const vec3 ood,
-    out float t)
-{
-    const float x0 = box.min_x * inv_dir.x - ood.x;
-    const float y0 = box.min_y * inv_dir.y - ood.y;
-    const float z0 = box.min_z * inv_dir.z - ood.z;
-    const float x1 = box.max_x * inv_dir.x - ood.x;
-    const float y1 = box.max_y * inv_dir.y - ood.y;
-    const float z1 = box.max_z * inv_dir.z - ood.z;
-
-    t = max(max(t_min, min(x0, x1)), max(min(y0, y1), min(z0, z1)));
-    const float t_max_box = min(min(t_max, max(x0, x1)), min(max(y0, y1), max(z0, z1)));
-
-    return t <= t_max_box;
-}
-
-bool test_leaf(
-    in const path_segment ray,
-    in const float t_max,
-    in const uint tri_offset,
-    in const uint tri_count,
-    out hit_info hit_info,
-    out float t)
-{
-    t = t_max;
-
-    const uint start = tri_offset;
-    const uint end = tri_offset + tri_count;
-
-    for (uint i = start; i < end; ++i)
-    {
-        const face f = faces[i];
-        const vec3 p0 = vertices[f.v_0].field1.xyz;
-        const vec3 p1 = vertices[f.v_1].field1.xyz;
-        const vec3 p2 = vertices[f.v_2].field1.xyz;
-
-        vec2 bc;
-        float t_temp;
-
-        const bool is_hit = intersect_triangle(
-            ray.origin, ray.dir,
-            p0, p1, p2,
-            bc, t_temp
-        );
-
-        if (!is_hit)
-        {
-            continue;
-        }
-
-        if (t_temp >= t)
-        {
-            continue;
-        }
-
-        t = t_temp;
-        hit_info.face_index = i;
-        hit_info.bc = bc;
+    if (t <= 0.0 || t >= t_max) {
+        return false;
     }
 
-    return t != t_max;
+    hit_info.face_index = face_index;
+    hit_info.bc = vec2(bc_u, bc_v);
+    hit_info.pixel_index = ray.pixel_index;
+    hit_info.pos = vec4(ray.origin + ray.dir * t, 1.0);
+
+    return true;
 }
 
-struct stack_item
+uint sign_to_byte_mask4(uint a)
 {
-    uint node_index;
-    float t_aabb_min;
-};
+    a = a & 0x80808080;
+    a = a + a - (a >> 7);
+    return a;
+}
+
+uint extract_byte(uint num, uint byte_idx)
+{
+    return (num >> (byte_idx * 8)) & 0xFF;
+}
+
+/* Unfortunately, we can't use gl_WorkGroupSize.x until
+ * https://github.com/KhronosGroup/glslang/issues/1916
+ * is fixed. */
+shared uvec2 sm_stack[32][MAX_SM_STACK_SIZE];
+
+uvec2 stack[MAX_STACK_SIZE];
+uint stack_size = 0;
+
+void stack_push(uvec2 group)
+{
+    if (stack_size < MAX_SM_STACK_SIZE) {
+        sm_stack[gl_LocalInvocationID.x][stack_size] = group;
+    }
+    else {
+        stack[stack_size - MAX_SM_STACK_SIZE] = group;
+    }
+    stack_size++;
+}
+
+uvec2 stack_pop()
+{
+    stack_size--;
+    if (stack_size < MAX_SM_STACK_SIZE) {
+        return sm_stack[gl_LocalInvocationID.x][stack_size];
+    }
+    else {
+        return stack[stack_size - MAX_SM_STACK_SIZE];
+    }
+}
 
 void traverse_bvh(in const uint ray_index)
 {
     const path_segment ray = path_segments[ray_index];
 
+    float t_max = FLOAT_MAX;
+    float t_min = 0.0;
     const vec3 inv_dir = 1.0 / ray.dir;
-    const vec3 ood = ray.origin / ray.dir;
 
-    float t_face_max = FLOAT_MAX;
-    int stack_index = 0;
-
-    stack_item stack[MAX_STACK_SIZE];
-    stack[0].node_index = 0;
-    stack[0].t_aabb_min = 0.0;
+    const uvec3 oct_inv = mix(uvec3(0), uvec3(4, 2, 1), greaterThanEqual(ray.dir, vec3(0.0)));
+    const uint oct_inv4 = (oct_inv.x | oct_inv.y | oct_inv.z) * 0x01010101;
 
     hit_info hit;
-    hit_info temp_hit;
-
     float temp_t;
 
-    while(stack_index >= 0)
+    uvec2 node_group = uvec2(0, 0x80000000);
+
+    while (true)
     {
-        stack_item item = stack[stack_index];
-        stack_index--;
+        uvec2 face_group = uvec2(0, 0);
 
-        const uint node_index = item.node_index;
-        const float t_aabb_min = item.t_aabb_min;
-
-        bvh_node node = bvh_nodes[node_index];
-
-        const bool hit_aabb = intersect_aabb(
-            t_aabb_min,
-            t_face_max,
-            node.aabb,
-            inv_dir,
-            ood,
-            temp_t
-        );
-
-        if (!hit_aabb)
+        if (node_group.y <= 0x00FFFFFF)
         {
-            continue;
+            face_group = node_group;
+            node_group = uvec2(0, 0);
+        }
+        else
+        {
+            const uint child_bit_idx = findMSB(node_group.y);
+            const uint slot_index = (child_bit_idx - 24) ^ (oct_inv4 & 0xFF);
+            const uint rel_idx = bitCount(node_group.y & ~(0xFFFFFFFF << slot_index));
+            const uint child_node_idx = node_group.x + rel_idx;
+
+            node_group.y &= ~(1 << child_bit_idx);
+
+            if (node_group.y > 0x00FFFFFF)
+            {
+                stack_push(node_group);
+            }
+
+            const bvh_node node = bvh_nodes[child_node_idx];
+
+            node_group.x = node.child_index;
+            face_group = uvec2(node.face_index, 0);
+
+            const vec3 local_inv_dir = uintBitsToFloat(uvec3(node.e) << 23) * inv_dir;
+            const vec3 local_orig = (node.p - ray.origin) * inv_dir;
+
+            uint hitmask = 0;
+
+            [[unroll, dependency_infinite]]
+            for (uint passIdx = 0; passIdx < 2; ++passIdx)
+            {
+                const uint meta4 = node.meta[passIdx];
+                const uint is_inner4 = (meta4 & (meta4 << 1)) & 0x10101010;
+                const uint inner_mask4 = sign_to_byte_mask4(is_inner4 << 3);
+                const uint bit_index4 = (meta4 ^ (oct_inv4 & inner_mask4)) & 0x1F1F1F1F;
+                const uint child_bits4 = (meta4 >> 5) & 0x07070707;
+
+                const vec4 x_gt_0 = vec4(inv_dir.x < 0.0);
+                const vec4 y_gt_0 = vec4(inv_dir.y < 0.0);
+                const vec4 z_gt_0 = vec4(inv_dir.z < 0.0);
+
+                const u8vec4 q_lo_x = node.q_lo_x[passIdx];
+                const u8vec4 q_hi_x = node.q_hi_x[passIdx];
+                const u8vec4 q_lo_y = node.q_lo_y[passIdx];
+                const u8vec4 q_hi_y = node.q_hi_y[passIdx];
+                const u8vec4 q_lo_z = node.q_lo_z[passIdx];
+                const u8vec4 q_hi_z = node.q_hi_z[passIdx];
+
+                const vec4 s_q_lo_x = mix(q_lo_x, q_hi_x, x_gt_0);
+                const vec4 s_q_hi_x = mix(q_hi_x, q_lo_x, x_gt_0);
+                const vec4 s_q_lo_y = mix(q_lo_y, q_hi_y, y_gt_0);
+                const vec4 s_q_hi_y = mix(q_hi_y, q_lo_y, y_gt_0);
+                const vec4 s_q_lo_z = mix(q_lo_z, q_hi_z, z_gt_0);
+                const vec4 s_q_hi_z = mix(q_hi_z, q_lo_z, z_gt_0);
+
+                const vec4 t_min_x = local_inv_dir.x * s_q_lo_x + local_orig.x;
+                const vec4 t_max_x = local_inv_dir.x * s_q_hi_x + local_orig.x;
+                const vec4 t_min_y = local_inv_dir.y * s_q_lo_y + local_orig.y;
+                const vec4 t_max_y = local_inv_dir.y * s_q_hi_y + local_orig.y;
+                const vec4 t_min_z = local_inv_dir.z * s_q_lo_z + local_orig.z;
+                const vec4 t_max_z = local_inv_dir.z * s_q_hi_z + local_orig.z;
+
+                [[unroll, dependency_infinite]]
+                for (uint child_idx = 0; child_idx < 4; ++child_idx)
+                {
+                    const float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], t_min));
+                    const float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], t_max));
+
+                    const bool is_intersected = bmin <= bmax;
+
+                    if (!is_intersected) {
+                        continue;
+                    }
+
+                    const uint child_bits = extract_byte(child_bits4, child_idx);
+                    const uint bit_index = extract_byte(bit_index4, child_idx);
+                    hitmask |= (child_bits << bit_index);
+                }
+            }
+
+            node_group.y = (hitmask & 0xFF000000) | node.imask;
+            face_group.y = (hitmask & 0x00FFFFFF);
         }
 
-        const bool is_leaf = (node.field2 & 0x80000000) == 0x80000000;
+        const uint num_threads = subgroupBallotBitCount(subgroupBallot(true));
 
-        if (is_leaf)
+        while (face_group.y != 0)
         {
-            const uint child_offset = node.field1;
-            const uint child_count = node.field2 & 0x7FFFFFFF;
+            const float R_t = 0.2;
+            const uint threshold = uint(num_threads * R_t);
 
-            const bool has_hit = test_leaf(
+            const uint num_active_threads = subgroupBallotBitCount(subgroupBallot(true));
+
+            if (num_active_threads < threshold)
+            {
+                stack_push(face_group);
+                break;
+            }
+
+            const uint face_rel_index = findMSB(face_group.y);
+
+            face_group.y &= ~(1 << face_rel_index);
+
+            const uint face_index = face_group.x + face_rel_index;
+
+            const bool has_hit = test_face(
                 ray,
-                t_face_max,
-                child_offset,
-                child_count,
-                temp_hit,
+                t_max,
+                face_index,
+                hit,
                 temp_t
             );
 
             if (has_hit)
             {
-                hit = temp_hit;
-                hit.pos = vec4(ray.origin + ray.dir * temp_t, 1.0);
-                t_face_max = temp_t;
+                t_max = temp_t;
             }
         }
-        else
-        {
-            stack_index++;
-            stack[stack_index].node_index = node.field1;
-            stack[stack_index].t_aabb_min = temp_t;
-            stack_index++;
-            stack[stack_index].node_index = node.field2;
-            stack[stack_index].t_aabb_min = temp_t;
-        }
-    }
 
-    if (t_face_max != FLOAT_MAX)
-    {
-        const uint hit_index = atomicAdd(hit_write_counter, 1);
-        hit.pixel_index = ray.pixel_index;
-        hits[hit_index] = hit;
+        if (node_group.y > 0x00FFFFFF) {
+            continue;
+        }
+
+        if (stack_size > 0)
+        {
+            node_group = stack_pop();
+            continue;
+        }
+
+        if (t_max != FLOAT_MAX)
+        {
+            const uint hit_index = atomicAdd(hit_write_counter, 1);
+            hits[hit_index] = hit;
+        }
+
+        return;
     }
 }
 

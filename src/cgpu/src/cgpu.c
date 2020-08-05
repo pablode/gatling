@@ -1089,9 +1089,12 @@ CgpuResult cgpu_create_device(
   );
 
   const char* required_exts[] = {
+    "VK_KHR_8bit_storage",
+    "VK_KHR_shader_float16_int8",
+    "VK_KHR_storage_buffer_storage_class",
     "VK_KHR_vulkan_memory_model"
   };
-  const uint32_t required_ext_count = 1;
+  const uint32_t required_ext_count = 4;
 
   for (uint32_t i = 0; i < required_ext_count; ++i)
   {
@@ -1157,9 +1160,22 @@ CgpuResult cgpu_create_device(
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
+  VkPhysicalDeviceShaderFloat16Int8Features features_shader_float16_int8;
+  features_shader_float16_int8.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+  features_shader_float16_int8.pNext = NULL;
+  features_shader_float16_int8.shaderFloat16 = VK_FALSE;
+  features_shader_float16_int8.shaderInt8 = VK_TRUE;
+
+  VkPhysicalDevice8BitStorageFeatures features_8bit_storage;
+  features_8bit_storage.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES;
+  features_8bit_storage.pNext = &features_shader_float16_int8;
+  features_8bit_storage.storageBuffer8BitAccess = VK_TRUE;
+  features_8bit_storage.uniformAndStorageBuffer8BitAccess = VK_TRUE;
+  features_8bit_storage.storagePushConstant8 = VK_FALSE;
+
   VkPhysicalDeviceVulkanMemoryModelFeatures features_vk_memory_model;
   features_vk_memory_model.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES;
-  features_vk_memory_model.pNext = NULL;
+  features_vk_memory_model.pNext = &features_8bit_storage;
   features_vk_memory_model.vulkanMemoryModel = VK_TRUE;
   features_vk_memory_model.vulkanMemoryModelDeviceScope = VK_FALSE;
   features_vk_memory_model.vulkanMemoryModelAvailabilityVisibilityChains = VK_FALSE;

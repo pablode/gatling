@@ -9,9 +9,13 @@
 
 #include "gp.h"
 #include "bvh.h"
+#include "bvh_collapse.h"
+#include "bvh_compress.h"
 
 typedef struct gp_scene {
-  gp_bvh       bvh;
+  gp_bvhcc     bvhcc;
+  uint32_t     face_count;
+  gp_face*     faces;
   gp_material* materials;
   uint32_t     material_count;
   uint32_t     vertex_count;
@@ -136,12 +140,13 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
   scene->vertex_count = vertex_count;
   scene->vertices = realloc(vertices, vertex_count * sizeof(gp_vertex));
 
+  gp_bvh bvh;
   const gp_bvh_build_params bvh_params = {
     .face_batch_size          = 1,
     .face_count               = face_count,
     .face_intersection_cost   = 1.2f,
     .faces                    = faces,
-    .leaf_max_face_count      = 4,
+    .leaf_max_face_count      = 1,
     .object_binning_enabled   = true,
     .object_binning_threshold = 1024,
     .object_bin_count         = 16,
@@ -151,8 +156,28 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
 
   gp_bvh_build(
     &bvh_params,
-    &scene->bvh
+    &bvh
   );
+
+  free(faces);
+
+  gp_bvhc bvhc;
+  gp_bvh_collapse_params cparams  = {
+    .bvh                    = &bvh,
+    .max_leaf_size          = 3,
+    .node_traversal_cost    = 1.0f,
+    .face_intersection_cost = 0.3f
+  };
+
+  gp_bvh_collapse(&cparams, &bvhc);
+  gp_free_bvh(&bvh);
+
+  scene->face_count = bvhc.face_count;
+  scene->faces = malloc(bvhc.face_count * sizeof(gp_face));
+  memcpy(scene->faces, bvhc.faces, bvhc.face_count * sizeof(gp_face));
+
+  gp_bvh_compress(&bvhc, &scene->bvhcc);
+  gp_free_bvhc(&bvhc);
 
   scene->material_count = ai_scene->mNumMaterials;
   scene->materials =
@@ -170,8 +195,6 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
     material->b = ai_color.b;
     material->a = ai_color.a;
   }
-
-  free(faces);
 
   aiReleaseImport(ai_scene);
 }
@@ -199,7 +222,7 @@ void gp_write_file(
 
 void gp_free_scene(gp_scene* scene)
 {
-  gp_free_bvh(&scene->bvh);
+  gp_free_bvhcc(&scene->bvhcc);
   free(scene->materials);
   free(scene->vertices);
 }
@@ -208,13 +231,13 @@ void gp_write_scene(
   const gp_scene* scene,
   const char* file_path)
 {
-  const gp_bvh* bvh = &scene->bvh;
+  const gp_bvhcc* bvhcc = &scene->bvhcc;
 
   const uint64_t header_size = 88;
   const uint64_t node_buf_offset = header_size;
-  const uint64_t node_buf_size = bvh->node_count * sizeof(gp_bvh_node);
+  const uint64_t node_buf_size = bvhcc->node_count * sizeof(gp_bvhcc_node);
   const uint64_t face_buf_offset = node_buf_offset + node_buf_size;
-  const uint64_t face_buf_size = bvh->face_count * sizeof(gp_face);
+  const uint64_t face_buf_size = scene->face_count * sizeof(gp_face);
   const uint64_t vertex_buf_offset = face_buf_offset + face_buf_size;
   const uint64_t vertex_buf_size = scene->vertex_count * sizeof(gp_vertex);
   const uint64_t material_buf_offset = vertex_buf_offset + vertex_buf_size;
@@ -232,11 +255,11 @@ void gp_write_scene(
   memcpy(&buffer[40], &vertex_buf_size,     8);
   memcpy(&buffer[48], &material_buf_offset, 8);
   memcpy(&buffer[56], &material_buf_size,   8);
-  memcpy(&buffer[64], &bvh->aabb, sizeof(gp_aabb));
+  memcpy(&buffer[64], &bvhcc->aabb, sizeof(gp_aabb));
 
-  memcpy(&buffer[node_buf_offset], bvh->nodes, node_buf_size);
+  memcpy(&buffer[node_buf_offset], bvhcc->nodes, node_buf_size);
 
-  memcpy(&buffer[face_buf_offset], bvh->faces, face_buf_size);
+  memcpy(&buffer[face_buf_offset], scene->faces, face_buf_size);
 
   for (uint32_t i = 0; i < scene->vertex_count; ++i)
   {

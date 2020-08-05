@@ -25,21 +25,23 @@ struct material
     vec4 color;
 };
 
-struct aabb
-{
-    float min_x;
-    float min_y;
-    float min_z;
-    float max_x;
-    float max_y;
-    float max_z;
-};
-
 struct bvh_node
 {
-    aabb aabb;
-    uint field1;
-    uint field2;
+    /* Quantization frame. */
+    vec3 p;                  /* 12 bytes */
+    u8vec3 e;                /*  3 bytes */
+    /* Indexing info. */
+    uint8_t imask;           /*  1 byte  */
+    uint child_index;        /*  4 bytes */
+    uint face_index;         /*  4 bytes */
+    uint meta[2];            /*  8 bytes */
+    /* Child data. */
+    u8vec4 q_lo_x[2];        /*  8 bytes */
+    u8vec4 q_lo_y[2];        /*  8 bytes */
+    u8vec4 q_lo_z[2];        /*  8 bytes */
+    u8vec4 q_hi_x[2];        /*  8 bytes */
+    u8vec4 q_hi_y[2];        /*  8 bytes */
+    u8vec4 q_hi_z[2];        /*  8 bytes */
 };
 
 struct path_segment
