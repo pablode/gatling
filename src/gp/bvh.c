@@ -194,7 +194,15 @@ static void gp_bvh_find_split_object_binned(
   gp_vec3 axis_lengths;
   gp_vec3_sub(range->centroid_bounds.max, range->centroid_bounds.min, axis_lengths);
 
-  const uint32_t bin_count = thread_data->params->object_bin_count;
+  uint32_t bin_count;
+  if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE) {
+    bin_count = CLAMP((int32_t) (range->stack_size * 0.05f + 4.0f), 0,
+                      (int32_t) thread_data->params->object_bin_count);
+  }
+  else {
+    bin_count = thread_data->params->object_bin_count;
+  }
+
   gp_bvh_object_bin* bins = (gp_bvh_object_bin*) thread_data->reused_bins;
   gp_aabb* reused_aabbs = (gp_aabb*) thread_data->reused_aabbs;
 
@@ -455,7 +463,14 @@ static void gp_bvh_do_split_object_binned(
   const float axis_length =
     range->centroid_bounds.max[split->axis] - range->centroid_bounds.min[split->axis];
 
-  const uint32_t bin_count = thread_data->params->object_bin_count;
+  uint32_t bin_count;
+  if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE) {
+    bin_count = CLAMP((int32_t) (range->stack_size * 0.05f + 4.0f), 0,
+                      (int32_t) thread_data->params->object_bin_count);
+  }
+  else {
+    bin_count = thread_data->params->object_bin_count;
+  }
 
   const float k1 = bin_count / axis_length;
 
@@ -569,7 +584,8 @@ static bool gp_bvh_build_work_range(
   const bool should_use_binning =
     range->stack_size > thread_data->params->object_binning_threshold;
 
-  const bool is_binning_enabled = thread_data->params->object_binning_enabled;
+  const bool is_binning_enabled =
+    thread_data->params->object_binning_mode != GP_BVH_BINNING_MODE_OFF;
 
   const bool do_binning =
     is_binning_enabled &&

@@ -147,7 +147,7 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
     .face_intersection_cost   = 1.2f,
     .faces                    = faces,
     .leaf_max_face_count      = 1,
-    .object_binning_enabled   = true,
+    .object_binning_mode      = GP_BVH_BINNING_MODE_FIXED,
     .object_binning_threshold = 1024,
     .object_bin_count         = 16,
     .vertex_count             = scene->vertex_count,

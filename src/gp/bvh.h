@@ -6,6 +6,12 @@
 #include "gp.h"
 #include "math.h"
 
+typedef enum GpBvhBinningMode {
+  GP_BVH_BINNING_MODE_ADAPTIVE,
+  GP_BVH_BINNING_MODE_FIXED,
+  GP_BVH_BINNING_MODE_OFF
+} GpBvhBinningMode;
+
 typedef struct gp_bvh_node {
   gp_aabb aabb;
   /* If this node is a leaf, the face offset. Otherwise, the offset
@@ -26,16 +32,16 @@ typedef struct gp_bvh {
 } gp_bvh;
 
 typedef struct gp_bvh_build_params {
-  uint32_t   face_batch_size;
-  uint32_t   face_count;
-  float      face_intersection_cost;
-  gp_face*   faces;
-  uint32_t   leaf_max_face_count;
-  bool       object_binning_enabled;
-  uint32_t   object_binning_threshold;
-  uint32_t   object_bin_count;
-  uint32_t   vertex_count;
-  gp_vertex* vertices;
+  uint32_t         face_batch_size;
+  uint32_t         face_count;
+  float            face_intersection_cost;
+  gp_face*         faces;
+  uint32_t         leaf_max_face_count;
+  GpBvhBinningMode object_binning_mode;
+  uint32_t         object_binning_threshold;
+  uint32_t         object_bin_count;
+  uint32_t         vertex_count;
+  gp_vertex*       vertices;
 } gp_bvh_build_params;
 
 void gp_bvh_build(
