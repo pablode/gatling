@@ -1417,7 +1417,7 @@ CgpuResult cgpu_destroy_device(
 
 CgpuResult cgpu_create_shader(
   cgpu_device device,
-  uint64_t source_size,
+  uint64_t size,
   const uint32_t* p_source,
   cgpu_shader* p_shader)
 {
@@ -1437,7 +1437,7 @@ CgpuResult cgpu_create_shader(
   shader_module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shader_module_create_info.pNext = NULL;
   shader_module_create_info.flags = 0;
-  shader_module_create_info.codeSize = source_size;
+  shader_module_create_info.codeSize = size;
   shader_module_create_info.pCode = p_source;
 
   const VkResult result = idevice->table.vkCreateShaderModule(

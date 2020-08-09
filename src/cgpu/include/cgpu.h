@@ -579,8 +579,8 @@ typedef struct cgpu_physical_device_limits {
 
 typedef struct cgpu_specialization_constant {
   uint32_t constant_id;
-  void* p_data;
   uint32_t size;
+  void* p_data;
 } cgpu_specialization_constant;
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
@@ -607,7 +607,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_device(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_shader(
   cgpu_device device,
-  uint64_t source_size,
+  uint64_t size,
   const uint32_t* p_source,
   cgpu_shader* p_shader
 );

@@ -225,6 +225,7 @@ void gp_free_scene(gp_scene* scene)
   gp_free_bvhcc(&scene->bvhcc);
   free(scene->materials);
   free(scene->vertices);
+  free(scene->faces);
 }
 
 void gp_write_scene(
