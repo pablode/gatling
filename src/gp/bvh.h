@@ -40,6 +40,9 @@ typedef struct gp_bvh_build_params {
   GpBvhBinningMode object_binning_mode;
   uint32_t         object_binning_threshold;
   uint32_t         object_bin_count;
+  uint32_t         spatial_bin_count;
+  float            spatial_reserve_factor;
+  float            spatial_split_alpha;
   uint32_t         vertex_count;
   gp_vertex*       vertices;
 } gp_bvh_build_params;

@@ -150,6 +150,9 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
     .object_binning_mode      = GP_BVH_BINNING_MODE_FIXED,
     .object_binning_threshold = 1024,
     .object_bin_count         = 16,
+    .spatial_bin_count        = 32,
+    .spatial_reserve_factor   = 1.25f,
+    .spatial_split_alpha      = 10e-5f,
     .vertex_count             = scene->vertex_count,
     .vertices                 = scene->vertices
   };
