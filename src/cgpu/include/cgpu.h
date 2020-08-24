@@ -681,6 +681,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   const char* p_shader_entry_point,
   uint32_t specialization_constant_count,
   const cgpu_specialization_constant* specialization_constants,
+  uint32_t push_constants_size,
   cgpu_pipeline* p_pipeline
 );
 
@@ -710,6 +711,13 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer(
   cgpu_buffer destination,
   uint64_t destination_offset,
   uint64_t size
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_push_constants(
+  cgpu_command_buffer command_buffer,
+  cgpu_pipeline pipeline,
+  uint32_t size,
+  const void* p_data
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_dispatch(

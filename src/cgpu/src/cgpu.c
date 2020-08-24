@@ -1956,6 +1956,7 @@ CgpuResult cgpu_create_pipeline(
   const char* p_shader_entry_point,
   uint32_t specialization_constant_count,
   const cgpu_specialization_constant* specialization_constants,
+  uint32_t push_constants_size,
   cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
@@ -2020,14 +2021,19 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_LAYOUT;
   }
 
+  VkPushConstantRange push_const_range;
+  push_const_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+  push_const_range.offset = 0;
+  push_const_range.size = push_constants_size;
+
   VkPipelineLayoutCreateInfo pipeline_layout_create_info;
   pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipeline_layout_create_info.pNext = NULL;
   pipeline_layout_create_info.flags = 0;
   pipeline_layout_create_info.setLayoutCount = 1;
   pipeline_layout_create_info.pSetLayouts = &ipipeline->descriptor_set_layout;
-  pipeline_layout_create_info.pushConstantRangeCount = 0;
-  pipeline_layout_create_info.pPushConstantRanges = NULL;
+  pipeline_layout_create_info.pushConstantRangeCount = push_constants_size ? 1 : 0;
+  pipeline_layout_create_info.pPushConstantRanges = &push_const_range;
 
   result = idevice->table.vkCreatePipelineLayout(
     idevice->logical_device,
@@ -2498,6 +2504,35 @@ CgpuResult cgpu_cmd_copy_buffer(
     &region
   );
 
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_cmd_push_constants(
+  cgpu_command_buffer command_buffer,
+  cgpu_pipeline pipeline,
+  uint32_t size,
+  const void* p_data)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_ipipeline* ipipeline;
+  if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  idevice->table.vkCmdPushConstants(
+    icommand_buffer->command_buffer,
+    ipipeline->layout,
+    VK_SHADER_STAGE_COMPUTE_BIT,
+    0,
+    size,
+    p_data
+  );
   return CGPU_OK;
 }
 

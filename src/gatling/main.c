@@ -102,6 +102,7 @@ static void gatling_create_pipeline(
   size_t num_shader_resource_buffers,
   uint32_t spec_const_count,
   const cgpu_specialization_constant* spec_constants,
+  uint32_t push_const_size,
   gatling_pipeline *pipeline)
 {
   gatling_file* file;
@@ -144,6 +145,7 @@ static void gatling_create_pipeline(
     "main",
     spec_const_count,
     spec_constants,
+    push_const_size,
     &pipeline->pipeline
   );
   gatling_cgpu_ensure(c_result);
@@ -529,14 +531,17 @@ int main(int argc, const char* argv[])
       { .constant_id = 10, .p_data = (void*) &camera_target[2],           .size = 4 },
       { .constant_id = 11, .p_data = (void*) &camera_fov,                 .size = 4 }
     };
+    const uint specc_count = 12;
+    const uint push_const_size = 0;
 
     gatling_create_pipeline(
       device,
       kernel_ray_gen_shader_path,
       shader_resource_buffers,
       num_shader_resource_buffers,
-      12,
+      specc_count,
       speccs,
+      push_const_size,
       &pipeline_ray_gen
     );
   }
@@ -556,14 +561,17 @@ int main(int argc, const char* argv[])
       { .constant_id = 4, .p_data = (void*) &traversal_stack_size,       .size = 4 },
       { .constant_id = 5, .p_data = (void*) &sm_traversal_stack_size,    .size = 4 }
     };
+    const uint specc_count = 6;
+    const uint push_const_size = 0;
 
     gatling_create_pipeline(
       device,
       kernel_extend_shader_path,
       shader_resource_buffers,
       num_shader_resource_buffers,
-      6,
+      specc_count,
       speccs,
+      push_const_size,
       &pipeline_extend
     );
   }
@@ -572,14 +580,17 @@ int main(int argc, const char* argv[])
     const cgpu_specialization_constant speccs[] = {
       { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 }
     };
+    const uint specc_count = 1;
+    const uint push_const_size = 0;
 
     gatling_create_pipeline(
       device,
       kernel_shade_shader_path,
       shader_resource_buffers,
       num_shader_resource_buffers,
-      1,
+      specc_count,
       speccs,
+      push_const_size,
       &pipeline_shade
     );
   }
