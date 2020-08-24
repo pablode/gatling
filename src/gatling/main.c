@@ -601,12 +601,12 @@ int main(int argc, const char* argv[])
   /* Write start timestamp. */
   c_result = cgpu_cmd_reset_timestamps(
     command_buffer,
-    0u,
-    32u
+    0,
+    32
   );
   gatling_cgpu_ensure(c_result);
 
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 0u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 0);
   gatling_cgpu_ensure(c_result);
 
   /* Copy staging buffer to input buffer. */
@@ -620,12 +620,13 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  cgpu_buffer_memory_barrier buffer_memory_barrier_1;
-  buffer_memory_barrier_1.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE;
-  buffer_memory_barrier_1.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
-  buffer_memory_barrier_1.buffer = input_buffer;
-  buffer_memory_barrier_1.offset = 0;
-  buffer_memory_barrier_1.size = CGPU_WHOLE_SIZE;
+  const cgpu_buffer_memory_barrier buffer_memory_barrier_1 = {
+    .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
+    .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ,
+    .buffer = input_buffer,
+    .offset = 0,
+    .size = CGPU_WHOLE_SIZE
+  };
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -642,7 +643,7 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 1u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 1);
   gatling_cgpu_ensure(c_result);
 
   c_result = cgpu_cmd_dispatch(
@@ -653,16 +654,17 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 2u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 2);
   gatling_cgpu_ensure(c_result);
 
   /* Trace rays. */
-  cgpu_buffer_memory_barrier buffer_memory_barrier_2;
-  buffer_memory_barrier_2.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  buffer_memory_barrier_2.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
-  buffer_memory_barrier_2.buffer = intermediate_buffer;
-  buffer_memory_barrier_2.offset = path_segment_buf_offset;
-  buffer_memory_barrier_2.size = path_segment_buf_size;
+  const cgpu_buffer_memory_barrier buffer_memory_barrier_2 = {
+    .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+    .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ,
+    .buffer = intermediate_buffer,
+    .offset = path_segment_buf_offset,
+    .size = path_segment_buf_size
+  };
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
@@ -678,7 +680,7 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 3u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 3);
   gatling_cgpu_ensure(c_result);
 
   c_result = cgpu_cmd_dispatch(
@@ -689,32 +691,31 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 4u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 4);
   gatling_cgpu_ensure(c_result);
 
   /* Shade hit points. */
-  cgpu_buffer_memory_barrier buffer_memory_barrier_3;
-  buffer_memory_barrier_3.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  buffer_memory_barrier_3.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
-  buffer_memory_barrier_3.buffer = intermediate_buffer;
-  buffer_memory_barrier_3.offset = hit_info_buf_offset;
-  buffer_memory_barrier_3.size = hit_info_buf_size;
-
-  cgpu_buffer_memory_barrier buffer_memory_barrier_4;
-  buffer_memory_barrier_4.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  buffer_memory_barrier_4.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ;
-  buffer_memory_barrier_4.buffer = output_buffer;
-  buffer_memory_barrier_4.offset = 0u;
-  buffer_memory_barrier_4.size = CGPU_WHOLE_SIZE;
-
-  cgpu_buffer_memory_barrier buffer_memory_barrier_3_and_4[] = {
-    buffer_memory_barrier_3, buffer_memory_barrier_4
+  const cgpu_buffer_memory_barrier buffer_memory_barrier_3[] = {
+    {
+      .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+      .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ,
+      .buffer = intermediate_buffer,
+      .offset = hit_info_buf_offset,
+      .size = hit_info_buf_size
+    },
+    {
+      .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+      .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ,
+      .buffer = output_buffer,
+      .offset = 0,
+      .size = CGPU_WHOLE_SIZE
+    }
   };
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
     0, NULL,
-    2, buffer_memory_barrier_3_and_4,
+    2, buffer_memory_barrier_3,
     0, NULL
   );
   gatling_cgpu_ensure(c_result);
@@ -725,7 +726,7 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 5u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 5);
   gatling_cgpu_ensure(c_result);
 
   c_result = cgpu_cmd_dispatch(
@@ -736,21 +737,22 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 6u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 6);
   gatling_cgpu_ensure(c_result);
 
   /* Copy staging buffer to output buffer. */
-  cgpu_buffer_memory_barrier buffer_memory_barrier_5;
-  buffer_memory_barrier_5.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  buffer_memory_barrier_5.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
-  buffer_memory_barrier_5.buffer = output_buffer;
-  buffer_memory_barrier_5.offset = 0;
-  buffer_memory_barrier_5.size = CGPU_WHOLE_SIZE;
+  const cgpu_buffer_memory_barrier buffer_memory_barrier_4 = {
+    .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+    .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ,
+    .buffer = output_buffer,
+    .offset = 0,
+    .size = CGPU_WHOLE_SIZE
+  };
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
     0, NULL,
-    1, &buffer_memory_barrier_5,
+    1, &buffer_memory_barrier_4,
     0, NULL
   );
   gatling_cgpu_ensure(c_result);
@@ -766,14 +768,14 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
 
   /* Write end timestamp and copy timestamps. */
-  c_result = cgpu_cmd_write_timestamp(command_buffer, 7u);
+  c_result = cgpu_cmd_write_timestamp(command_buffer, 7);
   gatling_cgpu_ensure(c_result);
 
   c_result = cgpu_cmd_copy_timestamps(
     command_buffer,
     timestamp_buffer,
-    0u,
-    8u,
+    0,
+    8,
     true
   );
   gatling_cgpu_ensure(c_result);
