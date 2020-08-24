@@ -23,7 +23,7 @@ void handle_store_destroy(
 uint64_t handle_store_create_handle(
   handle_store* store)
 {
-  assert(store->max_index < ~0ul);
+  assert(store->max_index < ~0u);
 
   uint32_t version;
   uint32_t index;
@@ -33,7 +33,8 @@ uint64_t handle_store_create_handle(
     version = 1;
     index = store->max_index++;
 
-    if (index >= store->version_capacity) {
+    if (index >= store->version_capacity)
+    {
       const uint32_t next_multiple_of_two =
         ((store->version_capacity + 1) / 2) * 2;
       store->versions = realloc(
@@ -42,6 +43,7 @@ uint64_t handle_store_create_handle(
       );
       store->version_capacity = next_multiple_of_two;
     }
+
     store->versions[index] = 1;
   }
   else
@@ -66,10 +68,12 @@ bool handle_store_is_handle_valid(
   if (index >= store->max_index) {
     return false;
   }
+
   uint32_t saved_version = store->versions[index];
   if (saved_version != version) {
     return false;
   }
+
   return true;
 }
 
@@ -80,9 +84,12 @@ void handle_store_free_handle(
   const uint32_t index = handle_store_get_index(handle);
   uint32_t version = store->versions[index];
   version++;
+
   store->versions[index] = version;
   store->free_index_count++;
-  if (store->free_index_count >= store->free_index_capacity) {
+
+  if (store->free_index_count >= store->free_index_capacity)
+  {
     const uint32_t next_multiple_of_two =
         ((store->free_index_count + 1) / 2) * 2;
     store->free_indices = realloc(
@@ -91,6 +98,7 @@ void handle_store_free_handle(
     );
     store->free_index_capacity = next_multiple_of_two;
   }
+
   store->free_indices[store->free_index_count - 1] = index;
 }
 

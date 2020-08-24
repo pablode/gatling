@@ -6,15 +6,15 @@
 
 void resource_store_create(
     resource_store* store,
-    size_t item_byte_size,
-    size_t initial_capacity)
+    uint32_t item_byte_size,
+    uint32_t initial_capacity)
 {
   assert(initial_capacity != 0);
   handle_store_create(&store->handle_store);
   store->objects = NULL;
   store->object_count = 0;
 
-  const size_t ptr_size = sizeof(void*);
+  const uint32_t ptr_size = sizeof(void*);
   store->item_byte_size = (item_byte_size + ptr_size - 1) / ptr_size * ptr_size;
   store->objects = malloc(store->item_byte_size * initial_capacity);
   store->object_count = initial_capacity;
@@ -45,8 +45,10 @@ bool resource_store_get(resource_store* store, uint64_t handle, void** object)
 #endif
 
   const uint32_t index = handle_store_get_index(handle);
-  if (index >= store->object_count) {
-    const size_t new_count = store->object_count * 2;
+
+  if (index >= store->object_count)
+  {
+    const uint32_t new_count = store->object_count * 2;
     store->objects = realloc(
         store->objects,
         new_count * store->item_byte_size

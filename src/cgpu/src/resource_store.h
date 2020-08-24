@@ -8,14 +8,14 @@
 typedef struct resource_store {
   handle_store handle_store;
   void*        objects;
-  size_t       object_count;
-  size_t       item_byte_size;
+  uint32_t     object_count;
+  uint32_t     item_byte_size;
 } resource_store;
 
 void resource_store_create(
   resource_store* store,
-  size_t item_byte_size,
-  size_t initial_capacity
+  uint32_t item_byte_size,
+  uint32_t initial_capacity
 );
 
 void resource_store_destroy(

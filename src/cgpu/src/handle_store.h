@@ -6,12 +6,12 @@
 #include <stdlib.h>
 
 typedef struct handle_store {
-  uint64_t  max_index;
+  uint32_t  max_index;
   uint32_t* versions;
-  size_t    version_capacity;
+  uint32_t  version_capacity;
   uint32_t* free_indices;
-  size_t    free_index_count;
-  size_t    free_index_capacity;
+  uint32_t  free_index_count;
+  uint32_t  free_index_capacity;
 } handle_store;
 
 void handle_store_create(
