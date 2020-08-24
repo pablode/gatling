@@ -222,12 +222,6 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
     gatling_print_usage_and_exit();
   }
 
-  if (strncmp("-", argv[1], 1) == 0 ||
-      strncmp("-", argv[2], 1) == 0)
-  {
-    gatling_print_usage_and_exit();
-  }
-
   options->input_file = argv[1];
   options->output_file = argv[2];
   options->image_width = DEFAULT_IMAGE_WIDTH;
@@ -238,39 +232,35 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
   {
     const char* arg = argv[i];
 
-    if (strncmp("--", arg, 2) != 0) {
+    char* value = strpbrk(arg, "=");
+
+    if (value == NULL) {
       gatling_print_usage_and_exit();
     }
 
-    char* key_value = strdup(&arg[2]);
-    char* value = key_value;
-    char* key = strsep(&value, "=");
+    value++;
 
-    bool fail = false;
+    bool fail = true;
 
-    if (value == NULL) {
-      fail = true;
-    }
-    else if (strcmp(key, "image-width") == 0) {
+    if (strstr(arg, "--image-width=") == arg)
+    {
       char* endptr;
       options->image_width = strtol(value, &endptr, 10);
-      fail |= (value == endptr);
+      fail = (endptr == value);
     }
-    else if (strcmp(key, "image-height") == 0) {
+    else if (strstr(arg, "--image-height=") == arg)
+    {
       char* endptr;
       options->image_height = strtol(value, &endptr, 10);
-      fail |= (value == endptr);
+      fail = (endptr == value);
     }
-    else if (strcmp(key, "spp") == 0) {
+    else if (strstr(arg, "--spp=") == arg)
+    {
       char* endptr;
       options->spp = strtol(value, &endptr, 10);
-      fail |= (value == endptr);
-    }
-    else {
-      fail = true;
+      fail = (endptr == value);
     }
 
-    free(key_value);
     if (fail) {
       gatling_print_usage_and_exit();
     }
