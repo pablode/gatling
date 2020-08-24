@@ -392,7 +392,7 @@ static void gp_bvh_find_split_spatial(
   gp_vec3 axis_lengths;
   gp_aabb_size(&range->aabb_bounds, axis_lengths);
   gp_vec3 bin_sizes;
-  gp_vec3_divs(axis_lengths, bin_count, bin_sizes);
+  gp_vec3_divs(axis_lengths, (float) bin_count, bin_sizes);
 
   /* Clear spatial bins. */
   for (uint32_t b = 0; b < bin_count * 3; ++b)

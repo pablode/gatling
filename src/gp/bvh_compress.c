@@ -58,9 +58,9 @@ static void gp_bvh_compress_node(
   out_node->face_index = in_node->face_index;
   out_node->imask = 0;
 
-  const float b_div_x = 1.0f / exp2f(e_x);
-  const float b_div_y = 1.0f / exp2f(e_y);
-  const float b_div_z = 1.0f / exp2f(e_z);
+  const float b_div_x = 1.0f / exp2f((float) e_x);
+  const float b_div_y = 1.0f / exp2f((float) e_y);
+  const float b_div_z = 1.0f / exp2f((float) e_z);
 
   for (uint32_t i = 0; i < 8; ++i)
   {
