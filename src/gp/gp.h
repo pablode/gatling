@@ -31,6 +31,10 @@ typedef struct gp_material {
   float g;
   float b;
   float a;
+  float emission_r;
+  float emission_g;
+  float emission_b;
+  float padding;
 } gp_material;
 
 #endif

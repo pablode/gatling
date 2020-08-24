@@ -23,6 +23,8 @@ struct face
 struct material
 {
     vec4 color;
+    vec3 emission;
+    float padding;
 };
 
 struct bvh_node

@@ -192,11 +192,17 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
     gp_material* material = &scene->materials[m];
 
     struct aiColor4D ai_color = { 1.0f, 0.0f, 1.0f, 0.0f };
+    struct aiColor4D ai_emission = { 0.0f, 0.0f, 0.0f, 0.0f };
     aiGetMaterialColor(ai_mat, AI_MATKEY_COLOR_DIFFUSE, &ai_color);
+    aiGetMaterialColor(ai_mat, AI_MATKEY_COLOR_EMISSIVE, &ai_emission);
     material->r = ai_color.r;
     material->g = ai_color.g;
     material->b = ai_color.b;
     material->a = ai_color.a;
+    material->emission_r = ai_emission.r;
+    material->emission_g = ai_emission.g;
+    material->emission_b = ai_emission.b;
+    material->padding = 0.0f;
   }
 
   aiReleaseImport(ai_scene);
