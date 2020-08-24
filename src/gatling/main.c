@@ -377,23 +377,11 @@ int main(int argc, const char* argv[])
 
   const uint64_t output_buffer_size = options.image_width * options.image_height * sizeof(float) * 4;
 
-  cgpu_buffer staging_buffer_in;
   cgpu_buffer input_buffer;
+  cgpu_buffer staging_buffer;
   cgpu_buffer intermediate_buffer;
   cgpu_buffer output_buffer;
-  cgpu_buffer staging_buffer_out;
   cgpu_buffer timestamp_buffer;
-
-  c_result = cgpu_create_buffer(
-    device,
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    device_buf_size,
-    &staging_buffer_in
-  );
-  gatling_cgpu_ensure(c_result);
 
   c_result = cgpu_create_buffer(
     device,
@@ -402,6 +390,18 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
     device_buf_size,
     &input_buffer
+  );
+  gatling_cgpu_ensure(c_result);
+
+  c_result = cgpu_create_buffer(
+    device,
+    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
+    CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
+    CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
+    CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+    output_buffer_size > device_buf_size ? output_buffer_size : device_buf_size,
+    &staging_buffer
   );
   gatling_cgpu_ensure(c_result);
 
@@ -430,17 +430,6 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
       CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    output_buffer_size,
-    &staging_buffer_out
-  );
-  gatling_cgpu_ensure(c_result);
-
-  c_result = cgpu_create_buffer(
-    device,
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
     32 * sizeof(uint64_t),
     &timestamp_buffer
   );
@@ -449,9 +438,9 @@ int main(int argc, const char* argv[])
   uint8_t* mapped_staging_mem;
   c_result = cgpu_map_buffer(
     device,
-    staging_buffer_in,
+    staging_buffer,
     0,
-    CGPU_WHOLE_SIZE,
+    device_buf_size,
     (void*)&mapped_staging_mem
   );
   gatling_cgpu_ensure(c_result);
@@ -467,7 +456,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_unmap_buffer(
     device,
-    staging_buffer_in
+    staging_buffer
   );
   gatling_cgpu_ensure(c_result);
 
@@ -612,11 +601,11 @@ int main(int argc, const char* argv[])
   /* Copy staging buffer to input buffer. */
   c_result = cgpu_cmd_copy_buffer(
     command_buffer,
-    staging_buffer_in,
+    staging_buffer,
     0,
     input_buffer,
     0,
-    CGPU_WHOLE_SIZE
+    device_buf_size
   );
   gatling_cgpu_ensure(c_result);
 
@@ -761,9 +750,9 @@ int main(int argc, const char* argv[])
     command_buffer,
     output_buffer,
     0,
-    staging_buffer_out,
+    staging_buffer,
     0,
-    CGPU_WHOLE_SIZE
+    output_buffer_size
   );
   gatling_cgpu_ensure(c_result);
 
@@ -843,9 +832,9 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_map_buffer(
     device,
-    staging_buffer_out,
+    staging_buffer,
     0,
-    CGPU_WHOLE_SIZE,
+    output_buffer_size,
     (void**)&mapped_staging_mem
   );
   gatling_cgpu_ensure(c_result);
@@ -858,7 +847,7 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_unmap_buffer(
     device,
-    staging_buffer_out
+    staging_buffer
   );
   gatling_cgpu_ensure(c_result);
 
@@ -890,17 +879,15 @@ int main(int argc, const char* argv[])
   gatling_destroy_pipeline(device, pipeline_extend);
   gatling_destroy_pipeline(device, pipeline_shade);
 
-  c_result = cgpu_destroy_buffer(device, timestamp_buffer);
-  gatling_cgpu_ensure(c_result);
-  c_result = cgpu_destroy_buffer(device, staging_buffer_in);
-  gatling_cgpu_ensure(c_result);
   c_result = cgpu_destroy_buffer(device, input_buffer);
+  gatling_cgpu_ensure(c_result);
+  c_result = cgpu_destroy_buffer(device, staging_buffer);
   gatling_cgpu_ensure(c_result);
   c_result = cgpu_destroy_buffer(device, intermediate_buffer);
   gatling_cgpu_ensure(c_result);
   c_result = cgpu_destroy_buffer(device, output_buffer);
   gatling_cgpu_ensure(c_result);
-  c_result = cgpu_destroy_buffer(device, staging_buffer_out);
+  c_result = cgpu_destroy_buffer(device, timestamp_buffer);
   gatling_cgpu_ensure(c_result);
 
   c_result = cgpu_destroy_device(device);
