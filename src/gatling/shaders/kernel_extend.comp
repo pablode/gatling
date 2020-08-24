@@ -17,8 +17,8 @@ bool test_face(
     in const path_segment ray,
     in const float t_max,
     in const uint face_index,
-    out hit_info hit_info,
-    out float t)
+    out float t,
+    out vec2 bc)
 {
     const face f = faces[face_index];
     const vec3 p0 = vertices[f.v_0].field1.xyz;
@@ -37,14 +37,14 @@ bool test_face(
     const float inv_det = 1.0 / det;
     const vec3 tvec = ray.origin - p0;
 
-    const float bc_u = dot(tvec, p) * inv_det;
-    if (bc_u < 0.0 || bc_u > 1.0) {
+    bc.x = dot(tvec, p) * inv_det;
+    if (bc.x < 0.0 || bc.x > 1.0) {
         return false;
     }
 
     const vec3 q = cross(tvec, e1);
-    const float bc_v = dot(ray.dir, q) * inv_det;
-    if (bc_v < 0.0 || (bc_u + bc_v > 1.0)) {
+    bc.y = dot(ray.dir, q) * inv_det;
+    if (bc.y < 0.0 || (bc.x + bc.y > 1.0)) {
         return false;
     }
 
@@ -53,11 +53,6 @@ bool test_face(
     if (t <= 0.0 || t >= t_max) {
         return false;
     }
-
-    hit_info.face_index = face_index;
-    hit_info.bc = vec2(bc_u, bc_v);
-    hit_info.pixel_index = ray.pixel_index;
-    hit_info.pos = vec4(ray.origin + ray.dir * t, 1.0);
 
     return true;
 }
@@ -115,8 +110,8 @@ void traverse_bvh(in const uint ray_index)
     const uvec3 oct_inv = mix(uvec3(0), uvec3(4, 2, 1), greaterThanEqual(ray.dir, vec3(0.0)));
     const uint oct_inv4 = (oct_inv.x | oct_inv.y | oct_inv.z) * 0x01010101;
 
-    hit_info hit;
-    float temp_t;
+    vec2 hit_bc;
+    uint hit_face_idx;
 
     uvec2 node_group = uvec2(0, 0x80000000);
 
@@ -230,17 +225,22 @@ void traverse_bvh(in const uint ray_index)
 
             const uint face_index = face_group.x + face_rel_index;
 
+            float temp_t;
+            vec2 temp_bc;
+
             const bool has_hit = test_face(
                 ray,
                 t_max,
                 face_index,
-                hit,
-                temp_t
+                temp_t,
+                temp_bc
             );
 
             if (has_hit)
             {
                 t_max = temp_t;
+                hit_bc = temp_bc;
+                hit_face_idx = face_index;
             }
         }
 
@@ -257,6 +257,12 @@ void traverse_bvh(in const uint ray_index)
         if (t_max != FLOAT_MAX)
         {
             const uint hit_index = atomicAdd(hit_write_counter, 1);
+
+            hit_info hit;
+            hit.pos = vec4(ray.origin + ray.dir * t_max, 1.0);
+            hit.face_index = hit_face_idx;
+            hit.bc = hit_bc;
+            hit.pixel_index = ray.pixel_index;
             hits[hit_index] = hit;
         }
 
@@ -272,7 +278,8 @@ void main()
     {
       const uint ray_index = atomicAdd(path_segment_counter, 1);
 
-      if (ray_index >= TOTAL_RAY_COUNT) {
+      if (ray_index >= TOTAL_RAY_COUNT)
+      {
         return;
       }
 
