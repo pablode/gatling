@@ -170,19 +170,22 @@ static void gatling_get_parent_directory(
   const char* file_path,
   char* dir_path)
 {
-  char* last_slash = strrchr(file_path, '/');
-  char* last_backslash = strrchr(file_path, '\\');
-  char* last_path_separator =
-      (last_slash > last_backslash) ? last_slash : last_backslash;
-  const uint32_t char_index = last_path_separator - file_path;
-  if (last_path_separator)
+  char* last_path_sep = strrchr(file_path, '/');
+
+  if (last_path_sep == NULL)
   {
-    memccpy(dir_path, file_path, 1, char_index);
+    last_path_sep = strrchr(file_path, '\\');
+  }
+
+  if (last_path_sep != NULL)
+  {
+    const uint32_t char_index = (uint32_t) (last_path_sep - file_path);
+    memcpy(dir_path, file_path, char_index);
     dir_path[char_index] = '\0';
   }
   else
   {
-    memccpy(dir_path, file_path, 1, 4096);
+    dir_path = ".\0";
   }
 }
 
