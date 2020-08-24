@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 #if defined (_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -12,6 +13,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <malloc.h>
 #endif
 
 #define MAX_MAPPED_MEM_RANGES 16
@@ -40,9 +42,9 @@ bool gatling_file_create(const char* path, uint64_t size, gatling_file** file)
   const DWORD creation_disposition = CREATE_ALWAYS;
   const DWORD desired_access = GENERIC_READ | GENERIC_WRITE;
   const DWORD share_mode = FILE_SHARE_WRITE;
-  const LPSECURITY_ATTRIBUTES* security_attributes = NULL;
-  const DWORD flags_and_attributes = 0;
+  const DWORD flags_and_attributes = FILE_ATTRIBUTE_NORMAL;
   const HANDLE file_template = NULL;
+  const LPSECURITY_ATTRIBUTES security_attributes = NULL;
 
   const HANDLE file_handle = CreateFileA(
     path,
@@ -86,6 +88,8 @@ bool gatling_file_create(const char* path, uint64_t size, gatling_file** file)
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
   (*file)->size = size;
+
+  return true;
 }
 
 bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** file)
@@ -99,7 +103,7 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
     protection_flags = PAGE_READONLY;
   }
   else if (usage == GATLING_FILE_USAGE_WRITE) {
-    desired_access = GENERIC_WRITE;
+    desired_access = GENERIC_READ | GENERIC_WRITE;
     share_mode = FILE_SHARE_WRITE;
     protection_flags = PAGE_READWRITE;
   }
@@ -107,9 +111,9 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
     return false;
   }
 
-  const LPSECURITY_ATTRIBUTES* security_attributes = NULL;
+  const LPSECURITY_ATTRIBUTES security_attributes = NULL;
   const DWORD creation_disposition = OPEN_EXISTING;
-  const DWORD flags_and_attributes = 0;
+  const DWORD flags_and_attributes = FILE_ATTRIBUTE_NORMAL;
   const HANDLE file_template = NULL;
 
   const HANDLE file_handle = CreateFileA(
@@ -144,7 +148,7 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
     return false;
   }
 
-  uint64_t size;
+  LARGE_INTEGER size;
   if (!GetFileSizeEx(file_handle, &size)) {
     return false;
   }
@@ -153,7 +157,9 @@ bool gatling_file_open(const char* path, GatlingFileUsage usage, gatling_file** 
   (*file)->usage = usage;
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
-  (*file)->size = size;
+  (*file)->size = (uint64_t) size.QuadPart;
+
+  return true;
 }
 
 uint64_t gatling_file_size(gatling_file* file)
@@ -197,7 +203,8 @@ void* gatling_mmap(
     desired_access,
     file_offset_high,
     file_offset_low,
-    size
+    /* This means file sizes greater than 4 GB are not supported on 32-bit systems. */
+    (SIZE_T) size
   );
 
   return mapped_addr;
