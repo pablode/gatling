@@ -12,6 +12,14 @@ static uint32_t DEFAULT_IMAGE_WIDTH = 1920;
 static uint32_t DEFAULT_IMAGE_HEIGHT = 1080;
 static uint32_t DEFAULT_SPP = 4;
 
+typedef struct program_options {
+  const char* input_file;
+  const char* output_file;
+  uint32_t image_width;
+  uint32_t image_height;
+  uint32_t spp;
+} program_options;
+
 #define gatling_fail(msg)                                                         \
   do {                                                                            \
     printf("Gatling encountered a fatal error at line %d: %s\n", __LINE__, msg);  \
@@ -55,9 +63,7 @@ static void gatling_save_img_wfunc(void *context, void *data, int size)
 static void gatling_save_img(
   const float* data,
   size_t float_count,
-  uint32_t image_width,
-  uint32_t image_height,
-  const char* file_path)
+  const program_options* options)
 {
   uint8_t* temp_data = malloc(float_count);
 
@@ -71,16 +77,16 @@ static void gatling_save_img(
 
   stbi_flip_vertically_on_write(true);
 
-  const uint32_t num_components = 4;
+  const uint32_t component_count = 4;
 
   const int result = stbi_write_png_to_func(
     gatling_save_img_wfunc,
-    (void*)file_path,
-    image_width,
-    image_height,
-    num_components,
+    (void*) options->output_file,
+    options->image_width,
+    options->image_height,
+    component_count,
     temp_data,
-    image_width * num_components
+    (int) (options->image_width * component_count)
   );
 
   free(temp_data);
@@ -98,8 +104,8 @@ typedef struct gatling_pipeline {
 static void gatling_create_pipeline(
   cgpu_device device,
   const char *shader_file_path,
+  uint32_t shader_resource_buffers_count,
   cgpu_shader_resource_buffer *shader_resource_buffers,
-  size_t num_shader_resource_buffers,
   uint32_t spec_const_count,
   const cgpu_specialization_constant* spec_constants,
   uint32_t push_const_size,
@@ -137,7 +143,7 @@ static void gatling_create_pipeline(
 
   c_result = cgpu_create_pipeline(
     device,
-    num_shader_resource_buffers,
+    shader_resource_buffers_count,
     shader_resource_buffers,
     0,
     NULL,
@@ -201,14 +207,6 @@ static void gatling_print_timestamp(
   const float elapsed_milliseconds = elapsed_microseconds / 1000.0f;
   printf("Elapsed time for %s: %.2fms\n", name, elapsed_milliseconds);
 }
-
-typedef struct program_options {
-  const char* input_file;
-  const char* output_file;
-  uint32_t image_width;
-  uint32_t image_height;
-  uint32_t spp;
-} program_options;
 
 void gatling_print_usage_and_exit()
 {
@@ -473,7 +471,7 @@ int main(int argc, const char* argv[])
   gatling_munmap(scene_file, mapped_scene_data);
   gatling_file_close(scene_file);
 
-  const uint32_t num_shader_resource_buffers = 7;
+  const uint32_t shader_resource_buffer_count = 7;
   cgpu_shader_resource_buffer shader_resource_buffers[] = {
     { 0,       output_buffer,                       0,               CGPU_WHOLE_SIZE },
     { 1, intermediate_buffer, path_segment_buf_offset,         path_segment_buf_size },
@@ -537,8 +535,8 @@ int main(int argc, const char* argv[])
     gatling_create_pipeline(
       device,
       kernel_ray_gen_shader_path,
+      shader_resource_buffer_count,
       shader_resource_buffers,
-      num_shader_resource_buffers,
       specc_count,
       speccs,
       push_const_size,
@@ -567,8 +565,8 @@ int main(int argc, const char* argv[])
     gatling_create_pipeline(
       device,
       kernel_extend_shader_path,
+      shader_resource_buffer_count,
       shader_resource_buffers,
-      num_shader_resource_buffers,
       specc_count,
       speccs,
       push_const_size,
@@ -586,8 +584,8 @@ int main(int argc, const char* argv[])
     gatling_create_pipeline(
       device,
       kernel_shade_shader_path,
+      shader_resource_buffer_count,
       shader_resource_buffers,
-      num_shader_resource_buffers,
       specc_count,
       speccs,
       push_const_size,
