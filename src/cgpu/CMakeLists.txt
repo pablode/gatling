@@ -1,8 +1,11 @@
 add_library(
   cgpu STATIC
+  include/cgpu.h
   src/cgpu.c
   src/handle_store.c
+  src/handle_store.h
   src/resource_store.c
+  src/resource_store.h
 )
 
 target_include_directories(
