@@ -94,8 +94,8 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
   const struct aiScene* ai_scene = aiImportFileExWithProperties(
     file_path,
     aiProcess_Triangulate |
+      aiProcess_GenNormals |
       aiProcess_FindInvalidData |
-      aiProcess_GenSmoothNormals |
       aiProcess_ImproveCacheLocality |
       aiProcess_JoinIdenticalVertices |
       aiProcess_TransformUVCoords |
