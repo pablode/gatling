@@ -864,9 +864,7 @@ int main(int argc, const char* argv[])
   gatling_save_img(
     image_data,
     output_buffer_size / 4,
-    options.image_width,
-    options.image_height,
-    options.output_file
+    &options
   );
 
   /* Clean up. */
