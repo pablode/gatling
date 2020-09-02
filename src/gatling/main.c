@@ -11,6 +11,9 @@
 static uint32_t DEFAULT_IMAGE_WIDTH = 1920;
 static uint32_t DEFAULT_IMAGE_HEIGHT = 1080;
 static uint32_t DEFAULT_SPP = 4;
+static float DEFAULT_CAMERA_ORIGIN[3] = { 0.0f, 0.5f, 2.5f };
+static float DEFAULT_CAMERA_TARGET[3] = { 0.0f, 0.5f, 0.0f };
+static float DEFAULT_CAMERA_FOV = 0.872665f;
 
 typedef struct program_options {
   const char* input_file;
@@ -18,6 +21,9 @@ typedef struct program_options {
   uint32_t image_width;
   uint32_t image_height;
   uint32_t spp;
+  float camera_origin[3];
+  float camera_target[3];
+  float camera_fov;
 } program_options;
 
 #define gatling_fail(msg)                                                         \
@@ -210,12 +216,23 @@ static void gatling_print_timestamp(
 
 void gatling_print_usage_and_exit()
 {
-  printf("Usage: gatling <scene.gsd> <test.png> [options]\n");
+  printf("Usage: gatling <scene.gsd> <output.png> [options]\n");
   printf("\n");
   printf("Options:\n");
-  printf("--image-width  [default: %u]\n", DEFAULT_IMAGE_WIDTH);
-  printf("--image-height [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
-  printf("--spp          [default: %u]\n", DEFAULT_SPP);
+  printf("--image-width   [default: %u]\n", DEFAULT_IMAGE_WIDTH);
+  printf("--image-height  [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
+  printf("--spp           [default: %u]\n", DEFAULT_SPP);
+  printf("--camera-origin [default: %.3f,%.3f,%.3f]\n",
+    DEFAULT_CAMERA_ORIGIN[0],
+    DEFAULT_CAMERA_ORIGIN[1],
+    DEFAULT_CAMERA_ORIGIN[2]
+  );
+  printf("--camera-target [default: %.3f,%.3f,%.3f]\n",
+    DEFAULT_CAMERA_TARGET[0],
+    DEFAULT_CAMERA_TARGET[1],
+    DEFAULT_CAMERA_TARGET[2]
+  );
+  printf("--camera-fov    [default: %.5f]\n", DEFAULT_CAMERA_FOV);
   exit(EXIT_FAILURE);
 }
 
@@ -230,6 +247,9 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
   options->image_width = DEFAULT_IMAGE_WIDTH;
   options->image_height = DEFAULT_IMAGE_HEIGHT;
   options->spp = DEFAULT_SPP;
+  memcpy(&options->camera_origin, &DEFAULT_CAMERA_ORIGIN, 12);
+  memcpy(&options->camera_target, &DEFAULT_CAMERA_TARGET, 12);
+  options->camera_fov = DEFAULT_CAMERA_FOV;
 
   for (uint32_t i = 3; i < argc; ++i)
   {
@@ -247,20 +267,48 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
 
     if (strstr(arg, "--image-width=") == arg)
     {
-      char* endptr;
+      char* endptr = NULL;
       options->image_width = strtol(value, &endptr, 10);
       fail = (endptr == value);
     }
     else if (strstr(arg, "--image-height=") == arg)
     {
-      char* endptr;
+      char* endptr = NULL;
       options->image_height = strtol(value, &endptr, 10);
       fail = (endptr == value);
     }
     else if (strstr(arg, "--spp=") == arg)
     {
-      char* endptr;
+      char* endptr = NULL;
       options->spp = strtol(value, &endptr, 10);
+      fail = (endptr == value);
+    }
+    else if (strstr(arg, "--camera-origin=") == arg)
+    {
+      const int scan_res = sscanf(
+        value,
+        "%f,%f,%f",
+        &options->camera_origin[0],
+        &options->camera_origin[1],
+        &options->camera_origin[2]
+      );
+      fail = (scan_res != 3);
+    }
+    else if (strstr(arg, "--camera-target=") == arg)
+    {
+      const int scan_res = sscanf(
+        value,
+        "%f,%f,%f",
+        &options->camera_target[0],
+        &options->camera_target[1],
+        &options->camera_target[2]
+      );
+      fail = (scan_res != 3);
+    }
+    else if (strstr(arg, "--camera-fov=") == arg)
+    {
+      char* endptr = NULL;
+      options->camera_fov = strtof(value, &endptr);
       fail = (endptr == value);
     }
 
@@ -497,37 +545,19 @@ int main(int argc, const char* argv[])
   gatling_pipeline pipeline_shade;
 
   {
-    const float aabb_length[3] = {
-      file_header.aabb_max_x - file_header.aabb_min_x,
-      file_header.aabb_max_y - file_header.aabb_min_y,
-      file_header.aabb_max_z - file_header.aabb_min_z
-    };
-
-    const float camera_target[3] = {
-      (file_header.aabb_max_x + file_header.aabb_min_x) * 0.5f,
-      (file_header.aabb_max_y + file_header.aabb_min_y) * 0.5f,
-      (file_header.aabb_max_z + file_header.aabb_min_z) * 0.5f
-    };
-    const float camera_origin[3] = {
-      camera_target[0] + aabb_length[0],
-      camera_target[1] + aabb_length[1],
-      camera_target[2] + aabb_length[2]
-    };
-    const float camera_fov = 0.872665f;
-
     const cgpu_specialization_constant speccs[] = {
       { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
       { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
       { .constant_id =  2, .p_data = (void*) &options.spp,                .size = 4 },
       { .constant_id =  3, .p_data = (void*) &options.image_width,        .size = 4 },
       { .constant_id =  4, .p_data = (void*) &options.image_height,       .size = 4 },
-      { .constant_id =  5, .p_data = (void*) &camera_origin[0],           .size = 4 },
-      { .constant_id =  6, .p_data = (void*) &camera_origin[1],           .size = 4 },
-      { .constant_id =  7, .p_data = (void*) &camera_origin[2],           .size = 4 },
-      { .constant_id =  8, .p_data = (void*) &camera_target[0],           .size = 4 },
-      { .constant_id =  9, .p_data = (void*) &camera_target[1],           .size = 4 },
-      { .constant_id = 10, .p_data = (void*) &camera_target[2],           .size = 4 },
-      { .constant_id = 11, .p_data = (void*) &camera_fov,                 .size = 4 }
+      { .constant_id =  5, .p_data = (void*) &options.camera_origin[0],   .size = 4 },
+      { .constant_id =  6, .p_data = (void*) &options.camera_origin[1],   .size = 4 },
+      { .constant_id =  7, .p_data = (void*) &options.camera_origin[2],   .size = 4 },
+      { .constant_id =  8, .p_data = (void*) &options.camera_target[0],   .size = 4 },
+      { .constant_id =  9, .p_data = (void*) &options.camera_target[1],   .size = 4 },
+      { .constant_id = 10, .p_data = (void*) &options.camera_target[2],   .size = 4 },
+      { .constant_id = 11, .p_data = (void*) &options.camera_fov,         .size = 4 }
     };
     const uint specc_count = 12;
     const uint push_const_size = 0;
