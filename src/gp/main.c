@@ -113,6 +113,15 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
     gp_fail(error_msg);
   }
 
+  if ((ai_scene->mFlags & AI_SCENE_FLAGS_VALIDATION_WARNING) == AI_SCENE_FLAGS_VALIDATION_WARNING)
+  {
+    printf("Warning: Assimp validation warning\n");
+  }
+  if ((ai_scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) == AI_SCENE_FLAGS_INCOMPLETE)
+  {
+    printf("Warning: Assimp scene import incomplete\n");
+  }
+
   uint32_t vertex_count = 0;
   uint32_t face_count = 0;
 
