@@ -1141,7 +1141,7 @@ static bool gp_bvh_build_work_range(
     const int32_t split_face_count =
       split_spatial.left_face_count + split_spatial.right_face_count;
 
-    int32_t free_face_count = range->stack_size_limit - split_face_count;
+    int32_t free_face_count = ((int32_t) range->stack_size_limit) - split_face_count;
 
     if (free_face_count >= 0)
     {
@@ -1213,14 +1213,16 @@ void gp_bvh_build(
   const gp_bvh_build_params* params,
   gp_bvh* bvh)
 {
-  /* Initialize root work range. */
+  /* Set up root work range. */
 
   gp_aabb root_aabb_bounds;
   gp_aabb root_centroid_bounds;
   gp_aabb_make_smallest(&root_aabb_bounds);
   gp_aabb_make_smallest(&root_centroid_bounds);
 
-  const uint32_t root_stack_size_limit = params->face_count * 2;
+  const uint32_t root_stack_size_limit = (params->spatial_split_alpha < 1.0f) ?
+    params->face_count * 2 : params->face_count;
+
   gp_bvh_face_ref* root_stack =
     (gp_bvh_face_ref*) malloc(root_stack_size_limit * sizeof(gp_bvh_face_ref));
 
@@ -1272,9 +1274,7 @@ void gp_bvh_build(
 
   const float root_half_area = gp_aabb_half_area(&root_aabb_bounds);
 
-  /* Set up work range queue. */
-
-  const uint32_t max_job_stack_size = params->face_count * 2;
+  const uint32_t max_job_stack_size = params->face_count;
 
   gp_bvh_work_job* job_stack = (gp_bvh_work_job*)
     malloc(max_job_stack_size * sizeof(gp_bvh_work_job));
@@ -1291,11 +1291,15 @@ void gp_bvh_build(
 
   /* Set up bvh. */
 
+  const uint32_t max_face_count = (params->spatial_split_alpha < 1.0f) ?
+    params->face_count * 8 : params->face_count;
+  const uint32_t max_node_count = max_face_count * 2;
+
   bvh->aabb = root_aabb_bounds;
   bvh->face_count = 0;
-  bvh->faces = malloc(params->face_count * 2 * sizeof(gp_face));
+  bvh->faces = malloc(max_face_count * sizeof(gp_face));
   bvh->node_count = 1;
-  bvh->nodes = malloc(params->face_count * 4 * sizeof(gp_bvh_node));
+  bvh->nodes = malloc(max_node_count * sizeof(gp_bvh_node));
 
   /* Allocate thread-local memory. */
 
