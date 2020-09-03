@@ -1142,7 +1142,8 @@ CgpuResult cgpu_create_device(
   int32_t queue_family_index = -1;
   for (uint32_t i = 0; i < queue_family_count; ++i) {
     const VkQueueFamilyProperties* queue_family = &queue_families[i];
-    if (queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) {
+    if ((queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+        (queue_family->queueFlags & VK_QUEUE_TRANSFER_BIT)) {
       queue_family_index = i;
     }
   }
@@ -2736,8 +2737,8 @@ CgpuResult cgpu_cmd_copy_timestamps(
     ibuffer->buffer,
     0,
     sizeof(uint64_t),
-    VK_QUERY_RESULT_64_BIT | wait_until_available ?
-      VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT
+    VK_QUERY_RESULT_64_BIT | (wait_until_available ?
+      VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT)
   );
 
   return CGPU_OK;
