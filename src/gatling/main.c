@@ -10,7 +10,8 @@
 
 static uint32_t DEFAULT_IMAGE_WIDTH = 1920;
 static uint32_t DEFAULT_IMAGE_HEIGHT = 1080;
-static uint32_t DEFAULT_SPP = 4;
+static uint32_t DEFAULT_SPP = 256;
+static uint32_t DEFAULT_BOUNCES = 4;
 static float DEFAULT_CAMERA_ORIGIN[3] = { 0.0f, 0.5f, 2.5f };
 static float DEFAULT_CAMERA_TARGET[3] = { 0.0f, 0.5f, 0.0f };
 static float DEFAULT_CAMERA_FOV = 0.872665f;
@@ -21,6 +22,7 @@ typedef struct program_options {
   uint32_t image_width;
   uint32_t image_height;
   uint32_t spp;
+  uint32_t bounces;
   float camera_origin[3];
   float camera_target[3];
   float camera_fov;
@@ -221,6 +223,7 @@ void gatling_print_usage_and_exit()
   printf("--image-width   [default: %u]\n", DEFAULT_IMAGE_WIDTH);
   printf("--image-height  [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
   printf("--spp           [default: %u]\n", DEFAULT_SPP);
+  printf("--bounces       [default: %u]\n", DEFAULT_BOUNCES);
   printf("--camera-origin [default: %.3f,%.3f,%.3f]\n",
     DEFAULT_CAMERA_ORIGIN[0],
     DEFAULT_CAMERA_ORIGIN[1],
@@ -246,6 +249,7 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
   options->image_width = DEFAULT_IMAGE_WIDTH;
   options->image_height = DEFAULT_IMAGE_HEIGHT;
   options->spp = DEFAULT_SPP;
+  options->bounces = DEFAULT_BOUNCES;
   memcpy(&options->camera_origin, &DEFAULT_CAMERA_ORIGIN, 12);
   memcpy(&options->camera_target, &DEFAULT_CAMERA_TARGET, 12);
   options->camera_fov = DEFAULT_CAMERA_FOV;
@@ -280,6 +284,12 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
     {
       char* endptr = NULL;
       options->spp = strtol(value, &endptr, 10);
+      fail = (endptr == value);
+    }
+    else if (strstr(arg, "--bounces=") == arg)
+    {
+      char* endptr = NULL;
+      options->bounces = strtol(value, &endptr, 10);
       fail = (endptr == value);
     }
     else if (strstr(arg, "--camera-origin=") == arg)
@@ -424,6 +434,8 @@ int main(int argc, const char* argv[])
 
   const uint64_t output_buffer_size = options.image_width * options.image_height * sizeof(float) * 4;
 
+  const uint64_t staging_buffer_size = output_buffer_size > device_buf_size ? output_buffer_size : device_buf_size;
+
   cgpu_buffer input_buffer;
   cgpu_buffer staging_buffer;
   cgpu_buffer intermediate_buffer;
@@ -447,7 +459,7 @@ int main(int argc, const char* argv[])
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE |
     CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
     CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    output_buffer_size > device_buf_size ? output_buffer_size : device_buf_size,
+    staging_buffer_size,
     &staging_buffer
   );
   gatling_cgpu_ensure(c_result);
@@ -558,8 +570,8 @@ int main(int argc, const char* argv[])
       { .constant_id = 10, .p_data = (void*) &options.camera_target[2],   .size = 4 },
       { .constant_id = 11, .p_data = (void*) &options.camera_fov,         .size = 4 }
     };
-    const uint specc_count = 12;
-    const uint push_const_size = 0;
+    const uint32_t specc_count = 12;
+    const uint32_t push_consts_size = 0;
 
     gatling_create_pipeline(
       device,
@@ -568,7 +580,7 @@ int main(int argc, const char* argv[])
       shader_resource_buffers,
       specc_count,
       speccs,
-      push_const_size,
+      push_consts_size,
       &pipeline_ray_gen
     );
   }
@@ -588,8 +600,8 @@ int main(int argc, const char* argv[])
       { .constant_id = 4, .p_data = (void*) &traversal_stack_size,       .size = 4 },
       { .constant_id = 5, .p_data = (void*) &sm_traversal_stack_size,    .size = 4 }
     };
-    const uint specc_count = 6;
-    const uint push_const_size = 0;
+    const uint32_t specc_count = 6;
+    const uint32_t push_consts_size = 0;
 
     gatling_create_pipeline(
       device,
@@ -598,7 +610,7 @@ int main(int argc, const char* argv[])
       shader_resource_buffers,
       specc_count,
       speccs,
-      push_const_size,
+      push_consts_size,
       &pipeline_extend
     );
   }
@@ -607,8 +619,8 @@ int main(int argc, const char* argv[])
     const cgpu_specialization_constant speccs[] = {
       { .constant_id = 0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 }
     };
-    const uint specc_count = 1;
-    const uint push_const_size = 0;
+    const uint32_t specc_count = 1;
+    const uint32_t push_consts_size = 0;
 
     gatling_create_pipeline(
       device,
@@ -617,7 +629,7 @@ int main(int argc, const char* argv[])
       shader_resource_buffers,
       specc_count,
       speccs,
-      push_const_size,
+      push_consts_size,
       &pipeline_shade
     );
   }
@@ -817,6 +829,8 @@ int main(int argc, const char* argv[])
 
   c_result = cgpu_reset_fence(device, fence);
   gatling_cgpu_ensure(c_result);
+
+  printf("Rendering!...\n");
 
   c_result = cgpu_submit_command_buffer(
     device,

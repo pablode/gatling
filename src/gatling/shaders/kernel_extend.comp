@@ -276,13 +276,13 @@ void main()
 
     while(true)
     {
-      const uint ray_index = atomicAdd(path_segment_counter, 1);
+        const uint ray_index = atomicAdd(path_segment_counter, 1);
 
-      if (ray_index >= TOTAL_RAY_COUNT)
-      {
-        return;
-      }
+        if (ray_index >= TOTAL_RAY_COUNT)
+        {
+            return;
+        }
 
-      traverse_bvh(ray_index);
+        traverse_bvh(ray_index);
     }
 }
