@@ -72,13 +72,12 @@ static void gatling_save_img(
   const program_options* options)
 {
   uint8_t* temp_data = malloc(float_count);
+  const float gamma = 1.0f / 2.2f;
 
   for (size_t i = 0; i < float_count; ++i)
   {
-    int32_t color = (int32_t) (data[i] * 255.0f);
-    if (color < 0)   { color = 0;   }
-    if (color > 255) { color = 255; }
-    temp_data[i] = (uint8_t) color;
+    const float value = fmaxf(0.0f, fminf(1.0f, data[i]));
+    temp_data[i] = (uint8_t) (powf(value, gamma) * 255.0f + 0.5f);
   }
 
   stbi_flip_vertically_on_write(true);
