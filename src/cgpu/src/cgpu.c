@@ -2125,7 +2125,7 @@ CgpuResult cgpu_create_pipeline(
 
   result = idevice->table.vkCreateComputePipelines(
     idevice->logical_device,
-    NULL,
+    VK_NULL_HANDLE,
     1,
     &pipeline_create_info,
     NULL,
