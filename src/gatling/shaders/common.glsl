@@ -1,9 +1,8 @@
-#ifndef GATLING_SHADER_COMMON
-#define GATLING_SHADER_COMMON
-
 const float FLOAT_MAX = 3.402823466e38;
 const float FLOAT_MIN = 1.175494351e-38;
 const float PI = 3.1415926535897932384626433832795;
+const float TRI_EPS = 0.0000001;
+const float RAY_OFFSET_EPS = 0.00001;
 
 struct vertex
 {
@@ -47,62 +46,53 @@ struct bvh_node
     u8vec4 q_hi_z[2];        /*  8 bytes */
 };
 
-struct path_segment
-{
-    vec3 origin;
-    uint pixel_index;
-    vec3 dir;
-    uint rec_depth;
-};
-
 struct hit_info
 {
-    vec4 pos;
-    vec2 bc;
-    uint pixel_index;
+    vec3 pos;
     uint face_index;
+    vec2 bc;
+    vec2 padding;
 };
 
-layout(set=0, binding=0) queuefamilycoherent buffer BufferOutput
+layout(set=0, binding=0) buffer BufferOutput
 {
-    uint pixels[];
+    vec4 pixels[];
 };
 
-layout(set=0, binding=1) buffer BufferPathSegments
-{
-    uint path_segment_counter;
-    uint pad_0;
-    uint pad_1;
-    uint pad_2;
-    path_segment path_segments[];
-};
-
-layout(set=0, binding=2) readonly buffer BufferBvhNodes
+layout(set=0, binding=1) readonly buffer BufferBvhNodes
 {
     bvh_node bvh_nodes[];
 };
 
-layout(set=0, binding=3) readonly buffer BufferFaces
+layout(set=0, binding=2) readonly buffer BufferFaces
 {
     face faces[];
 };
 
-layout(set=0, binding=4) readonly buffer BufferVertices
+layout(set=0, binding=3) readonly buffer BufferVertices
 {
     vertex vertices[];
 };
 
-layout(set=0, binding=5) readonly buffer BufferMaterials
+layout(set=0, binding=4) readonly buffer BufferMaterials
 {
     material materials[];
 };
 
-layout(set=0, binding=6) buffer BufferHitInfos
+uint wang_hash(uint seed)
 {
-    uint hit_write_counter;
-    uint hit_read_counter;
-    uint padding[2];
-    hit_info hits[];
-};
+    seed = (seed ^ 61) ^ (seed >> 16);
+    seed *= 9;
+    seed = seed ^ (seed >> 4);
+    seed *= 0x27d4eb2d;
+    seed = seed ^ (seed >> 15);
+    return seed;
+}
 
-#endif
+float random_float_between_0_and_1(inout uint seed)
+{
+    seed ^= seed << 13;
+    seed ^= seed >> 17;
+    seed ^= seed << 5;
+    return float(seed) * (1.0 / 4294967296.0);
+}

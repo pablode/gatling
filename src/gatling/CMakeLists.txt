@@ -12,18 +12,25 @@ target_compile_definitions(
   GATLING_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
+if (NOT MSVC)
+  set(MATH_LIB "m")
+else()
+  set(MATH_LIB "")
+endif()
+
 target_link_libraries(
   gatling PRIVATE
   cgpu
+  ${MATH_LIB}
 )
 
 add_shader_library(
   gatling-shaders
-  shaders/kernel_ray_gen.comp
-  shaders/kernel_extend.comp
-  shaders/kernel_shade.comp
+  shaders/main.comp
   INCLUDES
+    shaders/bvh.glsl
     shaders/common.glsl
+    shaders/extensions.glsl
 )
 
 set_target_properties(

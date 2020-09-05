@@ -1,0 +1,142 @@
+#version 450 core
+
+#include "extensions.glsl"
+#include "common.glsl"
+
+layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
+layout(constant_id = 2) const uint IMAGE_WIDTH = 1920;
+layout(constant_id = 3) const uint IMAGE_HEIGHT = 1080;
+layout(constant_id = 4) const uint SAMPLE_COUNT = 4;
+layout(constant_id = 5) const uint BOUNCES = 4;
+layout(constant_id = 6) const uint MAX_STACK_SIZE = 6;
+layout(constant_id = 7) const float CAMERA_ORIGIN_X = 15.0;
+layout(constant_id = 8) const float CAMERA_ORIGIN_Y = 15.0;
+layout(constant_id = 9) const float CAMERA_ORIGIN_Z = 15.0;
+layout(constant_id = 10) const float CAMERA_TARGET_X = 0.0;
+layout(constant_id = 11) const float CAMERA_TARGET_Y = 4.0;
+layout(constant_id = 12) const float CAMERA_TARGET_Z = 3.0;
+layout(constant_id = 13) const float CAMERA_FOV = radians(50.0);
+
+#include "bvh.glsl"
+
+vec3 uniform_sample_hemisphere(inout uint rng_state, vec3 normal)
+{
+    const float r1 = random_float_between_0_and_1(rng_state);
+    const float r2 = random_float_between_0_and_1(rng_state);
+
+    const vec3 u = abs(normal.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    const vec3 v = normalize(cross(u, normal));
+    const vec3 w = cross(normal, v);
+
+    const float phi = 2.0 * PI * r2;
+    const float sin_theta = sqrt(1.0 - r1 * r1);
+
+    const float x = sin_theta * cos(phi);
+    const float y = sin_theta * sin(phi);
+    const float z = r1;
+
+    return (x * w) + (y * v) + (z * normal);
+}
+
+vec3 trace_sample(inout uint rng_state, in vec3 prim_ray_origin, in vec3 prim_ray_dir)
+{
+    vec3 sample_color = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+
+    vec3 ray_origin = prim_ray_origin;
+    vec3 ray_dir = prim_ray_dir;
+
+    for (uint bounce = 0; bounce < (BOUNCES + 1); bounce++)
+    {
+        hit_info hit;
+
+        const bool found_hit = traverse_bvh(ray_origin, ray_dir, hit);
+
+        if (!found_hit) {
+            break;
+        }
+
+        const face f = faces[hit.face_index];
+        const vec3 n0 = vertices[f.v_0].field2.xyz;
+        const vec3 n1 = vertices[f.v_1].field2.xyz;
+        const vec3 n2 = vertices[f.v_2].field2.xyz;
+        const vec2 bc = hit.bc;
+
+        const vec3 normal = normalize(
+            n0 * (1.0 - bc.x - bc.y) +
+            n1 * bc.x +
+            n2 * bc.y
+        );
+
+        const material m = materials[f.mat_index];
+
+        sample_color += throughput * m.emission;
+
+        const float PDF = 1.0 / (2.0 * PI);
+
+        ray_origin = hit.pos + normal * RAY_OFFSET_EPS;
+        ray_dir = uniform_sample_hemisphere(rng_state, normal);
+
+        throughput *=
+            (m.color.rgb / PI) *
+            (abs(dot(normal, ray_dir)) / PDF);
+    }
+
+    return sample_color;
+}
+
+void main()
+{
+    const uvec2 pixel_pos = gl_GlobalInvocationID.xy;
+
+    if (pixel_pos.x >= IMAGE_WIDTH ||
+        pixel_pos.y >= IMAGE_HEIGHT)
+    {
+        return;
+    }
+
+    const uint pixel_index = pixel_pos.x + pixel_pos.y * IMAGE_WIDTH;
+    const vec3 camera_origin = vec3(CAMERA_ORIGIN_X, CAMERA_ORIGIN_Y, CAMERA_ORIGIN_Z);
+    const vec3 camera_target = vec3(CAMERA_TARGET_X, CAMERA_TARGET_Y, CAMERA_TARGET_Z);
+    const vec3 camera_forward = normalize(camera_target - camera_origin);
+    const vec3 camera_right = normalize(cross(camera_forward, vec3(0.0, 1.0, 0.0)));
+    const vec3 camera_up = cross(camera_right, camera_forward);
+    const float aspect_ratio = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
+    const float dist_to_plane = 1.0 / tan(CAMERA_FOV * 0.5);
+    const float inv_sample_count = 1.0 / float(SAMPLE_COUNT);
+
+    uint rng_state = wang_hash(pixel_index);
+
+    vec3 pixel_color = vec3(0.0);
+
+    for (uint s = 0; s < SAMPLE_COUNT; ++s)
+    {
+        /* Find new point on camera plane with random offset. */
+        const float r1 = random_float_between_0_and_1(rng_state);
+        const float r2 = random_float_between_0_and_1(rng_state);
+        const float norm_plane_pos_x = (float(pixel_pos.x) + r1) / float(IMAGE_WIDTH);
+        const float norm_plane_pos_y = (float(pixel_pos.y) + r2) / float(IMAGE_HEIGHT);
+
+        /* Convert from [0, 1] to [-1.0, 1.0] range. */
+        const float centered_offset_x = (2.0 * norm_plane_pos_x) - 1.0;
+        const float centered_offset_y = (2.0 * norm_plane_pos_y) - 1.0;
+
+        /* Calculate ray properties. */
+        const vec3 ray_origin = camera_origin;
+        vec3 ray_direction =
+            camera_right   * centered_offset_x * aspect_ratio +
+            camera_up      * centered_offset_y +
+            camera_forward * dist_to_plane;
+
+        /* Beware: a single direction component must not be zero.
+         * This is because we often take the inverse of the direction. */
+        ray_direction += vec3(equal(ray_direction, vec3(0.0))) * FLOAT_MIN;
+        ray_direction = normalize(ray_direction);
+
+        /* Pathtrace sample and accumulate color. */
+        const vec3 sample_color = trace_sample(rng_state, ray_origin, ray_direction);
+        pixel_color += sample_color * inv_sample_count;
+    }
+
+    pixels[pixel_index] = vec4(pixel_color, 1.0);
+}

@@ -1,20 +1,7 @@
-#version 450 core
-
-#include "extensions.glsl"
-#include "common.glsl"
-
-layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
-layout(constant_id = 1) const uint SAMPLE_COUNT = 1;
-layout(constant_id = 2) const uint IMAGE_WIDTH = 3840;
-layout(constant_id = 3) const uint IMAGE_HEIGHT = 2160;
-layout(constant_id = 4) const uint MAX_STACK_SIZE = 6;
-layout(constant_id = 5) const uint MAX_SM_STACK_SIZE = 12;
-
-const float TRI_EPS = 0.0000001;
-
 /* Möller-Trumbore triangle intersection. */
 bool test_face(
-    in const path_segment ray,
+    in const vec3 ray_origin,
+    in const vec3 ray_dir,
     in const float t_max,
     in const uint face_index,
     out float t,
@@ -27,7 +14,7 @@ bool test_face(
     const vec3 e1 = p1 - p0;
     const vec3 e2 = p2 - p0;
 
-    const vec3 p = cross(ray.dir, e2);
+    const vec3 p = cross(ray_dir, e2);
     const float det = dot(e1, p);
 
     if (abs(det) < TRI_EPS) {
@@ -35,7 +22,7 @@ bool test_face(
     }
 
     const float inv_det = 1.0 / det;
-    const vec3 tvec = ray.origin - p0;
+    const vec3 tvec = ray_origin - p0;
 
     bc.x = dot(tvec, p) * inv_det;
     if (bc.x < 0.0 || bc.x > 1.0) {
@@ -43,7 +30,7 @@ bool test_face(
     }
 
     const vec3 q = cross(tvec, e1);
-    bc.y = dot(ray.dir, q) * inv_det;
+    bc.y = dot(ray_dir, q) * inv_det;
     if (bc.y < 0.0 || (bc.x + bc.y > 1.0)) {
         return false;
     }
@@ -69,51 +56,21 @@ uint extract_byte(uint num, uint byte_idx)
     return (num >> (byte_idx * 8)) & 0xFF;
 }
 
-/* Unfortunately, we can't use gl_WorkGroupSize.x until
- * https://github.com/KhronosGroup/glslang/issues/1916
- * is fixed. */
-shared uvec2 sm_stack[32][MAX_SM_STACK_SIZE];
-
-uvec2 stack[MAX_STACK_SIZE];
-uint stack_size = 0;
-
-void stack_push(uvec2 group)
+bool traverse_bvh(in vec3 ray_origin, in vec3 ray_dir, out hit_info hit)
 {
-    if (stack_size < MAX_SM_STACK_SIZE) {
-        sm_stack[gl_LocalInvocationID.x][stack_size] = group;
-    }
-    else {
-        stack[stack_size - MAX_SM_STACK_SIZE] = group;
-    }
-    stack_size++;
-}
-
-uvec2 stack_pop()
-{
-    stack_size--;
-    if (stack_size < MAX_SM_STACK_SIZE) {
-        return sm_stack[gl_LocalInvocationID.x][stack_size];
-    }
-    else {
-        return stack[stack_size - MAX_SM_STACK_SIZE];
-    }
-}
-
-void traverse_bvh(in const uint ray_index)
-{
-    const path_segment ray = path_segments[ray_index];
-
     float t_max = FLOAT_MAX;
     float t_min = 0.0;
-    const vec3 inv_dir = 1.0 / ray.dir;
+    const vec3 inv_dir = 1.0 / ray_dir;
 
-    const uvec3 oct_inv = mix(uvec3(0), uvec3(4, 2, 1), greaterThanEqual(ray.dir, vec3(0.0)));
+    const uvec3 oct_inv = mix(uvec3(0), uvec3(4, 2, 1), greaterThanEqual(ray_dir, vec3(0.0)));
     const uint oct_inv4 = (oct_inv.x | oct_inv.y | oct_inv.z) * 0x01010101;
 
-    vec2 hit_bc;
-    uint hit_face_idx;
+    float temp_t;
 
     uvec2 node_group = uvec2(0, 0x80000000);
+
+    uvec2 stack[MAX_STACK_SIZE];
+    uint stack_size = 0;
 
     while (true)
     {
@@ -135,7 +92,8 @@ void traverse_bvh(in const uint ray_index)
 
             if (node_group.y > 0x00FFFFFF)
             {
-                stack_push(node_group);
+                stack[stack_size] = node_group;
+                stack_size++;
             }
 
             const bvh_node node = bvh_nodes[child_node_idx];
@@ -144,7 +102,7 @@ void traverse_bvh(in const uint ray_index)
             face_group = uvec2(node.face_index, 0);
 
             const vec3 local_inv_dir = uintBitsToFloat(uvec3(node.e) << 23) * inv_dir;
-            const vec3 local_orig = (node.p - ray.origin) * inv_dir;
+            const vec3 local_orig = (node.p - ray_origin) * inv_dir;
 
             uint hitmask = 0;
 
@@ -204,18 +162,19 @@ void traverse_bvh(in const uint ray_index)
             face_group.y = (hitmask & 0x00FFFFFF);
         }
 
-        const uint num_threads = subgroupBallotBitCount(subgroupBallot(true));
+        const uint active_inv_count1 = subgroupBallotBitCount(subgroupBallot(true));
 
         while (face_group.y != 0)
         {
             const float R_t = 0.2;
-            const uint threshold = uint(num_threads * R_t);
+            const uint threshold = uint(active_inv_count1 * R_t);
 
-            const uint num_active_threads = subgroupBallotBitCount(subgroupBallot(true));
+            const uint active_inv_count2 = subgroupBallotBitCount(subgroupBallot(true));
 
-            if (num_active_threads < threshold)
+            if (active_inv_count2 < threshold)
             {
-                stack_push(face_group);
+                stack[stack_size] = face_group;
+                stack_size++;
                 break;
             }
 
@@ -229,7 +188,8 @@ void traverse_bvh(in const uint ray_index)
             vec2 temp_bc;
 
             const bool has_hit = test_face(
-                ray,
+                ray_origin,
+                ray_dir,
                 t_max,
                 face_index,
                 temp_t,
@@ -239,8 +199,8 @@ void traverse_bvh(in const uint ray_index)
             if (has_hit)
             {
                 t_max = temp_t;
-                hit_bc = temp_bc;
-                hit_face_idx = face_index;
+                hit.bc = temp_bc;
+                hit.face_index = face_index;
             }
         }
 
@@ -250,39 +210,17 @@ void traverse_bvh(in const uint ray_index)
 
         if (stack_size > 0)
         {
-            node_group = stack_pop();
+            stack_size--;
+            node_group = stack[stack_size];
             continue;
         }
 
         if (t_max != FLOAT_MAX)
         {
-            const uint hit_index = atomicAdd(hit_write_counter, 1);
-
-            hit_info hit;
-            hit.pos = vec4(ray.origin + ray.dir * t_max, 1.0);
-            hit.face_index = hit_face_idx;
-            hit.bc = hit_bc;
-            hit.pixel_index = ray.pixel_index;
-            hits[hit_index] = hit;
+            hit.pos = ray_origin + ray_dir * t_max;
+            return true;
         }
 
-        return;
-    }
-}
-
-void main()
-{
-    const uint TOTAL_RAY_COUNT = IMAGE_WIDTH * IMAGE_HEIGHT * SAMPLE_COUNT;
-
-    while(true)
-    {
-        const uint ray_index = atomicAdd(path_segment_counter, 1);
-
-        if (ray_index >= TOTAL_RAY_COUNT)
-        {
-            return;
-        }
-
-        traverse_bvh(ray_index);
+        return false;
     }
 }
