@@ -5,7 +5,6 @@
 #include <math.h>
 #include <string.h>
 #include <assert.h>
-#include <stdatomic.h>
 
 /*
  * This builder produces a binary BVH using the Surface Area Heuristic (SAH).
@@ -93,7 +92,7 @@ typedef struct gp_bvh_thread_data {
   void* reused_bins;
   gp_aabb* reused_aabbs;
   gp_bvh_face_ref* reserve_buffer;
-  atomic_int_fast32_t* reserve_buffer_capacity;
+  int32_t* reserve_buffer_capacity;
 } gp_bvh_thread_data ;
 
 typedef struct gp_bvh_work_range {
@@ -1157,10 +1156,12 @@ static bool gp_bvh_build_work_range(
 
     /* Fall back to reserve buffer if no space is left in range. This is usually only the case
      * for ranges with few faces. Therefore it does not make sense to allocate more than needed. */
-    free_face_count = atomic_fetch_add(thread_data->reserve_buffer_capacity, -split_face_count);
+    free_face_count = *thread_data->reserve_buffer_capacity;
 
     if (free_face_count >= split_face_count)
     {
+      *thread_data->reserve_buffer_capacity -= split_face_count;
+
       gp_bvh_work_range reserve_range;
       reserve_range.stack = &thread_data->reserve_buffer[free_face_count - split_face_count];
       reserve_range.stack_dir = 1;
@@ -1308,7 +1309,7 @@ void gp_bvh_build(
     (params->spatial_split_alpha == 1.0f) ? 0 : (params->spatial_bin_count * sizeof(gp_bvh_spatial_bin) * 3);
   const uint32_t reused_bins_size = imax(object_bins_size, spatial_bins_size);
 
-  atomic_int_fast32_t reserve_buffer_capacity = (int32_t) (params->spatial_reserve_factor * params->face_count);
+  int32_t reserve_buffer_capacity = (int32_t) (params->spatial_reserve_factor * params->face_count);
   gp_bvh_face_ref* reserve_buffer = (gp_bvh_face_ref*) malloc(reserve_buffer_capacity * sizeof(gp_bvh_face_ref));
 
   gp_bvh_thread_data thread_data;
