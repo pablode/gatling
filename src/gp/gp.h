@@ -27,14 +27,14 @@ typedef struct gp_face {
 } gp_face;
 
 typedef struct gp_material {
-  float r;
-  float g;
-  float b;
-  float a;
+  float albedo_r;
+  float albedo_g;
+  float albedo_b;
+  float padding1;
   float emission_r;
   float emission_g;
   float emission_b;
-  float padding;
+  float padding2;
 } gp_material;
 
 #endif

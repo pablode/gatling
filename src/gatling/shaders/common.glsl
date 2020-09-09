@@ -22,7 +22,7 @@ struct face
 
 struct material
 {
-    vec4 color;
+    vec4 albedo;
     vec3 emission;
     float padding;
 };

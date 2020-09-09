@@ -78,7 +78,7 @@ vec3 trace_sample(inout uint rng_state, in vec3 prim_ray_origin, in vec3 prim_ra
         ray_dir = uniform_sample_hemisphere(rng_state, normal);
 
         throughput *=
-            (m.color.rgb / PI) *
+            (m.albedo.rgb / PI) *
             (abs(dot(normal, ray_dir)) / PDF);
     }
 
