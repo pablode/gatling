@@ -22,13 +22,13 @@ typedef struct gp_scene {
   gp_vertex*   vertices;
 } gp_scene;
 
-void gp_fail(const char* msg)
+static void gp_fail(const char* msg)
 {
   printf("Gatling encountered a fatal error: %s\n", msg);
   exit(-1);
 }
 
-void gp_assimp_add_node_mesh(
+static void gp_assimp_add_node_mesh(
   const struct aiScene* ai_scene, const struct aiNode* ai_node,
   const struct aiMatrix4x4* ai_parent_transform,
   uint32_t* face_index, gp_face* faces,
@@ -86,7 +86,7 @@ void gp_assimp_add_node_mesh(
   }
 }
 
-void gp_load_scene(gp_scene* scene, const char* file_path)
+static void gp_load_scene(gp_scene* scene, const char* file_path)
 {
   struct aiPropertyStore* props = aiCreatePropertyStore();
   aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
@@ -217,7 +217,7 @@ void gp_load_scene(gp_scene* scene, const char* file_path)
   aiReleaseImport(ai_scene);
 }
 
-void gp_write_file(
+static void gp_write_file(
   const uint8_t* data,
   uint64_t size,
   const char* file_path)
@@ -238,7 +238,7 @@ void gp_write_file(
   }
 }
 
-void gp_free_scene(gp_scene* scene)
+static void gp_free_scene(gp_scene* scene)
 {
   gp_free_bvhcc(&scene->bvhcc);
   free(scene->materials);
@@ -246,7 +246,7 @@ void gp_free_scene(gp_scene* scene)
   free(scene->faces);
 }
 
-void gp_write_scene(
+static void gp_write_scene(
   const gp_scene* scene,
   const char* file_path)
 {

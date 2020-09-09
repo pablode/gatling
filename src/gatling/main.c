@@ -42,13 +42,6 @@ typedef struct program_options {
     }                                                                                       \
   } while (0)
 
-static void gatling_cgpu_warn(CgpuResult result, const char *msg)
-{
-  if (result != CGPU_OK) {
-    printf("Gatling encountered an error: %s\n", msg);
-  }
-}
-
 static void gatling_save_img_wfunc(void *context, void *data, int size)
 {
   gatling_file* file;
@@ -126,7 +119,7 @@ static void gatling_get_parent_directory(
   }
 }
 
-void gatling_print_usage_and_exit()
+static void gatling_print_usage_and_exit()
 {
   printf("Usage: gatling <scene.gsd> <output.png> [options]\n");
   printf("\n");
@@ -149,7 +142,7 @@ void gatling_print_usage_and_exit()
   exit(EXIT_FAILURE);
 }
 
-void gatling_parse_args(int argc, const char* argv[], program_options* options)
+static void gatling_parse_args(int argc, const char* argv[], program_options* options)
 {
   if (argc < 3) {
     gatling_print_usage_and_exit();
@@ -165,7 +158,7 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
   memcpy(&options->camera_target, &DEFAULT_CAMERA_TARGET, 12);
   options->camera_fov = DEFAULT_CAMERA_FOV;
 
-  for (uint32_t i = 3; i < argc; ++i)
+  for (int i = 3; i < argc; ++i)
   {
     const char* arg = argv[i];
 
@@ -238,7 +231,7 @@ void gatling_parse_args(int argc, const char* argv[], program_options* options)
   }
 }
 
-uint64_t gatling_align_buffer(
+static uint64_t gatling_align_buffer(
   uint64_t offset_alignment,
   uint64_t buffer_size,
   uint64_t* total_size)
@@ -628,7 +621,6 @@ int main(int argc, const char* argv[])
   c_result = cgpu_unmap_buffer(device, timestamp_buffer);
   gatling_cgpu_ensure(c_result);
 
-  const float timestamp_ns_period = device_limits.timestampPeriod;
   const float elapsed_nanoseconds  = (float) (timestamp_end - timestamp_start) * device_limits.timestampPeriod;
   const float elapsed_microseconds = elapsed_nanoseconds / 1000.0f;
   const float elapsed_milliseconds = elapsed_microseconds / 1000.0f;
