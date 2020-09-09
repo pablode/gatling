@@ -42,13 +42,13 @@ Before path tracing, an intermediate representation of the scene must be built u
 Next, either disable the system's GPU watchdog or set an appropriate timeout value. For rendering, multiple optional arguments can be provided:
 ```
 ./bin/gatling scene.gsd render.png \
-    --image-width=1920 \
-    --image-height=1080 \
-    --spp=1024 \
+    --image-width=1200 \
+    --image-height=1200 \
+    --spp=256 \
     --bounces=4 \
-    --camera-origin=0,1,2.8 \
+    --camera-origin=0,1,3.1 \
     --camera-target=0,1,0 \
-    --camera-fov=0.85
+    --camera-fov=1.0
 ```
 
 _gatling_ is optimized for my Pascal GTX 1060 GPU and will most likely not work on old or integrated GPUs.

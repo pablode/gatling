@@ -8,13 +8,13 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-static uint32_t DEFAULT_IMAGE_WIDTH = 1920;
-static uint32_t DEFAULT_IMAGE_HEIGHT = 1080;
+static uint32_t DEFAULT_IMAGE_WIDTH = 1200;
+static uint32_t DEFAULT_IMAGE_HEIGHT = 1200;
 static uint32_t DEFAULT_SPP = 256;
 static uint32_t DEFAULT_BOUNCES = 4;
-static float DEFAULT_CAMERA_ORIGIN[3] = { 0.0f, 0.5f, 2.5f };
-static float DEFAULT_CAMERA_TARGET[3] = { 0.0f, 0.5f, 0.0f };
-static float DEFAULT_CAMERA_FOV = 0.872665f;
+static float DEFAULT_CAMERA_ORIGIN[3] = { 0.0f, 1.0f, 3.1f };
+static float DEFAULT_CAMERA_TARGET[3] = { 0.0f, 1.0f, 0.0f };
+static float DEFAULT_CAMERA_FOV = 1.0f;
 
 typedef struct program_options {
   const char* input_file;
@@ -400,7 +400,7 @@ int main(int argc, const char* argv[])
 
   gatling_file_close(scene_file);
 
-  /* Set up pipeline and shader. */
+  /* Set up pipeline. */
   cgpu_pipeline pipeline;
   {
     /* Map and create shader. */
@@ -542,7 +542,6 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
 
   /* Copy output buffer to staging buffer. */
-
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
     0, NULL,
