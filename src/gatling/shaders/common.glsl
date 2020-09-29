@@ -59,7 +59,7 @@ layout(set=0, binding=0) buffer BufferOutput
     vec4 pixels[];
 };
 
-layout(set=0, binding=1) readonly buffer BufferBvhNodes
+layout(set=0, binding=1, std430) readonly buffer BufferBvhNodes
 {
     bvh_node bvh_nodes[];
 };
