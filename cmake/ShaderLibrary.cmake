@@ -1,12 +1,12 @@
 include(CMakeParseArguments)
 
 # Try to find a GLSL compiler.
-if (NOT CMAKE_GLSL_COMPILER)
-  find_program(CMAKE_GLSL_COMPILER glslc)
+if (NOT GATLING_GLSL_COMPILER)
+  find_program(GATLING_GLSL_COMPILER glslc)
 endif()
 
-if (CMAKE_GLSL_COMPILER)
-  message(STATUS "Using GLSL compiler: ${CMAKE_GLSL_COMPILER}")
+if (GATLING_GLSL_COMPILER)
+  message(STATUS "Using GLSL compiler: ${GATLING_GLSL_COMPILER}")
 else()
   message(FATAL_ERROR "No GLSL compiler found.")
 endif()
@@ -75,7 +75,7 @@ function(add_shader_library target)
       MAIN_DEPENDENCY ${input_path}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       COMMENT "Compiling GLSL shader ${input_name}"
-      COMMAND ${CMAKE_GLSL_COMPILER} --target-env=vulkan1.1 -o ${output_path} -c ${input_path}
+      COMMAND ${GATLING_GLSL_COMPILER} --target-env=vulkan1.1 -o ${output_path} -c ${input_path}
       VERBATIM
       # Rebuild if an included file changes.
       DEPENDS ${TARGET_INCLUDES}

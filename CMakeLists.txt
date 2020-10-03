@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 
 project(gatling VERSION 0.1.0 LANGUAGES C)
 
@@ -6,7 +6,6 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(GATLING_OUTPUT_DIR "${CMAKE_BINARY_DIR}/bin" CACHE PATH "Location of build process output.")
-set(GATLING_EXTERN_DIR "${CMAKE_BINARY_DIR}/extern" CACHE PATH "Location of third-party sources.")
 set(GATLING_SOURCE_DIR "${PROJECT_SOURCE_DIR}/src" CACHE PATH "Location of the sources root folder.")
 set(GATLING_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake" CACHE PATH "Location of cmake scripts.")
 
