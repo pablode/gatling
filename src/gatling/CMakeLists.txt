@@ -12,16 +12,10 @@ target_compile_definitions(
   GATLING_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
-if (NOT MSVC)
-  set(MATH_LIB "m")
-else()
-  set(MATH_LIB "")
-endif()
-
 target_link_libraries(
   gatling PRIVATE
   cgpu
-  ${MATH_LIB}
+  ${C_MATH_LIBRARY}
 )
 
 add_shader_library(

@@ -20,14 +20,8 @@ target_compile_definitions(
   _USE_MATH_DEFINES
 )
 
-if (NOT MSVC)
-  set(MATH_LIB "m")
-else()
-  set(MATH_LIB "")
-endif()
-
 target_link_libraries(
   gp PRIVATE
   assimp
-  ${MATH_LIB}
+  ${C_MATH_LIBRARY}
 )

@@ -22,6 +22,7 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${GATLING_OUTPUT_DIR})
 endforeach(CONFIG_TYPE CMAKE_CONFIGURATION_TYPES)
 
+include(cmake/CMathLibrary.cmake)
 include(cmake/ShaderLibrary.cmake)
 
 include(CheckIPOSupported)
