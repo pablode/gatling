@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <malloc.h>
 #endif
 
 #define MAX_MAPPED_MEM_RANGES 16
