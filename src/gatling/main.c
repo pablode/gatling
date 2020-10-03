@@ -15,6 +15,8 @@ static uint32_t DEFAULT_MAX_BOUNCES = 4;
 static float DEFAULT_CAMERA_ORIGIN[3] = { 0.0f, 1.0f, 3.1f };
 static float DEFAULT_CAMERA_TARGET[3] = { 0.0f, 1.0f, 0.0f };
 static float DEFAULT_CAMERA_FOV = 1.0f;
+static uint32_t DEFAULT_RR_BOUNCE_OFFSET = 3;
+static float DEFAULT_RR_INV_MIN_TERM_PROB = 1.0f;
 
 typedef struct program_options {
   const char* input_file;
@@ -26,6 +28,8 @@ typedef struct program_options {
   float camera_origin[3];
   float camera_target[3];
   float camera_fov;
+  uint32_t rr_bounce_offset;
+  float rr_inv_min_term_prob;
 } program_options;
 
 #define gatling_fail(msg)                                                         \
@@ -124,21 +128,23 @@ static void gatling_print_usage_and_exit()
   printf("Usage: gatling <scene.gsd> <output.png> [options]\n");
   printf("\n");
   printf("Options:\n");
-  printf("--image-width   [default: %u]\n", DEFAULT_IMAGE_WIDTH);
-  printf("--image-height  [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
-  printf("--spp           [default: %u]\n", DEFAULT_SPP);
-  printf("--max-bounces   [default: %u]\n", DEFAULT_MAX_BOUNCES);
-  printf("--camera-origin [default: %.3f,%.3f,%.3f]\n",
+  printf("--image-width          [default: %u]\n", DEFAULT_IMAGE_WIDTH);
+  printf("--image-height         [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
+  printf("--spp                  [default: %u]\n", DEFAULT_SPP);
+  printf("--max-bounces          [default: %u]\n", DEFAULT_MAX_BOUNCES);
+  printf("--camera-origin        [default: %.3f,%.3f,%.3f]\n",
     DEFAULT_CAMERA_ORIGIN[0],
     DEFAULT_CAMERA_ORIGIN[1],
     DEFAULT_CAMERA_ORIGIN[2]
   );
-  printf("--camera-target [default: %.3f,%.3f,%.3f]\n",
+  printf("--camera-target        [default: %.3f,%.3f,%.3f]\n",
     DEFAULT_CAMERA_TARGET[0],
     DEFAULT_CAMERA_TARGET[1],
     DEFAULT_CAMERA_TARGET[2]
   );
-  printf("--camera-fov    [default: %.5f]\n", DEFAULT_CAMERA_FOV);
+  printf("--camera-fov           [default: %.5f]\n", DEFAULT_CAMERA_FOV);
+  printf("--rr-bounce-offset     [default: %u]\n", DEFAULT_RR_BOUNCE_OFFSET);
+  printf("--rr-inv-min-term-prob [default: %.2f]\n", DEFAULT_RR_INV_MIN_TERM_PROB);
   exit(EXIT_FAILURE);
 }
 
@@ -157,6 +163,8 @@ static void gatling_parse_args(int argc, const char* argv[], program_options* op
   memcpy(&options->camera_origin, &DEFAULT_CAMERA_ORIGIN, 12);
   memcpy(&options->camera_target, &DEFAULT_CAMERA_TARGET, 12);
   options->camera_fov = DEFAULT_CAMERA_FOV;
+  options->rr_bounce_offset = DEFAULT_RR_BOUNCE_OFFSET;
+  options->rr_inv_min_term_prob = DEFAULT_RR_INV_MIN_TERM_PROB;
 
   for (int i = 3; i < argc; ++i)
   {
@@ -222,6 +230,18 @@ static void gatling_parse_args(int argc, const char* argv[], program_options* op
     {
       char* endptr = NULL;
       options->camera_fov = strtof(value, &endptr);
+      fail = (endptr == value);
+    }
+    else if (strstr(arg, "--rr-bounce-offset=") == arg)
+    {
+      char* endptr = NULL;
+      options->rr_bounce_offset = strtol(value, &endptr, 10);
+      fail = (endptr == value);
+    }
+    else if (strstr(arg, "--rr-inv-min-term-prob=") == arg)
+    {
+      char* endptr = NULL;
+      options->rr_inv_min_term_prob = strtof(value, &endptr);
       fail = (endptr == value);
     }
 
@@ -454,22 +474,24 @@ int main(int argc, const char* argv[])
     const uint32_t traversal_stack_size = (log(node_count) / log(8)) * 2;
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
-      { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize, .size = 4 },
-      { .constant_id =  2, .p_data = (void*) &options.image_width,        .size = 4 },
-      { .constant_id =  3, .p_data = (void*) &options.image_height,       .size = 4 },
-      { .constant_id =  4, .p_data = (void*) &options.spp,                .size = 4 },
-      { .constant_id =  5, .p_data = (void*) &options.max_bounces,        .size = 4 },
-      { .constant_id =  6, .p_data = (void*) &traversal_stack_size,       .size = 4 },
-      { .constant_id =  7, .p_data = (void*) &options.camera_origin[0],   .size = 4 },
-      { .constant_id =  8, .p_data = (void*) &options.camera_origin[1],   .size = 4 },
-      { .constant_id =  9, .p_data = (void*) &options.camera_origin[2],   .size = 4 },
-      { .constant_id = 10, .p_data = (void*) &options.camera_target[0],   .size = 4 },
-      { .constant_id = 11, .p_data = (void*) &options.camera_target[1],   .size = 4 },
-      { .constant_id = 12, .p_data = (void*) &options.camera_target[2],   .size = 4 },
-      { .constant_id = 13, .p_data = (void*) &options.camera_fov,         .size = 4 }
+      { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize,   .size = 4 },
+      { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize,   .size = 4 },
+      { .constant_id =  2, .p_data = (void*) &options.image_width,          .size = 4 },
+      { .constant_id =  3, .p_data = (void*) &options.image_height,         .size = 4 },
+      { .constant_id =  4, .p_data = (void*) &options.spp,                  .size = 4 },
+      { .constant_id =  5, .p_data = (void*) &options.max_bounces,          .size = 4 },
+      { .constant_id =  6, .p_data = (void*) &traversal_stack_size,         .size = 4 },
+      { .constant_id =  7, .p_data = (void*) &options.camera_origin[0],     .size = 4 },
+      { .constant_id =  8, .p_data = (void*) &options.camera_origin[1],     .size = 4 },
+      { .constant_id =  9, .p_data = (void*) &options.camera_origin[2],     .size = 4 },
+      { .constant_id = 10, .p_data = (void*) &options.camera_target[0],     .size = 4 },
+      { .constant_id = 11, .p_data = (void*) &options.camera_target[1],     .size = 4 },
+      { .constant_id = 12, .p_data = (void*) &options.camera_target[2],     .size = 4 },
+      { .constant_id = 13, .p_data = (void*) &options.camera_fov,           .size = 4 },
+      { .constant_id = 14, .p_data = (void*) &options.rr_bounce_offset,     .size = 4 },
+      { .constant_id = 15, .p_data = (void*) &options.rr_inv_min_term_prob, .size = 4 },
     };
-    const uint32_t specc_count = 14;
+    const uint32_t specc_count = 16;
 
     c_result = cgpu_create_pipeline(
       device,

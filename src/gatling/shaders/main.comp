@@ -16,6 +16,8 @@ layout(constant_id = 10) const float CAMERA_TARGET_X = 0.0;
 layout(constant_id = 11) const float CAMERA_TARGET_Y = 4.0;
 layout(constant_id = 12) const float CAMERA_TARGET_Z = 3.0;
 layout(constant_id = 13) const float CAMERA_FOV = radians(50.0);
+layout(constant_id = 14) const uint RR_BOUNCE_OFFSET = 3;
+layout(constant_id = 15) const float RR_INV_MIN_TERM_PROB = 1.0;
 
 #include "bvh.glsl"
 
@@ -74,12 +76,27 @@ vec3 trace_sample(inout uint rng_state, in vec3 prim_ray_origin, in vec3 prim_ra
 
         const float PDF = 1.0 / (2.0 * PI);
 
-        ray_origin = hit.pos + normal * RAY_OFFSET_EPS;
         ray_dir = uniform_sample_hemisphere(rng_state, normal);
 
         throughput *=
             (m.albedo.rgb / PI) *
             (abs(dot(normal, ray_dir)) / PDF);
+
+        if (bounce >= RR_BOUNCE_OFFSET)
+        {
+          const float p = min(max(throughput.r, max(throughput.g, throughput.b)), RR_INV_MIN_TERM_PROB);
+
+          const float r = random_float_between_0_and_1(rng_state);
+
+          if (r > p)
+          {
+            break;
+          }
+
+          throughput /= p;
+        }
+
+        ray_origin = hit.pos + normal * RAY_OFFSET_EPS;
     }
 
     return sample_color;
