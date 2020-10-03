@@ -11,7 +11,7 @@
 static uint32_t DEFAULT_IMAGE_WIDTH = 1200;
 static uint32_t DEFAULT_IMAGE_HEIGHT = 1200;
 static uint32_t DEFAULT_SPP = 256;
-static uint32_t DEFAULT_BOUNCES = 4;
+static uint32_t DEFAULT_MAX_BOUNCES = 4;
 static float DEFAULT_CAMERA_ORIGIN[3] = { 0.0f, 1.0f, 3.1f };
 static float DEFAULT_CAMERA_TARGET[3] = { 0.0f, 1.0f, 0.0f };
 static float DEFAULT_CAMERA_FOV = 1.0f;
@@ -22,7 +22,7 @@ typedef struct program_options {
   uint32_t image_width;
   uint32_t image_height;
   uint32_t spp;
-  uint32_t bounces;
+  uint32_t max_bounces;
   float camera_origin[3];
   float camera_target[3];
   float camera_fov;
@@ -127,7 +127,7 @@ static void gatling_print_usage_and_exit()
   printf("--image-width   [default: %u]\n", DEFAULT_IMAGE_WIDTH);
   printf("--image-height  [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
   printf("--spp           [default: %u]\n", DEFAULT_SPP);
-  printf("--bounces       [default: %u]\n", DEFAULT_BOUNCES);
+  printf("--max-bounces   [default: %u]\n", DEFAULT_MAX_BOUNCES);
   printf("--camera-origin [default: %.3f,%.3f,%.3f]\n",
     DEFAULT_CAMERA_ORIGIN[0],
     DEFAULT_CAMERA_ORIGIN[1],
@@ -153,7 +153,7 @@ static void gatling_parse_args(int argc, const char* argv[], program_options* op
   options->image_width = DEFAULT_IMAGE_WIDTH;
   options->image_height = DEFAULT_IMAGE_HEIGHT;
   options->spp = DEFAULT_SPP;
-  options->bounces = DEFAULT_BOUNCES;
+  options->max_bounces = DEFAULT_MAX_BOUNCES;
   memcpy(&options->camera_origin, &DEFAULT_CAMERA_ORIGIN, 12);
   memcpy(&options->camera_target, &DEFAULT_CAMERA_TARGET, 12);
   options->camera_fov = DEFAULT_CAMERA_FOV;
@@ -190,10 +190,10 @@ static void gatling_parse_args(int argc, const char* argv[], program_options* op
       options->spp = strtol(value, &endptr, 10);
       fail = (endptr == value);
     }
-    else if (strstr(arg, "--bounces=") == arg)
+    else if (strstr(arg, "--max-bounces=") == arg)
     {
       char* endptr = NULL;
-      options->bounces = strtol(value, &endptr, 10);
+      options->max_bounces = strtol(value, &endptr, 10);
       fail = (endptr == value);
     }
     else if (strstr(arg, "--camera-origin=") == arg)
@@ -459,7 +459,7 @@ int main(int argc, const char* argv[])
       { .constant_id =  2, .p_data = (void*) &options.image_width,        .size = 4 },
       { .constant_id =  3, .p_data = (void*) &options.image_height,       .size = 4 },
       { .constant_id =  4, .p_data = (void*) &options.spp,                .size = 4 },
-      { .constant_id =  5, .p_data = (void*) &options.bounces,            .size = 4 },
+      { .constant_id =  5, .p_data = (void*) &options.max_bounces,        .size = 4 },
       { .constant_id =  6, .p_data = (void*) &traversal_stack_size,       .size = 4 },
       { .constant_id =  7, .p_data = (void*) &options.camera_origin[0],   .size = 4 },
       { .constant_id =  8, .p_data = (void*) &options.camera_origin[1],   .size = 4 },

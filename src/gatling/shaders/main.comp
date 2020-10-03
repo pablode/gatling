@@ -7,7 +7,7 @@ layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z = 1) in;
 layout(constant_id = 2) const uint IMAGE_WIDTH = 1920;
 layout(constant_id = 3) const uint IMAGE_HEIGHT = 1080;
 layout(constant_id = 4) const uint SAMPLE_COUNT = 4;
-layout(constant_id = 5) const uint BOUNCES = 4;
+layout(constant_id = 5) const uint MAX_BOUNCES = 4;
 layout(constant_id = 6) const uint MAX_STACK_SIZE = 6;
 layout(constant_id = 7) const float CAMERA_ORIGIN_X = 15.0;
 layout(constant_id = 8) const float CAMERA_ORIGIN_Y = 15.0;
@@ -46,7 +46,7 @@ vec3 trace_sample(inout uint rng_state, in vec3 prim_ray_origin, in vec3 prim_ra
     vec3 ray_origin = prim_ray_origin;
     vec3 ray_dir = prim_ray_dir;
 
-    for (uint bounce = 0; bounce < (BOUNCES + 1); bounce++)
+    for (uint bounce = 0; bounce < (MAX_BOUNCES + 1); bounce++)
     {
         hit_info hit;
 
