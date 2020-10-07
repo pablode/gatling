@@ -25,10 +25,10 @@ Following papers and techniques are implemented:
 
 ### Building
 
-Make sure to do a recursive clone. CMake 3.11+, a C11 compiler and Vulkan are required.
+CMake 3.14+, a C11 compiler and Vulkan are required.
 
 ```
-git clone https://github.com/pablode/gatling --recursive
+git clone https://github.com/pablode/gatling
 mkdir gatling/build && cd gatling/build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --target gp gatling
