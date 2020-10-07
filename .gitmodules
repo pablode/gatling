@@ -1,6 +1,0 @@
-[submodule "extern/assimp"]
-	path = extern/assimp
-	url = https://github.com/assimp/assimp
-[submodule "extern/volk"]
-	path = extern/volk
-	url = https://github.com/zeux/volk
