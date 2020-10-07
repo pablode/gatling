@@ -1,11 +1,11 @@
 include(CMakeParseArguments)
 
 # Try to find a GLSL compiler.
-if (NOT GATLING_GLSL_COMPILER)
+if(NOT GATLING_GLSL_COMPILER)
   find_program(GATLING_GLSL_COMPILER glslc)
 endif()
 
-if (GATLING_GLSL_COMPILER)
+if(GATLING_GLSL_COMPILER)
   message(STATUS "Using GLSL compiler: ${GATLING_GLSL_COMPILER}")
 else()
   message(FATAL_ERROR "No GLSL compiler found.")

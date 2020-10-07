@@ -21,13 +21,18 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${GATLING_OUTPUT_DIR})
 endforeach(CONFIG_TYPE CMAKE_CONFIGURATION_TYPES)
 
-include(cmake/CMathLibrary.cmake)
 include(cmake/ShaderLibrary.cmake)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ENABLE_IPO)
-if (ENABLE_IPO)
+if(ENABLE_IPO)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
+
+include(CheckLibraryExists)
+check_library_exists(m exp2f "" C_MATH_LIBRARY_EXISTS)
+if(C_MATH_LIBRARY_EXISTS)
+  set(C_MATH_LIBRARY "m")
 endif()
 
 add_subdirectory(extern)
