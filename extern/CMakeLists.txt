@@ -19,8 +19,6 @@ FetchContent_MakeAvailable(zlib)
 unset(SKIP_INSTALL_ALL)
 unset(ASM686)
 unset(AMD64)
-
-# assimp
 get_target_property(ZLIB_SOURCE_DIR zlib SOURCE_DIR)
 get_target_property(ZLIB_BINARY_DIR zlib BINARY_DIR)
 set(ZLIB_INCLUDE_DIRS ${ZLIB_BINARY_DIR} ${ZLIB_SOURCE_DIR})
@@ -29,6 +27,7 @@ set(ZLIB_LIBRARY $<TARGET_FILE:zlib>)
 set(ZLIB_LIBRARIES $<TARGET_FILE:zlib>)
 set(ZLIB_FOUND TRUE)
 
+# assimp
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
 set(ASSIMP_BUILD_MINIZIP ON)
 set(ASSIMP_BUILD_TESTS OFF)
@@ -41,6 +40,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(assimp)
 add_dependencies(assimp zlib)
+
+# libpng
+set(PNG_BUILD_ZLIB ON)
+set(PNG_EXECUTABLES OFF)
+set(PNG_SHARED OFF)
+set(PNG_STATIC ON)
+set(PNG_TESTS OFF)
+FetchContent_Declare(
+  libpng
+  GIT_REPOSITORY https://github.com/glennrp/libpng.git
+  GIT_TAG v1.6.35
+)
+FetchContent_MakeAvailable(libpng)
+add_dependencies(png zlib)
+get_target_property(PNG_BINARY_DIR png BINARY_DIR)
+get_target_property(PNG_SOURCE_DIR png SOURCE_DIR)
+target_include_directories(png PUBLIC $<BUILD_INTERFACE:${PNG_BINARY_DIR}>)
+target_include_directories(png PUBLIC $<BUILD_INTERFACE:${PNG_SOURCE_DIR}>)
 
 # volk
 FetchContent_Declare(

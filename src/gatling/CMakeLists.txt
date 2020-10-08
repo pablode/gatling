@@ -16,6 +16,7 @@ target_link_libraries(
   gatling PRIVATE
   cgpu
   ${C_MATH_LIBRARY}
+  png
 )
 
 add_shader_library(
