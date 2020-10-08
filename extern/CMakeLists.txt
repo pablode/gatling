@@ -1,16 +1,8 @@
-#
-# Define policies for old CMake project versions. These defaults only affect
-# the current folder and its subfolders. Policy values have to be evaluated
-# per-case.
-#
-
-# Make option() honor normal variables.
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
-#
-# Add dependency targets using CMake's FetchContent module.
-#
 include(FetchContent)
+
+#
+# Add dependencies using CMake's FetchContent module.
+#
 
 # assimp
 set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)

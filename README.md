@@ -30,7 +30,7 @@ CMake 3.14+, a C11 compiler and Vulkan are required.
 ```
 git clone https://github.com/pablode/gatling
 mkdir gatling/build && cd gatling/build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -Wno-dev -DCMAKE_BUILD_TYPE=Release
 cmake --build . --target gp gatling
 ```
 
@@ -48,7 +48,9 @@ Next, either disable the system's GPU watchdog or set an appropriate timeout val
     --bounces=4 \
     --camera-origin=0,1,3.1 \
     --camera-target=0,1,0 \
-    --camera-fov=1.0
+    --camera-fov=1.0 \
+    --rr-bounce-offset=3 \
+    --rr-inv-min-term-prob=1.0
 ```
 
 _gatling_ is optimized for my Pascal GTX 1060 GPU and will most likely not work on old or integrated GPUs.
