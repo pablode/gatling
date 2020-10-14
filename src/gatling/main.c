@@ -273,6 +273,17 @@ int main(int argc, const char* argv[])
     uint64_t vertex_buf_size;
     uint64_t material_buf_offset;
     uint64_t material_buf_size;
+    float aabb[2][3];
+    float camera_origin_x;
+    float camera_origin_y;
+    float camera_origin_z;
+    float camera_lookat_x;
+    float camera_lookat_y;
+    float camera_lookat_z;
+    float camera_up_x;
+    float camera_up_y;
+    float camera_up_z;
+    float camera_hfov;
   } file_header = *((struct file_header*) &mapped_scene_data[0]);
 
   uint64_t device_buf_size = 0;
@@ -420,6 +431,16 @@ int main(int argc, const char* argv[])
     const uint32_t node_count = file_header.node_buf_size / node_size;
     const uint32_t traversal_stack_size = (log(node_count) / log(8)) * 2;
 
+    const float aspect_ratio = (float) options.image_width / (float) options.image_height;
+
+    float fov;
+
+    if (aspect_ratio < 1.0f) {
+      fov = file_header.camera_hfov;
+    } else {
+      fov = 2.0f * atanf(tanf(file_header.camera_hfov / 2.0f) / aspect_ratio);
+    }
+
     const cgpu_specialization_constant speccs[] = {
       { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize,   .size = 4 },
       { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize,   .size = 4 },
@@ -428,17 +449,20 @@ int main(int argc, const char* argv[])
       { .constant_id =  4, .p_data = (void*) &options.spp,                  .size = 4 },
       { .constant_id =  5, .p_data = (void*) &options.max_bounces,          .size = 4 },
       { .constant_id =  6, .p_data = (void*) &traversal_stack_size,         .size = 4 },
-      { .constant_id =  7, .p_data = (void*) &options.camera_origin[0],     .size = 4 },
-      { .constant_id =  8, .p_data = (void*) &options.camera_origin[1],     .size = 4 },
-      { .constant_id =  9, .p_data = (void*) &options.camera_origin[2],     .size = 4 },
-      { .constant_id = 10, .p_data = (void*) &options.camera_target[0],     .size = 4 },
-      { .constant_id = 11, .p_data = (void*) &options.camera_target[1],     .size = 4 },
-      { .constant_id = 12, .p_data = (void*) &options.camera_target[2],     .size = 4 },
-      { .constant_id = 13, .p_data = (void*) &options.camera_fov,           .size = 4 },
-      { .constant_id = 14, .p_data = (void*) &options.rr_bounce_offset,     .size = 4 },
-      { .constant_id = 15, .p_data = (void*) &options.rr_inv_min_term_prob, .size = 4 },
+      { .constant_id =  7, .p_data = (void*) &file_header.camera_origin_x,  .size = 4 },
+      { .constant_id =  8, .p_data = (void*) &file_header.camera_origin_y,  .size = 4 },
+      { .constant_id =  9, .p_data = (void*) &file_header.camera_origin_z,  .size = 4 },
+      { .constant_id = 10, .p_data = (void*) &file_header.camera_lookat_x,  .size = 4 },
+      { .constant_id = 11, .p_data = (void*) &file_header.camera_lookat_y,  .size = 4 },
+      { .constant_id = 12, .p_data = (void*) &file_header.camera_lookat_z,  .size = 4 },
+      { .constant_id = 13, .p_data = (void*) &file_header.camera_up_x,      .size = 4 },
+      { .constant_id = 14, .p_data = (void*) &file_header.camera_up_y,      .size = 4 },
+      { .constant_id = 15, .p_data = (void*) &file_header.camera_up_z,      .size = 4 },
+      { .constant_id = 16, .p_data = (void*) &fov,                          .size = 4 },
+      { .constant_id = 17, .p_data = (void*) &options.rr_bounce_offset,     .size = 4 },
+      { .constant_id = 18, .p_data = (void*) &options.rr_inv_min_term_prob, .size = 4 },
     };
-    const uint32_t specc_count = 16;
+    const uint32_t specc_count = 19;
 
     c_result = cgpu_create_pipeline(
       device,

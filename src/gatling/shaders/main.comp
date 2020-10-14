@@ -12,12 +12,15 @@ layout(constant_id = 6) const uint MAX_STACK_SIZE = 6;
 layout(constant_id = 7) const float CAMERA_ORIGIN_X = 15.0;
 layout(constant_id = 8) const float CAMERA_ORIGIN_Y = 15.0;
 layout(constant_id = 9) const float CAMERA_ORIGIN_Z = 15.0;
-layout(constant_id = 10) const float CAMERA_TARGET_X = 0.0;
-layout(constant_id = 11) const float CAMERA_TARGET_Y = 4.0;
-layout(constant_id = 12) const float CAMERA_TARGET_Z = 3.0;
-layout(constant_id = 13) const float CAMERA_FOV = radians(50.0);
-layout(constant_id = 14) const uint RR_BOUNCE_OFFSET = 3;
-layout(constant_id = 15) const float RR_INV_MIN_TERM_PROB = 1.0;
+layout(constant_id = 10) const float CAMERA_LOOKAT_X = 0.0;
+layout(constant_id = 11) const float CAMERA_LOOKAT_Y = 4.0;
+layout(constant_id = 12) const float CAMERA_LOOKAT_Z = 3.0;
+layout(constant_id = 13) const float CAMERA_UP_X = 0.0;
+layout(constant_id = 14) const float CAMERA_UP_Y = 4.0;
+layout(constant_id = 15) const float CAMERA_UP_Z = 3.0;
+layout(constant_id = 16) const float CAMERA_FOV = radians(50.0);
+layout(constant_id = 17) const uint RR_BOUNCE_OFFSET = 3;
+layout(constant_id = 18) const float RR_INV_MIN_TERM_PROB = 1.0;
 
 #include "bvh.glsl"
 
@@ -113,13 +116,24 @@ void main()
     }
 
     const uint pixel_index = pixel_pos.x + pixel_pos.y * IMAGE_WIDTH;
+
     const vec3 camera_origin = vec3(CAMERA_ORIGIN_X, CAMERA_ORIGIN_Y, CAMERA_ORIGIN_Z);
-    const vec3 camera_target = vec3(CAMERA_TARGET_X, CAMERA_TARGET_Y, CAMERA_TARGET_Z);
-    const vec3 camera_forward = normalize(camera_target - camera_origin);
-    const vec3 camera_right = normalize(cross(camera_forward, vec3(0.0, 1.0, 0.0)));
-    const vec3 camera_up = cross(camera_right, camera_forward);
+    const vec3 camera_forward = normalize(vec3(CAMERA_LOOKAT_X, CAMERA_LOOKAT_Y, CAMERA_LOOKAT_Z));
+    const vec3 camera_up = normalize(vec3(CAMERA_UP_X, CAMERA_UP_Y, CAMERA_UP_Z));
+    const vec3 camera_right = cross(camera_forward, camera_up);
+
     const float aspect_ratio = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
-    const float dist_to_plane = 1.0 / tan(CAMERA_FOV * 0.5);
+
+    const float H = 1.0;
+    const float W = H * aspect_ratio;
+    const float d = H / (2.0 * tan(CAMERA_FOV * 0.5));
+
+    const float WX = W / float(IMAGE_WIDTH);
+    const float HY = H / float(IMAGE_HEIGHT);
+
+    const vec3 C = camera_origin + camera_forward * d;
+    const vec3 L = C - camera_right * W * 0.5 - camera_up * H * 0.5;
+
     const float inv_sample_count = 1.0 / float(SAMPLE_COUNT);
 
     uint rng_state = wang_hash(pixel_index);
@@ -128,22 +142,16 @@ void main()
 
     for (uint s = 0; s < SAMPLE_COUNT; ++s)
     {
-        /* Find new point on camera plane with random offset. */
         const float r1 = random_float_between_0_and_1(rng_state);
         const float r2 = random_float_between_0_and_1(rng_state);
-        const float norm_plane_pos_x = (float(pixel_pos.x) + r1) / float(IMAGE_WIDTH);
-        const float norm_plane_pos_y = (float(pixel_pos.y) + r2) / float(IMAGE_HEIGHT);
 
-        /* Convert from [0, 1] to [-1.0, 1.0] range. */
-        const float centered_offset_x = (2.0 * norm_plane_pos_x) - 1.0;
-        const float centered_offset_y = (2.0 * norm_plane_pos_y) - 1.0;
+        const vec3 P =
+            L +
+            (float(pixel_pos.x) + r1) * camera_right * WX +
+            (float(pixel_pos.y) + r2) * camera_up * HY;
 
-        /* Calculate ray properties. */
-        const vec3 ray_origin = camera_origin;
-        vec3 ray_direction =
-            camera_right   * centered_offset_x * aspect_ratio +
-            camera_up      * centered_offset_y +
-            camera_forward * dist_to_plane;
+        vec3 ray_origin = camera_origin;
+        vec3 ray_direction = normalize(P - camera_origin);
 
         /* Beware: a single direction component must not be zero.
          * This is because we often take the inverse of the direction. */
