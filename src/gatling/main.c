@@ -13,9 +13,6 @@ static uint32_t DEFAULT_IMAGE_WIDTH = 1200;
 static uint32_t DEFAULT_IMAGE_HEIGHT = 1200;
 static uint32_t DEFAULT_SPP = 256;
 static uint32_t DEFAULT_MAX_BOUNCES = 4;
-static float DEFAULT_CAMERA_ORIGIN[3] = { 0.0f, 1.0f, 3.1f };
-static float DEFAULT_CAMERA_TARGET[3] = { 0.0f, 1.0f, 0.0f };
-static float DEFAULT_CAMERA_FOV = 1.0f;
 static uint32_t DEFAULT_RR_BOUNCE_OFFSET = 3;
 static float DEFAULT_RR_INV_MIN_TERM_PROB = 1.0f;
 
@@ -26,9 +23,6 @@ typedef struct program_options {
   uint32_t image_height;
   uint32_t spp;
   uint32_t max_bounces;
-  float camera_origin[3];
-  float camera_target[3];
-  float camera_fov;
   uint32_t rr_bounce_offset;
   float rr_inv_min_term_prob;
 } program_options;
@@ -79,17 +73,6 @@ static void gatling_print_usage_and_exit()
   printf("--image-height         [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
   printf("--spp                  [default: %u]\n", DEFAULT_SPP);
   printf("--max-bounces          [default: %u]\n", DEFAULT_MAX_BOUNCES);
-  printf("--camera-origin        [default: %.3f,%.3f,%.3f]\n",
-    DEFAULT_CAMERA_ORIGIN[0],
-    DEFAULT_CAMERA_ORIGIN[1],
-    DEFAULT_CAMERA_ORIGIN[2]
-  );
-  printf("--camera-target        [default: %.3f,%.3f,%.3f]\n",
-    DEFAULT_CAMERA_TARGET[0],
-    DEFAULT_CAMERA_TARGET[1],
-    DEFAULT_CAMERA_TARGET[2]
-  );
-  printf("--camera-fov           [default: %.5f]\n", DEFAULT_CAMERA_FOV);
   printf("--rr-bounce-offset     [default: %u]\n", DEFAULT_RR_BOUNCE_OFFSET);
   printf("--rr-inv-min-term-prob [default: %.2f]\n", DEFAULT_RR_INV_MIN_TERM_PROB);
   exit(EXIT_FAILURE);
@@ -107,9 +90,6 @@ static void gatling_parse_args(int argc, const char* argv[], program_options* op
   options->image_height = DEFAULT_IMAGE_HEIGHT;
   options->spp = DEFAULT_SPP;
   options->max_bounces = DEFAULT_MAX_BOUNCES;
-  memcpy(&options->camera_origin, &DEFAULT_CAMERA_ORIGIN, 12);
-  memcpy(&options->camera_target, &DEFAULT_CAMERA_TARGET, 12);
-  options->camera_fov = DEFAULT_CAMERA_FOV;
   options->rr_bounce_offset = DEFAULT_RR_BOUNCE_OFFSET;
   options->rr_inv_min_term_prob = DEFAULT_RR_INV_MIN_TERM_PROB;
 
@@ -149,34 +129,6 @@ static void gatling_parse_args(int argc, const char* argv[], program_options* op
     {
       char* endptr = NULL;
       options->max_bounces = strtol(value, &endptr, 10);
-      fail = (endptr == value);
-    }
-    else if (strstr(arg, "--camera-origin=") == arg)
-    {
-      const int scan_res = sscanf(
-        value,
-        "%f,%f,%f",
-        &options->camera_origin[0],
-        &options->camera_origin[1],
-        &options->camera_origin[2]
-      );
-      fail = (scan_res != 3);
-    }
-    else if (strstr(arg, "--camera-target=") == arg)
-    {
-      const int scan_res = sscanf(
-        value,
-        "%f,%f,%f",
-        &options->camera_target[0],
-        &options->camera_target[1],
-        &options->camera_target[2]
-      );
-      fail = (scan_res != 3);
-    }
-    else if (strstr(arg, "--camera-fov=") == arg)
-    {
-      char* endptr = NULL;
-      options->camera_fov = strtof(value, &endptr);
       fail = (endptr == value);
     }
     else if (strstr(arg, "--rr-bounce-offset=") == arg)
