@@ -1,12 +1,13 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
 
 #include <cgpu.h>
 
+#include "img.h"
 #include "mmap.h"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
 
 static uint32_t DEFAULT_IMAGE_WIDTH = 1200;
 static uint32_t DEFAULT_IMAGE_HEIGHT = 1200;
@@ -45,60 +46,6 @@ typedef struct program_options {
       exit(EXIT_FAILURE);                                                                   \
     }                                                                                       \
   } while (0)
-
-static void gatling_save_img_wfunc(void *context, void *data, int size)
-{
-  gatling_file* file;
-  const char* file_path = (const char*) context;
-  const bool success = gatling_file_create(file_path, size, &file);
-  if (!success) {
-    gatling_fail("Unable to open output file.");
-  }
-
-  void* mapped_mem = gatling_mmap(file, 0, size);
-  if (!mapped_mem) {
-    gatling_fail("Unable to map output file.");
-  }
-  memcpy(mapped_mem, data, size);
-
-  gatling_munmap(file, mapped_mem);
-  gatling_file_close(file);
-}
-
-static void gatling_save_img(
-  const float* data,
-  size_t float_count,
-  const program_options* options)
-{
-  uint8_t* temp_data = malloc(float_count);
-  const float gamma = 1.0f / 2.2f;
-
-  for (size_t i = 0; i < float_count; ++i)
-  {
-    const float value = fmaxf(0.0f, fminf(1.0f, data[i]));
-    temp_data[i] = (uint8_t) (powf(value, gamma) * 255.0f + 0.5f);
-  }
-
-  stbi_flip_vertically_on_write(true);
-
-  const uint32_t component_count = 4;
-
-  const int result = stbi_write_png_to_func(
-    gatling_save_img_wfunc,
-    (void*) options->output_file,
-    options->image_width,
-    options->image_height,
-    component_count,
-    temp_data,
-    (int) (options->image_width * component_count)
-  );
-
-  free(temp_data);
-
-  if (!result) {
-    gatling_fail("Unable to save image.");
-  }
-}
 
 static void gatling_get_parent_directory(
   const char* file_path,
@@ -648,7 +595,12 @@ int main(int argc, const char* argv[])
   printf("Total rendering time: %.2fms\n", elapsed_milliseconds);
 
   /* Read data from gpu and save image. */
-  float* image_data = malloc(output_buffer_size);
+  float* image_floats = (float*) malloc(output_buffer_size);
+
+  if (!image_floats)
+  {
+    gatling_fail("Out of memory.");
+  }
 
   c_result = cgpu_map_buffer(
     device,
@@ -660,7 +612,7 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
 
   memcpy(
-    image_data,
+    image_floats,
     mapped_staging_mem,
     output_buffer_size
   );
@@ -671,13 +623,49 @@ int main(int argc, const char* argv[])
   );
   gatling_cgpu_ensure(c_result);
 
-  gatling_save_img(
-    image_data,
-    output_buffer_size / 4,
-    &options
+  uint8_t* image_bytes = (uint8_t*) malloc(options.image_width * options.image_height * 3);
+
+  if (!image_bytes)
+  {
+    gatling_fail("Out of memory.");
+  }
+
+  const float gamma = 1.0f / 2.2f;
+
+  for (uint32_t y = 0; y < options.image_height; ++y)
+  {
+    for (uint32_t x = 0; x < options.image_width; ++x)
+    {
+      for (uint32_t channel = 0; channel < 3; channel++)
+      {
+        const uint32_t in_idx = 4 * (y * options.image_width + x) + channel;
+
+        float value = image_floats[in_idx];
+        value = fmaxf(0.0f, fminf(1.0f, value));
+        value = powf(value, gamma) * 255.0f + 0.5f;
+
+        const uint32_t out_idx = 3 * (y * options.image_width + x) + channel;
+
+        image_bytes[out_idx] = (uint8_t) value;
+      }
+    }
+  }
+
+  free(image_floats);
+
+  const bool write_ok = gatling_img_write(
+    image_bytes,
+    options.image_width,
+    options.image_height,
+    options.output_file
   );
 
-  free(image_data);
+  free(image_bytes);
+
+  if (!write_ok)
+  {
+    gatling_fail("Unable to write image.");
+  }
 
   /* Clean up. */
   c_result = cgpu_destroy_fence(device, fence);

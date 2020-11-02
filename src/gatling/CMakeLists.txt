@@ -1,5 +1,7 @@
 add_executable(
   gatling
+  img.c
+  img.h
   main.c
   mmap.c
   mmap.h
