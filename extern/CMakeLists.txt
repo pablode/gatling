@@ -4,8 +4,10 @@ include(FetchContent)
 # Add dependencies using CMake's FetchContent module.
 #
 
-# zlib
 set(SKIP_INSTALL_ALL ON)
+set(BUILD_SHARED_LIBS OFF)
+
+# zlib
 # The AMD64 option causes an MSVC linker error and the ASM build has problems:
 # https://github.com/madler/zlib/issues/41#issuecomment-125848075
 set(AMD64 OFF CACHE INTERNAL "" FORCE)
@@ -16,7 +18,6 @@ FetchContent_Declare(
   GIT_TAG v1.2.11
 )
 FetchContent_MakeAvailable(zlib)
-unset(SKIP_INSTALL_ALL)
 unset(ASM686)
 unset(AMD64)
 get_target_property(ZLIB_SOURCE_DIR zlibstatic SOURCE_DIR)
