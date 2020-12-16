@@ -200,10 +200,12 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     scene->camera.look_at[0] = ai_look_at.x;
     scene->camera.look_at[1] = ai_look_at.y;
     scene->camera.look_at[2] = ai_look_at.z;
+    gp_vec3_normalize(scene->camera.look_at, scene->camera.look_at);
 
     scene->camera.up[0] = ai_up.x;
     scene->camera.up[1] = ai_up.y;
     scene->camera.up[2] = ai_up.z;
+    gp_vec3_normalize(scene->camera.up, scene->camera.up);
 
     scene->camera.hfov = ai_camera->mHorizontalFOV;
   }
