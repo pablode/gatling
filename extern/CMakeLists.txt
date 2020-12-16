@@ -19,12 +19,12 @@ FetchContent_MakeAvailable(zlib)
 unset(SKIP_INSTALL_ALL)
 unset(ASM686)
 unset(AMD64)
-get_target_property(ZLIB_SOURCE_DIR zlib SOURCE_DIR)
-get_target_property(ZLIB_BINARY_DIR zlib BINARY_DIR)
+get_target_property(ZLIB_SOURCE_DIR zlibstatic SOURCE_DIR)
+get_target_property(ZLIB_BINARY_DIR zlibstatic BINARY_DIR)
 set(ZLIB_INCLUDE_DIRS ${ZLIB_BINARY_DIR} ${ZLIB_SOURCE_DIR})
 set(ZLIB_INCLUDE_DIR ${ZLIB_BINARY_DIR} ${ZLIB_SOURCE_DIR})
-set(ZLIB_LIBRARY $<TARGET_FILE:zlib>)
-set(ZLIB_LIBRARIES $<TARGET_FILE:zlib>)
+set(ZLIB_LIBRARY $<TARGET_FILE:zlibstatic>)
+set(ZLIB_LIBRARIES $<TARGET_FILE:zlibstatic>)
 set(ZLIB_FOUND TRUE)
 
 # assimp
@@ -39,7 +39,7 @@ FetchContent_Declare(
   GIT_TAG v5.0.1
 )
 FetchContent_MakeAvailable(assimp)
-add_dependencies(assimp zlib)
+add_dependencies(assimp zlibstatic)
 
 # libpng
 set(PNG_BUILD_ZLIB ON)
