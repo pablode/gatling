@@ -24,6 +24,7 @@ float gp_vec3_dot(const gp_vec3 a, const gp_vec3 b);
 void gp_vec3_cross(const gp_vec3 a, const gp_vec3 b, gp_vec3 c);
 void gp_vec3_lerp(const gp_vec3 a, const gp_vec3 b, float t, gp_vec3 v);
 float gp_vec3_length(const gp_vec3 v);
+void gp_vec3_normalize(const gp_vec3 a, gp_vec3 b);
 void gp_vec3_max(const gp_vec3 a, const gp_vec3 b, gp_vec3 c);
 void gp_vec3_min(const gp_vec3 a, const gp_vec3 b, gp_vec3 c);
 float gp_vec3_comp_min(const gp_vec3 v);

@@ -45,6 +45,11 @@ static void gp_assimp_add_node_mesh(
   struct aiMatrix4x4 ai_trans = *ai_parent_transform;
   aiMultiplyMatrix4(&ai_trans, &ai_node->mTransformation);
 
+  struct aiMatrix3x3 ai_norm_trans;
+  aiMatrix3FromMatrix4(&ai_norm_trans, &ai_trans);
+  aiMatrix3Inverse(&ai_norm_trans);
+  aiTransposeMatrix3(&ai_norm_trans);
+
   for (uint32_t m = 0; m < ai_node->mNumMeshes; ++m)
   {
     const struct aiMesh* ai_mesh = ai_scene->mMeshes[ai_node->mMeshes[m]];
@@ -66,10 +71,10 @@ static void gp_assimp_add_node_mesh(
     for (uint32_t v = 0; v < ai_mesh->mNumVertices; ++v)
     {
       struct aiVector3D* ai_position = &ai_mesh->mVertices[v];
-      const struct aiVector3D* ai_normal = &ai_mesh->mNormals[v];
-      const struct aiVector3D* ai_tex_coords = &ai_mesh->mTextureCoords[0][v];
+      struct aiVector3D* ai_normal = &ai_mesh->mNormals[v];
 
       aiTransformVecByMatrix4(ai_position, &ai_trans);
+      aiTransformVecByMatrix3(ai_normal, &ai_norm_trans);
 
       struct gp_vertex* vertex = &vertices[*vertex_index];
       vertex->pos[0] = ai_position->x;
@@ -80,6 +85,8 @@ static void gp_assimp_add_node_mesh(
       vertex->norm[2] = ai_normal->z;
       vertex->uv[0] = 0.0f;
       vertex->uv[1] = 0.0f;
+
+      gp_vec3_normalize(vertex->norm, vertex->norm);
 
       (*vertex_index)++;
     }

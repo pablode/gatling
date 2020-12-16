@@ -87,6 +87,14 @@ float gp_vec3_length(const gp_vec3 v)
   return sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 }
 
+void gp_vec3_normalize(const gp_vec3 a, gp_vec3 b)
+{
+  float inv_length = 1.0f / gp_vec3_length(a);
+  b[0] = a[0] * inv_length;
+  b[1] = a[1] * inv_length;
+  b[2] = a[2] * inv_length;
+}
+
 void gp_vec3_max(const gp_vec3 a, const gp_vec3 b, gp_vec3 c)
 {
   c[0] = fmaxf(a[0], b[0]);
