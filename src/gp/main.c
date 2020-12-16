@@ -165,10 +165,20 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
   }
   else
   {
-    struct aiCamera* ai_camera = ai_scene->mCameras[0];
+    struct aiMatrix4x4 ai_cam_trans;
+    aiIdentityMatrix4(&ai_cam_trans);
 
+    struct aiCamera* ai_camera = ai_scene->mCameras[0];
     struct aiNode* ai_cam_node = gp_assimp_find_node(ai_scene->mRootNode, ai_camera->mName.data);
-    struct aiMatrix4x4 ai_cam_trans = ai_cam_node->mTransformation;
+
+    do
+    {
+      struct aiMatrix4x4 trans = ai_cam_node->mTransformation;
+      aiMultiplyMatrix4(&trans, &ai_cam_trans);
+      ai_cam_trans = trans;
+      ai_cam_node = ai_cam_node->mParent;
+    }
+    while (ai_cam_node);
 
     struct aiVector3D ai_origin = { 0.0f, 0.0f, 0.0f };
     aiTransformVecByMatrix4(&ai_origin, &ai_cam_trans);
