@@ -12,9 +12,9 @@ layout(constant_id = 6) const uint MAX_STACK_SIZE = 6;
 layout(constant_id = 7) const float CAMERA_ORIGIN_X = 15.0;
 layout(constant_id = 8) const float CAMERA_ORIGIN_Y = 15.0;
 layout(constant_id = 9) const float CAMERA_ORIGIN_Z = 15.0;
-layout(constant_id = 10) const float CAMERA_LOOKAT_X = 0.0;
-layout(constant_id = 11) const float CAMERA_LOOKAT_Y = 4.0;
-layout(constant_id = 12) const float CAMERA_LOOKAT_Z = 3.0;
+layout(constant_id = 10) const float CAMERA_FORWARD_X = 0.0;
+layout(constant_id = 11) const float CAMERA_FORWARD_Y = 4.0;
+layout(constant_id = 12) const float CAMERA_FORWARD_Z = 3.0;
 layout(constant_id = 13) const float CAMERA_UP_X = 0.0;
 layout(constant_id = 14) const float CAMERA_UP_Y = 4.0;
 layout(constant_id = 15) const float CAMERA_UP_Z = 3.0;
@@ -118,7 +118,7 @@ void main()
     const uint pixel_index = pixel_pos.x + pixel_pos.y * IMAGE_WIDTH;
 
     const vec3 camera_origin = vec3(CAMERA_ORIGIN_X, CAMERA_ORIGIN_Y, CAMERA_ORIGIN_Z);
-    const vec3 camera_forward = normalize(vec3(CAMERA_LOOKAT_X, CAMERA_LOOKAT_Y, CAMERA_LOOKAT_Z));
+    const vec3 camera_forward = normalize(vec3(CAMERA_FORWARD_X, CAMERA_FORWARD_Y, CAMERA_FORWARD_Z));
     const vec3 camera_up = normalize(vec3(CAMERA_UP_X, CAMERA_UP_Y, CAMERA_UP_Z));
     const vec3 camera_right = cross(camera_forward, camera_up);
 

@@ -14,7 +14,7 @@
 
 typedef struct gp_camera {
   gp_vec3 origin;
-  gp_vec3 look_at;
+  gp_vec3 forward;
   gp_vec3 up;
   float   hfov;
 } gp_camera;
@@ -192,15 +192,15 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     ai_cam_trans.b4 = 0.0f;
     ai_cam_trans.c4 = 0.0f;
 
-    struct aiVector3D ai_look_at = ai_camera->mLookAt;
+    struct aiVector3D ai_forward = ai_camera->mLookAt;
     struct aiVector3D ai_up = ai_camera->mUp;
-    aiTransformVecByMatrix4(&ai_look_at, &ai_cam_trans);
+    aiTransformVecByMatrix4(&ai_forward, &ai_cam_trans);
     aiTransformVecByMatrix4(&ai_up, &ai_cam_trans);
 
-    scene->camera.look_at[0] = ai_look_at.x;
-    scene->camera.look_at[1] = ai_look_at.y;
-    scene->camera.look_at[2] = ai_look_at.z;
-    gp_vec3_normalize(scene->camera.look_at, scene->camera.look_at);
+    scene->camera.forward[0] = ai_forward.x;
+    scene->camera.forward[1] = ai_forward.y;
+    scene->camera.forward[2] = ai_forward.z;
+    gp_vec3_normalize(scene->camera.forward, scene->camera.forward);
 
     scene->camera.up[0] = ai_up.x;
     scene->camera.up[1] = ai_up.y;

@@ -229,9 +229,9 @@ int main(int argc, const char* argv[])
     float camera_origin_x;
     float camera_origin_y;
     float camera_origin_z;
-    float camera_lookat_x;
-    float camera_lookat_y;
-    float camera_lookat_z;
+    float camera_forward_x;
+    float camera_forward_y;
+    float camera_forward_z;
     float camera_up_x;
     float camera_up_y;
     float camera_up_z;
@@ -404,9 +404,9 @@ int main(int argc, const char* argv[])
       { .constant_id =  7, .p_data = (void*) &file_header.camera_origin_x,  .size = 4 },
       { .constant_id =  8, .p_data = (void*) &file_header.camera_origin_y,  .size = 4 },
       { .constant_id =  9, .p_data = (void*) &file_header.camera_origin_z,  .size = 4 },
-      { .constant_id = 10, .p_data = (void*) &file_header.camera_lookat_x,  .size = 4 },
-      { .constant_id = 11, .p_data = (void*) &file_header.camera_lookat_y,  .size = 4 },
-      { .constant_id = 12, .p_data = (void*) &file_header.camera_lookat_z,  .size = 4 },
+      { .constant_id = 10, .p_data = (void*) &file_header.camera_forward_x, .size = 4 },
+      { .constant_id = 11, .p_data = (void*) &file_header.camera_forward_y, .size = 4 },
+      { .constant_id = 12, .p_data = (void*) &file_header.camera_forward_z, .size = 4 },
       { .constant_id = 13, .p_data = (void*) &file_header.camera_up_x,      .size = 4 },
       { .constant_id = 14, .p_data = (void*) &file_header.camera_up_y,      .size = 4 },
       { .constant_id = 15, .p_data = (void*) &file_header.camera_up_z,      .size = 4 },
