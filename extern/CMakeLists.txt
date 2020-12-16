@@ -36,7 +36,7 @@ set(ASSIMP_BUILD_MINIZIP ON)
 FetchContent_Declare(
   assimp
   GIT_REPOSITORY https://github.com/assimp/assimp.git
-  GIT_TAG v5.0.1
+  GIT_TAG 2f1ff974fdbfceeca3a889c87b8e38b3e01350ac
 )
 FetchContent_MakeAvailable(assimp)
 add_dependencies(assimp zlibstatic)
