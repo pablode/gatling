@@ -159,6 +159,45 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     printf("Warning: Assimp scene import incomplete\n");
   }
 
+  if (ai_scene->mNumCameras == 0)
+  {
+    printf("Warning: no camera found\n");
+  }
+  else
+  {
+    struct aiCamera* ai_camera = ai_scene->mCameras[0];
+
+    struct aiNode* ai_cam_node = gp_assimp_find_node(ai_scene->mRootNode, ai_camera->mName.data);
+    struct aiMatrix4x4 ai_cam_trans = ai_cam_node->mTransformation;
+
+    struct aiVector3D ai_origin = { 0.0f, 0.0f, 0.0f };
+    aiTransformVecByMatrix4(&ai_origin, &ai_cam_trans);
+
+    scene->camera.origin[0] = ai_origin.x;
+    scene->camera.origin[1] = ai_origin.y;
+    scene->camera.origin[2] = ai_origin.z;
+
+    /* Remove position to transform directions. */
+    ai_cam_trans.a4 = 0.0f;
+    ai_cam_trans.b4 = 0.0f;
+    ai_cam_trans.c4 = 0.0f;
+
+    struct aiVector3D ai_look_at = ai_camera->mLookAt;
+    struct aiVector3D ai_up = ai_camera->mUp;
+    aiTransformVecByMatrix4(&ai_look_at, &ai_cam_trans);
+    aiTransformVecByMatrix4(&ai_up, &ai_cam_trans);
+
+    scene->camera.look_at[0] = ai_look_at.x;
+    scene->camera.look_at[1] = ai_look_at.y;
+    scene->camera.look_at[2] = ai_look_at.z;
+
+    scene->camera.up[0] = ai_up.x;
+    scene->camera.up[1] = ai_up.y;
+    scene->camera.up[2] = ai_up.z;
+
+    scene->camera.hfov = ai_camera->mHorizontalFOV;
+  }
+
   uint32_t vertex_count = 0;
   uint32_t face_count = 0;
 
@@ -172,11 +211,11 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
   gp_vertex* vertices = (gp_vertex*) malloc(vertex_count * sizeof(gp_vertex));
   gp_face* faces = (gp_face*) malloc(face_count * sizeof(gp_face));
 
-  struct aiMatrix4x4 ai_identity_matrix;
-  aiIdentityMatrix4(&ai_identity_matrix);
-
   vertex_count = 0;
   face_count = 0;
+
+  struct aiMatrix4x4 ai_identity_matrix;
+  aiIdentityMatrix4(&ai_identity_matrix);
 
   gp_assimp_add_node_mesh(
     ai_scene, ai_scene->mRootNode, &ai_identity_matrix,
@@ -249,45 +288,6 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     material->emission_g = ai_emission.g;
     material->emission_b = ai_emission.b;
     material->padding2 = 0.0f;
-  }
-
-  if (ai_scene->mNumCameras == 0)
-  {
-    printf("Warning: no camera found\n");
-  }
-  else
-  {
-    struct aiCamera* ai_camera = ai_scene->mCameras[0];
-
-    struct aiNode* ai_cam_node = gp_assimp_find_node(ai_scene->mRootNode, ai_camera->mName.data);
-    struct aiMatrix4x4 ai_cam_trans = ai_cam_node->mTransformation;
-
-    struct aiVector3D ai_origin = { 0.0f, 0.0f, 0.0f };
-    aiTransformVecByMatrix4(&ai_origin, &ai_cam_trans);
-
-    scene->camera.origin[0] = ai_origin.x;
-    scene->camera.origin[1] = ai_origin.y;
-    scene->camera.origin[2] = ai_origin.z;
-
-    /* Remove position to transform directions. */
-    ai_cam_trans.a4 = 0.0f;
-    ai_cam_trans.b4 = 0.0f;
-    ai_cam_trans.c4 = 0.0f;
-
-    struct aiVector3D ai_look_at = ai_camera->mLookAt;
-    struct aiVector3D ai_up = ai_camera->mUp;
-    aiTransformVecByMatrix4(&ai_look_at, &ai_cam_trans);
-    aiTransformVecByMatrix4(&ai_up, &ai_cam_trans);
-
-    scene->camera.look_at[0] = ai_look_at.x;
-    scene->camera.look_at[1] = ai_look_at.y;
-    scene->camera.look_at[2] = ai_look_at.z;
-
-    scene->camera.up[0] = ai_up.x;
-    scene->camera.up[1] = ai_up.y;
-    scene->camera.up[2] = ai_up.z;
-
-    scene->camera.hfov = ai_camera->mHorizontalFOV;
   }
 
   aiReleaseImport(ai_scene);
