@@ -8,8 +8,8 @@ include(FetchContent)
 set(SKIP_INSTALL_ALL ON)
 # The AMD64 option causes an MSVC linker error and the ASM build has problems:
 # https://github.com/madler/zlib/issues/41#issuecomment-125848075
-set(AMD64 OFF)
-set(ASM686 OFF)
+set(AMD64 OFF CACHE INTERNAL "" FORCE)
+set(ASM686 OFF CACHE INTERNAL "" FORCE)
 FetchContent_Declare(
   zlib
   GIT_REPOSITORY https://github.com/madler/zlib.git
@@ -28,11 +28,11 @@ set(ZLIB_LIBRARIES $<TARGET_FILE:zlibstatic>)
 set(ZLIB_FOUND TRUE)
 
 # assimp
-set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE INTERNAL "" FORCE)
+set(ASSIMP_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
+set(ASSIMP_BUILD_ZLIB ON CACHE INTERNAL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE INTERNAL "" FORCE)
 set(ASSIMP_BUILD_MINIZIP ON)
-set(ASSIMP_BUILD_TESTS OFF)
-set(ASSIMP_BUILD_ZLIB ON)
-set(ASSIMP_INSTALL OFF)
 FetchContent_Declare(
   assimp
   GIT_REPOSITORY https://github.com/assimp/assimp.git
@@ -42,11 +42,10 @@ FetchContent_MakeAvailable(assimp)
 add_dependencies(assimp zlibstatic)
 
 # libpng
-set(PNG_BUILD_ZLIB ON)
-set(PNG_EXECUTABLES OFF)
-set(PNG_SHARED OFF)
-set(PNG_STATIC ON)
-set(PNG_TESTS OFF)
+set(SKIP_INSTALL_ALL ON)
+set(PNG_BUILD_ZLIB ON CACHE INTERNAL "" FORCE)
+set(PNG_STATIC ON CACHE INTERNAL "" FORCE)
+set(PNG_TESTS OFF CACHE INTERNAL "" FORCE)
 FetchContent_Declare(
   libpng
   GIT_REPOSITORY https://github.com/glennrp/libpng.git
