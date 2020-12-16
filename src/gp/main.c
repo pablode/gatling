@@ -34,8 +34,8 @@ static void gp_assimp_add_node_mesh(
   uint32_t* face_index, gp_face* faces,
   uint32_t* vertex_index, gp_vertex* vertices)
 {
-  struct aiMatrix4x4 ai_node_matrix = ai_node->mTransformation;
-  aiMultiplyMatrix4(&ai_node_matrix, ai_parent_transform);
+  struct aiMatrix4x4 ai_trans = *ai_parent_transform;
+  aiMultiplyMatrix4(&ai_trans, &ai_node->mTransformation);
 
   for (uint32_t m = 0; m < ai_node->mNumMeshes; ++m)
   {
@@ -61,7 +61,7 @@ static void gp_assimp_add_node_mesh(
       const struct aiVector3D* ai_normal = &ai_mesh->mNormals[v];
       const struct aiVector3D* ai_tex_coords = &ai_mesh->mTextureCoords[0][v];
 
-      aiTransformVecByMatrix4(ai_position, &ai_node_matrix);
+      aiTransformVecByMatrix4(ai_position, &ai_trans);
 
       struct gp_vertex* vertex = &vertices[*vertex_index];
       vertex->pos[0] = ai_position->x;
@@ -80,7 +80,7 @@ static void gp_assimp_add_node_mesh(
   for (uint32_t i = 0; i < ai_node->mNumChildren; ++i)
   {
     gp_assimp_add_node_mesh(
-      ai_scene, ai_node->mChildren[i], &ai_node_matrix,
+      ai_scene, ai_node->mChildren[i], &ai_trans,
       face_index, faces, vertex_index, vertices
     );
   }
