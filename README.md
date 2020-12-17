@@ -36,8 +36,10 @@ cmake --build . --target gp gatling
 
 Before path tracing, an intermediate representation of the scene must be built using `gp`, _gatling_'s asset compiler:
 ```
-./bin/gp cornell_box.obj scene.gsd
+./bin/gp cornell_box.gltf scene.gsd
 ```
+
+Make sure there is a camera in the scene and at least one emissive surface. It is recommended to use glTF as the transmission format.  
 
 Next, either disable the system's GPU watchdog or set an appropriate timeout value. For rendering, multiple optional arguments can be provided:
 ```
@@ -45,10 +47,7 @@ Next, either disable the system's GPU watchdog or set an appropriate timeout val
     --image-width=1200 \
     --image-height=1200 \
     --spp=256 \
-    --bounces=4 \
-    --camera-origin=0,1,3.1 \
-    --camera-target=0,1,0 \
-    --camera-fov=1.0 \
+    --max-bounces=4 \
     --rr-bounce-offset=3 \
     --rr-inv-min-term-prob=1.0
 ```
@@ -57,7 +56,7 @@ _gatling_ is optimized for my Pascal GTX 1060 GPU and will most likely not work 
 
 ### Outlook
 
-The general idea is to follow Manuka's _Shade-before-Hit_ architecture with GPU-based dicing and shading in the preprocessor. Additionally to that, a texture caching system with support for mip-mapping, compression and tiling is central. Bidirectional path tracing is yet another major goal. [More...](https://github.com/pablode/gatling/projects)
+The general idea is to follow Manuka's _Shade-before-Hit_ architecture with CPU dicing and GPU vertex pre-shading. Universal Scene Description (USD) will be the input format. A texture caching system with support for mip-mapping, compression and tiling is another major goal. [More...](https://github.com/pablode/gatling/projects)
 
 ### Further Reading
 
