@@ -125,6 +125,7 @@ struct aiNode* gp_assimp_find_node(const struct aiNode* ai_parent, const char* n
 
 static void gp_load_scene(gp_scene* scene, const char* file_path)
 {
+  /* Load scene using Assimp. */
   struct aiPropertyStore* props = aiCreatePropertyStore();
   aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
 
@@ -159,6 +160,7 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     printf("Warning: Assimp scene import incomplete\n");
   }
 
+  /* Get scene camera properties. */
   if (ai_scene->mNumCameras == 0)
   {
     printf("Warning: no camera found\n");
@@ -210,6 +212,40 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     scene->camera.hfov = ai_camera->mHorizontalFOV;
   }
 
+  /* Calculate the inverse view matrix to transform
+   * the whole scene graph into camera space. */
+  gp_vec3 right;
+  gp_vec3_cross(scene->camera.up, scene->camera.forward, right);
+
+  struct aiMatrix4x4 ai_root_trans;
+  ai_root_trans.a1 = right[0];
+  ai_root_trans.a2 = right[1];
+  ai_root_trans.a3 = right[2];
+  ai_root_trans.a4 = -gp_vec3_dot(right, scene->camera.origin);
+  ai_root_trans.b1 = scene->camera.up[0];
+  ai_root_trans.b2 = scene->camera.up[1];
+  ai_root_trans.b3 = scene->camera.up[2];
+  ai_root_trans.b4 = -gp_vec3_dot(scene->camera.up, scene->camera.origin);
+  ai_root_trans.c1 = scene->camera.forward[0];
+  ai_root_trans.c2 = scene->camera.forward[1];
+  ai_root_trans.c3 = scene->camera.forward[2];
+  ai_root_trans.c4 = -gp_vec3_dot(scene->camera.forward, scene->camera.origin);
+  ai_root_trans.d1 = 0.0f;
+  ai_root_trans.d2 = 0.0f;
+  ai_root_trans.d3 = 0.0f;
+  ai_root_trans.d4 = 1.0f;
+
+  scene->camera.up[0] = 0.0f;
+  scene->camera.up[1] = 1.0f;
+  scene->camera.up[2] = 0.0f;
+  scene->camera.forward[0] = 0.0f;
+  scene->camera.forward[1] = 0.0f;
+  scene->camera.forward[2] = 1.0f;
+  scene->camera.origin[0] = 0.0f;
+  scene->camera.origin[1] = 0.0f;
+  scene->camera.origin[2] = 0.0f;
+
+  /* Calculate and allocate geometry memory. */
   uint32_t vertex_count = 0;
   uint32_t face_count = 0;
 
@@ -226,17 +262,16 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
   vertex_count = 0;
   face_count = 0;
 
-  struct aiMatrix4x4 ai_identity_matrix;
-  aiIdentityMatrix4(&ai_identity_matrix);
-
+  /* Transform and add scene graph geometry. */
   gp_assimp_add_node_mesh(
-    ai_scene, ai_scene->mRootNode, &ai_identity_matrix,
+    ai_scene, ai_scene->mRootNode, &ai_root_trans,
     &face_count, faces, &vertex_count, vertices
   );
 
   scene->vertex_count = vertex_count;
   scene->vertices = realloc(vertices, vertex_count * sizeof(gp_vertex));
 
+  /* Build BVH. */
   gp_bvh bvh;
   const gp_bvh_build_params bvh_params = {
     .face_batch_size          = 1,
@@ -279,6 +314,7 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
   gp_bvh_compress(&bvhc, &scene->bvhcc);
   gp_free_bvhc(&bvhc);
 
+  /* Read materials. */
   scene->material_count = ai_scene->mNumMaterials;
   scene->materials =
     (gp_material*) malloc(scene->material_count * sizeof(gp_material));
@@ -302,6 +338,7 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     material->padding2 = 0.0f;
   }
 
+  /* Cleanup. */
   aiReleaseImport(ai_scene);
 }
 
