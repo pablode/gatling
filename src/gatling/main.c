@@ -387,7 +387,7 @@ int main(int argc, const char* argv[])
 
     float fov;
 
-    if (aspect_ratio < 1.0f) {
+    if (aspect_ratio > 1.0f) {
       fov = file_header.camera_hfov;
     } else {
       fov = 2.0f * atanf(tanf(file_header.camera_hfov / 2.0f) / aspect_ratio);
