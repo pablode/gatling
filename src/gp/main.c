@@ -70,19 +70,19 @@ static void gp_assimp_add_node_mesh(
 
     for (uint32_t v = 0; v < ai_mesh->mNumVertices; ++v)
     {
-      struct aiVector3D* ai_position = &ai_mesh->mVertices[v];
-      struct aiVector3D* ai_normal = &ai_mesh->mNormals[v];
+      struct aiVector3D ai_position = ai_mesh->mVertices[v];
+      struct aiVector3D ai_normal = ai_mesh->mNormals[v];
 
-      aiTransformVecByMatrix4(ai_position, &ai_trans);
-      aiTransformVecByMatrix3(ai_normal, &ai_norm_trans);
+      aiTransformVecByMatrix4(&ai_position, &ai_trans);
+      aiTransformVecByMatrix3(&ai_normal, &ai_norm_trans);
 
       struct gp_vertex* vertex = &vertices[*vertex_index];
-      vertex->pos[0] = ai_position->x;
-      vertex->pos[1] = ai_position->y;
-      vertex->pos[2] = ai_position->z;
-      vertex->norm[0] = ai_normal->x;
-      vertex->norm[1] = ai_normal->y;
-      vertex->norm[2] = ai_normal->z;
+      vertex->pos[0] = ai_position.x;
+      vertex->pos[1] = ai_position.y;
+      vertex->pos[2] = ai_position.z;
+      vertex->norm[0] = ai_normal.x;
+      vertex->norm[1] = ai_normal.y;
+      vertex->norm[2] = ai_normal.z;
       vertex->uv[0] = 0.0f;
       vertex->uv[1] = 0.0f;
 
