@@ -256,8 +256,8 @@ static void gp_bvh_find_split_object_binned(
   gp_aabb left_accum;
   gp_aabb right_accum;
 
-  gp_vec3 axis_lengths;
-  gp_vec3_sub(range->centroid_bounds.max, range->centroid_bounds.min, axis_lengths);
+  gml_vec3 axis_lengths;
+  gml_vec3_sub(range->centroid_bounds.max, range->centroid_bounds.min, axis_lengths);
 
   uint32_t bin_count;
   if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE) {
@@ -388,10 +388,10 @@ static void gp_bvh_find_split_spatial(
   const uint32_t bin_count = thread_data->params->spatial_bin_count;
   const gp_aabb* range_aabb = &range->aabb_bounds;
 
-  gp_vec3 axis_lengths;
+  gml_vec3 axis_lengths;
   gp_aabb_size(&range->aabb_bounds, axis_lengths);
-  gp_vec3 bin_sizes;
-  gp_vec3_divs(axis_lengths, (float) bin_count, bin_sizes);
+  gml_vec3 bin_sizes;
+  gml_vec3_divs(axis_lengths, (float) bin_count, bin_sizes);
 
   /* Clear spatial bins. */
   for (uint32_t b = 0; b < bin_count * 3; ++b)
@@ -418,17 +418,17 @@ static void gp_bvh_find_split_spatial(
       const gp_aabb* ref_aabb = &ref->aabb;
       const gp_face* face = &faces[ref->index];
 
-      gp_vec3 v_0;
-      gp_vec3_assign(vertices[face->v_i[2]].pos, v_0);
+      gml_vec3 v_0;
+      gml_vec3_assign(vertices[face->v_i[2]].pos, v_0);
 
       /* Insert all three edges into bin AABBs. */
       for (uint32_t e = 0; e < 3; ++e)
       {
-        gp_vec3 v_1, v_start, v_end;
-        gp_vec3_assign(vertices[face->v_i[e]].pos, v_1);
-        gp_vec3_assign(v_0[axis] <= v_1[axis] ? v_0 : v_1, v_start);
-        gp_vec3_assign(v_0[axis] <= v_1[axis] ? v_1 : v_0, v_end);
-        gp_vec3_assign(v_1, v_0);
+        gml_vec3 v_1, v_start, v_end;
+        gml_vec3_assign(vertices[face->v_i[e]].pos, v_1);
+        gml_vec3_assign(v_0[axis] <= v_1[axis] ? v_0 : v_1, v_start);
+        gml_vec3_assign(v_0[axis] <= v_1[axis] ? v_1 : v_0, v_end);
+        gml_vec3_assign(v_1, v_0);
 
         if (v_start[axis] > range->aabb_bounds.max[axis] ||
             v_end[axis] < range->aabb_bounds.min[axis]) {
@@ -439,14 +439,14 @@ static void gp_bvh_find_split_spatial(
         {
           const float edge_length = v_end[axis] - v_start[axis];
           const float t_plane_rel = (ref_aabb->min[axis] - v_start[axis]) / edge_length;
-          gp_vec3_lerp(v_start, v_end, t_plane_rel, v_start);
+          gml_vec3_lerp(v_start, v_end, t_plane_rel, v_start);
           v_start[axis] = ref_aabb->min[axis];
         }
         if (v_end[axis] > ref_aabb->max[axis])
         {
           const float edge_length = v_end[axis] - v_start[axis];
           const float t_plane_rel = (ref_aabb->max[axis] - v_start[axis]) / edge_length;
-          gp_vec3_lerp(v_start, v_end, t_plane_rel, v_end);
+          gml_vec3_lerp(v_start, v_end, t_plane_rel, v_end);
           v_end[axis] = ref_aabb->max[axis];
         }
 
@@ -469,10 +469,10 @@ static void gp_bvh_find_split_spatial(
         {
           const float t_bin_end_plane = range_aabb->min[axis] + (float) (bin_index + 1) * bin_size;
 
-          gp_vec3 v_i;
+          gml_vec3 v_i;
           const float edge_length = v_end[axis] - v_start[axis];
           const float t_plane_rel = (t_bin_end_plane - v_start[axis]) / edge_length;
-          gp_vec3_lerp(v_start, v_end, t_plane_rel, v_i);
+          gml_vec3_lerp(v_start, v_end, t_plane_rel, v_i);
           v_i[axis] = t_bin_end_plane;
 
           gp_bvh_spatial_bin* this_bin = &bins[axis * bin_count + bin_index + 0];
@@ -631,16 +631,16 @@ static void gp_bvh_do_split_spatial(
     gp_aabb_make_smallest(&left_aabb);
     gp_aabb_make_smallest(&right_aabb);
 
-    gp_vec3 v_0;
-    gp_vec3_assign(vertices[face->v_i[2]].pos, v_0);
+    gml_vec3 v_0;
+    gml_vec3_assign(vertices[face->v_i[2]].pos, v_0);
 
     for (uint32_t e = 0; e < 3; ++e)
     {
-      gp_vec3 v_1, v_start, v_end;
-      gp_vec3_assign(vertices[face->v_i[e]].pos, v_1);
-      gp_vec3_assign(v_0[split->axis] <= v_1[split->axis] ? v_0 : v_1, v_start);
-      gp_vec3_assign(v_0[split->axis] <= v_1[split->axis] ? v_1 : v_0, v_end);
-      gp_vec3_assign(v_1, v_0);
+      gml_vec3 v_1, v_start, v_end;
+      gml_vec3_assign(vertices[face->v_i[e]].pos, v_1);
+      gml_vec3_assign(v_0[split->axis] <= v_1[split->axis] ? v_0 : v_1, v_start);
+      gml_vec3_assign(v_0[split->axis] <= v_1[split->axis] ? v_1 : v_0, v_end);
+      gml_vec3_assign(v_1, v_0);
 
       /* Cull and chop edge. */
 
@@ -653,14 +653,14 @@ static void gp_bvh_do_split_spatial(
       {
         const float edge_length = v_end[axis] - v_start[axis];
         const float t_plane_rel = (ref_aabb->min[axis] - v_start[axis]) / edge_length;
-        gp_vec3_lerp(v_start, v_end, t_plane_rel, v_start);
+        gml_vec3_lerp(v_start, v_end, t_plane_rel, v_start);
         v_start[axis] = ref_aabb->min[axis];
       }
       if (v_end[axis] > ref_aabb->max[axis])
       {
         const float edge_length = v_end[axis] - v_start[axis];
         const float t_plane_rel = (ref_aabb->max[axis] - v_start[axis]) / edge_length;
-        gp_vec3_lerp(v_start, v_end, t_plane_rel, v_end);
+        gml_vec3_lerp(v_start, v_end, t_plane_rel, v_end);
         v_end[axis] = ref_aabb->max[axis];
       }
 
@@ -685,8 +685,8 @@ static void gp_bvh_do_split_spatial(
       const float t_plane_abs = t_plane - v_start[axis];
       const float t_plane_rel = (t_plane_abs / edge_length);
 
-      gp_vec3 v_i;
-      gp_vec3_lerp(v_start, v_end, t_plane_rel, v_i);
+      gml_vec3 v_i;
+      gml_vec3_lerp(v_start, v_end, t_plane_rel, v_i);
       v_i[axis] = t_plane;
 
       gp_aabb_include(&left_aabb, v_i, &left_aabb);
@@ -751,9 +751,9 @@ static void gp_bvh_do_split_spatial(
 
       gp_aabb_merge(&range2->aabb_bounds, &new_ref->aabb, &range2->aabb_bounds);
 
-      gp_vec3 new_centroid;
-      gp_vec3_add(new_ref->aabb.min, new_ref->aabb.max, new_centroid);
-      gp_vec3_muls(new_centroid, 0.5f, new_centroid);
+      gml_vec3 new_centroid;
+      gml_vec3_add(new_ref->aabb.min, new_ref->aabb.max, new_centroid);
+      gml_vec3_muls(new_centroid, 0.5f, new_centroid);
       gp_aabb_include(&range2->centroid_bounds, new_centroid, &range2->centroid_bounds);
 
       range2_index_start--;
@@ -769,9 +769,9 @@ static void gp_bvh_do_split_spatial(
 
       gp_aabb_merge(&range1->aabb_bounds, &ref->aabb, &range1->aabb_bounds);
 
-      gp_vec3 new_centroid;
-      gp_vec3_add(ref->aabb.min, ref->aabb.max, new_centroid);
-      gp_vec3_muls(new_centroid, 0.5f, new_centroid);
+      gml_vec3 new_centroid;
+      gml_vec3_add(ref->aabb.min, ref->aabb.max, new_centroid);
+      gml_vec3_muls(new_centroid, 0.5f, new_centroid);
       gp_aabb_include(&range1->centroid_bounds, new_centroid, &range1->centroid_bounds);
 
       range1_index_start++;
@@ -834,8 +834,8 @@ static void gp_bvh_do_split_object(
     const gp_bvh_face_ref* ref =
       &range->stack[range1_index_start * range->stack_dir];
 
-    gp_vec3 centroid;
-    gp_vec3_add(ref->aabb.min, ref->aabb.max, centroid);
+    gml_vec3 centroid;
+    gml_vec3_add(ref->aabb.min, ref->aabb.max, centroid);
 
     const bool is_in_left =
       (centroid[split->axis] < split->dcentroid) ||
@@ -844,7 +844,7 @@ static void gp_bvh_do_split_object(
     const bool is_in_range1 =
       (stack_dir_pos && is_in_left) || (stack_dir_neg && !is_in_left);
 
-    gp_vec3_muls(centroid, 0.5f, centroid);
+    gml_vec3_muls(centroid, 0.5f, centroid);
 
     /* Handle face being in the close range. */
 
@@ -961,9 +961,9 @@ static void gp_bvh_do_split_object_binned(
     const gp_bvh_face_ref* ref =
       &range->stack[range1_index_start * range->stack_dir];
 
-    gp_vec3 centroid;
-    gp_vec3_add(ref->aabb.min, ref->aabb.max, centroid);
-    gp_vec3_muls(centroid, 0.5f, centroid);
+    gml_vec3 centroid;
+    gml_vec3_add(ref->aabb.min, ref->aabb.max, centroid);
+    gml_vec3_muls(centroid, 0.5f, centroid);
 
     const uint32_t bin_index = (uint32_t) iclamp(
       (int32_t) (k1 * (centroid[split->axis] - range->centroid_bounds.min[split->axis])),
@@ -1264,9 +1264,9 @@ void gp_bvh_build(
       &root_aabb_bounds
     );
 
-    gp_vec3 centroid;
-    gp_vec3_add(face_ref->aabb.max, face_ref->aabb.min, centroid);
-    gp_vec3_muls(centroid, 0.5f, centroid);
+    gml_vec3 centroid;
+    gml_vec3_add(face_ref->aabb.max, face_ref->aabb.min, centroid);
+    gml_vec3_muls(centroid, 0.5f, centroid);
 
     gp_aabb_include(&root_centroid_bounds, centroid, &root_centroid_bounds);
 

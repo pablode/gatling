@@ -15,9 +15,9 @@
 #include "bvh_compress.h"
 
 typedef struct gp_camera {
-  gp_vec3 origin;
-  gp_vec3 forward;
-  gp_vec3 up;
+  gml_vec3 origin;
+  gml_vec3 forward;
+  gml_vec3 up;
   float   hfov;
 } gp_camera;
 
@@ -88,7 +88,7 @@ static void gp_assimp_add_node_mesh(
       vertex->uv[0] = 0.0f;
       vertex->uv[1] = 0.0f;
 
-      gp_vec3_normalize(vertex->norm, vertex->norm);
+      gml_vec3_normalize(vertex->norm, vertex->norm);
 
       (*vertex_index)++;
     }
@@ -204,34 +204,34 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     scene->camera.forward[0] = ai_forward.x;
     scene->camera.forward[1] = ai_forward.y;
     scene->camera.forward[2] = ai_forward.z;
-    gp_vec3_normalize(scene->camera.forward, scene->camera.forward);
+    gml_vec3_normalize(scene->camera.forward, scene->camera.forward);
 
     scene->camera.up[0] = ai_up.x;
     scene->camera.up[1] = ai_up.y;
     scene->camera.up[2] = ai_up.z;
-    gp_vec3_normalize(scene->camera.up, scene->camera.up);
+    gml_vec3_normalize(scene->camera.up, scene->camera.up);
 
     scene->camera.hfov = ai_camera->mHorizontalFOV;
   }
 
   /* Calculate the inverse view matrix to transform
    * the whole scene graph into camera space. */
-  gp_vec3 right;
-  gp_vec3_cross(scene->camera.up, scene->camera.forward, right);
+  gml_vec3 right;
+  gml_vec3_cross(scene->camera.up, scene->camera.forward, right);
 
   struct aiMatrix4x4 ai_root_trans;
   ai_root_trans.a1 = right[0];
   ai_root_trans.a2 = right[1];
   ai_root_trans.a3 = right[2];
-  ai_root_trans.a4 = -gp_vec3_dot(right, scene->camera.origin);
+  ai_root_trans.a4 = -gml_vec3_dot(right, scene->camera.origin);
   ai_root_trans.b1 = scene->camera.up[0];
   ai_root_trans.b2 = scene->camera.up[1];
   ai_root_trans.b3 = scene->camera.up[2];
-  ai_root_trans.b4 = -gp_vec3_dot(scene->camera.up, scene->camera.origin);
+  ai_root_trans.b4 = -gml_vec3_dot(scene->camera.up, scene->camera.origin);
   ai_root_trans.c1 = scene->camera.forward[0];
   ai_root_trans.c2 = scene->camera.forward[1];
   ai_root_trans.c3 = scene->camera.forward[2];
-  ai_root_trans.c4 = -gp_vec3_dot(scene->camera.forward, scene->camera.origin);
+  ai_root_trans.c4 = -gml_vec3_dot(scene->camera.forward, scene->camera.origin);
   ai_root_trans.d1 = 0.0f;
   ai_root_trans.d2 = 0.0f;
   ai_root_trans.d3 = 0.0f;
