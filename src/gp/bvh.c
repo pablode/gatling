@@ -110,7 +110,7 @@ typedef struct gp_bvh_work_job {
 } gp_bvh_work_job;
 
 #define GP_BVH_GEN_SORT_CMP_FUNC(AXIS)                                            \
-  GP_INLINE static int gp_bvh_sort_comp_func_##AXIS(                              \
+  static int gp_bvh_sort_comp_func_##AXIS(                                        \
     const void* a, const void* b)                                                 \
   {                                                                               \
     const gp_bvh_face_ref* ref_1 = (gp_bvh_face_ref*) a;                          \
@@ -131,12 +131,7 @@ GP_BVH_GEN_SORT_CMP_FUNC(0)
 GP_BVH_GEN_SORT_CMP_FUNC(1)
 GP_BVH_GEN_SORT_CMP_FUNC(2)
 
-GP_INLINE static int32_t imax(int32_t a, int32_t b) { return (a > b) ? a : b; }
-GP_INLINE static int32_t iclamp(int32_t a, int32_t min, int32_t max) {
-    return (a < min) ? min : ((a > max) ? max : a);
-}
-
-GP_INLINE static float gp_bvh_calc_face_intersection_cost(
+static float gp_bvh_calc_face_intersection_cost(
   float base_cost,
   uint32_t batch_size,
   uint32_t face_count)
@@ -260,11 +255,15 @@ static void gp_bvh_find_split_object_binned(
   gml_vec3_sub(range->centroid_bounds.max, range->centroid_bounds.min, axis_lengths);
 
   uint32_t bin_count;
-  if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE) {
-    bin_count = iclamp((int32_t) (range->stack_size * 0.05f + 4.0f), 0,
-                       (int32_t) thread_data->params->object_bin_count);
+  if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE)
+  {
+    bin_count = i32min(
+      (uint32_t) (range->stack_size * 0.05f + 4.0f),
+      thread_data->params->object_bin_count
+    );
   }
-  else {
+  else
+  {
     bin_count = thread_data->params->object_bin_count;
   }
 
@@ -297,11 +296,8 @@ static void gp_bvh_find_split_object_binned(
 
       const float centroid = (ref->aabb.min[axis] + ref->aabb.max[axis]) * 0.5f;
 
-      const uint32_t bin_index = (uint32_t) iclamp(
-        (int32_t) (k1 * (centroid - range->centroid_bounds.min[axis])),
-        0,
-        (int32_t) (bin_count - 1)
-      );
+      int32_t bin_index = (int32_t) (k1 * (centroid - range->centroid_bounds.min[axis]));
+      bin_index = i32max(0, i32min(bin_index, (bin_count - 1)));
 
       gp_bvh_object_bin* bin = &bins[bin_index];
       bin->face_count++;
@@ -452,8 +448,8 @@ static void gp_bvh_find_split_spatial(
 
         int32_t start_bin_index = (int32_t) ((v_start[axis] - range_aabb->min[axis]) / bin_size);
         int32_t end_bin_index = (int32_t) ((v_end[axis] - range_aabb->min[axis]) / bin_size);
-        start_bin_index = iclamp(start_bin_index, 0, bin_count - 1);
-        end_bin_index = iclamp(end_bin_index, 0, bin_count - 1);
+        start_bin_index = i32max(0, i32min(start_bin_index, bin_count - 1));
+        end_bin_index = i32max(0, i32min(end_bin_index, bin_count - 1));
 
         gp_aabb* start_bin_aabb = &bins[axis * bin_count + start_bin_index].aabb;
         gp_aabb* end_bin_aabb = &bins[axis * bin_count + end_bin_index].aabb;
@@ -485,8 +481,8 @@ static void gp_bvh_find_split_spatial(
       /* Increment entry and exit counters. */
       int32_t start_bin_index = (int32_t) ((ref->aabb.min[axis] - range_aabb->min[axis]) / bin_size);
       int32_t end_bin_index = (int32_t) ((ref->aabb.max[axis] - range_aabb->min[axis]) / bin_size);
-      start_bin_index = iclamp(start_bin_index, 0, bin_count - 1);
-      end_bin_index = iclamp(end_bin_index, 0, bin_count - 1);
+      start_bin_index = i32max(0, i32min(start_bin_index, bin_count - 1));
+      end_bin_index = i32max(0, i32min(end_bin_index, bin_count - 1));
 
       bins[axis * bin_count + start_bin_index].entry_count++;
       bins[axis * bin_count + end_bin_index].exit_count++;
@@ -700,8 +696,8 @@ static void gp_bvh_do_split_spatial(
 
     int32_t start_bin_index = (int32_t) ((ref->aabb.min[axis] - range->aabb_bounds.min[axis]) / bin_size);
     int32_t end_bin_index = (int32_t) ((ref->aabb.max[axis] - range->aabb_bounds.min[axis]) / bin_size);
-    start_bin_index = iclamp(start_bin_index, 0, bin_count - 1);
-    end_bin_index = iclamp(end_bin_index, 0, bin_count - 1);
+    start_bin_index = i32max(0, i32min(start_bin_index, bin_count - 1));
+    end_bin_index = i32max(0, i32min(end_bin_index, bin_count - 1));
 
     const bool is_in_left = start_bin_index < split->bin_index;
     const bool is_in_right = end_bin_index >= split->bin_index;
@@ -937,8 +933,8 @@ static void gp_bvh_do_split_object_binned(
 
   uint32_t bin_count;
   if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE) {
-    bin_count = iclamp((int32_t) (range->stack_size * 0.05f + 4.0f), 0,
-                       (int32_t) thread_data->params->object_bin_count);
+    bin_count = i32min((uint32_t) (range->stack_size * 0.05f + 4.0f),
+                       thread_data->params->object_bin_count);
   }
   else {
     bin_count = thread_data->params->object_bin_count;
@@ -965,11 +961,8 @@ static void gp_bvh_do_split_object_binned(
     gml_vec3_add(ref->aabb.min, ref->aabb.max, centroid);
     gml_vec3_muls(centroid, 0.5f, centroid);
 
-    const uint32_t bin_index = (uint32_t) iclamp(
-      (int32_t) (k1 * (centroid[split->axis] - range->centroid_bounds.min[split->axis])),
-      0,
-      (int32_t) (bin_count - 1)
-    );
+    int32_t bin_index = (int32_t) (k1 * (centroid[split->axis] - range->centroid_bounds.min[split->axis]));
+    bin_index = i32max(0, i32min(bin_index, (bin_count - 1)));
 
     const bool is_in_range1 =
       (stack_dir_pos && bin_index < split->bin_index) ||

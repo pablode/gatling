@@ -3,6 +3,28 @@
 
 #include <stdint.h>
 
+#define GML_MIN_FUNC(PREFIX, TYPE)  \
+  TYPE PREFIX##min(TYPE a, TYPE b);
+#define GML_MAX_FUNC(PREFIX, TYPE)  \
+  TYPE PREFIX##max(TYPE a, TYPE b);
+
+GML_MIN_FUNC(i, int)
+GML_MIN_FUNC(i32, int32_t)
+GML_MIN_FUNC(i64, int64_t)
+GML_MIN_FUNC(u, unsigned int)
+GML_MIN_FUNC(u32, uint32_t)
+GML_MIN_FUNC(u64, uint64_t)
+
+GML_MAX_FUNC(i, int)
+GML_MAX_FUNC(i32, int32_t)
+GML_MAX_FUNC(i64, int64_t)
+GML_MAX_FUNC(u, unsigned int)
+GML_MAX_FUNC(u32, uint32_t)
+GML_MAX_FUNC(u64, uint64_t)
+
+#undef GML_MIN_FUNC
+#undef GML_MAX_FUNC
+
 typedef float gml_vec3[3];
 
 void gml_vec3_assign(const gml_vec3 a, gml_vec3 b);
