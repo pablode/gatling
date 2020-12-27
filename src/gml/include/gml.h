@@ -2,6 +2,7 @@
 #define GML_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define GML_MIN_FUNC(PREFIX, TYPE)  \
   TYPE PREFIX##min(TYPE a, TYPE b);
@@ -32,7 +33,6 @@ void gml_vec3_add(const gml_vec3 a, const gml_vec3 b, gml_vec3 c);
 void gml_vec3_sub(const gml_vec3 a, const gml_vec3 b, gml_vec3 c);
 void gml_vec3_div(const gml_vec3 a, const gml_vec3 b, gml_vec3 c);
 void gml_vec3_divs(const gml_vec3 a, float s, gml_vec3 b);
-void gml_vec3_sdiv(float s, const gml_vec3 a, gml_vec3 b);
 void gml_vec3_mul(const gml_vec3 a, const gml_vec3 b, gml_vec3 c);
 void gml_vec3_muls(const gml_vec3 a, float s, gml_vec3 b);
 float gml_vec3_dot(const gml_vec3 a, const gml_vec3 b);
@@ -42,7 +42,26 @@ float gml_vec3_length(const gml_vec3 v);
 void gml_vec3_normalize(const gml_vec3 a, gml_vec3 b);
 void gml_vec3_max(const gml_vec3 a, const gml_vec3 b, gml_vec3 c);
 void gml_vec3_min(const gml_vec3 a, const gml_vec3 b, gml_vec3 c);
-float gml_vec3_comp_min(const gml_vec3 v);
-float gml_vec3_comp_max(const gml_vec3 v);
+float gml_vec3_mincomp(const gml_vec3 v);
+float gml_vec3_maxcomp(const gml_vec3 v);
+
+typedef float gml_vec4[4];
+
+void gml_vec4_assign(const gml_vec4 a, gml_vec4 b);
+
+typedef float gml_mat4[4][4];
+
+void gml_mat4_assign(const gml_mat4 a, gml_mat4 b);
+void gml_mat4_mul(const gml_mat4 a, const gml_mat4 b, gml_mat4 c);
+void gml_mat4_mul_vec4(const gml_mat4 a, const gml_vec4 b, gml_vec4 c);
+void gml_mat4_identity(gml_mat4 a);
+
+typedef float gml_mat3[3][3];
+
+void gml_mat3_assign(const gml_mat3 a, gml_mat3 b);
+void gml_mat3_from_mat4(const gml_mat4 a, gml_mat3 b);
+bool gml_mat3_invert(const gml_mat3 a, gml_mat3 b);
+void gml_mat3_transpose(const gml_mat3 a, gml_mat3 b);
+void gml_mat3_mul_vec3(const gml_mat3 a, const gml_vec3 b, gml_vec3 c);
 
 #endif

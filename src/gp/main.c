@@ -18,7 +18,7 @@ typedef struct gp_camera {
   gml_vec3 origin;
   gml_vec3 forward;
   gml_vec3 up;
-  float   hfov;
+  float    hfov;
 } gp_camera;
 
 typedef struct gp_scene {
@@ -38,19 +38,48 @@ static void gp_fail(const char* msg)
   exit(-1);
 }
 
+static void gp_convert_assimp_mat4(const struct aiMatrix4x4* ai_mat, gml_mat4 mat)
+{
+  mat[0][0] = ai_mat->a1;
+  mat[0][1] = ai_mat->a2;
+  mat[0][2] = ai_mat->a3;
+  mat[0][3] = ai_mat->a4;
+  mat[1][0] = ai_mat->b1;
+  mat[1][1] = ai_mat->b2;
+  mat[1][2] = ai_mat->b3;
+  mat[1][3] = ai_mat->b4;
+  mat[2][0] = ai_mat->c1;
+  mat[2][1] = ai_mat->c2;
+  mat[2][2] = ai_mat->c3;
+  mat[2][3] = ai_mat->c4;
+  mat[3][0] = ai_mat->d1;
+  mat[3][1] = ai_mat->d2;
+  mat[3][2] = ai_mat->d3;
+  mat[3][3] = ai_mat->d4;
+}
+
+static void gp_convert_assimp_vec3(const struct aiVector3D* ai_vec, gml_vec3 vec)
+{
+  vec[0] = ai_vec->x;
+  vec[1] = ai_vec->y;
+  vec[2] = ai_vec->z;
+}
+
 static void gp_assimp_add_node_mesh(
-  const struct aiScene* ai_scene, const struct aiNode* ai_node,
-  const struct aiMatrix4x4* ai_parent_transform,
+  const struct aiScene* ai_scene,
+  const struct aiNode* ai_node,
+  const gml_mat4 parent_trans,
   uint32_t* face_index, gp_face* faces,
   uint32_t* vertex_index, gp_vertex* vertices)
 {
-  struct aiMatrix4x4 ai_trans = *ai_parent_transform;
-  aiMultiplyMatrix4(&ai_trans, &ai_node->mTransformation);
+  gml_mat4 trans;
+  gp_convert_assimp_mat4(&ai_node->mTransformation, trans);
+  gml_mat4_mul(parent_trans, trans, trans);
 
-  struct aiMatrix3x3 ai_norm_trans;
-  aiMatrix3FromMatrix4(&ai_norm_trans, &ai_trans);
-  aiMatrix3Inverse(&ai_norm_trans);
-  aiTransposeMatrix3(&ai_norm_trans);
+  gml_mat3 norm_trans;
+  gml_mat3_from_mat4(trans, norm_trans);
+  gml_mat3_invert(norm_trans, norm_trans);
+  gml_mat3_transpose(norm_trans, norm_trans);
 
   for (uint32_t m = 0; m < ai_node->mNumMeshes; ++m)
   {
@@ -72,23 +101,26 @@ static void gp_assimp_add_node_mesh(
 
     for (uint32_t v = 0; v < ai_mesh->mNumVertices; ++v)
     {
-      struct aiVector3D ai_position = ai_mesh->mVertices[v];
-      struct aiVector3D ai_normal = ai_mesh->mNormals[v];
+      gml_vec3 pos;
+      gml_vec3 normal;
+      gp_convert_assimp_vec3(&ai_mesh->mVertices[v], pos);
+      gp_convert_assimp_vec3(&ai_mesh->mNormals[v], normal);
 
-      aiTransformVecByMatrix4(&ai_position, &ai_trans);
-      aiTransformVecByMatrix3(&ai_normal, &ai_norm_trans);
+      gml_vec4 pos4 = { pos[0], pos[1], pos[2], 1.0f };
+      gml_mat4_mul_vec4(trans, pos4, pos4);
+
+      gml_mat3_mul_vec3(norm_trans, normal, normal);
+      gml_vec3_normalize(normal, normal);
 
       struct gp_vertex* vertex = &vertices[*vertex_index];
-      vertex->pos[0] = ai_position.x;
-      vertex->pos[1] = ai_position.y;
-      vertex->pos[2] = ai_position.z;
-      vertex->norm[0] = ai_normal.x;
-      vertex->norm[1] = ai_normal.y;
-      vertex->norm[2] = ai_normal.z;
+      vertex->pos[0] = pos4[0];
+      vertex->pos[1] = pos4[1];
+      vertex->pos[2] = pos4[2];
+      vertex->norm[0] = normal[0];
+      vertex->norm[1] = normal[1];
+      vertex->norm[2] = normal[2];
       vertex->uv[0] = 0.0f;
       vertex->uv[1] = 0.0f;
-
-      gml_vec3_normalize(vertex->norm, vertex->norm);
 
       (*vertex_index)++;
     }
@@ -97,7 +129,7 @@ static void gp_assimp_add_node_mesh(
   for (uint32_t i = 0; i < ai_node->mNumChildren; ++i)
   {
     gp_assimp_add_node_mesh(
-      ai_scene, ai_node->mChildren[i], &ai_trans,
+      ai_scene, ai_node->mChildren[i], trans,
       face_index, faces, vertex_index, vertices
     );
   }
@@ -170,46 +202,35 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
   }
   else
   {
-    struct aiMatrix4x4 ai_cam_trans;
-    aiIdentityMatrix4(&ai_cam_trans);
+    gml_mat4 cam_trans;
+    gml_mat4_identity(cam_trans);
 
     struct aiCamera* ai_camera = ai_scene->mCameras[0];
     struct aiNode* ai_cam_node = gp_assimp_find_node(ai_scene->mRootNode, ai_camera->mName.data);
 
     do
     {
-      struct aiMatrix4x4 trans = ai_cam_node->mTransformation;
-      aiMultiplyMatrix4(&trans, &ai_cam_trans);
-      ai_cam_trans = trans;
+      gml_mat4 node_trans;
+      gp_convert_assimp_mat4(&ai_cam_node->mTransformation, node_trans);
+      gml_mat4_mul(node_trans, cam_trans, cam_trans);
       ai_cam_node = ai_cam_node->mParent;
     }
     while (ai_cam_node);
 
-    struct aiVector3D ai_origin = { 0.0f, 0.0f, 0.0f };
-    aiTransformVecByMatrix4(&ai_origin, &ai_cam_trans);
+    gml_vec4 origin = { 0.0f, 0.0f, 0.0f, 1.0f };
+    gml_mat4_mul_vec4(cam_trans, origin, origin);
+    scene->camera.origin[0] = origin[0];
+    scene->camera.origin[1] = origin[1];
+    scene->camera.origin[2] = origin[2];
 
-    scene->camera.origin[0] = ai_origin.x;
-    scene->camera.origin[1] = ai_origin.y;
-    scene->camera.origin[2] = ai_origin.z;
+    gml_mat3 dir_trans;
+    gml_mat3_from_mat4(cam_trans, dir_trans);
 
-    /* Remove position to transform directions. */
-    ai_cam_trans.a4 = 0.0f;
-    ai_cam_trans.b4 = 0.0f;
-    ai_cam_trans.c4 = 0.0f;
-
-    struct aiVector3D ai_forward = ai_camera->mLookAt;
-    struct aiVector3D ai_up = ai_camera->mUp;
-    aiTransformVecByMatrix4(&ai_forward, &ai_cam_trans);
-    aiTransformVecByMatrix4(&ai_up, &ai_cam_trans);
-
-    scene->camera.forward[0] = ai_forward.x;
-    scene->camera.forward[1] = ai_forward.y;
-    scene->camera.forward[2] = ai_forward.z;
+    gp_convert_assimp_vec3(&ai_camera->mLookAt, scene->camera.forward);
+    gp_convert_assimp_vec3(&ai_camera->mUp, scene->camera.up);
+    gml_mat3_mul_vec3(dir_trans, scene->camera.forward, scene->camera.forward);
+    gml_mat3_mul_vec3(dir_trans, scene->camera.up, scene->camera.up);
     gml_vec3_normalize(scene->camera.forward, scene->camera.forward);
-
-    scene->camera.up[0] = ai_up.x;
-    scene->camera.up[1] = ai_up.y;
-    scene->camera.up[2] = ai_up.z;
     gml_vec3_normalize(scene->camera.up, scene->camera.up);
 
     scene->camera.hfov = ai_camera->mHorizontalFOV;
@@ -220,23 +241,23 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
   gml_vec3 right;
   gml_vec3_cross(scene->camera.up, scene->camera.forward, right);
 
-  struct aiMatrix4x4 ai_root_trans;
-  ai_root_trans.a1 = right[0];
-  ai_root_trans.a2 = right[1];
-  ai_root_trans.a3 = right[2];
-  ai_root_trans.a4 = -gml_vec3_dot(right, scene->camera.origin);
-  ai_root_trans.b1 = scene->camera.up[0];
-  ai_root_trans.b2 = scene->camera.up[1];
-  ai_root_trans.b3 = scene->camera.up[2];
-  ai_root_trans.b4 = -gml_vec3_dot(scene->camera.up, scene->camera.origin);
-  ai_root_trans.c1 = scene->camera.forward[0];
-  ai_root_trans.c2 = scene->camera.forward[1];
-  ai_root_trans.c3 = scene->camera.forward[2];
-  ai_root_trans.c4 = -gml_vec3_dot(scene->camera.forward, scene->camera.origin);
-  ai_root_trans.d1 = 0.0f;
-  ai_root_trans.d2 = 0.0f;
-  ai_root_trans.d3 = 0.0f;
-  ai_root_trans.d4 = 1.0f;
+  gml_mat4 root_trans;
+  root_trans[0][0] = right[0];
+  root_trans[0][1] = right[1];
+  root_trans[0][2] = right[2];
+  root_trans[0][3] = -gml_vec3_dot(right, scene->camera.origin);
+  root_trans[1][0] = scene->camera.up[0];
+  root_trans[1][1] = scene->camera.up[1];
+  root_trans[1][2] = scene->camera.up[2];
+  root_trans[1][3] = -gml_vec3_dot(scene->camera.up, scene->camera.origin);
+  root_trans[2][0] = scene->camera.forward[0];
+  root_trans[2][1] = scene->camera.forward[1];
+  root_trans[2][2] = scene->camera.forward[2];
+  root_trans[2][3] = -gml_vec3_dot(scene->camera.forward, scene->camera.origin);
+  root_trans[3][0] = 0.0f;
+  root_trans[3][1] = 0.0f;
+  root_trans[3][2] = 0.0f;
+  root_trans[3][3] = 1.0f;
 
   scene->camera.up[0] = 0.0f;
   scene->camera.up[1] = 1.0f;
@@ -267,7 +288,7 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
 
   /* Transform and add scene graph geometry. */
   gp_assimp_add_node_mesh(
-    ai_scene, ai_scene->mRootNode, &ai_root_trans,
+    ai_scene, ai_scene->mRootNode, root_trans,
     &face_count, faces, &vertex_count, vertices
   );
 
