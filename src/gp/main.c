@@ -165,7 +165,8 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
   /* Get scene camera properties. */
   if (ai_scene->mNumCameras == 0)
   {
-    printf("Warning: no camera found\n");
+    printf("Error: no camera found\n");
+    exit(EXIT_FAILURE);
   }
   else
   {
