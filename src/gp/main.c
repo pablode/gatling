@@ -7,6 +7,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include <gml.h>
+
 #include "gp.h"
 #include "bvh.h"
 #include "bvh_collapse.h"

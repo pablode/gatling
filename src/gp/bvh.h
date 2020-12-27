@@ -2,7 +2,9 @@
 #define GP_BVH_H
 
 #include <stdbool.h>
+#include <gml.h>
 
+#include "aabb.h"
 #include "gp.h"
 #include "math.h"
 
