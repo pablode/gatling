@@ -4,7 +4,7 @@ const float PI = 3.1415926535897932384626433832795;
 const float TRI_EPS = 0.0000001;
 const float RAY_OFFSET_EPS = 0.00001;
 
-struct vertex
+struct fvertex
 {
     /* pos.{x, y, z}, tex.u */
     vec4 field1;
@@ -71,7 +71,7 @@ layout(set=0, binding=2) readonly buffer BufferFaces
 
 layout(set=0, binding=3) readonly buffer BufferVertices
 {
-    vertex vertices[];
+    fvertex vertices[];
 };
 
 layout(set=0, binding=4) readonly buffer BufferMaterials
