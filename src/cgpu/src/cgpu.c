@@ -994,6 +994,22 @@ CgpuResult cgpu_get_device_count(uint32_t* p_device_count)
   return CGPU_OK;
 }
 
+static bool cgpu_find_device_extension(const char* extension_name,
+                                       uint32_t extension_count,
+                                       VkExtensionProperties* extensions)
+{
+  for (uint32_t i = 0; i < extension_count; ++i)
+  {
+    const VkExtensionProperties* extension = &extensions[i];
+
+    if (strcmp(extension->extensionName, extension_name) == 0)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 CgpuResult cgpu_create_device(
   uint32_t index,
   cgpu_device* p_device)
@@ -1088,24 +1104,24 @@ CgpuResult cgpu_create_device(
     device_extensions
   );
 
+  const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
+
+  bool has_portability_subset = cgpu_find_device_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
+                                                           device_ext_count,
+                                                           device_extensions);
+
   const char* required_exts[] = {
     VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
-    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME
+    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
+    VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
   };
-  const uint32_t required_ext_count = 2;
+  const uint32_t required_ext_count = has_portability_subset ? 3 : 2;
 
   for (uint32_t i = 0; i < required_ext_count; ++i)
   {
     const char* required_ext = *(required_exts + i);
 
-    bool has_extension = false;
-    for (uint32_t e = 0; e < device_ext_count; ++e) {
-      const VkExtensionProperties* extension = &device_extensions[e];
-      if (strcmp(extension->extensionName, required_ext) == 0) {
-        has_extension = true;
-        break;
-      }
-    }
+    bool has_extension = cgpu_find_device_extension(required_ext, device_ext_count, device_extensions);
 
     if (!has_extension) {
       resource_store_free_handle(&idevice_store, p_device->handle);
