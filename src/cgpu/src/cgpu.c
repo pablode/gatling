@@ -1090,10 +1090,9 @@ CgpuResult cgpu_create_device(
 
   const char* required_exts[] = {
     VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
-    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
-    VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME
+    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME
   };
-  const uint32_t required_ext_count = 3;
+  const uint32_t required_ext_count = 2;
 
   for (uint32_t i = 0; i < required_ext_count; ++i)
   {
