@@ -660,7 +660,7 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
   c_result = cgpu_destroy_device(device);
   gatling_cgpu_ensure(c_result);
-  c_result = cgpu_destroy();
+  c_result = cgpu_terminate();
   gatling_cgpu_ensure(c_result);
 
   return EXIT_SUCCESS;

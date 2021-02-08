@@ -969,7 +969,7 @@ CgpuResult cgpu_initialize(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy(void)
+CgpuResult cgpu_terminate(void)
 {
   resource_store_destroy(&idevice_store);
   resource_store_destroy(&ishader_store);

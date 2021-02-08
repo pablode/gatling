@@ -590,7 +590,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
   uint32_t version_patch
 );
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_destroy(void);
+CGPU_API CgpuResult CGPU_CDECL cgpu_terminate(void);
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_get_device_count(
   uint32_t* p_device_count
