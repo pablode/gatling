@@ -1,5 +1,5 @@
 add_library(
-  gml
+  gml STATIC
   include/gml.h
   src/gml.c
 )
