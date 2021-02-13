@@ -330,6 +330,10 @@ int main(int argc, const char* argv[])
 
   gatling_file_close(scene_file);
 
+  /* We always work on 32x32 tiles. */
+  uint32_t workgroup_size_x = 32;
+  uint32_t workgroup_size_y = 32;
+
   /* Set up pipeline. */
   cgpu_pipeline pipeline;
   {
@@ -394,8 +398,8 @@ int main(int argc, const char* argv[])
     }
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id =  0, .p_data = (void*) &device_limits.subgroupSize,   .size = 4 },
-      { .constant_id =  1, .p_data = (void*) &device_limits.subgroupSize,   .size = 4 },
+      { .constant_id =  0, .p_data = (void*) &workgroup_size_x,             .size = 4 },
+      { .constant_id =  1, .p_data = (void*) &workgroup_size_y,             .size = 4 },
       { .constant_id =  2, .p_data = (void*) &options.image_width,          .size = 4 },
       { .constant_id =  3, .p_data = (void*) &options.image_height,         .size = 4 },
       { .constant_id =  4, .p_data = (void*) &options.spp,                  .size = 4 },
@@ -480,8 +484,8 @@ int main(int argc, const char* argv[])
   /* Trace rays. */
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    (options.image_width / device_limits.subgroupSize) + 1,
-    (options.image_height / device_limits.subgroupSize) + 1,
+    (options.image_width + workgroup_size_x - 1) / workgroup_size_x,
+    (options.image_height + workgroup_size_y - 1) / workgroup_size_y,
     1
   );
   gatling_cgpu_ensure(c_result);
