@@ -10,11 +10,14 @@ add_library(
 
 target_include_directories(
   cgpu
-  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
-  PRIVATE src
+  PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE
+    src
 )
 
 target_link_libraries(
-  cgpu PRIVATE
-  volk
+  cgpu
+  PRIVATE
+    volk
 )
