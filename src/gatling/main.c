@@ -536,6 +536,7 @@ int main(int argc, const char* argv[])
   gatling_cgpu_ensure(c_result);
 
   printf("Rendering...\n");
+  fflush(stdout);
 
   c_result = cgpu_submit_command_buffer(
     device,
