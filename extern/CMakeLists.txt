@@ -53,7 +53,7 @@ FetchContent_Declare(
   GIT_TAG v1.6.35
 )
 FetchContent_MakeAvailable(libpng)
-add_dependencies(png_static zlib)
+add_dependencies(png_static zlibstatic)
 get_target_property(PNG_BINARY_DIR png_static BINARY_DIR)
 get_target_property(PNG_SOURCE_DIR png_static SOURCE_DIR)
 target_include_directories(png_static PUBLIC $<BUILD_INTERFACE:${PNG_BINARY_DIR}>)
