@@ -1,93 +1,51 @@
 include(CMakeParseArguments)
 
-# Try to find a GLSL compiler.
-if(NOT GATLING_GLSL_COMPILER)
-  find_program(GATLING_GLSL_COMPILER glslc)
+if(NOT GATLING_GLSLANG_VALIDATOR)
+  find_program(GATLING_GLSLANG_VALIDATOR glslangValidator)
 endif()
 
-if(GATLING_GLSL_COMPILER)
-  message(STATUS "Using GLSL compiler: ${GATLING_GLSL_COMPILER}")
-else()
-  message(FATAL_ERROR "No GLSL compiler found.")
+if(NOT GATLING_GLSLANG_VALIDATOR)
+  message(FATAL_ERROR "glslangValidator not found!")
 endif()
 
-# Define SHADER_OUTPUT_DIRECTORY target property.
-define_property(
-  TARGET
-  PROPERTY SHADER_OUTPUT_DIRECTORY
-  BRIEF_DOCS "The directory where SPIR-V files are written to."
-  FULL_DOCS "The directory where SPIR-V files are written to. Has default value of RUNTIME_OUTPUT_DIRECTORY."
-)
+message(STATUS "Found glslangValidator: ${GATLING_GLSLANG_VALIDATOR}")
 
-# The add_shader_library function produces a target which, when built, invokes the
-# GLSL compiler on the given shader files. It provides an INCLUDES section where
-# files can be defined which are included by the shaders. This is necessary since
-# we want to recompile a shader each time included files change. Unfortunately, for
-# now, we can only recompile on a per-target basis. The target property
-# SHADER_OUTPUT_DIRECTORY can be set to define the compilation output directory.
-# It's initialized with the value of CMAKE_RUNTIME_OUTPUT_DIRECTORY.
 function(add_shader_library target)
 
-  # Read input args, extract shader file paths and names.
-  cmake_parse_arguments("TARGET" "" "" "INCLUDES" ${ARGN})
+  # Read shader files and includes
+  cmake_parse_arguments("TARGET" "" "" "INCLUDES" "${ARGN}")
 
-  list(APPEND TARGET_SHADERS_INPUT_FILE_PATHS "")
-  list(APPEND TARGET_SHADERS_INPUT_FILE_NAMES "")
-  list(APPEND TARGET_SHADERS_OUTPUT_FILE_NAMES "")
-  list(APPEND TARGET_SHADERS_OUTPUT_FILE_PATHS "")
+  # "Namespace" header files so we know that they are generated
+  set(header_dir "${CMAKE_CURRENT_BINARY_DIR}/SPV")
+
+  # Provide a compilation command for each shader file
+  set(header_paths "")
+
   foreach(shader ${TARGET_UNPARSED_ARGUMENTS})
-    get_filename_component(shader_path_abs ${shader} ABSOLUTE)
+    get_filename_component(shader_path ${shader} ABSOLUTE)
     get_filename_component(shader_name ${shader} NAME)
-    set(spv_file_name "${shader_name}.spv")
-    set(spv_file_path "${CMAKE_CURRENT_BINARY_DIR}/${spv_file_name}")
-    list(APPEND TARGET_SHADERS_INPUT_FILE_PATHS ${shader_path_abs})
-    list(APPEND TARGET_SHADERS_INPUT_FILE_NAMES ${shader_name})
-    list(APPEND TARGET_SHADERS_OUTPUT_FILE_NAMES ${spv_file_name})
-    list(APPEND TARGET_SHADERS_OUTPUT_FILE_PATHS ${spv_file_path})
-  endforeach()
+    get_filename_component(shader_name_we ${shader} NAME_WE)
+    get_filename_component(shader_ext ${shader} EXT)
+    string(SUBSTRING ${shader_ext} 1 -1 shader_ext)
 
-  # Create a custom target, set initial value of output directory property.
-  add_custom_target(${target} DEPENDS ${TARGET_SHADERS_OUTPUT_FILE_PATHS})
-  set_target_properties(${target} PROPERTIES SHADER_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+    set(header_path "${header_dir}/${shader_name}.spv.h")
 
-  # Make sure the path to the shader output directory exists when compiling.
-  add_custom_command(
-     TARGET ${target} PRE_BUILD
-     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_PROPERTY:${target},SHADER_OUTPUT_DIRECTORY>
-     VERBATIM
-  )
-
-  # Add custom commands to compile the shaders at build time.
-  list(LENGTH TARGET_SHADERS_INPUT_FILE_PATHS SHADER_FILE_COUNT)
-  math(EXPR SHADER_FILE_COUNT "${SHADER_FILE_COUNT}-1")
-  foreach(i RANGE ${SHADER_FILE_COUNT})
-    list(GET TARGET_SHADERS_INPUT_FILE_PATHS ${i} input_path)
-    list(GET TARGET_SHADERS_INPUT_FILE_NAMES ${i} input_name)
-    list(GET TARGET_SHADERS_OUTPUT_FILE_NAMES ${i} output_name)
-    list(GET TARGET_SHADERS_OUTPUT_FILE_PATHS ${i} output_path)
-
-    # Unfortunately, we have to use a workaround because of this issue:
-    # https://gitlab.kitware.com/cmake/cmake/issues/12877
-    # Instead of outputting directly to the specified directory, we write
-    # to a temporary location and copy the files on every build invocation.
     add_custom_command(
-      OUTPUT ${output_path}
-      MAIN_DEPENDENCY ${input_path}
+      OUTPUT ${header_path}
+      MAIN_DEPENDENCY ${shader_path}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-      COMMENT "Compiling GLSL shader ${input_name}"
-      COMMAND ${GATLING_GLSL_COMPILER} --target-env=vulkan1.1 -o ${output_path} -c ${input_path}
-      VERBATIM
-      # Rebuild if an included file changes.
+      COMMENT "Compiling GLSL shader ${shader_name}"
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${header_dir}
+      COMMAND ${GATLING_GLSLANG_VALIDATOR} --target-env vulkan1.1 --vn "SPV_${shader_name_we}_${shader_ext}" -o ${header_path} --quiet ${shader_path}
       DEPENDS ${TARGET_INCLUDES}
     )
 
-    # Always copy cached compiled shaders to output dir. Note that although the
-    # function name is the same as above, the commands do very different things.
-    add_custom_command(
-      TARGET ${target} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${output_path} "$<TARGET_PROPERTY:${target},SHADER_OUTPUT_DIRECTORY>/${output_name}"
-      VERBATIM
-    )
+    list(APPEND header_paths ${header_path})
+
   endforeach()
+
+  # Create a library which depends on the generated header files
+  add_library(${target} INTERFACE ${header_paths})
+  target_include_directories(${target} INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
 endfunction()

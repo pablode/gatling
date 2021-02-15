@@ -1,3 +1,12 @@
+add_shader_library(
+  gatling-shaders
+  shaders/main.comp
+  INCLUDES
+    shaders/bvh.glsl
+    shaders/common.glsl
+    shaders/extensions.glsl
+)
+
 add_executable(
   gatling
   img.c
@@ -18,27 +27,8 @@ target_compile_definitions(
 target_link_libraries(
   gatling
   PRIVATE
+    gatling-shaders
     cgpu
     ${C_MATH_LIBRARY}
     png_static
-)
-
-add_shader_library(
-  gatling-shaders
-  shaders/main.comp
-  INCLUDES
-    shaders/bvh.glsl
-    shaders/common.glsl
-    shaders/extensions.glsl
-)
-
-set_target_properties(
-  gatling-shaders
-  PROPERTIES
-    SHADER_OUTPUT_DIRECTORY "${GATLING_OUTPUT_DIR}/shaders"
-)
-
-add_dependencies(
-  gatling
-  gatling-shaders
 )

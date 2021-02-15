@@ -9,6 +9,8 @@
 #include "img.h"
 #include "mmap.h"
 
+#include <SPV/main.comp.spv.h>
+
 static uint32_t DEFAULT_IMAGE_WIDTH = 1200;
 static uint32_t DEFAULT_IMAGE_HEIGHT = 1200;
 static uint32_t DEFAULT_SPP = 256;
@@ -40,29 +42,6 @@ typedef struct program_options {
       exit(EXIT_FAILURE);                                                                   \
     }                                                                                       \
   } while (0)
-
-static void gatling_get_parent_directory(
-  const char* file_path,
-  char* dir_path)
-{
-  char* last_path_sep = strrchr(file_path, '/');
-
-  if (last_path_sep == NULL)
-  {
-    last_path_sep = strrchr(file_path, '\\');
-  }
-
-  if (last_path_sep != NULL)
-  {
-    const uint32_t char_index = (uint32_t) (last_path_sep - file_path);
-    memcpy(dir_path, file_path, char_index);
-    dir_path[char_index] = '\0';
-  }
-  else
-  {
-    dir_path = ".\0";
-  }
-}
 
 static void gatling_print_usage_and_exit()
 {
@@ -337,43 +316,18 @@ int main(int argc, const char* argv[])
   /* Set up pipeline. */
   cgpu_pipeline pipeline;
   {
-    /* Map and create shader. */
-    char dir_path[1024];
-    gatling_get_parent_directory(argv[0], dir_path);
-
-    char shader_path[2048];
-    snprintf(shader_path, 2048, "%s/shaders/main.comp.spv", dir_path);
-
-    gatling_file* file;
-    if (!gatling_file_open(shader_path, GATLING_FILE_USAGE_READ, &file)) {
-      gatling_fail("Unable to open shader file.");
-    }
-
-    const uint64_t file_size = gatling_file_size(file);
-
-    uint32_t* data = (uint32_t*) gatling_mmap(file, 0, file_size);
-
-    if (!data) {
-      gatling_fail("Unable to map shader file.");
-    }
-
     cgpu_shader shader;
     c_result = cgpu_create_shader(
       device,
-      file_size,
-      data,
+      sizeof(SPV_main_comp),
+      SPV_main_comp,
       &shader
     );
-
-    gatling_munmap(file, data);
-
-    gatling_file_close(file);
 
     if (c_result != CGPU_OK) {
       gatling_fail("Unable to create shader.");
     }
 
-    /* Set up pipeline. */
     const uint32_t shader_resources_buffer_count = 5;
     cgpu_shader_resource_buffer shader_resources_buffers[] = {
       { 0,       output_buffer,                       0,               CGPU_WHOLE_SIZE },
