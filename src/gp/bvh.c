@@ -1305,10 +1305,12 @@ void gp_bvh_build(
   int32_t reserve_buffer_capacity = (int32_t) (params->spatial_reserve_factor * params->face_count);
   gp_bvh_face_ref* reserve_buffer = (gp_bvh_face_ref*) malloc(reserve_buffer_capacity * sizeof(gp_bvh_face_ref));
 
+  int32_t reused_aabbs_size = imax(params->spatial_bin_count, params->face_count) * sizeof(gp_aabb);
+
   gp_bvh_thread_data thread_data;
   thread_data.params = params;
   thread_data.reused_bins = (void*) malloc(reused_bins_size);
-  thread_data.reused_aabbs = (gp_aabb*) malloc(params->face_count * sizeof(gp_aabb));
+  thread_data.reused_aabbs = (gp_aabb*) malloc(reused_aabbs_size);
   thread_data.root_half_area = root_half_area;
   thread_data.reserve_buffer = reserve_buffer;
   thread_data.reserve_buffer_capacity = &reserve_buffer_capacity;
