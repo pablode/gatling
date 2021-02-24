@@ -45,7 +45,8 @@ function(add_shader_library target)
   endforeach()
 
   # Create a library which depends on the generated header files
-  add_library(${target} INTERFACE ${header_paths})
+  add_library(${target} INTERFACE)
+  target_sources(${target} INTERFACE ${header_paths})
   target_include_directories(${target} INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
 endfunction()
