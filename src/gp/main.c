@@ -274,6 +274,15 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
     face_count += ai_mesh->mNumFaces;
   }
 
+  /* We don't support too few faces since this would lead to the
+   * root node being a leaf, requiring special handling in the
+   * traversal algorithm. */
+  if (face_count <= 3)
+  {
+    fprintf(stderr, "More than 3 faces required\n");
+    exit(EXIT_FAILURE);
+  }
+
   gp_vertex* vertices = (gp_vertex*) malloc(vertex_count * sizeof(gp_vertex));
   gp_face* faces = (gp_face*) malloc(face_count * sizeof(gp_face));
 

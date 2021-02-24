@@ -293,6 +293,10 @@ static uint32_t gp_bvh_collapse_create_nodes(
 
 void gp_bvh_collapse(const gp_bvh_collapse_params* params, gp_bvhc* bvhc)
 {
+  /* This would lead to a leaf node being root. This is not supported by this
+   * construction algorithm. */
+  assert(params->bvh->face_count > params->max_leaf_size);
+
   /* Calculate cost lookup table. */
   const uint32_t num_splits = params->bvh->node_count * 7;
   gp_bvh_collapse_split* splits = malloc(num_splits * sizeof(gp_bvh_collapse_split));
