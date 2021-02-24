@@ -339,7 +339,7 @@ int main(int argc, const char* argv[])
 
     const uint32_t node_size = 80;
     const uint32_t node_count = file_header.node_buf_size / node_size;
-    const uint32_t traversal_stack_size = (log(node_count) / log(8)) * 2;
+    const uint32_t traversal_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
     const float aspect_ratio = (float) options.image_width / (float) options.image_height;
 
