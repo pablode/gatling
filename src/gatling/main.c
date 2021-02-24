@@ -29,31 +29,31 @@ typedef struct program_options {
   float rr_inv_min_term_prob;
 } program_options;
 
-#define gatling_fail(msg)                                                         \
-  do {                                                                            \
-    printf("Gatling encountered a fatal error at line %d: %s\n", __LINE__, msg);  \
-    exit(EXIT_FAILURE);                                                           \
+#define gatling_fail(msg)                             \
+  do {                                                \
+    fprintf(stderr, "Line %d: %s\n", __LINE__, msg);  \
+    exit(EXIT_FAILURE);                               \
   } while(0)
 
-#define gatling_cgpu_ensure(result)                                                         \
-  do {                                                                                      \
-    if (result != CGPU_OK) {                                                                \
-      printf("Gatling encountered a fatal CGPU error at line %d: %d\n", __LINE__, result);  \
-      exit(EXIT_FAILURE);                                                                   \
-    }                                                                                       \
+#define gatling_cgpu_ensure(result)                                   \
+  do {                                                                \
+    if (result != CGPU_OK) {                                          \
+      fprintf(stderr, "Line %d: cgpu error %d\n", __LINE__, result);  \
+      exit(EXIT_FAILURE);                                             \
+    }                                                                 \
   } while (0)
 
 static void gatling_print_usage_and_exit()
 {
-  printf("Usage: gatling <scene.gsd> <output.png> [options]\n");
-  printf("\n");
-  printf("Options:\n");
-  printf("--image-width          [default: %u]\n", DEFAULT_IMAGE_WIDTH);
-  printf("--image-height         [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
-  printf("--spp                  [default: %u]\n", DEFAULT_SPP);
-  printf("--max-bounces          [default: %u]\n", DEFAULT_MAX_BOUNCES);
-  printf("--rr-bounce-offset     [default: %u]\n", DEFAULT_RR_BOUNCE_OFFSET);
-  printf("--rr-inv-min-term-prob [default: %.2f]\n", DEFAULT_RR_INV_MIN_TERM_PROB);
+  fprintf(stderr, "Usage: gatling <scene.gsd> <output.png> [options]\n");
+  fprintf(stderr, "\n");
+  fprintf(stderr, "Options:\n");
+  fprintf(stderr, "--image-width          [default: %u]\n", DEFAULT_IMAGE_WIDTH);
+  fprintf(stderr, "--image-height         [default: %u]\n", DEFAULT_IMAGE_HEIGHT);
+  fprintf(stderr, "--spp                  [default: %u]\n", DEFAULT_SPP);
+  fprintf(stderr, "--max-bounces          [default: %u]\n", DEFAULT_MAX_BOUNCES);
+  fprintf(stderr, "--rr-bounce-offset     [default: %u]\n", DEFAULT_RR_BOUNCE_OFFSET);
+  fprintf(stderr, "--rr-inv-min-term-prob [default: %.2f]\n", DEFAULT_RR_INV_MIN_TERM_PROB);
   exit(EXIT_FAILURE);
 }
 
@@ -156,19 +156,19 @@ int main(int argc, const char* argv[])
     GATLING_VERSION_PATCH
   );
   if (c_result != CGPU_OK) {
-    gatling_fail("Unable to initialize cgpu.");
+    gatling_fail("Unable to initialize cgpu");
   }
 
   uint32_t device_count;
   c_result = cgpu_get_device_count(&device_count);
   if (c_result != CGPU_OK || device_count == 0) {
-    gatling_fail("Unable to find device.");
+    gatling_fail("Unable to find device");
   }
 
   cgpu_device device;
   c_result = cgpu_create_device(0, &device);
   if (c_result != CGPU_OK) {
-    gatling_fail("Unable to create device.");
+    gatling_fail("Unable to create device");
   }
 
   cgpu_physical_device_limits device_limits;
@@ -179,7 +179,7 @@ int main(int argc, const char* argv[])
   gatling_file* scene_file;
   const bool ok = gatling_file_open(options.input_file, GATLING_FILE_USAGE_READ, &scene_file);
   if (!ok) {
-    gatling_fail("Unable to read scene file.");
+    gatling_fail("Unable to read scene file");
   }
 
   uint64_t scene_data_size = gatling_file_size(scene_file);
@@ -191,7 +191,7 @@ int main(int argc, const char* argv[])
   );
 
   if (!mapped_scene_data) {
-    gatling_fail("Unable to map scene file.");
+    gatling_fail("Unable to map scene file");
   }
 
   /* Create input and output buffers. */
@@ -325,7 +325,7 @@ int main(int argc, const char* argv[])
     );
 
     if (c_result != CGPU_OK) {
-      gatling_fail("Unable to create shader.");
+      gatling_fail("Unable to create shader");
     }
 
     const uint32_t shader_resources_buffer_count = 5;
@@ -534,7 +534,7 @@ int main(int argc, const char* argv[])
 
   if (!image_floats)
   {
-    gatling_fail("Out of memory.");
+    gatling_fail("Out of memory");
   }
 
   c_result = cgpu_map_buffer(
@@ -562,7 +562,7 @@ int main(int argc, const char* argv[])
 
   if (!image_bytes)
   {
-    gatling_fail("Out of memory.");
+    gatling_fail("Out of memory");
   }
 
   const float gamma = 1.0f / 2.2f;
@@ -599,7 +599,7 @@ int main(int argc, const char* argv[])
 
   if (!write_ok)
   {
-    gatling_fail("Unable to write image.");
+    gatling_fail("Unable to write image");
   }
 
   /* Clean up. */

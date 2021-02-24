@@ -32,12 +32,6 @@ typedef struct gp_scene {
   gp_vertex*   vertices;
 } gp_scene;
 
-static void gp_fail(const char* msg)
-{
-  printf("Gatling encountered a fatal error: %s\n", msg);
-  exit(-1);
-}
-
 static void gp_convert_assimp_mat4(const struct aiMatrix4x4* ai_mat, gml_mat4 mat)
 {
   mat[0][0] = ai_mat->a1;
@@ -181,23 +175,23 @@ static void gp_load_scene(gp_scene* scene, const char* file_path)
 
   if(!ai_scene)
   {
-    const char* error_msg = aiGetErrorString();
-    gp_fail(error_msg);
+    fprintf(stderr, "%s\n", aiGetErrorString());
+    exit(EXIT_FAILURE);
   }
 
   if ((ai_scene->mFlags & AI_SCENE_FLAGS_VALIDATION_WARNING) == AI_SCENE_FLAGS_VALIDATION_WARNING)
   {
-    printf("Warning: Assimp validation warning\n");
+    fprintf(stderr, "Assimp validation warning\n");
   }
   if ((ai_scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE) == AI_SCENE_FLAGS_INCOMPLETE)
   {
-    printf("Warning: Assimp scene import incomplete\n");
+    fprintf(stderr, "Assimp scene import incomplete\n");
   }
 
   /* Get scene camera properties. */
   if (ai_scene->mNumCameras == 0)
   {
-    printf("Error: no camera found\n");
+    fprintf(stderr, "No camera found\n");
     exit(EXIT_FAILURE);
   }
   else
@@ -372,18 +366,27 @@ static void gp_write_file(
   const char* file_path)
 {
   FILE *file = fopen(file_path, "wb");
-  if (file == NULL) {
-    gp_fail("Unable to open file for writing.");
+
+  if (file == NULL)
+  {
+    fprintf(stderr, "Unable to open file %s for writing\n", file_path);
+    exit(EXIT_FAILURE);
   }
 
   const uint64_t written_size = fwrite(data, 1, size, file);
-  if (written_size != size) {
-    gp_fail("Unable to write file.");
+
+  if (written_size != size)
+  {
+    fprintf(stderr, "Unable to write file %s\n", file_path);
+    exit(EXIT_FAILURE);
   }
 
   const int close_result = fclose(file);
-  if (close_result != 0) {
-    printf("Unable to close file '%s'.", file_path);
+
+  if (close_result != 0)
+  {
+    fprintf(stderr, "Unable to close file %s\n", file_path);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -454,7 +457,7 @@ int main(int argc, const char* argv[])
 {
   if (argc != 3)
   {
-    printf("Usage: gp <input_file> <output.gsd>\n");
+    fprintf(stderr, "Usage: gp <input_file> <output.gsd>\n");
     return EXIT_FAILURE;
   }
 
