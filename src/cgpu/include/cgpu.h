@@ -675,7 +675,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   cgpu_device device,
   uint32_t buffer_resource_count,
   const cgpu_shader_resource_buffer* p_buffer_resources,
-  uint32_t shader_resource_count,
+  uint32_t image_resource_count,
   const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
