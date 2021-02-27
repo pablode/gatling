@@ -1,11 +1,10 @@
 #ifndef GP_BVH_H
 #define GP_BVH_H
 
-#include <stdbool.h>
 #include <gml.h>
 
-#include "gp.h"
-#include "math.h"
+struct gi_face;
+struct gi_vertex;
 
 typedef enum GpBvhBinningMode {
   GP_BVH_BINNING_MODE_ADAPTIVE,
@@ -25,27 +24,27 @@ typedef struct gp_bvh_node {
 } gp_bvh_node;
 
 typedef struct gp_bvh {
-  gml_aabb     aabb;
-  uint32_t     node_count;
-  gp_bvh_node* nodes;
-  uint32_t     face_count;
-  gp_face*     faces;
+  gml_aabb        aabb;
+  uint32_t        node_count;
+  gp_bvh_node*    nodes;
+  uint32_t        face_count;
+  struct gi_face* faces;
 } gp_bvh;
 
 typedef struct gp_bvh_build_params {
-  uint32_t         face_batch_size;
-  uint32_t         face_count;
-  float            face_intersection_cost;
-  gp_face*         faces;
-  uint32_t         leaf_max_face_count;
-  GpBvhBinningMode object_binning_mode;
-  uint32_t         object_binning_threshold;
-  uint32_t         object_bin_count;
-  uint32_t         spatial_bin_count;
-  float            spatial_reserve_factor;
-  float            spatial_split_alpha;
-  uint32_t         vertex_count;
-  gp_vertex*       vertices;
+  uint32_t          face_batch_size;
+  uint32_t          face_count;
+  float             face_intersection_cost;
+  struct gi_face*   faces;
+  uint32_t          leaf_max_face_count;
+  GpBvhBinningMode  object_binning_mode;
+  uint32_t          object_binning_threshold;
+  uint32_t          object_bin_count;
+  uint32_t          spatial_bin_count;
+  float             spatial_reserve_factor;
+  float             spatial_split_alpha;
+  uint32_t          vertex_count;
+  struct gi_vertex* vertices;
 } gp_bvh_build_params;
 
 void gp_bvh_build(

@@ -14,11 +14,11 @@ typedef struct gp_bvhc_node {
 } gp_bvhc_node;
 
 typedef struct gp_bvhc {
-  gml_aabb      aabb;
-  uint32_t      node_count;
-  gp_bvhc_node* nodes;
-  uint32_t      face_count;
-  gp_face*      faces;
+  gml_aabb        aabb;
+  uint32_t        node_count;
+  gp_bvhc_node*   nodes;
+  uint32_t        face_count;
+  struct gi_face* faces;
 } gp_bvhc;
 
 typedef struct gp_bvh_collapse_params {

@@ -1,7 +1,8 @@
 #include "bvh_collapse.h"
 
+#include "gi.h"
+
 #include <stdlib.h>
-#include <stdint.h>
 #include <math.h>
 #include <assert.h>
 
@@ -320,7 +321,7 @@ void gp_bvh_collapse(const gp_bvh_collapse_params* params, gp_bvhc* bvhc)
   bvhc->node_count = 1;
   bvhc->nodes = malloc(params->bvh->node_count * sizeof(gp_bvhc_node));
   bvhc->face_count = 0;
-  bvhc->faces = malloc(params->bvh->face_count * sizeof(gp_face));
+  bvhc->faces = malloc(params->bvh->face_count * sizeof(struct gi_face));
 
   /* Clear root node. */
   gp_bvhc_node* root_node = &bvhc->nodes[0];

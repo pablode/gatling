@@ -28,20 +28,6 @@ set(ZLIB_LIBRARY $<TARGET_FILE:zlibstatic>)
 set(ZLIB_LIBRARIES $<TARGET_FILE:zlibstatic>)
 set(ZLIB_FOUND TRUE)
 
-# assimp
-set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE INTERNAL "" FORCE)
-set(ASSIMP_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
-set(ASSIMP_BUILD_ZLIB ON CACHE INTERNAL "" FORCE)
-set(ASSIMP_INSTALL OFF CACHE INTERNAL "" FORCE)
-set(ASSIMP_BUILD_MINIZIP ON)
-FetchContent_Declare(
-  assimp
-  GIT_REPOSITORY https://github.com/assimp/assimp.git
-  GIT_TAG 2f1ff974fdbfceeca3a889c87b8e38b3e01350ac
-)
-FetchContent_MakeAvailable(assimp)
-add_dependencies(assimp zlibstatic)
-
 # libpng
 set(SKIP_INSTALL_ALL ON)
 set(PNG_BUILD_ZLIB ON CACHE INTERNAL "" FORCE)

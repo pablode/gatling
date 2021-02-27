@@ -1,5 +1,7 @@
 #include "bvh.h"
 
+#include "gi.h"
+
 #include <stdbool.h>
 #include <stdlib.h>
 #include <math.h>
@@ -379,8 +381,8 @@ static void gp_bvh_find_split_spatial(
   gp_bvh_split_spatial* split)
 {
   gp_bvh_spatial_bin* bins = (gp_bvh_spatial_bin*) thread_data->reused_bins;
-  const gp_vertex* vertices = thread_data->params->vertices;
-  const gp_face* faces = thread_data->params->faces;
+  const struct gi_vertex* vertices = thread_data->params->vertices;
+  const struct gi_face* faces = thread_data->params->faces;
   const uint32_t bin_count = thread_data->params->spatial_bin_count;
   const gml_aabb* range_aabb = &range->aabb_bounds;
 
@@ -412,7 +414,7 @@ static void gp_bvh_find_split_spatial(
       const float bin_size = bin_sizes[axis];
 
       const gml_aabb* ref_aabb = &ref->aabb;
-      const gp_face* face = &faces[ref->index];
+      const struct gi_face* face = &faces[ref->index];
 
       gml_vec3 v_0;
       gml_vec3_assign(vertices[face->v_i[2]].pos, v_0);
@@ -585,8 +587,8 @@ static void gp_bvh_do_split_spatial(
   const float axis_length = range->aabb_bounds.max[split->axis] - range->aabb_bounds.min[split->axis];
   const float bin_size = axis_length / bin_count;
 
-  const gp_vertex* vertices = thread_data->params->vertices;
-  const gp_face* faces = thread_data->params->faces;
+  const struct gi_vertex* vertices = thread_data->params->vertices;
+  const struct gi_face* faces = thread_data->params->faces;
   const uint32_t axis = split->axis;
 
   const int32_t split_face_count = split->left_face_count + split->right_face_count;
@@ -618,7 +620,7 @@ static void gp_bvh_do_split_spatial(
     gp_bvh_face_ref* ref = &range->stack[range1_index_start * range->stack_dir];
 
     const gml_aabb* ref_aabb = &ref->aabb;
-    const gp_face* face = &faces[ref->index];
+    const struct gi_face* face = &faces[ref->index];
 
     /* Split all edges on the split plane and get AABBs for both sides. */
 
@@ -1224,10 +1226,10 @@ void gp_bvh_build(
 
   for (uint32_t i = 0; i < params->face_count; ++i)
   {
-    const gp_face* face = &params->faces[i];
-    const gp_vertex* v_a = &params->vertices[face->v_i[0]];
-    const gp_vertex* v_b = &params->vertices[face->v_i[1]];
-    const gp_vertex* v_c = &params->vertices[face->v_i[2]];
+    const struct gi_face* face = &params->faces[i];
+    const struct gi_vertex* v_a = &params->vertices[face->v_i[0]];
+    const struct gi_vertex* v_b = &params->vertices[face->v_i[1]];
+    const struct gi_vertex* v_c = &params->vertices[face->v_i[2]];
 
     gp_bvh_face_ref* face_ref = &root_stack[root_stack_size];
 
@@ -1291,7 +1293,7 @@ void gp_bvh_build(
 
   bvh->aabb = root_aabb_bounds;
   bvh->face_count = 0;
-  bvh->faces = malloc(max_face_count * sizeof(gp_face));
+  bvh->faces = malloc(max_face_count * sizeof(struct gi_face));
   bvh->node_count = 1;
   bvh->nodes = malloc(max_node_count * sizeof(gp_bvh_node));
 
@@ -1348,7 +1350,7 @@ void gp_bvh_build(
       for (uint32_t i = 0; i < job.range.stack_size; ++i)
       {
         const gp_bvh_face_ref* ref = &job.range.stack[(int32_t)i * job.range.stack_dir];
-        const gp_face* face = &params->faces[ref->index];
+        const struct gi_face* face = &params->faces[ref->index];
         bvh->faces[bvh->face_count] = *face;
         bvh->face_count++;
       }
@@ -1384,7 +1386,7 @@ void gp_bvh_build(
   /* Reallocate bvh memory. */
 
   bvh->nodes = (gp_bvh_node*) realloc(bvh->nodes, bvh->node_count * sizeof(gp_bvh_node));
-  bvh->faces = (gp_face*) realloc(bvh->faces, bvh->face_count * sizeof(gp_face));
+  bvh->faces = (struct gi_face*) realloc(bvh->faces, bvh->face_count * sizeof(struct gi_face));
 }
 
 void gp_free_bvh(gp_bvh* bvh)
