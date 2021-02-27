@@ -1,4 +1,3 @@
 add_subdirectory(cgpu)
 add_subdirectory(gml)
-add_subdirectory(gatling)
 add_subdirectory(gi)

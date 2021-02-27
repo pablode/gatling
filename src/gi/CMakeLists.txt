@@ -1,3 +1,12 @@
+add_shader_library(
+  gi-shaders
+  src/shaders/main.comp
+  INCLUDES
+    src/shaders/bvh.glsl
+    src/shaders/common.glsl
+    src/shaders/extensions.glsl
+)
+
 add_library(
   gi
   include/gi.h
@@ -18,18 +27,19 @@ target_include_directories(
     src
 )
 
-if(WIN32)
-  target_compile_definitions(
-    gi
-    PRIVATE
-      NOMINMAX
-      _USE_MATH_DEFINES
-  )
-endif()
+target_compile_definitions(
+  gi
+  PRIVATE
+    GATLING_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    GATLING_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    GATLING_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+)
 
 target_link_libraries(
   gi
   PRIVATE
+    gi-shaders
+    cgpu
     ${C_MATH_LIBRARY}
     gml
 )

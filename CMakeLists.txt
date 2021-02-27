@@ -35,5 +35,10 @@ if(C_MATH_LIBRARY_EXISTS)
   set(C_MATH_LIBRARY "m")
 endif()
 
+if (WIN32)
+  add_compile_definitions(NOMINMAX)
+  add_compile_definitions(_USE_MATH_DEFINES)
+endif()
+
 add_subdirectory(extern)
 add_subdirectory(src)

@@ -20,7 +20,7 @@ layout(constant_id = 12) const float CAMERA_FORWARD_Z = 3.0;
 layout(constant_id = 13) const float CAMERA_UP_X = 0.0;
 layout(constant_id = 14) const float CAMERA_UP_Y = 4.0;
 layout(constant_id = 15) const float CAMERA_UP_Z = 3.0;
-layout(constant_id = 16) const float CAMERA_FOV = radians(50.0);
+layout(constant_id = 16) const float CAMERA_VFOV = radians(50.0);
 layout(constant_id = 17) const uint RR_BOUNCE_OFFSET = 3;
 layout(constant_id = 18) const float RR_INV_MIN_TERM_PROB = 1.0;
 
@@ -128,7 +128,7 @@ void main()
 
     const float H = 1.0;
     const float W = H * aspect_ratio;
-    const float d = H / (2.0 * tan(CAMERA_FOV * 0.5));
+    const float d = H / (2.0 * tan(CAMERA_VFOV * 0.5));
 
     const float WX = W / float(IMAGE_WIDTH);
     const float HY = H / float(IMAGE_HEIGHT);

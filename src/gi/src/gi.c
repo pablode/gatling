@@ -6,11 +6,15 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <math.h>
+
+#include <cgpu.h>
+#include <SPV/main.comp.spv.h>
 
 struct gi_scene_cache
 {
   gp_bvhcc             bvhcc;
-  struct gi_camera     camera;
   uint32_t             face_count;
   struct gi_face*      faces;
   struct gp_material * materials;
@@ -21,10 +25,18 @@ struct gi_scene_cache
 
 int giInitialize()
 {
+  CgpuResult result = cgpu_initialize(
+    "gatling",
+    GATLING_VERSION_MAJOR,
+    GATLING_VERSION_MINOR,
+    GATLING_VERSION_PATCH
+  );
+  return (result == CGPU_OK) ? GI_OK : GI_ERROR;
 }
 
 void giTerminate()
 {
+  cgpu_terminate();
 }
 
 int giCreateSceneCache(struct gi_scene_cache** cache)
@@ -103,7 +115,320 @@ int giPreprocess(const struct gi_preprocess_params* params,
   return GI_OK;
 }
 
+static uint64_t gi_align_buffer(uint64_t alignment, uint64_t buffer_size, uint64_t* total_size)
+{
+  const uint64_t offset = ((*total_size) + alignment - 1) / alignment * alignment;
+
+  (*total_size) = offset + buffer_size;
+
+  return offset;
+}
+
+#define GI_CGPU_VERIFY(result)                                                                       \
+  do {                                                                                               \
+    if (result != CGPU_OK) {                                                                         \
+      fprintf(stderr, "Gatling encountered a fatal CGPU error at line %d: %d\n", __LINE__, result);  \
+      return GI_ERROR;                                                                               \
+    }                                                                                                \
+  } while (0)
+
 int giRender(const struct gi_render_params* params,
              float* rgba_img)
 {
+  /* Set up device. */
+  CgpuResult c_result;
+
+  uint32_t device_count;
+  c_result = cgpu_get_device_count(&device_count);
+  GI_CGPU_VERIFY(c_result);
+
+  if (device_count == 0) {
+    fprintf(stderr, "No device found!\n");
+    return GI_ERROR;
+  }
+
+  cgpu_device device;
+  c_result = cgpu_create_device(0, &device);
+  GI_CGPU_VERIFY(c_result);
+
+  cgpu_physical_device_limits device_limits;
+  c_result = cgpu_get_physical_device_limits(device, &device_limits);
+  GI_CGPU_VERIFY(c_result);
+
+  /* Set up GPU buffers. */
+  uint64_t device_buf_size = 0;
+  const uint64_t offset_align = device_limits.minStorageBufferOffsetAlignment;
+
+  uint64_t node_buf_size = params->scene_cache->bvhcc.node_count * sizeof(gp_bvhcc_node);
+  uint64_t face_buf_size = params->scene_cache->face_count * sizeof(struct gi_face);
+  uint64_t vertex_buf_size = params->scene_cache->vertex_count * sizeof(struct gi_vertex);
+  uint64_t material_buf_size = params->scene_cache->material_count * sizeof(struct gi_material);
+
+  const uint64_t new_node_buf_offset = gi_align_buffer(offset_align, node_buf_size, &device_buf_size);
+  const uint64_t new_face_buf_offset = gi_align_buffer(offset_align, face_buf_size, &device_buf_size);
+  const uint64_t new_vertex_buf_offset = gi_align_buffer(offset_align, vertex_buf_size, &device_buf_size);
+  const uint64_t new_material_buf_offset = gi_align_buffer(offset_align, material_buf_size, &device_buf_size);
+
+  const int COLOR_COMPONENT_COUNT = 4;
+  const uint64_t output_buffer_size = params->image_width * params->image_height * sizeof(float) * COLOR_COMPONENT_COUNT;
+  const uint64_t staging_buffer_size = output_buffer_size > device_buf_size ? output_buffer_size : device_buf_size;
+
+  cgpu_buffer input_buffer;
+  cgpu_buffer staging_buffer;
+  cgpu_buffer output_buffer;
+
+  c_result = cgpu_create_buffer(
+    device,
+    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    device_buf_size,
+    &input_buffer
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_create_buffer(
+    device,
+    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+    staging_buffer_size,
+    &staging_buffer
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_create_buffer(
+    device,
+    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    output_buffer_size,
+    &output_buffer
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  uint8_t* mapped_staging_mem;
+  c_result = cgpu_map_buffer(
+    device,
+    staging_buffer,
+    0,
+    device_buf_size,
+    (void*)&mapped_staging_mem
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  memcpy(&mapped_staging_mem[new_node_buf_offset], params->scene_cache->bvhcc.nodes, node_buf_size);
+  memcpy(&mapped_staging_mem[new_face_buf_offset], params->scene_cache->faces, face_buf_size);
+  memcpy(&mapped_staging_mem[new_vertex_buf_offset], params->scene_cache->vertices, vertex_buf_size);
+  memcpy(&mapped_staging_mem[new_material_buf_offset], params->scene_cache->materials, material_buf_size);
+
+  c_result = cgpu_unmap_buffer(
+    device,
+    staging_buffer
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  /* We always work on 32x32 tiles. */
+  uint32_t workgroup_size_x = 32;
+  uint32_t workgroup_size_y = 32;
+
+  /* Set up pipeline. */
+  cgpu_pipeline pipeline;
+  {
+    cgpu_shader shader;
+    c_result = cgpu_create_shader(
+      device,
+      sizeof(SPV_main_comp),
+      SPV_main_comp,
+      &shader
+    );
+    GI_CGPU_VERIFY(c_result);
+
+    cgpu_shader_resource_buffer sr_buffers[] = {
+      { 0,       output_buffer,                       0,   CGPU_WHOLE_SIZE },
+      { 1,        input_buffer,     new_node_buf_offset,     node_buf_size },
+      { 2,        input_buffer,     new_face_buf_offset,     face_buf_size },
+      { 3,        input_buffer,   new_vertex_buf_offset,   vertex_buf_size },
+      { 4,        input_buffer, new_material_buf_offset, material_buf_size },
+    };
+    const uint32_t sr_buffer_count = sizeof(sr_buffers) / sizeof(sr_buffers[0]);
+
+    const uint32_t node_size = sizeof(gp_bvhcc_node);
+    const uint32_t node_count = node_buf_size / node_size;
+    const uint32_t traversal_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
+
+    const cgpu_specialization_constant speccs[] = {
+      { .constant_id =  0, .p_data = (void*) &workgroup_size_x,             .size = 4 },
+      { .constant_id =  1, .p_data = (void*) &workgroup_size_y,             .size = 4 },
+      { .constant_id =  2, .p_data = (void*) &params->image_width,          .size = 4 },
+      { .constant_id =  3, .p_data = (void*) &params->image_height,         .size = 4 },
+      { .constant_id =  4, .p_data = (void*) &params->spp,                  .size = 4 },
+      { .constant_id =  5, .p_data = (void*) &params->max_bounces,          .size = 4 },
+      { .constant_id =  6, .p_data = (void*) &traversal_stack_size,         .size = 4 },
+      { .constant_id =  7, .p_data = (void*) &params->camera->position[0],  .size = 4 },
+      { .constant_id =  8, .p_data = (void*) &params->camera->position[1],  .size = 4 },
+      { .constant_id =  9, .p_data = (void*) &params->camera->position[2],  .size = 4 },
+      { .constant_id = 10, .p_data = (void*) &params->camera->forward[0],   .size = 4 },
+      { .constant_id = 11, .p_data = (void*) &params->camera->forward[1],   .size = 4 },
+      { .constant_id = 12, .p_data = (void*) &params->camera->forward[2],   .size = 4 },
+      { .constant_id = 13, .p_data = (void*) &params->camera->up[0],        .size = 4 },
+      { .constant_id = 14, .p_data = (void*) &params->camera->up[1],        .size = 4 },
+      { .constant_id = 15, .p_data = (void*) &params->camera->up[2],        .size = 4 },
+      { .constant_id = 16, .p_data = (void*) &params->camera->vfov,         .size = 4 },
+      { .constant_id = 17, .p_data = (void*) &params->rr_bounce_offset,     .size = 4 },
+      { .constant_id = 18, .p_data = (void*) &params->rr_inv_min_term_prob, .size = 4 },
+    };
+    const uint32_t specc_count = sizeof(speccs) / sizeof(speccs[0]);
+
+    const uint32_t sr_image_count = 0;
+    const cgpu_shader_resource_image* sr_images = NULL;
+    const char* shader_entry_point = "main";
+    const uint32_t push_constants_size = 0;
+
+    c_result = cgpu_create_pipeline(
+      device,
+      sr_buffer_count,
+      sr_buffers,
+      sr_image_count,
+      sr_images,
+      shader,
+      shader_entry_point,
+      specc_count,
+      speccs,
+      push_constants_size,
+      &pipeline
+    );
+    GI_CGPU_VERIFY(c_result);
+
+    c_result = cgpu_destroy_shader(device, shader);
+    GI_CGPU_VERIFY(c_result);
+  }
+
+  /* Set up command buffer. */
+  cgpu_command_buffer command_buffer;
+  c_result = cgpu_create_command_buffer(device, &command_buffer);
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_begin_command_buffer(command_buffer);
+  GI_CGPU_VERIFY(c_result);
+
+  /* Copy staging buffer to input buffer. */
+  c_result = cgpu_cmd_copy_buffer(
+    command_buffer,
+    staging_buffer,
+    0,
+    input_buffer,
+    0,
+    device_buf_size
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_cmd_pipeline_barrier(
+    command_buffer,
+    0, NULL,
+    1, &(cgpu_buffer_memory_barrier) {
+      .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
+      .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ,
+      .buffer = input_buffer,
+      .offset = 0,
+      .size = CGPU_WHOLE_SIZE
+    },
+    0, NULL
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_cmd_bind_pipeline(command_buffer, pipeline);
+  GI_CGPU_VERIFY(c_result);
+
+  /* Trace rays. */
+  c_result = cgpu_cmd_dispatch(
+    command_buffer,
+    (params->image_width + workgroup_size_x - 1) / workgroup_size_x,
+    (params->image_height + workgroup_size_y - 1) / workgroup_size_y,
+    1
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  /* Copy output buffer to staging buffer. */
+  c_result = cgpu_cmd_pipeline_barrier(
+    command_buffer,
+    0, NULL,
+    1, &(cgpu_buffer_memory_barrier) {
+      .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+      .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ,
+      .buffer = output_buffer,
+      .offset = 0,
+      .size = CGPU_WHOLE_SIZE
+    },
+    0, NULL
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_cmd_copy_buffer(
+    command_buffer,
+    output_buffer,
+    0,
+    staging_buffer,
+    0,
+    output_buffer_size
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  /* Submit command buffer. */
+  c_result = cgpu_end_command_buffer(command_buffer);
+  GI_CGPU_VERIFY(c_result);
+
+  cgpu_fence fence;
+  c_result = cgpu_create_fence(device, &fence);
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_reset_fence(device, fence);
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_submit_command_buffer(
+    device,
+    command_buffer,
+    fence
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  c_result = cgpu_wait_for_fence(device, fence);
+  GI_CGPU_VERIFY(c_result);
+
+  /* Read data from GPU to image. */
+  c_result = cgpu_map_buffer(
+    device,
+    staging_buffer,
+    0,
+    output_buffer_size,
+    (void**) &mapped_staging_mem
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  memcpy(
+    rgba_img,
+    mapped_staging_mem,
+    output_buffer_size
+  );
+
+  c_result = cgpu_unmap_buffer(
+    device,
+    staging_buffer
+  );
+  GI_CGPU_VERIFY(c_result);
+
+  /* Clean up. */
+  c_result = cgpu_destroy_fence(device, fence);
+  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_destroy_command_buffer(device, command_buffer);
+  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_destroy_pipeline(device, pipeline);
+  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_destroy_buffer(device, input_buffer);
+  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_destroy_buffer(device, staging_buffer);
+  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_destroy_buffer(device, output_buffer);
+  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_destroy_device(device);
+  GI_CGPU_VERIFY(c_result);
+
+  return GI_OK;
 }
