@@ -1,5 +1,5 @@
 #include <pxr/pxr.h>
-#include "pxr/usd/ar/resolver.h"
+#include <pxr/base/gf/gamma.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
@@ -16,6 +16,7 @@
 #include <pxr/imaging/hio/image.h>
 #include <pxr/imaging/hio/imageRegistry.h>
 #include <pxr/imaging/hio/types.h>
+#include <pxr/usd/ar/resolver.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
@@ -127,10 +128,10 @@ int main(int argc, const char* argv[])
   HdRenderIndex* renderIndex = HdRenderIndex::New(renderDelegate, HdDriverVector());
   TF_VERIFY(renderIndex);
 
-  UsdImagingDelegate frontend(renderIndex, SdfPath::AbsoluteRootPath());
-  frontend.Populate(stage->GetPseudoRoot());
-  frontend.SetTime(0);
-  frontend.SetRefineLevelFallback(4);
+  UsdImagingDelegate sceneDelegate(renderIndex, SdfPath::AbsoluteRootPath());
+  sceneDelegate.Populate(stage->GetPseudoRoot());
+  sceneDelegate.SetTime(0);
+  sceneDelegate.SetRefineLevelFallback(4);
 
   HdCamera* camera = FindCamera(stage, renderIndex, settings.cameraPath);
   if (!camera)
@@ -172,10 +173,23 @@ int main(int argc, const char* argv[])
 
   engine.Execute(renderIndex, &tasks);
 
-  // Write image to file.
   renderBuffer->Resolve();
   TF_VERIFY(renderBuffer->IsConverged());
 
+  // Gamma correction.
+  float* mappedMem = (float*) renderBuffer->Map();
+  TF_VERIFY(mappedMem != nullptr);
+
+  int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
+
+  for (int i = 0; i < pixelCount; i++)
+  {
+    mappedMem[i * 4 + 0] = GfConvertLinearToDisplay(mappedMem[i * 4 + 0]);
+    mappedMem[i * 4 + 1] = GfConvertLinearToDisplay(mappedMem[i * 4 + 1]);
+    mappedMem[i * 4 + 2] = GfConvertLinearToDisplay(mappedMem[i * 4 + 2]);
+  }
+
+  // Write image to file.
   HioImageSharedPtr image = HioImage::OpenForWriting(settings.outputFilePath);
 
   if (!image)
@@ -183,9 +197,6 @@ int main(int argc, const char* argv[])
     fprintf(stderr, "Unable to open output file for writing!\n");
     return EXIT_FAILURE;
   }
-
-  void* mappedMem = renderBuffer->Map();
-  TF_VERIFY(mappedMem != nullptr);
 
   HioImage::StorageSpec storage;
   storage.width = (int) renderBuffer->GetWidth();
