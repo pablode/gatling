@@ -35,6 +35,12 @@ if(C_MATH_LIBRARY_EXISTS)
   set(C_MATH_LIBRARY "m")
 endif()
 
+find_package(
+  USD REQUIRED
+  HINTS ${USD_ROOT} $ENV{USD_ROOT}
+  NAMES pxr
+)
+
 if (WIN32)
   add_compile_definitions(NOMINMAX)
   add_compile_definitions(_USE_MATH_DEFINES)

@@ -1,0 +1,22 @@
+{
+    "Plugins": [
+        {
+            "Info": {
+                "Types": {
+                    "HdGatlingRendererPlugin": {
+                        "bases": [
+                            "HdRendererPlugin"
+                        ],
+                        "displayName": "Gatling",
+                        "priority": 99
+                    }
+                }
+            },
+            "LibraryPath": "../$<TARGET_FILE_NAME:hdGatling>",
+            "Name": "hdGatling",
+            "ResourcePath": "resources",
+            "Root": "..",
+            "Type": "library"
+        }
+    ]
+}
