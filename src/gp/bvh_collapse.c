@@ -86,7 +86,7 @@ static gp_bvh_collapse_split gp_bvh_collapse_C_distribute(const gp_bvh_collapse_
 static gp_bvh_collapse_split gp_bvh_collapse_C_internal(const gp_bvh_collapse_work_data* wdata, uint32_t n)
 {
   const gp_bvh_node* node = &wdata->params->bvh->nodes[n];
-  const float A_n = gp_aabb_area(&node->aabb);
+  const float A_n = gml_aabb_area(&node->aabb);
 
   gp_bvh_collapse_split split = gp_bvh_collapse_C_distribute(wdata, n, 7);
   split.split_type = GP_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL;
@@ -108,7 +108,7 @@ static gp_bvh_collapse_split gp_bvh_collapse_C_leaf(const gp_bvh_collapse_work_d
   }
 
   const gp_bvh_node* node = &wdata->params->bvh->nodes[n];
-  const float A_n = gp_aabb_area(&node->aabb);
+  const float A_n = gml_aabb_area(&node->aabb);
   split.cost = A_n * p_n * wdata->params->face_intersection_cost;
 
   return split;
@@ -141,7 +141,7 @@ static void gp_bvh_collapse_calc_costs(const gp_bvh_collapse_work_data* wdata, u
 
   if ((node->field2 & 0x80000000) == 0x80000000)
   {
-    const float A_n = gp_aabb_area(&node->aabb);
+    const float A_n = gml_aabb_area(&node->aabb);
     const uint32_t p_n = (node->field2 & 0x7FFFFFFF);
     const float cost = A_n * p_n * wdata->params->face_intersection_cost;
 
@@ -195,13 +195,13 @@ static void gp_bvh_collapse_collect_childs(
 static uint32_t gp_bvh_collapse_push_child_leaves(
   const gp_bvh_collapse_work_data* wdata,
   uint32_t node_idx,
-  gp_aabb* aabb)
+  gml_aabb* aabb)
 {
   const gp_bvh_node* node = &wdata->params->bvh->nodes[node_idx];
 
   if ((node->field2 & 0x80000000) == 0x80000000)
   {
-    gp_aabb_merge(aabb, &node->aabb, aabb);
+    gml_aabb_merge(aabb, &node->aabb, aabb);
     const uint32_t face_count = (node->field2 & 0x7FFFFFFF);
 
     for (uint32_t i = 0; i < face_count; ++i)
@@ -222,7 +222,7 @@ static uint32_t gp_bvh_collapse_create_nodes(
   const gp_bvh_collapse_work_data* wdata,
   uint32_t node_idx,
   gp_bvhc_node* parent_node,
-  gp_aabb* parent_aabb)
+  gml_aabb* parent_aabb)
 {
   /* Inline nodes contained in distributed splits. */
   uint32_t child_node_count = 0;
@@ -250,7 +250,7 @@ static uint32_t gp_bvh_collapse_create_nodes(
       parent_node->offsets[i] = face_offset - parent_node->face_index;
       parent_node->counts[i] = (0x80000000 | face_count);
 
-      gp_aabb_merge(parent_aabb, &parent_node->aabbs[i], parent_aabb);
+      gml_aabb_merge(parent_aabb, &parent_node->aabbs[i], parent_aabb);
     }
     else if (split->split_type == GP_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL)
     {
@@ -280,12 +280,12 @@ static uint32_t gp_bvh_collapse_create_nodes(
     {
       new_node->counts[k] = 0;
       new_node->offsets[k] = 0;
-      gp_aabb_make_smallest(&new_node->aabbs[k]);
+      gml_aabb_make_smallest(&new_node->aabbs[k]);
     }
 
     parent_node->counts[i] = gp_bvh_collapse_create_nodes(wdata, child_node_idx, new_node, &parent_node->aabbs[i]);
 
-    gp_aabb_merge(parent_aabb, &parent_node->aabbs[i], parent_aabb);
+    gml_aabb_merge(parent_aabb, &parent_node->aabbs[i], parent_aabb);
   }
 
   return child_node_count;
@@ -327,7 +327,7 @@ void gp_bvh_collapse(const gp_bvh_collapse_params* params, gp_bvhc* bvhc)
   for (uint32_t j = 0; j < 8; ++j) {
     root_node->offsets[j] = 0;
     root_node->counts[j] = 0;
-    gp_aabb_make_smallest(&root_node->aabbs[j]);
+    gml_aabb_make_smallest(&root_node->aabbs[j]);
   }
 
   /* Construct wide bvh recursively using previously calculated costs. */

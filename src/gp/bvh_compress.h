@@ -68,7 +68,7 @@ static_assert(sizeof(gp_bvhcc_node) == 80,
   "Compressed BVH node size should be 80 bytes.");
 
 typedef struct gp_bvhcc {
-  gp_aabb        aabb;
+  gml_aabb       aabb;
   uint32_t       node_count;
   gp_bvhcc_node* nodes;
 } gp_bvhcc;

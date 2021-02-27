@@ -6,7 +6,7 @@
 #include "bvh.h"
 
 typedef struct gp_bvhc_node {
-  gp_aabb  aabbs[8];
+  gml_aabb aabbs[8];
   uint32_t offsets[8];
   uint32_t counts[8];
   uint32_t child_index;
@@ -14,7 +14,7 @@ typedef struct gp_bvhc_node {
 } gp_bvhc_node;
 
 typedef struct gp_bvhc {
-  gp_aabb       aabb;
+  gml_aabb      aabb;
   uint32_t      node_count;
   gp_bvhc_node* nodes;
   uint32_t      face_count;

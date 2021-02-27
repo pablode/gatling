@@ -5,7 +5,7 @@
 
 static void gp_bvh_compress_node(
   const gp_bvhc_node* in_node,
-  const gp_aabb* parent_aabb,
+  const gml_aabb* parent_aabb,
   gp_bvhcc_node* out_node)
 {
   const uint32_t Nq = 8;
@@ -80,7 +80,7 @@ static void gp_bvh_compress_node(
       continue;
     }
 
-    const gp_aabb* in_aabb = &in_node->aabbs[i];
+    const gml_aabb* in_aabb = &in_node->aabbs[i];
     const float b_lo_x = in_aabb->min[0];
     const float b_lo_y = in_aabb->min[1];
     const float b_lo_z = in_aabb->min[2];
@@ -117,7 +117,7 @@ static void gp_bvh_compress_node(
 static void gp_bvh_compress_subtree(
   const gp_bvhc* bvhc, gp_bvhcc* bvhcc,
   uint32_t node_idx,
-  const gp_aabb* node_aabb)
+  const gml_aabb* node_aabb)
 {
   const gp_bvhc_node* in_node = &bvhc->nodes[node_idx];
   gp_bvhcc_node* out_node = &bvhcc->nodes[node_idx];

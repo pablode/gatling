@@ -64,4 +64,19 @@ bool gml_mat3_invert(const gml_mat3 a, gml_mat3 b);
 void gml_mat3_transpose(const gml_mat3 a, gml_mat3 b);
 void gml_mat3_mul_vec3(const gml_mat3 a, const gml_vec3 b, gml_vec3 c);
 
+typedef struct gml_aabb {
+  gml_vec3 min;
+  gml_vec3 max;
+} gml_aabb;
+
+void gml_aabb_make_smallest(gml_aabb* aabb);
+void gml_aabb_make_biggest(gml_aabb* aabb);
+void gml_aabb_make_from_triangle(const gml_vec3 v_a, const gml_vec3 v_b, const gml_vec3 v_c, gml_aabb* aabb);
+void gml_aabb_merge(const gml_aabb* aabb_a, const gml_aabb* aabb_b, gml_aabb* aabb_c);
+void gml_aabb_include(const gml_aabb* aabb_a, const gml_vec3 v, gml_aabb* aabb_b);
+void gml_aabb_intersect(const gml_aabb* aabb_a, const gml_aabb* aabb_b, gml_aabb* aabb_c);
+void gml_aabb_size(const gml_aabb* aabb, gml_vec3 size);
+float gml_aabb_half_area(const gml_aabb* aabb);
+float gml_aabb_area(const gml_aabb* aabb);
+
 #endif

@@ -1,7 +1,5 @@
 add_executable(
   gp
-  aabb.c
-  aabb.h
   bvh.c
   bvh.h
   bvh_collapse.c

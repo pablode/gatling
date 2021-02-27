@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <gml.h>
 
-#include "aabb.h"
 #include "gp.h"
 #include "math.h"
 
@@ -15,7 +14,7 @@ typedef enum GpBvhBinningMode {
 } GpBvhBinningMode;
 
 typedef struct gp_bvh_node {
-  gp_aabb aabb;
+  gml_aabb aabb;
   /* If this node is a leaf, the face offset. Otherwise, the offset
    * to the left child node. */
   uint32_t field1;
@@ -26,7 +25,7 @@ typedef struct gp_bvh_node {
 } gp_bvh_node;
 
 typedef struct gp_bvh {
-  gp_aabb      aabb;
+  gml_aabb     aabb;
   uint32_t     node_count;
   gp_bvh_node* nodes;
   uint32_t     face_count;

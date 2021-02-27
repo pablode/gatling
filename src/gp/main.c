@@ -435,7 +435,7 @@ static void gp_write_scene(
   memcpy(&buffer[40], &vertex_buf_size,     8);
   memcpy(&buffer[48], &material_buf_offset, 8);
   memcpy(&buffer[56], &material_buf_size,   8);
-  memcpy(&buffer[64], &bvhcc->aabb,         sizeof(gp_aabb));
+  memcpy(&buffer[64], &bvhcc->aabb,         sizeof(gml_aabb));
   memcpy(&buffer[88], &scene->camera,       sizeof(gp_camera));
 
   memcpy(&buffer[node_buf_offset], bvhcc->nodes, node_buf_size);
