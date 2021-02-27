@@ -180,6 +180,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
   printf("#Vertices: %zu\n", vertices.size());
   printf("#Faces: %zu\n", faces.size());
+  fflush(stdout);
 }
 
 void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const
@@ -274,6 +275,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   {
     const std::string& cameraIdStr = camera->GetId().GetString();
     printf("Building scene cache for camera %s\n", cameraIdStr.c_str());
+    fflush(stdout);
 
     std::vector<gi_vertex> vertices;
     std::vector<gi_face> faces;
