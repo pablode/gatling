@@ -59,13 +59,11 @@ file(
     ${PLUGINFO}
 )
 
-set(PLUGIN_PATH "${CMAKE_INSTALL_PREFIX}/plugin/usd")
-
 install(
   FILES
     "${PLUGINFO_PATH}"
   DESTINATION
-    "${PLUGIN_PATH}/hdGatling/resources"
+    "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
   COMPONENT
     hdGatling
 )
@@ -74,12 +72,12 @@ install(
   TARGETS
     hdGatling gi
   LIBRARY
-    DESTINATION "${PLUGIN_PATH}"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}"
     COMPONENT hdGatling
   RUNTIME
-    DESTINATION "${PLUGIN_PATH}"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}"
     COMPONENT hdGatling
   ARCHIVE
-    DESTINATION "${PLUGIN_PATH}"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}"
     COMPONENT hdGatling
 )
