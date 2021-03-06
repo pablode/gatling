@@ -2,7 +2,7 @@ const float FLOAT_MAX = 3.402823466e38;
 const float FLOAT_MIN = 1.175494351e-38;
 const float PI = 3.1415926535897932384626433832795;
 const float TRI_EPS = 0.0000001;
-const float RAY_OFFSET_EPS = 0.00001;
+const float RAY_OFFSET_EPS = 0.0001;
 
 struct fvertex
 {
