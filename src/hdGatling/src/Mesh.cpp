@@ -227,7 +227,13 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
                                    HdTokens->normals,
                                    normalInterpolation);
 
-  if (foundNormals && normalInterpolation == HdInterpolation::HdInterpolationVertex)
+  HdMeshTopology topology = GetMeshTopology(sceneDelegate);
+
+  bool isCatmullClark = (topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark);
+
+  if (!isCatmullClark &&
+      foundNormals &&
+      normalInterpolation == HdInterpolation::HdInterpolationVertex)
   {
     VtValue boxedNormals = sceneDelegate->Get(id, HdTokens->normals);
     normals = boxedNormals.Get<VtVec3fArray>();
@@ -238,7 +244,6 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
   // "For faceVarying primvars, however, indexing serves a higher purpose (and should be used only for this purpose,
   // since renderers and OpenSubdiv will assume it) of establishing a surface topology for the primvar."
   // https://graphics.pixar.com/usd/docs/api/class_usd_geom_primvar.html
-  HdMeshTopology topology = GetMeshTopology(sceneDelegate);
 
   Hd_VertexAdjacency adjacency;
   adjacency.BuildAdjacencyTable(&topology);
