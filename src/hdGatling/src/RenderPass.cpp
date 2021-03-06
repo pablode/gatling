@@ -27,9 +27,9 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   m_defaultMaterial.albedo[0] = 1.0f;
   m_defaultMaterial.albedo[1] = 1.0f;
   m_defaultMaterial.albedo[2] = 1.0f;
-  m_defaultMaterial.emission[0] = 0.1f;
-  m_defaultMaterial.emission[1] = 0.1f;
-  m_defaultMaterial.emission[2] = 0.1f;
+  m_defaultMaterial.emission[0] = 0.0f;
+  m_defaultMaterial.emission[1] = 0.0f;
+  m_defaultMaterial.emission[2] = 0.0f;
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
