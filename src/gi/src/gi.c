@@ -78,7 +78,7 @@ int giPreprocess(const struct gi_preprocess_params* params,
     .object_bin_count         = 16,
     .spatial_bin_count        = 32,
     .spatial_reserve_factor   = 1.25f,
-    .spatial_split_alpha      = 10e-5f,
+    .spatial_split_alpha      = 1.0f,
     .vertex_count             = params->vertex_count,
     .vertices                 = params->vertices
   };
