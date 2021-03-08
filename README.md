@@ -2,75 +2,91 @@
 ## gatling
 
 <p align="middle">
-  <a href="http://pablode.com/cornell_250k.png"><img height=220 src="http://pablode.com/cornell_250k_small.png" /></a>
-  <a href="http://pablode.com/salle_100k.png"><img height=220 src="http://pablode.com/salle_100k_small.png" /></a>
+  <a href="http://pablode.com/gatling/pokedstudio.png"><img width=450 src="http://pablode.com/gatling/pokedstudio_sm.png" /></a>
 </p>
 <p align="middle">
-  Models downloaded from Morgan McGuire's <a href="https://casual-effects.com/data">Computer Graphics Archive</a>.
+  Pokedstudio's <a href="https://cloud.blender.org/p/gallery/57e51eaa0fcf29412d1f1e76">Blender splash screen</a> <a href="https://creativecommons.org/licenses/by-sa/2.0/legalcode">(CC BY-SA)</a>, modified for and rendered in Gatling.
 </p>
 
 ### About
 
-_gatling_ is a GPU path tracer written in C. It's supposed to be a personal research project and learning experience.
+This is my GPU path tracer I work on in my free time.  
 
-Following papers and techniques are implemented:
+It features a BVH builder with binned SAH [\[Wald 2007\]](#user-content-wald-2007), spatial splits [\[Stich et al. 2009\]](#user-content-stich-et-al-2009), SAH-preserving widening to nodes of 8 childs, compression, and an efficient traversal kernel [\[Ylitie et al. 2017\]](#user-content-ylitie-et-al-2017).
 
-- Compressed 8-wide BVH building and traversal [\[Ylitie et al. 2017\]](#user-content-ylitie-et-al-2017)
-- Spatial splits in BVHs [\[Stich et al. 2009\]](#user-content-stich-et-al-2009)
-- Range-based memory scheme for parallel spatial splitting [\[Gobbetti et al. 2016\]](#user-content-gobbetti-et-al-2016)
-- SAH with Binning [\[Wald 2007\]](#user-content-wald-2007)
-- Wavefront architecture with persistent threads [\[Laine et al. 2013\]](#user-content-laine-et-al-2013)
-- Cross-platform memory mapping
-- Uniform hemisphere sampling with lambertian BRDF
+Gatling is exposed as a Hydra render delegate and comes with a standalone that accepts Universal Scene Description (USD) files [\[Elkoura et al. 2019\]](#user-content-elkoura-et-al-2019).
 
-### Building
+### Build
 
-CMake 3.14+, a C11 compiler and Vulkan are required.
+You need to build and install version 21.02 of Pixar's <a href="https://github.com/PixarAnimationStudios/USD">USD Framework</a>.
+Additionally, CMake 3.14+, a C11 compiler and the Vulkan SDK are required.
 
+Clone the project and set up a build folder:
 ```
 git clone https://github.com/pablode/gatling
 mkdir gatling/build && cd gatling/build
-cmake .. -Wno-dev -DCMAKE_BUILD_TYPE=Release
-cmake --build . --target gp gatling
 ```
 
-Before path tracing, an intermediate representation of the scene must be built using `gp`, _gatling_'s asset compiler:
+Pass the USD install directory in the CMake generation phase:
 ```
-./bin/gp cornell_box.gltf scene.gsd
-```
-
-Make sure there is a camera in the scene and at least one emissive surface. It is recommended to use glTF as the transmission format.  
-
-Next, either disable the system's GPU watchdog or set an appropriate timeout value. For rendering, multiple optional arguments can be provided:
-```
-./bin/gatling scene.gsd render.png \
-    --image-width=1200 \
-    --image-height=1200 \
-    --spp=256 \
-    --max-bounces=4 \
-    --rr-bounce-offset=3 \
-    --rr-inv-min-term-prob=1.0
+cmake .. -Wno-dev \
+         -DUSD_ROOT=<USD_INSTALL_DIR> \
+         -DCMAKE_INSTALL_PREFIX=<USD_INSTALL_DIR>/plugin/usd
 ```
 
-_gatling_ is optimized for my Pascal GTX 1060 GPU and will most likely not work on old or integrated GPUs.
+> Note: If you're using MSVC, be sure to select a 64-bit generator.
+
+Build the relevant targets and install the Hydra delegate to the USD plugin folder:
+```
+cmake --build . -j8 --target hdGatling gatling
+cmake --install . --component hdGatling
+```
+
+> Note: On Windows, append `--config RelWithDebInfo` to the build command. <a href="https://github.com/PixarAnimationStudios/USD/issues/1466">Two</a> <a href="https://github.com/oneapi-src/oneTBB/issues/154">bugs</a> prevent other configurations from working.
+
+### Usage
+
+Gatling can be used by every application which supports Hydra, either natively or through a plugin. It also comes with a headless standalone.
+A USD file (.usd, .usda, .usdc, .usdz) is required as input. Make sure there is a camera in the scene and at least one emissive surface.
+
+To play around with Gatling:
+```
+usdview <scene.usd> --renderer Gatling
+```
+
+<p align="middle">
+  <a href="http://pablode.com/gatling/usdview_classroom.png"><img width=360 src="http://pablode.com/gatling/usdview_classroom_sm.png" /></a>
+</p>
+<p align="middle">
+  Christophe Seux's <a href="https://www.blender.org/download/demo-files/">Class room</a>
+  rendered using Gatling inside <a href="https://graphics.pixar.com/usd/docs/USD-Toolset.html#USDToolset-usdview">Pixar's usdview</a> tool.
+</p>
+
+To output an actual image:
+```
+./bin/gatling <scene.usd> render.png \
+    --image-width 1200 \
+    --image-height 1200 \
+    --spp 1024 \
+    --max-bounces 8
+```
+
+> Note: Disable the system's GPU watchdog or set an appropriate timeout value.
 
 ### Outlook
 
-The general idea is to follow Manuka's _Shade-before-Hit_ architecture with CPU dicing and GPU vertex pre-shading. Universal Scene Description (USD) will be the input format. A texture caching system with support for mip-mapping, compression and tiling is another major goal. [More...](https://github.com/pablode/gatling/projects)
+The idea is to follow Manuka's _Shade-before-Hit_ architecture with CPU dicing and GPU vertex pre-shading. Material networks are going to be translated to GLSL or SPIR-V shader code. [More...](https://github.com/pablode/gatling/projects)
 
 ### Further Reading
+
+###### Elkoura et al. 2019
+George Elkoura, Sebastian Grassia, Sunya Boonyatera, Alex Mohr, Pol Jeremias-Vila, and Matt Kuruc. 2019. A deep dive into universal scene description and hydra. In ACM SIGGRAPH 2019 Courses (SIGGRAPH '19). Association for Computing Machinery, New York, NY, USA, Article 1, 1–48. DOI:10.1145/3305366.3328033
 
 ###### Ylitie et al. 2017
 Henri Ylitie, Tero Karras, and Samuli Laine. 2017. Efficient incoherent ray traversal on GPUs through compressed wide BVHs. In Proceedings of High Performance Graphics (HPG ’17). Association for Computing Machinery, New York, NY, USA, Article 4, 1–13. DOI:10.1145/3105762.3105773
 
 ###### Stich et al. 2009
 Stich, Martin & Friedrich, Heiko & Dietrich, Andreas. 2009. Spatial splits in bounding volume hierarchies. In Proceedings of the Conference on High Performance Graphics 2009 (HPG ’09). Association for Computing Machinery, New York, NY, USA, 7–13. DOI:10.1145/1572769.1572771
-
-###### Gobbetti et al. 2016
-Gobbetti, Enrico & Bethe, Wes. Parallel Spatial Splits in Bounding Volume Hierarchies. 2016. Eurographics Symposium on Parallel Graphics and Visualization. DOI:10.2312/pgv.20161179
-
-###### Laine et al. 2013
-Samuli Laine, Tero Karras, and Timo Aila. 2013. Megakernels considered harmful: wavefront path tracing on GPUs. In Proceedings of the 5th High-Performance Graphics Conference (HPG '13). Association for Computing Machinery, New York, NY, USA, 137–143. DOI:10.1145/2492045.2492060
 
 ###### Wald 2007
 Ingo Wald. 2007. On fast Construction of SAH-based Bounding Volume Hierarchies. In Proceedings of the 2007 IEEE Symposium on Interactive Ray Tracing (RT '07). IEEE Computer Society, USA, 33–40. DOI:10.1109/RT.2007.4342588
