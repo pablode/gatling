@@ -17,3 +17,7 @@ target_link_libraries(
   PRIVATE
     ${C_MATH_LIBRARY}
 )
+
+if(ENABLE_IPO)
+  set_target_properties(gml PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()

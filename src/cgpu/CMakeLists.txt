@@ -21,3 +21,7 @@ target_link_libraries(
   PRIVATE
     volk
 )
+
+if(ENABLE_IPO)
+  set_target_properties(cgpu PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()

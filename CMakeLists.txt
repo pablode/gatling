@@ -21,9 +21,6 @@ include(cmake/ShaderLibrary.cmake)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ENABLE_IPO)
-if(ENABLE_IPO)
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()
 
 include(CheckLibraryExists)
 check_library_exists(m exp2f "" C_MATH_LIBRARY_EXISTS)

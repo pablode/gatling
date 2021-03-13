@@ -43,3 +43,7 @@ target_link_libraries(
     ${C_MATH_LIBRARY}
     gml
 )
+
+if(ENABLE_IPO)
+  set_target_properties(gi PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+endif()
