@@ -32,17 +32,16 @@ Pass the USD install directory in the CMake generation phase:
 cmake .. -Wno-dev \
          -DUSD_ROOT=<USD_INSTALL_DIR> \
          -DCMAKE_INSTALL_PREFIX=<USD_INSTALL_DIR>/plugin/usd
+         -DCMAKE_BUILD_TYPE=Release
 ```
 
 > Note: If you're using MSVC, be sure to select a 64-bit generator.
 
 Build the relevant targets and install the Hydra delegate to the USD plugin folder:
 ```
-cmake --build . -j8 --target hdGatling gatling
+cmake --build . -j8 --target hdGatling gatling --config Release
 cmake --install . --component hdGatling
 ```
-
-> Note: On Windows, append `--config RelWithDebInfo` to the build command. <a href="https://github.com/PixarAnimationStudios/USD/issues/1466">Two</a> <a href="https://github.com/oneapi-src/oneTBB/issues/154">bugs</a> prevent other configurations from working.
 
 ### Usage
 
