@@ -160,7 +160,7 @@ void main()
         ray_direction += vec3(equal(ray_direction, vec3(0.0))) * FLOAT_MIN;
         ray_direction = normalize(ray_direction);
 
-        /* Pathtrace sample and accumulate color. */
+        /* Path trace sample and accumulate color. */
         const vec3 sample_color = trace_sample(rng_state, ray_origin, ray_direction);
         pixel_color += sample_color * inv_sample_count;
     }
