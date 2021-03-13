@@ -153,7 +153,7 @@ void main()
             (float(pixel_pos.y) + r2) * camera_up * HY;
 
         vec3 ray_origin = camera_origin;
-        vec3 ray_direction = normalize(P - camera_origin);
+        vec3 ray_direction = P - camera_origin;
 
         /* Beware: a single direction component must not be zero.
          * This is because we often take the inverse of the direction. */
