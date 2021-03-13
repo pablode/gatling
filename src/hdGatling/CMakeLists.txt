@@ -40,6 +40,9 @@ target_include_directories(
     src
 )
 
+# Workaround for https://github.com/oneapi-src/oneTBB/issues/154
+target_compile_definitions(hdGatling PRIVATE "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>")
+
 target_link_libraries(
   hdGatling
   PRIVATE
