@@ -11,6 +11,7 @@ HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
   : HdMesh(id)
   , m_prototypeTransform(1.0)
   , m_color(0.0, 0.0, 0.0)
+  , m_hasColor(false)
 {
 }
 
@@ -82,7 +83,7 @@ void HdGatlingMesh::_PullGeometry(HdSceneDelegate* sceneDelegate)
 
   VtVec3fArray points;
   VtVec3fArray normals;
-  _PullPrimvars(sceneDelegate, points, normals, m_color);
+  _PullPrimvars(sceneDelegate, points, normals, m_color, m_hasColor);
 
   int faceVertexIndexOffset = 0;
   int unsupportedFaceCount = 0;
@@ -184,7 +185,8 @@ bool HdGatlingMesh::_FindPrimvar(HdSceneDelegate* sceneDelegate,
 void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
                                   VtVec3fArray& points,
                                   VtVec3fArray& normals,
-                                  GfVec3f& color) const
+                                  GfVec3f& color,
+                                  bool& hasColor) const
 {
   const SdfPath& id = GetId();
 
@@ -219,6 +221,7 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
     VtValue boxedColors = sceneDelegate->Get(id, HdTokens->displayColor);
     const VtVec3fArray& colors = boxedColors.Get<VtVec3fArray>();
     color = colors[0];
+    hasColor = true;
   }
 
   // Handle normals.
@@ -284,6 +287,11 @@ const GfMatrix4d& HdGatlingMesh::GetPrototypeTransform() const
 const GfVec3f& HdGatlingMesh::GetColor() const
 {
   return m_color;
+}
+
+bool HdGatlingMesh::HasColor() const
+{
+  return m_hasColor;
 }
 
 HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const

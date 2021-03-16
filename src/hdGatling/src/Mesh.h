@@ -33,6 +33,8 @@ public:
 
   const GfVec3f& GetColor() const;
 
+  bool HasColor() const;
+
 protected:
   HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
@@ -49,7 +51,8 @@ private:
   void _PullPrimvars(HdSceneDelegate* sceneDelegate,
                      VtVec3fArray& points,
                      VtVec3fArray& normals,
-                     GfVec3f& color) const;
+                     GfVec3f& color,
+                     bool& hasColor) const;
 
 private:
   GfMatrix4d m_prototypeTransform;
@@ -57,6 +60,7 @@ private:
   std::vector<GfVec3f> m_normals;
   std::vector<GfVec3i> m_faces;
   GfVec3f m_color;
+  bool m_hasColor;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

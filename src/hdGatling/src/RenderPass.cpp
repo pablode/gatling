@@ -139,7 +139,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     const SdfPath& materialId = mesh->GetMaterialId();
     uint32_t materialIndex;
 
-    if (materialId.IsEmpty())
+    if (materialId.IsEmpty() && mesh->HasColor())
     {
       const GfVec3f& color = mesh->GetColor();
 
