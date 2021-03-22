@@ -1,5 +1,6 @@
 #include <pxr/pxr.h>
 #include <pxr/base/gf/gamma.h>
+#include <pxr/base/tf/stopwatch.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/engine.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
@@ -116,14 +117,22 @@ int main(int argc, const char* argv[])
   }
 
   // Load scene.
+  TfStopwatch timerLoad;
+  timerLoad.Start();
+
   ArGetResolver().ConfigureResolverForAsset(settings.sceneFilePath);
   UsdStageRefPtr stage = UsdStage::Open(settings.sceneFilePath);
+
+  timerLoad.Stop();
 
   if (!stage)
   {
     fprintf(stderr, "Unable to open USD stage file.\n");
     return EXIT_FAILURE;
   }
+
+  printf("USD scene loaded (%.3fs)\n", timerLoad.GetSeconds());
+  fflush(stdout);
 
   HdRenderIndex* renderIndex = HdRenderIndex::New(renderDelegate, HdDriverVector());
   TF_VERIFY(renderIndex);
@@ -169,12 +178,19 @@ int main(int argc, const char* argv[])
   tasks.push_back(renderTask);
 
   // Perform rendering.
-  HdEngine engine;
+  TfStopwatch timerRender;
+  timerRender.Start();
 
+  HdEngine engine;
   engine.Execute(renderIndex, &tasks);
 
   renderBuffer->Resolve();
   TF_VERIFY(renderBuffer->IsConverged());
+
+  timerRender.Stop();
+
+  printf("Rendering finished (%.3fs)\n", timerRender.GetSeconds());
+  fflush(stdout);
 
   // Gamma correction.
   float* mappedMem = (float*) renderBuffer->Map();
@@ -190,6 +206,9 @@ int main(int argc, const char* argv[])
   }
 
   // Write image to file.
+  TfStopwatch timerWrite;
+  timerWrite.Start();
+
   HioImageSharedPtr image = HioImage::OpenForWriting(settings.outputFilePath);
 
   if (!image)
@@ -210,6 +229,10 @@ int main(int argc, const char* argv[])
   image->Write(storage, metadata);
 
   renderBuffer->Unmap();
+  timerWrite.Stop();
+
+  printf("Wrote image (%.3fs)\n", timerWrite.GetSeconds());
+  fflush(stdout);
 
   renderDelegate->DestroyBprim(renderBuffer);
 
