@@ -43,6 +43,11 @@ target_include_directories(
 # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
 target_compile_definitions(hdGatling PRIVATE "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>")
 
+# Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
+if (MSVC_VERSION GREATER_EQUAL 1920)
+    target_compile_options(hdGatling PRIVATE "/Zc:inline-")
+endif()
+
 target_link_libraries(
   hdGatling
   PRIVATE
