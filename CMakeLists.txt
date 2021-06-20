@@ -34,6 +34,8 @@ find_package(
   NAMES pxr
 )
 
+find_package(MaterialX REQUIRED)
+
 if (WIN32)
   add_compile_definitions(NOMINMAX)
   add_compile_definitions(_USE_MATH_DEFINES)

@@ -18,7 +18,7 @@ Gatling is exposed as a Hydra render delegate and comes with a standalone that a
 
 ### Build
 
-You need to build and install version 21.05 of Pixar's <a href="https://github.com/PixarAnimationStudios/USD">USD Framework</a>.
+You need to build and install version 21.05 of Pixar's <a href="https://github.com/PixarAnimationStudios/USD">USD Framework</a> with MaterialX support enabled.
 Additionally, CMake 3.14+, a C11 compiler and the Vulkan SDK are required.
 
 Clone the project and set up a build folder:
