@@ -45,10 +45,9 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
   {
-    HdChangeTracker& changeTracker = renderIndex.GetChangeTracker();
     const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
 
-    _SetMaterialId(changeTracker, materialId);
+    SetMaterialId(materialId);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform)

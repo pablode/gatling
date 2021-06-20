@@ -39,9 +39,7 @@ void SimpleRenderTask::Execute(HdTaskContext* taskContext)
 {
   TF_UNUSED(taskContext);
 
-  m_renderPassState->Bind();
   m_renderPass->Execute(m_renderPassState, m_renderTags);
-  m_renderPassState->Unbind();
 }
 
 const TfTokenVector& SimpleRenderTask::GetRenderTags() const
