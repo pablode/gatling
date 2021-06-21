@@ -1,5 +1,6 @@
 add_subdirectory(cgpu)
 add_subdirectory(gml)
 add_subdirectory(gi)
+add_subdirectory(shadergen)
 add_subdirectory(hdGatling)
 add_subdirectory(gatling)
