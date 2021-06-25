@@ -2,6 +2,8 @@ add_library(
   shadergen STATIC
   include/shadergen.h
   src/shadergen.cpp
+  src/GlslSyntax.h
+  src/GlslSyntax.cpp
 )
 
 set_target_properties(
