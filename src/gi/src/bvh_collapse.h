@@ -5,32 +5,35 @@
 
 #include "bvh.h"
 
-typedef struct gp_bvhc_node {
+struct gp_bvhc_node
+{
   gml_aabb aabbs[8];
   uint32_t offsets[8];
   uint32_t counts[8];
   uint32_t child_index;
   uint32_t face_index;
-} gp_bvhc_node;
+};
 
-typedef struct gp_bvhc {
-  gml_aabb        aabb;
-  uint32_t        node_count;
-  gp_bvhc_node*   nodes;
-  uint32_t        face_count;
-  struct gi_face* faces;
-} gp_bvhc;
+struct gp_bvhc
+{
+  gml_aabb             aabb;
+  uint32_t             node_count;
+  struct gp_bvhc_node* nodes;
+  uint32_t             face_count;
+  struct gi_face*      faces;
+};
 
-typedef struct gp_bvh_collapse_params {
-  const gp_bvh* bvh;
-  float         face_intersection_cost;
-  uint32_t      max_leaf_size;
-  float         node_traversal_cost;
-} gp_bvh_collapse_params;
+struct gp_bvh_collapse_params
+{
+  const struct gp_bvh* bvh;
+  float                face_intersection_cost;
+  uint32_t             max_leaf_size;
+  float                node_traversal_cost;
+};
 
-void gp_bvh_collapse(const gp_bvh_collapse_params* params,
-                     gp_bvhc* bvhc);
+void gp_bvh_collapse(const struct gp_bvh_collapse_params* params,
+                     struct gp_bvhc* bvhc);
 
-void gp_free_bvhc(gp_bvhc* bvhcc);
+void gp_free_bvhc(struct gp_bvhc* bvhcc);
 
 #endif

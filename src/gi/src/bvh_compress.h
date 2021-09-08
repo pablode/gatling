@@ -42,7 +42,8 @@
  *     DOI: https://doi.org/10.1145/3105762.3105773
  */
 
-typedef struct gp_bvhcc_node {
+struct gp_bvhcc_node
+{
   /* Quantization frame. */
   float p_x;               /* 4 bytes */
   float p_y;               /* 4 bytes */
@@ -62,20 +63,20 @@ typedef struct gp_bvhcc_node {
   uint8_t q_hi_x[8];       /* 8 bytes */
   uint8_t q_hi_y[8];       /* 8 bytes */
   uint8_t q_hi_z[8];       /* 8 bytes */
-} gp_bvhcc_node;
+};
 
-static_assert(sizeof(gp_bvhcc_node) == 80,
-  "Compressed BVH node size should be 80 bytes.");
+static_assert(sizeof(struct gp_bvhcc_node) == 80, "Compressed BVH node size should be 80 bytes.");
 
-typedef struct gp_bvhcc {
-  gml_aabb       aabb;
-  uint32_t       node_count;
-  gp_bvhcc_node* nodes;
-} gp_bvhcc;
+struct gp_bvhcc
+{
+  gml_aabb              aabb;
+  uint32_t              node_count;
+  struct gp_bvhcc_node* nodes;
+};
 
-void gp_bvh_compress(const gp_bvhc* bvhc,
-                     gp_bvhcc* bvhcc);
+void gp_bvh_compress(const struct gp_bvhc* bvhc,
+                     struct gp_bvhcc* bvhcc);
 
-void gp_free_bvhcc(gp_bvhcc* bvhcc);
+void gp_free_bvhcc(struct gp_bvhcc* bvhcc);
 
 #endif

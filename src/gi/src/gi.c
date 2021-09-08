@@ -14,7 +14,7 @@
 
 struct gi_scene_cache
 {
-  gp_bvhcc             bvhcc;
+  struct gp_bvhcc      bvhcc;
   uint32_t             face_count;
   struct gi_face*      faces;
   struct gp_material * materials;
@@ -66,8 +66,8 @@ int giPreprocess(const struct gi_preprocess_params* params,
   }
 
   /* Build BVH. */
-  gp_bvh bvh;
-  const gp_bvh_build_params bvh_params = {
+  struct gp_bvh bvh;
+  const struct gp_bvh_build_params bvh_params = {
     .face_batch_size          = 1,
     .face_count               = params->face_count,
     .face_intersection_cost   = 1.2f,
@@ -85,8 +85,8 @@ int giPreprocess(const struct gi_preprocess_params* params,
 
   gp_bvh_build(&bvh_params, &bvh);
 
-  gp_bvhc bvhc;
-  gp_bvh_collapse_params cparams  = {
+  struct gp_bvhc bvhc;
+  struct gp_bvh_collapse_params cparams  = {
     .bvh                    = &bvh,
     .max_leaf_size          = 3,
     .node_traversal_cost    = 1.0f,
@@ -161,7 +161,7 @@ int giRender(const struct gi_render_params* params,
   uint64_t device_buf_size = 0;
   const uint64_t offset_align = device_limits.minStorageBufferOffsetAlignment;
 
-  uint64_t node_buf_size = params->scene_cache->bvhcc.node_count * sizeof(gp_bvhcc_node);
+  uint64_t node_buf_size = params->scene_cache->bvhcc.node_count * sizeof(struct gp_bvhcc_node);
   uint64_t face_buf_size = params->scene_cache->face_count * sizeof(struct gi_face);
   uint64_t vertex_buf_size = params->scene_cache->vertex_count * sizeof(struct gi_vertex);
   uint64_t material_buf_size = params->scene_cache->material_count * sizeof(struct gi_material);
@@ -252,7 +252,7 @@ int giRender(const struct gi_render_params* params,
     };
     const uint32_t sr_buffer_count = sizeof(sr_buffers) / sizeof(sr_buffers[0]);
 
-    const uint32_t node_size = sizeof(gp_bvhcc_node);
+    const uint32_t node_size = sizeof(struct gp_bvhcc_node);
     const uint32_t node_count = node_buf_size / node_size;
     const uint32_t traversal_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
