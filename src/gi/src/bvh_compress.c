@@ -9,22 +9,22 @@ static void gp_bvh_compress_node(const gp_bvhc_node* in_node,
 {
   const uint32_t Nq = 8;
 
-  const float B_lo_x = parent_aabb->min[0];
-  const float B_lo_y = parent_aabb->min[1];
-  const float B_lo_z = parent_aabb->min[2];
-  const float B_hi_x = parent_aabb->max[0];
-  const float B_hi_y = parent_aabb->max[1];
-  const float B_hi_z = parent_aabb->max[2];
+  float B_lo_x = parent_aabb->min[0];
+  float B_lo_y = parent_aabb->min[1];
+  float B_lo_z = parent_aabb->min[2];
+  float B_hi_x = parent_aabb->max[0];
+  float B_hi_y = parent_aabb->max[1];
+  float B_hi_z = parent_aabb->max[2];
 
   out_node->p_x = B_lo_x;
   out_node->p_y = B_lo_y;
   out_node->p_z = B_lo_z;
 
-  const float s_x = B_hi_x - B_lo_x;
-  const float s_y = B_hi_y - B_lo_y;
-  const float s_z = B_hi_z - B_lo_z;
+  float s_x = B_hi_x - B_lo_x;
+  float s_y = B_hi_y - B_lo_y;
+  float s_z = B_hi_z - B_lo_z;
 
-  const float e_div = 1.0f / (float) ((1 << Nq) - 1);
+  float e_div = 1.0f / (float) ((1 << Nq) - 1);
 
   int32_t e_x, e_y, e_z;
 
@@ -57,13 +57,13 @@ static void gp_bvh_compress_node(const gp_bvhc_node* in_node,
   out_node->face_index = in_node->face_index;
   out_node->imask = 0;
 
-  const float b_div_x = 1.0f / exp2f((float) e_x);
-  const float b_div_y = 1.0f / exp2f((float) e_y);
-  const float b_div_z = 1.0f / exp2f((float) e_z);
+  float b_div_x = 1.0f / exp2f((float) e_x);
+  float b_div_y = 1.0f / exp2f((float) e_y);
+  float b_div_z = 1.0f / exp2f((float) e_z);
 
   for (uint32_t i = 0; i < 8; ++i)
   {
-    const uint32_t child_count = in_node->counts[i] & 0x7FFFFFFF;
+    uint32_t child_count = in_node->counts[i] & 0x7FFFFFFF;
 
     if (child_count == 0)
     {
@@ -80,12 +80,12 @@ static void gp_bvh_compress_node(const gp_bvhc_node* in_node,
     }
 
     const gml_aabb* in_aabb = &in_node->aabbs[i];
-    const float b_lo_x = in_aabb->min[0];
-    const float b_lo_y = in_aabb->min[1];
-    const float b_lo_z = in_aabb->min[2];
-    const float b_hi_x = in_aabb->max[0];
-    const float b_hi_y = in_aabb->max[1];
-    const float b_hi_z = in_aabb->max[2];
+    float b_lo_x = in_aabb->min[0];
+    float b_lo_y = in_aabb->min[1];
+    float b_lo_z = in_aabb->min[2];
+    float b_hi_x = in_aabb->max[0];
+    float b_hi_y = in_aabb->max[1];
+    float b_hi_z = in_aabb->max[2];
 
     out_node->q_lo_x[i] = (uint8_t) floorf((b_lo_x - B_lo_x) * b_div_x);
     out_node->q_lo_y[i] = (uint8_t) floorf((b_lo_y - B_lo_y) * b_div_y);
@@ -94,8 +94,8 @@ static void gp_bvh_compress_node(const gp_bvhc_node* in_node,
     out_node->q_hi_y[i] = (uint8_t) ceilf((b_hi_y - B_lo_y) * b_div_y);
     out_node->q_hi_z[i] = (uint8_t) ceilf((b_hi_z - B_lo_z) * b_div_z);
 
-    const int32_t offset = in_node->offsets[i];
-    const bool is_internal = (in_node->counts[i] & 0x80000000) != 0x80000000;
+    int32_t offset = in_node->offsets[i];
+    bool is_internal = (in_node->counts[i] & 0x80000000) != 0x80000000;
 
     if (is_internal)
     {
@@ -123,14 +123,14 @@ static void gp_bvh_compress_subtree(const gp_bvhc* bvhc,
 
   for (uint32_t i = 0; i < 8; ++i)
   {
-    const bool is_empty = (in_node->counts[i] == 0);
-    const uint32_t is_leaf = (in_node->counts[i] & 0x80000000) == 0x80000000;
+    bool is_empty = (in_node->counts[i] == 0);
+    bool is_leaf = (in_node->counts[i] & 0x80000000) == 0x80000000;
 
     if (is_empty || is_leaf) {
       continue;
     }
 
-    const uint32_t child_node_idx = in_node->child_index + in_node->offsets[i];
+    uint32_t child_node_idx = in_node->child_index + in_node->offsets[i];
     gp_bvh_compress_subtree(bvhc, bvhcc, child_node_idx, &in_node->aabbs[i]);
   }
 
