@@ -14,13 +14,13 @@
 
 struct gi_scene_cache
 {
-  struct gp_bvhcc      bvhcc;
-  uint32_t             face_count;
-  struct gi_face*      faces;
-  struct gp_material * materials;
-  uint32_t             material_count;
-  uint32_t             vertex_count;
-  struct gi_vertex*    vertices;
+  struct gp_bvhcc     bvhcc;
+  uint32_t            face_count;
+  struct gi_face*     faces;
+  struct gi_material* materials;
+  uint32_t            material_count;
+  uint32_t            vertex_count;
+  struct gi_vertex*   vertices;
 };
 
 int giInitialize()
