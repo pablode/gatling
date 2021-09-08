@@ -52,7 +52,8 @@ static uint32_t gi_bvhc_count_child_faces(const struct gi_bvhc_work_data* wdata,
 {
   const struct gi_bvh_node* node = &wdata->params->bvh->nodes[node_idx];
 
-  if ((node->field2 & 0x80000000) == 0x80000000) {
+  if ((node->field2 & 0x80000000) == 0x80000000)
+  {
     return (node->field2 & 0x7FFFFFFF);
   }
 
@@ -76,13 +77,12 @@ static struct gi_bvhc_split gi_bvhc_C_distribute(const struct gi_bvhc_work_data*
 
   for (uint32_t k = 0; k < j; ++k)
   {
-    uint32_t n_left = node->field1;
-    uint32_t n_right = node->field2;
-    struct gi_bvhc_split split_left = gi_bvhc_C(wdata, n_left, k);
-    struct gi_bvhc_split split_right = gi_bvhc_C(wdata, n_right, j - k - 1);
+    struct gi_bvhc_split split_left = gi_bvhc_C(wdata, node->field1, k);
+    struct gi_bvhc_split split_right = gi_bvhc_C(wdata, node->field2, j - k - 1);
     float cost = split_left.cost + split_right.cost;
 
-    if (cost < split.cost) {
+    if (cost < split.cost)
+    {
       split.cost = cost;
       split.left_count = k;
       split.right_count = j - k - 1;
@@ -185,22 +185,25 @@ static void gi_bvhc_collect_childs(const struct gi_bvhc_work_data* wdata,
   assert(*child_count <= 8);
 
   const struct gi_bvhc_split* split = &wdata->splits[node_index * 7 + child_index];
-
   const struct gi_bvh_node* node = &wdata->params->bvh->nodes[node_index];
   const struct gi_bvhc_split* left_split = &wdata->splits[node->field1 * 7 + split->left_count];
   const struct gi_bvhc_split* right_split = &wdata->splits[node->field2 * 7 + split->right_count];
 
-  if (left_split->split_type == GI_BVHC_SPLIT_TYPE_DISTRIBUTE) {
+  if (left_split->split_type == GI_BVHC_SPLIT_TYPE_DISTRIBUTE)
+  {
     gi_bvhc_collect_childs(wdata, node->field1, split->left_count, child_count, child_indices);
   }
-  else {
+  else
+  {
     child_indices[(*child_count)++] = node->field1;
   }
 
-  if (right_split->split_type == GI_BVHC_SPLIT_TYPE_DISTRIBUTE) {
+  if (right_split->split_type == GI_BVHC_SPLIT_TYPE_DISTRIBUTE)
+  {
     gi_bvhc_collect_childs(wdata, node->field2, split->right_count, child_count, child_indices);
   }
-  else {
+  else
+  {
     child_indices[(*child_count)++] = node->field2;
   }
 }
@@ -218,8 +221,7 @@ static uint32_t gi_bvhc_push_child_leaves(const struct gi_bvhc_work_data* wdata,
 
     for (uint32_t i = 0; i < face_count; ++i)
     {
-      wdata->bvhc->faces[wdata->bvhc->face_count + i] =
-        wdata->params->bvh->faces[node->field1 + i];
+      wdata->bvhc->faces[wdata->bvhc->face_count + i] = wdata->params->bvh->faces[node->field1 + i];
     }
     wdata->bvhc->face_count += face_count;
 
@@ -252,11 +254,7 @@ static uint32_t gi_bvhc_create_nodes(const struct gi_bvhc_work_data* wdata,
     if (split->split_type == GI_BVHC_SPLIT_TYPE_LEAF)
     {
       uint32_t face_offset = wdata->bvhc->face_count;
-      uint32_t face_count = gi_bvhc_push_child_leaves(
-        wdata,
-        child_node_idx,
-        &parent_node->aabbs[i]
-      );
+      uint32_t face_count = gi_bvhc_push_child_leaves(wdata, child_node_idx, &parent_node->aabbs[i]);
 
       parent_node->offsets[i] = face_offset - parent_node->face_index;
       parent_node->counts[i] = (0x80000000 | face_count);
@@ -280,7 +278,8 @@ static uint32_t gi_bvhc_create_nodes(const struct gi_bvhc_work_data* wdata,
     int32_t child_node_idx = child_node_indices[i];
     const struct gi_bvhc_split* split = &wdata->splits[child_node_idx * 7];
 
-    if (split->split_type != GI_BVHC_SPLIT_TYPE_INTERNAL) {
+    if (split->split_type != GI_BVHC_SPLIT_TYPE_INTERNAL)
+    {
       continue;
     }
 
@@ -305,8 +304,7 @@ static uint32_t gi_bvhc_create_nodes(const struct gi_bvhc_work_data* wdata,
 void gi_bvh_collapse(const struct gi_bvhc_params* params,
                      struct gi_bvhc* bvhc)
 {
-  /* This would lead to a leaf node being root. This is not supported by this
-   * construction algorithm. */
+  /* This would lead to a leaf node being root. We don't support it. */
   assert(params->bvh->face_count > params->max_leaf_size);
 
   /* Calculate cost lookup table. */
@@ -336,7 +334,9 @@ void gi_bvh_collapse(const struct gi_bvhc_params* params,
 
   /* Clear root node. */
   struct gi_bvhc_node* root_node = &bvhc->nodes[0];
-  for (uint32_t j = 0; j < 8; ++j) {
+
+  for (uint32_t j = 0; j < 8; ++j)
+  {
     root_node->offsets[j] = 0;
     root_node->counts[j] = 0;
     gml_aabb_make_smallest(&root_node->aabbs[j]);

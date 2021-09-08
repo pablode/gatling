@@ -26,25 +26,24 @@ static void gi_bvhcc_compress_node(const struct gi_bvhc_node* in_node,
 
   float e_div = 1.0f / (float) ((1 << Nq) - 1);
 
-  int32_t e_x, e_y, e_z;
+  int32_t e_x = -127;
+  int32_t e_y = -127;
+  int32_t e_z = -127;
 
-  if (s_x <= 0.0f) {
-    e_x = -127;
-  } else {
+  if (s_x > 0.0f)
+  {
     e_x = (int32_t) ceilf(log2f(s_x * e_div));
     e_x = (e_x < -127) ? -127 : (e_x > 128) ? 128 : e_x;
   }
 
-  if (s_y <= 0.0f) {
-    e_y = -127;
-  } else {
+  if (s_y > 0.0f)
+  {
     e_y = (int32_t) ceilf(log2f(s_y * e_div));
     e_y = (e_y < -127) ? -127 : (e_y > 128) ? 128 : e_y;
   }
 
-  if (s_z <= 0.0f) {
-    e_z = -127;
-  } else {
+  if (s_z > 0.0f)
+  {
     e_z = (int32_t) ceilf(log2f(s_z * e_div));
     e_z = (e_z < -127) ? -127 : (e_z > 128) ? 128 : e_z;
   }
@@ -126,7 +125,8 @@ static void gi_bvhcc_compress_subtree(const struct gi_bvhc* bvhc,
     bool is_empty = (in_node->counts[i] == 0);
     bool is_leaf = (in_node->counts[i] & 0x80000000) == 0x80000000;
 
-    if (is_empty || is_leaf) {
+    if (is_empty || is_leaf)
+    {
       continue;
     }
 
