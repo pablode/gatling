@@ -67,7 +67,7 @@ int giPreprocess(const struct gi_preprocess_params* params,
 
   /* Build BVH. */
   struct gi_bvh bvh;
-  const struct gi_bvh_build_params bvh_params = {
+  const struct gi_bvh_params bvh_params = {
     .face_batch_size          = 1,
     .face_count               = params->face_count,
     .face_intersection_cost   = 1.2f,
@@ -86,14 +86,14 @@ int giPreprocess(const struct gi_preprocess_params* params,
   gi_bvh_build(&bvh_params, &bvh);
 
   struct gi_bvhc bvhc;
-  struct gi_bvh_collapse_params cparams  = {
+  struct gi_bvhc_params bvhc_params = {
     .bvh                    = &bvh,
     .max_leaf_size          = 3,
     .node_traversal_cost    = 1.0f,
     .face_intersection_cost = 0.3f
   };
 
-  gi_bvh_collapse(&cparams, &bvhc);
+  gi_bvh_collapse(&bvhc_params, &bvhc);
   gi_free_bvh(&bvh);
 
   /* Copy vertices, materials and new faces. */

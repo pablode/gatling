@@ -23,7 +23,7 @@ struct gi_bvhc
   struct gi_face*      faces;
 };
 
-struct gi_bvh_collapse_params
+struct gi_bvhc_params
 {
   const struct gi_bvh* bvh;
   float                face_intersection_cost;
@@ -31,7 +31,7 @@ struct gi_bvh_collapse_params
   float                node_traversal_cost;
 };
 
-void gi_bvh_collapse(const struct gi_bvh_collapse_params* params,
+void gi_bvh_collapse(const struct gi_bvhc_params* params,
                      struct gi_bvhc* bvhc);
 
 void gi_free_bvhc(struct gi_bvhc* bvhcc);

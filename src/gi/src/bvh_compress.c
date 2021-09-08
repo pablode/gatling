@@ -3,9 +3,9 @@
 #include <math.h>
 #include <stdlib.h>
 
-static void gi_bvh_compress_node(const struct gi_bvhc_node* in_node,
-                                 const gml_aabb* parent_aabb,
-                                 struct gi_bvhcc_node* out_node)
+static void gi_bvhcc_compress_node(const struct gi_bvhc_node* in_node,
+                                   const gml_aabb* parent_aabb,
+                                   struct gi_bvhcc_node* out_node)
 {
   const uint32_t Nq = 8;
 
@@ -113,10 +113,10 @@ static void gi_bvh_compress_node(const struct gi_bvhc_node* in_node,
   }
 }
 
-static void gi_bvh_compress_subtree(const struct gi_bvhc* bvhc,
-                                    struct gi_bvhcc* bvhcc,
-                                    uint32_t node_idx,
-                                    const gml_aabb* node_aabb)
+static void gi_bvhcc_compress_subtree(const struct gi_bvhc* bvhc,
+                                      struct gi_bvhcc* bvhcc,
+                                      const gml_aabb* node_aabb,
+                                      uint32_t node_idx)
 {
   const struct gi_bvhc_node* in_node = &bvhc->nodes[node_idx];
   struct gi_bvhcc_node* out_node = &bvhcc->nodes[node_idx];
@@ -131,10 +131,10 @@ static void gi_bvh_compress_subtree(const struct gi_bvhc* bvhc,
     }
 
     uint32_t child_node_idx = in_node->child_index + in_node->offsets[i];
-    gi_bvh_compress_subtree(bvhc, bvhcc, child_node_idx, &in_node->aabbs[i]);
+    gi_bvhcc_compress_subtree(bvhc, bvhcc, &in_node->aabbs[i], child_node_idx);
   }
 
-  gi_bvh_compress_node(in_node, node_aabb, out_node);
+  gi_bvhcc_compress_node(in_node, node_aabb, out_node);
 }
 
 void gi_bvh_compress(const struct gi_bvhc* bvhc,
@@ -145,7 +145,7 @@ void gi_bvh_compress(const struct gi_bvhc* bvhc,
   bvhcc->node_count = bvhc->node_count;
   bvhcc->nodes = malloc(bvhc->node_count * sizeof(struct gi_bvhcc_node));
 
-  gi_bvh_compress_subtree(bvhc, bvhcc, 0, &bvhc->aabb);
+  gi_bvhcc_compress_subtree(bvhc, bvhcc, &bvhc->aabb, 0);
 }
 
 void gi_free_bvhcc(struct gi_bvhcc* bvhcc)

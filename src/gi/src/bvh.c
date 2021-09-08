@@ -96,7 +96,7 @@ struct gi_bvh_split_spatial
 
 struct gi_bvh_thread_data
 {
-  const struct gi_bvh_build_params* params;
+  const struct gi_bvh_params* params;
   float root_half_area;
   void* reused_bins;
   gml_aabb* reused_aabbs;
@@ -1199,7 +1199,7 @@ static bool gi_bvh_build_work_range(const struct gi_bvh_thread_data* thread_data
   return true;
 }
 
-void gi_bvh_build(const struct gi_bvh_build_params* params,
+void gi_bvh_build(const struct gi_bvh_params* params,
                   struct gi_bvh* bvh)
 {
   /* Set up root work range. */

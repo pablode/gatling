@@ -34,7 +34,7 @@ struct gi_bvh
   struct gi_face*     faces;
 };
 
-struct gi_bvh_build_params {
+struct gi_bvh_params {
   uint32_t              face_batch_size;
   uint32_t              face_count;
   float                 face_intersection_cost;
@@ -50,7 +50,7 @@ struct gi_bvh_build_params {
   struct gi_vertex*     vertices;
 };
 
-void gi_bvh_build(const struct gi_bvh_build_params* params,
+void gi_bvh_build(const struct gi_bvh_params* params,
                   struct gi_bvh* bvh);
 
 void gi_free_bvh(struct gi_bvh* bvh);
