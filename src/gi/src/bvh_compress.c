@@ -3,10 +3,9 @@
 #include <math.h>
 #include <stdlib.h>
 
-static void gp_bvh_compress_node(
-  const gp_bvhc_node* in_node,
-  const gml_aabb* parent_aabb,
-  gp_bvhcc_node* out_node)
+static void gp_bvh_compress_node(const gp_bvhc_node* in_node,
+                                 const gml_aabb* parent_aabb,
+                                 gp_bvhcc_node* out_node)
 {
   const uint32_t Nq = 8;
 
@@ -114,10 +113,10 @@ static void gp_bvh_compress_node(
   }
 }
 
-static void gp_bvh_compress_subtree(
-  const gp_bvhc* bvhc, gp_bvhcc* bvhcc,
-  uint32_t node_idx,
-  const gml_aabb* node_aabb)
+static void gp_bvh_compress_subtree(const gp_bvhc* bvhc,
+                                    gp_bvhcc* bvhcc,
+                                    uint32_t node_idx,
+                                    const gml_aabb* node_aabb)
 {
   const gp_bvhc_node* in_node = &bvhc->nodes[node_idx];
   gp_bvhcc_node* out_node = &bvhcc->nodes[node_idx];
@@ -138,7 +137,8 @@ static void gp_bvh_compress_subtree(
   gp_bvh_compress_node(in_node, node_aabb, out_node);
 }
 
-void gp_bvh_compress(const gp_bvhc* bvhc, gp_bvhcc* bvhcc)
+void gp_bvh_compress(const gp_bvhc* bvhc,
+                     gp_bvhcc* bvhcc)
 {
   bvhcc->aabb = bvhc->aabb;
 

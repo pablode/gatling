@@ -47,10 +47,8 @@ typedef struct gp_bvh_build_params {
   struct gi_vertex* vertices;
 } gp_bvh_build_params;
 
-void gp_bvh_build(
-  const gp_bvh_build_params* params,
-  gp_bvh* bvh
-);
+void gp_bvh_build(const gp_bvh_build_params* params,
+                  gp_bvh* bvh);
 
 void gp_free_bvh(gp_bvh* bvh);
 

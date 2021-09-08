@@ -115,7 +115,9 @@ int giPreprocess(const struct gi_preprocess_params* params,
   return GI_OK;
 }
 
-static uint64_t gi_align_buffer(uint64_t alignment, uint64_t buffer_size, uint64_t* total_size)
+static uint64_t gi_align_buffer(uint64_t alignment,
+                                uint64_t buffer_size,
+                                uint64_t* total_size)
 {
   const uint64_t offset = ((*total_size) + alignment - 1) / alignment * alignment;
 

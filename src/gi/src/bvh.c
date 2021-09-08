@@ -133,19 +133,17 @@ GP_BVH_GEN_SORT_CMP_FUNC(0)
 GP_BVH_GEN_SORT_CMP_FUNC(1)
 GP_BVH_GEN_SORT_CMP_FUNC(2)
 
-static float gp_bvh_calc_face_intersection_cost(
-  float base_cost,
-  uint32_t batch_size,
-  uint32_t face_count)
+static float gp_bvh_calc_face_intersection_cost(float base_cost,
+                                                uint32_t batch_size,
+                                                uint32_t face_count)
 {
   const uint32_t rounded_to_batch_size = ((face_count + batch_size - 1) / batch_size) * batch_size;
   return rounded_to_batch_size * base_cost;
 }
 
-static void gp_bvh_find_split_object(
-  const gp_bvh_thread_data* thread_data,
-  const gp_bvh_work_range* range,
-  gp_bvh_split_object* split)
+static void gp_bvh_find_split_object(const gp_bvh_thread_data* thread_data,
+                                     const gp_bvh_work_range* range,
+                                     gp_bvh_split_object* split)
 {
   float best_sah_cost = INFINITY;
   float best_tie_break = INFINITY;
@@ -242,10 +240,9 @@ static void gp_bvh_find_split_object(
   }
 }
 
-static void gp_bvh_find_split_object_binned(
-  const gp_bvh_thread_data* thread_data,
-  const gp_bvh_work_range* range,
-  gp_bvh_split_object_binned* split)
+static void gp_bvh_find_split_object_binned(const gp_bvh_thread_data* thread_data,
+                                            const gp_bvh_work_range* range,
+                                            gp_bvh_split_object_binned* split)
 {
   float best_sah_cost = INFINITY;
   float best_tie_break = INFINITY;
@@ -375,10 +372,9 @@ static void gp_bvh_find_split_object_binned(
   }
 }
 
-static void gp_bvh_find_split_spatial(
-  const gp_bvh_thread_data* thread_data,
-  const gp_bvh_work_range* range,
-  gp_bvh_split_spatial* split)
+static void gp_bvh_find_split_spatial(const gp_bvh_thread_data* thread_data,
+                                      const gp_bvh_work_range* range,
+                                      gp_bvh_split_spatial* split)
 {
   gp_bvh_spatial_bin* bins = (gp_bvh_spatial_bin*) thread_data->reused_bins;
   const struct gi_vertex* vertices = thread_data->params->vertices;
@@ -576,12 +572,11 @@ static void gp_bvh_find_split_spatial(
   }
 }
 
-static void gp_bvh_do_split_spatial(
-  const gp_bvh_thread_data* thread_data,
-  const gp_bvh_split_spatial* split,
-  const gp_bvh_work_range* range,
-  gp_bvh_work_range* range_left,
-  gp_bvh_work_range* range_right)
+static void gp_bvh_do_split_spatial(const gp_bvh_thread_data* thread_data,
+                                    const gp_bvh_split_spatial* split,
+                                    const gp_bvh_work_range* range,
+                                    gp_bvh_work_range* range_left,
+                                    gp_bvh_work_range* range_right)
 {
   const uint32_t bin_count = thread_data->params->spatial_bin_count;
   const float axis_length = range->aabb_bounds.max[split->axis] - range->aabb_bounds.min[split->axis];
@@ -783,11 +778,10 @@ static void gp_bvh_do_split_spatial(
   assert(range_right->stack_size == split->right_face_count);
 }
 
-static void gp_bvh_do_split_object(
-  const gp_bvh_split_object* split,
-  const gp_bvh_work_range* range,
-  gp_bvh_work_range* range_left,
-  gp_bvh_work_range* range_right)
+static void gp_bvh_do_split_object(const gp_bvh_split_object* split,
+                                   const gp_bvh_work_range* range,
+                                   gp_bvh_work_range* range_left,
+                                   gp_bvh_work_range* range_right)
 {
   /* This partitioning algorithm is a little bit special since we
    * deal with directional ranges. While partitioning, we want both
@@ -898,12 +892,11 @@ static void gp_bvh_do_split_object(
   range2->stack_size_limit = range2->stack_size + (free_face_count - half_free_face_count);
 }
 
-static void gp_bvh_do_split_object_binned(
-  const gp_bvh_thread_data* thread_data,
-  const gp_bvh_split_object_binned* split,
-  const gp_bvh_work_range* range,
-  gp_bvh_work_range* range_left,
-  gp_bvh_work_range* range_right)
+static void gp_bvh_do_split_object_binned(const gp_bvh_thread_data* thread_data,
+                                          const gp_bvh_split_object_binned* split,
+                                          const gp_bvh_work_range* range,
+                                          gp_bvh_work_range* range_left,
+                                          gp_bvh_work_range* range_right)
 {
   /* See non-binned object splitting for a general algorithm description. */
 
@@ -1025,11 +1018,10 @@ static void gp_bvh_do_split_object_binned(
   range2->stack_size_limit = range2->stack_size + (free_face_count - half_free_face_count);
 }
 
-static bool gp_bvh_build_work_range(
-  const gp_bvh_thread_data* thread_data,
-  const gp_bvh_work_range* range,
-  gp_bvh_work_range* range_left,
-  gp_bvh_work_range* range_right)
+static bool gp_bvh_build_work_range(const gp_bvh_thread_data* thread_data,
+                                    const gp_bvh_work_range* range,
+                                    gp_bvh_work_range* range_left,
+                                    gp_bvh_work_range* range_right)
 {
   /* Make a leaf if face count is too low. */
 
@@ -1205,9 +1197,8 @@ static bool gp_bvh_build_work_range(
   return true;
 }
 
-void gp_bvh_build(
-  const gp_bvh_build_params* params,
-  gp_bvh* bvh)
+void gp_bvh_build(const gp_bvh_build_params* params,
+                  gp_bvh* bvh)
 {
   /* Set up root work range. */
 

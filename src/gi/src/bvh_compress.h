@@ -73,7 +73,8 @@ typedef struct gp_bvhcc {
   gp_bvhcc_node* nodes;
 } gp_bvhcc;
 
-void gp_bvh_compress(const gp_bvhc* bvhc, gp_bvhcc* bvhcc);
+void gp_bvh_compress(const gp_bvhc* bvhc,
+                     gp_bvhcc* bvhcc);
 
 void gp_free_bvhcc(gp_bvhcc* bvhcc);
 

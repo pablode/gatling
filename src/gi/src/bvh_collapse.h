@@ -28,7 +28,8 @@ typedef struct gp_bvh_collapse_params {
   float         node_traversal_cost;
 } gp_bvh_collapse_params;
 
-void gp_bvh_collapse(const gp_bvh_collapse_params* params, gp_bvhc* bvhc);
+void gp_bvh_collapse(const gp_bvh_collapse_params* params,
+                     gp_bvhc* bvhc);
 
 void gp_free_bvhc(gp_bvhc* bvhcc);
 
