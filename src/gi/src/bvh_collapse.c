@@ -34,7 +34,7 @@ enum GpBvhCollapseSplitType
 
 struct gp_bvh_collapse_split
 {
-  int32_t split_type;
+  enum GpBvhCollapseSplitType split_type;
   int32_t left_count;
   int32_t right_count;
   float cost;
