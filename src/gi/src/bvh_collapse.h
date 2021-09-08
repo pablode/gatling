@@ -1,11 +1,11 @@
-#ifndef GP_BVH_COLLAPSE_H
-#define GP_BVH_COLLAPSE_H
+#ifndef GI_BVH_COLLAPSE_H
+#define GI_BVH_COLLAPSE_H
 
 #include <stddef.h>
 
 #include "bvh.h"
 
-struct gp_bvhc_node
+struct gi_bvhc_node
 {
   gml_aabb aabbs[8];
   uint32_t offsets[8];
@@ -14,26 +14,26 @@ struct gp_bvhc_node
   uint32_t face_index;
 };
 
-struct gp_bvhc
+struct gi_bvhc
 {
   gml_aabb             aabb;
   uint32_t             node_count;
-  struct gp_bvhc_node* nodes;
+  struct gi_bvhc_node* nodes;
   uint32_t             face_count;
   struct gi_face*      faces;
 };
 
-struct gp_bvh_collapse_params
+struct gi_bvh_collapse_params
 {
-  const struct gp_bvh* bvh;
+  const struct gi_bvh* bvh;
   float                face_intersection_cost;
   uint32_t             max_leaf_size;
   float                node_traversal_cost;
 };
 
-void gp_bvh_collapse(const struct gp_bvh_collapse_params* params,
-                     struct gp_bvhc* bvhc);
+void gi_bvh_collapse(const struct gi_bvh_collapse_params* params,
+                     struct gi_bvhc* bvhc);
 
-void gp_free_bvhc(struct gp_bvhc* bvhcc);
+void gi_free_bvhc(struct gi_bvhc* bvhcc);
 
 #endif

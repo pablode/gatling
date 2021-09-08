@@ -25,61 +25,61 @@
  *     DOI: https://doi.org/10.1145/3105762.3105773
  */
 
-enum GpBvhCollapseSplitType
+enum GiBvhCollapseSplitType
 {
-  GP_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL = 1,
-  GP_BVH_COLLAPSE_SPLIT_TYPE_LEAF = 2,
-  GP_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE = 3
+  GI_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL = 1,
+  GI_BVH_COLLAPSE_SPLIT_TYPE_LEAF = 2,
+  GI_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE = 3
 };
 
-struct gp_bvh_collapse_split
+struct gi_bvh_collapse_split
 {
-  enum GpBvhCollapseSplitType split_type;
+  enum GiBvhCollapseSplitType split_type;
   int32_t left_count;
   int32_t right_count;
   float cost;
 };
 
-struct gp_bvh_collapse_work_data
+struct gi_bvh_collapse_work_data
 {
-  struct gp_bvhc*                      bvhc;
-  const struct gp_bvh_collapse_params* params;
-  struct gp_bvh_collapse_split*        splits;
+  struct gi_bvhc*                      bvhc;
+  const struct gi_bvh_collapse_params* params;
+  struct gi_bvh_collapse_split*        splits;
 };
 
-static uint32_t gp_bvh_collapse_count_child_faces(const struct gp_bvh_collapse_work_data* wdata,
+static uint32_t gi_bvh_collapse_count_child_faces(const struct gi_bvh_collapse_work_data* wdata,
                                                   uint32_t node_idx)
 {
-  const struct gp_bvh_node* node = &wdata->params->bvh->nodes[node_idx];
+  const struct gi_bvh_node* node = &wdata->params->bvh->nodes[node_idx];
 
   if ((node->field2 & 0x80000000) == 0x80000000) {
     return (node->field2 & 0x7FFFFFFF);
   }
 
-  return gp_bvh_collapse_count_child_faces(wdata, node->field1) +
-         gp_bvh_collapse_count_child_faces(wdata, node->field2);
+  return gi_bvh_collapse_count_child_faces(wdata, node->field1) +
+         gi_bvh_collapse_count_child_faces(wdata, node->field2);
 }
 
-static struct gp_bvh_collapse_split gp_bvh_collapse_C(const struct gp_bvh_collapse_work_data* wdata,
+static struct gi_bvh_collapse_split gi_bvh_collapse_C(const struct gi_bvh_collapse_work_data* wdata,
                                                       uint32_t n,
                                                       uint32_t i);
 
-static struct gp_bvh_collapse_split gp_bvh_collapse_C_distribute(const struct gp_bvh_collapse_work_data* wdata,
+static struct gi_bvh_collapse_split gi_bvh_collapse_C_distribute(const struct gi_bvh_collapse_work_data* wdata,
                                                                  uint32_t n,
                                                                  uint32_t j)
 {
-  const struct gp_bvh_node* node = &wdata->params->bvh->nodes[n];
+  const struct gi_bvh_node* node = &wdata->params->bvh->nodes[n];
 
-  struct gp_bvh_collapse_split split;
-  split.split_type = GP_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE;
+  struct gi_bvh_collapse_split split;
+  split.split_type = GI_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE;
   split.cost = INFINITY;
 
   for (uint32_t k = 0; k < j; ++k)
   {
     uint32_t n_left = node->field1;
     uint32_t n_right = node->field2;
-    struct gp_bvh_collapse_split split_left = gp_bvh_collapse_C(wdata, n_left, k);
-    struct gp_bvh_collapse_split split_right = gp_bvh_collapse_C(wdata, n_right, j - k - 1);
+    struct gi_bvh_collapse_split split_left = gi_bvh_collapse_C(wdata, n_left, k);
+    struct gi_bvh_collapse_split split_right = gi_bvh_collapse_C(wdata, n_right, j - k - 1);
     float cost = split_left.cost + split_right.cost;
 
     if (cost < split.cost) {
@@ -92,25 +92,25 @@ static struct gp_bvh_collapse_split gp_bvh_collapse_C_distribute(const struct gp
   return split;
 }
 
-static struct gp_bvh_collapse_split gp_bvh_collapse_C_internal(const struct gp_bvh_collapse_work_data* wdata,
+static struct gi_bvh_collapse_split gi_bvh_collapse_C_internal(const struct gi_bvh_collapse_work_data* wdata,
                                                                uint32_t n)
 {
-  const struct gp_bvh_node* node = &wdata->params->bvh->nodes[n];
+  const struct gi_bvh_node* node = &wdata->params->bvh->nodes[n];
   float A_n = gml_aabb_area(&node->aabb);
 
-  struct gp_bvh_collapse_split split = gp_bvh_collapse_C_distribute(wdata, n, 7);
-  split.split_type = GP_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL;
+  struct gi_bvh_collapse_split split = gi_bvh_collapse_C_distribute(wdata, n, 7);
+  split.split_type = GI_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL;
   split.cost += A_n * wdata->params->node_traversal_cost;
   return split;
 }
 
-static struct gp_bvh_collapse_split gp_bvh_collapse_C_leaf(const struct gp_bvh_collapse_work_data* wdata,
+static struct gi_bvh_collapse_split gi_bvh_collapse_C_leaf(const struct gi_bvh_collapse_work_data* wdata,
                                                            uint32_t n)
 {
-  uint32_t p_n = gp_bvh_collapse_count_child_faces(wdata, n);
+  uint32_t p_n = gi_bvh_collapse_count_child_faces(wdata, n);
 
-  struct gp_bvh_collapse_split split;
-  split.split_type = GP_BVH_COLLAPSE_SPLIT_TYPE_LEAF;
+  struct gi_bvh_collapse_split split;
+  split.split_type = GI_BVH_COLLAPSE_SPLIT_TYPE_LEAF;
 
   if (p_n > wdata->params->max_leaf_size)
   {
@@ -118,14 +118,14 @@ static struct gp_bvh_collapse_split gp_bvh_collapse_C_leaf(const struct gp_bvh_c
     return split;
   }
 
-  const struct gp_bvh_node* node = &wdata->params->bvh->nodes[n];
+  const struct gi_bvh_node* node = &wdata->params->bvh->nodes[n];
   float A_n = gml_aabb_area(&node->aabb);
   split.cost = A_n * p_n * wdata->params->face_intersection_cost;
 
   return split;
 }
 
-static struct gp_bvh_collapse_split gp_bvh_collapse_C(const struct gp_bvh_collapse_work_data* wdata,
+static struct gi_bvh_collapse_split gi_bvh_collapse_C(const struct gi_bvh_collapse_work_data* wdata,
                                                       uint32_t n,
                                                       uint32_t i)
 {
@@ -136,22 +136,22 @@ static struct gp_bvh_collapse_split gp_bvh_collapse_C(const struct gp_bvh_collap
 
   if (i == 0)
   {
-    struct gp_bvh_collapse_split c_leaf = gp_bvh_collapse_C_leaf(wdata, n);
-    struct gp_bvh_collapse_split c_internal = gp_bvh_collapse_C_internal(wdata, n);
+    struct gi_bvh_collapse_split c_leaf = gi_bvh_collapse_C_leaf(wdata, n);
+    struct gi_bvh_collapse_split c_internal = gi_bvh_collapse_C_internal(wdata, n);
     return (c_leaf.cost < c_internal.cost) ? c_leaf : c_internal;
   }
   else
   {
-    struct gp_bvh_collapse_split c_dist = gp_bvh_collapse_C_distribute(wdata, n, i);
-    struct gp_bvh_collapse_split c_recur = gp_bvh_collapse_C(wdata, n, i - 1);
+    struct gi_bvh_collapse_split c_dist = gi_bvh_collapse_C_distribute(wdata, n, i);
+    struct gi_bvh_collapse_split c_recur = gi_bvh_collapse_C(wdata, n, i - 1);
     return (c_dist.cost < c_recur.cost) ? c_dist : c_recur;
   }
 }
 
-static void gp_bvh_collapse_calc_costs(const struct gp_bvh_collapse_work_data* wdata,
+static void gi_bvh_collapse_calc_costs(const struct gi_bvh_collapse_work_data* wdata,
                                        uint32_t n)
 {
-  const struct gp_bvh_node* node = &wdata->params->bvh->nodes[n];
+  const struct gi_bvh_node* node = &wdata->params->bvh->nodes[n];
 
   if ((node->field2 & 0x80000000) == 0x80000000)
   {
@@ -161,22 +161,22 @@ static void gp_bvh_collapse_calc_costs(const struct gp_bvh_collapse_work_data* w
 
     for (uint32_t i = 0; i < 7; ++i)
     {
-      wdata->splits[n * 7 + i].split_type = GP_BVH_COLLAPSE_SPLIT_TYPE_LEAF;
+      wdata->splits[n * 7 + i].split_type = GI_BVH_COLLAPSE_SPLIT_TYPE_LEAF;
       wdata->splits[n * 7 + i].cost = cost;
     }
     return;
   }
 
-  gp_bvh_collapse_calc_costs(wdata, node->field1);
-  gp_bvh_collapse_calc_costs(wdata, node->field2);
+  gi_bvh_collapse_calc_costs(wdata, node->field1);
+  gi_bvh_collapse_calc_costs(wdata, node->field2);
 
   for (uint32_t i = 0; i < 7; ++i)
   {
-    wdata->splits[n * 7 + i] = gp_bvh_collapse_C(wdata, n, i);
+    wdata->splits[n * 7 + i] = gi_bvh_collapse_C(wdata, n, i);
   }
 }
 
-static void gp_bvh_collapse_collect_childs(const struct gp_bvh_collapse_work_data* wdata,
+static void gi_bvh_collapse_collect_childs(const struct gi_bvh_collapse_work_data* wdata,
                                            uint32_t node_index,
                                            uint32_t child_index,
                                            uint32_t* child_count,
@@ -184,32 +184,32 @@ static void gp_bvh_collapse_collect_childs(const struct gp_bvh_collapse_work_dat
 {
   assert(*child_count <= 8);
 
-  const struct gp_bvh_collapse_split* split = &wdata->splits[node_index * 7 + child_index];
+  const struct gi_bvh_collapse_split* split = &wdata->splits[node_index * 7 + child_index];
 
-  const struct gp_bvh_node* node = &wdata->params->bvh->nodes[node_index];
-  const struct gp_bvh_collapse_split* left_split = &wdata->splits[node->field1 * 7 + split->left_count];
-  const struct gp_bvh_collapse_split* right_split = &wdata->splits[node->field2 * 7 + split->right_count];
+  const struct gi_bvh_node* node = &wdata->params->bvh->nodes[node_index];
+  const struct gi_bvh_collapse_split* left_split = &wdata->splits[node->field1 * 7 + split->left_count];
+  const struct gi_bvh_collapse_split* right_split = &wdata->splits[node->field2 * 7 + split->right_count];
 
-  if (left_split->split_type == GP_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE) {
-    gp_bvh_collapse_collect_childs(wdata, node->field1, split->left_count, child_count, child_indices);
+  if (left_split->split_type == GI_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE) {
+    gi_bvh_collapse_collect_childs(wdata, node->field1, split->left_count, child_count, child_indices);
   }
   else {
     child_indices[(*child_count)++] = node->field1;
   }
 
-  if (right_split->split_type == GP_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE) {
-    gp_bvh_collapse_collect_childs(wdata, node->field2, split->right_count, child_count, child_indices);
+  if (right_split->split_type == GI_BVH_COLLAPSE_SPLIT_TYPE_DISTRIBUTE) {
+    gi_bvh_collapse_collect_childs(wdata, node->field2, split->right_count, child_count, child_indices);
   }
   else {
     child_indices[(*child_count)++] = node->field2;
   }
 }
 
-static uint32_t gp_bvh_collapse_push_child_leaves(const struct gp_bvh_collapse_work_data* wdata,
+static uint32_t gi_bvh_collapse_push_child_leaves(const struct gi_bvh_collapse_work_data* wdata,
                                                   uint32_t node_idx,
                                                   gml_aabb* aabb)
 {
-  const struct gp_bvh_node* node = &wdata->params->bvh->nodes[node_idx];
+  const struct gi_bvh_node* node = &wdata->params->bvh->nodes[node_idx];
 
   if ((node->field2 & 0x80000000) == 0x80000000)
   {
@@ -226,19 +226,19 @@ static uint32_t gp_bvh_collapse_push_child_leaves(const struct gp_bvh_collapse_w
     return face_count;
   }
 
-  return gp_bvh_collapse_push_child_leaves(wdata, node->field1, aabb) +
-         gp_bvh_collapse_push_child_leaves(wdata, node->field2, aabb);
+  return gi_bvh_collapse_push_child_leaves(wdata, node->field1, aabb) +
+         gi_bvh_collapse_push_child_leaves(wdata, node->field2, aabb);
 }
 
-static uint32_t gp_bvh_collapse_create_nodes(const struct gp_bvh_collapse_work_data* wdata,
+static uint32_t gi_bvh_collapse_create_nodes(const struct gi_bvh_collapse_work_data* wdata,
                                              uint32_t node_idx,
-                                             struct gp_bvhc_node* parent_node,
+                                             struct gi_bvhc_node* parent_node,
                                              gml_aabb* parent_aabb)
 {
   /* Inline nodes contained in distributed splits. */
   uint32_t child_node_count = 0;
   uint32_t child_node_indices[8];
-  gp_bvh_collapse_collect_childs(wdata, node_idx, 0, &child_node_count, child_node_indices);
+  gi_bvh_collapse_collect_childs(wdata, node_idx, 0, &child_node_count, child_node_indices);
 
   /* Create leaf nodes and internal node offsets. */
   parent_node->child_index = wdata->bvhc->node_count;
@@ -247,12 +247,12 @@ static uint32_t gp_bvh_collapse_create_nodes(const struct gp_bvh_collapse_work_d
   for (uint32_t i = 0; i < child_node_count; ++i)
   {
     int32_t child_node_idx = child_node_indices[i];
-    const struct gp_bvh_collapse_split* split = &wdata->splits[child_node_idx * 7];
+    const struct gi_bvh_collapse_split* split = &wdata->splits[child_node_idx * 7];
 
-    if (split->split_type == GP_BVH_COLLAPSE_SPLIT_TYPE_LEAF)
+    if (split->split_type == GI_BVH_COLLAPSE_SPLIT_TYPE_LEAF)
     {
       uint32_t face_offset = wdata->bvhc->face_count;
-      uint32_t face_count = gp_bvh_collapse_push_child_leaves(
+      uint32_t face_count = gi_bvh_collapse_push_child_leaves(
         wdata,
         child_node_idx,
         &parent_node->aabbs[i]
@@ -263,7 +263,7 @@ static uint32_t gp_bvh_collapse_create_nodes(const struct gp_bvh_collapse_work_d
 
       gml_aabb_merge(parent_aabb, &parent_node->aabbs[i], parent_aabb);
     }
-    else if (split->split_type == GP_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL)
+    else if (split->split_type == GI_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL)
     {
       uint32_t new_node_idx = (wdata->bvhc->node_count++);
       parent_node->offsets[i] = new_node_idx - parent_node->child_index;
@@ -278,14 +278,14 @@ static uint32_t gp_bvh_collapse_create_nodes(const struct gp_bvh_collapse_work_d
   for (uint32_t i = 0; i < child_node_count; ++i)
   {
     int32_t child_node_idx = child_node_indices[i];
-    const struct gp_bvh_collapse_split* split = &wdata->splits[child_node_idx * 7];
+    const struct gi_bvh_collapse_split* split = &wdata->splits[child_node_idx * 7];
 
-    if (split->split_type != GP_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL) {
+    if (split->split_type != GI_BVH_COLLAPSE_SPLIT_TYPE_INTERNAL) {
       continue;
     }
 
     uint32_t new_node_idx = parent_node->child_index + parent_node->offsets[i];
-    struct gp_bvhc_node* new_node = &wdata->bvhc->nodes[new_node_idx];
+    struct gi_bvhc_node* new_node = &wdata->bvhc->nodes[new_node_idx];
 
     for (uint32_t k = 0; k < 8; ++k)
     {
@@ -294,7 +294,7 @@ static uint32_t gp_bvh_collapse_create_nodes(const struct gp_bvh_collapse_work_d
       gml_aabb_make_smallest(&new_node->aabbs[k]);
     }
 
-    parent_node->counts[i] = gp_bvh_collapse_create_nodes(wdata, child_node_idx, new_node, &parent_node->aabbs[i]);
+    parent_node->counts[i] = gi_bvh_collapse_create_nodes(wdata, child_node_idx, new_node, &parent_node->aabbs[i]);
 
     gml_aabb_merge(parent_aabb, &parent_node->aabbs[i], parent_aabb);
   }
@@ -302,8 +302,8 @@ static uint32_t gp_bvh_collapse_create_nodes(const struct gp_bvh_collapse_work_d
   return child_node_count;
 }
 
-void gp_bvh_collapse(const struct gp_bvh_collapse_params* params,
-                     struct gp_bvhc* bvhc)
+void gi_bvh_collapse(const struct gi_bvh_collapse_params* params,
+                     struct gi_bvhc* bvhc)
 {
   /* This would lead to a leaf node being root. This is not supported by this
    * construction algorithm. */
@@ -311,31 +311,31 @@ void gp_bvh_collapse(const struct gp_bvh_collapse_params* params,
 
   /* Calculate cost lookup table. */
   uint32_t num_splits = params->bvh->node_count * 7;
-  struct gp_bvh_collapse_split* splits = malloc(num_splits * sizeof(struct gp_bvh_collapse_split));
+  struct gi_bvh_collapse_split* splits = malloc(num_splits * sizeof(struct gi_bvh_collapse_split));
 
   for (uint32_t i = 0; i < num_splits; ++i)
   {
-    struct gp_bvh_collapse_split* split = &splits[i];
+    struct gi_bvh_collapse_split* split = &splits[i];
     split->split_type = -1;
   }
 
-  struct gp_bvh_collapse_work_data work_data = {
+  struct gi_bvh_collapse_work_data work_data = {
     .bvhc = bvhc,
     .params = params,
     .splits = splits
   };
 
-  gp_bvh_collapse_calc_costs(&work_data, 0);
+  gi_bvh_collapse_calc_costs(&work_data, 0);
 
   /* Set up new bvh and include a root node. */
   bvhc->aabb = params->bvh->aabb;
   bvhc->node_count = 1;
-  bvhc->nodes = malloc(params->bvh->node_count * sizeof(struct gp_bvhc_node));
+  bvhc->nodes = malloc(params->bvh->node_count * sizeof(struct gi_bvhc_node));
   bvhc->face_count = 0;
   bvhc->faces = malloc(params->bvh->face_count * sizeof(struct gi_face));
 
   /* Clear root node. */
-  struct gp_bvhc_node* root_node = &bvhc->nodes[0];
+  struct gi_bvhc_node* root_node = &bvhc->nodes[0];
   for (uint32_t j = 0; j < 8; ++j) {
     root_node->offsets[j] = 0;
     root_node->counts[j] = 0;
@@ -343,15 +343,15 @@ void gp_bvh_collapse(const struct gp_bvh_collapse_params* params,
   }
 
   /* Construct wide bvh recursively using previously calculated costs. */
-  gp_bvh_collapse_create_nodes(&work_data, 0, root_node, &bvhc->aabb);
+  gi_bvh_collapse_create_nodes(&work_data, 0, root_node, &bvhc->aabb);
 
   /* There can be less nodes than in the input BVH because we collapse leaves. */
-  bvhc->nodes = realloc(bvhc->nodes, bvhc->node_count * sizeof(struct gp_bvhc_node));
+  bvhc->nodes = realloc(bvhc->nodes, bvhc->node_count * sizeof(struct gi_bvhc_node));
 
   free(splits);
 }
 
-void gp_free_bvhc(struct gp_bvhc* bvhc)
+void gi_free_bvhc(struct gi_bvhc* bvhc)
 {
   free(bvhc->nodes);
   free(bvhc->faces);

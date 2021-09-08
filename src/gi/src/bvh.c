@@ -49,26 +49,26 @@
  *     DOI: https://doi.org/10.2312/pgv.20161179
  */
 
-struct gp_bvh_face_ref
+struct gi_bvh_face_ref
 {
   gml_aabb aabb;
   uint32_t index;
 };
 
-struct gp_bvh_object_bin
+struct gi_bvh_object_bin
 {
   gml_aabb aabb;
   uint32_t face_count;
 };
 
-struct gp_bvh_spatial_bin
+struct gi_bvh_spatial_bin
 {
   uint32_t entry_count;
   uint32_t exit_count;
   gml_aabb aabb;
 };
 
-struct gp_bvh_split_object
+struct gi_bvh_split_object
 {
   float sah_cost;
   uint32_t axis;
@@ -77,7 +77,7 @@ struct gp_bvh_split_object
   float overlap_half_area;
 };
 
-struct gp_bvh_split_object_binned
+struct gi_bvh_split_object_binned
 {
   float sah_cost;
   uint32_t axis;
@@ -85,7 +85,7 @@ struct gp_bvh_split_object_binned
   float overlap_half_area;
 };
 
-struct gp_bvh_split_spatial
+struct gi_bvh_split_spatial
 {
   float sah_cost;
   uint32_t axis;
@@ -94,19 +94,19 @@ struct gp_bvh_split_spatial
   uint32_t right_face_count;
 };
 
-struct gp_bvh_thread_data
+struct gi_bvh_thread_data
 {
-  const struct gp_bvh_build_params* params;
+  const struct gi_bvh_build_params* params;
   float root_half_area;
   void* reused_bins;
   gml_aabb* reused_aabbs;
-  struct gp_bvh_face_ref* reserve_buffer;
+  struct gi_bvh_face_ref* reserve_buffer;
   int32_t* reserve_buffer_capacity;
 };
 
-struct gp_bvh_work_range
+struct gi_bvh_work_range
 {
-  struct gp_bvh_face_ref* stack;
+  struct gi_bvh_face_ref* stack;
   int32_t stack_dir;
   uint32_t stack_size;
   uint32_t stack_size_limit;
@@ -114,18 +114,18 @@ struct gp_bvh_work_range
   gml_aabb centroid_bounds;
 };
 
-struct gp_bvh_work_job
+struct gi_bvh_work_job
 {
-  struct gp_bvh_work_range range;
+  struct gi_bvh_work_range range;
   uint32_t node_index;
 };
 
-#define GP_BVH_GEN_SORT_CMP_FUNC(AXIS)                                            \
-  static int gp_bvh_sort_comp_func_##AXIS(                                        \
+#define GI_BVH_GEN_SORT_CMP_FUNC(AXIS)                                            \
+  static int gi_bvh_sort_comp_func_##AXIS(                                        \
     const void* a, const void* b)                                                 \
   {                                                                               \
-    const struct gp_bvh_face_ref* ref_1 = (struct gp_bvh_face_ref*) a;            \
-    const struct gp_bvh_face_ref* ref_2 = (struct gp_bvh_face_ref*) b;            \
+    const struct gi_bvh_face_ref* ref_1 = (struct gi_bvh_face_ref*) a;            \
+    const struct gi_bvh_face_ref* ref_2 = (struct gi_bvh_face_ref*) b;            \
     float aabb_dcentroid_1 = ref_1->aabb.min[AXIS] + ref_1->aabb.max[AXIS];       \
     float aabb_dcentroid_2 = ref_2->aabb.min[AXIS] + ref_2->aabb.max[AXIS];       \
                                                                                   \
@@ -138,11 +138,11 @@ struct gp_bvh_work_job
     }                                                                             \
   }
 
-GP_BVH_GEN_SORT_CMP_FUNC(0)
-GP_BVH_GEN_SORT_CMP_FUNC(1)
-GP_BVH_GEN_SORT_CMP_FUNC(2)
+GI_BVH_GEN_SORT_CMP_FUNC(0)
+GI_BVH_GEN_SORT_CMP_FUNC(1)
+GI_BVH_GEN_SORT_CMP_FUNC(2)
 
-static float gp_bvh_calc_face_intersection_cost(float base_cost,
+static float gi_bvh_calc_face_intersection_cost(float base_cost,
                                                 uint32_t batch_size,
                                                 uint32_t face_count)
 {
@@ -150,9 +150,9 @@ static float gp_bvh_calc_face_intersection_cost(float base_cost,
   return rounded_to_batch_size * base_cost;
 }
 
-static void gp_bvh_find_split_object(const struct gp_bvh_thread_data* thread_data,
-                                     const struct gp_bvh_work_range* range,
-                                     struct gp_bvh_split_object* split)
+static void gi_bvh_find_split_object(const struct gi_bvh_thread_data* thread_data,
+                                     const struct gi_bvh_work_range* range,
+                                     struct gi_bvh_split_object* split)
 {
   float best_sah_cost = INFINITY;
   float best_tie_break = INFINITY;
@@ -160,7 +160,7 @@ static void gp_bvh_find_split_object(const struct gp_bvh_thread_data* thread_dat
   gml_aabb left_accum;
   gml_aabb right_accum;
 
-  struct gp_bvh_face_ref* range_stack_left =
+  struct gi_bvh_face_ref* range_stack_left =
     (range->stack_dir == 1) ? range->stack : (range->stack - (range->stack_size - 1));
 
   /* Test each axis and sort faces along it. */
@@ -169,13 +169,13 @@ static void gp_bvh_find_split_object(const struct gp_bvh_thread_data* thread_dat
     switch (axis)
     {
       case 0:
-        qsort(range_stack_left, range->stack_size, sizeof(struct gp_bvh_face_ref), gp_bvh_sort_comp_func_0);
+        qsort(range_stack_left, range->stack_size, sizeof(struct gi_bvh_face_ref), gi_bvh_sort_comp_func_0);
         break;
       case 1:
-        qsort(range_stack_left, range->stack_size, sizeof(struct gp_bvh_face_ref), gp_bvh_sort_comp_func_1);
+        qsort(range_stack_left, range->stack_size, sizeof(struct gi_bvh_face_ref), gi_bvh_sort_comp_func_1);
         break;
       case 2:
-        qsort(range_stack_left, range->stack_size, sizeof(struct gp_bvh_face_ref), gp_bvh_sort_comp_func_2);
+        qsort(range_stack_left, range->stack_size, sizeof(struct gi_bvh_face_ref), gi_bvh_sort_comp_func_2);
         break;
       default:
         assert(false);
@@ -186,7 +186,7 @@ static void gp_bvh_find_split_object(const struct gp_bvh_thread_data* thread_dat
 
     for (int32_t r = range->stack_size - 1; r > 0; --r)
     {
-      const struct gp_bvh_face_ref* ref = &range_stack_left[r];
+      const struct gi_bvh_face_ref* ref = &range_stack_left[r];
       gml_aabb_merge(&right_accum, &ref->aabb, &right_accum);
       thread_data->reused_aabbs[r - 1] = right_accum;
     }
@@ -196,7 +196,7 @@ static void gp_bvh_find_split_object(const struct gp_bvh_thread_data* thread_dat
 
     for (uint32_t l = 1; l < range->stack_size; ++l)
     {
-      const struct gp_bvh_face_ref* ref = &range_stack_left[(int32_t)l - 1];
+      const struct gi_bvh_face_ref* ref = &range_stack_left[(int32_t)l - 1];
       gml_aabb_merge(&left_accum, &ref->aabb, &left_accum);
 
       uint32_t r = range->stack_size - l;
@@ -206,12 +206,12 @@ static void gp_bvh_find_split_object(const struct gp_bvh_thread_data* thread_dat
       float area_r = gml_aabb_half_area(&thread_data->reused_aabbs[l - 1]);
 
       float sah_cost =
-        gp_bvh_calc_face_intersection_cost(
+        gi_bvh_calc_face_intersection_cost(
           thread_data->params->face_intersection_cost,
           thread_data->params->face_batch_size,
           l
         ) * area_l +
-        gp_bvh_calc_face_intersection_cost(
+        gi_bvh_calc_face_intersection_cost(
           thread_data->params->face_intersection_cost,
           thread_data->params->face_batch_size,
           r
@@ -249,9 +249,9 @@ static void gp_bvh_find_split_object(const struct gp_bvh_thread_data* thread_dat
   }
 }
 
-static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thread_data,
-                                            const struct gp_bvh_work_range* range,
-                                            struct gp_bvh_split_object_binned* split)
+static void gi_bvh_find_split_object_binned(const struct gi_bvh_thread_data* thread_data,
+                                            const struct gi_bvh_work_range* range,
+                                            struct gi_bvh_split_object_binned* split)
 {
   float best_sah_cost = INFINITY;
   float best_tie_break = INFINITY;
@@ -263,7 +263,7 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
   gml_vec3_sub(range->centroid_bounds.max, range->centroid_bounds.min, axis_lengths);
 
   uint32_t bin_count;
-  if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE)
+  if (thread_data->params->object_binning_mode == GI_BVH_BINNING_MODE_ADAPTIVE)
   {
     bin_count = i32min(
       (uint32_t) (range->stack_size * 0.05f + 4.0f),
@@ -275,7 +275,7 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
     bin_count = thread_data->params->object_bin_count;
   }
 
-  struct gp_bvh_object_bin* bins = (struct gp_bvh_object_bin*) thread_data->reused_bins;
+  struct gi_bvh_object_bin* bins = (struct gi_bvh_object_bin*) thread_data->reused_bins;
   gml_aabb* reused_aabbs = (gml_aabb*) thread_data->reused_aabbs;
 
   /* Test each axis. */
@@ -292,7 +292,7 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
     /* Clear object bins. */
     for (uint32_t i = 0; i < bin_count; ++i)
     {
-      struct gp_bvh_object_bin* bin = &bins[i];
+      struct gi_bvh_object_bin* bin = &bins[i];
       gml_aabb_make_smallest(&bin->aabb);
       bin->face_count = 0;
     }
@@ -300,14 +300,14 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
     /* Project faces to bins. */
     for (uint32_t i = 0; i < range->stack_size; ++i)
     {
-      const struct gp_bvh_face_ref* ref = &range->stack[(int32_t)i * range->stack_dir];
+      const struct gi_bvh_face_ref* ref = &range->stack[(int32_t)i * range->stack_dir];
 
       float centroid = (ref->aabb.min[axis] + ref->aabb.max[axis]) * 0.5f;
 
       int32_t bin_index = (int32_t) (k1 * (centroid - range->centroid_bounds.min[axis]));
       bin_index = i32max(0, i32min(bin_index, (bin_count - 1)));
 
-      struct gp_bvh_object_bin* bin = &bins[bin_index];
+      struct gi_bvh_object_bin* bin = &bins[bin_index];
       bin->face_count++;
 
       gml_aabb_merge(&bin->aabb, &ref->aabb, &bin->aabb);
@@ -318,7 +318,7 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
 
     for (uint32_t r = bin_count - 1; r > 0; --r)
     {
-      const struct gp_bvh_object_bin* bin = &bins[r];
+      const struct gi_bvh_object_bin* bin = &bins[r];
       gml_aabb_merge(&right_accum, &bin->aabb, &right_accum);
       reused_aabbs[r - 1] = right_accum;
     }
@@ -330,7 +330,7 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
 
     for (uint32_t l = 1; l < bin_count; ++l)
     {
-      const struct gp_bvh_object_bin* bin = &bins[l - 1];
+      const struct gi_bvh_object_bin* bin = &bins[l - 1];
       gml_aabb_merge(&left_accum, &bin->aabb, &left_accum);
 
       left_face_count += bin->face_count;
@@ -341,12 +341,12 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
       float area_r = gml_aabb_half_area(&reused_aabbs[l - 1]);
 
       float sah_cost =
-        gp_bvh_calc_face_intersection_cost(
+        gi_bvh_calc_face_intersection_cost(
           thread_data->params->face_intersection_cost,
           thread_data->params->face_batch_size,
           left_face_count
         ) * area_l +
-        gp_bvh_calc_face_intersection_cost(
+        gi_bvh_calc_face_intersection_cost(
           thread_data->params->face_intersection_cost,
           thread_data->params->face_batch_size,
           right_face_count
@@ -381,11 +381,11 @@ static void gp_bvh_find_split_object_binned(const struct gp_bvh_thread_data* thr
   }
 }
 
-static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_data,
-                                      const struct gp_bvh_work_range* range,
-                                      struct gp_bvh_split_spatial* split)
+static void gi_bvh_find_split_spatial(const struct gi_bvh_thread_data* thread_data,
+                                      const struct gi_bvh_work_range* range,
+                                      struct gi_bvh_split_spatial* split)
 {
-  struct gp_bvh_spatial_bin* bins = (struct gp_bvh_spatial_bin*) thread_data->reused_bins;
+  struct gi_bvh_spatial_bin* bins = (struct gi_bvh_spatial_bin*) thread_data->reused_bins;
   const struct gi_vertex* vertices = thread_data->params->vertices;
   const struct gi_face* faces = thread_data->params->faces;
   const gml_aabb* range_aabb = &range->aabb_bounds;
@@ -399,7 +399,7 @@ static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_da
   /* Clear spatial bins. */
   for (uint32_t b = 0; b < bin_count * 3; ++b)
   {
-    struct gp_bvh_spatial_bin* bin = &bins[b];
+    struct gi_bvh_spatial_bin* bin = &bins[b];
     bin->entry_count = 0;
     bin->exit_count = 0;
     gml_aabb_make_smallest(&bin->aabb);
@@ -408,7 +408,7 @@ static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_da
   /* Fill spatial bins. */
   for (uint32_t f = 0; f < range->stack_size; ++f)
   {
-    const struct gp_bvh_face_ref* ref = &range->stack[(int32_t) f * range->stack_dir];
+    const struct gi_bvh_face_ref* ref = &range->stack[(int32_t) f * range->stack_dir];
 
     for (uint32_t axis = 0; axis < 3; ++axis)
     {
@@ -478,8 +478,8 @@ static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_da
           gml_vec3_lerp(v_start, v_end, t_plane_rel, v_i);
           v_i[axis] = t_bin_end_plane;
 
-          struct gp_bvh_spatial_bin* this_bin = &bins[axis * bin_count + bin_index + 0];
-          struct gp_bvh_spatial_bin* next_bin = &bins[axis * bin_count + bin_index + 1];
+          struct gi_bvh_spatial_bin* this_bin = &bins[axis * bin_count + bin_index + 0];
+          struct gi_bvh_spatial_bin* next_bin = &bins[axis * bin_count + bin_index + 1];
           gml_aabb_include(&this_bin->aabb, v_i, &this_bin->aabb);
           gml_aabb_include(&next_bin->aabb, v_i, &next_bin->aabb);
         }
@@ -514,7 +514,7 @@ static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_da
 
     for (int32_t r = bin_count - 1; r > 0; --r)
     {
-      const struct gp_bvh_spatial_bin* bin = &bins[axis * bin_count + r];
+      const struct gi_bvh_spatial_bin* bin = &bins[axis * bin_count + r];
       gml_aabb_merge(&right_accum, &bin->aabb, &right_accum);
       thread_data->reused_aabbs[r - 1] = right_accum;
     }
@@ -527,7 +527,7 @@ static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_da
 
     for (uint32_t l = 1; l < bin_count; ++l)
     {
-      const struct gp_bvh_spatial_bin* bin = &bins[axis * bin_count + l - 1];
+      const struct gi_bvh_spatial_bin* bin = &bins[axis * bin_count + l - 1];
       gml_aabb_merge(&left_accum, &bin->aabb, &left_accum);
 
       left_face_count += bin->entry_count;
@@ -543,12 +543,12 @@ static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_da
       float area_r = gml_aabb_half_area(&thread_data->reused_aabbs[l - 1]);
 
       float sah_cost =
-        gp_bvh_calc_face_intersection_cost(
+        gi_bvh_calc_face_intersection_cost(
           thread_data->params->face_intersection_cost,
           thread_data->params->face_batch_size,
           left_face_count
         ) * area_l +
-        gp_bvh_calc_face_intersection_cost(
+        gi_bvh_calc_face_intersection_cost(
           thread_data->params->face_intersection_cost,
           thread_data->params->face_batch_size,
           right_face_count
@@ -581,11 +581,11 @@ static void gp_bvh_find_split_spatial(const struct gp_bvh_thread_data* thread_da
   }
 }
 
-static void gp_bvh_do_split_spatial(const struct gp_bvh_thread_data* thread_data,
-                                    const struct gp_bvh_split_spatial* split,
-                                    const struct gp_bvh_work_range* range,
-                                    struct gp_bvh_work_range* range_left,
-                                    struct gp_bvh_work_range* range_right)
+static void gi_bvh_do_split_spatial(const struct gi_bvh_thread_data* thread_data,
+                                    const struct gi_bvh_split_spatial* split,
+                                    const struct gi_bvh_work_range* range,
+                                    struct gi_bvh_work_range* range_left,
+                                    struct gi_bvh_work_range* range_right)
 {
   uint32_t bin_count = thread_data->params->spatial_bin_count;
   float axis_length = range->aabb_bounds.max[split->axis] - range->aabb_bounds.min[split->axis];
@@ -599,8 +599,8 @@ static void gp_bvh_do_split_spatial(const struct gp_bvh_thread_data* thread_data
   int32_t free_face_count = range->stack_size_limit - split_face_count;
   assert(free_face_count >= 0);
 
-  struct gp_bvh_work_range* range1 = range->stack_dir == 1 ? range_left : range_right;
-  struct gp_bvh_work_range* range2 = range->stack_dir == 1 ? range_right : range_left;
+  struct gi_bvh_work_range* range1 = range->stack_dir == 1 ? range_left : range_right;
+  struct gi_bvh_work_range* range2 = range->stack_dir == 1 ? range_right : range_left;
 
   int32_t range1_index_start = 0;
   int32_t range1_index_end = range->stack_size - 1;
@@ -621,7 +621,7 @@ static void gp_bvh_do_split_spatial(const struct gp_bvh_thread_data* thread_data
   while (range1_index_start <= range1_index_end)
   {
     /* Note that this reference is not const! It will be changed. */
-    struct gp_bvh_face_ref* ref = &range->stack[range1_index_start * range->stack_dir];
+    struct gi_bvh_face_ref* ref = &range->stack[range1_index_start * range->stack_dir];
 
     const gml_aabb* ref_aabb = &ref->aabb;
     const struct gi_face* face = &faces[ref->index];
@@ -738,7 +738,7 @@ static void gp_bvh_do_split_spatial(const struct gp_bvh_thread_data* thread_data
       else
       {
         /* Swap faces and overwrite our AABB with the new, chopped one. */
-        struct gp_bvh_face_ref tmp = range->stack[range2_index_start * range->stack_dir];
+        struct gi_bvh_face_ref tmp = range->stack[range2_index_start * range->stack_dir];
         range->stack[range2_index_start * range->stack_dir].index = ref->index;
         range->stack[range2_index_start * range->stack_dir].aabb = *new_ref_aabb_r2;
 
@@ -746,7 +746,7 @@ static void gp_bvh_do_split_spatial(const struct gp_bvh_thread_data* thread_data
         range1_index_end--;
       }
 
-      const struct gp_bvh_face_ref* new_ref =
+      const struct gi_bvh_face_ref* new_ref =
         &range->stack[range2_index_start * range->stack_dir];
 
       gml_aabb_merge(&range2->aabb_bounds, &new_ref->aabb, &range2->aabb_bounds);
@@ -785,10 +785,10 @@ static void gp_bvh_do_split_spatial(const struct gp_bvh_thread_data* thread_data
   assert(range_right->stack_size == split->right_face_count);
 }
 
-static void gp_bvh_do_split_object(const struct gp_bvh_split_object* split,
-                                   const struct gp_bvh_work_range* range,
-                                   struct gp_bvh_work_range* range_left,
-                                   struct gp_bvh_work_range* range_right)
+static void gi_bvh_do_split_object(const struct gi_bvh_split_object* split,
+                                   const struct gi_bvh_work_range* range,
+                                   struct gi_bvh_work_range* range_left,
+                                   struct gi_bvh_work_range* range_right)
 {
   /* This partitioning algorithm is a little bit special since we
    * deal with directional ranges. While partitioning, we want both
@@ -802,8 +802,8 @@ static void gp_bvh_do_split_object(const struct gp_bvh_split_object* split,
   /* Range 1 is the side close to the origin of the parent stack.
    * Range 2 represents the opposite side. */
 
-  struct gp_bvh_work_range* range1 = range->stack_dir == 1 ? range_left : range_right;
-  struct gp_bvh_work_range* range2 = range->stack_dir == 1 ? range_right : range_left;
+  struct gi_bvh_work_range* range1 = range->stack_dir == 1 ? range_left : range_right;
+  struct gi_bvh_work_range* range2 = range->stack_dir == 1 ? range_right : range_left;
 
   int32_t range1_index_start = 0;
   int32_t range1_index_end = range->stack_size - 1;
@@ -830,7 +830,7 @@ static void gp_bvh_do_split_object(const struct gp_bvh_split_object* split,
 
   while (range1_index_start <= range1_index_end)
   {
-    const struct gp_bvh_face_ref* ref =
+    const struct gi_bvh_face_ref* ref =
       &range->stack[range1_index_start * range->stack_dir];
 
     gml_vec3 centroid;
@@ -876,7 +876,7 @@ static void gp_bvh_do_split_object(const struct gp_bvh_split_object* split,
     }
     else
     {
-      struct gp_bvh_face_ref tmp = range->stack[range2_index_start * range->stack_dir];
+      struct gi_bvh_face_ref tmp = range->stack[range2_index_start * range->stack_dir];
       range->stack[range2_index_start * range->stack_dir] = range->stack[range1_index_start * range->stack_dir];
       range->stack[range1_index_start * range->stack_dir] = tmp;
     }
@@ -896,16 +896,16 @@ static void gp_bvh_do_split_object(const struct gp_bvh_split_object* split,
   range2->stack_size_limit = range2->stack_size + (free_face_count - half_free_face_count);
 }
 
-static void gp_bvh_do_split_object_binned(const struct gp_bvh_thread_data* thread_data,
-                                          const struct gp_bvh_split_object_binned* split,
-                                          const struct gp_bvh_work_range* range,
-                                          struct gp_bvh_work_range* range_left,
-                                          struct gp_bvh_work_range* range_right)
+static void gi_bvh_do_split_object_binned(const struct gi_bvh_thread_data* thread_data,
+                                          const struct gi_bvh_split_object_binned* split,
+                                          const struct gi_bvh_work_range* range,
+                                          struct gi_bvh_work_range* range_left,
+                                          struct gi_bvh_work_range* range_right)
 {
   /* See non-binned object splitting for a general algorithm description. */
 
-  struct gp_bvh_work_range* range1 = range->stack_dir == 1 ? range_left : range_right;
-  struct gp_bvh_work_range* range2 = range->stack_dir == 1 ? range_right : range_left;
+  struct gi_bvh_work_range* range1 = range->stack_dir == 1 ? range_left : range_right;
+  struct gi_bvh_work_range* range2 = range->stack_dir == 1 ? range_right : range_left;
 
   int32_t range1_index_start = 0;
   int32_t range1_index_end = range->stack_size - 1;
@@ -931,7 +931,7 @@ static void gp_bvh_do_split_object_binned(const struct gp_bvh_thread_data* threa
     range->centroid_bounds.max[split->axis] - range->centroid_bounds.min[split->axis];
 
   uint32_t bin_count;
-  if (thread_data->params->object_binning_mode == GP_BVH_BINNING_MODE_ADAPTIVE) {
+  if (thread_data->params->object_binning_mode == GI_BVH_BINNING_MODE_ADAPTIVE) {
     bin_count = i32min((uint32_t) (range->stack_size * 0.05f + 4.0f),
                        thread_data->params->object_bin_count);
   }
@@ -953,7 +953,7 @@ static void gp_bvh_do_split_object_binned(const struct gp_bvh_thread_data* threa
      * This should be consistent with the way we found the split - this
      * way, we don't have any deviations due to floating point math. */
 
-    const struct gp_bvh_face_ref* ref =
+    const struct gi_bvh_face_ref* ref =
       &range->stack[range1_index_start * range->stack_dir];
 
     gml_vec3 centroid;
@@ -1000,7 +1000,7 @@ static void gp_bvh_do_split_object_binned(const struct gp_bvh_thread_data* threa
     }
     else
     {
-      struct gp_bvh_face_ref tmp = range->stack[range2_index_start * range->stack_dir];
+      struct gi_bvh_face_ref tmp = range->stack[range2_index_start * range->stack_dir];
       range->stack[range2_index_start * range->stack_dir] = range->stack[range1_index_start * range->stack_dir];
       range->stack[range1_index_start * range->stack_dir] = tmp;
     }
@@ -1020,10 +1020,10 @@ static void gp_bvh_do_split_object_binned(const struct gp_bvh_thread_data* threa
   range2->stack_size_limit = range2->stack_size + (free_face_count - half_free_face_count);
 }
 
-static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data,
-                                    const struct gp_bvh_work_range* range,
-                                    struct gp_bvh_work_range* range_left,
-                                    struct gp_bvh_work_range* range_right)
+static bool gi_bvh_build_work_range(const struct gi_bvh_thread_data* thread_data,
+                                    const struct gi_bvh_work_range* range,
+                                    struct gi_bvh_work_range* range_left,
+                                    struct gi_bvh_work_range* range_right)
 {
   /* Make a leaf if face count is too low. */
 
@@ -1046,7 +1046,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
     range->stack_size > thread_data->params->object_binning_threshold;
 
   bool is_binning_enabled =
-    thread_data->params->object_binning_mode != GP_BVH_BINNING_MODE_OFF;
+    thread_data->params->object_binning_mode != GI_BVH_BINNING_MODE_OFF;
 
   bool do_binning =
     is_binning_enabled &&
@@ -1055,9 +1055,9 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
 
   /* Evaluate possible splits. */
 
-  struct gp_bvh_split_object_binned split_object_binned;
-  struct gp_bvh_split_object split_object;
-  struct gp_bvh_split_spatial split_spatial;
+  struct gi_bvh_split_object_binned split_object_binned;
+  struct gi_bvh_split_object split_object;
+  struct gi_bvh_split_spatial split_spatial;
 
   split_object_binned.sah_cost = INFINITY;
   split_object_binned.bin_index = 0;
@@ -1070,7 +1070,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
 
   if (do_binning)
   {
-    gp_bvh_find_split_object_binned(
+    gi_bvh_find_split_object_binned(
       thread_data,
       range,
       &split_object_binned
@@ -1079,7 +1079,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
   }
   else
   {
-    gp_bvh_find_split_object(
+    gi_bvh_find_split_object(
       thread_data,
       range,
       &split_object
@@ -1092,7 +1092,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
 
   if (try_spatial_split)
   {
-    gp_bvh_find_split_spatial(
+    gi_bvh_find_split_spatial(
       thread_data,
       range,
       &split_spatial
@@ -1100,7 +1100,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
   }
 
   float leaf_sah_cost =
-    gp_bvh_calc_face_intersection_cost(
+    gi_bvh_calc_face_intersection_cost(
       thread_data->params->face_intersection_cost,
       thread_data->params->face_batch_size,
       range->stack_size
@@ -1133,7 +1133,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
 
     if (free_face_count >= 0)
     {
-      gp_bvh_do_split_spatial(
+      gi_bvh_do_split_spatial(
         thread_data,
         &split_spatial,
         range,
@@ -1151,7 +1151,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
     {
       *thread_data->reserve_buffer_capacity -= split_face_count;
 
-      struct gp_bvh_work_range reserve_range;
+      struct gi_bvh_work_range reserve_range;
       reserve_range.stack = &thread_data->reserve_buffer[free_face_count - split_face_count];
       reserve_range.stack_dir = 1;
       reserve_range.stack_size = range->stack_size;
@@ -1162,10 +1162,10 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
       memcpy(
         reserve_range.stack,
         (range->stack_dir == 1) ? range->stack : (range->stack - (range->stack_size - 1)),
-        range->stack_size * sizeof(struct gp_bvh_face_ref)
+        range->stack_size * sizeof(struct gi_bvh_face_ref)
       );
 
-      gp_bvh_do_split_spatial(
+      gi_bvh_do_split_spatial(
         thread_data,
         &split_spatial,
         &reserve_range,
@@ -1178,7 +1178,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
 
   if (do_binning)
   {
-    gp_bvh_do_split_object_binned(
+    gi_bvh_do_split_object_binned(
       thread_data,
       &split_object_binned,
       range,
@@ -1188,7 +1188,7 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
   }
   else
   {
-    gp_bvh_do_split_object(
+    gi_bvh_do_split_object(
       &split_object,
       range,
       range_left,
@@ -1199,8 +1199,8 @@ static bool gp_bvh_build_work_range(const struct gp_bvh_thread_data* thread_data
   return true;
 }
 
-void gp_bvh_build(const struct gp_bvh_build_params* params,
-                  struct gp_bvh* bvh)
+void gi_bvh_build(const struct gi_bvh_build_params* params,
+                  struct gi_bvh* bvh)
 {
   /* Set up root work range. */
 
@@ -1215,8 +1215,8 @@ void gp_bvh_build(const struct gp_bvh_build_params* params,
     root_stack_size_limit *= 2;
   }
 
-  struct gp_bvh_face_ref* root_stack =
-    (struct gp_bvh_face_ref*) malloc(root_stack_size_limit * sizeof(struct gp_bvh_face_ref));
+  struct gi_bvh_face_ref* root_stack =
+    (struct gi_bvh_face_ref*) malloc(root_stack_size_limit * sizeof(struct gi_bvh_face_ref));
 
   uint32_t root_stack_size = 0;
 
@@ -1227,7 +1227,7 @@ void gp_bvh_build(const struct gp_bvh_build_params* params,
     const struct gi_vertex* v_b = &params->vertices[face->v_i[1]];
     const struct gi_vertex* v_c = &params->vertices[face->v_i[2]];
 
-    struct gp_bvh_face_ref* face_ref = &root_stack[root_stack_size];
+    struct gi_bvh_face_ref* face_ref = &root_stack[root_stack_size];
 
     gml_aabb_make_from_triangle(
       v_a->pos,
@@ -1267,8 +1267,8 @@ void gp_bvh_build(const struct gp_bvh_build_params* params,
 
   uint32_t max_job_stack_size = params->face_count;
 
-  struct gp_bvh_work_job* job_stack = (struct gp_bvh_work_job*)
-    malloc(max_job_stack_size * sizeof(struct gp_bvh_work_job));
+  struct gi_bvh_work_job* job_stack = (struct gi_bvh_work_job*)
+    malloc(max_job_stack_size * sizeof(struct gi_bvh_work_job));
 
   job_stack[0].range.stack            = root_stack;
   job_stack[0].range.stack_dir        = 1;
@@ -1290,21 +1290,21 @@ void gp_bvh_build(const struct gp_bvh_build_params* params,
   bvh->face_count = 0;
   bvh->faces = malloc(max_face_count * sizeof(struct gi_face));
   bvh->node_count = 1;
-  bvh->nodes = malloc(max_node_count * sizeof(struct gp_bvh_node));
+  bvh->nodes = malloc(max_node_count * sizeof(struct gi_bvh_node));
 
   /* Allocate thread-local memory. */
 
-  uint32_t object_bins_size = params->object_bin_count * sizeof(struct gp_bvh_object_bin);
+  uint32_t object_bins_size = params->object_bin_count * sizeof(struct gi_bvh_object_bin);
   uint32_t spatial_bins_size =
-    (params->spatial_split_alpha == 1.0f) ? 0 : (params->spatial_bin_count * sizeof(struct gp_bvh_spatial_bin) * 3);
+    (params->spatial_split_alpha == 1.0f) ? 0 : (params->spatial_bin_count * sizeof(struct gi_bvh_spatial_bin) * 3);
   uint32_t reused_bins_size = imax(object_bins_size, spatial_bins_size);
 
   int32_t reserve_buffer_capacity = (int32_t) (params->spatial_reserve_factor * params->face_count);
-  struct gp_bvh_face_ref* reserve_buffer = (struct gp_bvh_face_ref*) malloc(reserve_buffer_capacity * sizeof(struct gp_bvh_face_ref));
+  struct gi_bvh_face_ref* reserve_buffer = (struct gi_bvh_face_ref*) malloc(reserve_buffer_capacity * sizeof(struct gi_bvh_face_ref));
 
   int32_t reused_aabbs_size = imax(params->spatial_bin_count, params->face_count) * sizeof(gml_aabb);
 
-  struct gp_bvh_thread_data thread_data;
+  struct gi_bvh_thread_data thread_data;
   thread_data.params = params;
   thread_data.reused_bins = (void*) malloc(reused_bins_size);
   thread_data.reused_aabbs = (gml_aabb*) malloc(reused_aabbs_size);
@@ -1319,19 +1319,19 @@ void gp_bvh_build(const struct gp_bvh_build_params* params,
     job_stack_size--;
 
     /* Process bvh range. */
-    struct gp_bvh_work_job job = job_stack[job_stack_size];
+    struct gi_bvh_work_job job = job_stack[job_stack_size];
 
-    struct gp_bvh_work_range left_range;
-    struct gp_bvh_work_range right_range;
+    struct gi_bvh_work_range left_range;
+    struct gi_bvh_work_range right_range;
 
-    bool make_leaf = !gp_bvh_build_work_range(
+    bool make_leaf = !gi_bvh_build_work_range(
       &thread_data,
       &job.range,
       &left_range,
       &right_range
     );
 
-    struct gp_bvh_node* node = &bvh->nodes[job.node_index];
+    struct gi_bvh_node* node = &bvh->nodes[job.node_index];
 
     node->aabb = job.range.aabb_bounds;
 
@@ -1344,7 +1344,7 @@ void gp_bvh_build(const struct gp_bvh_build_params* params,
       /* Resolve face references and write them into the bvh. */
       for (uint32_t i = 0; i < job.range.stack_size; ++i)
       {
-        const struct gp_bvh_face_ref* ref = &job.range.stack[(int32_t)i * job.range.stack_dir];
+        const struct gi_bvh_face_ref* ref = &job.range.stack[(int32_t)i * job.range.stack_dir];
         const struct gi_face* face = &params->faces[ref->index];
         bvh->faces[bvh->face_count] = *face;
         bvh->face_count++;
@@ -1380,11 +1380,11 @@ void gp_bvh_build(const struct gp_bvh_build_params* params,
 
   /* Reallocate bvh memory. */
 
-  bvh->nodes = (struct gp_bvh_node*) realloc(bvh->nodes, bvh->node_count * sizeof(struct gp_bvh_node));
+  bvh->nodes = (struct gi_bvh_node*) realloc(bvh->nodes, bvh->node_count * sizeof(struct gi_bvh_node));
   bvh->faces = (struct gi_face*) realloc(bvh->faces, bvh->face_count * sizeof(struct gi_face));
 }
 
-void gp_free_bvh(struct gp_bvh* bvh)
+void gi_free_bvh(struct gi_bvh* bvh)
 {
   free(bvh->nodes);
   free(bvh->faces);
