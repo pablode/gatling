@@ -1,2 +1,0 @@
-#extension GL_EXT_control_flow_attributes: require
-#extension GL_KHR_shader_subgroup_ballot: require

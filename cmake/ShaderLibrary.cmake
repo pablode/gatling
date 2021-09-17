@@ -36,7 +36,7 @@ function(add_shader_library target)
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       COMMENT "Compiling GLSL shader ${shader_name}"
       COMMAND ${CMAKE_COMMAND} -E make_directory ${header_dir}
-      COMMAND ${GATLING_GLSLANG_VALIDATOR} --target-env vulkan1.1 --vn "SPV_${shader_name_we}_${shader_ext}" -o ${header_path} --quiet ${shader_path}
+      COMMAND ${GATLING_GLSLANG_VALIDATOR} -D -e CSMain --target-env vulkan1.1 --vn "SPV_${shader_name_we}_${shader_ext}" -o ${header_path} --quiet ${shader_path}
       DEPENDS ${TARGET_INCLUDES}
     )
 

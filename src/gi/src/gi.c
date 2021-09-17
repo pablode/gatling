@@ -257,31 +257,29 @@ int giRender(const struct gi_render_params* params,
     const uint32_t traversal_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
     const cgpu_specialization_constant speccs[] = {
-      { .constant_id =  0, .p_data = (void*) &workgroup_size_x,             .size = 4 },
-      { .constant_id =  1, .p_data = (void*) &workgroup_size_y,             .size = 4 },
-      { .constant_id =  2, .p_data = (void*) &params->image_width,          .size = 4 },
-      { .constant_id =  3, .p_data = (void*) &params->image_height,         .size = 4 },
-      { .constant_id =  4, .p_data = (void*) &params->spp,                  .size = 4 },
-      { .constant_id =  5, .p_data = (void*) &params->max_bounces,          .size = 4 },
-      { .constant_id =  6, .p_data = (void*) &traversal_stack_size,         .size = 4 },
-      { .constant_id =  7, .p_data = (void*) &params->camera->position[0],  .size = 4 },
-      { .constant_id =  8, .p_data = (void*) &params->camera->position[1],  .size = 4 },
-      { .constant_id =  9, .p_data = (void*) &params->camera->position[2],  .size = 4 },
-      { .constant_id = 10, .p_data = (void*) &params->camera->forward[0],   .size = 4 },
-      { .constant_id = 11, .p_data = (void*) &params->camera->forward[1],   .size = 4 },
-      { .constant_id = 12, .p_data = (void*) &params->camera->forward[2],   .size = 4 },
-      { .constant_id = 13, .p_data = (void*) &params->camera->up[0],        .size = 4 },
-      { .constant_id = 14, .p_data = (void*) &params->camera->up[1],        .size = 4 },
-      { .constant_id = 15, .p_data = (void*) &params->camera->up[2],        .size = 4 },
-      { .constant_id = 16, .p_data = (void*) &params->camera->vfov,         .size = 4 },
-      { .constant_id = 17, .p_data = (void*) &params->rr_bounce_offset,     .size = 4 },
-      { .constant_id = 18, .p_data = (void*) &params->rr_inv_min_term_prob, .size = 4 },
+      { .constant_id =  0, .p_data = (void*) &params->image_width,          .size = 4 },
+      { .constant_id =  1, .p_data = (void*) &params->image_height,         .size = 4 },
+      { .constant_id =  2, .p_data = (void*) &params->spp,                  .size = 4 },
+      { .constant_id =  3, .p_data = (void*) &params->max_bounces,          .size = 4 },
+      { .constant_id =  4, .p_data = (void*) &traversal_stack_size,         .size = 4 },
+      { .constant_id =  5, .p_data = (void*) &params->camera->position[0],  .size = 4 },
+      { .constant_id =  6, .p_data = (void*) &params->camera->position[1],  .size = 4 },
+      { .constant_id =  7, .p_data = (void*) &params->camera->position[2],  .size = 4 },
+      { .constant_id =  8, .p_data = (void*) &params->camera->forward[0],   .size = 4 },
+      { .constant_id =  9, .p_data = (void*) &params->camera->forward[1],   .size = 4 },
+      { .constant_id = 10, .p_data = (void*) &params->camera->forward[2],   .size = 4 },
+      { .constant_id = 11, .p_data = (void*) &params->camera->up[0],        .size = 4 },
+      { .constant_id = 12, .p_data = (void*) &params->camera->up[1],        .size = 4 },
+      { .constant_id = 13, .p_data = (void*) &params->camera->up[2],        .size = 4 },
+      { .constant_id = 14, .p_data = (void*) &params->camera->vfov,         .size = 4 },
+      { .constant_id = 15, .p_data = (void*) &params->rr_bounce_offset,     .size = 4 },
+      { .constant_id = 16, .p_data = (void*) &params->rr_inv_min_term_prob, .size = 4 },
     };
     const uint32_t specc_count = sizeof(speccs) / sizeof(speccs[0]);
 
     const uint32_t sr_image_count = 0;
     const cgpu_shader_resource_image* sr_images = NULL;
-    const char* shader_entry_point = "main";
+    const char* shader_entry_point = "CSMain";
     const uint32_t push_constants_size = 0;
 
     c_result = cgpu_create_pipeline(
