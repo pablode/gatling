@@ -56,6 +56,11 @@ uint extract_byte(uint num, uint byte_idx)
     return (num >> (byte_idx * 8)) & 0xFF;
 }
 
+vec4 uint_unpack_vec4(uint u)
+{
+  return vec4(extract_byte(u, 0), extract_byte(u, 1), extract_byte(u, 2), extract_byte(u, 3));
+}
+
 bool traverse_bvh(in vec3 ray_origin, in vec3 ray_dir, out hit_info hit)
 {
     float t_max = FLOAT_MAX;
@@ -98,40 +103,42 @@ bool traverse_bvh(in vec3 ray_origin, in vec3 ray_dir, out hit_info hit)
 
             const bvh_node node = bvh_nodes[child_node_idx];
 
-            node_group.x = node.child_index;
-            face_group = uvec2(node.face_index, 0);
+            node_group.x = node.f2.x;
+            face_group = uvec2(node.f2.y, 0);
 
-            const vec3 local_inv_dir = uintBitsToFloat(uvec3(node.e) << 23) * inv_dir;
-            const vec3 local_orig = (node.p - ray_origin) * inv_dir;
+            uvec3 node_e = uvec3(extract_byte(node.f1.w, 0), extract_byte(node.f1.w, 1), extract_byte(node.f1.w, 2));
+            vec3 local_inv_dir = uintBitsToFloat(node_e << 23) * inv_dir;
+            vec3 p = uintBitsToFloat(node.f1.xyz);
+            vec3 local_orig = (p - ray_origin) * inv_dir;
 
             uint hitmask = 0;
 
             [[unroll, dependency_infinite]]
             for (uint passIdx = 0; passIdx < 2; ++passIdx)
             {
-                const uint meta4 = node.meta[passIdx];
+                const uint meta4 = (passIdx == 0) ? node.f2.z : node.f2.w;
                 const uint is_inner4 = (meta4 & (meta4 << 1)) & 0x10101010;
                 const uint inner_mask4 = sign_to_byte_mask4(is_inner4 << 3);
                 const uint bit_index4 = (meta4 ^ (oct_inv4 & inner_mask4)) & 0x1F1F1F1F;
                 const uint child_bits4 = (meta4 >> 5) & 0x07070707;
 
-                const vec4 x_gt_0 = vec4(inv_dir.x < 0.0);
-                const vec4 y_gt_0 = vec4(inv_dir.y < 0.0);
-                const vec4 z_gt_0 = vec4(inv_dir.z < 0.0);
+                const bool x_lt_0 = (inv_dir.x < 0.0);
+                const bool y_lt_0 = (inv_dir.y < 0.0);
+                const bool z_lt_0 = (inv_dir.z < 0.0);
 
-                const u8vec4 q_lo_x = node.q_lo_x[passIdx];
-                const u8vec4 q_hi_x = node.q_hi_x[passIdx];
-                const u8vec4 q_lo_y = node.q_lo_y[passIdx];
-                const u8vec4 q_hi_y = node.q_hi_y[passIdx];
-                const u8vec4 q_lo_z = node.q_lo_z[passIdx];
-                const u8vec4 q_hi_z = node.q_hi_z[passIdx];
+                const uint q_lo_x = (passIdx == 0) ? node.f3.x : node.f3.y;
+                const uint q_hi_x = (passIdx == 0) ? node.f4.z : node.f4.w;
+                const uint q_lo_y = (passIdx == 0) ? node.f3.z : node.f3.w;
+                const uint q_hi_y = (passIdx == 0) ? node.f5.x : node.f5.y;
+                const uint q_lo_z = (passIdx == 0) ? node.f4.x : node.f4.y;
+                const uint q_hi_z = (passIdx == 0) ? node.f5.z : node.f5.w;
 
-                const vec4 s_q_lo_x = mix(q_lo_x, q_hi_x, x_gt_0);
-                const vec4 s_q_hi_x = mix(q_hi_x, q_lo_x, x_gt_0);
-                const vec4 s_q_lo_y = mix(q_lo_y, q_hi_y, y_gt_0);
-                const vec4 s_q_hi_y = mix(q_hi_y, q_lo_y, y_gt_0);
-                const vec4 s_q_lo_z = mix(q_lo_z, q_hi_z, z_gt_0);
-                const vec4 s_q_hi_z = mix(q_hi_z, q_lo_z, z_gt_0);
+                const vec4 s_q_lo_x = uint_unpack_vec4(x_lt_0 ? q_hi_x : q_lo_x);
+                const vec4 s_q_hi_x = uint_unpack_vec4(x_lt_0 ? q_lo_x : q_hi_x);
+                const vec4 s_q_lo_y = uint_unpack_vec4(y_lt_0 ? q_hi_y : q_lo_y);
+                const vec4 s_q_hi_y = uint_unpack_vec4(y_lt_0 ? q_lo_y : q_hi_y);
+                const vec4 s_q_lo_z = uint_unpack_vec4(z_lt_0 ? q_hi_z : q_lo_z);
+                const vec4 s_q_hi_z = uint_unpack_vec4(z_lt_0 ? q_lo_z : q_hi_z);
 
                 const vec4 t_min_x = local_inv_dir.x * s_q_lo_x + local_orig.x;
                 const vec4 t_max_x = local_inv_dir.x * s_q_hi_x + local_orig.x;
@@ -158,7 +165,8 @@ bool traverse_bvh(in vec3 ray_origin, in vec3 ray_dir, out hit_info hit)
                 }
             }
 
-            node_group.y = (hitmask & 0xFF000000) | node.imask;
+            uint node_imask = extract_byte(node.f1.w, 3);
+            node_group.y = (hitmask & 0xFF000000) | node_imask;
             face_group.y = (hitmask & 0x00FFFFFF);
         }
 

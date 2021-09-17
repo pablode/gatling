@@ -29,21 +29,11 @@ struct material
 
 struct bvh_node
 {
-    /* Quantization frame. */
-    vec3 p;                  /* 12 bytes */
-    u8vec3 e;                /*  3 bytes */
-    /* Indexing info. */
-    uint8_t imask;           /*  1 byte  */
-    uint child_index;        /*  4 bytes */
-    uint face_index;         /*  4 bytes */
-    uint meta[2];            /*  8 bytes */
-    /* Child data. */
-    u8vec4 q_lo_x[2];        /*  8 bytes */
-    u8vec4 q_lo_y[2];        /*  8 bytes */
-    u8vec4 q_lo_z[2];        /*  8 bytes */
-    u8vec4 q_hi_x[2];        /*  8 bytes */
-    u8vec4 q_hi_y[2];        /*  8 bytes */
-    u8vec4 q_hi_z[2];        /*  8 bytes */
+    uvec4 f1;
+    uvec4 f2;
+    uvec4 f3;
+    uvec4 f4;
+    uvec4 f5;
 };
 
 struct hit_info
