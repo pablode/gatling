@@ -1110,25 +1110,6 @@ CgpuResult cgpu_create_device(
                                                            device_ext_count,
                                                            device_extensions);
 
-  const char* required_exts[] = {
-    VK_KHR_8BIT_STORAGE_EXTENSION_NAME,
-    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
-    VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-  };
-  const uint32_t required_ext_count = has_portability_subset ? 3 : 2;
-
-  for (uint32_t i = 0; i < required_ext_count; ++i)
-  {
-    const char* required_ext = *(required_exts + i);
-
-    bool has_extension = cgpu_find_device_extension(required_ext, device_ext_count, device_extensions);
-
-    if (!has_extension) {
-      resource_store_free_handle(&idevice_store, p_device->handle);
-      return CGPU_FAIL_DEVICE_EXTENSION_NOT_SUPPORTED;
-    }
-  }
-
   uint32_t queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
@@ -1175,22 +1156,9 @@ CgpuResult cgpu_create_device(
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
-  VkPhysicalDeviceShaderFloat16Int8Features features_shader_float16_int8;
-  features_shader_float16_int8.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
-  features_shader_float16_int8.pNext = NULL;
-  features_shader_float16_int8.shaderFloat16 = VK_FALSE;
-  features_shader_float16_int8.shaderInt8 = VK_TRUE;
-
-  VkPhysicalDevice8BitStorageFeatures features_8bit_storage;
-  features_8bit_storage.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES;
-  features_8bit_storage.pNext = &features_shader_float16_int8;
-  features_8bit_storage.storageBuffer8BitAccess = VK_TRUE;
-  features_8bit_storage.uniformAndStorageBuffer8BitAccess = VK_TRUE;
-  features_8bit_storage.storagePushConstant8 = VK_FALSE;
-
   VkPhysicalDeviceFeatures2 device_features2;
   device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  device_features2.pNext = &features_8bit_storage;
+  device_features2.pNext = NULL;
   device_features2.features.robustBufferAccess = VK_FALSE;
   device_features2.features.fullDrawIndexUint32 = VK_FALSE;
   device_features2.features.imageCubeArray = VK_FALSE;
@@ -1257,8 +1225,8 @@ CgpuResult cgpu_create_device(
    nowadays, there is no difference to instance validation layers. */
   device_create_info.enabledLayerCount = 0;
   device_create_info.ppEnabledLayerNames = NULL;
-  device_create_info.enabledExtensionCount = required_ext_count;
-  device_create_info.ppEnabledExtensionNames = required_exts;
+  device_create_info.enabledExtensionCount = has_portability_subset ? 1 : 0;
+  device_create_info.ppEnabledExtensionNames = &VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
   device_create_info.pEnabledFeatures = NULL;
 
   VkResult result = vkCreateDevice(
