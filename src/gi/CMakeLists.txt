@@ -1,6 +1,6 @@
 add_shader_library(
   gi-shaders
-  src/shaders/main.comp
+  src/shaders/main.comp.hlsl
   INCLUDES
     src/shaders/bvh.hlsl
     src/shaders/common.hlsl

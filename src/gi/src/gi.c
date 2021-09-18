@@ -10,7 +10,7 @@
 #include <math.h>
 
 #include <cgpu.h>
-#include <SPV/main.comp.spv.h>
+#include <SPV/main.comp.hlsl.spv.h>
 
 struct gi_scene_cache
 {
