@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
 project(gatling VERSION 0.2.0)
 
@@ -17,6 +17,7 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${OUTPUT_DIR})
 endforeach()
 
+find_package(Vulkan REQUIRED)
 include(cmake/ShaderLibrary.cmake)
 
 include(CheckIPOSupported)
