@@ -40,7 +40,7 @@ static void PrintCorrectUsage(const HdRenderSettingDescriptorList& renderSetting
   // Print each setting as one row.
   for (const HdRenderSettingDescriptor& desc : renderSettingDescs)
   {
-    const char* keyCStr = desc.key.GetString().c_str();
+    const char* keyCStr = desc.key.GetText();
     const char* nameCStr = desc.name.c_str();
 
     bool isValueEmpty = desc.defaultValue.IsEmpty();

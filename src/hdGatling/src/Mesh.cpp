@@ -145,8 +145,7 @@ void HdGatlingMesh::_PullGeometry(HdSceneDelegate* sceneDelegate)
   if (unsupportedFaceCount > 0)
   {
     const SdfPath& id = GetId();
-    const std::string& idStr = id.GetString();
-    TF_WARN(TfStringPrintf("Mesh %s has %i unsupported faces", idStr.c_str(), unsupportedFaceCount));
+    TF_WARN(TfStringPrintf("Mesh %s has %i unsupported faces", id.GetText(), unsupportedFaceCount));
   }
 }
 

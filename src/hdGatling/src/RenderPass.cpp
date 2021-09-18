@@ -273,8 +273,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   if (!m_sceneCache)
   {
-    const std::string& cameraIdStr = camera->GetId().GetString();
-    printf("Building scene cache for camera %s\n", cameraIdStr.c_str());
+    const SdfPath& cameraId = camera->GetId();
+    printf("Building scene cache for camera %s\n", cameraId.GetText());
     fflush(stdout);
 
     std::vector<gi_vertex> vertices;
