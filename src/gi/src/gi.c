@@ -237,8 +237,8 @@ int giRender(const struct gi_render_params* params,
     cgpu_shader shader;
     c_result = cgpu_create_shader(
       device,
-      sizeof(SPV_main_comp),
-      SPV_main_comp,
+      sizeof(g_CSMain),
+      (uint32_t*)g_CSMain,
       &shader
     );
     GI_CGPU_VERIFY(c_result);

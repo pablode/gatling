@@ -17,7 +17,17 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${OUTPUT_DIR})
 endforeach()
 
+option(GATLING_USE_DXC "Whether to use DXC instead of glslang or not" OFF)
+if(GATLING_USE_DXC)
+  find_program(DXC_EXECUTABLE DXC HINTS ${DXC_ROOT})
+  if(NOT DXC_EXECUTABLE)
+    message(FATAL_ERROR "DXC executable not found!")
+  endif()
+endif()
+
 find_package(Vulkan REQUIRED)
+find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
+
 include(cmake/ShaderLibrary.cmake)
 
 include(CheckIPOSupported)
@@ -29,13 +39,7 @@ if(C_MATH_LIBRARY_EXISTS)
   set(C_MATH_LIBRARY "m")
 endif()
 
-find_package(
-  USD REQUIRED
-  HINTS ${USD_ROOT} $ENV{USD_ROOT}
-  NAMES pxr
-)
-
-if (WIN32)
+if(WIN32)
   add_compile_definitions(NOMINMAX)
   add_compile_definitions(_USE_MATH_DEFINES)
 endif()
