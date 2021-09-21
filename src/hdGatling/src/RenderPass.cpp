@@ -137,7 +137,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     }
 
     const SdfPath& materialId = mesh->GetMaterialId();
-    uint32_t materialIndex;
+    uint32_t materialIndex = 0;
 
     if (materialId.IsEmpty() && mesh->HasColor())
     {
@@ -163,9 +163,12 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       HdSprim* sprim = renderIndex->GetSprim(HdPrimTypeTokens->material, materialId);
       HdGatlingMaterial* material = dynamic_cast<HdGatlingMaterial*>(sprim);
 
-      materialIndex = materials.size();
-      materials.push_back(material->GetGiMaterial());
-      materialMapping[materialId] = materialIndex;
+      if (material)
+      {
+        materialIndex = materials.size();
+        materials.push_back(material->GetGiMaterial());
+        materialMapping[materialId] = materialIndex;
+      }
     }
 
     const GfMatrix4d& prototypeTransform = mesh->GetPrototypeTransform();
