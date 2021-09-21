@@ -55,14 +55,14 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     m_prototypeTransform = sceneDelegate->GetTransform(id);
   }
 
-  bool pullGeometry =
+  bool updateGeometry =
     (*dirtyBits & HdChangeTracker::DirtyPoints) |
     (*dirtyBits & HdChangeTracker::DirtyNormals) |
     (*dirtyBits & HdChangeTracker::DirtyTopology);
 
   *dirtyBits = HdChangeTracker::Clean;
 
-  if (!pullGeometry)
+  if (!updateGeometry)
   {
     return;
   }
@@ -71,81 +71,36 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   m_points.clear();
   m_normals.clear();
 
-  _PullGeometry(sceneDelegate);
+  _UpdateGeometry(sceneDelegate);
 }
 
-void HdGatlingMesh::_PullGeometry(HdSceneDelegate* sceneDelegate)
+void HdGatlingMesh::_UpdateGeometry(HdSceneDelegate* sceneDelegate)
 {
-  HdMeshTopology topology = GetMeshTopology(sceneDelegate);
-  const VtIntArray& faceVertexCounts = topology.GetFaceVertexCounts();
-  const VtIntArray& faceVertexIndices = topology.GetFaceVertexIndices();
+  const HdMeshTopology& topology = GetMeshTopology(sceneDelegate);
+  const SdfPath& id = GetId();
+  HdMeshUtil meshUtil(&topology, id);
+
+  VtVec3iArray indices;
+  VtIntArray primitiveParams;
+  meshUtil.ComputeTriangleIndices(&indices, &primitiveParams);
 
   VtVec3fArray points;
   VtVec3fArray normals;
-  _PullPrimvars(sceneDelegate, points, normals, m_color, m_hasColor);
+  bool indexedNormals;
+  _PullPrimvars(sceneDelegate, points, normals, indexedNormals, m_color, m_hasColor);
 
-  int faceVertexIndexOffset = 0;
-  int unsupportedFaceCount = 0;
-  std::vector<int> remappedVertexIndices(faceVertexIndices.size(), -1);
-
-  for (int i = 0; i < topology.GetNumFaces(); i++)
+  for (int i = 0; i < indices.size(); i++)
   {
-    int faceVertexCount = faceVertexCounts[i];
+    GfVec3i newFaceIndices(i * 3 + 0, i * 3 + 1, i * 3 + 2);
+    m_faces.push_back(newFaceIndices);
 
-    if (faceVertexCount != 3 && faceVertexCount != 4)
-    {
-      unsupportedFaceCount++;
-
-      faceVertexIndexOffset += faceVertexCount;
-
-      continue;
-    }
-
-    int newFaceVertexIndices[4];
-
-    for (int j = 0; j < faceVertexCount; j++)
-    {
-      int v_i = faceVertexIndices[faceVertexIndexOffset + j];
-
-      if (remappedVertexIndices[v_i] == -1)
-      {
-        remappedVertexIndices[v_i] = m_points.size();
-
-        GfVec3f normal = normals[v_i];
-        normal.Normalize();
-        m_normals.push_back(normal);
-        m_points.push_back(points[v_i]);
-      }
-
-      newFaceVertexIndices[j] = remappedVertexIndices[v_i];
-    }
-
-    faceVertexIndexOffset += faceVertexCount;
-
-    GfVec3i f_0(
-      newFaceVertexIndices[0],
-      newFaceVertexIndices[1],
-      newFaceVertexIndices[2]
-    );
-    m_faces.push_back(f_0);
-
-    if (faceVertexCount == 3)
-    {
-      continue;
-    }
-
-    GfVec3i f_1(
-      newFaceVertexIndices[0],
-      newFaceVertexIndices[2],
-      newFaceVertexIndices[3]
-    );
-    m_faces.push_back(f_1);
-  }
-
-  if (unsupportedFaceCount > 0)
-  {
-    const SdfPath& id = GetId();
-    TF_WARN(TfStringPrintf("Mesh %s has %i unsupported faces", id.GetText(), unsupportedFaceCount));
+    const GfVec3i& faceIndices = indices[i];
+    m_points.push_back(points[faceIndices[0]]);
+    m_points.push_back(points[faceIndices[1]]);
+    m_points.push_back(points[faceIndices[2]]);
+    m_normals.push_back(normals[indexedNormals ? faceIndices[0] : newFaceIndices[0]]);
+    m_normals.push_back(normals[indexedNormals ? faceIndices[1] : newFaceIndices[1]]);
+    m_normals.push_back(normals[indexedNormals ? faceIndices[2] : newFaceIndices[2]]);
   }
 }
 
@@ -183,6 +138,7 @@ bool HdGatlingMesh::_FindPrimvar(HdSceneDelegate* sceneDelegate,
 void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
                                   VtVec3fArray& points,
                                   VtVec3fArray& normals,
+                                  bool& indexedNormals,
                                   GfVec3f& color,
                                   bool& hasColor) const
 {
@@ -228,27 +184,43 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
                                    HdTokens->normals,
                                    normalInterpolation);
 
-  HdMeshTopology topology = GetMeshTopology(sceneDelegate);
-
-  bool isCatmullClark = (topology.GetScheme() == PxOsdOpenSubdivTokens->catmullClark);
-
-  if (!isCatmullClark &&
-      foundNormals &&
+  if (foundNormals &&
       normalInterpolation == HdInterpolation::HdInterpolationVertex)
   {
     VtValue boxedNormals = sceneDelegate->Get(id, HdTokens->normals);
     normals = boxedNormals.Get<VtVec3fArray>();
+    indexedNormals = true;
     return;
   }
 
-  // If normals are not per vertex, their indices are used for subdivision:
-  // "For faceVarying primvars, however, indexing serves a higher purpose (and should be used only for this purpose,
-  // since renderers and OpenSubdiv will assume it) of establishing a surface topology for the primvar."
-  // https://graphics.pixar.com/usd/docs/api/class_usd_geom_primvar.html
+  HdMeshTopology topology = GetMeshTopology(sceneDelegate);
+
+  if (foundNormals &&
+      normalInterpolation == HdInterpolation::HdInterpolationFaceVarying)
+  {
+    VtValue boxedFvNormals = sceneDelegate->Get(id, HdTokens->normals);
+    const VtVec3fArray& fvNormals = boxedFvNormals.Get<VtVec3fArray>();
+
+    HdMeshUtil meshUtil(&topology, id);
+    VtValue boxedTriangulatedNormals;
+    if (!meshUtil.ComputeTriangulatedFaceVaryingPrimvar(
+        fvNormals.cdata(),
+        fvNormals.size(),
+        HdTypeFloatVec3,
+        &boxedTriangulatedNormals))
+    {
+      TF_CODING_ERROR("Unable to triangulate face-varying normals of %s", id.GetText());
+    }
+
+    normals = boxedTriangulatedNormals.Get<VtVec3fArray>();
+    indexedNormals = false;
+    return;
+  }
 
   Hd_VertexAdjacency adjacency;
   adjacency.BuildAdjacencyTable(&topology);
-  normals = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, points.size(), points.data());
+  normals = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, points.size(), points.cdata());
+  indexedNormals = true;
 }
 
 const TfTokenVector BUILTIN_PRIMVAR_NAMES =

@@ -42,7 +42,7 @@ protected:
                  HdDirtyBits *dirtyBits) override;
 
 private:
-  void _PullGeometry(HdSceneDelegate* sceneDelegate);
+  void _UpdateGeometry(HdSceneDelegate* sceneDelegate);
 
   bool _FindPrimvar(HdSceneDelegate* sceneDelegate,
                     TfToken primvarName,
@@ -51,6 +51,7 @@ private:
   void _PullPrimvars(HdSceneDelegate* sceneDelegate,
                      VtVec3fArray& points,
                      VtVec3fArray& normals,
+                     bool& indexedNormals,
                      GfVec3f& color,
                      bool& hasColor) const;
 
