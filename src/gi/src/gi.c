@@ -10,7 +10,7 @@
 #include <math.h>
 
 #include <cgpu.h>
-#include <SPV/main.comp.hlsl.spv.h>
+#include <shadergen.h>
 
 struct gi_scene_cache
 {
@@ -23,19 +23,22 @@ struct gi_scene_cache
   struct gi_vertex*   vertices;
 };
 
-int giInitialize()
+int giInitialize(const char* resource_path)
 {
-  CgpuResult result = cgpu_initialize(
-    "gatling",
-    GATLING_VERSION_MAJOR,
-    GATLING_VERSION_MINOR,
-    GATLING_VERSION_PATCH
-  );
-  return (result == CGPU_OK) ? GI_OK : GI_ERROR;
+  if (cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH) != CGPU_OK)
+  {
+    return GI_ERROR;
+  }
+  if (!sgInitialize(resource_path))
+  {
+    return GI_ERROR;
+  }
+  return GI_OK;
 }
 
 void giTerminate()
 {
+  sgTerminate();
   cgpu_terminate();
 }
 
@@ -234,13 +237,21 @@ int giRender(const struct gi_render_params* params,
   /* Set up pipeline. */
   cgpu_pipeline pipeline;
   {
+    uint32_t main_spv_size;
+    uint32_t* main_spv;
+    if (!sgGenerateMainShader(&main_spv_size, &main_spv))
+    {
+      return GI_ERROR;
+    }
+
     cgpu_shader shader;
     c_result = cgpu_create_shader(
       device,
-      sizeof(g_CSMain),
-      (uint32_t*)g_CSMain,
+      main_spv_size,
+      main_spv,
       &shader
     );
+    free(main_spv);
     GI_CGPU_VERIFY(c_result);
 
     cgpu_shader_resource_buffer sr_buffers[] = {

@@ -64,7 +64,7 @@ struct gi_render_params
   uint32_t                spp;
 };
 
-int giInitialize();
+int giInitialize(const char* resource_path);
 
 void giTerminate();
 

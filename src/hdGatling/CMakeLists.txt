@@ -40,8 +40,15 @@ target_include_directories(
     src
 )
 
-# Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
-target_compile_definitions(hdGatling PRIVATE "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>")
+target_compile_definitions(
+  hdGatling
+  PUBLIC
+    # Required for PLUG_THIS_PLUGIN macro
+    MFB_PACKAGE_NAME=hdGatling
+  PRIVATE
+    # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
+    "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
+)
 
 # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
 if (MSVC_VERSION GREATER_EQUAL 1920)

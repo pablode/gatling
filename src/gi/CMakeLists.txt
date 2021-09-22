@@ -1,11 +1,3 @@
-add_shader_library(
-  gi-shaders
-  src/shaders/main.comp.hlsl
-  INCLUDES
-    src/shaders/bvh.hlsl
-    src/shaders/common.hlsl
-)
-
 add_library(
   gi
   include/gi.h
@@ -37,8 +29,8 @@ target_compile_definitions(
 target_link_libraries(
   gi
   PRIVATE
-    gi-shaders
     cgpu
+    shadergen
     ${C_MATH_LIBRARY}
     gml
 )

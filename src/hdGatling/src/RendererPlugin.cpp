@@ -2,6 +2,8 @@
 #include "RenderDelegate.h"
 
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
+#include <pxr/base/plug/plugin.h>
+#include "pxr/base/plug/thisPlugin.h"
 
 #include <gi.h>
 
@@ -14,7 +16,11 @@ TF_REGISTRY_FUNCTION(TfType)
 
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 {
-  int initResult = giInitialize();
+  PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
+  const char* resourcePath = plugin->GetResourcePath().c_str();
+  printf("Resource path: %s\n", resourcePath);
+
+  int initResult = giInitialize(resourcePath);
 
   m_isSupported = (initResult == GI_OK);
 }

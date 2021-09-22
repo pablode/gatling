@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 project(gatling VERSION 0.2.0)
 
@@ -17,18 +17,8 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${OUTPUT_DIR})
 endforeach()
 
-option(GATLING_USE_DXC "Whether to use DXC instead of glslang or not" OFF)
-if(GATLING_USE_DXC)
-  find_program(DXC_EXECUTABLE DXC HINTS ${DXC_ROOT})
-  if(NOT DXC_EXECUTABLE)
-    message(FATAL_ERROR "DXC executable not found!")
-  endif()
-endif()
-
 find_package(Vulkan REQUIRED)
 find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
-
-include(cmake/ShaderLibrary.cmake)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ENABLE_IPO)

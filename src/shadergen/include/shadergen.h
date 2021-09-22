@@ -7,7 +7,11 @@
 extern "C" {
 #endif
 
-bool sgGenerateMainShader(uint32_t* spv_size,
+bool sgInitialize(const char* resourcePath);
+
+void sgTerminate();
+
+bool sgGenerateMainShader(uint32_t* spvSize,
                           uint32_t** spv);
 
 #ifdef __cplusplus
