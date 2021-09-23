@@ -157,7 +157,8 @@ bool _sgCompileHlslToSpv(const std::string& source,
 
 bool sgGenerateMainShader(const SgMainShaderParams* params,
                           uint32_t* spvSize,
-                          uint32_t** spv)
+                          uint32_t** spv,
+                          const char** entryPoint)
 {
   std::string filePath = s_shadersPath + "/main.comp.hlsl";
 
@@ -202,7 +203,7 @@ bool sgGenerateMainShader(const SgMainShaderParams* params,
   APPEND_CONSTANT("RR_INV_MIN_TERM_PROB", rr_inv_min_term_prob)
 
   std::string source = ss.str() + "\n" + staticSource;
-  const char* entryPoint = "CSMain";
+  *entryPoint = "CSMain";
 
-  return _sgCompileHlslToSpv(source, filePath, entryPoint, spvSize, spv);
+  return _sgCompileHlslToSpv(source, filePath, *entryPoint, spvSize, spv);
 }
