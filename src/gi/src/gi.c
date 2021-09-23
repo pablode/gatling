@@ -302,8 +302,6 @@ int giRender(const struct gi_render_params* params,
       sr_images,
       shader,
       shader_entry_point,
-      0,
-      NULL,
       push_constants_size,
       &pipeline
     );

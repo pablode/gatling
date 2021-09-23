@@ -21,8 +21,6 @@
 #define MAX_BUFFER_MEMORY_BARRIERS 64
 #define MAX_IMAGE_MEMORY_BARRIERS 64
 #define MAX_MEMORY_BARRIERS 128
-#define MAX_SPECIALIZATION_CONSTANTS 32
-#define MAX_SPECIALIZATION_BUFFER_SIZE 1024
 
 /* Internal structures. */
 
@@ -1930,8 +1928,6 @@ CgpuResult cgpu_create_pipeline(
   const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
-  uint32_t specialization_constant_count,
-  const cgpu_specialization_constant* specialization_constants,
   uint32_t push_constants_size,
   cgpu_pipeline* p_pipeline)
 {
@@ -2027,58 +2023,6 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_PIPELINE_LAYOUT;
   }
 
-  if (specialization_constant_count > MAX_SPECIALIZATION_CONSTANTS)
-  {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-    idevice->table.vkDestroyDescriptorSetLayout(
-      idevice->logical_device,
-      ipipeline->descriptor_set_layout,
-      NULL
-    );
-    return CGPU_FAIL_MAX_SPECIALIZATION_CONSTANTS_REACHED;
-  }
-
-  VkSpecializationInfo stage_specialization;
-  uint8_t specialization_buffer[MAX_SPECIALIZATION_BUFFER_SIZE];
-  VkSpecializationMapEntry vk_specialization_constants[MAX_SPECIALIZATION_CONSTANTS];
-  uint32_t specialization_buffer_size = 0;
-
-  if (specialization_constant_count > 0)
-  {
-    stage_specialization.pData = &specialization_buffer;
-    stage_specialization.mapEntryCount = specialization_constant_count;
-    stage_specialization.pMapEntries = vk_specialization_constants;
-
-    for (uint32_t i = 0; i < specialization_constant_count; ++i)
-    {
-      VkSpecializationMapEntry* vk_spec_const = &vk_specialization_constants[i];
-      const cgpu_specialization_constant* spec_const = &specialization_constants[i];
-
-      if (specialization_buffer_size + spec_const->size > MAX_SPECIALIZATION_BUFFER_SIZE)
-      {
-        resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-        idevice->table.vkDestroyDescriptorSetLayout(
-          idevice->logical_device,
-          ipipeline->descriptor_set_layout,
-          NULL
-        );
-        return CGPU_FAIL_MAX_SPECIALIZATION_BUFFER_SIZE_REACHED;
-      }
-
-      vk_spec_const->constantID = spec_const->constant_id;
-      vk_spec_const->offset = specialization_buffer_size;
-      vk_spec_const->size = spec_const->size;
-      memcpy(
-        (void*)(&specialization_buffer[specialization_buffer_size]),
-        spec_const->p_data,
-        spec_const->size
-      );
-      specialization_buffer_size += spec_const->size;
-    }
-
-    stage_specialization.dataSize = specialization_buffer_size;
-  }
-
   VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
   pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_shader_stage_create_info.pNext = NULL;
@@ -2086,8 +2030,7 @@ CgpuResult cgpu_create_pipeline(
   pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   pipeline_shader_stage_create_info.module = ishader->module;
   pipeline_shader_stage_create_info.pName = p_shader_entry_point;
-  pipeline_shader_stage_create_info.pSpecializationInfo =
-    (specialization_constant_count > 0) ? &stage_specialization : NULL;
+  pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
 
   VkComputePipelineCreateInfo pipeline_create_info;
   pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;

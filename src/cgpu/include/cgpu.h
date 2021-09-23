@@ -86,11 +86,9 @@ typedef enum CgpuResult {
   CGPU_FAIL_MAX_PHYSICAL_DEVICES_REACHED = -29,
   CGPU_FAIL_MAX_DEVICE_EXTENSIONS_REACHED = -30,
   CGPU_FAIL_MAX_QUEUE_FAMILIES_REACHED = -31,
-  CGPU_FAIL_MAX_SPECIALIZATION_CONSTANTS_REACHED = -32,
-  CGPU_FAIL_MAX_SPECIALIZATION_BUFFER_SIZE_REACHED = -33,
-  CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED = -34,
-  CGPU_FAIL_VK_VERSION_NOT_SUPPORTED = -35,
-  CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET = -36
+  CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED = -32,
+  CGPU_FAIL_VK_VERSION_NOT_SUPPORTED = -33,
+  CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET = -34
 } CgpuResult;
 
 typedef uint32_t CgpuBufferUsageFlags;
@@ -577,12 +575,6 @@ typedef struct cgpu_physical_device_limits {
   uint32_t             subgroupSize;
 } cgpu_physical_device_limits;
 
-typedef struct cgpu_specialization_constant {
-  uint32_t constant_id;
-  uint32_t size;
-  void* p_data;
-} cgpu_specialization_constant;
-
 CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
   const char* p_app_name,
   uint32_t version_major,
@@ -679,8 +671,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
-  uint32_t specialization_constant_count,
-  const cgpu_specialization_constant* specialization_constants,
   uint32_t push_constants_size,
   cgpu_pipeline* p_pipeline
 );
