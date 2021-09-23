@@ -78,7 +78,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out hit_info hit)
 
     uint2 node_group = uint2(0, 0x80000000);
 
-    uint2 stack[6]; // TODO: variable size via define
+    uint2 stack[MAX_STACK_SIZE];
     uint stack_size = 0;
 
     while (true)

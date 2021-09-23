@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <sstream>
+#include <limits>
 
 std::string s_shadersPath;
 shaderc_compiler_t s_compiler;
@@ -119,23 +121,18 @@ void sgTerminate()
   shaderc_compiler_release(s_compiler);
 }
 
-bool _sgCompileHlslToSpv(const std::string& shaderPath,
+bool _sgCompileHlslToSpv(const std::string& source,
+                         const std::string& filePath,
                          const char* entryPoint,
                          uint32_t* spvSize,
                          uint32_t** spv)
 {
-  std::string source;
-  if (!_sgReadTextFromFile(shaderPath, source))
-  {
-    return false;
-  }
-
   shaderc_compilation_result_t result = shaderc_compile_into_spv(
     s_compiler,
     source.c_str(),
     source.size(),
     shaderc_compute_shader,
-    shaderPath.c_str(),
+    filePath.c_str(),
     entryPoint,
     s_compileOptions
   );
@@ -158,11 +155,54 @@ bool _sgCompileHlslToSpv(const std::string& shaderPath,
   return true;
 }
 
-bool sgGenerateMainShader(uint32_t* spvSize,
+bool sgGenerateMainShader(const SgMainShaderParams* params,
+                          uint32_t* spvSize,
                           uint32_t** spv)
 {
-  std::string shaderPath = s_shadersPath + "/main.comp.hlsl";
+  std::string filePath = s_shadersPath + "/main.comp.hlsl";
+
+  std::string staticSource;
+  if (!_sgReadTextFromFile(filePath, staticSource))
+  {
+    return false;
+  }
+
+  std::stringstream ss;
+  ss << std::showpoint;
+  ss << std::setprecision(std::numeric_limits<float>::digits10);
+
+#define HLSL_TYPE_STRING(ctype) _Generic((ctype), \
+  unsigned int: "uint",                           \
+  float: "float")
+
+#define APPEND_CONSTANT(name, cvar)     \
+  ss << "const ";                       \
+  ss << HLSL_TYPE_STRING(params->cvar); \
+  ss << " " << name << " = ";           \
+  ss << params->cvar << ";\n";
+
+  APPEND_CONSTANT("NUM_THREADS_X", num_threads_x)
+  APPEND_CONSTANT("NUM_THREADS_Y", num_threads_y)
+  APPEND_CONSTANT("MAX_STACK_SIZE", max_stack_size)
+  APPEND_CONSTANT("IMAGE_WIDTH", image_width)
+  APPEND_CONSTANT("IMAGE_HEIGHT", image_height)
+  APPEND_CONSTANT("SAMPLE_COUNT", spp)
+  APPEND_CONSTANT("MAX_BOUNCES", max_bounces)
+  APPEND_CONSTANT("CAMERA_ORIGIN_X", camera_position_x)
+  APPEND_CONSTANT("CAMERA_ORIGIN_Y", camera_position_y)
+  APPEND_CONSTANT("CAMERA_ORIGIN_Z", camera_position_z)
+  APPEND_CONSTANT("CAMERA_FORWARD_X", camera_forward_x)
+  APPEND_CONSTANT("CAMERA_FORWARD_Y", camera_forward_y)
+  APPEND_CONSTANT("CAMERA_FORWARD_Z", camera_forward_z)
+  APPEND_CONSTANT("CAMERA_UP_X", camera_up_x)
+  APPEND_CONSTANT("CAMERA_UP_Y", camera_up_y)
+  APPEND_CONSTANT("CAMERA_UP_Z", camera_up_z)
+  APPEND_CONSTANT("CAMERA_VFOV", camera_vfov)
+  APPEND_CONSTANT("RR_BOUNCE_OFFSET", rr_bounce_offset)
+  APPEND_CONSTANT("RR_INV_MIN_TERM_PROB", rr_inv_min_term_prob)
+
+  std::string source = ss.str() + "\n" + staticSource;
   const char* entryPoint = "CSMain";
 
-  return _sgCompileHlslToSpv(shaderPath, entryPoint, spvSize, spv);
+  return _sgCompileHlslToSpv(source, filePath, entryPoint, spvSize, spv);
 }

@@ -1,23 +1,5 @@
 #include "common.hlsl"
 
-[[vk::constant_id(0)]] const uint IMAGE_WIDTH = 1920;
-[[vk::constant_id(1)]] const uint IMAGE_HEIGHT = 1080;
-[[vk::constant_id(2)]] const uint SAMPLE_COUNT = 4;
-[[vk::constant_id(3)]] const uint MAX_BOUNCES = 4;
-[[vk::constant_id(4)]] const uint MAX_STACK_SIZE = 6;
-[[vk::constant_id(5)]] const float CAMERA_ORIGIN_X = 15.0;
-[[vk::constant_id(6)]] const float CAMERA_ORIGIN_Y = 15.0;
-[[vk::constant_id(7)]] const float CAMERA_ORIGIN_Z = 15.0;
-[[vk::constant_id(8)]] const float CAMERA_FORWARD_X = 0.0;
-[[vk::constant_id(9)]] const float CAMERA_FORWARD_Y = 4.0;
-[[vk::constant_id(10)]] const float CAMERA_FORWARD_Z = 3.0;
-[[vk::constant_id(11)]] const float CAMERA_UP_X = 0.0;
-[[vk::constant_id(12)]] const float CAMERA_UP_Y = 4.0;
-[[vk::constant_id(13)]] const float CAMERA_UP_Z = 3.0;
-[[vk::constant_id(14)]] const float CAMERA_VFOV = 0.872665; // radians(50.0);
-[[vk::constant_id(15)]] const uint RR_BOUNCE_OFFSET = 3;
-[[vk::constant_id(16)]] const float RR_INV_MIN_TERM_PROB = 1.0;
-
 #include "bvh.hlsl"
 
 float3 uniform_sample_hemisphere(inout uint rng_state, float3 normal)
@@ -102,7 +84,7 @@ float3 trace_sample(inout uint rng_state, in float3 prim_ray_origin, in float3 p
     return sample_color;
 }
 
-[numthreads(32, 32, 1)] // TODO: set using define
+[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
 void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
     const uint2 pixel_pos = GlobalInvocationID.xy;
