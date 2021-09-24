@@ -5,6 +5,7 @@
 #include "Instancer.h"
 #include "RenderBuffer.h"
 #include "Material.h"
+#include "Tokens.h"
 
 #include <pxr/imaging/hd/resourceRegistry.h>
 #include <pxr/base/gf/vec4f.h>

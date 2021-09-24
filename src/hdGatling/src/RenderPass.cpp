@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include "Instancer.h"
 #include "Material.h"
+#include "Tokens.h"
 
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>

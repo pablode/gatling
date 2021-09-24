@@ -6,8 +6,6 @@
 
 #include <gi.h>
 
-#include "Settings.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingCamera;

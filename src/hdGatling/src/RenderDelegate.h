@@ -2,8 +2,6 @@
 
 #include <pxr/imaging/hd/renderDelegate.h>
 
-#include "Settings.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingRenderDelegate final : public HdRenderDelegate

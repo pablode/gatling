@@ -16,8 +16,8 @@ add_library(
   src/Instancer.cpp
   src/RenderBuffer.h
   src/RenderBuffer.cpp
-  src/Settings.h
-  src/Settings.cpp
+  src/Tokens.h
+  src/Tokens.cpp
 )
 
 set_target_properties(

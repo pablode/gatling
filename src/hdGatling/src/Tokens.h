@@ -1,6 +1,5 @@
 #pragma once
 
-#include <pxr/pxr.h>
 #include <pxr/base/tf/staticTokens.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
