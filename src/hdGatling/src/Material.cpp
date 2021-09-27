@@ -1,33 +1,27 @@
 #include "Material.h"
 
-#include <pxr/usdImaging/usdImaging/tokens.h>
+#include <gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_PRIVATE_TOKENS(
-  _usdPreviewSurfaceParamTokens,
-  (diffuseColor)
-  (emissiveColor)
-);
-
-HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id)
+HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id,
+                                     const MaterialNetworkTranslator& translator)
   : HdMaterial(id)
+  , m_translator(translator)
 {
-  m_material.albedo[0] = 0.0f;
-  m_material.albedo[1] = 0.0f;
-  m_material.albedo[2] = 0.0f;
-  m_material.emission[0] = 0.0f;
-  m_material.emission[1] = 0.0f;
-  m_material.emission[2] = 0.0f;
 }
 
 HdGatlingMaterial::~HdGatlingMaterial()
 {
+  if (m_giMaterial)
+  {
+    giDestroyMaterial(m_giMaterial);
+  }
 }
 
-const gi_material& HdGatlingMaterial::GetGiMaterial() const
+HdDirtyBits HdGatlingMaterial::GetInitialDirtyBitsMask() const
 {
-  return m_material;
+  return DirtyBits::DirtyParams;
 }
 
 void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
@@ -46,8 +40,7 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   const SdfPath& id = GetId();
-
-  VtValue resource = sceneDelegate->GetMaterialResource(id);
+  const VtValue& resource = sceneDelegate->GetMaterialResource(id);
 
   if (!resource.IsHolding<HdMaterialNetworkMap>())
   {
@@ -55,56 +48,22 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   const HdMaterialNetworkMap& networkMap = resource.UncheckedGet<HdMaterialNetworkMap>();
+  HdMaterialNetwork2 network;
+  bool isVolume = false;
 
-  const HdMaterialNetwork* network = TfMapLookupPtr(networkMap.map, HdMaterialTerminalTokens->surface);
-
-  if (!network)
+  HdMaterialNetwork2ConvertFromHdMaterialNetworkMap(networkMap, &network, &isVolume);
+  if (isVolume)
   {
+    TF_WARN("Volume %s unsupported", id.GetText());
     return;
   }
 
-  _ReadMaterialNetwork(network);
+  m_giMaterial = m_translator.ParseNetwork(id, network);
 }
 
-void HdGatlingMaterial::_ReadMaterialNetwork(const HdMaterialNetwork* network)
+const gi_material* HdGatlingMaterial::GetGiMaterial() const
 {
-  // Instead of actually trying to understand different nodes and the connections
-  // between them, we just greedily fill our data from all UsdPreviewSurface nodes.
-  for (const HdMaterialNode& node : network->nodes)
-  {
-    if (node.identifier != UsdImagingTokens->UsdPreviewSurface)
-    {
-      continue;
-    }
-
-    auto boxedDiffuseColorIter = node.parameters.find(_usdPreviewSurfaceParamTokens->diffuseColor);
-    auto boxedEmissiveColorIter = node.parameters.find(_usdPreviewSurfaceParamTokens->emissiveColor);
-
-    if (boxedDiffuseColorIter != node.parameters.end())
-    {
-      VtValue vtValue = boxedDiffuseColorIter->second;;
-      GfVec3f diffuseColor = vtValue.Get<GfVec3f>();
-
-      m_material.albedo[0] = diffuseColor[0];
-      m_material.albedo[1] = diffuseColor[1];
-      m_material.albedo[2] = diffuseColor[2];
-    }
-
-    if (boxedEmissiveColorIter != node.parameters.end())
-    {
-      VtValue vtValue = boxedEmissiveColorIter->second;;
-      GfVec3f emissiveColor = vtValue.Get<GfVec3f>();
-
-      m_material.emission[0] = emissiveColor[0];
-      m_material.emission[1] = emissiveColor[1];
-      m_material.emission[2] = emissiveColor[2];
-    }
-  }
-}
-
-HdDirtyBits HdGatlingMaterial::GetInitialDirtyBitsMask() const
-{
-  return DirtyBits::DirtyParams;
+  return m_giMaterial;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

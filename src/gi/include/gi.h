@@ -44,12 +44,12 @@ struct gi_scene_cache;
 
 struct gi_preprocess_params
 {
-  uint32_t            face_count;
-  struct gi_face*     faces;
-  struct gi_material* materials;
-  uint32_t            material_count;
-  uint32_t            vertex_count;
-  struct gi_vertex*   vertices;
+  uint32_t                   face_count;
+  struct gi_face*            faces;
+  const struct gi_material** materials;
+  uint32_t                   material_count;
+  uint32_t                   vertex_count;
+  struct gi_vertex*          vertices;
 };
 
 struct gi_render_params
@@ -67,6 +67,10 @@ struct gi_render_params
 int giInitialize(const char* resource_path);
 
 void giTerminate();
+
+struct gi_material* giCreateMaterialFromMtlx(const char* doc);
+
+void giDestroyMaterial(struct gi_material* material);
 
 int giCreateSceneCache(struct gi_scene_cache** cache);
 

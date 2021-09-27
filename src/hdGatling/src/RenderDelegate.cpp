@@ -14,7 +14,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap)
+HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
+                                                 const MaterialNetworkTranslator& translator)
+  : m_translator(translator)
 {
   m_resourceRegistry = std::make_shared<HdResourceRegistry>();
 
@@ -129,7 +131,7 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId,
   }
   else if (typeId == HdPrimTypeTokens->material)
   {
-    return new HdGatlingMaterial(sprimId);
+    return new HdGatlingMaterial(sprimId, m_translator);
   }
 
   return nullptr;

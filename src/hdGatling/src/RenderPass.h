@@ -38,13 +38,13 @@ private:
                    GfMatrix4d rootTransform,
                    std::vector<gi_vertex>& vertices,
                    std::vector<gi_face>& faces,
-                   std::vector<gi_material>& materials) const;
+                   std::vector<const gi_material*>& materials) const;
 
   void _ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const;
 
 private:
   const HdRenderSettingsMap& m_settings;
-  gi_material m_defaultMaterial;
+  gi_material* m_defaultMaterial;
   bool m_isConverged;
   uint32_t m_lastSceneStateVersion;
   uint32_t m_lastRenderSettingsVersion;

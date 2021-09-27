@@ -2,6 +2,10 @@
 
 #include <pxr/imaging/hd/rendererPlugin.h>
 
+#include <memory>
+
+#include "MaterialNetworkTranslator.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingRendererPlugin final : public HdRendererPlugin
@@ -21,6 +25,7 @@ public:
   bool IsSupported() const override;
 
 private:
+  std::unique_ptr<MaterialNetworkTranslator> m_translator;
   bool m_isSupported;
 };
 

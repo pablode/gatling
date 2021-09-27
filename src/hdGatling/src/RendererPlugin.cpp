@@ -17,11 +17,13 @@ TF_REGISTRY_FUNCTION(TfType)
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 {
   PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
-  const char* resourcePath = plugin->GetResourcePath().c_str();
-  printf("Resource path: %s\n", resourcePath);
+  const std::string& resourcePath = plugin->GetResourcePath();
+  printf("Resource path %s\n", resourcePath.c_str());
 
-  int initResult = giInitialize(resourcePath);
+  std::string mtlxlibPath = resourcePath + "/mtlxlib";
+  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxlibPath);
 
+  int initResult = giInitialize(resourcePath.c_str());
   m_isSupported = (initResult == GI_OK);
 }
 
@@ -34,12 +36,12 @@ HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate()
 {
   HdRenderSettingsMap settingsMap;
 
-  return new HdGatlingRenderDelegate(settingsMap);
+  return new HdGatlingRenderDelegate(settingsMap, *m_translator);
 }
 
 HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate(const HdRenderSettingsMap& settingsMap)
 {
-  return new HdGatlingRenderDelegate(settingsMap);
+  return new HdGatlingRenderDelegate(settingsMap, *m_translator);
 }
 
 void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDelegate)

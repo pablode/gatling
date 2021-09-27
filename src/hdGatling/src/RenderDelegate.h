@@ -2,12 +2,15 @@
 
 #include <pxr/imaging/hd/renderDelegate.h>
 
+#include "MaterialNetworkTranslator.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingRenderDelegate final : public HdRenderDelegate
 {
 public:
-  HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap);
+  HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
+                          const MaterialNetworkTranslator& translator);
 
   ~HdGatlingRenderDelegate() override;
 
@@ -67,6 +70,7 @@ public:
   TfTokenVector GetShaderSourceTypes() const override;
 
 private:
+  const MaterialNetworkTranslator& m_translator;
   HdRenderSettingDescriptorList m_settingDescriptors;
   HdResourceRegistrySharedPtr m_resourceRegistry;
 };

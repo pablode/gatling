@@ -8,6 +8,8 @@ add_library(
   src/Camera.cpp
   src/Material.h
   src/Material.cpp
+  src/MaterialNetworkTranslator.h
+  src/MaterialNetworkTranslator.cpp
   src/Mesh.h
   src/Mesh.cpp
   src/RenderPass.h
@@ -58,7 +60,9 @@ endif()
 target_link_libraries(
   hdGatling
   PRIVATE
-    gi usdImaging
+    usdImaging
+    hdMtlx
+    gi
   PUBLIC
     hd
 )

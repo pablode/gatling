@@ -42,6 +42,17 @@ void giTerminate()
   cgpu_terminate();
 }
 
+struct gi_material* giCreateMaterialFromMtlx(const char* doc)
+{
+  // TODO
+  return NULL;
+}
+
+void giDestroyMaterial(struct gi_material* material)
+{
+  // TODO
+}
+
 int giCreateSceneCache(struct gi_scene_cache** cache)
 {
   *cache = malloc(sizeof(struct gi_scene_cache));

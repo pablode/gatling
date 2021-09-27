@@ -4,30 +4,31 @@
 
 #include <gi.h>
 
+#include "MaterialNetworkTranslator.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingMaterial final : public HdMaterial
 {
 public:
-  HdGatlingMaterial(const SdfPath& id);
+  HdGatlingMaterial(const SdfPath& id,
+                    const MaterialNetworkTranslator& translator);
 
   ~HdGatlingMaterial() override;
 
 public:
-  const gi_material& GetGiMaterial() const;
+  HdDirtyBits GetInitialDirtyBitsMask() const override;
 
-public:
   void Sync(HdSceneDelegate* sceneDelegate,
             HdRenderParam* renderParam,
             HdDirtyBits* dirtyBits) override;
 
-  HdDirtyBits GetInitialDirtyBitsMask() const override;
+public:
+  const gi_material* GetGiMaterial() const;
 
 private:
-  void _ReadMaterialNetwork(const HdMaterialNetwork* network);
-
-private:
-  gi_material m_material;
+  const MaterialNetworkTranslator& m_translator;
+  gi_material* m_giMaterial = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

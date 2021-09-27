@@ -13,6 +13,17 @@
 
 #include <gi.h>
 
+static const char* DEFAULT_MTLX_DOC =
+  "<?xml version=\"1.0\"?>"
+  "<materialx version=\"1.38\" colorspace=\"lin_rec709\">"
+  "  <UsdPreviewSurface name=\"SR_invalid\" type=\"surfaceshader\">"
+  "    <input name=\"diffuseColor\" type=\"color3\" value=\"1.0, 0.0, 1.0\" />"
+  "  </UsdPreviewSurface>"
+  "  <surfacematerial name=\"USD_Invalid\" type=\"material\">"
+  "    <input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"SR_invalid\" />"
+  "  </surfacematerial>"
+  "</materialx>";
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
@@ -25,12 +36,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_lastRenderSettingsVersion(UINT32_MAX)
   , m_sceneCache(nullptr)
 {
-  m_defaultMaterial.albedo[0] = 1.0f;
-  m_defaultMaterial.albedo[1] = 1.0f;
-  m_defaultMaterial.albedo[2] = 1.0f;
-  m_defaultMaterial.emission[0] = 0.0f;
-  m_defaultMaterial.emission[1] = 0.0f;
-  m_defaultMaterial.emission[2] = 0.0f;
+  m_defaultMaterial = giCreateMaterialFromMtlx(DEFAULT_MTLX_DOC);
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
@@ -99,7 +105,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
                                       std::vector<gi_vertex>& vertices,
                                       std::vector<gi_face>& faces,
-                                      std::vector<gi_material>& materials) const
+                                      std::vector<const gi_material*>& materials) const
 {
   vertices.clear();
   faces.clear();
@@ -140,22 +146,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     const SdfPath& materialId = mesh->GetMaterialId();
     uint32_t materialIndex = 0;
 
-    if (materialId.IsEmpty() && mesh->HasColor())
-    {
-      const GfVec3f& color = mesh->GetColor();
-
-      gi_material newMaterial;
-      newMaterial.albedo[0] = color[0];
-      newMaterial.albedo[1] = color[1];
-      newMaterial.albedo[2] = color[2];
-      newMaterial.emission[0] = 0.0f;
-      newMaterial.emission[1] = 0.0f;
-      newMaterial.emission[2] = 0.0f;
-
-      materialIndex = materials.size();
-      materials.push_back(newMaterial);
-    }
-    else if (materialMapping.find(materialId) != materialMapping.end())
+    if (materialMapping.find(materialId) != materialMapping.end())
     {
       materialIndex = materialMapping[materialId];
     }
@@ -283,7 +274,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
     std::vector<gi_vertex> vertices;
     std::vector<gi_face> faces;
-    std::vector<gi_material> materials;
+    std::vector<const gi_material*> materials;
 
     // Transform scene into camera space to increase floating point precision.
     GfMatrix4d viewMatrix = camera->GetTransform().GetInverse();
