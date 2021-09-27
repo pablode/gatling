@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 project(gatling VERSION 0.2.0)
 
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
@@ -19,6 +21,7 @@ endforeach()
 
 find_package(Vulkan REQUIRED)
 find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
+find_package(MDL REQUIRED)
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ENABLE_IPO)
