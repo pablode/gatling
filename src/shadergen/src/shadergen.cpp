@@ -1,9 +1,14 @@
 #include "shadergen.h"
 
-#include "GlslangShaderCompiler.h"
 #include "MtlxMdlCodeGen.h"
 #include "MdlHlslCodeGen.h"
 #include "MdlRuntime.h"
+
+#ifdef GATLING_USE_DXC
+#include "DxcShaderCompiler.h"
+#else
+#include "GlslangShaderCompiler.h"
+#endif
 
 #include <string>
 #include <sstream>
@@ -43,7 +48,11 @@ bool sgInitialize(const char* resourcePath,
     return false;
   }
 
+#ifdef GATLING_USE_DXC
+  s_shaderCompiler = std::make_unique<sg::DxcShaderCompiler>(s_shaderPath);
+#else
   s_shaderCompiler = std::make_unique<sg::GlslangShaderCompiler>(s_shaderPath);
+#endif
   if (!s_shaderCompiler->init())
   {
     return false;

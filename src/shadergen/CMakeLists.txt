@@ -4,8 +4,6 @@ add_library(
   src/shadergen.cpp
   src/IShaderCompiler.h
   src/IShaderCompiler.cpp
-  src/GlslangShaderCompiler.h
-  src/GlslangShaderCompiler.cpp
   src/MtlxMdlCodeGen.h
   src/MtlxMdlCodeGen.cpp
   src/MdlHlslCodeGen.h
@@ -13,6 +11,12 @@ add_library(
   src/MdlRuntime.h
   src/MdlRuntime.cpp
 )
+
+if(${GATLING_USE_DXC})
+  target_sources(shadergen PRIVATE src/DxcShaderCompiler.h src/DxcShaderCompiler.cpp)
+else()
+  target_sources(shadergen PRIVATE src/GlslangShaderCompiler.h src/GlslangShaderCompiler.cpp)
+endif()
 
 set_target_properties(
   shadergen
@@ -35,12 +39,17 @@ target_include_directories(
 target_link_libraries(
   shadergen
   PRIVATE
-    shaderc
-    shaderc_util
     MaterialXCore
     MaterialXFormat
     MaterialXGenMdl
 )
+
+if(${GATLING_USE_DXC})
+  target_link_libraries(shadergen PRIVATE DXC)
+  target_compile_definitions(shadergen PRIVATE GATLING_USE_DXC)
+else()
+  target_link_libraries(shadergen PRIVATE shaderc shaderc_util)
+endif()
 
 install(
   FILES

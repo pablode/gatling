@@ -37,6 +37,7 @@ install(
 #
 # shaderc dependencies. The revisions are taken from the repo/DEPS.
 #
+if(NOT ${GATLING_USE_DXC})
 
 # SPIRV-Headers
 set(SPIRV_HEADERS_SKIP_EXAMPLES ON)
@@ -58,3 +59,5 @@ set(SHADERC_SKIP_TESTS ON)
 set(SHADERC_SKIP_INSTALL ON)
 set(SHADERC_ENABLE_SHARED_CRT ON)
 add_subdirectory(shaderc)
+
+endif()

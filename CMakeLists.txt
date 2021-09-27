@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.11 FATAL_ERROR)
 
+include(CMakeDependentOption)
+
 project(gatling VERSION 0.2.0)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -19,9 +21,15 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${OUTPUT_DIR})
 endforeach()
 
+cmake_dependent_option(GATLING_USE_DXC "Use DXC instead of glslang" OFF WIN32 OFF)
+
 find_package(Vulkan REQUIRED)
 find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
 find_package(MDL REQUIRED)
+
+if(${GATLING_USE_DXC})
+  find_package(DXC REQUIRED)
+endif()
 
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ENABLE_IPO)
