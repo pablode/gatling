@@ -55,6 +55,17 @@ public:
 
   void DestroyBprim(HdBprim* bprim) override;
 
+public:
+  TfToken GetMaterialBindingPurpose() const override;
+
+  // In a USD file, there can be multiple networks associated with a material:
+  //   token outputs:mdl:surface.connect = </Root/Glass.outputs:out>
+  //   token outputs:surface.connect = </Root/GlassPreviewSurface.outputs:surface>
+  // This function returns the order of preference used when selecting one for rendering.
+  TfTokenVector GetMaterialRenderContexts() const override;
+
+  TfTokenVector GetShaderSourceTypes() const override;
+
 private:
   HdRenderSettingDescriptorList m_settingDescriptors;
   HdResourceRegistrySharedPtr m_resourceRegistry;

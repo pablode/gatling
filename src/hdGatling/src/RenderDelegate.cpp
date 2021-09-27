@@ -180,4 +180,19 @@ void HdGatlingRenderDelegate::DestroyBprim(HdBprim* bprim)
   delete bprim;
 }
 
+TfToken HdGatlingRenderDelegate::GetMaterialBindingPurpose() const
+{
+  return HdTokens->full;
+}
+
+TfTokenVector HdGatlingRenderDelegate::GetMaterialRenderContexts() const
+{
+  return TfTokenVector{ HdGatlingRenderContexts->mtlx };
+}
+
+TfTokenVector HdGatlingRenderDelegate::GetShaderSourceTypes() const
+{
+  return TfTokenVector{ HdGatlingSourceTypes->mtlx };
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
