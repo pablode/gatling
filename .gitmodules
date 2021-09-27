@@ -1,0 +1,3 @@
+[submodule "extern/MaterialX"]
+	path = extern/MaterialX
+	url = https://github.com/materialx/MaterialX

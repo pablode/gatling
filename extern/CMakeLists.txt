@@ -3,13 +3,41 @@ include(FetchContent)
 # Make option() honor normal variables.
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
+#
 # volk
+#
 FetchContent_Declare(
   volk
   GIT_REPOSITORY https://github.com/zeux/volk.git
   GIT_TAG 1.2.140
 )
 FetchContent_MakeAvailable(volk)
+
+#
+# MaterialX
+#
+set(MATERIALX_BUILD_GEN_GLSL OFF)
+set(MATERIALX_BUILD_GEN_OSL OFF)
+set(MATERIALX_BUILD_RENDER OFF)
+set(MATERIALX_BUILD_TESTS OFF)
+set(MATERIALX_INSTALL_PYTHON OFF)
+set(MATERIALX_TEST_RENDER OFF)
+add_subdirectory(MaterialX)
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/MaterialX/source/MaterialXGenMdl/mdl/materialx"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mtlxmdl"
+  COMPONENT hdGatling
+)
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/MaterialX/libraries/"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mtlxlib"
+  COMPONENT hdGatling
+  FILES_MATCHING
+  PATTERN "*.mdl"
+  PATTERN "*.mtlx"
+)
 
 #
 # shaderc dependencies. The revisions are taken from the repo/DEPS.
