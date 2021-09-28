@@ -58,6 +58,23 @@ void sgDestroyMaterial(SgMaterial* mat)
   delete mat;
 }
 
+template<typename T>
+constexpr const char* _sgGetHlslType(T var)
+{
+  if constexpr(std::is_same<T, uint32_t>::value)
+  {
+    return "uint";
+  }
+  else if constexpr(std::is_same<T, float>::value)
+  {
+    return "float";
+  }
+  else
+  {
+    static_assert(false, "HLSL type mapping does not exist");
+  }
+}
+
 bool sgGenerateMainShader(const SgMainShaderParams* params,
                           uint32_t* spvSize,
                           uint32_t** spv,
@@ -67,13 +84,9 @@ bool sgGenerateMainShader(const SgMainShaderParams* params,
   ss << std::showpoint;
   ss << std::setprecision(std::numeric_limits<float>::digits10);
 
-#define HLSL_TYPE_STRING(ctype) _Generic((ctype), \
-  unsigned int: "uint",                           \
-  float: "float")
-
 #define APPEND_CONSTANT(name, cvar)     \
   ss << "const ";                       \
-  ss << HLSL_TYPE_STRING(params->cvar); \
+  ss << _sgGetHlslType(params->cvar);   \
   ss << " " << name << " = ";           \
   ss << params->cvar << ";\n";
 
