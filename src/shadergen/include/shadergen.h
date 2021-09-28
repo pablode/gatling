@@ -7,9 +7,14 @@
 extern "C" {
 #endif
 
-bool sgInitialize(const char* resourcePath);
+bool sgInitialize(const char* shaderPath,
+                  const char* mtlxlibPath);
 
 void sgTerminate();
+
+struct SgMaterial* sgCreateMaterialFromMtlx(const char* docStr);
+
+void sgDestroyMaterial(struct SgMaterial* mat);
 
 struct SgMainShaderParams
 {

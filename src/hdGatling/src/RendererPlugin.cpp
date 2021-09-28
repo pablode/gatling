@@ -20,10 +20,11 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
   const std::string& resourcePath = plugin->GetResourcePath();
   printf("Resource path %s\n", resourcePath.c_str());
 
+  std::string shaderPath = resourcePath + "/shaders";
   std::string mtlxlibPath = resourcePath + "/mtlxlib";
   m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxlibPath);
 
-  int initResult = giInitialize(resourcePath.c_str());
+  int initResult = giInitialize(shaderPath.c_str(), mtlxlibPath.c_str());
   m_isSupported = (initResult == GI_OK);
 }
 

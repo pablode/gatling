@@ -1,18 +1,27 @@
 #include "shadergen.h"
 
 #include "GlslangShaderCompiler.h"
+#include "MtlxMdlTranslator.h"
 
 #include <string>
 #include <sstream>
 #include <limits>
 #include <iomanip>
 
+struct SgMaterial
+{
+  std::string mdlSrc;
+  std::string subIdentifier;
+};
+
 std::string s_shaderPath;
 std::unique_ptr<sg::IShaderCompiler> s_shaderCompiler;
+std::unique_ptr<sg::MtlxMdlTranslator> s_mtlxMdlTranslator;
 
-bool sgInitialize(const char* resourcePath)
+bool sgInitialize(const char* shaderPath,
+                  const char* mtlxlibPath)
 {
-  s_shaderPath = std::string(resourcePath) + "/shaders";
+  s_shaderPath = shaderPath;
   s_shaderCompiler = std::make_unique<sg::GlslangShaderCompiler>(s_shaderPath);
 
   if (!s_shaderCompiler->init())
@@ -20,11 +29,33 @@ bool sgInitialize(const char* resourcePath)
     return false;
   }
 
+  s_mtlxMdlTranslator = std::make_unique<sg::MtlxMdlTranslator>(mtlxlibPath);
+
   return true;
 }
 
 void sgTerminate()
 {
+}
+
+SgMaterial* sgCreateMaterialFromMtlx(const char* docStr)
+{
+  std::string mdlSrc;
+  std::string subIdentifier;
+  if (!s_mtlxMdlTranslator->translate(docStr, mdlSrc, subIdentifier))
+  {
+    return nullptr;
+  }
+
+  SgMaterial* mat = new SgMaterial();
+  mat->mdlSrc = mdlSrc;
+  mat->subIdentifier = subIdentifier;
+  return mat;
+}
+
+void sgDestroyMaterial(SgMaterial* mat)
+{
+  delete mat;
 }
 
 bool sgGenerateMainShader(const SgMainShaderParams* params,

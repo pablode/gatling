@@ -6,6 +6,8 @@ add_library(
   src/IShaderCompiler.cpp
   src/GlslangShaderCompiler.h
   src/GlslangShaderCompiler.cpp
+  src/MtlxMdlTranslator.h
+  src/MtlxMdlTranslator.cpp
 )
 
 set_target_properties(
@@ -30,6 +32,9 @@ target_link_libraries(
   PRIVATE
     shaderc
     shaderc_util
+    MaterialXCore
+    MaterialXFormat
+    MaterialXGenMdl
 )
 
 install(

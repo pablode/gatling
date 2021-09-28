@@ -18,14 +18,6 @@ struct gi_camera
   float vfov;
 };
 
-struct gi_material
-{
-  float albedo[3];
-  float padding1;
-  float emission[3];
-  float padding2;
-};
-
 struct gi_vertex
 {
   float pos[3];
@@ -64,13 +56,14 @@ struct gi_render_params
   uint32_t                spp;
 };
 
-int giInitialize(const char* resource_path);
+int giInitialize(const char* shader_path,
+                 const char* mtlxlib_path);
 
 void giTerminate();
 
 struct gi_material* giCreateMaterialFromMtlx(const char* doc);
 
-void giDestroyMaterial(struct gi_material* material);
+void giDestroyMaterial(struct gi_material* mat);
 
 int giCreateSceneCache(struct gi_scene_cache** cache);
 

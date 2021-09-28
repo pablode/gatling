@@ -12,6 +12,11 @@
 #include <cgpu.h>
 #include <shadergen.h>
 
+struct gi_material
+{
+  struct SgMaterial* sg_mat;
+};
+
 struct gi_scene_cache
 {
   struct gi_bvhcc     bvhcc;
@@ -23,13 +28,14 @@ struct gi_scene_cache
   struct gi_vertex*   vertices;
 };
 
-int giInitialize(const char* resource_path)
+int giInitialize(const char* shader_path,
+                 const char* mtlxlib_path)
 {
   if (cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH) != CGPU_OK)
   {
     return GI_ERROR;
   }
-  if (!sgInitialize(resource_path))
+  if (!sgInitialize(shader_path, mtlxlib_path))
   {
     return GI_ERROR;
   }
@@ -42,15 +48,23 @@ void giTerminate()
   cgpu_terminate();
 }
 
-struct gi_material* giCreateMaterialFromMtlx(const char* doc)
+struct gi_material* giCreateMaterialFromMtlx(const char* doc_str)
 {
-  // TODO
-  return NULL;
+  struct SgMaterial* sg_mat = sgCreateMaterialFromMtlx(doc_str);
+  if (!sg_mat)
+  {
+    return NULL;
+  }
+
+  struct gi_material* mat = malloc(sizeof(struct gi_material));
+  mat->sg_mat = sg_mat;
+  return mat;
 }
 
-void giDestroyMaterial(struct gi_material* material)
+void giDestroyMaterial(struct gi_material* mat)
 {
-  // TODO
+  sgDestroyMaterial(mat->sg_mat);
+  free(mat);
 }
 
 int giCreateSceneCache(struct gi_scene_cache** cache)
