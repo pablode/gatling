@@ -16,11 +16,11 @@
 static const char* DEFAULT_MTLX_DOC =
   "<?xml version=\"1.0\"?>"
   "<materialx version=\"1.38\" colorspace=\"lin_rec709\">"
-  "  <UsdPreviewSurface name=\"SR_invalid\" type=\"surfaceshader\">"
+  "  <UsdPreviewSurface name=\"SR_Invalid\" type=\"surfaceshader\">"
   "    <input name=\"diffuseColor\" type=\"color3\" value=\"1.0, 0.0, 1.0\" />"
   "  </UsdPreviewSurface>"
   "  <surfacematerial name=\"USD_Invalid\" type=\"material\">"
-  "    <input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"SR_invalid\" />"
+  "    <input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"SR_Invalid\" />"
   "  </surfacematerial>"
   "</materialx>";
 
