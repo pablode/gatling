@@ -1,87 +1,161 @@
 #include "common.hlsl"
-
 #include "bvh.hlsl"
 
-float3 uniform_sample_hemisphere(inout uint rng_state, float3 normal)
+struct Sample_state
 {
-    const float r1 = random_float_between_0_and_1(rng_state);
-    const float r2 = random_float_between_0_and_1(rng_state);
+    float3 ray_origin;
+    float3 ray_dir;
+    float3 throughput;
+    float3 value;
+    uint rng_state;
+};
 
-    const float3 u = abs(normal.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
-    const float3 v = normalize(cross(u, normal));
-    const float3 w = cross(normal, v);
+bool shade_hit(inout Sample_state state,
+               in Hit_info hit)
+{
+    face f = faces[hit.face_idx];
+    fvertex v_0 = vertices[f.v_0];
+    fvertex v_1 = vertices[f.v_1];
+    fvertex v_2 = vertices[f.v_2];
 
-    const float phi = 2.0 * PI * r2;
-    const float sin_theta = sqrt(1.0 - r1 * r1);
+    /* Geometric normal. */
+    float3 p_0 = v_0.field1.xyz;
+    float3 p_1 = v_1.field1.xyz;
+    float3 p_2 = v_2.field1.xyz;
+    float3 geom_normal = normalize(cross(p_1 - p_0, p_2 - p_0));
 
-    const float x = sin_theta * cos(phi);
-    const float y = sin_theta * sin(phi);
-    const float z = r1;
+    /* Shading normal. */
+    float3 n_0 = v_0.field2.xyz;
+    float3 n_1 = v_1.field2.xyz;
+    float3 n_2 = v_2.field2.xyz;
 
-    return (x * w) + (y * v) + (z * normal);
+    float2 bc = hit.bc;
+    float3 normal = normalize(
+        n_0 * (1.0 - bc.x - bc.y) +
+        n_1 * bc.x +
+        n_2 * bc.y
+    );
+
+    /* Tangent and bitangent. */
+    float3 L = abs(normal.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
+    float3 tangent = normalize(cross(L, normal));
+    float3 bitangent = cross(normal, tangent);
+
+    /* Flip normals to side of incident ray. */
+    if (dot(geom_normal, state.ray_dir) > 0.0)
+    {
+        geom_normal *= -1.0f;
+    }
+    if (dot(normal, state.ray_dir) > 0.0)
+    {
+        normal *= -1.0f;
+    }
+
+    /* EDF evaluation. */
+    Shading_state_material shading_state_material;
+    shading_state_material.normal = normal;
+    shading_state_material.geom_normal = geom_normal;
+    shading_state_material.position = hit.pos;
+    shading_state_material.tangent_u[0] = tangent;
+    shading_state_material.tangent_v[0] = bitangent;
+    shading_state_material.animation_time = 0.0;
+
+    Edf_evaluate_data edf_evaluate_data;
+    edf_evaluate_data.k1 = -state.ray_dir;
+    mdl_edf_emission_init(f.mat_idx, shading_state_material);
+    mdl_edf_emission_evaluate(f.mat_idx, edf_evaluate_data, shading_state_material);
+
+    float3 emission_intensity = mdl_edf_emission_intensity(f.mat_idx, shading_state_material);
+
+    /* BSDF (importance) sampling. */
+    Bsdf_sample_data bsdf_sample_data;
+    bsdf_sample_data.ior1 = BSDF_USE_MATERIAL_IOR;
+    bsdf_sample_data.ior2 = BSDF_USE_MATERIAL_IOR;
+    bsdf_sample_data.k1 = -state.ray_dir;
+    bsdf_sample_data.xi.x = random_float_between_0_and_1(state.rng_state);
+    bsdf_sample_data.xi.y = random_float_between_0_and_1(state.rng_state);
+    bsdf_sample_data.xi.z = random_float_between_0_and_1(state.rng_state);
+    bsdf_sample_data.xi.w = random_float_between_0_and_1(state.rng_state);
+    mdl_bsdf_scattering_init(f.mat_idx, shading_state_material);
+    mdl_bsdf_scattering_sample(f.mat_idx, bsdf_sample_data, shading_state_material);
+
+    state.value += state.throughput * edf_evaluate_data.edf * emission_intensity;
+
+    if ((bsdf_sample_data.event_type & BSDF_EVENT_ABSORB) != 0)
+    {
+        return false;
+    }
+
+    /* Prepare state for next ray. */
+    bool is_transmission = ((bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0);
+
+    state.ray_dir = bsdf_sample_data.k2;
+    state.ray_origin = hit.pos + geom_normal * RAY_OFFSET_EPS * (is_transmission ? -1.0 : 1.0);
+
+    state.throughput *= bsdf_sample_data.bsdf_over_pdf;
+
+    return true;
 }
 
-float3 trace_sample(inout uint rng_state, in float3 prim_ray_origin, in float3 prim_ray_dir)
+bool russian_roulette(inout uint rng_state, inout float3 throughput)
 {
-    float3 sample_color = float3(0.0, 0.0, 0.0);
-    float3 throughput = float3(1.0, 1.0, 1.0);
+    float r = random_float_between_0_and_1(rng_state);
 
-    float3 ray_origin = prim_ray_origin;
-    float3 ray_dir = prim_ray_dir;
+    float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
+    float p = min(max_throughput, RR_INV_MIN_TERM_PROB);
+
+    if (r > p)
+    {
+      return true;
+    }
+
+    throughput /= p;
+
+    return false;
+}
+
+float3 evaluate_sample(inout uint rng_state,
+                       in float3 ray_origin,
+                       in float3 ray_dir)
+{
+    Sample_state state;
+    state.ray_origin = ray_origin;
+    state.ray_dir = ray_dir;
+    state.throughput = float3(1.0, 1.0, 1.0);
+    state.value = float3(0.0, 0.0, 0.0);
+    state.rng_state = rng_state;
 
     for (uint bounce = 0; bounce < (MAX_BOUNCES + 1); bounce++)
     {
-        hit_info hit;
+        Hit_info hit_info;
 
-        const bool found_hit = traverse_bvh(ray_origin, ray_dir, hit);
+        bool found_hit = traverse_bvh(state.ray_origin,
+                                      state.ray_dir,
+                                      hit_info);
 
         if (!found_hit)
         {
             break;
         }
 
-        const face f = faces[hit.face_index];
-        const float3 n0 = vertices[f.v_0].field2.xyz;
-        const float3 n1 = vertices[f.v_1].field2.xyz;
-        const float3 n2 = vertices[f.v_2].field2.xyz;
-        const float2 bc = hit.bc;
+        bool continue_sampling = shade_hit(state, hit_info);
 
-        const float3 normal = normalize(
-            n0 * (1.0 - bc.x - bc.y) +
-            n1 * bc.x +
-            n2 * bc.y
-        );
-
-        const material m = materials[f.mat_index];
-
-        sample_color += throughput * m.emission;
-
-        const float PDF = 1.0 / (2.0 * PI);
-
-        ray_dir = uniform_sample_hemisphere(rng_state, normal);
-
-        throughput *=
-            (m.albedo.rgb / PI) *
-            (abs(dot(normal, ray_dir)) / PDF);
+        if (!continue_sampling)
+        {
+            break;
+        }
 
         if (bounce >= RR_BOUNCE_OFFSET)
         {
-          const float p = min(max(throughput.r, max(throughput.g, throughput.b)), RR_INV_MIN_TERM_PROB);
-
-          const float r = random_float_between_0_and_1(rng_state);
-
-          if (r > p)
-          {
-            break;
-          }
-
-          throughput /= p;
+            if (russian_roulette(state.rng_state,
+                                 state.throughput))
+            {
+                break;
+            }
         }
-
-        ray_origin = hit.pos + normal * RAY_OFFSET_EPS;
     }
 
-    return sample_color;
+    return state.value;
 }
 
 [[vk::push_constant]]
@@ -150,7 +224,7 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         ray_direction = normalize(ray_direction);
 
         /* Path trace sample and accumulate color. */
-        const float3 sample_color = trace_sample(rng_state, ray_origin, ray_direction);
+        const float3 sample_color = evaluate_sample(rng_state, ray_origin, ray_direction);
         pixel_color += sample_color * inv_sample_count;
     }
 

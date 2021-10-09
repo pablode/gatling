@@ -61,7 +61,7 @@ float4 uint_unpack_float4(uint u)
   return float4(extract_byte(u, 0), extract_byte(u, 1), extract_byte(u, 2), extract_byte(u, 3));
 }
 
-bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out hit_info hit)
+bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
 {
     float t_max = FLOAT_MAX;
     float t_min = 0.0;
@@ -213,7 +213,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out hit_info hit)
             {
                 t_max = temp_t;
                 hit.bc = temp_bc;
-                hit.face_index = face_index;
+                hit.face_idx = face_index;
             }
         }
 

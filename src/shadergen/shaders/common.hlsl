@@ -17,7 +17,7 @@ struct face
     uint v_0;
     uint v_1;
     uint v_2;
-    uint mat_index;
+    uint mat_idx;
 };
 
 struct material
@@ -36,12 +36,11 @@ struct bvh_node
     uint4 f5;
 };
 
-struct hit_info
+struct Hit_info
 {
     float3 pos;
-    uint face_index;
+    uint face_idx;
     float2 bc;
-    float2 padding;
 };
 
 [[vk::binding(0)]]
