@@ -85,7 +85,7 @@ void sgDestroyMaterial(SgMaterial* mat)
 }
 
 bool _sgGenerateMainShaderMdlCode(uint32_t materialCount,
-                                  struct SgMaterial** materials,
+                                  const struct SgMaterial** materials,
                                   std::string& generatedHlsl)
 {
   std::vector<const sg::SourceIdentifierPair*> srcIdVec;

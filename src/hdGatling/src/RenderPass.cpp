@@ -34,16 +34,21 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_isConverged(false)
   , m_lastSceneStateVersion(UINT32_MAX)
   , m_lastRenderSettingsVersion(UINT32_MAX)
-  , m_sceneCache(nullptr)
+  , m_geomCache(nullptr)
+  , m_shaderCache(nullptr)
 {
   m_defaultMaterial = giCreateMaterialFromMtlx(DEFAULT_MTLX_DOC);
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
 {
-  if (m_sceneCache)
+  if (m_geomCache)
   {
-    giDestroySceneCache(m_sceneCache);
+    giDestroyGeomCache(m_geomCache);
+  }
+  if (m_shaderCache)
+  {
+    giDestroyShaderCache(m_shaderCache);
   }
 }
 
@@ -251,7 +256,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
-
   bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
   bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
 
@@ -266,10 +270,15 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastSceneStateVersion = sceneStateVersion;
   m_lastRenderSettingsVersion = renderSettingsStateVersion;
 
-  if (!m_sceneCache)
+  if (!m_geomCache)
   {
+    if (m_geomCache)
+    {
+      giDestroyGeomCache(m_geomCache);
+    }
+
     const SdfPath& cameraId = camera->GetId();
-    printf("Building scene cache for camera %s\n", cameraId.GetText());
+    printf("Building geom cache for camera %s\n", cameraId.GetText());
     fflush(stdout);
 
     std::vector<gi_vertex> vertices;
@@ -281,42 +290,59 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
     _BakeMeshes(renderIndex, viewMatrix, vertices, faces, materials);
 
-    gi_preprocess_params preprocessParams;
-    preprocessParams.face_count = faces.size();
-    preprocessParams.faces = faces.data();
-    preprocessParams.vertex_count = vertices.size();
-    preprocessParams.vertices = vertices.data();
-    preprocessParams.material_count = materials.size();
-    preprocessParams.materials = materials.data();
+    gi_geom_cache_params geomParams;
+    geomParams.face_count = faces.size();
+    geomParams.faces = faces.data();
+    geomParams.material_count = materials.size();
+    geomParams.materials = materials.data();
+    geomParams.vertex_count = vertices.size();
+    geomParams.vertices = vertices.data();
 
-    int32_t result;
-
-    result = giCreateSceneCache(&m_sceneCache);
-
-    TF_VERIFY(result == GI_OK, "Unable to create scene cache.");
-
-    result = giPreprocess(&preprocessParams,
-                          m_sceneCache);
-
-    TF_VERIFY(result == GI_OK, "Unable to preprocess scene.");
+    m_geomCache = giCreateGeomCache(&geomParams);
+    TF_VERIFY(m_geomCache, "Unable to create geom cache");
 
     m_rootMatrix = viewMatrix;
+  }
+
+  bool rebuildShaderCache = !m_shaderCache || renderSettingsChanged;
+
+  if (m_geomCache && rebuildShaderCache)
+  {
+    if (m_shaderCache)
+    {
+      giDestroyShaderCache(m_shaderCache);
+    }
+
+    printf("Building shader cache...\n");
+    fflush(stdout);
+
+    gi_shader_cache_params shaderParams;
+    shaderParams.geom_cache = m_geomCache;
+    shaderParams.max_bounces = m_settings.find(HdGatlingSettingsTokens->max_bounces)->second.Get<int>();
+    shaderParams.spp = m_settings.find(HdGatlingSettingsTokens->spp)->second.Get<int>();
+    shaderParams.rr_bounce_offset = m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second.Get<int>();
+    // Workaround for bug https://github.com/PixarAnimationStudios/USD/issues/913
+    VtValue rr_inv_min_term_prob = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
+    shaderParams.rr_inv_min_term_prob = rr_inv_min_term_prob.CastToTypeid(typeid(double)).Get<double>();
+
+    m_shaderCache = giCreateShaderCache(&shaderParams);
+    TF_VERIFY(m_shaderCache, "Unable to create shader cache");
+  }
+
+  if (!m_geomCache || !m_shaderCache)
+  {
+    return;
   }
 
   gi_camera giCamera;
   _ConstructGiCamera(*camera, giCamera);
 
   gi_render_params renderParams;
-  renderParams.scene_cache = m_sceneCache;
   renderParams.camera = &giCamera;
+  renderParams.geom_cache = m_geomCache;
   renderParams.image_width = renderBuffer->GetWidth();
   renderParams.image_height = renderBuffer->GetHeight();
-  renderParams.spp = m_settings.find(HdGatlingSettingsTokens->spp)->second.Get<int>();
-  renderParams.max_bounces = m_settings.find(HdGatlingSettingsTokens->max_bounces)->second.Get<int>();
-  renderParams.rr_bounce_offset = m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second.Get<int>();
-  // Workaround for bug https://github.com/PixarAnimationStudios/USD/issues/913
-  VtValue rr_inv_min_term_prob = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
-  renderParams.rr_inv_min_term_prob = rr_inv_min_term_prob.CastToTypeid(typeid(double)).Get<double>();
+  renderParams.shader_cache = m_shaderCache;
 
   float* img_data = (float*) renderBuffer->Map();
 

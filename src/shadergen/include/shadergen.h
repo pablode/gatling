@@ -30,7 +30,7 @@ struct SgMainShaderParams
   uint32_t rr_bounce_offset;
   float rr_inv_min_term_prob;
   uint32_t material_count;
-  struct SgMaterial** materials;
+  const struct SgMaterial** materials;
 };
 
 bool sgGenerateMainShader(const struct SgMainShaderParams* params,

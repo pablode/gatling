@@ -12,20 +12,30 @@
 #include <cgpu.h>
 #include <shadergen.h>
 
+const uint32_t WORKGROUP_SIZE_X = 16;
+const uint32_t WORKGROUP_SIZE_Y = 16;
+
+struct gi_geom_cache
+{
+  struct gi_bvhcc           bvhcc;
+  uint32_t                  face_count;
+  struct gi_face*           faces;
+  uint32_t                  material_count;
+  const struct SgMaterial** materials;
+  uint32_t                  vertex_count;
+  struct gi_vertex*         vertices;
+};
+
+struct gi_shader_cache
+{
+  const char* shader_entry_point;
+  uint32_t    spv_size;
+  uint32_t*   spv;
+};
+
 struct gi_material
 {
   struct SgMaterial* sg_mat;
-};
-
-struct gi_scene_cache
-{
-  struct gi_bvhcc     bvhcc;
-  uint32_t            face_count;
-  struct gi_face*     faces;
-  struct gi_material* materials;
-  uint32_t            material_count;
-  uint32_t            vertex_count;
-  struct gi_vertex*   vertices;
 };
 
 int giInitialize(const char* resource_path,
@@ -69,31 +79,16 @@ void giDestroyMaterial(struct gi_material* mat)
   free(mat);
 }
 
-int giCreateSceneCache(struct gi_scene_cache** cache)
-{
-  *cache = malloc(sizeof(struct gi_scene_cache));
-
-  return (*cache == NULL) ? GI_ERROR : GI_OK;
-}
-
-void giDestroySceneCache(struct gi_scene_cache* cache)
-{
-  gi_free_bvhcc(&cache->bvhcc);
-  free(cache->materials);
-  free(cache->vertices);
-  free(cache->faces);
-  free(cache);
-}
-
-int giPreprocess(const struct gi_preprocess_params* params,
-                 struct gi_scene_cache* scene_cache)
+struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* params)
 {
   /* We don't support too few faces since this would lead to the root node
    * being a leaf, requiring special handling in the traversal algorithm. */
   if (params->face_count <= 3)
   {
-    return GI_ERROR;
+    return NULL;
   }
+
+  struct gi_geom_cache* cache = malloc(sizeof(struct gi_geom_cache));
 
   /* Build BVH. */
   struct gi_bvh bvh;
@@ -126,23 +121,80 @@ int giPreprocess(const struct gi_preprocess_params* params,
   gi_bvh_collapse(&bvhc_params, &bvhc);
   gi_free_bvh(&bvh);
 
-  /* Copy vertices, materials and new faces. */
-  scene_cache->face_count = bvhc.face_count;
-  scene_cache->faces = malloc(scene_cache->face_count * sizeof(struct gi_face));
-  memcpy(scene_cache->faces, bvhc.faces, bvhc.face_count * sizeof(struct gi_face));
+  /* Copy geometry and materials. */
+  cache->face_count = bvhc.face_count;
+  cache->faces = malloc(cache->face_count * sizeof(struct gi_face));
+  memcpy(cache->faces, bvhc.faces, bvhc.face_count * sizeof(struct gi_face));
 
-  scene_cache->vertex_count = params->vertex_count;
-  scene_cache->vertices = malloc(scene_cache->vertex_count * sizeof(struct gi_vertex));
-  memcpy(scene_cache->vertices, params->vertices, params->vertex_count * sizeof(struct gi_vertex));
+  cache->vertex_count = params->vertex_count;
+  cache->vertices = malloc(cache->vertex_count * sizeof(struct gi_vertex));
+  memcpy(cache->vertices, params->vertices, params->vertex_count * sizeof(struct gi_vertex));
 
-  scene_cache->material_count = params->material_count;
-  scene_cache->materials = malloc(scene_cache->material_count * sizeof(struct gi_material));
-  memcpy(scene_cache->materials, params->materials, params->material_count * sizeof(struct gi_material));
-
-  gi_bvh_compress(&bvhc, &scene_cache->bvhcc);
+  gi_bvh_compress(&bvhc, &cache->bvhcc);
   gi_free_bvhc(&bvhc);
 
-  return GI_OK;
+  cache->material_count = params->material_count;
+  cache->materials = malloc(sizeof(const struct SgMaterial*) * cache->material_count);
+  for (int i = 0; i < cache->material_count; i++)
+  {
+    cache->materials[i] = params->materials[i]->sg_mat;
+  }
+
+  return cache;
+}
+
+void giDestroyGeomCache(struct gi_geom_cache* cache)
+{
+  gi_free_bvhcc(&cache->bvhcc);
+  free(cache->vertices);
+  free(cache->faces);
+  free(cache->materials);
+  free(cache);
+}
+
+struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params* params)
+{
+  /* Compile shader. */
+  uint32_t node_count = params->geom_cache->bvhcc.node_count;
+  uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
+
+  struct SgMainShaderParams shaderParams = {
+    .num_threads_x        = WORKGROUP_SIZE_X,
+    .num_threads_y        = WORKGROUP_SIZE_Y,
+    .max_stack_size       = max_stack_size,
+    .spp                  = params->spp,
+    .max_bounces          = params->max_bounces,
+    .rr_bounce_offset     = params->rr_bounce_offset,
+    .rr_inv_min_term_prob = params->rr_inv_min_term_prob,
+    .material_count       = params->geom_cache->material_count,
+    .materials            = params->geom_cache->materials
+  };
+
+  uint32_t spv_size;
+  uint32_t* spv;
+  const char* shader_entry_point;
+  bool success = sgGenerateMainShader(&shaderParams,
+                                      &spv_size,
+                                      &spv,
+                                      &shader_entry_point);
+
+  if (!success)
+  {
+    return NULL;
+  }
+
+  struct gi_shader_cache* cache = malloc(sizeof(struct gi_shader_cache));
+  cache->shader_entry_point = shader_entry_point;
+  cache->spv_size = spv_size;
+  cache->spv = spv;
+
+  return cache;
+}
+
+void giDestroyShaderCache(struct gi_shader_cache* cache)
+{
+  free(cache->spv);
+  free(cache);
 }
 
 static uint64_t gi_align_buffer(uint64_t alignment,
@@ -191,9 +243,9 @@ int giRender(const struct gi_render_params* params,
   uint64_t device_buf_size = 0;
   const uint64_t offset_align = device_limits.minStorageBufferOffsetAlignment;
 
-  uint64_t node_buf_size = params->scene_cache->bvhcc.node_count * sizeof(struct gi_bvhcc_node);
-  uint64_t face_buf_size = params->scene_cache->face_count * sizeof(struct gi_face);
-  uint64_t vertex_buf_size = params->scene_cache->vertex_count * sizeof(struct gi_vertex);
+  uint64_t node_buf_size = params->geom_cache->bvhcc.node_count * sizeof(struct gi_bvhcc_node);
+  uint64_t face_buf_size = params->geom_cache->face_count * sizeof(struct gi_face);
+  uint64_t vertex_buf_size = params->geom_cache->vertex_count * sizeof(struct gi_vertex);
 
   const uint64_t new_node_buf_offset = gi_align_buffer(offset_align, node_buf_size, &device_buf_size);
   const uint64_t new_face_buf_offset = gi_align_buffer(offset_align, face_buf_size, &device_buf_size);
@@ -244,19 +296,15 @@ int giRender(const struct gi_render_params* params,
   );
   GI_CGPU_VERIFY(c_result);
 
-  memcpy(&mapped_staging_mem[new_node_buf_offset], params->scene_cache->bvhcc.nodes, node_buf_size);
-  memcpy(&mapped_staging_mem[new_face_buf_offset], params->scene_cache->faces, face_buf_size);
-  memcpy(&mapped_staging_mem[new_vertex_buf_offset], params->scene_cache->vertices, vertex_buf_size);
+  memcpy(&mapped_staging_mem[new_node_buf_offset], params->geom_cache->bvhcc.nodes, node_buf_size);
+  memcpy(&mapped_staging_mem[new_face_buf_offset], params->geom_cache->faces, face_buf_size);
+  memcpy(&mapped_staging_mem[new_vertex_buf_offset], params->geom_cache->vertices, vertex_buf_size);
 
   c_result = cgpu_unmap_buffer(
     device,
     staging_buffer
   );
   GI_CGPU_VERIFY(c_result);
-
-  /* We always work on tiles. */
-  uint32_t workgroup_size_x = 16;
-  uint32_t workgroup_size_y = 16;
 
   /* Set up pipeline. */
   gml_vec3 cam_forward, cam_up;
@@ -267,61 +315,27 @@ int giRender(const struct gi_render_params* params,
     params->camera->position[0],
     params->camera->position[1],
     params->camera->position[2],
-    params->image_width,
+    *((float*)&params->image_width),
     cam_forward[0],
     cam_forward[1],
     cam_forward[2],
-    params->image_height,
+    *((float*)&params->image_height),
     cam_up[0],
     cam_up[1],
     cam_up[2],
     params->camera->vfov
   };
-  uint32_t push_size = sizeof(push_data);
+  uint32_t push_data_size = sizeof(push_data);
 
   cgpu_pipeline pipeline;
   {
-    uint32_t node_size = sizeof(struct gi_bvhcc_node);
-    uint32_t node_count = node_buf_size / node_size;
-    uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
-
-    uint32_t material_count = params->scene_cache->material_count;
-    struct SgMaterial** materials = malloc(sizeof(const struct SgMaterial*) * material_count);
-    for (int i = 0; i < material_count; i++)
-    {
-      materials[i] = params->scene_cache->materials[i].sg_mat;
-    }
-
-    struct SgMainShaderParams shaderParams = {
-      .num_threads_x = workgroup_size_x,
-      .num_threads_y = workgroup_size_y,
-      .max_stack_size = max_stack_size,
-      .spp = params->spp,
-      .max_bounces = params->max_bounces,
-      .rr_bounce_offset = params->rr_bounce_offset,
-      .rr_inv_min_term_prob = params->rr_inv_min_term_prob,
-      .material_count = material_count,
-      .materials = materials
-    };
-
-    uint32_t spv_size;
-    uint32_t* spv;
-    const char* entry_point;
-    if (!sgGenerateMainShader(&shaderParams, &spv_size, &spv, &entry_point))
-    {
-      free(materials);
-      return GI_ERROR;
-    }
-    free(materials);
-
     cgpu_shader shader;
     c_result = cgpu_create_shader(
       device,
-      spv_size,
-      spv,
+      params->shader_cache->spv_size,
+      params->shader_cache->spv,
       &shader
     );
-    free(spv);
     GI_CGPU_VERIFY(c_result);
 
     cgpu_shader_resource_buffer sr_buffers[] = {
@@ -343,8 +357,8 @@ int giRender(const struct gi_render_params* params,
       sr_image_count,
       sr_images,
       shader,
-      entry_point,
-      push_size,
+      params->shader_cache->shader_entry_point,
+      push_data_size,
       &pipeline
     );
     GI_CGPU_VERIFY(c_result);
@@ -393,15 +407,15 @@ int giRender(const struct gi_render_params* params,
   c_result = cgpu_cmd_push_constants(
     command_buffer,
     pipeline,
-    push_size,
-    push_data
+    push_data_size,
+    &push_data
   );
   GI_CGPU_VERIFY(c_result);
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
-    (params->image_width + workgroup_size_x - 1) / workgroup_size_x,
-    (params->image_height + workgroup_size_y - 1) / workgroup_size_y,
+    (params->image_width + WORKGROUP_SIZE_X - 1) / WORKGROUP_SIZE_X,
+    (params->image_height + WORKGROUP_SIZE_Y - 1) / WORKGROUP_SIZE_Y,
     1
   );
   GI_CGPU_VERIFY(c_result);
