@@ -84,6 +84,17 @@ float3 trace_sample(inout uint rng_state, in float3 prim_ray_origin, in float3 p
     return sample_color;
 }
 
+[[vk::push_constant]]
+cbuffer PC
+{
+  float3 CAMERA_POSITION;
+  uint   IMAGE_WIDTH;
+  float3 CAMERA_FORWARD;
+  uint   IMAGE_HEIGHT;
+  float3 CAMERA_UP;
+  float  CAMERA_VFOV;
+};
+
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
 void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
@@ -97,10 +108,7 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const uint pixel_index = pixel_pos.x + pixel_pos.y * IMAGE_WIDTH;
 
-    float3 camera_origin = float3(CAMERA_ORIGIN_X, CAMERA_ORIGIN_Y, CAMERA_ORIGIN_Z);
-    float3 camera_forward = normalize(float3(CAMERA_FORWARD_X, CAMERA_FORWARD_Y, CAMERA_FORWARD_Z));
-    float3 camera_up = normalize(float3(CAMERA_UP_X, CAMERA_UP_Y, CAMERA_UP_Z));
-    const float3 camera_right = cross(camera_forward, camera_up);
+    float3 camera_right = cross(CAMERA_FORWARD, CAMERA_UP);
 
     const float aspect_ratio = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
 
@@ -111,8 +119,8 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float WX = W / float(IMAGE_WIDTH);
     const float HY = H / float(IMAGE_HEIGHT);
 
-    const float3 C = camera_origin + camera_forward * d;
-    const float3 L = C - camera_right * W * 0.5 - camera_up * H * 0.5;
+    const float3 C = CAMERA_POSITION + CAMERA_FORWARD * d;
+    const float3 L = C - camera_right * W * 0.5 - CAMERA_UP * H * 0.5;
 
     const float inv_sample_count = 1.0 / float(SAMPLE_COUNT);
 
@@ -128,10 +136,10 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const float3 P =
             L +
             (float(pixel_pos.x) + r1) * camera_right * WX +
-            (float(pixel_pos.y) + r2) * camera_up * HY;
+            (float(pixel_pos.y) + r2) * CAMERA_UP * HY;
 
-        float3 ray_origin = camera_origin;
-        float3 ray_direction = P - camera_origin;
+        float3 ray_origin = CAMERA_POSITION;
+        float3 ray_direction = P - ray_origin;
 
         /* Beware: a single direction component must not be zero.
          * This is because we often take the inverse of the direction. */

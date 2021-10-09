@@ -260,6 +260,26 @@ int giRender(const struct gi_render_params* params,
   uint32_t workgroup_size_y = 32;
 
   /* Set up pipeline. */
+  gml_vec3 cam_forward, cam_up;
+  gml_vec3_normalize(params->camera->forward, cam_forward);
+  gml_vec3_normalize(params->camera->up, cam_up);
+
+  float push_data[] = {
+    params->camera->position[0],
+    params->camera->position[1],
+    params->camera->position[2],
+    params->image_width,
+    cam_forward[0],
+    cam_forward[1],
+    cam_forward[2],
+    params->image_height,
+    cam_up[0],
+    cam_up[1],
+    cam_up[2],
+    params->camera->vfov
+  };
+  uint32_t push_size = sizeof(push_data);
+
   cgpu_pipeline pipeline;
   {
     uint32_t node_size = sizeof(struct gi_bvhcc_node);
@@ -270,20 +290,8 @@ int giRender(const struct gi_render_params* params,
       .num_threads_x = workgroup_size_x,
       .num_threads_y = workgroup_size_y,
       .max_stack_size = max_stack_size,
-      .image_width = params->image_width,
-      .image_height = params->image_height,
       .spp = params->spp,
       .max_bounces = params->max_bounces,
-      .camera_position_x = params->camera->position[0],
-      .camera_position_y = params->camera->position[1],
-      .camera_position_z = params->camera->position[2],
-      .camera_forward_x = params->camera->forward[0],
-      .camera_forward_y = params->camera->forward[1],
-      .camera_forward_z = params->camera->forward[2],
-      .camera_up_x = params->camera->up[0],
-      .camera_up_y = params->camera->up[1],
-      .camera_up_z = params->camera->up[2],
-      .camera_vfov = params->camera->vfov,
       .rr_bounce_offset = params->rr_bounce_offset,
       .rr_inv_min_term_prob = params->rr_inv_min_term_prob,
     };
@@ -327,7 +335,7 @@ int giRender(const struct gi_render_params* params,
       sr_images,
       shader,
       entry_point,
-      push_constants_size,
+      push_size,
       &pipeline
     );
     GI_CGPU_VERIFY(c_result);
@@ -373,6 +381,14 @@ int giRender(const struct gi_render_params* params,
   GI_CGPU_VERIFY(c_result);
 
   /* Trace rays. */
+  c_result = cgpu_cmd_push_constants(
+    command_buffer,
+    pipeline,
+    push_size,
+    push_data
+  );
+  GI_CGPU_VERIFY(c_result);
+
   c_result = cgpu_cmd_dispatch(
     command_buffer,
     (params->image_width + workgroup_size_x - 1) / workgroup_size_x,
