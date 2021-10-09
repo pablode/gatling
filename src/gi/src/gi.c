@@ -255,9 +255,9 @@ int giRender(const struct gi_render_params* params,
   );
   GI_CGPU_VERIFY(c_result);
 
-  /* We always work on 32x32 tiles. */
-  uint32_t workgroup_size_x = 32;
-  uint32_t workgroup_size_y = 32;
+  /* We always work on tiles. */
+  uint32_t workgroup_size_x = 16;
+  uint32_t workgroup_size_y = 16;
 
   /* Set up pipeline. */
   gml_vec3 cam_forward, cam_up;
