@@ -19,19 +19,16 @@ namespace mx = MaterialX;
 namespace sg
 {
   MtlxMdlTranslator::MtlxMdlTranslator(const char* mtlxlibPath)
+    : m_mtlxlibPath(mtlxlibPath)
   {
-    // Init shadergen and context.
+    // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
-    m_context = std::make_unique<mx::GenContext>(m_shaderGen);
-    m_context->registerSourceCodeSearchPath(mtlxlibPath);
-
     std::string target = m_shaderGen->getTarget();
 
     // MaterialX libs.
     m_stdLib = mx::createDocument();
     mx::FilePathVec libFolders;
-    mx::FileSearchPath folderSearchPath(mtlxlibPath);
-    mx::loadLibraries(libFolders, folderSearchPath, m_stdLib);
+    mx::loadLibraries(libFolders, m_mtlxlibPath, m_stdLib);
 
     // Color management.
     mx::DefaultColorManagementSystemPtr colorSystem = mx::DefaultColorManagementSystem::create(target);
@@ -50,9 +47,6 @@ namespace sg
 
     unitSystem->setUnitConverterRegistry(unitRegistry);
     m_shaderGen->setUnitSystem(unitSystem);
-
-    mx::GenOptions& contextOptions = m_context->getOptions();
-    contextOptions.targetDistanceUnit = "meter";
   }
 
   mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc)
@@ -90,8 +84,14 @@ namespace sg
 
   bool MtlxMdlTranslator::translate(const char* mtlxSrc, std::string& mdlSrc, std::string& subIdentifier)
   {
-    mx::ShaderPtr shader = nullptr;
+    // Don't cache the context because it is thread-local.
+    mx::GenContext context(m_shaderGen);
+    context.registerSourceCodeSearchPath(m_mtlxlibPath);
 
+    mx::GenOptions& contextOptions = context.getOptions();
+    contextOptions.targetDistanceUnit = "meter";
+
+    mx::ShaderPtr shader = nullptr;
     try
     {
       mx::DocumentPtr doc = mx::createDocument();
@@ -105,7 +105,7 @@ namespace sg
       }
 
       subIdentifier = element->getName();
-      shader = m_shaderGen->generate(subIdentifier, element, *m_context);
+      shader = m_shaderGen->generate(subIdentifier, element, context);
     }
     catch (const std::exception& ex)
     {
