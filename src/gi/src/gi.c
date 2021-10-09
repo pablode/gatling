@@ -194,12 +194,10 @@ int giRender(const struct gi_render_params* params,
   uint64_t node_buf_size = params->scene_cache->bvhcc.node_count * sizeof(struct gi_bvhcc_node);
   uint64_t face_buf_size = params->scene_cache->face_count * sizeof(struct gi_face);
   uint64_t vertex_buf_size = params->scene_cache->vertex_count * sizeof(struct gi_vertex);
-  uint64_t material_buf_size = params->scene_cache->material_count * sizeof(struct gi_material);
 
   const uint64_t new_node_buf_offset = gi_align_buffer(offset_align, node_buf_size, &device_buf_size);
   const uint64_t new_face_buf_offset = gi_align_buffer(offset_align, face_buf_size, &device_buf_size);
   const uint64_t new_vertex_buf_offset = gi_align_buffer(offset_align, vertex_buf_size, &device_buf_size);
-  const uint64_t new_material_buf_offset = gi_align_buffer(offset_align, material_buf_size, &device_buf_size);
 
   const int COLOR_COMPONENT_COUNT = 4;
   const uint64_t output_buffer_size = params->image_width * params->image_height * sizeof(float) * COLOR_COMPONENT_COUNT;
@@ -249,7 +247,6 @@ int giRender(const struct gi_render_params* params,
   memcpy(&mapped_staging_mem[new_node_buf_offset], params->scene_cache->bvhcc.nodes, node_buf_size);
   memcpy(&mapped_staging_mem[new_face_buf_offset], params->scene_cache->faces, face_buf_size);
   memcpy(&mapped_staging_mem[new_vertex_buf_offset], params->scene_cache->vertices, vertex_buf_size);
-  memcpy(&mapped_staging_mem[new_material_buf_offset], params->scene_cache->materials, material_buf_size);
 
   c_result = cgpu_unmap_buffer(
     device,
@@ -332,7 +329,6 @@ int giRender(const struct gi_render_params* params,
       { 1,        input_buffer,     new_node_buf_offset,     node_buf_size },
       { 2,        input_buffer,     new_face_buf_offset,     face_buf_size },
       { 3,        input_buffer,   new_vertex_buf_offset,   vertex_buf_size },
-      { 4,        input_buffer, new_material_buf_offset, material_buf_size },
     };
     const uint32_t sr_buffer_count = sizeof(sr_buffers) / sizeof(sr_buffers[0]);
 

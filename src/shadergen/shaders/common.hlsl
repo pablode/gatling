@@ -20,13 +20,6 @@ struct face
     uint mat_idx;
 };
 
-struct material
-{
-    float4 albedo;
-    float3 emission;
-    float padding;
-};
-
 struct bvh_node
 {
     uint4 f1;
@@ -54,9 +47,6 @@ StructuredBuffer<face> faces;
 
 [[vk::binding(3)]]
 StructuredBuffer<fvertex> vertices;
-
-[[vk::binding(4)]]
-StructuredBuffer<material> materials;
 
 uint wang_hash(uint seed)
 {
