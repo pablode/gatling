@@ -32,7 +32,6 @@ namespace sg
     mx::FilePathVec libFolders;
     mx::FileSearchPath folderSearchPath(mtlxlibPath);
     mx::loadLibraries(libFolders, folderSearchPath, m_stdLib);
-    m_shaderGen->registerShaderMetadata(m_stdLib, *m_context);
 
     // Color management.
     mx::DefaultColorManagementSystemPtr colorSystem = mx::DefaultColorManagementSystem::create(target);
