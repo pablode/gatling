@@ -56,8 +56,10 @@ struct gi_render_params
   uint32_t                spp;
 };
 
-int giInitialize(const char* shader_path,
-                 const char* mtlxlib_path);
+int giInitialize(const char* resource_path,
+                 const char* shader_path,
+                 const char* mtlxlib_path,
+                 const char* mtlxmdl_path);
 
 void giTerminate();
 

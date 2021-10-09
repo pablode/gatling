@@ -8,6 +8,10 @@ add_library(
   src/GlslangShaderCompiler.cpp
   src/MtlxMdlTranslator.h
   src/MtlxMdlTranslator.cpp
+  src/MdlHlslTranslator.h
+  src/MdlHlslTranslator.cpp
+  src/MdlRuntime.h
+  src/MdlRuntime.cpp
 )
 
 set_target_properties(
@@ -25,6 +29,7 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE
     src
+    ${MDL_INCLUDE_DIR}
 )
 
 target_link_libraries(
@@ -35,6 +40,15 @@ target_link_libraries(
     MaterialXCore
     MaterialXFormat
     MaterialXGenMdl
+)
+
+install(
+  FILES
+    ${MDL_SHARED_LIB}
+  DESTINATION
+    "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
+  COMPONENT
+    hdGatling
 )
 
 install(

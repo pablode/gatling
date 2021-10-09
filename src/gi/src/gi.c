@@ -28,14 +28,16 @@ struct gi_scene_cache
   struct gi_vertex*   vertices;
 };
 
-int giInitialize(const char* shader_path,
-                 const char* mtlxlib_path)
+int giInitialize(const char* resource_path,
+                 const char* shader_path,
+                 const char* mtlxlib_path,
+                 const char* mtlxmdl_path)
 {
   if (cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH) != CGPU_OK)
   {
     return GI_ERROR;
   }
-  if (!sgInitialize(shader_path, mtlxlib_path))
+  if (!sgInitialize(resource_path, shader_path, mtlxlib_path, mtlxmdl_path))
   {
     return GI_ERROR;
   }
@@ -286,6 +288,13 @@ int giRender(const struct gi_render_params* params,
     uint32_t node_count = node_buf_size / node_size;
     uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
+    uint32_t material_count = params->scene_cache->material_count;
+    struct SgMaterial** materials = malloc(sizeof(const struct SgMaterial*) * material_count);
+    for (int i = 0; i < material_count; i++)
+    {
+      materials[i] = params->scene_cache->materials[i].sg_mat;
+    }
+
     struct SgMainShaderParams shaderParams = {
       .num_threads_x = workgroup_size_x,
       .num_threads_y = workgroup_size_y,
@@ -294,6 +303,8 @@ int giRender(const struct gi_render_params* params,
       .max_bounces = params->max_bounces,
       .rr_bounce_offset = params->rr_bounce_offset,
       .rr_inv_min_term_prob = params->rr_inv_min_term_prob,
+      .material_count = material_count,
+      .materials = materials
     };
 
     uint32_t spv_size;
@@ -301,8 +312,10 @@ int giRender(const struct gi_render_params* params,
     const char* entry_point;
     if (!sgGenerateMainShader(&shaderParams, &spv_size, &spv, &entry_point))
     {
+      free(materials);
       return GI_ERROR;
     }
+    free(materials);
 
     cgpu_shader shader;
     c_result = cgpu_create_shader(

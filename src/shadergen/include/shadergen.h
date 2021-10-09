@@ -7,8 +7,12 @@
 extern "C" {
 #endif
 
-bool sgInitialize(const char* shaderPath,
-                  const char* mtlxlibPath);
+struct SgMaterial;
+
+bool sgInitialize(const char* resourcePath,
+                  const char* shaderPath,
+                  const char* mtlxlibPath,
+                  const char* mtlxmdlPath);
 
 void sgTerminate();
 
@@ -25,6 +29,8 @@ struct SgMainShaderParams
   uint32_t max_bounces;
   uint32_t rr_bounce_offset;
   float rr_inv_min_term_prob;
+  uint32_t material_count;
+  struct SgMaterial** materials;
 };
 
 bool sgGenerateMainShader(const struct SgMainShaderParams* params,
