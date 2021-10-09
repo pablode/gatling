@@ -17,26 +17,30 @@ const uint32_t WORKGROUP_SIZE_Y = 16;
 
 struct gi_geom_cache
 {
-  struct gi_bvhcc           bvhcc;
-  uint32_t                  face_count;
-  struct gi_face*           faces;
+  uint32_t                  bvh_node_count;
+  cgpu_buffer               buffer;
+  uint64_t                  node_buf_offset;
+  uint64_t                  node_buf_size;
+  uint64_t                  face_buf_offset;
+  uint64_t                  face_buf_size;
+  uint64_t                  vertex_buf_offset;
+  uint64_t                  vertex_buf_size;
   uint32_t                  material_count;
   const struct SgMaterial** materials;
-  uint32_t                  vertex_count;
-  struct gi_vertex*         vertices;
 };
 
 struct gi_shader_cache
 {
+  cgpu_shader shader;
   const char* shader_entry_point;
-  uint32_t    spv_size;
-  uint32_t*   spv;
 };
 
 struct gi_material
 {
   struct SgMaterial* sg_mat;
 };
+
+cgpu_device s_device;
 
 int giInitialize(const char* resource_path,
                  const char* shader_path,
@@ -51,12 +55,30 @@ int giInitialize(const char* resource_path,
   {
     return GI_ERROR;
   }
+
+  /* Set up GPU device. */
+  CgpuResult c_result;
+
+  uint32_t device_count;
+  c_result = cgpu_get_device_count(&device_count);
+  if (c_result != CGPU_OK) return GI_ERROR;
+
+  if (device_count == 0)
+  {
+    fprintf(stderr, "No device found!\n");
+    return GI_ERROR;
+  }
+
+  c_result = cgpu_create_device(0, &s_device);
+  if (c_result != CGPU_OK) return GI_ERROR;
+
   return GI_OK;
 }
 
 void giTerminate()
 {
   sgTerminate();
+  cgpu_destroy_device(s_device);
   cgpu_terminate();
 }
 
@@ -79,6 +101,17 @@ void giDestroyMaterial(struct gi_material* mat)
   free(mat);
 }
 
+static uint64_t giAlignBuffer(uint64_t alignment,
+                                uint64_t buffer_size,
+                                uint64_t* total_size)
+{
+  const uint64_t offset = ((*total_size) + alignment - 1) / alignment * alignment;
+
+  (*total_size) = offset + buffer_size;
+
+  return offset;
+}
+
 struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* params)
 {
   /* We don't support too few faces since this would lead to the root node
@@ -87,8 +120,6 @@ struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* param
   {
     return NULL;
   }
-
-  struct gi_geom_cache* cache = malloc(sizeof(struct gi_geom_cache));
 
   /* Build BVH. */
   struct gi_bvh bvh;
@@ -119,20 +150,118 @@ struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* param
   };
 
   gi_bvh_collapse(&bvhc_params, &bvhc);
+
   gi_free_bvh(&bvh);
 
-  /* Copy geometry and materials. */
-  cache->face_count = bvhc.face_count;
-  cache->faces = malloc(cache->face_count * sizeof(struct gi_face));
-  memcpy(cache->faces, bvhc.faces, bvhc.face_count * sizeof(struct gi_face));
+  struct gi_bvhcc bvhcc;
+  gi_bvh_compress(&bvhc, &bvhcc);
 
-  cache->vertex_count = params->vertex_count;
-  cache->vertices = malloc(cache->vertex_count * sizeof(struct gi_vertex));
-  memcpy(cache->vertices, params->vertices, params->vertex_count * sizeof(struct gi_vertex));
+  /* Upload to GPU buffer. */
+  struct gi_geom_cache* cache = NULL;
+  cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
+  cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
+  cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
+  cgpu_fence fence = { CGPU_INVALID_HANDLE };
 
-  gi_bvh_compress(&bvhc, &cache->bvhcc);
-  gi_free_bvhc(&bvhc);
+  cgpu_physical_device_limits device_limits;
+  CgpuResult c_result = cgpu_get_physical_device_limits(s_device, &device_limits);
+  if (c_result != CGPU_OK) goto cleanup;
 
+  uint64_t buf_size = 0;
+  const uint64_t offset_align = device_limits.minStorageBufferOffsetAlignment;
+
+  uint64_t node_buf_size = bvhcc.node_count * sizeof(struct gi_bvhcc_node);
+  uint64_t face_buf_size = params->face_count * sizeof(struct gi_face);
+  uint64_t vertex_buf_size = params->vertex_count * sizeof(struct gi_vertex);
+
+  uint64_t node_buf_offset = giAlignBuffer(offset_align, node_buf_size, &buf_size);
+  uint64_t face_buf_offset = giAlignBuffer(offset_align, face_buf_size, &buf_size);
+  uint64_t vertex_buf_offset = giAlignBuffer(offset_align, vertex_buf_size, &buf_size);
+
+  c_result = cgpu_create_buffer(
+    s_device,
+    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    buf_size,
+    &buffer
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_create_buffer(
+    s_device,
+    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+    buf_size,
+    &staging_buffer
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
+  uint8_t* mapped_staging_mem;
+  c_result = cgpu_map_buffer(
+    s_device,
+    staging_buffer,
+    0,
+    buf_size,
+    (void*)&mapped_staging_mem
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
+  memcpy(&mapped_staging_mem[node_buf_offset], bvhcc.nodes, node_buf_size);
+  memcpy(&mapped_staging_mem[face_buf_offset], bvhc.faces, face_buf_size);
+  memcpy(&mapped_staging_mem[vertex_buf_offset], params->vertices, vertex_buf_size);
+
+  c_result = cgpu_unmap_buffer(
+    s_device,
+    staging_buffer
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
+  /* Upload data to GPU. */
+  c_result = cgpu_create_command_buffer(s_device, &command_buffer);
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_begin_command_buffer(command_buffer);
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_cmd_copy_buffer(
+    command_buffer,
+    staging_buffer,
+    0,
+    buffer,
+    0,
+    buf_size
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_end_command_buffer(command_buffer);
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_create_fence(s_device, &fence);
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_reset_fence(s_device, fence);
+
+  c_result = cgpu_submit_command_buffer(
+    s_device,
+    command_buffer,
+    fence
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_wait_for_fence(s_device, fence);
+  if (c_result != CGPU_OK) goto cleanup;
+
+  cache = malloc(sizeof(struct gi_geom_cache));
+  cache->bvh_node_count = bvhcc.node_count;
+  cache->buffer = buffer;
+  cache->node_buf_size = node_buf_size;
+  cache->face_buf_size = face_buf_size;
+  cache->vertex_buf_size = vertex_buf_size;
+  cache->node_buf_offset = node_buf_offset;
+  cache->face_buf_offset = face_buf_offset;
+  cache->vertex_buf_offset = vertex_buf_offset;
+
+  /* Copy materials. */
   cache->material_count = params->material_count;
   cache->materials = malloc(sizeof(const struct SgMaterial*) * cache->material_count);
   for (int i = 0; i < cache->material_count; i++)
@@ -140,22 +269,30 @@ struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* param
     cache->materials[i] = params->materials[i]->sg_mat;
   }
 
+cleanup:
+  gi_free_bvhc(&bvhc);
+
+  cgpu_destroy_fence(s_device, fence);
+  cgpu_destroy_command_buffer(s_device, command_buffer);
+  cgpu_destroy_buffer(s_device, staging_buffer);
+  if (!cache)
+  {
+    cgpu_destroy_buffer(s_device, buffer);
+  }
+
   return cache;
 }
 
 void giDestroyGeomCache(struct gi_geom_cache* cache)
 {
-  gi_free_bvhcc(&cache->bvhcc);
-  free(cache->vertices);
-  free(cache->faces);
-  free(cache->materials);
+  cgpu_destroy_buffer(s_device, cache->buffer);
   free(cache);
 }
 
 struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params* params)
 {
   /* Compile shader. */
-  uint32_t node_count = params->geom_cache->bvhcc.node_count;
+  uint32_t node_count = params->geom_cache->bvh_node_count;
   uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
   struct SgMainShaderParams shaderParams = {
@@ -183,128 +320,60 @@ struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params*
     return NULL;
   }
 
+  cgpu_shader shader;
+  if (cgpu_create_shader(s_device,
+                         spv_size,
+                         spv,
+                         &shader) != CGPU_OK)
+  {
+    return NULL;
+  }
+
   struct gi_shader_cache* cache = malloc(sizeof(struct gi_shader_cache));
   cache->shader_entry_point = shader_entry_point;
-  cache->spv_size = spv_size;
-  cache->spv = spv;
+  cache->shader = shader;
 
   return cache;
 }
 
 void giDestroyShaderCache(struct gi_shader_cache* cache)
 {
-  free(cache->spv);
+  cgpu_destroy_shader(s_device, cache->shader);
   free(cache);
 }
-
-static uint64_t gi_align_buffer(uint64_t alignment,
-                                uint64_t buffer_size,
-                                uint64_t* total_size)
-{
-  const uint64_t offset = ((*total_size) + alignment - 1) / alignment * alignment;
-
-  (*total_size) = offset + buffer_size;
-
-  return offset;
-}
-
-#define GI_CGPU_VERIFY(result)                                                                       \
-  do {                                                                                               \
-    if (result != CGPU_OK) {                                                                         \
-      fprintf(stderr, "Gatling encountered a fatal CGPU error at line %d: %d\n", __LINE__, result);  \
-      return GI_ERROR;                                                                               \
-    }                                                                                                \
-  } while (0)
 
 int giRender(const struct gi_render_params* params,
              float* rgba_img)
 {
-  /* Set up device. */
-  CgpuResult c_result;
+  int result = GI_ERROR;
 
-  uint32_t device_count;
-  c_result = cgpu_get_device_count(&device_count);
-  GI_CGPU_VERIFY(c_result);
+  cgpu_buffer output_buffer = { CGPU_INVALID_HANDLE };
+  cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
+  cgpu_pipeline pipeline = { CGPU_INVALID_HANDLE };
+  cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
+  cgpu_fence fence = { CGPU_INVALID_HANDLE };
 
-  if (device_count == 0) {
-    fprintf(stderr, "No device found!\n");
-    return GI_ERROR;
-  }
-
-  cgpu_device device;
-  c_result = cgpu_create_device(0, &device);
-  GI_CGPU_VERIFY(c_result);
-
-  cgpu_physical_device_limits device_limits;
-  c_result = cgpu_get_physical_device_limits(device, &device_limits);
-  GI_CGPU_VERIFY(c_result);
-
-  /* Set up GPU buffers. */
-  uint64_t device_buf_size = 0;
-  const uint64_t offset_align = device_limits.minStorageBufferOffsetAlignment;
-
-  uint64_t node_buf_size = params->geom_cache->bvhcc.node_count * sizeof(struct gi_bvhcc_node);
-  uint64_t face_buf_size = params->geom_cache->face_count * sizeof(struct gi_face);
-  uint64_t vertex_buf_size = params->geom_cache->vertex_count * sizeof(struct gi_vertex);
-
-  const uint64_t new_node_buf_offset = gi_align_buffer(offset_align, node_buf_size, &device_buf_size);
-  const uint64_t new_face_buf_offset = gi_align_buffer(offset_align, face_buf_size, &device_buf_size);
-  const uint64_t new_vertex_buf_offset = gi_align_buffer(offset_align, vertex_buf_size, &device_buf_size);
-
+  /* Set up buffers. */
   const int COLOR_COMPONENT_COUNT = 4;
-  const uint64_t output_buffer_size = params->image_width * params->image_height * sizeof(float) * COLOR_COMPONENT_COUNT;
-  const uint64_t staging_buffer_size = output_buffer_size > device_buf_size ? output_buffer_size : device_buf_size;
+  const uint64_t buffer_size = params->image_width * params->image_height * sizeof(float) * COLOR_COMPONENT_COUNT;
 
-  cgpu_buffer input_buffer;
-  cgpu_buffer staging_buffer;
-  cgpu_buffer output_buffer;
-
-  c_result = cgpu_create_buffer(
-    device,
-    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    device_buf_size,
-    &input_buffer
-  );
-  GI_CGPU_VERIFY(c_result);
-
-  c_result = cgpu_create_buffer(
-    device,
+  CgpuResult c_result = cgpu_create_buffer(
+    s_device,
     CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    staging_buffer_size,
+    buffer_size,
     &staging_buffer
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_create_buffer(
-    device,
+    s_device,
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    output_buffer_size,
+    buffer_size,
     &output_buffer
   );
-  GI_CGPU_VERIFY(c_result);
-
-  uint8_t* mapped_staging_mem;
-  c_result = cgpu_map_buffer(
-    device,
-    staging_buffer,
-    0,
-    device_buf_size,
-    (void*)&mapped_staging_mem
-  );
-  GI_CGPU_VERIFY(c_result);
-
-  memcpy(&mapped_staging_mem[new_node_buf_offset], params->geom_cache->bvhcc.nodes, node_buf_size);
-  memcpy(&mapped_staging_mem[new_face_buf_offset], params->geom_cache->faces, face_buf_size);
-  memcpy(&mapped_staging_mem[new_vertex_buf_offset], params->geom_cache->vertices, vertex_buf_size);
-
-  c_result = cgpu_unmap_buffer(
-    device,
-    staging_buffer
-  );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   /* Set up pipeline. */
   gml_vec3 cam_forward, cam_up;
@@ -327,81 +396,39 @@ int giRender(const struct gi_render_params* params,
   };
   uint32_t push_data_size = sizeof(push_data);
 
-  cgpu_pipeline pipeline;
-  {
-    cgpu_shader shader;
-    c_result = cgpu_create_shader(
-      device,
-      params->shader_cache->spv_size,
-      params->shader_cache->spv,
-      &shader
-    );
-    GI_CGPU_VERIFY(c_result);
+  cgpu_shader_resource_buffer sr_buffers[] = {
+    { 0,              output_buffer,                                       0,                       CGPU_WHOLE_SIZE },
+    { 1, params->geom_cache->buffer,   params->geom_cache->node_buf_offset,   params->geom_cache->node_buf_size },
+    { 2, params->geom_cache->buffer,   params->geom_cache->face_buf_offset,   params->geom_cache->face_buf_size },
+    { 3, params->geom_cache->buffer, params->geom_cache->vertex_buf_offset, params->geom_cache->vertex_buf_size },
+  };
+  const uint32_t sr_buffer_count = sizeof(sr_buffers) / sizeof(sr_buffers[0]);
 
-    cgpu_shader_resource_buffer sr_buffers[] = {
-      { 0,       output_buffer,                       0,   CGPU_WHOLE_SIZE },
-      { 1,        input_buffer,     new_node_buf_offset,     node_buf_size },
-      { 2,        input_buffer,     new_face_buf_offset,     face_buf_size },
-      { 3,        input_buffer,   new_vertex_buf_offset,   vertex_buf_size },
-    };
-    const uint32_t sr_buffer_count = sizeof(sr_buffers) / sizeof(sr_buffers[0]);
+  const uint32_t sr_image_count = 0;
+  const cgpu_shader_resource_image* sr_images = NULL;
 
-    const uint32_t sr_image_count = 0;
-    const cgpu_shader_resource_image* sr_images = NULL;
-    const uint32_t push_constants_size = 0;
-
-    c_result = cgpu_create_pipeline(
-      device,
-      sr_buffer_count,
-      sr_buffers,
-      sr_image_count,
-      sr_images,
-      shader,
-      params->shader_cache->shader_entry_point,
-      push_data_size,
-      &pipeline
-    );
-    GI_CGPU_VERIFY(c_result);
-
-    c_result = cgpu_destroy_shader(device, shader);
-    GI_CGPU_VERIFY(c_result);
-  }
+  c_result = cgpu_create_pipeline(
+    s_device,
+    sr_buffer_count,
+    sr_buffers,
+    sr_image_count,
+    sr_images,
+    params->shader_cache->shader,
+    params->shader_cache->shader_entry_point,
+    push_data_size,
+    &pipeline
+  );
+  if (c_result != CGPU_OK) goto cleanup;
 
   /* Set up command buffer. */
-  cgpu_command_buffer command_buffer;
-  c_result = cgpu_create_command_buffer(device, &command_buffer);
-  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_create_command_buffer(s_device, &command_buffer);
+  if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_begin_command_buffer(command_buffer);
-  GI_CGPU_VERIFY(c_result);
-
-  /* Copy staging buffer to input buffer. */
-  c_result = cgpu_cmd_copy_buffer(
-    command_buffer,
-    staging_buffer,
-    0,
-    input_buffer,
-    0,
-    device_buf_size
-  );
-  GI_CGPU_VERIFY(c_result);
-
-  c_result = cgpu_cmd_pipeline_barrier(
-    command_buffer,
-    0, NULL,
-    1, &(cgpu_buffer_memory_barrier) {
-      .src_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-      .dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ,
-      .buffer = input_buffer,
-      .offset = 0,
-      .size = CGPU_WHOLE_SIZE
-    },
-    0, NULL
-  );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_cmd_bind_pipeline(command_buffer, pipeline);
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   /* Trace rays. */
   c_result = cgpu_cmd_push_constants(
@@ -410,7 +437,7 @@ int giRender(const struct gi_render_params* params,
     push_data_size,
     &push_data
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_cmd_dispatch(
     command_buffer,
@@ -418,7 +445,7 @@ int giRender(const struct gi_render_params* params,
     (params->image_height + WORKGROUP_SIZE_Y - 1) / WORKGROUP_SIZE_Y,
     1
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   /* Copy output buffer to staging buffer. */
   c_result = cgpu_cmd_pipeline_barrier(
@@ -433,7 +460,7 @@ int giRender(const struct gi_render_params* params,
     },
     0, NULL
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_cmd_copy_buffer(
     command_buffer,
@@ -441,68 +468,61 @@ int giRender(const struct gi_render_params* params,
     0,
     staging_buffer,
     0,
-    output_buffer_size
+    buffer_size
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   /* Submit command buffer. */
   c_result = cgpu_end_command_buffer(command_buffer);
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
-  cgpu_fence fence;
-  c_result = cgpu_create_fence(device, &fence);
-  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_create_fence(s_device, &fence);
+  if (c_result != CGPU_OK) goto cleanup;
 
-  c_result = cgpu_reset_fence(device, fence);
-  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_reset_fence(s_device, fence);
+  if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_submit_command_buffer(
-    device,
+    s_device,
     command_buffer,
     fence
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
-  c_result = cgpu_wait_for_fence(device, fence);
-  GI_CGPU_VERIFY(c_result);
+  c_result = cgpu_wait_for_fence(s_device, fence);
+  if (c_result != CGPU_OK) goto cleanup;
 
   /* Read data from GPU to image. */
+  uint8_t* mapped_staging_mem;
   c_result = cgpu_map_buffer(
-    device,
+    s_device,
     staging_buffer,
     0,
-    output_buffer_size,
+    buffer_size,
     (void**) &mapped_staging_mem
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
   memcpy(
     rgba_img,
     mapped_staging_mem,
-    output_buffer_size
+    buffer_size
   );
 
   c_result = cgpu_unmap_buffer(
-    device,
+    s_device,
     staging_buffer
   );
-  GI_CGPU_VERIFY(c_result);
+  if (c_result != CGPU_OK) goto cleanup;
 
-  /* Clean up. */
-  c_result = cgpu_destroy_fence(device, fence);
-  GI_CGPU_VERIFY(c_result);
-  c_result = cgpu_destroy_command_buffer(device, command_buffer);
-  GI_CGPU_VERIFY(c_result);
-  c_result = cgpu_destroy_pipeline(device, pipeline);
-  GI_CGPU_VERIFY(c_result);
-  c_result = cgpu_destroy_buffer(device, input_buffer);
-  GI_CGPU_VERIFY(c_result);
-  c_result = cgpu_destroy_buffer(device, staging_buffer);
-  GI_CGPU_VERIFY(c_result);
-  c_result = cgpu_destroy_buffer(device, output_buffer);
-  GI_CGPU_VERIFY(c_result);
-  c_result = cgpu_destroy_device(device);
-  GI_CGPU_VERIFY(c_result);
+  result = GI_OK;
 
-  return GI_OK;
+cleanup:
+  cgpu_destroy_fence(s_device, fence);
+  cgpu_destroy_command_buffer(s_device, command_buffer);
+  cgpu_destroy_pipeline(s_device, pipeline);
+  cgpu_destroy_buffer(s_device, staging_buffer);
+  cgpu_destroy_buffer(s_device, output_buffer);
+
+  return result;
 }
