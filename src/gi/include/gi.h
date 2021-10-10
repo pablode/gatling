@@ -63,11 +63,15 @@ struct gi_render_params
   const struct gi_shader_cache* shader_cache;
 };
 
-int giInitialize(const char* resource_path,
-                 const char* shader_path,
-                 const char* mtlxlib_path,
-                 const char* mtlxmdl_path);
+struct gi_init_params
+{
+  const char* resource_path;
+  const char* shader_path;
+  const char* mtlxlib_path;
+  const char* mtlxmdl_path;
+};
 
+int giInitialize(const struct gi_init_params* params);
 void giTerminate();
 
 struct gi_material* giCreateMaterialFromMtlx(const char* doc);

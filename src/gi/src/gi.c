@@ -42,16 +42,17 @@ struct gi_material
 
 cgpu_device s_device;
 
-int giInitialize(const char* resource_path,
-                 const char* shader_path,
-                 const char* mtlxlib_path,
-                 const char* mtlxmdl_path)
+int giInitialize(const struct gi_init_params* params)
 {
   if (cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH) != CGPU_OK)
   {
     return GI_ERROR;
   }
-  if (!sgInitialize(resource_path, shader_path, mtlxlib_path, mtlxmdl_path))
+
+  if (!sgInitialize(params->resource_path,
+                    params->shader_path,
+                    params->mtlxlib_path,
+                    params->mtlxmdl_path))
   {
     return GI_ERROR;
   }

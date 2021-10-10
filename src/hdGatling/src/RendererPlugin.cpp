@@ -17,15 +17,24 @@ TF_REGISTRY_FUNCTION(TfType)
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 {
   PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
+
   const std::string& resourcePath = plugin->GetResourcePath();
   printf("Resource path %s\n", resourcePath.c_str());
 
-  std::string mtlxlibPath = resourcePath + "/mtlxlib";
-  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxlibPath);
-
   std::string shaderPath = resourcePath + "/shaders";
   std::string mtlxmdlPath = resourcePath + "/mtlxmdl";
-  int initResult = giInitialize(resourcePath.c_str(), shaderPath.c_str(), mtlxlibPath.c_str(), mtlxmdlPath.c_str());
+  std::string mtlxlibPath = resourcePath + "/mtlxlib";
+
+  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxlibPath);
+
+  gi_init_params params;
+  params.resource_path = resourcePath.c_str();
+  params.shader_path = shaderPath.c_str();
+  params.mtlxlib_path = mtlxlibPath.c_str();
+  params.mtlxmdl_path = mtlxmdlPath.c_str();
+
+  int initResult = giInitialize(&params);
+
   m_isSupported = (initResult == GI_OK);
 }
 
