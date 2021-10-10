@@ -9,10 +9,10 @@
 
 namespace sg
 {
-  class MtlxMdlTranslator
+  class MtlxMdlCodeGen
   {
   public:
-    explicit MtlxMdlTranslator(const char* mtlxlibPath);
+    explicit MtlxMdlCodeGen(const char* mtlxlibPath);
 
   public:
     bool translate(const char* mtlxSrc, std::string& mdlSrc, std::string& subIdentifier);

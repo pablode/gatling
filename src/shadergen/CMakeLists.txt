@@ -6,10 +6,10 @@ add_library(
   src/IShaderCompiler.cpp
   src/GlslangShaderCompiler.h
   src/GlslangShaderCompiler.cpp
-  src/MtlxMdlTranslator.h
-  src/MtlxMdlTranslator.cpp
-  src/MdlHlslTranslator.h
-  src/MdlHlslTranslator.cpp
+  src/MtlxMdlCodeGen.h
+  src/MtlxMdlCodeGen.cpp
+  src/MdlHlslCodeGen.h
+  src/MdlHlslCodeGen.cpp
   src/MdlRuntime.h
   src/MdlRuntime.cpp
 )

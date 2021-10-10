@@ -1,8 +1,8 @@
 #include "shadergen.h"
 
 #include "GlslangShaderCompiler.h"
-#include "MtlxMdlTranslator.h"
-#include "MdlHlslTranslator.h"
+#include "MtlxMdlCodeGen.h"
+#include "MdlHlslCodeGen.h"
 #include "MdlRuntime.h"
 
 #include <string>
@@ -18,8 +18,8 @@ struct SgMaterial
 std::string s_shaderPath;
 
 std::unique_ptr<sg::MdlRuntime> s_mdlRuntime;
-std::unique_ptr<sg::MdlHlslTranslator> s_mdlHlslTranslator;
-std::unique_ptr<sg::MtlxMdlTranslator> s_mtlxMdlTranslator;
+std::unique_ptr<sg::MdlHlslCodeGen> s_mdlHlslCodeGen;
+std::unique_ptr<sg::MtlxMdlCodeGen> s_mtlxMdlCodeGen;
 std::unique_ptr<sg::IShaderCompiler> s_shaderCompiler;
 
 bool sgInitialize(const char* resourcePath,
@@ -37,8 +37,8 @@ bool sgInitialize(const char* resourcePath,
 
   auto& neuray = s_mdlRuntime->getNeuray();
 
-  s_mdlHlslTranslator = std::make_unique<sg::MdlHlslTranslator>();
-  if (!s_mdlHlslTranslator->init(neuray, mtlxmdlPath))
+  s_mdlHlslCodeGen = std::make_unique<sg::MdlHlslCodeGen>();
+  if (!s_mdlHlslCodeGen->init(neuray, mtlxmdlPath))
   {
     return false;
   }
@@ -49,15 +49,15 @@ bool sgInitialize(const char* resourcePath,
     return false;
   }
 
-  s_mtlxMdlTranslator = std::make_unique<sg::MtlxMdlTranslator>(mtlxlibPath);
+  s_mtlxMdlCodeGen = std::make_unique<sg::MtlxMdlCodeGen>(mtlxlibPath);
 
   return true;
 }
 
 void sgTerminate()
 {
-  s_mdlHlslTranslator.reset();
-  s_mtlxMdlTranslator.reset();
+  s_mdlHlslCodeGen.reset();
+  s_mtlxMdlCodeGen.reset();
   s_shaderCompiler.reset();
   s_mdlRuntime.reset();
 }
@@ -66,7 +66,7 @@ SgMaterial* sgCreateMaterialFromMtlx(const char* docStr)
 {
   std::string mdlSrc;
   std::string subIdentifier;
-  if (!s_mtlxMdlTranslator->translate(docStr, mdlSrc, subIdentifier))
+  if (!s_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier))
   {
     return nullptr;
   }
@@ -96,7 +96,7 @@ bool _sgGenerateMainShaderMdlCode(uint32_t materialCount,
     srcIdVec.push_back(&pair);
   }
 
-  return s_mdlHlslTranslator->translate(srcIdVec, generatedHlsl);
+  return s_mdlHlslCodeGen->translate(srcIdVec, generatedHlsl);
 }
 
 bool sgGenerateMainShader(const SgMainShaderParams* params,

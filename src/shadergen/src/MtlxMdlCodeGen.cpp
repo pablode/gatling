@@ -1,4 +1,4 @@
-#include "MtlxMdlTranslator.h"
+#include "MtlxMdlCodeGen.h"
 
 #include <MaterialXCore/Definition.h>
 #include <MaterialXCore/Document.h>
@@ -18,7 +18,7 @@ namespace mx = MaterialX;
 
 namespace sg
 {
-  MtlxMdlTranslator::MtlxMdlTranslator(const char* mtlxlibPath)
+  MtlxMdlCodeGen::MtlxMdlCodeGen(const char* mtlxlibPath)
     : m_mtlxlibPath(mtlxlibPath)
   {
     // Init shadergen.
@@ -82,7 +82,7 @@ namespace sg
     return surfaceElement->asA<mx::TypedElement>();
   }
 
-  bool MtlxMdlTranslator::translate(const char* mtlxSrc, std::string& mdlSrc, std::string& subIdentifier)
+  bool MtlxMdlCodeGen::translate(const char* mtlxSrc, std::string& mdlSrc, std::string& subIdentifier)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);

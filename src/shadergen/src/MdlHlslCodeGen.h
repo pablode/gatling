@@ -22,7 +22,7 @@ namespace sg
     std::string identifier;
   };
 
-  class MdlHlslTranslator
+  class MdlHlslCodeGen
   {
   public:
     bool init(mi::neuraylib::INeuray& neuray,

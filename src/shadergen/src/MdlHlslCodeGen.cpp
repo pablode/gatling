@@ -1,4 +1,4 @@
-#include "MdlHlslTranslator.h"
+#include "MdlHlslCodeGen.h"
 
 #include <mi/mdl_sdk.h>
 
@@ -135,8 +135,8 @@ namespace sg
   const char* MODULE_PREFIX = "::gatling_";
   const char* MODULE_CATEGORY = "shadergen";
 
-  bool MdlHlslTranslator::init(mi::neuraylib::INeuray& neuray,
-                               const char* mtlxmdlPath)
+  bool MdlHlslCodeGen::init(mi::neuraylib::INeuray& neuray,
+                            const char* mtlxmdlPath)
   {
     m_logger = mi::base::make_handle(new MdlLogger());
 
@@ -168,8 +168,8 @@ namespace sg
     return true;
   }
 
-  bool MdlHlslTranslator::translate(const std::vector<const SourceIdentifierPair*>& input,
-                                    std::string& hlslSrc)
+  bool MdlHlslCodeGen::translate(const std::vector<const SourceIdentifierPair*>& input,
+                                 std::string& hlslSrc)
   {
     mi::base::Handle<mi::neuraylib::IScope> scope(m_mdlDatabase->get_global_scope());
     mi::base::Handle<mi::neuraylib::ITransaction> transaction(scope->create_transaction());
@@ -216,10 +216,10 @@ namespace sg
     return true;
   }
 
-  bool MdlHlslTranslator::appendModuleToLinkUnit(const SourceIdentifierPair& sourceAndIdentifier,
-                                                 uint32_t idx,
-                                                 mi::neuraylib::ITransaction* transaction,
-                                                 mi::neuraylib::ILink_unit* linkUnit)
+  bool MdlHlslCodeGen::appendModuleToLinkUnit(const SourceIdentifierPair& sourceAndIdentifier,
+                                              uint32_t idx,
+                                              mi::neuraylib::ITransaction* transaction,
+                                              mi::neuraylib::ILink_unit* linkUnit)
   {
     std::string moduleName = std::string(MODULE_PREFIX) + std::to_string(idx);
 
@@ -299,7 +299,7 @@ namespace sg
     return result == 0;
   }
 
-  void MdlHlslTranslator::printContextMessages()
+  void MdlHlslCodeGen::printContextMessages()
   {
     for (mi::Size i = 0, n = m_mdlContext->get_messages_count(); i < n; ++i)
     {
