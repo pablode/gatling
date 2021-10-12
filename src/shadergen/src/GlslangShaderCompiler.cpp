@@ -2,30 +2,16 @@
 
 #include <shaderc/env.h>
 #include <libshaderc_util/file_finder.h>
+#include <libshaderc_util/io_shaderc.h>
 
 #include <fstream>
 
 namespace detail
 {
-  bool readTextFromFile(const std::string& filePath,
-                        std::string& text)
-  {
-    std::ifstream file(filePath, std::ios_base::in | std::ios_base::binary);
-    if (!file.is_open())
-    {
-      return false;
-    }
-    file.seekg(0, std::ios_base::end);
-    text.resize(file.tellg(), ' ');
-    file.seekg(0, std::ios_base::beg);
-    file.read(&text[0], text.size());
-    return file.good();
-  }
-
   struct IncludeStringKeeper
   {
     std::string sourcePath;
-    std::string content;
+    std::vector<char> content;
   };
 
   shaderc_include_result* resolveInclude(void* userData,
@@ -45,8 +31,8 @@ namespace detail
       sourcePath = fileFinder.FindReadableFilepath(requestedSource);
     }
 
-    std::string content;
-    if (!readTextFromFile(sourcePath, content))
+    std::vector<char> content;
+    if (!shaderc_util::ReadFile(sourcePath, &content))
     {
       return nullptr;
     }
@@ -59,7 +45,7 @@ namespace detail
     result->user_data = keeper;
     result->source_name = keeper->sourcePath.c_str();
     result->source_name_length = keeper->sourcePath.size();
-    result->content = keeper->content.c_str();
+    result->content = keeper->content.data();
     result->content_length = keeper->content.size();
     return result;
   }

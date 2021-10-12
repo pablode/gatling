@@ -14,6 +14,7 @@
 #include <sstream>
 #include <limits>
 #include <iomanip>
+#include <fstream>
 
 struct SgMaterial
 {
@@ -93,9 +94,9 @@ void sgDestroyMaterial(SgMaterial* mat)
   delete mat;
 }
 
-bool _sgGenerateMainShaderMdlCode(uint32_t materialCount,
+bool _sgGenerateMainShaderMdlHlsl(uint32_t materialCount,
                                   const struct SgMaterial** materials,
-                                  std::string& generatedHlsl)
+                                  std::string& hlsl)
 {
   std::vector<const sg::SourceIdentifierPair*> srcIdVec;
 
@@ -105,7 +106,22 @@ bool _sgGenerateMainShaderMdlCode(uint32_t materialCount,
     srcIdVec.push_back(&pair);
   }
 
-  return s_mdlHlslCodeGen->translate(srcIdVec, generatedHlsl);
+  return s_mdlHlslCodeGen->translate(srcIdVec, hlsl);
+}
+
+bool _sgReadTextFromFile(const std::string& filePath,
+                         std::string& text)
+{
+  std::ifstream file(filePath, std::ios_base::in | std::ios_base::binary);
+  if (!file.is_open())
+  {
+    return false;
+  }
+  file.seekg(0, std::ios_base::end);
+  text.resize(file.tellg(), ' ');
+  file.seekg(0, std::ios_base::beg);
+  file.read(&text[0], text.size());
+  return file.good();
 }
 
 bool sgGenerateMainShader(const SgMainShaderParams* params,
@@ -113,6 +129,9 @@ bool sgGenerateMainShader(const SgMainShaderParams* params,
                           uint32_t** spv,
                           const char** entryPoint)
 {
+  std::string fileName = "main.comp.hlsl";
+  std::string filePath = s_shaderPath + "/" + fileName;
+
   std::stringstream ss;
   ss << std::showpoint;
   ss << std::setprecision(std::numeric_limits<float>::digits10);
@@ -128,20 +147,23 @@ bool sgGenerateMainShader(const SgMainShaderParams* params,
   APPEND_CONSTANT("RR_BOUNCE_OFFSET", rr_bounce_offset)
   APPEND_CONSTANT("RR_INV_MIN_TERM_PROB", rr_inv_min_term_prob)
 
-  std::string genMdlHlsl;
-  if (!_sgGenerateMainShaderMdlCode(params->material_count,
+  std::string genMdl;
+  if (!_sgGenerateMainShaderMdlHlsl(params->material_count,
                                     params->materials,
-                                    genMdlHlsl))
+                                    genMdl))
   {
     return false;
   }
 
-  std::string fileName = "main.comp.hlsl";
-  std::string filePath = s_shaderPath + "/" + fileName;
+  std::string fileSrc;
+  if (!_sgReadTextFromFile(filePath, fileSrc))
+  {
+    return false;
+  }
 
   ss << "#include \"mdl_types.hlsl\"\n";
-  ss << genMdlHlsl;
-  ss << "#include \"" + fileName + "\"\n";
+  ss << genMdl;
+  ss << fileSrc;
 
   *entryPoint = "CSMain";
   return s_shaderCompiler->compileHlslToSpv(ss.str(), filePath, *entryPoint, spvSize, spv);
