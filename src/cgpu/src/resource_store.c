@@ -38,11 +38,9 @@ void resource_store_free_handle(resource_store* store, uint64_t handle)
 
 bool resource_store_get(resource_store* store, uint64_t handle, void** object)
 {
-#ifndef NDEBUG
   if (!handle_store_is_handle_valid(&store->handle_store, handle)) {
     return false;
   }
-#endif
 
   const uint32_t index = handle_store_get_index(handle);
 
