@@ -52,6 +52,7 @@
 #include <stdbool.h>
 
 #define CGPU_WHOLE_SIZE (~0ULL)
+#define CGPU_INVALID_HANDLE 0xFFFFFFFFFFFFFFFF
 
 typedef enum CgpuResult {
   CGPU_OK = 0,
