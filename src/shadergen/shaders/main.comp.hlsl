@@ -158,8 +158,7 @@ float3 evaluate_sample(inout uint rng_state,
     return state.value;
 }
 
-[[vk::push_constant]]
-cbuffer PC
+struct PushConstants
 {
   float3 CAMERA_POSITION;
   uint   IMAGE_WIDTH;
@@ -169,32 +168,39 @@ cbuffer PC
   float  CAMERA_VFOV;
 };
 
+// Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
+#if defined(_DXC)
+[[vk::push_constant]] PushConstants PC;
+#else
+[[vk::push_constant]] ConstantBuffer<PushConstants> PC;
+#endif
+
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
 void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
     const uint2 pixel_pos = GlobalInvocationID.xy;
 
-    if (pixel_pos.x >= IMAGE_WIDTH ||
-        pixel_pos.y >= IMAGE_HEIGHT)
+    if (pixel_pos.x >= PC.IMAGE_WIDTH ||
+        pixel_pos.y >= PC.IMAGE_HEIGHT)
     {
         return;
     }
 
-    const uint pixel_index = pixel_pos.x + pixel_pos.y * IMAGE_WIDTH;
+    const uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
 
-    float3 camera_right = cross(CAMERA_FORWARD, CAMERA_UP);
+    float3 camera_right = cross(PC.CAMERA_FORWARD, PC.CAMERA_UP);
 
-    const float aspect_ratio = float(IMAGE_WIDTH) / float(IMAGE_HEIGHT);
+    const float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
 
     const float H = 1.0;
     const float W = H * aspect_ratio;
-    const float d = H / (2.0 * tan(CAMERA_VFOV * 0.5));
+    const float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
 
-    const float WX = W / float(IMAGE_WIDTH);
-    const float HY = H / float(IMAGE_HEIGHT);
+    const float WX = W / float(PC.IMAGE_WIDTH);
+    const float HY = H / float(PC.IMAGE_HEIGHT);
 
-    const float3 C = CAMERA_POSITION + CAMERA_FORWARD * d;
-    const float3 L = C - camera_right * W * 0.5 - CAMERA_UP * H * 0.5;
+    const float3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
+    const float3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
 
     const float inv_sample_count = 1.0 / float(SAMPLE_COUNT);
 
@@ -210,9 +216,9 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         const float3 P =
             L +
             (float(pixel_pos.x) + r1) * camera_right * WX +
-            (float(pixel_pos.y) + r2) * CAMERA_UP * HY;
+            (float(pixel_pos.y) + r2) * PC.CAMERA_UP * HY;
 
-        float3 ray_origin = CAMERA_POSITION;
+        float3 ray_origin = PC.CAMERA_POSITION;
         float3 ray_direction = P - ray_origin;
 
         /* Beware: a single direction component must not be zero.
