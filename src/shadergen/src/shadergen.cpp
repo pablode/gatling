@@ -1,8 +1,9 @@
 #include "shadergen.h"
 
 #include "MtlxMdlCodeGen.h"
-#include "MdlHlslCodeGen.h"
 #include "MdlRuntime.h"
+#include "MdlMaterialCompiler.h"
+#include "MdlHlslCodeGen.h"
 
 #ifdef GATLING_USE_DXC
 #include "DxcShaderCompiler.h"
@@ -18,12 +19,13 @@
 
 struct SgMaterial
 {
-  sg::SourceIdentifierPair srcAndIdentifier;
+  mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
 };
 
 std::string s_shaderPath;
 
 std::unique_ptr<sg::MdlRuntime> s_mdlRuntime;
+std::unique_ptr<sg::MdlMaterialCompiler> s_mdlMaterialCompiler;
 std::unique_ptr<sg::MdlHlslCodeGen> s_mdlHlslCodeGen;
 std::unique_ptr<sg::MtlxMdlCodeGen> s_mtlxMdlCodeGen;
 std::unique_ptr<sg::IShaderCompiler> s_shaderCompiler;
@@ -36,18 +38,18 @@ bool sgInitialize(const char* resourcePath,
   s_shaderPath = shaderPath;
 
   s_mdlRuntime = std::make_unique<sg::MdlRuntime>();
-  if (!s_mdlRuntime->init(resourcePath))
+  if (!s_mdlRuntime->init(resourcePath, mtlxmdlPath))
   {
     return false;
   }
-
-  auto& neuray = s_mdlRuntime->getNeuray();
 
   s_mdlHlslCodeGen = std::make_unique<sg::MdlHlslCodeGen>();
-  if (!s_mdlHlslCodeGen->init(neuray, mtlxmdlPath))
+  if (!s_mdlHlslCodeGen->init(*s_mdlRuntime))
   {
     return false;
   }
+
+  s_mdlMaterialCompiler = std::make_unique<sg::MdlMaterialCompiler>(*s_mdlRuntime);
 
 #ifdef GATLING_USE_DXC
   s_shaderCompiler = std::make_unique<sg::DxcShaderCompiler>(s_shaderPath);
@@ -66,9 +68,10 @@ bool sgInitialize(const char* resourcePath,
 
 void sgTerminate()
 {
-  s_mdlHlslCodeGen.reset();
   s_mtlxMdlCodeGen.reset();
   s_shaderCompiler.reset();
+  s_mdlMaterialCompiler.reset();
+  s_mdlHlslCodeGen.reset();
   s_mdlRuntime.reset();
 }
 
@@ -81,11 +84,14 @@ SgMaterial* sgCreateMaterialFromMtlx(const char* docStr)
     return nullptr;
   }
 
-  SgMaterial* mat = new SgMaterial();
+  mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
+  if (!s_mdlMaterialCompiler->compileMaterial(mdlSrc, subIdentifier, compiledMaterial))
+  {
+    return nullptr;
+  }
 
-  sg::SourceIdentifierPair& pair = mat->srcAndIdentifier;
-  pair.src = mdlSrc;
-  pair.identifier = subIdentifier;
+  SgMaterial* mat = new SgMaterial();
+  mat->compiledMaterial = compiledMaterial;
   return mat;
 }
 
@@ -98,15 +104,14 @@ bool _sgGenerateMainShaderMdlHlsl(uint32_t materialCount,
                                   const struct SgMaterial** materials,
                                   std::string& hlsl)
 {
-  std::vector<const sg::SourceIdentifierPair*> srcIdVec;
+  std::vector<const mi::neuraylib::ICompiled_material*> compiledMaterials;
 
   for (uint32_t i = 0; i < materialCount; i++)
   {
-    const sg::SourceIdentifierPair& pair = materials[i]->srcAndIdentifier;
-    srcIdVec.push_back(&pair);
+    compiledMaterials.push_back(materials[i]->compiledMaterial.get());
   }
 
-  return s_mdlHlslCodeGen->translate(srcIdVec, hlsl);
+  return s_mdlHlslCodeGen->translate(compiledMaterials, hlsl);
 }
 
 bool _sgReadTextFromFile(const std::string& filePath,

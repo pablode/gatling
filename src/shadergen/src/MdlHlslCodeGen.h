@@ -1,50 +1,40 @@
 #pragma once
 
 #include <mi/base/handle.h>
-#include <mi/base/ilogger.h>
+#include <mi/neuraylib/icompiled_material.h>
 #include <mi/neuraylib/ineuray.h>
 #include <mi/neuraylib/idatabase.h>
 #include <mi/neuraylib/itransaction.h>
-#include <mi/neuraylib/imdl_factory.h>
-#include <mi/neuraylib/imdl_execution_context.h>
-#include <mi/neuraylib/imdl_impexp_api.h>
 #include <mi/neuraylib/imdl_backend.h>
+#include <mi/neuraylib/imdl_execution_context.h>
 
 #include <stdint.h>
 #include <string>
 #include <vector>
 
+#include "MdlRuntime.h"
+#include "MdlLogger.h"
+
 namespace sg
 {
-  struct SourceIdentifierPair
-  {
-    std::string src;
-    std::string identifier;
-  };
-
   class MdlHlslCodeGen
   {
   public:
-    bool init(mi::neuraylib::INeuray& neuray,
-              const char* mtlxmdlPath);
+    bool init(MdlRuntime& runtime);
 
-    bool translate(const std::vector<const SourceIdentifierPair*>& input,
+    bool translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
                    std::string& hlslSrc);
 
   private:
-    bool appendModuleToLinkUnit(const SourceIdentifierPair& sourceAndIdentifier,
-                                uint32_t idx,
-                                mi::neuraylib::ITransaction* transaction,
-                                mi::neuraylib::ILink_unit* linkUnit);
-
-    void printContextMessages();
+    bool appendMaterialToLinkUnit(uint32_t idx,
+                                  const mi::neuraylib::ICompiled_material* compiledMaterial,
+                                  mi::neuraylib::ILink_unit* linkUnit);
 
   private:
-    mi::base::Handle<mi::base::ILogger> m_logger;
-    mi::base::Handle<mi::neuraylib::IDatabase> m_mdlDatabase;
-    mi::base::Handle<mi::neuraylib::IMdl_factory> m_mdlFactory;
-    mi::base::Handle<mi::neuraylib::IMdl_execution_context> m_mdlContext;
-    mi::base::Handle<mi::neuraylib::IMdl_impexp_api> m_mdlImpExpApi;
-    mi::base::Handle<mi::neuraylib::IMdl_backend> m_mdlBackend;
+    mi::base::Handle<MdlLogger> m_logger;
+    mi::base::Handle<mi::neuraylib::IMdl_backend> m_backend;
+    mi::base::Handle<mi::neuraylib::IDatabase> m_database;
+    mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
+    mi::base::Handle<mi::neuraylib::IMdl_execution_context> m_context;
   };
 }

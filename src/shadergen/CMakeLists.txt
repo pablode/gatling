@@ -8,6 +8,12 @@ add_library(
   src/MtlxMdlCodeGen.cpp
   src/MdlHlslCodeGen.h
   src/MdlHlslCodeGen.cpp
+  src/MdlLogger.h
+  src/MdlLogger.cpp
+  src/MdlMaterialCompiler.h
+  src/MdlMaterialCompiler.cpp
+  src/MdlNeurayLoader.h
+  src/MdlNeurayLoader.cpp
   src/MdlRuntime.h
   src/MdlRuntime.cpp
 )
