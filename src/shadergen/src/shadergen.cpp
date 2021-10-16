@@ -149,6 +149,7 @@ bool sgGenerateMainShader(const SgMainShaderParams* params,
   APPEND_CONSTANT("MAX_STACK_SIZE", max_stack_size)
   APPEND_CONSTANT("SAMPLE_COUNT", spp)
   APPEND_CONSTANT("MAX_BOUNCES", max_bounces)
+  APPEND_CONSTANT("MAX_SAMPLE_VALUE", max_sample_value)
   APPEND_CONSTANT("RR_BOUNCE_OFFSET", rr_bounce_offset)
   APPEND_CONSTANT("RR_INV_MIN_TERM_PROB", rr_inv_min_term_prob)
 

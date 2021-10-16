@@ -302,6 +302,7 @@ struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params*
     .max_stack_size       = max_stack_size,
     .spp                  = params->spp,
     .max_bounces          = params->max_bounces,
+    .max_sample_value     = params->max_sample_value,
     .rr_bounce_offset     = params->rr_bounce_offset,
     .rr_inv_min_term_prob = params->rr_inv_min_term_prob,
     .material_count       = params->geom_cache->material_count,

@@ -324,7 +324,9 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     shaderParams.rr_bounce_offset = m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second.Get<int>();
     // Workaround for bug https://github.com/PixarAnimationStudios/USD/issues/913
     VtValue rr_inv_min_term_prob = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
+    VtValue max_sample_value = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
     shaderParams.rr_inv_min_term_prob = rr_inv_min_term_prob.CastToTypeid(typeid(double)).Get<double>();
+    shaderParams.max_sample_value = max_sample_value.CastToTypeid(typeid(double)).Get<double>();
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");

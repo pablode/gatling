@@ -155,7 +155,9 @@ float3 evaluate_sample(inout uint rng_state,
         }
     }
 
-    return state.value;
+    float3 min_sample_value = float3(0.0, 0.0, 0.0);
+    float3 max_sample_value = float3(MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE);
+    return clamp(state.value, min_sample_value, max_sample_value);
 }
 
 struct PushConstants

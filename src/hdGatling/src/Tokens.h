@@ -8,7 +8,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((spp, "spp"))                                    \
   ((max_bounces, "max-bounces"))                    \
   ((rr_bounce_offset, "rr-bounce-offset"))          \
-  ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))
+  ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))  \
+  ((max_sample_value, "max-sample-value"))
 
 // mtlx node identifier is given by usdMtlx.
 #define HD_GATLING_NODE_IDENTIFIER_TOKENS           \

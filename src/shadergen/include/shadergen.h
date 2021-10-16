@@ -29,6 +29,7 @@ struct SgMainShaderParams
   uint32_t max_bounces;
   uint32_t rr_bounce_offset;
   float rr_inv_min_term_prob;
+  float max_sample_value;
   uint32_t material_count;
   const struct SgMaterial** materials;
 };
