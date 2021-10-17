@@ -89,7 +89,7 @@ install(
 
 install(
   TARGETS
-    hdGatling gi
+    hdGatling
   LIBRARY
     DESTINATION "${CMAKE_INSTALL_PREFIX}"
     COMPONENT hdGatling

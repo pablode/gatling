@@ -1,5 +1,5 @@
 add_library(
-  gi
+  gi STATIC
   include/gi.h
   src/gi.c
   src/bvh.c
