@@ -51,6 +51,8 @@ HdGatlingRenderPass::~HdGatlingRenderPass()
   {
     giDestroyShaderCache(m_shaderCache);
   }
+
+  giDestroyMaterial(m_defaultMaterial);
 }
 
 bool HdGatlingRenderPass::IsConverged() const
