@@ -3,6 +3,7 @@
 #include <mi/mdl_sdk.h>
 
 #include <atomic>
+#include <cassert>
 
 namespace sg
 {
