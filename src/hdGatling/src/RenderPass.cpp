@@ -39,6 +39,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_shaderCache(nullptr)
 {
   m_defaultMaterial = giCreateMaterialFromMtlx(DEFAULT_MTLX_DOC);
+  assert(m_defaultMaterial);
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
@@ -165,9 +166,14 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
       if (material)
       {
-        materialIndex = materials.size();
-        materials.push_back(material->GetGiMaterial());
-        materialMapping[materialId] = materialIndex;
+        const gi_material* giMat = material->GetGiMaterial();
+
+        if (giMat)
+        {
+          materialIndex = materials.size();
+          materials.push_back(giMat);
+          materialMapping[materialId] = materialIndex;
+        }
       }
     }
 
