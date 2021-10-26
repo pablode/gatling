@@ -1,8 +1,8 @@
 const static float FLOAT_MAX = 3.402823466e38;
 const static float FLOAT_MIN = 1.175494351e-38;
 const static float PI = 3.1415926535897932384626433832795;
-const static float TRI_EPS = 0.0000001;
-const static float RAY_OFFSET_EPS = 0.0001;
+const static float TRI_EPS = 0.000000001;
+const static float RAY_OFFSET_EPS = 0.00001;
 
 struct fvertex
 {
