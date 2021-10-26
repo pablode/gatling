@@ -2,35 +2,41 @@
 ## gatling
 
 <p align="middle">
-  <a href="http://pablode.com/gatling/pokedstudio.png"><img width=450 src="http://pablode.com/gatling/pokedstudio_sm.png" /></a>
+  <a href="http://pablode.com/gatling/wwc_mustang.png"><img width=460 src="http://pablode.com/gatling/wwc_mustang_sm.png" /></a>
 </p>
 <p align="middle">
-  Pokedstudio's <a href="https://cloud.blender.org/p/gallery/57e51eaa0fcf29412d1f1e76">Blender splash screen</a> <a href="https://creativecommons.org/licenses/by-sa/2.0/legalcode">(CC BY-SA)</a>, modified for and rendered in Gatling.
+  1965 Ford Mustang Fastback from <a href="https://wirewheelsclub.com/models/1965-ford-mustang-fastback/">Wire Wheels Club</a>, rendered in Gatling.
 </p>
 
 ### About
 
-This is my GPU path tracer I work on in my free time.  
+This is my toy path tracer I work on in my free time.
 
-It features a BVH builder with binned SAH [\[Wald 2007\]](#user-content-wald-2007), spatial splits [\[Stich et al. 2009\]](#user-content-stich-et-al-2009), SAH-preserving widening to nodes of 8 childs, compression, and an efficient traversal kernel [\[Ylitie et al. 2017\]](#user-content-ylitie-et-al-2017).
+It is exposed as a Hydra render delegate and comes with a standalone that accepts Universal Scene Description (USD) files [\[Elkoura et al. 2019\]](#user-content-elkoura-et-al-2019). Both UsdPreviewSurface and MaterialX [\[Smythe et al. 2019\]](#user-content-smythe-et-al-2019) material network nodes are supported.
 
-Gatling is exposed as a Hydra render delegate and comes with a standalone that accepts Universal Scene Description (USD) files [\[Elkoura et al. 2019\]](#user-content-elkoura-et-al-2019).
+Gatling features a BVH builder with binned SAH [\[Wald 2007\]](#user-content-wald-2007), spatial splits [\[Stich et al. 2009\]](#user-content-stich-et-al-2009), SAH-preserving widening to nodes of 8 childs, compression, and an efficient traversal kernel [\[Ylitie et al. 2017\]](#user-content-ylitie-et-al-2017). Complex BSDFs like the Autodesk Standard Surface and the Disney BRDF are supported and importance sampled.
 
 ### Build
 
-You need to build and install version 21.05 of Pixar's <a href="https://github.com/PixarAnimationStudios/USD">USD Framework</a>.
-Additionally, CMake 3.11+, a C11 compiler and the Vulkan SDK are required.
+The following is required:
 
-Clone the project and set up a build folder:
+- CMake 3.11+
+- C11 compiler and C++14 compiler
+- <a href="https://vulkan.lunarg.com/">Vulkan SDK</a>
+- <a href="https://github.com/PixarAnimationStudios/USD/tree/v21.08">USD 21.08</a> with MaterialX support
+- <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.0.1</a> binaries
+
+Do a recursive clone of the repository and set up a build folder:
 ```
-git clone https://github.com/pablode/gatling
+git clone https://github.com/pablode/gatling --recursive
 mkdir gatling/build && cd gatling/build
 ```
 
-Pass the USD install directory in the CMake generation phase:
+Pass following parameters in the CMake generation phase:
 ```
 cmake .. -Wno-dev \
          -DUSD_ROOT=<USD_INSTALL_DIR> \
+         -DMDL_ROOT=<MDL_INSTALL_DIR> \
          -DCMAKE_INSTALL_PREFIX=<USD_INSTALL_DIR>/plugin/usd
          -DCMAKE_BUILD_TYPE=Release
 ```
@@ -43,25 +49,25 @@ cmake --build . -j8 --target hdGatling gatling --config Release
 cmake --install . --component hdGatling
 ```
 
+#### DXC
+
+On Windows, Microsoft's DirectX Shader Compiler (DXC) can be used instead of Khronos's glslang. This allows for validation of the generated HLSL shader.
+
+Download the <a href="https://github.com/microsoft/DirectXShaderCompiler/releases/tag/v1.6.2106">DXC June 2021 binaries</a> and set `-DDXC_ROOT` in the CMake generation phase to point to the unpacked folder. You can switch between both shader compilers using the `-DGATLING_USE_DXC` option.
+
 ### Usage
 
-Gatling can be used by every application which supports Hydra, either natively or through a plugin. It also comes with a headless standalone.
-A USD file (.usd, .usda, .usdc, .usdz) is required as input. Make sure there is a camera in the scene and at least one emissive surface.
-
-To play around with Gatling:
-```
-usdview <scene.usd> --renderer Gatling
-```
+Gatling can be used by every application which supports Hydra, either natively or through a plugin.
 
 <p align="middle">
-  <a href="http://pablode.com/gatling/usdview_classroom.png"><img width=360 src="http://pablode.com/gatling/usdview_classroom_sm.png" /></a>
+  <a href="http://pablode.com/gatling/usdview_coffeemaker.png"><img width=360 src="http://pablode.com/gatling/usdview_coffeemaker_sm.png" /></a>
 </p>
 <p align="middle">
-  Christophe Seux's <a href="https://www.blender.org/download/demo-files/">Class room</a>
-  rendered using Gatling inside <a href="https://graphics.pixar.com/usd/docs/USD-Toolset.html#USDToolset-usdview">Pixar's usdview</a> tool.
+  <a href="https://www.blendswap.com/blend/16368">cekuhnen's Coffee Maker</a> (<a href="https://creativecommons.org/licenses/by/2.0/legalcode">CC-BY</a>), slightly modified, rendered using Gatling inside <a href="https://graphics.pixar.com/usd/docs/USD-Toolset.html#USDToolset-usdview">Pixar's usdview</a> tool.
 </p>
 
-To output an actual image:
+A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .usdz) as input. Make sure that there is a polygonal light source in the scene.
+
 ```
 ./bin/gatling <scene.usd> render.png \
     --image-width 1200 \
@@ -74,9 +80,12 @@ To output an actual image:
 
 ### Outlook
 
-The idea is to follow Manuka's _Shade-before-Hit_ architecture with CPU dicing and GPU vertex pre-shading. Material networks are going to be translated to GLSL or SPIR-V shader code. [More...](https://github.com/pablode/gatling/projects)
+Basic texturing is the next important feature. After that, support for MDL materials will be considered.
 
 ### Further Reading
+
+###### Smythe et al. 2019
+Doug Smythe, Jonathan Stone, Davide Pesare, Henrik Edström. 2019. MaterialX: An Open Standard for Network-Based CG Object Looks. ASWF Open Source Day SIGGRAPH 2019. Retrieved October 25, 2021 from https://www.materialx.org/assets/MaterialX_Sig2019_BOF_slides.pdf.
 
 ###### Elkoura et al. 2019
 George Elkoura, Sebastian Grassia, Sunya Boonyatera, Alex Mohr, Pol Jeremias-Vila, and Matt Kuruc. 2019. A deep dive into universal scene description and hydra. In ACM SIGGRAPH 2019 Courses (SIGGRAPH '19). Association for Computing Machinery, New York, NY, USA, Article 1, 1–48. DOI:10.1145/3305366.3328033
@@ -94,7 +103,7 @@ Ingo Wald. 2007. On fast Construction of SAH-based Bounding Volume Hierarchies. 
 
 ```
 
-    Copyright (C) 2020 Pablo Delgado Krämer
+    Copyright (C) 2021 Pablo Delgado Krämer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
