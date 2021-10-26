@@ -35,7 +35,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (UsdPrimvarReader_point)
   (UsdPrimvarReader_vector)
   (UsdPrimvarReader_matrix)
-  // MaterialX UsdPreviewSurface node types
+  // MaterialX USD node type equivalents
   (ND_UsdPreviewSurface_surfaceshader)
   (ND_UsdUVTexture)
   (ND_UsdPrimvarReader_integer)

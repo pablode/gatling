@@ -135,7 +135,7 @@ struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* param
     .object_bin_count         = 16,
     .spatial_bin_count        = 32,
     .spatial_reserve_factor   = 1.25f,
-    .spatial_split_alpha      = 1.0f,
+    .spatial_split_alpha      = 1.0f, /* Temporarily disabled. */
     .vertex_count             = params->vertex_count,
     .vertices                 = params->vertices
   };
@@ -211,13 +211,9 @@ struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* param
   memcpy(&mapped_staging_mem[face_buf_offset], bvhc.faces, face_buf_size);
   memcpy(&mapped_staging_mem[vertex_buf_offset], params->vertices, vertex_buf_size);
 
-  c_result = cgpu_unmap_buffer(
-    s_device,
-    staging_buffer
-  );
+  c_result = cgpu_unmap_buffer(s_device, staging_buffer);
   if (c_result != CGPU_OK) goto cleanup;
 
-  /* Upload data to GPU. */
   c_result = cgpu_create_command_buffer(s_device, &command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
 
@@ -292,7 +288,6 @@ void giDestroyGeomCache(struct gi_geom_cache* cache)
 
 struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params* params)
 {
-  /* Compile shader. */
   uint32_t node_count = params->geom_cache->bvh_node_count;
   uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
@@ -348,6 +343,7 @@ int giRender(const struct gi_render_params* params,
              float* rgba_img)
 {
   int result = GI_ERROR;
+  CgpuResult c_result;
 
   cgpu_buffer output_buffer = { CGPU_INVALID_HANDLE };
   cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
@@ -359,7 +355,7 @@ int giRender(const struct gi_render_params* params,
   const int COLOR_COMPONENT_COUNT = 4;
   const uint64_t buffer_size = params->image_width * params->image_height * sizeof(float) * COLOR_COMPONENT_COUNT;
 
-  CgpuResult c_result = cgpu_create_buffer(
+  c_result = cgpu_create_buffer(
     s_device,
     CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
@@ -398,23 +394,23 @@ int giRender(const struct gi_render_params* params,
   };
   uint32_t push_data_size = sizeof(push_data);
 
-  cgpu_shader_resource_buffer sr_buffers[] = {
-    { 0,              output_buffer,                                       0,                       CGPU_WHOLE_SIZE },
+  cgpu_shader_resource_buffer buffers[] = {
+    { 0,              output_buffer,                                     0,                     CGPU_WHOLE_SIZE },
     { 1, params->geom_cache->buffer,   params->geom_cache->node_buf_offset,   params->geom_cache->node_buf_size },
     { 2, params->geom_cache->buffer,   params->geom_cache->face_buf_offset,   params->geom_cache->face_buf_size },
     { 3, params->geom_cache->buffer, params->geom_cache->vertex_buf_offset, params->geom_cache->vertex_buf_size },
   };
-  const uint32_t sr_buffer_count = sizeof(sr_buffers) / sizeof(sr_buffers[0]);
+  const uint32_t buffer_count = sizeof(buffers) / sizeof(buffers[0]);
 
-  const uint32_t sr_image_count = 0;
-  const cgpu_shader_resource_image* sr_images = NULL;
+  const uint32_t image_count = 0;
+  const cgpu_shader_resource_image* images = NULL;
 
   c_result = cgpu_create_pipeline(
     s_device,
-    sr_buffer_count,
-    sr_buffers,
-    sr_image_count,
-    sr_images,
+    buffer_count,
+    buffers,
+    image_count,
+    images,
     params->shader_cache->shader,
     params->shader_cache->shader_entry_point,
     push_data_size,
@@ -505,11 +501,7 @@ int giRender(const struct gi_render_params* params,
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  memcpy(
-    rgba_img,
-    mapped_staging_mem,
-    buffer_size
-  );
+  memcpy(rgba_img, mapped_staging_mem, buffer_size);
 
   c_result = cgpu_unmap_buffer(
     s_device,

@@ -79,6 +79,7 @@ bool shade_hit(inout Sample_state state,
     mdl_bsdf_scattering_init(f.mat_idx, shading_state_material);
     mdl_bsdf_scattering_sample(f.mat_idx, bsdf_sample_data, shading_state_material);
 
+    /* Handle results. */
     state.value += state.throughput * edf_evaluate_data.edf * emission_intensity;
 
     if ((bsdf_sample_data.event_type & BSDF_EVENT_ABSORB) != 0)
@@ -86,13 +87,13 @@ bool shade_hit(inout Sample_state state,
         return false;
     }
 
-    /* Prepare state for next ray. */
+    state.throughput *= bsdf_sample_data.bsdf_over_pdf;
+
+    /* Prepare next ray. */
     bool is_transmission = ((bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0);
 
     state.ray_dir = bsdf_sample_data.k2;
     state.ray_origin = hit.pos + geom_normal * RAY_OFFSET_EPS * (is_transmission ? -1.0 : 1.0);
-
-    state.throughput *= bsdf_sample_data.bsdf_over_pdf;
 
     return true;
 }
@@ -129,9 +130,7 @@ float3 evaluate_sample(inout uint rng_state,
     {
         Hit_info hit_info;
 
-        bool found_hit = traverse_bvh(state.ray_origin,
-                                      state.ray_dir,
-                                      hit_info);
+        bool found_hit = traverse_bvh(state.ray_origin, state.ray_dir, hit_info);
 
         if (!found_hit)
         {
@@ -147,8 +146,7 @@ float3 evaluate_sample(inout uint rng_state,
 
         if (bounce >= RR_BOUNCE_OFFSET)
         {
-            if (russian_roulette(state.rng_state,
-                                 state.throughput))
+            if (russian_roulette(state.rng_state, state.throughput))
             {
                 break;
             }
