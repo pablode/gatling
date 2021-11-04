@@ -22,3 +22,9 @@
 [submodule "extern/VulkanMemoryAllocator"]
 	path = extern/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+[submodule "extern/libspng"]
+	path = extern/libspng
+	url = https://github.com/randy408/libspng.git
+[submodule "extern/miniz"]
+	path = extern/miniz
+	url = https://github.com/richgel999/miniz.git

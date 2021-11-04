@@ -88,3 +88,24 @@ if(${GATLING_USE_EMBREE})
   set(EMBREE_TASKING_SYSTEM "" CACHE STRING "Don't use TBB." FORCE)
   add_subdirectory(embree)
 endif()
+
+#
+# miniz
+#
+set(BUILD_SHARED_LIBS OFF CACHE PATH "" FORCE)
+add_subdirectory(miniz)
+
+#
+# libspng
+#
+add_library(
+  spng STATIC
+  libspng/spng/spng.c
+)
+target_include_directories(spng PUBLIC libspng/spng)
+target_link_libraries(spng PRIVATE miniz)
+target_compile_definitions(
+  spng
+  PRIVATE SPNG_USE_MINIZ
+  PUBLIC SPNG_STATIC
+)
