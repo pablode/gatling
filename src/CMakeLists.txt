@@ -1,6 +1,7 @@
 add_subdirectory(vma-c)
 add_subdirectory(cgpu)
 add_subdirectory(gml)
+add_subdirectory(imgio)
 add_subdirectory(shadergen)
 add_subdirectory(gi)
 add_subdirectory(hdGatling)
