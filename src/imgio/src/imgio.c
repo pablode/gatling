@@ -2,6 +2,7 @@
 
 #include "mmap.h"
 #include "png.h"
+#include "jpeg.h"
 
 #include <stdlib.h>
 
@@ -25,6 +26,11 @@ int imgio_load_img(const char* file_path,
   }
 
   int r = imgio_png_decode(size, data, img);
+
+  if (r == IMGIO_ERR_UNSUPPORTED_ENCODING)
+  {
+    r = imgio_jpeg_decode(size, data, img);
+  }
 
   imgio_munmap(file, data);
   imgio_file_close(file);

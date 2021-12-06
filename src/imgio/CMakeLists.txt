@@ -4,6 +4,8 @@ add_library(
   include/img.h
   include/error_codes.h
   src/imgio.c
+  src/jpeg.c
+  src/jpeg.h
   src/png.c
   src/png.h
   src/mmap.h
@@ -22,4 +24,5 @@ target_link_libraries(
   imgio
   PRIVATE
     spng
+    turbojpeg-static
 )
