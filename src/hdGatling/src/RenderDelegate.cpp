@@ -213,12 +213,12 @@ TfToken HdGatlingRenderDelegate::GetMaterialBindingPurpose() const
 
 TfTokenVector HdGatlingRenderDelegate::GetMaterialRenderContexts() const
 {
-  return TfTokenVector{ HdGatlingRenderContexts->mtlx };
+  return TfTokenVector{ HdGatlingRenderContexts->mtlx, HdGatlingRenderContexts->mdl };
 }
 
 TfTokenVector HdGatlingRenderDelegate::GetShaderSourceTypes() const
 {
-  return TfTokenVector{ HdGatlingSourceTypes->mtlx };
+  return TfTokenVector{ HdGatlingSourceTypes->mtlx, HdGatlingSourceTypes->mdl };
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
