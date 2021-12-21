@@ -88,7 +88,8 @@ struct gi_init_params
 int giInitialize(const struct gi_init_params* params);
 void giTerminate();
 
-struct gi_material* giCreateMaterialFromMtlx(const char* doc);
+struct gi_material* giCreateMaterialFromMtlx(const char* doc_str);
+struct gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
 void giDestroyMaterial(struct gi_material* mat);
 
 struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* params);

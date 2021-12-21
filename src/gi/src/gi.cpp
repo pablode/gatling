@@ -112,6 +112,19 @@ gi_material* giCreateMaterialFromMtlx(const char* doc_str)
   return mat;
 }
 
+struct gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier)
+{
+  struct sg::Material* sg_mat = s_shaderGen->createMaterialFromMdlFile(file_path, sub_identifier);
+  if (!sg_mat)
+  {
+    return NULL;
+  }
+
+  struct gi_material* mat = new gi_material;
+  mat->sg_mat = sg_mat;
+  return mat;
+}
+
 void giDestroyMaterial(gi_material* mat)
 {
   s_shaderGen->destroyMaterial(mat->sg_mat);

@@ -27,6 +27,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   (mtlx)
 
 #define HD_GATLING_RENDER_CONTEXT_TOKENS             \
+  (mdl)                                              \
   (mtlx)
 
 #define HD_GATLING_NODE_CONTEXT_TOKENS               \

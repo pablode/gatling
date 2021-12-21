@@ -164,6 +164,45 @@ MaterialNetworkTranslator::MaterialNetworkTranslator(const std::string& mtlxLibP
 gi_material* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,
                                                      const HdMaterialNetwork2& network) const
 {
+  gi_material* result = TryParseMdlNetwork(network);
+
+  if (!result)
+  {
+    result = TryParseMtlxNetwork(id, network);
+  }
+
+  return result;
+}
+
+gi_material* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwork2& network) const
+{
+  if (network.nodes.size() != 1)
+  {
+    return nullptr;
+  }
+
+  const HdMaterialNode2& node = network.nodes.begin()->second;
+
+  SdrRegistry& sdrRegistry = SdrRegistry::GetInstance();
+  SdrShaderNodeConstPtr sdrNode = sdrRegistry.GetShaderNodeByIdentifier(node.nodeTypeId);
+
+  if (!sdrNode || sdrNode->GetContext() != HdGatlingNodeContexts->mdl)
+  {
+    return nullptr;
+  }
+
+  const NdrTokenMap& metadata = sdrNode->GetMetadata();
+  const auto& subIdentifierIt = metadata.find(HdGatlingNodeMetadata->subIdentifier);
+  TF_DEV_AXIOM(subIdentifierIt != metadata.end());
+
+  const std::string& subIdentifier = (*subIdentifierIt).second;
+  const std::string& fileUri = sdrNode->GetResolvedImplementationURI();
+
+  return giCreateMaterialFromMdlFile(fileUri.c_str(), subIdentifier.c_str());
+}
+
+gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+{
   HdMaterialNetwork2 mtlxNetwork;
   if (!_ConvertNodesToMaterialXNodes(network, mtlxNetwork))
   {

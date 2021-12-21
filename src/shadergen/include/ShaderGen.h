@@ -26,8 +26,9 @@ namespace sg
     ~ShaderGen();
 
   public:
-    struct Material* createMaterialFromMtlx(std::string_view docStr);
-    void destroyMaterial(struct Material* mat);
+    Material* createMaterialFromMtlx(std::string_view docStr);
+    Material* createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
+    void destroyMaterial(Material* mat);
     bool isMaterialEmissive(const struct Material* mat);
 
   public:

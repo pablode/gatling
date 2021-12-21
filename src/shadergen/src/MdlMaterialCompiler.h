@@ -1,6 +1,7 @@
 #pragma once
 
-#include <string>
+#include <string_view>
+#include <functional>
 
 #include <mi/base/handle.h>
 #include <mi/neuraylib/icompiled_material.h>
@@ -21,18 +22,23 @@ namespace sg
     MdlMaterialCompiler(MdlRuntime& runtime);
 
   public:
-    bool compileMaterial(const std::string& src,
-                         const std::string& identifier,
+    bool compileFromString(std::string_view srcStr,
+                           std::string_view identifier,
+                           mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
+
+    bool compileFromFile(std::string_view filePath,
+                         std::string_view identifier,
                          mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
   private:
-    bool createModule(mi::neuraylib::IMdl_execution_context* context,
-                      const char* moduleName,
-                      const char* mdlSrc);
+    bool compile(std::string_view identifier,
+                 std::string_view moduleName,
+                 std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
+                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
     bool createCompiledMaterial(mi::neuraylib::IMdl_execution_context* context,
-                                const char* moduleName,
-                                const std::string& identifier,
+                                std::string_view moduleName,
+                                std::string_view identifier,
                                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
   private:

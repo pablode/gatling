@@ -21,6 +21,10 @@ public:
                             const HdMaterialNetwork2& network) const;
 
 private:
+  gi_material* TryParseMdlNetwork(const HdMaterialNetwork2& network) const;
+
+  gi_material* TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
+
   MaterialX::DocumentPtr CreateMaterialXDocumentFromNetwork(const SdfPath& id,
                                                             const HdMaterialNetwork2& network) const;
 

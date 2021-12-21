@@ -111,7 +111,21 @@ namespace sg
     }
 
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    if (!m_mdlMaterialCompiler->compileMaterial(mdlSrc, subIdentifier, compiledMaterial))
+    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
+    {
+      return nullptr;
+    }
+
+    Material* mat = new Material();
+    mat->compiledMaterial = compiledMaterial;
+    mat->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
+    return mat;
+  }
+
+  Material* ShaderGen::createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
+  {
+    mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
+    if (!m_mdlMaterialCompiler->compileFromFile(filePath, subIdentifier, compiledMaterial))
     {
       return nullptr;
     }
