@@ -30,12 +30,12 @@ namespace sg
     }
 
     m_neuray = mi::base::Handle<mi::neuraylib::INeuray>(m_loader->getNeuray());
-    mi::base::Handle<mi::neuraylib::IMdl_configuration> config(m_neuray->get_api_component<mi::neuraylib::IMdl_configuration>());
 
+    m_config = mi::base::Handle<mi::neuraylib::IMdl_configuration>(m_neuray->get_api_component<mi::neuraylib::IMdl_configuration>());
     m_logger = mi::base::Handle<MdlLogger>(new MdlLogger());
-    config->set_logger(m_logger.get());
+    m_config->set_logger(m_logger.get());
 
-    if (config->add_mdl_path(mtlxmdlPath))
+    if (m_config->add_mdl_path(mtlxmdlPath))
     {
       m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MaterialX MDL file path not found, translation not possible");
       return false;
@@ -75,6 +75,11 @@ namespace sg
   mi::base::Handle<mi::neuraylib::IMdl_factory> MdlRuntime::getFactory()
   {
     return m_factory;
+  }
+
+  mi::base::Handle<mi::neuraylib::IMdl_configuration> MdlRuntime::getConfig()
+  {
+    return m_config;
   }
 
   mi::base::Handle<mi::neuraylib::IMdl_impexp_api> MdlRuntime::getImpExpApi()

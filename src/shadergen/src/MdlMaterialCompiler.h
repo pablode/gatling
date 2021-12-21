@@ -39,6 +39,7 @@ namespace sg
     mi::base::Handle<MdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
+    mi::base::Handle<mi::neuraylib::IMdl_configuration> m_config;
     mi::base::Handle<mi::neuraylib::IMdl_factory> m_factory;
     mi::base::Handle<mi::neuraylib::IMdl_impexp_api> m_impExpApi;
   };

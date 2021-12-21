@@ -21,6 +21,7 @@ namespace sg
     m_logger = mi::base::Handle<MdlLogger>(runtime.getLogger());
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
     m_transaction = mi::base::Handle<mi::neuraylib::ITransaction>(runtime.getTransaction());
+    m_config = mi::base::Handle<mi::neuraylib::IMdl_configuration>(runtime.getConfig());
     m_factory = mi::base::Handle<mi::neuraylib::IMdl_factory>(runtime.getFactory());
     m_impExpApi = mi::base::Handle<mi::neuraylib::IMdl_impexp_api>(runtime.getImpExpApi());
   }
