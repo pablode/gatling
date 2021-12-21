@@ -7,7 +7,7 @@
 
 namespace sg
 {
-  const char* MODULE_PREFIX = "::gatling_";
+  const char* MODULE_PREFIX = "::gatling::";
   std::atomic_uint32_t s_idCounter(0);
 
   std::string _makeModuleName(const std::string& identifier)
