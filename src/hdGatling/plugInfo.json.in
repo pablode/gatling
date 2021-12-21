@@ -4,11 +4,17 @@
             "Info": {
                 "Types": {
                     "HdGatlingRendererPlugin": {
-                        "bases": [
-                            "HdRendererPlugin"
-                        ],
+                        "bases": ["HdRendererPlugin"],
                         "displayName": "Gatling",
                         "priority": 99
+                    },
+                    "HdGatlingMdlDiscoveryPlugin": {
+                        "bases": ["NdrDiscoveryPlugin"],
+                        "displayName": "MDL Discovery"
+                    },
+                    "HdGatlingMdlParserPlugin": {
+                        "bases": ["NdrParserPlugin"],
+                        "displayName": "MDL Node Parser"
                     }
                 }
             },

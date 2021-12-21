@@ -10,6 +10,10 @@ add_library(
   src/Material.cpp
   src/MaterialNetworkTranslator.h
   src/MaterialNetworkTranslator.cpp
+  src/MdlDiscoveryPlugin.h
+  src/MdlDiscoveryPlugin.cpp
+  src/MdlParserPlugin.h
+  src/MdlParserPlugin.cpp
   src/Mesh.h
   src/Mesh.cpp
   src/RenderPass.h
