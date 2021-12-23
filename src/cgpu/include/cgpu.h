@@ -1,6 +1,10 @@
 #ifndef CGPU_H
 #define CGPU_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if defined(CGPU_EXPORT_SYMBOLS) && defined(CGPU_IMPORT_SYMBOLS)
   #error "Symbols can not be exported and imported at the same time."
 #endif
@@ -806,5 +810,9 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_get_physical_device_limits(
   cgpu_device device,
   cgpu_physical_device_limits* p_limits
 );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -1,13 +1,22 @@
 add_library(
   gi STATIC
   include/gi.h
-  src/gi.c
-  src/bvh.c
+  src/gi.cpp
+  src/bvh.cpp
   src/bvh.h
-  src/bvh_collapse.c
+  src/bvh_collapse.cpp
   src/bvh_collapse.h
-  src/bvh_compress.c
+  src/bvh_compress.cpp
   src/bvh_compress.h
+)
+
+set_target_properties(
+  gi
+  PROPERTIES
+    LINKER_LANGUAGE CXX
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
 )
 
 target_include_directories(

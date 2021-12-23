@@ -16,24 +16,24 @@ struct gi_bvhc_node
 
 struct gi_bvhc
 {
-  gml_aabb             aabb;
-  uint32_t             node_count;
-  struct gi_bvhc_node* nodes;
-  uint32_t             face_count;
-  struct gi_face*      faces;
+  gml_aabb      aabb;
+  uint32_t      node_count;
+  gi_bvhc_node* nodes;
+  uint32_t      face_count;
+  gi_face*      faces;
 };
 
 struct gi_bvhc_params
 {
-  const struct gi_bvh* bvh;
-  float                face_intersection_cost;
-  uint32_t             max_leaf_size;
-  float                node_traversal_cost;
+  const gi_bvh* bvh;
+  float         face_intersection_cost;
+  uint32_t      max_leaf_size;
+  float         node_traversal_cost;
 };
 
-void gi_bvh_collapse(const struct gi_bvhc_params* params,
-                     struct gi_bvhc* bvhc);
+void gi_bvh_collapse(const gi_bvhc_params* params,
+                     gi_bvhc* bvhc);
 
-void gi_free_bvhc(struct gi_bvhc* bvhcc);
+void gi_free_bvhc(gi_bvhc* bvhcc);
 
 #endif

@@ -69,14 +69,14 @@ static_assert(sizeof(struct gi_bvhcc_node) == 80, "Compressed BVH node size shou
 
 struct gi_bvhcc
 {
-  gml_aabb              aabb;
-  uint32_t              node_count;
-  struct gi_bvhcc_node* nodes;
+  gml_aabb       aabb;
+  uint32_t       node_count;
+  gi_bvhcc_node* nodes;
 };
 
-void gi_bvh_compress(const struct gi_bvhc* bvhc,
-                     struct gi_bvhcc* bvhcc);
+void gi_bvh_compress(const gi_bvhc* bvhc,
+                     gi_bvhcc* bvhcc);
 
-void gi_free_bvhcc(struct gi_bvhcc* bvhcc);
+void gi_free_bvhcc(gi_bvhcc* bvhcc);
 
 #endif

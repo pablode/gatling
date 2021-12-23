@@ -3,9 +3,9 @@
 #include <math.h>
 #include <stdlib.h>
 
-static void gi_bvhcc_compress_node(const struct gi_bvhc_node* in_node,
+static void gi_bvhcc_compress_node(const gi_bvhc_node* in_node,
                                    const gml_aabb* parent_aabb,
-                                   struct gi_bvhcc_node* out_node)
+                                   gi_bvhcc_node* out_node)
 {
   const uint32_t Nq = 8;
 
@@ -112,13 +112,13 @@ static void gi_bvhcc_compress_node(const struct gi_bvhc_node* in_node,
   }
 }
 
-static void gi_bvhcc_compress_subtree(const struct gi_bvhc* bvhc,
-                                      struct gi_bvhcc* bvhcc,
+static void gi_bvhcc_compress_subtree(const gi_bvhc* bvhc,
+                                      gi_bvhcc* bvhcc,
                                       const gml_aabb* node_aabb,
                                       uint32_t node_idx)
 {
-  const struct gi_bvhc_node* in_node = &bvhc->nodes[node_idx];
-  struct gi_bvhcc_node* out_node = &bvhcc->nodes[node_idx];
+  const gi_bvhc_node* in_node = &bvhc->nodes[node_idx];
+  gi_bvhcc_node* out_node = &bvhcc->nodes[node_idx];
 
   for (uint32_t i = 0; i < 8; ++i)
   {
@@ -137,18 +137,18 @@ static void gi_bvhcc_compress_subtree(const struct gi_bvhc* bvhc,
   gi_bvhcc_compress_node(in_node, node_aabb, out_node);
 }
 
-void gi_bvh_compress(const struct gi_bvhc* bvhc,
-                     struct gi_bvhcc* bvhcc)
+void gi_bvh_compress(const gi_bvhc* bvhc,
+                     gi_bvhcc* bvhcc)
 {
   bvhcc->aabb = bvhc->aabb;
 
   bvhcc->node_count = bvhc->node_count;
-  bvhcc->nodes = malloc(bvhc->node_count * sizeof(struct gi_bvhcc_node));
+  bvhcc->nodes = new gi_bvhcc_node[bvhc->node_count];
 
   gi_bvhcc_compress_subtree(bvhc, bvhcc, &bvhc->aabb, 0);
 }
 
-void gi_free_bvhcc(struct gi_bvhcc* bvhcc)
+void gi_free_bvhcc(gi_bvhcc* bvhcc)
 {
-  free(bvhcc->nodes);
+  delete bvhcc->nodes;
 }

@@ -1,6 +1,10 @@
 #ifndef GML_H
 #define GML_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -78,5 +82,9 @@ void gml_aabb_intersect(const gml_aabb* aabb_a, const gml_aabb* aabb_b, gml_aabb
 void gml_aabb_size(const gml_aabb* aabb, gml_vec3 size);
 float gml_aabb_half_area(const gml_aabb* aabb);
 float gml_aabb_area(const gml_aabb* aabb);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
