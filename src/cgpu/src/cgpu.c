@@ -50,6 +50,8 @@ typedef struct cgpu_iimage {
   VkImageView    image_view;
   VkDeviceMemory memory;
   uint64_t       size;
+  uint32_t       width;
+  uint32_t       height;
 } cgpu_iimage;
 
 typedef struct cgpu_ipipeline {
@@ -1541,6 +1543,9 @@ CgpuResult cgpu_create_image(
     idevice->table.vkFreeMemory(idevice->logical_device, iimage->memory, NULL);
   }
 
+  iimage->width = width;
+  iimage->height = height;
+
   return CGPU_OK;
 }
 
@@ -2129,6 +2134,64 @@ CgpuResult cgpu_cmd_copy_buffer(
     icommand_buffer->command_buffer,
     isource_buffer->buffer,
     idestination_buffer->buffer,
+    1,
+    &region
+  );
+
+  return CGPU_OK;
+}
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
+  cgpu_command_buffer command_buffer,
+  cgpu_buffer buffer,
+  cgpu_image image)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_ibuffer* ibuffer;
+  if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_iimage* iimage;
+  if (!cgpu_resolve_image(image, &iimage)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  VkImageSubresourceLayers layers;
+  layers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  layers.mipLevel = 0;
+  layers.baseArrayLayer = 0;
+  layers.layerCount = 1;
+
+  VkOffset3D offset;
+  offset.x = 0;
+  offset.y = 0;
+  offset.z = 0;
+
+  VkExtent3D extent;
+  extent.width = iimage->width;
+  extent.height = iimage->height;
+  extent.depth = 1;
+
+  VkBufferImageCopy region;
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource = layers;
+  region.imageOffset = offset;
+  region.imageExtent = extent;
+
+  vkCmdCopyBufferToImage(
+    icommand_buffer->command_buffer,
+    ibuffer->buffer,
+    iimage->image,
+    VK_IMAGE_LAYOUT_GENERAL,
     1,
     &region
   );

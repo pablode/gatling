@@ -704,6 +704,12 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer(
   uint64_t size
 );
 
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
+  cgpu_command_buffer command_buffer,
+  cgpu_buffer buffer,
+  cgpu_image image
+);
+
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_push_constants(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline,
