@@ -36,7 +36,7 @@ void HdGatlingCamera::Sync(HdSceneDelegate* sceneDelegate,
     // See https://wiki.panotools.org/Field_of_View
     float aperture = _verticalAperture * GfCamera::APERTURE_UNIT;
     float focalLength = _focalLength * GfCamera::FOCAL_LENGTH_UNIT;
-    float vfov = 2.0f * std::atanf(aperture / (2.0f * focalLength));
+    float vfov = 2.0f * std::atan(aperture / (2.0f * focalLength));
 
     m_vfov = vfov;
   }
