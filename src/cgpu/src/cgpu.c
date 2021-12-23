@@ -52,6 +52,7 @@ typedef struct cgpu_iimage {
   uint64_t       size;
   uint32_t       width;
   uint32_t       height;
+  bool           initialized;
 } cgpu_iimage;
 
 typedef struct cgpu_ipipeline {
@@ -1545,6 +1546,7 @@ CgpuResult cgpu_create_image(
 
   iimage->width = width;
   iimage->height = height;
+  iimage->initialized = false;
 
   return CGPU_OK;
 }
@@ -1911,7 +1913,7 @@ CgpuResult cgpu_create_pipeline(
     VkDescriptorImageInfo* descriptor_image_info = &descriptor_image_infos[i];
     descriptor_image_info->sampler = idevice->sampler;
     descriptor_image_info->imageView = iimage->image_view;
-    descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
     VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2196,6 +2198,8 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
     &region
   );
 
+  iimage->initialized = true;
+
   return CGPU_OK;
 }
 
@@ -2319,8 +2323,8 @@ CgpuResult cgpu_cmd_pipeline_barrier(
     b_vk->pNext = NULL;
     b_vk->srcAccessMask = cgpu_translate_access_flags(b_cgpu->src_access_flags);
     b_vk->dstAccessMask = cgpu_translate_access_flags(b_cgpu->dst_access_flags);
-    b_vk->oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    b_vk->newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    b_vk->oldLayout = iimage->initialized ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_UNDEFINED;
+    b_vk->newLayout = VK_IMAGE_LAYOUT_GENERAL;
     b_vk->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     b_vk->image = iimage->image;
