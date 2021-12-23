@@ -1405,34 +1405,25 @@ CgpuResult cgpu_create_image(
   }
 
   VkImageTiling vk_image_tiling = VK_IMAGE_TILING_OPTIMAL;
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC)
-        == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) {
-    vk_image_tiling = VK_IMAGE_TILING_LINEAR;
-  }
-  else if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST)
-        == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) {
+  if (usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC || usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) {
     vk_image_tiling = VK_IMAGE_TILING_LINEAR;
   }
 
   VkImageUsageFlags vk_image_usage = 0;
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC)
-        == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) {
+  if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) {
     vk_image_usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   }
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST)
-        == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) {
+  if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) {
     vk_image_usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   }
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_SAMPLED)
-        == CGPU_IMAGE_USAGE_FLAG_SAMPLED) {
+  if ((usage & CGPU_IMAGE_USAGE_FLAG_SAMPLED) == CGPU_IMAGE_USAGE_FLAG_SAMPLED) {
     vk_image_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
   }
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_STORAGE)
-        == CGPU_IMAGE_USAGE_FLAG_STORAGE) {
+  if ((usage & CGPU_IMAGE_USAGE_FLAG_STORAGE) == CGPU_IMAGE_USAGE_FLAG_STORAGE) {
     vk_image_usage |= VK_IMAGE_USAGE_STORAGE_BIT;
   }
 
-  const VkFormat vk_format = cgpu_translate_image_format(format);
+  VkFormat vk_format = cgpu_translate_image_format(format);
 
   VkImageCreateInfo image_info;
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1477,8 +1468,7 @@ CgpuResult cgpu_create_image(
     &mem_requirements
   );
 
-  const VkMemoryPropertyFlags mem_flags =
-      cgpu_translate_memory_properties(memory_properties);
+  const VkMemoryPropertyFlags mem_flags = cgpu_translate_memory_properties(memory_properties);
 
   int32_t mem_index = -1;
   for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
@@ -1548,11 +1538,7 @@ CgpuResult cgpu_create_image(
   {
     resource_store_free_handle(&iimage_store, p_image->handle);
     idevice->table.vkDestroyImage(idevice->logical_device, iimage->image, NULL);
-    idevice->table.vkFreeMemory(
-      idevice->logical_device,
-      iimage->memory,
-      NULL
-    );
+    idevice->table.vkFreeMemory(idevice->logical_device, iimage->memory, NULL);
   }
 
   return CGPU_OK;
@@ -1921,8 +1907,7 @@ CgpuResult cgpu_create_pipeline(
     descriptor_image_info->imageView = iimage->image_view;
     descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    VkWriteDescriptorSet* write_descriptor_set =
-      &write_descriptor_sets[write_desc_set_count];
+    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_descriptor_set->pNext = NULL;
     write_descriptor_set->dstSet = ipipeline->descriptor_set;
@@ -2137,8 +2122,7 @@ CgpuResult cgpu_cmd_copy_buffer(
   VkBufferCopy region;
   region.srcOffset = source_offset;
   region.dstOffset = destination_offset;
-  region.size =
-    (size == CGPU_WHOLE_SIZE) ? isource_buffer->size : size;
+  region.size = (size == CGPU_WHOLE_SIZE) ? isource_buffer->size : size;
 
   idevice->table.vkCmdCopyBuffer(
     icommand_buffer->command_buffer,
