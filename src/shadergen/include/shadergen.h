@@ -30,6 +30,7 @@ struct SgMainShaderParams
   uint32_t rr_bounce_offset;
   float rr_inv_min_term_prob;
   float max_sample_value;
+  float bg_color[4];
   uint32_t material_count;
   const struct SgMaterial** materials;
 };

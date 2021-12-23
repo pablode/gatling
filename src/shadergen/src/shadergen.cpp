@@ -153,6 +153,12 @@ bool sgGenerateMainShader(const SgMainShaderParams* params,
   APPEND_CONSTANT("RR_BOUNCE_OFFSET", rr_bounce_offset)
   APPEND_CONSTANT("RR_INV_MIN_TERM_PROB", rr_inv_min_term_prob)
 
+  ss << "#define BACKGROUND_COLOR float4("
+      << params->bg_color[0] << ", "
+      << params->bg_color[1] << ", "
+      << params->bg_color[2] << ", "
+      << params->bg_color[3] << ")\n";
+
   std::string genMdl;
   if (!_sgGenerateMainShaderMdlHlsl(params->material_count,
                                     params->materials,

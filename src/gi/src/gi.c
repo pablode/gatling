@@ -300,6 +300,10 @@ struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params*
     .max_sample_value     = params->max_sample_value,
     .rr_bounce_offset     = params->rr_bounce_offset,
     .rr_inv_min_term_prob = params->rr_inv_min_term_prob,
+    .bg_color[0]          = params->bg_color[0],
+    .bg_color[1]          = params->bg_color[1],
+    .bg_color[2]          = params->bg_color[2],
+    .bg_color[3]          = params->bg_color[3],
     .material_count       = params->geom_cache->material_count,
     .materials            = params->geom_cache->materials
   };

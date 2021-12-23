@@ -53,6 +53,7 @@ struct gi_shader_cache_params
   uint32_t                    rr_bounce_offset;
   float                       rr_inv_min_term_prob;
   float                       max_sample_value;
+  float                       bg_color[4];
 };
 
 struct gi_render_params

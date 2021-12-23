@@ -48,6 +48,7 @@ private:
   bool m_isConverged;
   uint32_t m_lastSceneStateVersion;
   uint32_t m_lastRenderSettingsVersion;
+  GfVec4f m_lastBackgroundColor;
   gi_geom_cache* m_geomCache;
   gi_shader_cache* m_shaderCache;
   GfMatrix4d m_rootMatrix;

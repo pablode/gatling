@@ -35,6 +35,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_isConverged(false)
   , m_lastSceneStateVersion(UINT32_MAX)
   , m_lastRenderSettingsVersion(UINT32_MAX)
+  , m_lastBackgroundColor(GfVec4f(0.0f, 0.0f, 0.0f, 0.0f))
   , m_geomCache(nullptr)
   , m_shaderCache(nullptr)
 {
@@ -262,13 +263,15 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(colorAovBinding->renderBuffer);
+  GfVec4f backgroundColor = colorAovBinding->clearValue.Get<GfVec4f>();
 
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
   bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
   bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
+  bool backgroundColorChanged = (backgroundColor != m_lastBackgroundColor);
 
-  if (!sceneChanged && !renderSettingsChanged)
+  if (!sceneChanged && !renderSettingsChanged && !backgroundColorChanged)
   {
     renderBuffer->SetConverged(true);
     return;
@@ -278,6 +281,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   m_lastSceneStateVersion = sceneStateVersion;
   m_lastRenderSettingsVersion = renderSettingsStateVersion;
+  m_lastBackgroundColor = backgroundColor;
 
   if (!m_geomCache)
   {
@@ -313,7 +317,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     m_rootMatrix = viewMatrix;
   }
 
-  bool rebuildShaderCache = !m_shaderCache || renderSettingsChanged;
+  bool rebuildShaderCache = !m_shaderCache || renderSettingsChanged || backgroundColorChanged;
 
   if (m_geomCache && rebuildShaderCache)
   {
@@ -335,6 +339,10 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     VtValue max_sample_value = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
     shaderParams.rr_inv_min_term_prob = rr_inv_min_term_prob.CastToTypeid(typeid(double)).Get<double>();
     shaderParams.max_sample_value = max_sample_value.CastToTypeid(typeid(double)).Get<double>();
+    for (uint32_t i = 0; i < 4; i++)
+    {
+      shaderParams.bg_color[i] = backgroundColor[i];
+    }
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");

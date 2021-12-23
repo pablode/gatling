@@ -130,6 +130,7 @@ float3 evaluate_sample(inout uint4 rng_state,
 
         if (!found_hit)
         {
+            state.value += state.throughput * BACKGROUND_COLOR.rgb;
             break;
         }
 
