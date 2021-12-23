@@ -1683,13 +1683,13 @@ CgpuResult cgpu_create_pipeline(
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
-  const uint32_t desc_set_binding_count = buffer_resource_count + image_resource_count;
+  uint32_t resource_count = buffer_resource_count + image_resource_count;
 
   VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   descriptor_set_layout_create_info.pNext = NULL;
   descriptor_set_layout_create_info.flags = 0;
-  descriptor_set_layout_create_info.bindingCount = desc_set_binding_count;
+  descriptor_set_layout_create_info.bindingCount = resource_count;
   descriptor_set_layout_create_info.pBindings = descriptor_set_bindings;
 
   VkResult result = idevice->table.vkCreateDescriptorSetLayout(
@@ -1775,17 +1775,18 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE;
   }
 
-  VkDescriptorPoolSize descriptor_pool_size;
-  descriptor_pool_size.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  descriptor_pool_size.descriptorCount = desc_set_binding_count;
+  VkDescriptorPoolSize descriptor_pool_sizes[] = {
+    { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = buffer_resource_count },
+    { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  .descriptorCount = image_resource_count  }
+  };
 
   VkDescriptorPoolCreateInfo descriptor_pool_create_info;
   descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   descriptor_pool_create_info.pNext = NULL;
   descriptor_pool_create_info.flags = 0;
   descriptor_pool_create_info.maxSets = 1;
-  descriptor_pool_create_info.poolSizeCount = 1;
-  descriptor_pool_create_info.pPoolSizes = &descriptor_pool_size;
+  descriptor_pool_create_info.poolSizeCount = 2;
+  descriptor_pool_create_info.pPoolSizes = descriptor_pool_sizes;
 
   result = idevice->table.vkCreateDescriptorPool(
     idevice->logical_device,
