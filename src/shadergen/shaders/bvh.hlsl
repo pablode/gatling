@@ -94,10 +94,10 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
         {
             const uint child_bit_idx = firstbithigh(node_group.y);
             const uint slot_index = (child_bit_idx - 24) ^ (oct_inv4 & 0xFF);
-            const uint rel_idx = countbits(node_group.y & ~(0xFFFFFFFF << slot_index));
+            const uint rel_idx = countbits(node_group.y & ~(0xFFFFFFFFu << slot_index));
             const uint child_node_idx = node_group.x + rel_idx;
 
-            node_group.y &= ~(1 << child_bit_idx);
+            node_group.y &= ~(1u << child_bit_idx);
 
             if (node_group.y > 0x00FFFFFF)
             {
@@ -193,7 +193,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
 
             const uint face_rel_index = firstbithigh(face_group.y);
 
-            face_group.y &= ~(1 << face_rel_index);
+            face_group.y &= ~(1u << face_rel_index);
 
             const uint face_index = face_group.x + face_rel_index;
 
