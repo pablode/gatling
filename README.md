@@ -101,6 +101,8 @@ Ingo Wald. 2007. On fast Construction of SAH-based Bounding Volume Hierarchies. 
 
 ### License
 
+Gatling is licensed under the GPL v3, as included in the [LICENSE](LICENSE) file.
+
 ```
 
     Copyright (C) 2021 Pablo Delgado Krämer
@@ -119,3 +121,7 @@ Ingo Wald. 2007. On fast Construction of SAH-based Bounding Volume Hierarchies. 
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ```
+
+It contains code from the Ray Tracing Gems I book, which is [MIT](docs/licenses/LICENSE.MIT.rtgems) licensed and copyrighted:
+
+* Copyright 2019 NVIDIA Corporation
