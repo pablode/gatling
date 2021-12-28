@@ -125,3 +125,7 @@ Gatling is licensed under the GPL v3, as included in the [LICENSE](LICENSE) file
 It contains code from the Ray Tracing Gems I book, which is [MIT](docs/licenses/LICENSE.MIT.rtgems) licensed and copyrighted:
 
 * Copyright 2019 NVIDIA Corporation
+
+It contains code from the MDL SDK, which is [BSD](docs/licenses/LICENSE.BSD-3.mdl-sdk) licensed and copyrighted:
+
+* Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
