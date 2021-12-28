@@ -3,11 +3,11 @@
 
 struct Sample_state
 {
+    uint4 rng_state;
     float3 ray_origin;
     float3 ray_dir;
     float3 throughput;
     float3 value;
-    uint rng_state;
 };
 
 bool shade_hit(inout Sample_state state,
@@ -72,10 +72,7 @@ bool shade_hit(inout Sample_state state,
     bsdf_sample_data.ior1 = BSDF_USE_MATERIAL_IOR;
     bsdf_sample_data.ior2 = BSDF_USE_MATERIAL_IOR;
     bsdf_sample_data.k1 = -state.ray_dir;
-    bsdf_sample_data.xi.x = random_float_between_0_and_1(state.rng_state);
-    bsdf_sample_data.xi.y = random_float_between_0_and_1(state.rng_state);
-    bsdf_sample_data.xi.z = random_float_between_0_and_1(state.rng_state);
-    bsdf_sample_data.xi.w = random_float_between_0_and_1(state.rng_state);
+    bsdf_sample_data.xi = pcg4d_next(state.rng_state);
     mdl_bsdf_scattering_init(f.mat_idx, shading_state_material);
     mdl_bsdf_scattering_sample(f.mat_idx, bsdf_sample_data, shading_state_material);
 
@@ -98,14 +95,12 @@ bool shade_hit(inout Sample_state state,
     return true;
 }
 
-bool russian_roulette(inout uint rng_state, inout float3 throughput)
+bool russian_roulette(in float random_float, inout float3 throughput)
 {
-    float r = random_float_between_0_and_1(rng_state);
-
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
     float p = min(max_throughput, RR_INV_MIN_TERM_PROB);
 
-    if (r > p)
+    if (random_float > p)
     {
       return true;
     }
@@ -115,7 +110,8 @@ bool russian_roulette(inout uint rng_state, inout float3 throughput)
     return false;
 }
 
-float3 evaluate_sample(inout uint rng_state,
+float3 evaluate_sample(inout uint4 rng_state,
+                       in float random_float,
                        in float3 ray_origin,
                        in float3 ray_dir)
 {
@@ -146,7 +142,7 @@ float3 evaluate_sample(inout uint rng_state,
 
         if (bounce >= RR_BOUNCE_OFFSET)
         {
-            if (russian_roulette(state.rng_state, state.throughput))
+            if (russian_roulette(random_float, state.throughput))
             {
                 break;
             }
@@ -204,19 +200,17 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     const float inv_sample_count = 1.0 / float(SAMPLE_COUNT);
 
-    uint rng_state = wang_hash(pixel_index);
-
     float3 pixel_color = float3(0.0, 0.0, 0.0);
 
     for (uint s = 0; s < SAMPLE_COUNT; ++s)
     {
-        const float r1 = random_float_between_0_and_1(rng_state);
-        const float r2 = random_float_between_0_and_1(rng_state);
+        uint4 rng_state = pcg4d_init(pixel_pos.xy, s);
+        float4 r = pcg4d_next(rng_state);
 
         const float3 P =
             L +
-            (float(pixel_pos.x) + r1) * camera_right * WX +
-            (float(pixel_pos.y) + r2) * PC.CAMERA_UP * HY;
+            (float(pixel_pos.x) + r.x) * camera_right * WX +
+            (float(pixel_pos.y) + r.y) * PC.CAMERA_UP * HY;
 
         float3 ray_origin = PC.CAMERA_POSITION;
         float3 ray_direction = P - ray_origin;
@@ -230,7 +224,7 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         ray_direction = normalize(ray_direction);
 
         /* Path trace sample and accumulate color. */
-        const float3 sample_color = evaluate_sample(rng_state, ray_origin, ray_direction);
+        const float3 sample_color = evaluate_sample(rng_state, r.z, ray_origin, ray_direction);
         pixel_color += sample_color * inv_sample_count;
     }
 

@@ -47,22 +47,34 @@ StructuredBuffer<face> faces;
 [[vk::binding(3)]]
 StructuredBuffer<fvertex> vertices;
 
-uint wang_hash(uint seed)
+// RNG producing on a four-element vector.
+// From: "Hash Functions for GPU Rendering" by Jarzynski and Olano.
+// Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/
+uint4 pcg4d(uint4 v)
 {
-    seed = (seed ^ 61) ^ (seed >> 16);
-    seed *= 9;
-    seed = seed ^ (seed >> 4);
-    seed *= 0x27d4eb2d;
-    seed = seed ^ (seed >> 15);
-    return seed;
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    v ^= v >> 16u;
+    v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
+    return v;
 }
 
-float random_float_between_0_and_1(inout uint seed)
+uint4 pcg4d_init(uint2 pixel_coords, uint frame_num)
 {
-    seed ^= seed << 13;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;
-    return float(seed) * (1.0 / 4294967296.0);
+    return uint4(pixel_coords.xy, frame_num, 0);
+}
+
+float4 uint4ToFloat4(uint4 v)
+{
+    v >>= 9;
+    v |= 0x3f800000;
+    return float4(asfloat(v)) - float4(1.0, 1.0, 1.0, 1.0);
+}
+
+float4 pcg4d_next(inout uint4 rng_state)
+{
+    rng_state.w++;
+    return uint4ToFloat4(pcg4d(rng_state));
 }
 
 // From: "A Fast and Robust Method for Avoiding Self-Intersection"
