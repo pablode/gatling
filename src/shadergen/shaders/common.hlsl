@@ -2,7 +2,6 @@ const static float FLOAT_MAX = 3.402823466e38;
 const static float FLOAT_MIN = 1.175494351e-38;
 const static float PI = 3.1415926535897932384626433832795;
 const static float TRI_EPS = 0.000000001;
-const static float RAY_OFFSET_EPS = 0.00001;
 
 struct fvertex
 {
@@ -64,4 +63,27 @@ float random_float_between_0_and_1(inout uint seed)
     seed ^= seed >> 17;
     seed ^= seed << 5;
     return float(seed) * (1.0 / 4294967296.0);
+}
+
+// From: "A Fast and Robust Method for Avoiding Self-Intersection"
+// Wächter and Binder, Ch. 6 in Ray Tracing Gems I.
+float3 offset_ray_origin(float3 p, float3 n)
+{
+    const float ORIGIN = 1.0 / 32.0;
+    const float FLOAT_SCALE = 1.0 / 65536.0;
+    const float INT_SCALE = 256.0;
+
+    int3 of_i = int3(INT_SCALE * n.x, INT_SCALE * n.y, INT_SCALE * n.z);
+
+    float3 p_i = float3(
+        asfloat(asint(p.x) + ((p.x < 0.0) ? -of_i.x : of_i.x)),
+        asfloat(asint(p.y) + ((p.y < 0.0) ? -of_i.y : of_i.y)),
+        asfloat(asint(p.z) + ((p.z < 0.0) ? -of_i.z : of_i.z))
+    );
+
+    return float3(
+        abs(p.x) < ORIGIN ? (p.x + FLOAT_SCALE * n.x) : p_i.x,
+        abs(p.y) < ORIGIN ? (p.y + FLOAT_SCALE * n.y) : p_i.y,
+        abs(p.z) < ORIGIN ? (p.z + FLOAT_SCALE * n.z) : p_i.z
+    );
 }

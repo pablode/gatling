@@ -93,7 +93,7 @@ bool shade_hit(inout Sample_state state,
     bool is_transmission = ((bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0);
 
     state.ray_dir = bsdf_sample_data.k2;
-    state.ray_origin = hit.pos + geom_normal * RAY_OFFSET_EPS * (is_transmission ? -1.0 : 1.0);
+    state.ray_origin = offset_ray_origin(hit.pos, geom_normal * (is_transmission ? -1.0 : 1.0));
 
     return true;
 }
