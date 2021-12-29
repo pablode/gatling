@@ -56,7 +56,7 @@ namespace sg
                           const char* message)
   {
 #ifdef NDEBUG
-    const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_WARNING;
+    const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_ERROR;
 #else
     const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_DEBUG;
 #endif
