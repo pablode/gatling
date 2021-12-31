@@ -23,7 +23,7 @@ The following is required:
 - CMake 3.11+
 - C11 compiler and C++14 compiler
 - <a href="https://vulkan.lunarg.com/">Vulkan SDK</a>
-- <a href="https://github.com/PixarAnimationStudios/USD/tree/v21.08">USD 21.08</a> with MaterialX support
+- <a href="https://github.com/PixarAnimationStudios/USD/tree/v21.11">USD 21.11</a> with MaterialX support
 - <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.0.1</a> binaries
 
 Do a recursive clone of the repository and set up a build folder:

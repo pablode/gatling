@@ -120,7 +120,6 @@ int main(int argc, const char* argv[])
   TfStopwatch timerLoad;
   timerLoad.Start();
 
-  ArGetResolver().ConfigureResolverForAsset(settings.sceneFilePath);
   UsdStageRefPtr stage = UsdStage::Open(settings.sceneFilePath);
 
   timerLoad.Stop();

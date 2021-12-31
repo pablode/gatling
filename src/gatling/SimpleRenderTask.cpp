@@ -31,8 +31,6 @@ void SimpleRenderTask::Prepare(HdTaskContext* taskContext,
 
   const HdResourceRegistrySharedPtr& resourceRegistry = renderIndex->GetResourceRegistry();
   m_renderPassState->Prepare(resourceRegistry);
-
-  m_renderPass->Prepare(m_renderTags);
 }
 
 void SimpleRenderTask::Execute(HdTaskContext* taskContext)
