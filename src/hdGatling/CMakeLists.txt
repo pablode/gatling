@@ -1,5 +1,5 @@
 add_library(
-  hdGatling SHARED
+  hdGatling MODULE
   include/RendererPlugin.h
   src/RendererPlugin.cpp
   src/RenderDelegate.h
