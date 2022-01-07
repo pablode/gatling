@@ -1,6 +1,7 @@
 #include "MaterialNetworkTranslator.h"
 
 #include <pxr/imaging/hd/material.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdr/registry.h>
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 

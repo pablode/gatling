@@ -1,6 +1,7 @@
 #pragma once
 
 #include <pxr/imaging/hd/material.h>
+#include <pxr/imaging/hd/sceneDelegate.h>
 
 #include <gi.h>
 
