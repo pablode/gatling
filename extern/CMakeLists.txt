@@ -116,3 +116,12 @@ target_compile_definitions(
 set(CMAKE_INSTALL_DOCDIR "${CMAKE_CURRENT_BINARY_DIR}/doc" CACHE PATH "" FORCE)
 add_subdirectory(libjpeg-turbo)
 target_include_directories(turbojpeg-static PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libjpeg-turbo>)
+
+#
+# SPIRV-Reflect
+#
+add_library(
+  spirv-reflect STATIC
+  SPIRV-Reflect/spirv_reflect.c
+)
+target_include_directories(spirv-reflect PUBLIC SPIRV-Reflect)
