@@ -85,6 +85,15 @@ HdCamera* FindCamera(UsdStageRefPtr& stage, HdRenderIndex* renderIndex, std::str
   return camera;
 }
 
+float AccurateLinearToSrgb(float linearValue)
+{
+  // Moving Frostbite to Physically Based Rendering 3.0, Section 5.1.5:
+  // https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
+  float sRgbLo = linearValue * 12.92f;
+  float sRgbHi = (std::pow(std::abs(linearValue), 1.0f / 2.4f) * 1.055f) - 0.055f;
+  return (linearValue <= 0.0031308f) ? sRgbLo : sRgbHi;
+}
+
 int main(int argc, const char* argv[])
 {
   // Init plugin.
@@ -200,9 +209,9 @@ int main(int argc, const char* argv[])
     int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
     for (int i = 0; i < pixelCount; i++)
     {
-      mappedMem[i * 4 + 0] = GfConvertLinearToDisplay(mappedMem[i * 4 + 0]);
-      mappedMem[i * 4 + 1] = GfConvertLinearToDisplay(mappedMem[i * 4 + 1]);
-      mappedMem[i * 4 + 2] = GfConvertLinearToDisplay(mappedMem[i * 4 + 2]);
+      mappedMem[i * 4 + 0] = AccurateLinearToSrgb(mappedMem[i * 4 + 0]);
+      mappedMem[i * 4 + 1] = AccurateLinearToSrgb(mappedMem[i * 4 + 1]);
+      mappedMem[i * 4 + 2] = AccurateLinearToSrgb(mappedMem[i * 4 + 2]);
     }
   }
 
