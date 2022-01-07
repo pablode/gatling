@@ -35,6 +35,7 @@ namespace sg
     std::unique_ptr<MdlNeurayLoader> m_loader;
 
     mi::base::Handle<MdlLogger> m_logger;
+    mi::base::Handle<mi::neuraylib::INeuray> m_neuray;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
     mi::base::Handle<mi::neuraylib::IMdl_factory> m_factory;

@@ -22,7 +22,6 @@ namespace sg
   {
     if (m_neuray)
     {
-      m_neuray->shutdown();
       m_neuray.reset();
     }
     if (m_dsoHandle)
@@ -41,7 +40,7 @@ namespace sg
     {
       return false;
     }
-    return m_neuray->start() == 0;
+    return true;
   }
 
   mi::base::Handle<mi::neuraylib::INeuray> MdlNeurayLoader::getNeuray() const
