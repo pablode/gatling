@@ -26,6 +26,8 @@ The following is required:
 - <a href="https://github.com/PixarAnimationStudios/USD/tree/v21.11">USD 21.11</a> with MaterialX support
 - <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.0.1</a> binaries
 
+> Note: EXR export requires building USD with OpenImageIO support.
+
 Do a recursive clone of the repository and set up a build folder:
 ```
 git clone https://github.com/pablode/gatling --recursive
