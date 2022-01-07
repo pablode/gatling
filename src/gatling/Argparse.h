@@ -15,6 +15,7 @@ struct AppSettings
   int imageWidth;
   int imageHeight;
   std::string cameraPath;
+  bool gammaCorrection;
   bool help;
 };
 

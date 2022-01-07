@@ -195,13 +195,15 @@ int main(int argc, const char* argv[])
   float* mappedMem = (float*) renderBuffer->Map();
   TF_VERIFY(mappedMem != nullptr);
 
-  int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
-
-  for (int i = 0; i < pixelCount; i++)
+  if (settings.gammaCorrection)
   {
-    mappedMem[i * 4 + 0] = GfConvertLinearToDisplay(mappedMem[i * 4 + 0]);
-    mappedMem[i * 4 + 1] = GfConvertLinearToDisplay(mappedMem[i * 4 + 1]);
-    mappedMem[i * 4 + 2] = GfConvertLinearToDisplay(mappedMem[i * 4 + 2]);
+    int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
+    for (int i = 0; i < pixelCount; i++)
+    {
+      mappedMem[i * 4 + 0] = GfConvertLinearToDisplay(mappedMem[i * 4 + 0]);
+      mappedMem[i * 4 + 1] = GfConvertLinearToDisplay(mappedMem[i * 4 + 1]);
+      mappedMem[i * 4 + 2] = GfConvertLinearToDisplay(mappedMem[i * 4 + 2]);
+    }
   }
 
   // Write image to file.

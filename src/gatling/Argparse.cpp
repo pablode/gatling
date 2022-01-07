@@ -7,12 +7,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 constexpr static int DEFAULT_IMAGE_WIDTH = 800;
 constexpr static int DEFAULT_IMAGE_HEIGHT = 800;
 constexpr static const char* DEFAULT_CAMERA_PATH = "";
+constexpr static bool DEFAULT_GAMMA_CORRECTION = true;
 
 TF_DEFINE_PRIVATE_TOKENS(
   _AppSettingsTokens,
-  ((image_width, "image-width"))   \
-  ((image_height, "image-height")) \
-  ((camera_path, "camera-path"))   \
+  ((image_width, "image-width"))           \
+  ((image_height, "image-height"))         \
+  ((camera_path, "camera-path"))           \
+  ((gamma_correction, "gamma-correction")) \
   ((help, "help"))
 );
 
@@ -100,6 +102,21 @@ static bool ParseFloat(float* out, const char* in)
   return in != end;
 }
 
+static bool ParseBool(bool* out, const char* in)
+{
+  if (std::strcmp(in, "true") == 0)
+  {
+    *out = true;
+    return true;
+  }
+  if (std::strcmp(in, "false") == 0)
+  {
+    *out = false;
+    return true;
+  }
+  return false;
+}
+
 bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, AppSettings& settings)
 {
   // Add non-delegate specific options to temporary settings list.
@@ -107,6 +124,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
   renderSettingDescs.push_back(HdRenderSettingDescriptor{"Output image width", _AppSettingsTokens->image_width, VtValue(DEFAULT_IMAGE_WIDTH)});
   renderSettingDescs.push_back(HdRenderSettingDescriptor{"Output image height", _AppSettingsTokens->image_height, VtValue(DEFAULT_IMAGE_HEIGHT)});
   renderSettingDescs.push_back(HdRenderSettingDescriptor{"Camera path", _AppSettingsTokens->camera_path, VtValue(DEFAULT_CAMERA_PATH)});
+  renderSettingDescs.push_back(HdRenderSettingDescriptor{"Gamma correction", _AppSettingsTokens->gamma_correction, VtValue(DEFAULT_GAMMA_CORRECTION)});
   renderSettingDescs.push_back(HdRenderSettingDescriptor{"Display usage", _AppSettingsTokens->help, VtValue()});
 
   // We always want to display the options in the same (sorted) order.
@@ -129,6 +147,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
   settings.imageWidth = DEFAULT_IMAGE_WIDTH;
   settings.imageHeight = DEFAULT_IMAGE_HEIGHT;
   settings.cameraPath = DEFAULT_CAMERA_PATH;
+  settings.gammaCorrection = DEFAULT_GAMMA_CORRECTION;
   settings.help = false;
 
   for (int i = 3; i < argc; i++)
@@ -175,6 +194,14 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
         return false;
       }
       settings.cameraPath = std::string(argv[++i]);
+    }
+    else if (arg == _AppSettingsTokens->gamma_correction)
+    {
+      if (i + 1 >= argc || !ParseBool(&settings.gammaCorrection, argv[++i]))
+      {
+        PrintCorrectUsage(renderSettingDescs);
+        return false;
+      }
     }
     // Handle delegate settings.
     else
