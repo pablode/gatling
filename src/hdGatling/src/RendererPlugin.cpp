@@ -19,8 +19,6 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
   PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
 
   const std::string& resourcePath = plugin->GetResourcePath();
-  printf("Resource path %s\n", resourcePath.c_str());
-
   std::string shaderPath = resourcePath + "/shaders";
   std::string mtlxmdlPath = resourcePath + "/mtlxmdl";
   std::string mtlxlibPath = resourcePath + "/mtlxlib";
