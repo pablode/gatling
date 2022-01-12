@@ -256,13 +256,20 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   if (!colorAovBinding)
   {
+    TF_RUNTIME_ERROR("Color AOV binding not found");
+    return;
+  }
+
+  HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(colorAovBinding->renderBuffer);
+  if (renderBuffer->GetFormat() != HdFormatFloat32Vec4)
+  {
+    TF_RUNTIME_ERROR("Unsupported render buffer format");
     return;
   }
 
   HdRenderIndex* renderIndex = GetRenderIndex();
   HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
-  HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(colorAovBinding->renderBuffer);
 
   GfVec4f backgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
   if (colorAovBinding->clearValue.IsHolding<GfVec4f>())
