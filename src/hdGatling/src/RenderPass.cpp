@@ -263,7 +263,12 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(colorAovBinding->renderBuffer);
-  GfVec4f backgroundColor = colorAovBinding->clearValue.Get<GfVec4f>();
+
+  GfVec4f backgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
+  if (colorAovBinding->clearValue.IsHolding<GfVec4f>())
+  {
+    backgroundColor = colorAovBinding->clearValue.Get<GfVec4f>();
+  }
 
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
