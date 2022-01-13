@@ -22,6 +22,8 @@ target_link_libraries(
     volk
 )
 
+set_target_properties(cgpu PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 if(ENABLE_IPO)
   set_target_properties(cgpu PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif()

@@ -35,6 +35,8 @@ target_link_libraries(
     gml
 )
 
+set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 if(ENABLE_IPO)
   set_target_properties(gi PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif()
