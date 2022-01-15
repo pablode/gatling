@@ -22,6 +22,7 @@ target_link_libraries(
     volk
 )
 
+# Required since library is linked into hdGatling DSO
 set_target_properties(cgpu PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(ENABLE_IPO)
