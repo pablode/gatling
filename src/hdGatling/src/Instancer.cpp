@@ -1,6 +1,8 @@
 #include "Instancer.h"
 
 #include <pxr/imaging/hd/sceneDelegate.h>
+#include <pxr/base/gf/quath.h>
+#include <pxr/base/gf/quatf.h>
 #include <pxr/base/gf/quatd.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -55,6 +57,15 @@ void HdGatlingInstancer::Sync(HdSceneDelegate* sceneDelegate,
   }
 }
 
+namespace
+{
+  template <class To>
+  struct _TypeConversionHelper {
+    template <class From>
+    inline To operator()(From const &from) const { return To(from); }
+  };
+}
+
 VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& prototypeId)
 {
   HdSceneDelegate* sceneDelegate = GetDelegate();
@@ -67,40 +78,50 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
   VtValue boxedScales = m_primvarMap[HdInstancerTokens->scale];
   VtValue boxedInstanceTransforms = m_primvarMap[HdInstancerTokens->instanceTransform];
 
-  VtVec3fArray translates;
-  if (boxedTranslates.IsHolding<VtVec3fArray>())
+  VtVec3dArray translates;
+  if (boxedTranslates.CanCast<VtVec3dArray>())
   {
-    translates = boxedTranslates.UncheckedGet<VtVec3fArray>();
+    translates = boxedTranslates.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
   }
   else if (!boxedTranslates.IsEmpty())
   {
-    TF_CODING_WARNING("Instancer translate values are not of type Vec3f!");
+    TF_CODING_WARNING("Instancer translate value type %s not supported", boxedTranslates.GetTypeName().c_str());
   }
 
-  VtVec4fArray rotates;
-  if (boxedRotates.IsHolding<VtVec4fArray>())
+  VtQuatdArray rotates;
+  if (boxedRotates.IsHolding<VtQuatdArray>())
   {
-    rotates = boxedRotates.Get<VtVec4fArray>();
+    rotates = boxedRotates.UncheckedGet<VtQuatdArray>();
+  }
+  else if (boxedRotates.IsHolding<VtQuatfArray>())
+  {
+    auto& rawArray = boxedRotates.UncheckedGet<VtQuatfArray>();
+    std::transform(rawArray.begin(), rawArray.end(), rotates.begin(), _TypeConversionHelper<GfQuatd>());
+  }
+  else if (boxedRotates.IsHolding<VtQuathArray>())
+  {
+    auto& rawArray = boxedRotates.UncheckedGet<VtQuathArray>();
+    std::transform(rawArray.begin(), rawArray.end(), rotates.begin(), _TypeConversionHelper<GfQuatd>());
   }
   else if (!boxedRotates.IsEmpty())
   {
-    TF_CODING_WARNING("Instancer rotate values are not of type Vec3f!");
+    TF_CODING_WARNING("Instancer rotate value type %s not supported", boxedRotates.GetTypeName().c_str());
   }
 
-  VtVec3fArray scales;
-  if (boxedScales.IsHolding<VtVec3fArray>())
+  VtVec3dArray scales;
+  if (boxedScales.CanCast<VtVec3dArray>())
   {
-    scales = boxedScales.Get<VtVec3fArray>();
+    scales = boxedScales.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
   }
   else if (!boxedScales.IsEmpty())
   {
-    TF_CODING_WARNING("Instancer scale values are not of type Vec3f!");
+    TF_CODING_WARNING("Instancer scale value type %s not supported", boxedScales.GetTypeName().c_str());
   }
 
   VtMatrix4dArray instanceTransforms;
-  if (boxedInstanceTransforms.IsHolding<VtMatrix4dArray>())
+  if (boxedInstanceTransforms.CanCast<VtMatrix4dArray>())
   {
-    instanceTransforms = boxedInstanceTransforms.Get<VtMatrix4dArray>();
+    instanceTransforms = boxedInstanceTransforms.UncheckedGet<VtMatrix4dArray>();
   }
 
   GfMatrix4d instancerTransform = sceneDelegate->GetInstancerTransform(id);
@@ -120,20 +141,17 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
 
     if (i < translates.size())
     {
-      auto trans = GfVec3d(translates[instanceIndex]);
-      temp.SetTranslate(trans);
+      temp.SetTranslate(translates[instanceIndex]);
       mat = temp * mat;
     }
     if (i < rotates.size())
     {
-      GfVec4f rot = rotates[instanceIndex];
-      temp.SetRotate(GfQuatd(rot[0], rot[1], rot[2], rot[3]));
+      temp.SetRotate(rotates[instanceIndex]);
       mat = temp * mat;
     }
     if (i < scales.size())
     {
-      auto scale = GfVec3d(scales[instanceIndex]);
-      temp.SetScale(scale);
+      temp.SetScale(scales[instanceIndex]);
       mat = temp * mat;
     }
     if (i < instanceTransforms.size())
