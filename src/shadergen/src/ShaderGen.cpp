@@ -16,12 +16,14 @@
 #include <limits>
 #include <iomanip>
 #include <fstream>
+#include <cassert>
 
 namespace sg
 {
   struct Material
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
+    bool isEmissive;
   };
 
   bool ShaderGen::init(const InitParams& params)
@@ -66,6 +68,39 @@ namespace sg
     delete m_mdlRuntime;
   }
 
+  bool _sgIsMaterialEmissive(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("surface.emission.intensity"));
+
+    if (expr->get_kind() != mi::neuraylib::IExpression::Kind::EK_CONSTANT)
+    {
+      return true;
+    }
+
+    mi::base::Handle<const mi::neuraylib::IExpression_constant> constExpr(expr.get_interface<const mi::neuraylib::IExpression_constant>());
+    mi::base::Handle<const mi::neuraylib::IValue> value(constExpr->get_value());
+
+    if (value->get_kind() != mi::neuraylib::IValue::Kind::VK_COLOR)
+    {
+      assert(false);
+      return true;
+    }
+
+    mi::base::Handle<const mi::neuraylib::IValue_color> color(value.get_interface<const mi::neuraylib::IValue_color>());
+
+    if (color->get_size() != 3)
+    {
+      assert(false);
+      return true;
+    }
+
+    mi::base::Handle<const mi::neuraylib::IValue_float> v0(color->get_value(0));
+    mi::base::Handle<const mi::neuraylib::IValue_float> v1(color->get_value(1));
+    mi::base::Handle<const mi::neuraylib::IValue_float> v2(color->get_value(2));
+
+    return v0->get_value() != 0.0f || v1->get_value() != 0.0f || v2->get_value() != 0.0f;
+  }
+
   Material* ShaderGen::createMaterialFromMtlx(std::string_view docStr)
   {
     std::string mdlSrc;
@@ -83,12 +118,18 @@ namespace sg
 
     Material* mat = new Material();
     mat->compiledMaterial = compiledMaterial;
+    mat->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
     return mat;
   }
 
   void ShaderGen::destroyMaterial(Material* mat)
   {
     delete mat;
+  }
+
+  bool ShaderGen::isMaterialEmissive(const struct Material* mat)
+  {
+    return mat->isEmissive;
   }
 
   bool _sgGenerateMainShaderMdlHlsl(MdlHlslCodeGen& codeGen,

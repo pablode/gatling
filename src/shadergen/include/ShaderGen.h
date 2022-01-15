@@ -28,6 +28,7 @@ namespace sg
   public:
     struct Material* createMaterialFromMtlx(std::string_view docStr);
     void destroyMaterial(struct Material* mat);
+    bool isMaterialEmissive(const struct Material* mat);
 
   public:
     struct MainShaderParams
