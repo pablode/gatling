@@ -1782,18 +1782,28 @@ CgpuResult cgpu_create_pipeline(
     return CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE;
   }
 
-  VkDescriptorPoolSize descriptor_pool_sizes[] = {
-    { .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = buffer_resource_count },
-    { .type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  .descriptorCount = image_resource_count  }
-  };
+  uint32_t pool_size_count = 0;
+  VkDescriptorPoolSize pool_sizes[2];
+  if (buffer_resource_count > 0)
+  {
+    pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    pool_sizes[pool_size_count].descriptorCount = buffer_resource_count;
+    pool_size_count++;
+  }
+  if (image_resource_count > 0)
+  {
+    pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    pool_sizes[pool_size_count].descriptorCount = image_resource_count;
+    pool_size_count++;
+  }
 
   VkDescriptorPoolCreateInfo descriptor_pool_create_info;
   descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
   descriptor_pool_create_info.pNext = NULL;
   descriptor_pool_create_info.flags = 0;
   descriptor_pool_create_info.maxSets = 1;
-  descriptor_pool_create_info.poolSizeCount = 2;
-  descriptor_pool_create_info.pPoolSizes = descriptor_pool_sizes;
+  descriptor_pool_create_info.poolSizeCount = pool_size_count;
+  descriptor_pool_create_info.pPoolSizes = pool_sizes;
 
   result = idevice->table.vkCreateDescriptorPool(
     idevice->logical_device,
