@@ -349,8 +349,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     // Workaround for bug https://github.com/PixarAnimationStudios/USD/issues/913
     VtValue rr_inv_min_term_prob = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
     VtValue max_sample_value = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
-    shaderParams.rr_inv_min_term_prob = rr_inv_min_term_prob.CastToTypeid(typeid(double)).Get<double>();
-    shaderParams.max_sample_value = max_sample_value.CastToTypeid(typeid(double)).Get<double>();
+    shaderParams.rr_inv_min_term_prob = float(rr_inv_min_term_prob.Cast<double>().Get<double>());
+    shaderParams.max_sample_value = float(max_sample_value.Cast<double>().Get<double>());
     for (uint32_t i = 0; i < 4; i++)
     {
       shaderParams.bg_color[i] = backgroundColor[i];
