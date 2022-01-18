@@ -112,7 +112,7 @@ namespace sg
                                                const std::string& filePath,
                                                const char* entryPoint,
                                                uint32_t* spvSize,
-                                               uint32_t** spv)
+                                               uint8_t** spv)
   {
     shaderc_compilation_result_t result = shaderc_compile_into_spv(
       m_compiler,
@@ -134,7 +134,7 @@ namespace sg
     *spvSize = shaderc_result_get_length(result);
 
     const char* data = shaderc_result_get_bytes(result);
-    *spv = (uint32_t*) malloc(*spvSize);
+    *spv = (uint8_t*) malloc(*spvSize);
     memcpy(*spv, data, *spvSize);
 
     shaderc_result_release(result);

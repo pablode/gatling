@@ -19,7 +19,7 @@ namespace sg
                                   const std::string& filePath,
                                   const char* entryPoint,
                                   uint32_t* spvSize,
-                                  uint32_t** spv) = 0;
+                                  uint8_t** spv) = 0;
 
   protected:
     const std::string m_shaderPath;

@@ -20,7 +20,7 @@ namespace sg
                           const std::string& filePath,
                           const char* entryPoint,
                           uint32_t* spvSize,
-                          uint32_t** spv) override;
+                          uint8_t** spv) override;
 
   private:
     shaderc_compiler_t m_compiler = nullptr;

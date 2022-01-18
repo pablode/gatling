@@ -131,7 +131,7 @@ bool _sgReadTextFromFile(const std::string& filePath,
 
 bool sgGenerateMainShader(const SgMainShaderParams* params,
                           uint32_t* spvSize,
-                          uint32_t** spv,
+                          uint8_t** spv,
                           const char** entryPoint)
 {
   std::string fileName = "main.comp.hlsl";

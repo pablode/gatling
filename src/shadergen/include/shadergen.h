@@ -37,7 +37,7 @@ struct SgMainShaderParams
 
 bool sgGenerateMainShader(const struct SgMainShaderParams* params,
                           uint32_t* spvSize,
-                          uint32_t** spv,
+                          uint8_t** spv,
                           const char** entryPoint);
 
 #ifdef __cplusplus

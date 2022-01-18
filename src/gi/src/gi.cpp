@@ -307,7 +307,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   shaderParams.materials            = params->geom_cache->materials;
 
   uint32_t spv_size;
-  uint32_t* spv;
+  uint8_t* spv;
   const char* shader_entry_point;
   bool success = sgGenerateMainShader(&shaderParams,
                                       &spv_size,

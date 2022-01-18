@@ -42,7 +42,7 @@ namespace sg
                                            const std::string& filePath,
                                            const char* entryPoint,
                                            uint32_t* spvSize,
-                                           uint32_t** spv)
+                                           uint8_t** spv)
   {
     std::wstring wFilePath = _convertCStrToWString(filePath.c_str());
     std::wstring wEntryPoint = _convertCStrToWString(entryPoint);
@@ -106,7 +106,7 @@ namespace sg
     }
 
     *spvSize = spirvBlob->GetBufferSize();
-    *spv = (uint32_t*) malloc(*spvSize);
+    *spv = (uint8_t*) malloc(*spvSize);
     memcpy(*spv, spirvBlob->GetBufferPointer(), *spvSize);
 
     return true;

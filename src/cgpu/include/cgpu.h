@@ -605,7 +605,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_device(
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_shader(
   cgpu_device device,
   uint64_t size,
-  const uint32_t* p_source,
+  const uint8_t* p_source,
   cgpu_shader* p_shader
 );
 
