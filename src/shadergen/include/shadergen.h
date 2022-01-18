@@ -1,47 +1,61 @@
 #ifndef SHADERGEN_H
 #define SHADERGEN_H
 
-#include <stdint.h>
+#include <cstdint>
+#include <string_view>
+#include <vector>
+#include <string>
+#include <memory>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-struct SgMaterial;
-
-bool sgInitialize(const char* resourcePath,
-                  const char* shaderPath,
-                  const char* mtlxlibPath,
-                  const char* mtlxmdlPath);
-
-void sgTerminate();
-
-struct SgMaterial* sgCreateMaterialFromMtlx(const char* docStr);
-
-void sgDestroyMaterial(struct SgMaterial* mat);
-
-struct SgMainShaderParams
+namespace sg
 {
-  uint32_t num_threads_x;
-  uint32_t num_threads_y;
-  uint32_t max_stack_size;
-  uint32_t spp;
-  uint32_t max_bounces;
-  uint32_t rr_bounce_offset;
-  float rr_inv_min_term_prob;
-  float max_sample_value;
-  float bg_color[4];
-  uint32_t material_count;
-  const struct SgMaterial** materials;
-};
+  struct Material;
 
-bool sgGenerateMainShader(const struct SgMainShaderParams* params,
-                          uint32_t* spvSize,
-                          uint8_t** spv,
-                          const char** entryPoint);
+  class ShaderGen
+  {
+  public:
+    struct InitParams
+    {
+      std::string_view resourcePath;
+      std::string_view shaderPath;
+      std::string_view mtlxlibPath;
+      std::string_view mtlxmdlPath;
+    };
 
-#ifdef __cplusplus
+    bool init(const InitParams& params);
+    ~ShaderGen();
+
+  public:
+    struct Material* createMaterialFromMtlx(std::string_view docStr);
+    void destroyMaterial(struct Material* mat);
+
+  public:
+    struct MainShaderParams
+    {
+      uint32_t numThreadsX;
+      uint32_t numThreadsY;
+      uint32_t maxStackSize;
+      uint32_t spp;
+      uint32_t maxBounces;
+      uint32_t rrBounceOffset;
+      float rrInvMinTermProb;
+      float maxSampleValue;
+      float bgColor[4];
+      std::vector<Material*> materials;
+    };
+
+    bool generateMainShader(const struct MainShaderParams* params,
+                            std::vector<uint8_t>& spv,
+                            std::string& entryPoint);
+
+  private:
+    class MdlRuntime* m_mdlRuntime = nullptr;
+    class MdlMaterialCompiler* m_mdlMaterialCompiler = nullptr;
+    class MdlHlslCodeGen* m_mdlHlslCodeGen = nullptr;
+    class MtlxMdlCodeGen* m_mtlxMdlCodeGen = nullptr;
+    class IShaderCompiler* m_shaderCompiler = nullptr;
+    std::string m_shaderPath;
+  };
 }
-#endif
 
 #endif

@@ -2,7 +2,7 @@
 
 namespace sg
 {
-  IShaderCompiler::IShaderCompiler(const std::string& shaderPath)
+  IShaderCompiler::IShaderCompiler(std::string_view shaderPath)
     : m_shaderPath(shaderPath)
   {
   }

@@ -82,7 +82,7 @@ namespace sg
     return surfaceElement->asA<mx::TypedElement>();
   }
 
-  bool MtlxMdlCodeGen::translate(const char* mtlxSrc, std::string& mdlSrc, std::string& subIdentifier)
+  bool MtlxMdlCodeGen::translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -96,7 +96,7 @@ namespace sg
     {
       mx::DocumentPtr doc = mx::createDocument();
       doc->importLibrary(m_stdLib);
-      mx::readFromXmlString(doc, mtlxSrc);
+      mx::readFromXmlString(doc, mtlxSrc.data());
 
       mx::TypedElementPtr element = _FindSurfaceShaderElement(doc);
       if (!element)

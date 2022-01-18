@@ -16,11 +16,10 @@ namespace sg
   public:
     bool init() override;
 
-    bool compileHlslToSpv(const std::string& source,
-                          const std::string& filePath,
-                          const char* entryPoint,
-                          uint32_t* spvSize,
-                          uint8_t** spv) override;
+    bool compileHlslToSpv(std::string_view source,
+                          std::string_view filePath,
+                          std::string_view entryPoint,
+                          std::vector<uint8_t>& spv) override;
 
   private:
     shaderc_compiler_t m_compiler = nullptr;

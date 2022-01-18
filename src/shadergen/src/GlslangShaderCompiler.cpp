@@ -108,19 +108,18 @@ namespace sg
     }
   }
 
-  bool GlslangShaderCompiler::compileHlslToSpv(const std::string& source,
-                                               const std::string& filePath,
-                                               const char* entryPoint,
-                                               uint32_t* spvSize,
-                                               uint8_t** spv)
+  bool GlslangShaderCompiler::compileHlslToSpv(std::string_view source,
+                                               std::string_view filePath,
+                                               std::string_view entryPoint,
+                                               std::vector<uint8_t>& spv)
   {
     shaderc_compilation_result_t result = shaderc_compile_into_spv(
       m_compiler,
-      source.c_str(),
+      source.data(),
       source.size(),
       shaderc_compute_shader,
-      filePath.c_str(),
-      entryPoint,
+      filePath.data(),
+      entryPoint.data(),
       m_compileOptions
     );
 
@@ -131,14 +130,13 @@ namespace sg
       return false;
     }
 
-    *spvSize = shaderc_result_get_length(result);
+    size_t spvSize = shaderc_result_get_length(result);
+    spv.resize(spvSize);
 
     const char* data = shaderc_result_get_bytes(result);
-    *spv = (uint8_t*) malloc(*spvSize);
-    memcpy(*spv, data, *spvSize);
+    memcpy(spv.data(), data, spvSize);
 
     shaderc_result_release(result);
-
     return true;
   }
 }

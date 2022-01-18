@@ -15,7 +15,7 @@ namespace sg
     explicit MtlxMdlCodeGen(const char* mtlxlibPath);
 
   public:
-    bool translate(const char* mtlxSrc, std::string& mdlSrc, std::string& subIdentifier);
+    bool translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier);
 
   private:
     const MaterialX::FileSearchPath m_mtlxlibPath;

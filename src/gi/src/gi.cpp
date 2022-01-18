@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <vector>
 
 #include <cgpu.h>
 #include <shadergen.h>
@@ -17,31 +18,32 @@ const uint32_t WORKGROUP_SIZE_Y = 16;
 
 struct gi_geom_cache
 {
-  uint32_t           bvh_node_count;
-  cgpu_buffer        buffer;
-  uint64_t           node_buf_offset;
-  uint64_t           node_buf_size;
-  uint64_t           face_buf_offset;
-  uint64_t           face_buf_size;
-  uint64_t           vertex_buf_offset;
-  uint64_t           vertex_buf_size;
-  uint32_t           material_count;
-  const SgMaterial** materials;
+  uint32_t                   bvh_node_count;
+  cgpu_buffer                buffer;
+  uint64_t                   node_buf_offset;
+  uint64_t                   node_buf_size;
+  uint64_t                   face_buf_offset;
+  uint64_t                   face_buf_size;
+  uint64_t                   vertex_buf_offset;
+  uint64_t                   vertex_buf_size;
+  uint32_t                   material_count;
+  std::vector<sg::Material*> materials;
 };
 
 struct gi_shader_cache
 {
   cgpu_shader shader;
-  const char* shader_entry_point;
+  std::string shader_entry_point;
 };
 
 struct gi_material
 {
-  SgMaterial* sg_mat;
+  sg::Material* sg_mat;
 };
 
 cgpu_device s_device;
 cgpu_physical_device_limits s_device_limits;
+std::unique_ptr<sg::ShaderGen> s_shaderGen;
 
 int giInitialize(const gi_init_params* params)
 {
@@ -50,10 +52,14 @@ int giInitialize(const gi_init_params* params)
     return GI_ERROR;
   }
 
-  if (!sgInitialize(params->resource_path,
-                    params->shader_path,
-                    params->mtlxlib_path,
-                    params->mtlxmdl_path))
+  sg::ShaderGen::InitParams sgParams;
+  sgParams.resourcePath = params->resource_path;
+  sgParams.shaderPath = params->shader_path;
+  sgParams.mtlxlibPath = params->mtlxlib_path;
+  sgParams.mtlxmdlPath = params->mtlxmdl_path;
+
+  s_shaderGen = std::make_unique<sg::ShaderGen>();
+  if (!s_shaderGen->init(sgParams))
   {
     return GI_ERROR;
   }
@@ -82,14 +88,14 @@ int giInitialize(const gi_init_params* params)
 
 void giTerminate()
 {
-  sgTerminate();
+  s_shaderGen.reset();
   cgpu_destroy_device(s_device);
   cgpu_terminate();
 }
 
 gi_material* giCreateMaterialFromMtlx(const char* doc_str)
 {
-  SgMaterial* sg_mat = sgCreateMaterialFromMtlx(doc_str);
+  sg::Material* sg_mat = s_shaderGen->createMaterialFromMtlx(doc_str);
   if (!sg_mat)
   {
     return NULL;
@@ -102,7 +108,7 @@ gi_material* giCreateMaterialFromMtlx(const char* doc_str)
 
 void giDestroyMaterial(gi_material* mat)
 {
-  sgDestroyMaterial(mat->sg_mat);
+  s_shaderGen->destroyMaterial(mat->sg_mat);
   delete mat;
 }
 
@@ -258,7 +264,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   /* Copy materials. */
   cache->material_count = params->material_count;
-  cache->materials = new const SgMaterial*[cache->material_count];
+  cache->materials.resize(cache->material_count);
   for (int i = 0; i < cache->material_count; i++)
   {
     cache->materials[i] = params->materials[i]->sg_mat;
@@ -290,40 +296,30 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   uint32_t node_count = params->geom_cache->bvh_node_count;
   uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
-  SgMainShaderParams shaderParams;
-  shaderParams.num_threads_x        = WORKGROUP_SIZE_X;
-  shaderParams.num_threads_y        = WORKGROUP_SIZE_Y;
-  shaderParams.max_stack_size       = max_stack_size;
-  shaderParams.spp                  = params->spp;
-  shaderParams.max_bounces          = params->max_bounces;
-  shaderParams.max_sample_value     = params->max_sample_value;
-  shaderParams.rr_bounce_offset     = params->rr_bounce_offset;
-  shaderParams.rr_inv_min_term_prob = params->rr_inv_min_term_prob;
-  shaderParams.bg_color[0]          = params->bg_color[0];
-  shaderParams.bg_color[1]          = params->bg_color[1];
-  shaderParams.bg_color[2]          = params->bg_color[2];
-  shaderParams.bg_color[3]          = params->bg_color[3];
-  shaderParams.material_count       = params->geom_cache->material_count;
-  shaderParams.materials            = params->geom_cache->materials;
+  sg::ShaderGen::MainShaderParams shaderParams;
+  shaderParams.numThreadsX      = WORKGROUP_SIZE_X;
+  shaderParams.numThreadsY      = WORKGROUP_SIZE_Y;
+  shaderParams.maxStackSize     = max_stack_size;
+  shaderParams.spp              = params->spp;
+  shaderParams.maxBounces       = params->max_bounces;
+  shaderParams.maxSampleValue   = params->max_sample_value;
+  shaderParams.rrBounceOffset   = params->rr_bounce_offset;
+  shaderParams.rrInvMinTermProb = params->rr_inv_min_term_prob;
+  shaderParams.bgColor[0]       = params->bg_color[0];
+  shaderParams.bgColor[1]       = params->bg_color[1];
+  shaderParams.bgColor[2]       = params->bg_color[2];
+  shaderParams.bgColor[3]       = params->bg_color[3];
+  shaderParams.materials        = params->geom_cache->materials;
 
-  uint32_t spv_size;
-  uint8_t* spv;
-  const char* shader_entry_point;
-  bool success = sgGenerateMainShader(&shaderParams,
-                                      &spv_size,
-                                      &spv,
-                                      &shader_entry_point);
-
-  if (!success)
+  std::vector<uint8_t> spv;
+  std::string shader_entry_point;
+  if (!s_shaderGen->generateMainShader(&shaderParams, spv, shader_entry_point))
   {
     return NULL;
   }
 
   cgpu_shader shader;
-  if (cgpu_create_shader(s_device,
-                         spv_size,
-                         spv,
-                         &shader) != CGPU_OK)
+  if (cgpu_create_shader(s_device, spv.size(), spv.data(), &shader) != CGPU_OK)
   {
     return NULL;
   }
@@ -421,7 +417,7 @@ int giRender(const gi_render_params* params,
     image_count,
     images,
     params->shader_cache->shader,
-    params->shader_cache->shader_entry_point,
+    params->shader_cache->shader_entry_point.c_str(),
     push_data_size,
     &pipeline
   );

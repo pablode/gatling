@@ -4,7 +4,7 @@
 
 namespace sg
 {
-  DxcShaderCompiler::DxcShaderCompiler(const std::string& shaderPath)
+  DxcShaderCompiler::DxcShaderCompiler(std::string_view shaderPath)
     : IShaderCompiler(shaderPath)
   {
   }
@@ -38,14 +38,13 @@ namespace sg
     return wstr;
   }
 
-  bool DxcShaderCompiler::compileHlslToSpv(const std::string& source,
-                                           const std::string& filePath,
-                                           const char* entryPoint,
-                                           uint32_t* spvSize,
-                                           uint8_t** spv)
+  bool DxcShaderCompiler::compileHlslToSpv(std::string_view source,
+                                           std::string_view filePath,
+                                           std::string_view entryPoint,
+                                           std::vector<uint8_t>& spv)
   {
-    std::wstring wFilePath = _convertCStrToWString(filePath.c_str());
-    std::wstring wEntryPoint = _convertCStrToWString(entryPoint);
+    std::wstring wFilePath = _convertCStrToWString(filePath.data());
+    std::wstring wEntryPoint = _convertCStrToWString(entryPoint.data());
 
     CComPtr<IDxcBlobEncoding> sourceBufEnc;
     if (FAILED(m_utils->CreateBlob(source.data(), source.size(), DXC_CP_UTF8, &sourceBufEnc)))
@@ -105,9 +104,9 @@ namespace sg
       return false;
     }
 
-    *spvSize = spirvBlob->GetBufferSize();
-    *spv = (uint8_t*) malloc(*spvSize);
-    memcpy(*spv, spirvBlob->GetBufferPointer(), *spvSize);
+    size_t spvSize = spirvBlob->GetBufferSize();
+    spv.resize(spvSize);
+    memcpy(spv.data(), spirvBlob->GetBufferPointer(), spvSize);
 
     return true;
   }
