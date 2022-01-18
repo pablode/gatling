@@ -1573,7 +1573,6 @@ CgpuResult cgpu_create_pipeline(
   const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
-  uint32_t push_constants_size,
   cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
@@ -1641,7 +1640,7 @@ CgpuResult cgpu_create_pipeline(
   VkPushConstantRange push_const_range;
   push_const_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
   push_const_range.offset = 0;
-  push_const_range.size = push_constants_size;
+  push_const_range.size = ishader->reflection.push_constants_size;
 
   VkPipelineLayoutCreateInfo pipeline_layout_create_info;
   pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1649,7 +1648,7 @@ CgpuResult cgpu_create_pipeline(
   pipeline_layout_create_info.flags = 0;
   pipeline_layout_create_info.setLayoutCount = 1;
   pipeline_layout_create_info.pSetLayouts = &ipipeline->descriptor_set_layout;
-  pipeline_layout_create_info.pushConstantRangeCount = push_constants_size ? 1 : 0;
+  pipeline_layout_create_info.pushConstantRangeCount = push_const_range.size ? 1 : 0;
   pipeline_layout_create_info.pPushConstantRanges = &push_const_range;
 
   result = idevice->table.vkCreatePipelineLayout(

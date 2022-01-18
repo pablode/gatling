@@ -454,7 +454,6 @@ int giRender(const gi_render_params* params,
     images,
     params->shader_cache->shader,
     params->shader_cache->shader_entry_point.c_str(),
-    push_data_size,
     &pipeline
   );
   if (c_result != CGPU_OK) goto cleanup;

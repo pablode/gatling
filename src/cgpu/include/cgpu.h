@@ -672,7 +672,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
-  uint32_t push_constants_size,
   cgpu_pipeline* p_pipeline
 );
 
