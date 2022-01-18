@@ -1,5 +1,6 @@
 #include "cgpu.h"
 #include "resource_store.h"
+#include "shader_reflection.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -68,6 +69,7 @@ typedef struct cgpu_ipipeline {
 
 typedef struct cgpu_ishader {
   VkShaderModule module;
+  cgpu_shader_reflection reflection;
 } cgpu_ishader;
 
 typedef struct cgpu_ifence {
@@ -1212,6 +1214,17 @@ CgpuResult cgpu_create_shader(
     return CGPU_FAIL_UNABLE_TO_CREATE_SHADER_MODULE;
   }
 
+  if (!cgpu_perform_shader_reflection(size, (uint32_t*) p_source, &ishader->reflection))
+  {
+    idevice->table.vkDestroyShaderModule(
+      idevice->logical_device,
+      ishader->module,
+      NULL
+    );
+    resource_store_free_handle(&ishader_store, p_shader->handle);
+    return CGPU_FAIL_UNABLE_TO_REFLECT_SHADER;
+  }
+
   return CGPU_OK;
 }
 
@@ -1227,6 +1240,8 @@ CgpuResult cgpu_destroy_shader(
   if (!cgpu_resolve_shader(shader, &ishader)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+
+  cgpu_destroy_shader_reflection(&ishader->reflection);
 
   idevice->table.vkDestroyShaderModule(
     idevice->logical_device,

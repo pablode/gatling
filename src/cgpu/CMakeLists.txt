@@ -6,6 +6,8 @@ add_library(
   src/handle_store.h
   src/resource_store.c
   src/resource_store.h
+  src/shader_reflection.c
+  src/shader_reflection.h
 )
 
 target_include_directories(
@@ -21,6 +23,7 @@ target_link_libraries(
   PRIVATE
     volk
     vma-c
+    spirv-reflect
 )
 
 set_target_properties(
