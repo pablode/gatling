@@ -96,11 +96,13 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
   else if (boxedRotates.IsHolding<VtQuatfArray>())
   {
     auto& rawArray = boxedRotates.UncheckedGet<VtQuatfArray>();
+    rotates.resize(rawArray.size());
     std::transform(rawArray.begin(), rawArray.end(), rotates.begin(), _TypeConversionHelper<GfQuatd>());
   }
   else if (boxedRotates.IsHolding<VtQuathArray>())
   {
     auto& rawArray = boxedRotates.UncheckedGet<VtQuathArray>();
+    rotates.resize(rawArray.size());
     std::transform(rawArray.begin(), rawArray.end(), rotates.begin(), _TypeConversionHelper<GfQuatd>());
   }
   else if (!boxedRotates.IsEmpty())
