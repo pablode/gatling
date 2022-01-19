@@ -1,6 +1,29 @@
 #include "common.hlsl"
 #include "bvh.hlsl"
 
+struct PushConstants
+{
+  float3 CAMERA_POSITION;
+  uint   IMAGE_WIDTH;
+  float3 CAMERA_FORWARD;
+  uint   IMAGE_HEIGHT;
+  float3 CAMERA_UP;
+  float  CAMERA_VFOV;
+  float4 BACKGROUND_COLOR;
+  uint   SAMPLE_COUNT;
+  uint   MAX_BOUNCES;
+  float  MAX_SAMPLE_VALUE;
+  uint   RR_BOUNCE_OFFSET;
+  float  RR_INV_MIN_TERM_PROB;
+};
+
+// Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
+#if defined(_DXC)
+[[vk::push_constant]] PushConstants PC;
+#else
+[[vk::push_constant]] ConstantBuffer<PushConstants> PC;
+#endif
+
 struct Sample_state
 {
     uint4 rng_state;
@@ -98,7 +121,7 @@ bool shade_hit(inout Sample_state state,
 bool russian_roulette(in float random_float, inout float3 throughput)
 {
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
-    float p = min(max_throughput, RR_INV_MIN_TERM_PROB);
+    float p = min(max_throughput, PC.RR_INV_MIN_TERM_PROB);
 
     if (random_float > p)
     {
@@ -122,7 +145,7 @@ float3 evaluate_sample(inout uint4 rng_state,
     state.value = float3(0.0, 0.0, 0.0);
     state.rng_state = rng_state;
 
-    for (uint bounce = 0; bounce < (MAX_BOUNCES + 1); bounce++)
+    for (uint bounce = 0; bounce < (PC.MAX_BOUNCES + 1); bounce++)
     {
         Hit_info hit_info;
 
@@ -130,7 +153,7 @@ float3 evaluate_sample(inout uint4 rng_state,
 
         if (!found_hit)
         {
-            state.value += state.throughput * BACKGROUND_COLOR.rgb;
+            state.value += state.throughput * PC.BACKGROUND_COLOR.rgb;
             break;
         }
 
@@ -141,7 +164,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             break;
         }
 
-        if (bounce >= RR_BOUNCE_OFFSET)
+        if (bounce >= PC.RR_BOUNCE_OFFSET)
         {
             if (russian_roulette(random_float, state.throughput))
             {
@@ -151,26 +174,9 @@ float3 evaluate_sample(inout uint4 rng_state,
     }
 
     float3 min_sample_value = float3(0.0, 0.0, 0.0);
-    float3 max_sample_value = float3(MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE, MAX_SAMPLE_VALUE);
+    float3 max_sample_value = float3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE);
     return clamp(state.value, min_sample_value, max_sample_value);
 }
-
-struct PushConstants
-{
-  float3 CAMERA_POSITION;
-  uint   IMAGE_WIDTH;
-  float3 CAMERA_FORWARD;
-  uint   IMAGE_HEIGHT;
-  float3 CAMERA_UP;
-  float  CAMERA_VFOV;
-};
-
-// Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
-#if defined(_DXC)
-[[vk::push_constant]] PushConstants PC;
-#else
-[[vk::push_constant]] ConstantBuffer<PushConstants> PC;
-#endif
 
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
 void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
@@ -199,11 +205,11 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
     const float3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
     const float3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
 
-    const float inv_sample_count = 1.0 / float(SAMPLE_COUNT);
+    const float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
 
     float3 pixel_color = float3(0.0, 0.0, 0.0);
 
-    for (uint s = 0; s < SAMPLE_COUNT; ++s)
+    for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
     {
         uint4 rng_state = pcg4d_init(pixel_pos.xy, s);
         float4 r = pcg4d_next(rng_state);

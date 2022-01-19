@@ -136,17 +136,6 @@ namespace sg
     APPEND_CONSTANT("NUM_THREADS_X", numThreadsX)
     APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
     APPEND_CONSTANT("MAX_STACK_SIZE", maxStackSize)
-    APPEND_CONSTANT("SAMPLE_COUNT", spp)
-    APPEND_CONSTANT("MAX_BOUNCES", maxBounces)
-    APPEND_CONSTANT("MAX_SAMPLE_VALUE", maxSampleValue)
-    APPEND_CONSTANT("RR_BOUNCE_OFFSET", rrBounceOffset)
-    APPEND_CONSTANT("RR_INV_MIN_TERM_PROB", rrInvMinTermProb)
-
-    ss << "#define BACKGROUND_COLOR float4("
-        << params->bgColor[0] << ", "
-        << params->bgColor[1] << ", "
-        << params->bgColor[2] << ", "
-        << params->bgColor[3] << ")\n";
 
     std::string genMdl;
     if (!_sgGenerateMainShaderMdlHlsl(*m_mdlHlslCodeGen, params->materials, genMdl))

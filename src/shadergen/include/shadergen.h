@@ -35,12 +35,6 @@ namespace sg
       uint32_t numThreadsX;
       uint32_t numThreadsY;
       uint32_t maxStackSize;
-      uint32_t spp;
-      uint32_t maxBounces;
-      uint32_t rrBounceOffset;
-      float rrInvMinTermProb;
-      float maxSampleValue;
-      float bgColor[4];
       std::vector<Material*> materials;
     };
 

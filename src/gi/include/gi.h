@@ -45,24 +45,19 @@ struct gi_geom_cache_params
   struct gi_vertex*          vertices;
 };
 
-struct gi_shader_cache_params
-{
-  const struct gi_geom_cache* geom_cache;
-  uint32_t                    max_bounces;
-  uint32_t                    spp;
-  uint32_t                    rr_bounce_offset;
-  float                       rr_inv_min_term_prob;
-  float                       max_sample_value;
-  float                       bg_color[4];
-};
-
 struct gi_render_params
 {
   const struct gi_camera*       camera;
   const struct gi_geom_cache*   geom_cache;
+  const struct gi_shader_cache* shader_cache;
   uint32_t                      image_width;
   uint32_t                      image_height;
-  const struct gi_shader_cache* shader_cache;
+  uint32_t                      max_bounces;
+  uint32_t                      spp;
+  uint32_t                      rr_bounce_offset;
+  float                         rr_inv_min_term_prob;
+  float                         max_sample_value;
+  float                         bg_color[4];
 };
 
 struct gi_init_params
@@ -79,10 +74,10 @@ void giTerminate();
 struct gi_material* giCreateMaterialFromMtlx(const char* doc);
 void giDestroyMaterial(struct gi_material* mat);
 
-struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* params);
+struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* geom_cache);
 void giDestroyGeomCache(struct gi_geom_cache* cache);
 
-struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params* params);
+struct gi_shader_cache* giCreateShaderCache(const gi_geom_cache* geom_cache_params);
 void giDestroyShaderCache(struct gi_shader_cache* cache);
 
 int giRender(const struct gi_render_params* params,

@@ -291,25 +291,16 @@ void giDestroyGeomCache(gi_geom_cache* cache)
   delete cache;
 }
 
-gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
+gi_shader_cache* giCreateShaderCache(const gi_geom_cache* geom_cache)
 {
-  uint32_t node_count = params->geom_cache->bvh_node_count;
+  uint32_t node_count = geom_cache->bvh_node_count;
   uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
 
   sg::ShaderGen::MainShaderParams shaderParams;
   shaderParams.numThreadsX      = WORKGROUP_SIZE_X;
   shaderParams.numThreadsY      = WORKGROUP_SIZE_Y;
   shaderParams.maxStackSize     = max_stack_size;
-  shaderParams.spp              = params->spp;
-  shaderParams.maxBounces       = params->max_bounces;
-  shaderParams.maxSampleValue   = params->max_sample_value;
-  shaderParams.rrBounceOffset   = params->rr_bounce_offset;
-  shaderParams.rrInvMinTermProb = params->rr_inv_min_term_prob;
-  shaderParams.bgColor[0]       = params->bg_color[0];
-  shaderParams.bgColor[1]       = params->bg_color[1];
-  shaderParams.bgColor[2]       = params->bg_color[2];
-  shaderParams.bgColor[3]       = params->bg_color[3];
-  shaderParams.materials        = params->geom_cache->materials;
+  shaderParams.materials        = geom_cache->materials;
 
   std::vector<uint8_t> spv;
   std::string shader_entry_point;
@@ -384,18 +375,18 @@ int giRender(const gi_render_params* params,
   gml_vec3_normalize(params->camera->up, cam_up);
 
   float push_data[] = {
-    params->camera->position[0],
-    params->camera->position[1],
-    params->camera->position[2],
-    *((float*)&params->image_width),
-    cam_forward[0],
-    cam_forward[1],
-    cam_forward[2],
-    *((float*)&params->image_height),
-    cam_up[0],
-    cam_up[1],
-    cam_up[2],
-    params->camera->vfov
+    /* float3 */ params->camera->position[0], params->camera->position[1], params->camera->position[2],
+    /* uint   */ *((float*)&params->image_width),
+    /* float3 */ cam_forward[0], cam_forward[1], cam_forward[2],
+    /* uint   */ *((float*)&params->image_height),
+    /* float3 */ cam_up[0], cam_up[1], cam_up[2],
+    /* float  */ params->camera->vfov,
+    /* float4 */ params->bg_color[0], params->bg_color[1], params->bg_color[2], params->bg_color[3],
+    /* uint   */ *((float*)&params->spp),
+    /* uint   */ *((float*)&params->max_bounces),
+    /* float  */ params->max_sample_value,
+    /* uint   */ *((float*)&params->rr_bounce_offset),
+    /* float  */ params->rr_inv_min_term_prob
   };
   uint32_t push_data_size = sizeof(push_data);
 
