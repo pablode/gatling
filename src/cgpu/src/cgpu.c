@@ -2162,6 +2162,10 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
@@ -2195,7 +2199,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
   region.imageOffset = offset;
   region.imageExtent = extent;
 
-  vkCmdCopyBufferToImage(
+  idevice->table.vkCmdCopyBufferToImage(
     icommand_buffer->command_buffer,
     ibuffer->buffer,
     iimage->image,
