@@ -29,7 +29,6 @@ struct gi_geom_cache
   uint64_t                   face_buf_size;
   uint64_t                   vertex_buf_offset;
   uint64_t                   vertex_buf_size;
-  uint32_t                   material_count;
   std::vector<sg::Material*> materials;
 };
 
@@ -271,15 +270,16 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cache->buffer = buffer;
   cache->node_buf_size = node_buf_size;
   cache->face_buf_size = face_buf_size;
+  cache->emissive_face_indices_buf_offset = emissive_face_indices_buf_size;
   cache->vertex_buf_size = vertex_buf_size;
   cache->node_buf_offset = node_buf_offset;
   cache->face_buf_offset = face_buf_offset;
+  cache->emissive_face_indices_buf_offset = emissive_face_indices_buf_offset;
   cache->vertex_buf_offset = vertex_buf_offset;
 
   /* Copy materials. */
-  cache->material_count = params->material_count;
-  cache->materials.resize(cache->material_count);
-  for (int i = 0; i < cache->material_count; i++)
+  cache->materials.resize(params->material_count);
+  for (int i = 0; i < cache->materials.size(); i++)
   {
     cache->materials[i] = params->materials[i]->sg_mat;
   }
