@@ -45,6 +45,9 @@ StructuredBuffer<bvh_node> bvh_nodes;
 StructuredBuffer<face> faces;
 
 [[vk::binding(3)]]
+StructuredBuffer<uint> emissive_face_indices;
+
+[[vk::binding(4)]]
 StructuredBuffer<fvertex> vertices;
 
 // RNG producing on a four-element vector.

@@ -27,6 +27,8 @@ struct gi_geom_cache
   uint64_t                   node_buf_size;
   uint64_t                   face_buf_offset;
   uint64_t                   face_buf_size;
+  uint64_t                   emissive_face_indices_buf_offset;
+  uint64_t                   emissive_face_indices_buf_size;
   uint64_t                   vertex_buf_offset;
   uint64_t                   vertex_buf_size;
   std::vector<sg::Material*> materials;
@@ -180,6 +182,18 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   gi::bvh::Bvh8c bvh8c = gi::bvh::compress_bvh8(bvh8);
 
+  /* Build list of emissive faces. */
+  std::vector<uint32_t> emissive_face_indices;
+  emissive_face_indices.reserve(1024);
+  for (uint32_t i = 0; i < params->face_count; i++)
+  {
+    const gi_material* mat = params->materials[params->faces[i].mat_index];
+    if (s_shaderGen->isMaterialEmissive(mat->sg_mat))
+    {
+      emissive_face_indices.push_back(i);
+    }
+  }
+
   /* Upload to GPU buffer. */
   gi_geom_cache* cache = NULL;
   cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
@@ -192,10 +206,12 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   uint64_t node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
   uint64_t face_buf_size = params->face_count * sizeof(gi_face);
+  uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
   uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
 
   uint64_t node_buf_offset = giAlignBuffer(offset_align, node_buf_size, &buf_size);
   uint64_t face_buf_offset = giAlignBuffer(offset_align, face_buf_size, &buf_size);
+  uint64_t emissive_face_indices_buf_offset = giAlignBuffer(offset_align, emissive_face_indices_buf_size, &buf_size);
   uint64_t vertex_buf_offset = giAlignBuffer(offset_align, vertex_buf_size, &buf_size);
 
   CgpuResult c_result = cgpu_create_buffer(
@@ -226,6 +242,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   memcpy(&mapped_staging_mem[node_buf_offset], bvh8c.nodes.data(), node_buf_size);
   memcpy(&mapped_staging_mem[face_buf_offset], bvh8.faces.data(), face_buf_size);
+  memcpy(&mapped_staging_mem[emissive_face_indices_buf_offset], emissive_face_indices.data(), emissive_face_indices_buf_size);
   memcpy(&mapped_staging_mem[vertex_buf_offset], params->vertices, vertex_buf_size);
 
   c_result = cgpu_unmap_buffer(s_device, staging_buffer);
@@ -270,7 +287,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cache->buffer = buffer;
   cache->node_buf_size = node_buf_size;
   cache->face_buf_size = face_buf_size;
-  cache->emissive_face_indices_buf_offset = emissive_face_indices_buf_size;
+  cache->emissive_face_indices_buf_size = emissive_face_indices_buf_size;
   cache->vertex_buf_size = vertex_buf_size;
   cache->node_buf_offset = node_buf_offset;
   cache->face_buf_offset = face_buf_offset;
@@ -406,10 +423,11 @@ int giRender(const gi_render_params* params,
   uint32_t push_data_size = sizeof(push_data);
 
   cgpu_shader_resource_buffer buffers[] = {
-    { 0,              output_buffer,                                     0,                     CGPU_WHOLE_SIZE },
-    { 1, params->geom_cache->buffer,   params->geom_cache->node_buf_offset,   params->geom_cache->node_buf_size },
-    { 2, params->geom_cache->buffer,   params->geom_cache->face_buf_offset,   params->geom_cache->face_buf_size },
-    { 3, params->geom_cache->buffer, params->geom_cache->vertex_buf_offset, params->geom_cache->vertex_buf_size },
+    { 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE },
+    { 1, params->geom_cache->buffer,                  params->geom_cache->node_buf_offset,                  params->geom_cache->node_buf_size },
+    { 2, params->geom_cache->buffer,                  params->geom_cache->face_buf_offset,                  params->geom_cache->face_buf_size },
+    { 3, params->geom_cache->buffer, params->geom_cache->emissive_face_indices_buf_offset, params->geom_cache->emissive_face_indices_buf_size },
+    { 4, params->geom_cache->buffer,                params->geom_cache->vertex_buf_offset,                params->geom_cache->vertex_buf_size },
   };
   const uint32_t buffer_count = sizeof(buffers) / sizeof(buffers[0]);
 
