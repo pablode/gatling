@@ -1,35 +1,35 @@
 /* Möller-Trumbore triangle intersection. */
 bool test_face(
-    in const float3 ray_origin,
-    in const float3 ray_dir,
-    in const float t_max,
-    in const uint face_index,
+    in float3 ray_origin,
+    in float3 ray_dir,
+    in float t_max,
+    in uint face_index,
     out float t,
     out float2 bc)
 {
-    const face f = faces[face_index];
-    const float3 p0 = vertices[f.v_0].field1.xyz;
-    const float3 p1 = vertices[f.v_1].field1.xyz;
-    const float3 p2 = vertices[f.v_2].field1.xyz;
-    const float3 e1 = p1 - p0;
-    const float3 e2 = p2 - p0;
+    face f = faces[face_index];
+    float3 p0 = vertices[f.v_0].field1.xyz;
+    float3 p1 = vertices[f.v_1].field1.xyz;
+    float3 p2 = vertices[f.v_2].field1.xyz;
+    float3 e1 = p1 - p0;
+    float3 e2 = p2 - p0;
 
-    const float3 p = cross(ray_dir, e2);
-    const float det = dot(e1, p);
+    float3 p = cross(ray_dir, e2);
+    float det = dot(e1, p);
 
     if (abs(det) < TRI_EPS) {
         return false;
     }
 
-    const float inv_det = 1.0 / det;
-    const float3 tvec = ray_origin - p0;
+    float inv_det = 1.0 / det;
+    float3 tvec = ray_origin - p0;
 
     bc.x = dot(tvec, p) * inv_det;
     if (bc.x < 0.0 || bc.x > 1.0) {
         return false;
     }
 
-    const float3 q = cross(tvec, e1);
+    float3 q = cross(tvec, e1);
     bc.y = dot(ray_dir, q) * inv_det;
     if (bc.y < 0.0 || (bc.x + bc.y > 1.0)) {
         return false;
@@ -65,16 +65,14 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
 {
     float t_max = FLOAT_MAX;
     float t_min = 0.0;
-    const float3 inv_dir = 1.0 / ray_dir;
+    float3 inv_dir = 1.0 / ray_dir;
 
-    const uint3 oct_inv = uint3(
+    uint3 oct_inv = uint3(
         ray_dir.x >= 0.0 ? 0 : 0x4,
         ray_dir.y >= 0.0 ? 0 : 0x2,
         ray_dir.z >= 0.0 ? 0 : 0x1
     );
-    const uint oct_inv4 = (oct_inv.x | oct_inv.y | oct_inv.z) * 0x01010101;
-
-    float temp_t;
+    uint oct_inv4 = (oct_inv.x | oct_inv.y | oct_inv.z) * 0x01010101;
 
     uint2 node_group = uint2(0, 0x80000000);
 
@@ -92,10 +90,10 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
         }
         else
         {
-            const uint child_bit_idx = firstbithigh(node_group.y);
-            const uint slot_index = (child_bit_idx - 24) ^ (oct_inv4 & 0xFF);
-            const uint rel_idx = countbits(node_group.y & ~(0xFFFFFFFFu << slot_index));
-            const uint child_node_idx = node_group.x + rel_idx;
+            uint child_bit_idx = firstbithigh(node_group.y);
+            uint slot_index = (child_bit_idx - 24) ^ (oct_inv4 & 0xFF);
+            uint rel_idx = countbits(node_group.y & ~(0xFFFFFFFFu << slot_index));
+            uint child_node_idx = node_group.x + rel_idx;
 
             node_group.y &= ~(1u << child_bit_idx);
 
@@ -109,7 +107,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
                 stack_size++;
             }
 
-            const bvh_node node = bvh_nodes[child_node_idx];
+            bvh_node node = bvh_nodes[child_node_idx];
 
             node_group.x = node.f2.x;
             face_group = uint2(node.f2.y, 0);
@@ -124,52 +122,52 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
             [unroll(2)]
             for (uint passIdx = 0; passIdx < 2; ++passIdx)
             {
-                const uint meta4 = (passIdx == 0) ? node.f2.z : node.f2.w;
-                const uint is_inner4 = (meta4 & (meta4 << 1)) & 0x10101010;
-                const uint inner_mask4 = sign_to_byte_mask4(is_inner4 << 3);
-                const uint bit_index4 = (meta4 ^ (oct_inv4 & inner_mask4)) & 0x1F1F1F1F;
-                const uint child_bits4 = (meta4 >> 5) & 0x07070707;
+                uint meta4 = (passIdx == 0) ? node.f2.z : node.f2.w;
+                uint is_inner4 = (meta4 & (meta4 << 1)) & 0x10101010;
+                uint inner_mask4 = sign_to_byte_mask4(is_inner4 << 3);
+                uint bit_index4 = (meta4 ^ (oct_inv4 & inner_mask4)) & 0x1F1F1F1F;
+                uint child_bits4 = (meta4 >> 5) & 0x07070707;
 
-                const bool x_lt_0 = (inv_dir.x < 0.0);
-                const bool y_lt_0 = (inv_dir.y < 0.0);
-                const bool z_lt_0 = (inv_dir.z < 0.0);
+                bool x_lt_0 = (inv_dir.x < 0.0);
+                bool y_lt_0 = (inv_dir.y < 0.0);
+                bool z_lt_0 = (inv_dir.z < 0.0);
 
-                const uint q_lo_x = (passIdx == 0) ? node.f3.x : node.f3.y;
-                const uint q_hi_x = (passIdx == 0) ? node.f4.z : node.f4.w;
-                const uint q_lo_y = (passIdx == 0) ? node.f3.z : node.f3.w;
-                const uint q_hi_y = (passIdx == 0) ? node.f5.x : node.f5.y;
-                const uint q_lo_z = (passIdx == 0) ? node.f4.x : node.f4.y;
-                const uint q_hi_z = (passIdx == 0) ? node.f5.z : node.f5.w;
+                uint q_lo_x = (passIdx == 0) ? node.f3.x : node.f3.y;
+                uint q_hi_x = (passIdx == 0) ? node.f4.z : node.f4.w;
+                uint q_lo_y = (passIdx == 0) ? node.f3.z : node.f3.w;
+                uint q_hi_y = (passIdx == 0) ? node.f5.x : node.f5.y;
+                uint q_lo_z = (passIdx == 0) ? node.f4.x : node.f4.y;
+                uint q_hi_z = (passIdx == 0) ? node.f5.z : node.f5.w;
 
-                const float4 s_q_lo_x = uint_unpack_float4(x_lt_0 ? q_hi_x : q_lo_x);
-                const float4 s_q_hi_x = uint_unpack_float4(x_lt_0 ? q_lo_x : q_hi_x);
-                const float4 s_q_lo_y = uint_unpack_float4(y_lt_0 ? q_hi_y : q_lo_y);
-                const float4 s_q_hi_y = uint_unpack_float4(y_lt_0 ? q_lo_y : q_hi_y);
-                const float4 s_q_lo_z = uint_unpack_float4(z_lt_0 ? q_hi_z : q_lo_z);
-                const float4 s_q_hi_z = uint_unpack_float4(z_lt_0 ? q_lo_z : q_hi_z);
+                float4 s_q_lo_x = uint_unpack_float4(x_lt_0 ? q_hi_x : q_lo_x);
+                float4 s_q_hi_x = uint_unpack_float4(x_lt_0 ? q_lo_x : q_hi_x);
+                float4 s_q_lo_y = uint_unpack_float4(y_lt_0 ? q_hi_y : q_lo_y);
+                float4 s_q_hi_y = uint_unpack_float4(y_lt_0 ? q_lo_y : q_hi_y);
+                float4 s_q_lo_z = uint_unpack_float4(z_lt_0 ? q_hi_z : q_lo_z);
+                float4 s_q_hi_z = uint_unpack_float4(z_lt_0 ? q_lo_z : q_hi_z);
 
-                const float4 t_min_x = local_inv_dir.x * s_q_lo_x + local_orig.x;
-                const float4 t_max_x = local_inv_dir.x * s_q_hi_x + local_orig.x;
-                const float4 t_min_y = local_inv_dir.y * s_q_lo_y + local_orig.y;
-                const float4 t_max_y = local_inv_dir.y * s_q_hi_y + local_orig.y;
-                const float4 t_min_z = local_inv_dir.z * s_q_lo_z + local_orig.z;
-                const float4 t_max_z = local_inv_dir.z * s_q_hi_z + local_orig.z;
+                float4 t_min_x = local_inv_dir.x * s_q_lo_x + local_orig.x;
+                float4 t_max_x = local_inv_dir.x * s_q_hi_x + local_orig.x;
+                float4 t_min_y = local_inv_dir.y * s_q_lo_y + local_orig.y;
+                float4 t_max_y = local_inv_dir.y * s_q_hi_y + local_orig.y;
+                float4 t_min_z = local_inv_dir.z * s_q_lo_z + local_orig.z;
+                float4 t_max_z = local_inv_dir.z * s_q_hi_z + local_orig.z;
 
                 [unroll(4)]
                 for (uint child_idx = 0; child_idx < 4; ++child_idx)
                 {
-                    const float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], t_min));
-                    const float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], t_max));
+                    float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], t_min));
+                    float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], t_max));
 
-                    const bool is_intersected = bmin <= bmax;
+                    bool is_intersected = bmin <= bmax;
 
                     if (!is_intersected)
                     {
                         continue;
                     }
 
-                    const uint child_bits = extract_byte(child_bits4, child_idx);
-                    const uint bit_index = extract_byte(bit_index4, child_idx);
+                    uint child_bits = extract_byte(child_bits4, child_idx);
+                    uint bit_index = extract_byte(bit_index4, child_idx);
                     hitmask |= (child_bits << bit_index);
                 }
             }
@@ -179,13 +177,13 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
             face_group.y = (hitmask & 0x00FFFFFF);
         }
 
-        const uint active_inv_count1 = WaveActiveCountBits(true);
+        uint active_inv_count1 = WaveActiveCountBits(true);
 
         while (face_group.y != 0)
         {
-            const uint threshold = uint(active_inv_count1 * POSTPONE_RATIO);
+            uint threshold = uint(active_inv_count1 * POSTPONE_RATIO);
 
-            const uint active_inv_count2 = WaveActiveCountBits(true);
+            uint active_inv_count2 = WaveActiveCountBits(true);
 
             if (active_inv_count2 < threshold)
             {
@@ -198,16 +196,16 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
                 break;
             }
 
-            const uint face_rel_index = firstbithigh(face_group.y);
+            uint face_rel_index = firstbithigh(face_group.y);
 
             face_group.y &= ~(1u << face_rel_index);
 
-            const uint face_index = face_group.x + face_rel_index;
+            uint face_index = face_group.x + face_rel_index;
 
             float temp_t;
             float2 temp_bc;
 
-            const bool has_hit = test_face(
+            bool has_hit = test_face(
                 ray_origin,
                 ray_dir,
                 t_max,
