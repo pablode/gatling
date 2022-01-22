@@ -28,6 +28,14 @@ struct bvh_node
     uint4 f5;
 };
 
+struct RayInfo
+{
+  float3 origin;
+  float  tmin;
+  float3 dir;
+  float  tmax;
+};
+
 struct Hit_info
 {
     float3 pos;

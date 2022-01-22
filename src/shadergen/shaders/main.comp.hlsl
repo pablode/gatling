@@ -140,16 +140,21 @@ float3 evaluate_sample(inout uint4 rng_state,
 {
     Sample_state state;
     state.ray_origin = ray_origin;
-    state.ray_dir = ray_dir;
+    state.ray_dir    = ray_dir;
     state.throughput = float3(1.0, 1.0, 1.0);
-    state.value = float3(0.0, 0.0, 0.0);
-    state.rng_state = rng_state;
+    state.value      = float3(0.0, 0.0, 0.0);
+    state.rng_state  = rng_state;
 
     for (uint bounce = 0; bounce < (PC.MAX_BOUNCES + 1); bounce++)
     {
-        Hit_info hit_info;
+        RayInfo ray;
+        ray.origin = state.ray_origin;
+        ray.tmin   = 0.0;
+        ray.dir    = state.ray_dir;
+        ray.tmax   = FLOAT_MAX;
 
-        bool found_hit = traverse_bvh(state.ray_origin, state.ray_dir, hit_info);
+        Hit_info hit_info;
+        bool found_hit = bvh_find_hit_closest(ray, hit_info);
 
         if (!found_hit)
         {

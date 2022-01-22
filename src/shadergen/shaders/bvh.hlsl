@@ -61,16 +61,16 @@ float4 uint_unpack_float4(uint u)
   return float4(extract_byte(u, 0), extract_byte(u, 1), extract_byte(u, 2), extract_byte(u, 3));
 }
 
-bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
+bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
 {
-    float t_max = FLOAT_MAX;
-    float t_min = 0.0;
-    float3 inv_dir = 1.0 / ray_dir;
+    float t_min = ray.tmin;
+    float t_max = ray.tmax;
+    float3 inv_dir = 1.0 / ray.dir;
 
     uint3 oct_inv = uint3(
-        ray_dir.x >= 0.0 ? 0 : 0x4,
-        ray_dir.y >= 0.0 ? 0 : 0x2,
-        ray_dir.z >= 0.0 ? 0 : 0x1
+        ray.dir.x >= 0.0 ? 0 : 0x4,
+        ray.dir.y >= 0.0 ? 0 : 0x2,
+        ray.dir.z >= 0.0 ? 0 : 0x1
     );
     uint oct_inv4 = (oct_inv.x | oct_inv.y | oct_inv.z) * 0x01010101;
 
@@ -115,7 +115,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
             uint3 node_e = uint3(extract_byte(node.f1.w, 0), extract_byte(node.f1.w, 1), extract_byte(node.f1.w, 2));
             float3 local_inv_dir = asfloat(node_e << 23) * inv_dir;
             float3 p = asfloat(node.f1.xyz);
-            float3 local_orig = (p - ray_origin) * inv_dir;
+            float3 local_orig = (p - ray.origin) * inv_dir;
 
             uint hitmask = 0;
 
@@ -206,8 +206,8 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
             float2 temp_bc;
 
             bool has_hit = test_face(
-                ray_origin,
-                ray_dir,
+                ray.origin,
+                ray.dir,
                 t_max,
                 face_index,
                 temp_t,
@@ -236,7 +236,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
 
         if (t_max != FLOAT_MAX)
         {
-            hit.pos = ray_origin + ray_dir * t_max;
+            hit.pos = ray.origin + ray.dir * t_max;
             return true;
         }
 
