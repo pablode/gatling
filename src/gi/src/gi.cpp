@@ -11,7 +11,7 @@
 #include <vector>
 
 #include <cgpu.h>
-#include <shadergen.h>
+#include <ShaderGen.h>
 
 const uint32_t WORKGROUP_SIZE_X = 16;
 const uint32_t WORKGROUP_SIZE_Y = 16;
