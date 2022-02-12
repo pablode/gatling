@@ -34,6 +34,7 @@ namespace sg
     {
       uint32_t numThreadsX;
       uint32_t numThreadsY;
+      float postponeRatio;
       uint32_t maxStackSize;
       std::vector<Material*> materials;
     };

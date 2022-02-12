@@ -136,6 +136,7 @@ namespace sg
     APPEND_CONSTANT("NUM_THREADS_X", numThreadsX)
     APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
     APPEND_CONSTANT("MAX_STACK_SIZE", maxStackSize)
+    APPEND_CONSTANT("POSTPONE_RATIO", postponeRatio)
 
     std::string genMdl;
     if (!_sgGenerateMainShaderMdlHlsl(*m_mdlHlslCodeGen, params->materials, genMdl))

@@ -293,14 +293,18 @@ void giDestroyGeomCache(gi_geom_cache* cache)
 
 gi_shader_cache* giCreateShaderCache(const gi_geom_cache* geom_cache)
 {
+  float postpone_ratio = 0.2f;
   uint32_t node_count = geom_cache->bvh_node_count;
-  uint32_t max_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
+  uint32_t max_bvh_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
+  uint32_t max_postponed_tris = int(s_device_limits.subgroupSize * postpone_ratio) - 1;
+  uint32_t max_stack_size = max_bvh_stack_size + max_postponed_tris;
 
   sg::ShaderGen::MainShaderParams shaderParams;
-  shaderParams.numThreadsX      = WORKGROUP_SIZE_X;
-  shaderParams.numThreadsY      = WORKGROUP_SIZE_Y;
-  shaderParams.maxStackSize     = max_stack_size;
-  shaderParams.materials        = geom_cache->materials;
+  shaderParams.numThreadsX   = WORKGROUP_SIZE_X;
+  shaderParams.numThreadsY   = WORKGROUP_SIZE_Y;
+  shaderParams.postponeRatio = postpone_ratio;
+  shaderParams.maxStackSize  = max_stack_size;
+  shaderParams.materials     = geom_cache->materials;
 
   std::vector<uint8_t> spv;
   std::string shader_entry_point;

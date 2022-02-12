@@ -179,8 +179,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
 
         while (face_group.y != 0)
         {
-            const float R_t = 0.2;
-            const uint threshold = uint(active_inv_count1 * R_t);
+            const uint threshold = uint(active_inv_count1 * POSTPONE_RATIO);
 
             const uint active_inv_count2 = WaveActiveCountBits(true);
 
