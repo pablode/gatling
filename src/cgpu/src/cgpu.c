@@ -830,11 +830,23 @@ CgpuResult cgpu_create_device(
     device_extensions
   );
 
-  const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
+  uint32_t enabled_device_extension_count = 0;
+  const char* enabled_device_extensions[2];
 
-  bool has_portability_subset = cgpu_find_device_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME,
-                                                           device_ext_count,
-                                                           device_extensions);
+  const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
+  if (cgpu_find_device_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, device_ext_count, device_extensions))
+  {
+    enabled_device_extensions[enabled_device_extension_count] = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
+    enabled_device_extension_count++;
+  }
+#ifndef NDEBUG
+  // Required for shader printf feature.
+  if (cgpu_find_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions))
+  {
+    enabled_device_extensions[enabled_device_extension_count] = VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME;
+    enabled_device_extension_count++;
+  }
+#endif
 
   uint32_t queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(
@@ -951,8 +963,8 @@ CgpuResult cgpu_create_device(
    nowadays, there is no difference to instance validation layers. */
   device_create_info.enabledLayerCount = 0;
   device_create_info.ppEnabledLayerNames = NULL;
-  device_create_info.enabledExtensionCount = has_portability_subset ? 1 : 0;
-  device_create_info.ppEnabledExtensionNames = &VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
+  device_create_info.enabledExtensionCount = enabled_device_extension_count;
+  device_create_info.ppEnabledExtensionNames = enabled_device_extensions;
   device_create_info.pEnabledFeatures = NULL;
 
   VkResult result = vkCreateDevice(

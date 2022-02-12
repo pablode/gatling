@@ -86,6 +86,13 @@ namespace sg
     shaderc_compile_options_set_target_env(m_compileOptions, shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
     shaderc_compile_options_set_target_spirv(m_compileOptions, shaderc_spirv_version_1_3);
 
+#ifdef NDEBUG
+    shaderc_compile_options_set_suppress_warnings(m_compileOptions);
+#else
+    shaderc_compile_options_set_generate_debug_info(m_compileOptions);
+    shaderc_compile_options_set_warnings_as_errors(m_compileOptions);
+#endif
+
     shaderc_compile_options_set_include_callbacks(
       m_compileOptions,
       detail::resolveInclude,

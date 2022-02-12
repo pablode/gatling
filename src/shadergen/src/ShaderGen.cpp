@@ -130,6 +130,10 @@ namespace sg
     ss << std::showpoint;
     ss << std::setprecision(std::numeric_limits<float>::digits10);
 
+#ifdef NDEBUG
+    ss << "#define NDEBUG\n";
+#endif
+
   #define APPEND_CONSTANT(name, cvar) \
     ss << "#define " << name << " " << params->cvar << "\n";
 
