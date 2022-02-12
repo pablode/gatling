@@ -18,8 +18,16 @@ target_link_libraries(
     ${C_MATH_LIBRARY}
 )
 
-# Required since library is linked into hdGatling DSO
-set_target_properties(gml PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(
+  gml
+  PROPERTIES
+    LINKER_LANGUAGE C
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+    # Required since library is linked into hdGatling DSO
+    POSITION_INDEPENDENT_CODE ON
+)
 
 if(ENABLE_IPO)
   set_target_properties(gml PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)

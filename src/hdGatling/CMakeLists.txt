@@ -25,10 +25,6 @@ add_library(
 set_target_properties(
   hdGatling
   PROPERTIES
-    LINKER_LANGUAGE CXX
-    CXX_STANDARD 14
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
     INSTALL_RPATH_USE_LINK_PATH ON
     # The other libs in the plugin dir have no "lib" prefix, so let's match this
     PREFIX ""

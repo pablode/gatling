@@ -11,15 +11,6 @@ add_library(
   src/bvh_compress.h
 )
 
-set_target_properties(
-  gi
-  PROPERTIES
-    LINKER_LANGUAGE CXX
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
-)
-
 target_include_directories(
   gi
   PUBLIC

@@ -27,10 +27,6 @@ endif()
 set_target_properties(
   shadergen
   PROPERTIES
-    LINKER_LANGUAGE CXX
-    CXX_STANDARD 17
-    CXX_STANDARD_REQUIRED ON
-    CXX_EXTENSIONS OFF
     # Required since library is linked into hdGatling DSO
     POSITION_INDEPENDENT_CODE ON
 )
