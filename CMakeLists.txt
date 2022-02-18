@@ -21,7 +21,7 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${OUTPUT_DIR})
 endforeach()
 
-option(GATLING_USE_EMBREE "Use Embree for BVH building." OFF)
+option(GATLING_USE_EMBREE "Use Embree for BVH building." ON)
 cmake_dependent_option(GATLING_USE_DXC "Use DXC instead of glslang" OFF WIN32 OFF)
 
 find_package(Vulkan REQUIRED)
