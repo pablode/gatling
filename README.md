@@ -23,7 +23,7 @@ The following is required:
 - CMake 3.11+
 - C11 compiler and C++14 compiler
 - <a href="https://vulkan.lunarg.com/">Vulkan SDK</a>
-- <a href="https://github.com/PixarAnimationStudios/USD/tree/v21.11">USD 21.11</a> with MaterialX support
+- <a href="https://github.com/PixarAnimationStudios/USD/tree/v22.03">USD 22.03</a> with MaterialX support
 - <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.0.1</a> binaries
 
 > Note: EXR export requires building USD with OpenImageIO support.
