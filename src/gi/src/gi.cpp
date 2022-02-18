@@ -3,6 +3,9 @@
 #include "bvh.h"
 #include "bvh_collapse.h"
 #include "bvh_compress.h"
+#ifdef GATLING_USE_EMBREE
+#include "bvh_embree.h"
+#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -133,10 +136,25 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   }
 
   /* Build BVH. */
+  float node_traversal_cost = 1.0f;
+  float face_intersection_cost = 0.3f;
+
+#ifdef GATLING_USE_EMBREE
+  gi::bvh::EmbreeBuildParams bvh_params;
+  bvh_params.face_batch_size        = 1;
+  bvh_params.face_count             = params->face_count;
+  bvh_params.face_intersection_cost = face_intersection_cost;
+  bvh_params.faces                  = params->faces;
+  bvh_params.node_traversal_cost    = node_traversal_cost;
+  bvh_params.vertex_count           = params->vertex_count;
+  bvh_params.vertices               = params->vertices;
+
+  gi::bvh::Bvh2 bvh = gi::bvh::build_bvh2_embree(bvh_params);
+#else
   gi::bvh::BvhBuildParams bvh_params;
   bvh_params.face_batch_size          = 1;
   bvh_params.face_count               = params->face_count;
-  bvh_params.face_intersection_cost   = 0.3f;
+  bvh_params.face_intersection_cost   = face_intersection_cost;
   bvh_params.faces                    = params->faces;
   bvh_params.leaf_max_face_count      = 1;
   bvh_params.object_binning_mode      = gi::bvh::BvhBinningMode::Fixed;
@@ -148,11 +166,12 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   bvh_params.vertices                 = params->vertices;
 
   gi::bvh::Bvh2 bvh = gi::bvh::build_bvh2(bvh_params);
+#endif
 
   gi::bvh::CollapseParams bvh8_params;
   bvh8_params.max_leaf_size          = 3;
-  bvh8_params.node_traversal_cost    = 1.0f;
-  bvh8_params.face_intersection_cost = 0.3f;
+  bvh8_params.node_traversal_cost    = node_traversal_cost;
+  bvh8_params.face_intersection_cost = face_intersection_cost;
 
   gi::bvh::Bvh<8> bvh8;
   if (!gi::bvh::collapse_bvh2(bvh, bvh8_params, bvh8))

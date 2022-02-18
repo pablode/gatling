@@ -45,6 +45,12 @@ target_link_libraries(
     gml
 )
 
+if(${GATLING_USE_EMBREE})
+  target_sources(gi PRIVATE src/bvh_embree.h src/bvh_embree.cpp)
+  target_compile_definitions(gi PRIVATE GATLING_USE_EMBREE)
+  target_link_libraries(gi PRIVATE embree)
+endif()
+
 # Required since library is linked into hdGatling DSO
 set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
