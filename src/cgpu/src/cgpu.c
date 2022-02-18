@@ -839,7 +839,7 @@ CgpuResult cgpu_create_device(
     enabled_device_extensions[enabled_device_extension_count] = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
     enabled_device_extension_count++;
   }
-#ifndef NDEBUG
+#if !defined(NDEBUG) && !defined(__APPLE__)
   // Required for shader printf feature.
   if (cgpu_find_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions))
   {

@@ -101,7 +101,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
 
             if (node_group.y > 0x00FFFFFF)
             {
-#ifndef NDEBUG
+#ifdef DEBUG_PRINTF
                 if (stack_size >= MAX_STACK_SIZE)
                     printf("Error: traversal stack size exceeds maximum capacity\n");
 #endif
@@ -189,7 +189,7 @@ bool traverse_bvh(in float3 ray_origin, in float3 ray_dir, out Hit_info hit)
 
             if (active_inv_count2 < threshold)
             {
-#ifndef NDEBUG
+#ifdef DEBUG_PRINTF
                 if (stack_size >= MAX_STACK_SIZE)
                     printf("Error: traversal stack size exceeds maximum capacity\n");
 #endif

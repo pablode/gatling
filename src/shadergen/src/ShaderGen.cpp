@@ -130,8 +130,8 @@ namespace sg
     ss << std::showpoint;
     ss << std::setprecision(std::numeric_limits<float>::digits10);
 
-#ifdef NDEBUG
-    ss << "#define NDEBUG\n";
+#if !defined(NDEBUG) && !defined(__APPLE__)
+    ss << "#define DEBUG_PRINTF\n";
 #endif
 
   #define APPEND_CONSTANT(name, cvar) \
