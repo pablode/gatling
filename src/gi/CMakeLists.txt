@@ -6,6 +6,7 @@ add_library(
   src/bvh.h
   src/bvh_collapse.cpp
   src/bvh_collapse.h
+  src/bvh_collapse.inl
   src/bvh_compress.cpp
   src/bvh_compress.h
 )

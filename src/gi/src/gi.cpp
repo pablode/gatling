@@ -133,37 +133,34 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   }
 
   /* Build BVH. */
-  gi_bvh_params bvh_params;
+  gi::bvh::BvhBuildParams bvh_params;
   bvh_params.face_batch_size          = 1;
   bvh_params.face_count               = params->face_count;
-  bvh_params.face_intersection_cost   = 1.2f;
+  bvh_params.face_intersection_cost   = 0.3f;
   bvh_params.faces                    = params->faces;
   bvh_params.leaf_max_face_count      = 1;
-  bvh_params.object_binning_mode      = GI_BVH_BINNING_MODE_FIXED;
+  bvh_params.object_binning_mode      = gi::bvh::BvhBinningMode::Fixed;
   bvh_params.object_binning_threshold = 1024;
   bvh_params.object_bin_count         = 16;
   bvh_params.spatial_bin_count        = 32;
-  bvh_params.spatial_reserve_factor   = 1.25f;
   bvh_params.spatial_split_alpha      = 1.0f; /* Temporarily disabled. */
   bvh_params.vertex_count             = params->vertex_count;
   bvh_params.vertices                 = params->vertices;
 
-  gi_bvh bvh;
-  gi_bvh_build(&bvh_params, &bvh);
+  gi::bvh::Bvh2 bvh = gi::bvh::build_bvh2(bvh_params);
 
-  gi_bvhc_params bvhc_params;
-  bvhc_params.bvh                    = &bvh;
-  bvhc_params.max_leaf_size          = 3;
-  bvhc_params.node_traversal_cost    = 1.0f;
-  bvhc_params.face_intersection_cost = 0.3f;
+  gi::bvh::CollapseParams bvh8_params;
+  bvh8_params.max_leaf_size          = 3;
+  bvh8_params.node_traversal_cost    = 1.0f;
+  bvh8_params.face_intersection_cost = 0.3f;
 
-  gi_bvhc bvhc;
-  gi_bvh_collapse(&bvhc_params, &bvhc);
+  gi::bvh::Bvh<8> bvh8;
+  if (!gi::bvh::collapse_bvh2(bvh, bvh8_params, bvh8))
+  {
+    return NULL;
+  }
 
-  gi_free_bvh(&bvh);
-
-  gi_bvhcc bvhcc;
-  gi_bvh_compress(&bvhc, &bvhcc);
+  gi::bvh::Bvh8c bvh8c = gi::bvh::compress_bvh8(bvh8);
 
   /* Upload to GPU buffer. */
   gi_geom_cache* cache = NULL;
@@ -175,7 +172,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   uint64_t buf_size = 0;
   const uint64_t offset_align = s_device_limits.minStorageBufferOffsetAlignment;
 
-  uint64_t node_buf_size = bvhcc.node_count * sizeof(gi_bvhcc_node);
+  uint64_t node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
   uint64_t face_buf_size = params->face_count * sizeof(gi_face);
   uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
 
@@ -211,8 +208,8 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  memcpy(&mapped_staging_mem[node_buf_offset], bvhcc.nodes, node_buf_size);
-  memcpy(&mapped_staging_mem[face_buf_offset], bvhc.faces, face_buf_size);
+  memcpy(&mapped_staging_mem[node_buf_offset], bvh8c.nodes.data(), node_buf_size);
+  memcpy(&mapped_staging_mem[face_buf_offset], bvh8.faces.data(), face_buf_size);
   memcpy(&mapped_staging_mem[vertex_buf_offset], params->vertices, vertex_buf_size);
 
   c_result = cgpu_unmap_buffer(s_device, staging_buffer);
@@ -253,7 +250,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   if (c_result != CGPU_OK) goto cleanup;
 
   cache = new gi_geom_cache;
-  cache->bvh_node_count = bvhcc.node_count;
+  cache->bvh_node_count = bvh8c.nodes.size();
   cache->buffer = buffer;
   cache->node_buf_size = node_buf_size;
   cache->face_buf_size = face_buf_size;
@@ -271,9 +268,6 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   }
 
 cleanup:
-  gi_free_bvhc(&bvhc);
-  gi_free_bvhcc(&bvhcc);
-
   cgpu_destroy_fence(s_device, fence);
   cgpu_destroy_command_buffer(s_device, command_buffer);
   cgpu_destroy_buffer(s_device, staging_buffer);

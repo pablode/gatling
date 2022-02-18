@@ -1,39 +1,44 @@
-#ifndef GI_BVH_COLLAPSE_H
-#define GI_BVH_COLLAPSE_H
+#pragma once
 
 #include <stddef.h>
+#include <vector>
 
 #include "bvh.h"
 
-struct gi_bvhc_node
+namespace gi
 {
-  gml_aabb aabbs[8];
-  uint32_t offsets[8];
-  uint32_t counts[8];
-  uint32_t child_index;
-  uint32_t face_index;
-};
+  namespace bvh
+  {
+    template<size_t WIDTH>
+    struct BvhNode
+    {
+      gml_aabb aabbs[WIDTH];
+      uint32_t offsets[WIDTH];
+      uint32_t counts[WIDTH];
+      uint32_t child_index;
+      uint32_t face_index;
+    };
 
-struct gi_bvhc
-{
-  gml_aabb      aabb;
-  uint32_t      node_count;
-  gi_bvhc_node* nodes;
-  uint32_t      face_count;
-  gi_face*      faces;
-};
+    template<size_t WIDTH>
+    struct Bvh
+    {
+      gml_aabb                    aabb;
+      std::vector<BvhNode<WIDTH>> nodes;
+      std::vector<gi_face>        faces;
+    };
 
-struct gi_bvhc_params
-{
-  const gi_bvh* bvh;
-  float         face_intersection_cost;
-  uint32_t      max_leaf_size;
-  float         node_traversal_cost;
-};
+    struct CollapseParams
+    {
+      float    face_intersection_cost;
+      float    node_traversal_cost;
+      uint32_t max_leaf_size;
+    };
 
-void gi_bvh_collapse(const gi_bvhc_params* params,
-                     gi_bvhc* bvhc);
+    template<size_t N>
+    bool collapse_bvh2(const Bvh2& bvh2,
+                       const CollapseParams& params,
+                       Bvh<N>& bvh);
+  }
+}
 
-void gi_free_bvhc(gi_bvhc* bvhcc);
-
-#endif
+#include "bvh_collapse.inl"
