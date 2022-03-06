@@ -34,30 +34,6 @@ TF_DEFINE_PRIVATE_TOKENS(
   (HdGatlingRendererPlugin)
 );
 
-HdRendererPluginHandle GetHdGatlingPlugin()
-{
-  HdRendererPluginRegistry& registry = HdRendererPluginRegistry::GetInstance();
-
-  HfPluginDescVector pluginDescriptors;
-  registry.GetPluginDescs(&pluginDescriptors);
-
-  for (const HfPluginDesc& pluginDesc : pluginDescriptors)
-  {
-    const TfToken& pluginId = pluginDesc.id;
-
-    if (pluginId != _AppTokens->HdGatlingRendererPlugin)
-    {
-      continue;
-    }
-
-    HdRendererPluginHandle plugin = registry.GetOrCreateRendererPlugin(pluginId);
-
-    return plugin;
-  }
-
-  return HdRendererPluginHandle();
-}
-
 HdCamera* FindCamera(UsdStageRefPtr& stage, HdRenderIndex* renderIndex, std::string& settingsCameraPath)
 {
   SdfPath cameraPath;
@@ -97,7 +73,8 @@ float AccurateLinearToSrgb(float linearValue)
 int main(int argc, const char* argv[])
 {
   // Init plugin.
-  HdRendererPluginHandle pluginHandle = GetHdGatlingPlugin();
+  HdRendererPluginRegistry& pluginRegistry = HdRendererPluginRegistry::GetInstance();
+  HdRendererPluginHandle pluginHandle = pluginRegistry.GetOrCreateRendererPlugin(_AppTokens->HdGatlingRendererPlugin);
 
   if (!pluginHandle)
   {
