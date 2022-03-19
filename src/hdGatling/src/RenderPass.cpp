@@ -20,7 +20,7 @@ static const char* DEFAULT_MTLX_DOC =
   "    <input name=\"diffuseColor\" type=\"color3\" value=\"1.0, 0.0, 1.0\" />"
   "    <input name=\"roughness\" type=\"float\" value=\"1.0\" />"
   "  </UsdPreviewSurface>"
-  "  <surfacematerial name=\"USD_Invalid\" type=\"material\">"
+  "  <surfacematerial name=\"invalid\" type=\"material\">"
   "    <input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"SR_Invalid\" />"
   "  </surfacematerial>"
   "</materialx>";
