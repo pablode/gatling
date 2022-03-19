@@ -20,7 +20,7 @@ target_link_libraries(
   cgpu
   PRIVATE
     volk
-    VulkanMemoryAllocator
+    vma-c
 )
 
 set_target_properties(

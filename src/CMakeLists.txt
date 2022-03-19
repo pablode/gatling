@@ -1,3 +1,4 @@
+add_subdirectory(vma-c)
 add_subdirectory(cgpu)
 add_subdirectory(gml)
 add_subdirectory(shadergen)
