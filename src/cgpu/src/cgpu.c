@@ -6,6 +6,8 @@
 #include <string.h>
 #include <volk.h>
 
+#include <vma.h>
+
 #define MIN_VK_API_VERSION VK_API_VERSION_1_1
 
 /* Array and pool allocation limits. */
@@ -37,6 +39,7 @@ typedef struct cgpu_idevice {
   VkSampler                   sampler;
   struct VolkDeviceTable      table;
   cgpu_physical_device_limits limits;
+  VmaAllocator                allocator;
 } cgpu_idevice;
 
 typedef struct cgpu_ibuffer {
@@ -1092,6 +1095,65 @@ CgpuResult cgpu_create_device(
     return CGPU_FAIL_UNABLE_TO_CREATE_QUERY_POOL;
   }
 
+  VmaVulkanFunctions vulkan_functions = {0};
+  vulkan_functions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+  vulkan_functions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+  vulkan_functions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2;
+  vulkan_functions.vkAllocateMemory = idevice->table.vkAllocateMemory;
+  vulkan_functions.vkFreeMemory = idevice->table.vkFreeMemory;
+  vulkan_functions.vkMapMemory = idevice->table.vkMapMemory;
+  vulkan_functions.vkUnmapMemory = idevice->table.vkUnmapMemory;
+  vulkan_functions.vkFlushMappedMemoryRanges = idevice->table.vkFlushMappedMemoryRanges;
+  vulkan_functions.vkInvalidateMappedMemoryRanges = idevice->table.vkInvalidateMappedMemoryRanges;
+  vulkan_functions.vkBindBufferMemory = idevice->table.vkBindBufferMemory;
+  vulkan_functions.vkBindImageMemory = idevice->table.vkBindImageMemory;
+  vulkan_functions.vkGetBufferMemoryRequirements = idevice->table.vkGetBufferMemoryRequirements;
+  vulkan_functions.vkGetImageMemoryRequirements = idevice->table.vkGetImageMemoryRequirements;
+  vulkan_functions.vkCreateBuffer = idevice->table.vkCreateBuffer;
+  vulkan_functions.vkDestroyBuffer = idevice->table.vkDestroyBuffer;
+  vulkan_functions.vkCreateImage = idevice->table.vkCreateImage;
+  vulkan_functions.vkDestroyImage = idevice->table.vkDestroyImage;
+  vulkan_functions.vkCmdCopyBuffer = idevice->table.vkCmdCopyBuffer;
+  vulkan_functions.vkGetBufferMemoryRequirements2KHR = idevice->table.vkGetBufferMemoryRequirements2;
+  vulkan_functions.vkGetImageMemoryRequirements2KHR = idevice->table.vkGetImageMemoryRequirements2;
+  vulkan_functions.vkBindBufferMemory2KHR = idevice->table.vkBindBufferMemory2;
+  vulkan_functions.vkBindImageMemory2KHR = idevice->table.vkBindImageMemory2;
+
+  VmaAllocatorCreateInfo alloc_create_info = {0};
+  alloc_create_info.vulkanApiVersion = MIN_VK_API_VERSION;
+  alloc_create_info.physicalDevice = idevice->physical_device;
+  alloc_create_info.device = idevice->logical_device;
+  alloc_create_info.instance = iinstance.instance;
+  alloc_create_info.pVulkanFunctions = &vulkan_functions;
+
+  result = vmaCreateAllocator(&alloc_create_info, &idevice->allocator);
+
+  if (result != VK_SUCCESS)
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+
+    idevice->table.vkDestroyQueryPool(
+      idevice->logical_device,
+      idevice->timestamp_pool,
+      NULL
+    );
+    idevice->table.vkDestroySampler(
+      idevice->logical_device,
+      idevice->sampler,
+      NULL
+    );
+    idevice->table.vkDestroyCommandPool(
+      idevice->logical_device,
+      idevice->command_pool,
+      NULL
+    );
+    idevice->table.vkDestroyDevice(
+      idevice->logical_device,
+      NULL
+    );
+    return CGPU_FAIL_UNABLE_TO_INITIALIZE_VMA;
+  }
+
   return CGPU_OK;
 }
 
@@ -1103,11 +1165,14 @@ CgpuResult cgpu_destroy_device(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
+  vmaDestroyAllocator(idevice->allocator);
+
   idevice->table.vkDestroyQueryPool(
     idevice->logical_device,
     idevice->timestamp_pool,
     NULL
   );
+
   idevice->table.vkDestroySampler(
     idevice->logical_device,
     idevice->sampler,
