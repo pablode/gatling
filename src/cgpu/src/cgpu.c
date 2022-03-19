@@ -1333,8 +1333,6 @@ CgpuResult cgpu_destroy_buffer(
 CgpuResult cgpu_map_buffer(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t offset,
-  uint64_t size,
   void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
@@ -1520,8 +1518,6 @@ CgpuResult cgpu_destroy_image(
 CgpuResult cgpu_map_image(
   cgpu_device device,
   cgpu_image image,
-  uint64_t offset,
-  uint64_t size,
   void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;

@@ -221,8 +221,6 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   c_result = cgpu_map_buffer(
     s_device,
     staging_buffer,
-    0,
-    buf_size,
     (void**) &mapped_staging_mem
   );
   if (c_result != CGPU_OK) goto cleanup;
@@ -509,8 +507,6 @@ int giRender(const gi_render_params* params,
   c_result = cgpu_map_buffer(
     s_device,
     staging_buffer,
-    0,
-    buffer_size,
     (void**) &mapped_staging_mem
   );
   if (c_result != CGPU_OK) goto cleanup;

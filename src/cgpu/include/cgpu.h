@@ -629,8 +629,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_buffer(
 CGPU_API CgpuResult CGPU_CDECL cgpu_map_buffer(
   cgpu_device device,
   cgpu_buffer buffer,
-  uint64_t offset,
-  uint64_t size,
   void** pp_mapped_mem
 );
 
@@ -657,8 +655,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_image(
 CGPU_API CgpuResult CGPU_CDECL cgpu_map_image(
   cgpu_device device,
   cgpu_image image,
-  uint64_t offset,
-  uint64_t size,
   void** pp_mapped_mem
 );
 
