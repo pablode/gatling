@@ -51,7 +51,7 @@ typedef struct cgpu_ibuffer {
 typedef struct cgpu_iimage {
   VkImage        image;
   VkImageView    image_view;
-  VkDeviceMemory memory;
+  VmaAllocation  allocation;
   uint64_t       size;
   uint32_t       width;
   uint32_t       height;
@@ -108,8 +108,7 @@ CGPU_RESOLVE_HANDLE(      pipeline,       cgpu_pipeline,       cgpu_ipipeline,  
 CGPU_RESOLVE_HANDLE(         fence,          cgpu_fence,          cgpu_ifence,          ifence_store)
 CGPU_RESOLVE_HANDLE(command_buffer, cgpu_command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
 
-static VkMemoryPropertyFlags cgpu_translate_memory_properties(
-  CgpuMemoryPropertyFlags memory_properties)
+static VkMemoryPropertyFlags cgpu_translate_memory_properties(CgpuMemoryPropertyFlags memory_properties)
 {
   VkMemoryPropertyFlags mem_flags = 0;
   if ((memory_properties & CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL) == CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL) {
@@ -1346,13 +1345,9 @@ CgpuResult cgpu_map_buffer(
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-
-  VkResult result = vmaMapMemory(idevice->allocator, ibuffer->allocation, pp_mapped_mem);
-
-  if (result != VK_SUCCESS) {
+  if (vmaMapMemory(idevice->allocator, ibuffer->allocation, pp_mapped_mem) != VK_SUCCESS) {
     return CGPU_FAIL_UNABLE_TO_MAP_MEMORY;
   }
-
   return CGPU_OK;
 }
 
@@ -1433,72 +1428,31 @@ CgpuResult cgpu_create_image(
   image_info.pQueueFamilyIndices = NULL;
   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  VkResult result = idevice->table.vkCreateImage(
-    idevice->logical_device,
+  VmaAllocationCreateInfo alloc_info = { 0 };
+  alloc_info.requiredFlags = cgpu_translate_memory_properties(memory_properties);
+
+  VkResult result = vmaCreateImage(
+    idevice->allocator,
     &image_info,
-    NULL,
-    &iimage->image
+    &alloc_info,
+    &iimage->image,
+    &iimage->allocation,
+    NULL
   );
+
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&iimage_store, p_image->handle);
     return CGPU_FAIL_UNABLE_TO_CREATE_IMAGE;
   }
 
-  VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
-  vkGetPhysicalDeviceMemoryProperties(
-    idevice->physical_device,
-    &physical_device_memory_properties
+  VmaAllocationInfo allocation_info;
+  vmaGetAllocationInfo(
+    idevice->allocator,
+    iimage->allocation,
+    &allocation_info
   );
 
-  VkMemoryRequirements mem_requirements;
-  idevice->table.vkGetImageMemoryRequirements(
-    idevice->logical_device,
-    iimage->image,
-    &mem_requirements
-  );
-
-  const VkMemoryPropertyFlags mem_flags = cgpu_translate_memory_properties(memory_properties);
-
-  int32_t mem_index = -1;
-  for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
-    if ((mem_requirements.memoryTypeBits & (1 << i)) &&
-        (physical_device_memory_properties.memoryTypes[i].propertyFlags & mem_flags) == mem_flags) {
-      mem_index = i;
-      break;
-    }
-  }
-  if (mem_index == -1) {
-    resource_store_free_handle(&iimage_store, p_image->handle);
-    idevice->table.vkDestroyImage(idevice->logical_device, iimage->image, NULL);
-    return CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE;
-  }
-
-  VkMemoryAllocateInfo mem_alloc_info;
-  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  mem_alloc_info.pNext = NULL;
-  mem_alloc_info.allocationSize = mem_requirements.size;
-  mem_alloc_info.memoryTypeIndex = mem_index;
-
-  result = idevice->table.vkAllocateMemory(
-    idevice->logical_device,
-    &mem_alloc_info,
-    NULL,
-    &iimage->memory
-  );
-  if (result != VK_SUCCESS) {
-    resource_store_free_handle(&iimage_store, p_image->handle);
-    idevice->table.vkDestroyImage(idevice->logical_device, iimage->image, NULL);
-    return CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY;
-  }
-
-  idevice->table.vkBindImageMemory(
-    idevice->logical_device,
-    iimage->image,
-    iimage->memory,
-    0
-  );
-
-  iimage->size = mem_requirements.size;
+  iimage->size = allocation_info.size;
 
   VkImageViewCreateInfo image_view_info;
   image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1526,8 +1480,8 @@ CgpuResult cgpu_create_image(
   if (result != VK_SUCCESS)
   {
     resource_store_free_handle(&iimage_store, p_image->handle);
-    idevice->table.vkDestroyImage(idevice->logical_device, iimage->image, NULL);
-    idevice->table.vkFreeMemory(idevice->logical_device, iimage->memory, NULL);
+    vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
+    return CGPU_FAIL_UNABLE_TO_CREATE_IMAGE;
   }
 
   iimage->width = width;
@@ -1556,17 +1510,7 @@ CgpuResult cgpu_destroy_image(
     NULL
   );
 
-  idevice->table.vkDestroyImage(
-    idevice->logical_device,
-    iimage->image,
-    NULL
-  );
-
-  idevice->table.vkFreeMemory(
-    idevice->logical_device,
-    iimage->memory,
-    NULL
-  );
+  vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
 
   resource_store_free_handle(&iimage_store, image.handle);
 
@@ -1588,20 +1532,9 @@ CgpuResult cgpu_map_image(
   if (!cgpu_resolve_image(image, &iimage)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-
-  const VkResult result = idevice->table.vkMapMemory(
-    idevice->logical_device,
-    iimage->memory,
-    offset,
-    (size == CGPU_WHOLE_SIZE) ? iimage->size : size,
-    0,
-    pp_mapped_mem
-  );
-
-  if (result != VK_SUCCESS) {
+  if (vmaMapMemory(idevice->allocator, iimage->allocation, pp_mapped_mem) != VK_SUCCESS) {
     return CGPU_FAIL_UNABLE_TO_MAP_MEMORY;
   }
-
   return CGPU_OK;
 }
 
@@ -1617,10 +1550,7 @@ CgpuResult cgpu_unmap_image(
   if (!cgpu_resolve_image(image, &iimage)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  idevice->table.vkUnmapMemory(
-    idevice->logical_device,
-    iimage->memory
-  );
+  vmaUnmapMemory(idevice->allocator, iimage->allocation);
   return CGPU_OK;
 }
 
