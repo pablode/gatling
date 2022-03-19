@@ -19,3 +19,6 @@
 [submodule "extern/embree"]
 	path = extern/embree
 	url = https://github.com/embree/embree
+[submodule "extern/VulkanMemoryAllocator"]
+	path = extern/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator

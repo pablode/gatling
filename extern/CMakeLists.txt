@@ -35,6 +35,13 @@ install(
 )
 
 #
+# VulkanMemoryAllocator
+#
+set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
+set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF)
+add_subdirectory(VulkanMemoryAllocator)
+
+#
 # shaderc dependencies. The revisions are taken from the repo/DEPS.
 #
 if(NOT ${GATLING_USE_DXC})

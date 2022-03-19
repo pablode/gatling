@@ -20,6 +20,7 @@ target_link_libraries(
   cgpu
   PRIVATE
     volk
+    VulkanMemoryAllocator
 )
 
 set_target_properties(
