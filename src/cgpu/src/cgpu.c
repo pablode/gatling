@@ -44,8 +44,8 @@ typedef struct cgpu_idevice {
 
 typedef struct cgpu_ibuffer {
   VkBuffer       buffer;
-  VkDeviceMemory memory;
   uint64_t       size;
+  VmaAllocation  allocation;
 } cgpu_ibuffer;
 
 typedef struct cgpu_iimage {
@@ -1289,71 +1289,22 @@ CgpuResult cgpu_create_buffer(
   buffer_info.queueFamilyIndexCount = 0;
   buffer_info.pQueueFamilyIndices = NULL;
 
-  VkResult result = idevice->table.vkCreateBuffer(
-    idevice->logical_device,
+  VmaAllocationCreateInfo alloc_info = {0};
+  alloc_info.requiredFlags = cgpu_translate_memory_properties(memory_properties);
+
+  VkResult result = vmaCreateBuffer(
+    idevice->allocator,
     &buffer_info,
-    NULL,
-    &ibuffer->buffer
+    &alloc_info,
+    &ibuffer->buffer,
+    &ibuffer->allocation,
+    NULL
   );
+
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ibuffer_store, p_buffer->handle);
     return CGPU_FAIL_UNABLE_TO_CREATE_BUFFER;
   }
-
-  VkPhysicalDeviceMemoryProperties physical_device_memory_properties;
-  vkGetPhysicalDeviceMemoryProperties(
-    idevice->physical_device,
-    &physical_device_memory_properties
-  );
-
-  VkMemoryRequirements mem_requirements;
-  idevice->table.vkGetBufferMemoryRequirements(
-    idevice->logical_device,
-    ibuffer->buffer,
-    &mem_requirements
-  );
-
-  const VkMemoryPropertyFlags mem_flags =
-      cgpu_translate_memory_properties(memory_properties);
-
-  int32_t mem_index = -1;
-  for (uint32_t i = 0; i < physical_device_memory_properties.memoryTypeCount; ++i) {
-    if ((mem_requirements.memoryTypeBits & (1 << i)) &&
-        (physical_device_memory_properties.memoryTypes[i].propertyFlags & mem_flags) == mem_flags) {
-      mem_index = i;
-      break;
-    }
-  }
-  if (mem_index == -1) {
-    resource_store_free_handle(&ibuffer_store, p_buffer->handle);
-    idevice->table.vkDestroyBuffer(idevice->logical_device, ibuffer->buffer, NULL);
-    return CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE;
-  }
-
-  VkMemoryAllocateInfo mem_alloc_info;
-  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  mem_alloc_info.pNext = NULL;
-  mem_alloc_info.allocationSize = mem_requirements.size;
-  mem_alloc_info.memoryTypeIndex = mem_index;
-
-  result = idevice->table.vkAllocateMemory(
-    idevice->logical_device,
-    &mem_alloc_info,
-    NULL,
-    &ibuffer->memory
-  );
-  if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ibuffer_store, p_buffer->handle);
-    idevice->table.vkDestroyBuffer(idevice->logical_device, ibuffer->buffer, NULL);
-    return CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY;
-  }
-
-  idevice->table.vkBindBufferMemory(
-    idevice->logical_device,
-    ibuffer->buffer,
-    ibuffer->memory,
-    0
-  );
 
   ibuffer->size = size;
 
@@ -1373,16 +1324,7 @@ CgpuResult cgpu_destroy_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  idevice->table.vkDestroyBuffer(
-    idevice->logical_device,
-    ibuffer->buffer,
-    NULL
-  );
-  idevice->table.vkFreeMemory(
-    idevice->logical_device,
-    ibuffer->memory,
-    NULL
-  );
+  vmaDestroyBuffer(idevice->allocator, ibuffer->buffer, ibuffer->allocation);
 
   resource_store_free_handle(&ibuffer_store, buffer.handle);
 
@@ -1405,14 +1347,7 @@ CgpuResult cgpu_map_buffer(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  const VkResult result = idevice->table.vkMapMemory(
-    idevice->logical_device,
-    ibuffer->memory,
-    offset,
-    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size,
-    0,
-    pp_mapped_mem
-  );
+  VkResult result = vmaMapMemory(idevice->allocator, ibuffer->allocation, pp_mapped_mem);
 
   if (result != VK_SUCCESS) {
     return CGPU_FAIL_UNABLE_TO_MAP_MEMORY;
@@ -1433,10 +1368,7 @@ CgpuResult cgpu_unmap_buffer(
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  idevice->table.vkUnmapMemory(
-    idevice->logical_device,
-    ibuffer->memory
-  );
+  vmaUnmapMemory(idevice->allocator, ibuffer->allocation);
   return CGPU_OK;
 }
 
@@ -2678,18 +2610,11 @@ CgpuResult cgpu_flush_mapped_memory(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkMappedMemoryRange memory_range;
-  memory_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-  memory_range.pNext = NULL;
-  memory_range.memory = ibuffer->memory;
-  memory_range.offset = offset;
-  memory_range.size =
-    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size;
-
-  const VkResult result = idevice->table.vkFlushMappedMemoryRanges(
-    idevice->logical_device,
-    1,
-    &memory_range
+  VkResult result = vmaFlushAllocation(
+    idevice->allocator,
+    ibuffer->allocation,
+    offset,
+    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size
   );
 
   if (result != VK_SUCCESS) {
@@ -2713,18 +2638,11 @@ CgpuResult cgpu_invalidate_mapped_memory(
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkMappedMemoryRange memory_range;
-  memory_range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-  memory_range.pNext = NULL;
-  memory_range.memory = ibuffer->memory;
-  memory_range.offset = offset;
-  memory_range.size =
-    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size;
-
-  const VkResult result = idevice->table.vkInvalidateMappedMemoryRanges(
-    idevice->logical_device,
-    1,
-    &memory_range
+  VkResult result = vmaInvalidateAllocation(
+    idevice->allocator,
+    ibuffer->allocation,
+    offset,
+    (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size
   );
 
   if (result != VK_SUCCESS) {
