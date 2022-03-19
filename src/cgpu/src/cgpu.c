@@ -613,6 +613,10 @@ CgpuResult cgpu_initialize(
     return CGPU_FAIL_UNABLE_TO_INITIALIZE_VOLK;
   }
 
+  if (volkGetInstanceVersion() < MIN_VK_API_VERSION) {
+    return CGPU_FAIL_UNABLE_TO_INITIALIZE_VOLK;
+  }
+
 #ifndef NDEBUG
   const char* validation_layers[] = {
       "VK_LAYER_KHRONOS_validation"
@@ -664,7 +668,7 @@ CgpuResult cgpu_initialize(
     return CGPU_FAIL_UNABLE_TO_INITIALIZE_VULKAN;
   }
 
-  volkLoadInstance(iinstance.instance);
+  volkLoadInstanceOnly(iinstance.instance);
 
   resource_store_create(&idevice_store, sizeof(cgpu_idevice), 1);
   resource_store_create(&ishader_store, sizeof(cgpu_ishader), 16);
