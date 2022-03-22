@@ -95,7 +95,8 @@ typedef enum CgpuResult {
   CGPU_FAIL_VK_VERSION_NOT_SUPPORTED = -33,
   CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET = -34,
   CGPU_FAIL_UNABLE_TO_INITIALIZE_VMA = -35,
-  CGPU_FAIL_UNABLE_TO_REFLECT_SHADER = -36
+  CGPU_FAIL_UNABLE_TO_REFLECT_SHADER = -36,
+  CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH = -37
 } CgpuResult;
 
 typedef uint32_t CgpuBufferUsageFlags;
@@ -468,8 +469,7 @@ typedef struct cgpu_buffer_memory_barrier {
 
 typedef struct cgpu_image_memory_barrier {
   cgpu_image image;
-  CgpuMemoryAccessFlags src_access_flags;
-  CgpuMemoryAccessFlags dst_access_flags;
+  CgpuMemoryAccessFlags access_mask;
 } cgpu_image_memory_barrier;
 
 typedef struct cgpu_physical_device_limits {

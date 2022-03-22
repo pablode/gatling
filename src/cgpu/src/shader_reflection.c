@@ -32,31 +32,26 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     goto fail;
   }
 
-  p_reflection->resource_count = binding_count;
-  p_reflection->resources = (cgpu_shader_reflection_resource*) malloc(sizeof(cgpu_shader_reflection_resource) * p_reflection->resource_count);
+  p_reflection->resource_count = 0;
+  p_reflection->resources = (cgpu_shader_reflection_resource*) malloc(sizeof(cgpu_shader_reflection_resource) * binding_count);
 
   for (uint32_t i = 0; i < binding_count; i++)
   {
     const SpvReflectDescriptorBinding* binding = bindings[i];
-    VkDescriptorType desc_type = (VkDescriptorType) binding->descriptor_type;
 
-    cgpu_shader_reflection_resource* sr_res = &p_reflection->resources[i];
-
-    switch (desc_type)
+    if (!binding->accessed)
     {
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-      sr_res->resource_type = CGPU_SHADER_REFLECTION_RESOURCE_TYPE_BUFFER;
-      break;
-    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-      sr_res->resource_type = CGPU_SHADER_REFLECTION_RESOURCE_TYPE_STORAGE_IMAGE;
-      break;
-    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-      sr_res->resource_type = CGPU_SHADER_REFLECTION_RESOURCE_TYPE_SAMPLED_IMAGE;
-      break;
-    default:
-      assert(false);
-      goto fail;
+      continue;
     }
+
+    cgpu_shader_reflection_resource* sr_res = &p_reflection->resources[p_reflection->resource_count++];
+    sr_res->descriptor_type = (int) binding->descriptor_type;
+
+    // Unfortunately SPIRV-Reflect lacks this functionality:
+    // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
+    const SpvReflectTypeDescription* type_description = binding->type_description;
+    sr_res->write_access = ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+    sr_res->read_access = true;
 
     sr_res->binding = binding->binding;
   }

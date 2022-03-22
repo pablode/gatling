@@ -3,16 +3,11 @@
 
 #include "cgpu.h"
 
-typedef enum CgpuShaderReflectionResourceType {
-  CGPU_SHADER_REFLECTION_RESOURCE_TYPE_BUFFER,
-  CGPU_SHADER_REFLECTION_RESOURCE_TYPE_STORAGE_IMAGE,
-  CGPU_SHADER_REFLECTION_RESOURCE_TYPE_SAMPLED_IMAGE,
-  CGPU_SHADER_REFLECTION_RESOURCE_TYPE_PUSH_CONSTANT
-} CgpuShaderReflectionResourceType;
-
 typedef struct cgpu_shader_reflection_resource {
   uint32_t binding;
-  CgpuShaderReflectionResourceType resource_type;
+  int descriptor_type;
+  bool write_access;
+  bool read_access;
 } cgpu_shader_reflection_resource;
 
 typedef struct cgpu_shader_reflection {
