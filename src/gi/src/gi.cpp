@@ -23,6 +23,7 @@ struct gi_geom_cache
 {
   uint32_t                   bvh_node_count;
   cgpu_buffer                buffer;
+  uint32_t                   light_count;
   uint64_t                   node_buf_offset;
   uint64_t                   node_buf_size;
   uint64_t                   face_buf_offset;
@@ -285,6 +286,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cache = new gi_geom_cache;
   cache->bvh_node_count = bvh8c.nodes.size();
   cache->buffer = buffer;
+  cache->light_count = emissive_face_indices.size();
   cache->node_buf_size = node_buf_size;
   cache->face_buf_size = face_buf_size;
   cache->emissive_face_indices_buf_size = emissive_face_indices_buf_size;
@@ -418,7 +420,8 @@ int giRender(const gi_render_params* params,
     /* uint   */ *((float*)&params->max_bounces),
     /* float  */ params->max_sample_value,
     /* uint   */ *((float*)&params->rr_bounce_offset),
-    /* float  */ params->rr_inv_min_term_prob
+    /* float  */ params->rr_inv_min_term_prob,
+    /* uint   */ *((float*)&params->geom_cache->light_count)
   };
   uint32_t push_data_size = sizeof(push_data);
 

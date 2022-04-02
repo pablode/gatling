@@ -15,6 +15,7 @@ struct PushConstants
   float  MAX_SAMPLE_VALUE;
   uint   RR_BOUNCE_OFFSET;
   float  RR_INV_MIN_TERM_PROB;
+  uint   LIGHT_COUNT;
 };
 
 // Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
@@ -154,12 +155,47 @@ float3 evaluate_sample(inout uint4 rng_state,
         ray.tmax   = FLOAT_MAX;
 
         Hit_info hit_info;
+
         bool found_hit = bvh_find_hit_closest(ray, hit_info);
 
         if (!found_hit)
         {
             state.value += state.throughput * PC.BACKGROUND_COLOR.rgb;
             break;
+        }
+
+        /* NEE */
+        {
+            /* Sample light from global list. */
+            float4 random4 = pcg4d_next(state.rng_state);
+
+            uint light_idx = min(PC.LIGHT_COUNT - 1, uint(random4.x * PC.LIGHT_COUNT));
+            uint face_index = emissive_face_indices[light_idx];
+
+            face f = faces[face_index];
+            fvertex v0 = vertices[f.v_0];
+            fvertex v1 = vertices[f.v_1];
+            fvertex v2 = vertices[f.v_2];
+
+            /* Sample point on light surface.
+             * See: Ray Tracing Gems Chapter 16: Sampling Transformations Zoo 16.5.2.1 */
+            float beta = 1.0 - sqrt(random4.y);
+            float gamma = (1.0 - beta) * random4.z;
+            float alpha = 1.0 - beta - gamma;
+            float3 P = alpha * v0.field1.xyz + beta * v1.field1.xyz + gamma * v2.field1.xyz;
+
+            float3 to_light = normalize(P - hit_info.pos);
+            float3 hit_offset = offset_ray_origin(hit_info.pos, to_light);
+            float3 light_offset = offset_ray_origin(P, -to_light);
+
+            ray.origin = hit_offset;
+            ray.dir = to_light;
+            ray.tmin = 0.0;
+            ray.tmax = length(light_offset - hit_offset);
+            bool is_occluded = bvh_find_hit_any(ray);
+
+            /* Occlusion debug visualization. */
+            return is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
         }
 
         bool continue_sampling = shade_hit(state, hit_info);
