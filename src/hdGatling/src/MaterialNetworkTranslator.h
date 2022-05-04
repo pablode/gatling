@@ -2,12 +2,9 @@
 
 #include <pxr/usd/sdf/path.h>
 
-#include <memory>
+#include <MaterialXCore/Document.h>
 
-namespace MaterialX
-{
-  using DocumentPtr = std::shared_ptr<class Document>;
-}
+#include <memory>
 
 struct gi_material;
 
