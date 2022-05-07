@@ -21,7 +21,7 @@ Gatling features a BVH builder with binned SAH [\[Wald 2007\]](#user-content-wal
 You need to
 
 - install the <a href="https://vulkan.lunarg.com/">Vulkan SDK</a>
-- download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.0.1</a> binaries
+- download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.1.2</a> binaries
 - build my <a href="https://github.com/pablode/USD/tree/mtlx-1.38.4-adsk-dev">USD 22.05 fork</a> with MaterialX support
 
 > Note: EXR export requires building USD with OpenImageIO support.
