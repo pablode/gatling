@@ -60,6 +60,11 @@ bool shade_hit(inout Sample_state state,
         n_2 * bc.y
     );
 
+#if AOV_ID == AOV_ID_NORMAL
+    state.value = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
+    return false;
+#endif
+
     /* Tangent and bitangent. */
     float3 L = abs(normal.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
     float3 tangent = normalize(cross(L, normal));

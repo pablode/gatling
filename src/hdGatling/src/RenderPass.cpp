@@ -224,6 +224,7 @@ const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVect
   for (const HdRenderPassAovBinding& aovBinding : aovBindings)
   {
     if (aovBinding.aovName != HdAovTokens->color &&
+        aovBinding.aovName != HdAovTokens->normal &&
         aovBinding.aovName != HdGatlingAovTokens->debug_nee)
     {
       HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
@@ -241,12 +242,13 @@ gi_aov_id _GetAovId(const TfToken& aovName)
 {
   gi_aov_id id = GI_AOV_ID_COLOR;
 
-  if (aovName == HdGatlingAovTokens->debug_nee)
-  {
+  if (aovName == HdAovTokens->normal) {
+    id = GI_AOV_ID_NORMAL;
+  }
+  else if (aovName == HdGatlingAovTokens->debug_nee) {
     id = GI_AOV_ID_DEBUG_NEE;
   }
-  else if (aovName != HdAovTokens->color)
-  {
+  else if (aovName != HdAovTokens->color) {
     TF_CODING_ERROR("Invalid AOV id");
   }
 

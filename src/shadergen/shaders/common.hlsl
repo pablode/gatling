@@ -5,7 +5,8 @@ const static float TRI_EPS = 0.000000001;
 
 // These must match the IDs in gi.h
 #define AOV_ID_COLOR 0
-#define AOV_ID_DEBUG_NEE 1
+#define AOV_ID_NORMAL 1
+#define AOV_ID_DEBUG_NEE 2
 
 struct fvertex
 {
