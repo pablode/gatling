@@ -33,6 +33,7 @@ namespace sg
   public:
     struct MainShaderParams
     {
+      uint32_t aovId;
       uint32_t numThreadsX;
       uint32_t numThreadsY;
       float postponeRatio;

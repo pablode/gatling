@@ -195,7 +195,10 @@ float3 evaluate_sample(inout uint4 rng_state,
             bool is_occluded = bvh_find_hit_any(ray);
 
             /* Occlusion debug visualization. */
-            return is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
+#if AOV_ID == AOV_ID_DEBUG_NEE
+            state.value = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
+            break;
+#endif
         }
 
         bool continue_sampling = shade_hit(state, hit_info);

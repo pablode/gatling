@@ -321,8 +321,10 @@ void giDestroyGeomCache(gi_geom_cache* cache)
   delete cache;
 }
 
-gi_shader_cache* giCreateShaderCache(const gi_geom_cache* geom_cache)
+gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 {
+  const gi_geom_cache* geom_cache = params->geom_cache;
+
   float postpone_ratio = 0.2f;
   uint32_t node_count = geom_cache->bvh_node_count;
   uint32_t max_bvh_stack_size = (node_count < 3) ? 1 : (log(node_count) * 2 / log(8));
@@ -330,6 +332,7 @@ gi_shader_cache* giCreateShaderCache(const gi_geom_cache* geom_cache)
   uint32_t max_stack_size = max_bvh_stack_size + max_postponed_tris;
 
   sg::ShaderGen::MainShaderParams shaderParams;
+  shaderParams.aovId         = params->aov_id;
   shaderParams.numThreadsX   = WORKGROUP_SIZE_X;
   shaderParams.numThreadsY   = WORKGROUP_SIZE_Y;
   shaderParams.postponeRatio = postpone_ratio;

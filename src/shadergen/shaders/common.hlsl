@@ -3,6 +3,10 @@ const static float FLOAT_MIN = 1.175494351e-38;
 const static float PI = 3.1415926535897932384626433832795;
 const static float TRI_EPS = 0.000000001;
 
+// These must match the IDs in gi.h
+#define AOV_ID_COLOR 0
+#define AOV_ID_DEBUG_NEE 1
+
 struct fvertex
 {
     /* pos.{x, y, z}, tex.u */

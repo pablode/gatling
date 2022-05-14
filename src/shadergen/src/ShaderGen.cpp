@@ -178,6 +178,7 @@ namespace sg
   #define APPEND_CONSTANT(name, cvar) \
     ss << "#define " << name << " " << params->cvar << "\n";
 
+    APPEND_CONSTANT("AOV_ID", aovId)
     APPEND_CONSTANT("NUM_THREADS_X", numThreadsX)
     APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
     APPEND_CONSTANT("MAX_STACK_SIZE", maxStackSize)

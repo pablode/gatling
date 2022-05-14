@@ -10,6 +10,12 @@ extern "C" {
 #define GI_OK 0
 #define GI_ERROR 1
 
+enum gi_aov_id
+{
+  GI_AOV_ID_COLOR     = 0,
+  GI_AOV_ID_DEBUG_NEE = 1
+};
+
 struct gi_camera
 {
   float position[3];
@@ -45,6 +51,12 @@ struct gi_geom_cache_params
   struct gi_vertex*          vertices;
 };
 
+struct gi_shader_cache_params
+{
+  enum gi_aov_id aov_id;
+  struct gi_geom_cache* geom_cache;
+};
+
 struct gi_render_params
 {
   const struct gi_camera*       camera;
@@ -74,10 +86,10 @@ void giTerminate();
 struct gi_material* giCreateMaterialFromMtlx(const char* doc);
 void giDestroyMaterial(struct gi_material* mat);
 
-struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* geom_cache);
+struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* params);
 void giDestroyGeomCache(struct gi_geom_cache* cache);
 
-struct gi_shader_cache* giCreateShaderCache(const gi_geom_cache* geom_cache_params);
+struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params* params);
 void giDestroyShaderCache(struct gi_shader_cache* cache);
 
 int giRender(const struct gi_render_params* params,

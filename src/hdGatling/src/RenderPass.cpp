@@ -219,6 +219,40 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_c
   giCamera.vfov = camera.GetVFov();
 }
 
+const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVector& aovBindings)
+{
+  for (const HdRenderPassAovBinding& aovBinding : aovBindings)
+  {
+    if (aovBinding.aovName != HdAovTokens->color &&
+        aovBinding.aovName != HdGatlingAovTokens->debug_nee)
+    {
+      HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
+      renderBuffer->SetConverged(true);
+      continue;
+    }
+
+    return &aovBinding;
+  }
+
+  return nullptr;
+}
+
+gi_aov_id _GetAovId(const TfToken& aovName)
+{
+  gi_aov_id id = GI_AOV_ID_COLOR;
+
+  if (aovName == HdGatlingAovTokens->debug_nee)
+  {
+    id = GI_AOV_ID_DEBUG_NEE;
+  }
+  else if (aovName != HdAovTokens->color)
+  {
+    TF_CODING_ERROR("Invalid AOV id");
+  }
+
+  return id;
+}
+
 void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassState,
                                    const TfTokenVector& renderTags)
 {
@@ -234,33 +268,19 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   }
 
   const HdRenderPassAovBindingVector& aovBindings = renderPassState->GetAovBindings();
-
   if (aovBindings.empty())
   {
     return;
   }
 
-  const HdRenderPassAovBinding* colorAovBinding = nullptr;
-
-  for (const HdRenderPassAovBinding& aovBinding : aovBindings)
+  const HdRenderPassAovBinding* aovBinding = _FilterAovBinding(aovBindings);
+  if (!aovBinding)
   {
-    if (aovBinding.aovName != HdAovTokens->color)
-    {
-      HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
-      renderBuffer->SetConverged(true);
-      continue;
-    }
-
-    colorAovBinding = &aovBinding;
-  }
-
-  if (!colorAovBinding)
-  {
-    TF_RUNTIME_ERROR("Color AOV binding not found");
+    TF_RUNTIME_ERROR("AOV not supported");
     return;
   }
 
-  HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(colorAovBinding->renderBuffer);
+  HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding->renderBuffer);
   if (renderBuffer->GetFormat() != HdFormatFloat32Vec4)
   {
     TF_RUNTIME_ERROR("Unsupported render buffer format");
@@ -272,16 +292,19 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
 
   GfVec4f backgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
-  if (colorAovBinding->clearValue.IsHolding<GfVec4f>())
+  if (aovBinding->clearValue.IsHolding<GfVec4f>())
   {
-    backgroundColor = colorAovBinding->clearValue.Get<GfVec4f>();
+    backgroundColor = aovBinding->clearValue.Get<GfVec4f>();
   }
 
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
+  gi_aov_id aovId = _GetAovId(aovBinding->aovName);
+
   bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
   bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
   bool backgroundColorChanged = (backgroundColor != m_lastBackgroundColor);
+  bool aovChanged = (aovId != m_lastAovId);
 
   if (!sceneChanged && !renderSettingsChanged && !backgroundColorChanged)
   {
@@ -294,6 +317,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastSceneStateVersion = sceneStateVersion;
   m_lastRenderSettingsVersion = renderSettingsStateVersion;
   m_lastBackgroundColor = backgroundColor;
+  m_lastAovId = aovId;
 
   if (!m_geomCache)
   {
@@ -329,7 +353,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     m_rootMatrix = viewMatrix;
   }
 
-  if (m_geomCache && !m_shaderCache)
+  if (m_geomCache && (!m_shaderCache || aovChanged))
   {
     if (m_shaderCache)
     {
@@ -339,7 +363,11 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     printf("Building shader cache...\n");
     fflush(stdout);
 
-    m_shaderCache = giCreateShaderCache(m_geomCache);
+    gi_shader_cache_params shaderParams;
+    shaderParams.aov_id = aovId;
+    shaderParams.geom_cache = m_geomCache;
+
+    m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");
   }
 
