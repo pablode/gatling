@@ -163,6 +163,14 @@ float3 evaluate_sample(inout uint4 rng_state,
 
         bool found_hit = bvh_find_hit_closest(ray, hit_info);
 
+#if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
+        state.value = float3(float(hit_info.bvh_steps), 0.0, 0.0);
+        break;
+#elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
+        state.value = float3(0.0, 0.0, float(hit_info.tri_tests));
+        break;
+#endif
+
         if (!found_hit)
         {
             state.value += state.throughput * PC.BACKGROUND_COLOR.rgb;

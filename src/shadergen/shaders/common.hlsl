@@ -7,6 +7,8 @@ const static float TRI_EPS = 0.000000001;
 #define AOV_ID_COLOR 0
 #define AOV_ID_NORMAL 1
 #define AOV_ID_DEBUG_NEE 2
+#define AOV_ID_DEBUG_BVH_STEPS 3
+#define AOV_ID_DEBUG_TRI_TESTS 4
 
 struct fvertex
 {
@@ -46,6 +48,11 @@ struct Hit_info
     float3 pos;
     uint face_idx;
     float2 bc;
+#if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
+    uint bvh_steps;
+#elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
+    uint tri_tests;
+#endif
 };
 
 [[vk::binding(0)]]

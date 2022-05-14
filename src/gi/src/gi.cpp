@@ -37,6 +37,7 @@ struct gi_geom_cache
 
 struct gi_shader_cache
 {
+  uint32_t    aov_id;
   cgpu_shader shader;
   std::string shader_entry_point;
 };
@@ -354,6 +355,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   }
 
   gi_shader_cache* cache = new gi_shader_cache;
+  cache->aov_id = params->aov_id;
   cache->shader_entry_point = shader_entry_point;
   cache->shader = shader;
 
@@ -380,7 +382,8 @@ int giRender(const gi_render_params* params,
 
   /* Set up buffers. */
   const int COLOR_COMPONENT_COUNT = 4;
-  const uint64_t buffer_size = params->image_width * params->image_height * sizeof(float) * COLOR_COMPONENT_COUNT;
+  const int pixel_count = params->image_width * params->image_height;
+  const uint64_t buffer_size = pixel_count * COLOR_COMPONENT_COUNT * sizeof(float);
 
   c_result = cgpu_create_buffer(
     s_device,
@@ -543,6 +546,22 @@ int giRender(const gi_render_params* params,
     staging_buffer
   );
   if (c_result != CGPU_OK) goto cleanup;
+
+  bool normalizeImage = (params->shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
+                         params->shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS);
+
+  if (normalizeImage)
+  {
+    const int value_count = pixel_count * COLOR_COMPONENT_COUNT;
+
+    float max_value = 0.0f;
+    for (int i = 0; i < value_count; i++) {
+      max_value = std::max(max_value, rgba_img[i]);
+    }
+    for (int i = 0; i < value_count && max_value > 0.0f; i++) {
+      rgba_img[i] /= max_value;
+    }
+  }
 
   result = GI_OK;
 

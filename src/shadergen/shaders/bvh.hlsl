@@ -79,6 +79,12 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
     uint2 stack[MAX_STACK_SIZE];
     uint stack_size = 0;
 
+#if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
+    hit.bvh_steps = 0;
+#elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
+    hit.tri_tests = 0;
+#endif
+
     while (true)
     {
         uint2 face_group = uint2(0, 0);
@@ -90,6 +96,9 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
         }
         else
         {
+#if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
+            hit.bvh_steps++;
+#endif
             uint child_bit_idx = firstbithigh(node_group.y);
             uint slot_index = (child_bit_idx - 24) ^ (oct_inv4 & 0xFF);
             uint rel_idx = countbits(node_group.y & ~(0xFFFFFFFFu << slot_index));
@@ -220,6 +229,10 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
                 hit.bc = temp_bc;
                 hit.face_idx = face_index;
             }
+
+#if AOV_ID == AOV_ID_DEBUG_TRI_TESTS
+            hit.tri_tests++;
+#endif
         }
 
         if (node_group.y > 0x00FFFFFF)
