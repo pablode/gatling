@@ -223,11 +223,14 @@ const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVect
 {
   for (const HdRenderPassAovBinding& aovBinding : aovBindings)
   {
-    if (aovBinding.aovName != HdAovTokens->color &&
-        aovBinding.aovName != HdAovTokens->normal &&
-        aovBinding.aovName != HdGatlingAovTokens->debug_nee &&
-        aovBinding.aovName != HdGatlingAovTokens->debug_bvh_steps &&
-        aovBinding.aovName != HdGatlingAovTokens->debug_tri_tests)
+    if (aovBinding.aovName != HdAovTokens->color
+        && aovBinding.aovName != HdAovTokens->normal
+#ifndef NDEBUG
+        && aovBinding.aovName != HdGatlingAovTokens->debug_nee
+        && aovBinding.aovName != HdGatlingAovTokens->debug_bvh_steps
+        && aovBinding.aovName != HdGatlingAovTokens->debug_tri_tests
+#endif
+       )
     {
       HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
       renderBuffer->SetConverged(true);
