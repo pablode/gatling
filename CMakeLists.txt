@@ -47,5 +47,7 @@ if(WIN32)
   add_compile_definitions(_USE_MATH_DEFINES)
 endif()
 
+include(cmake/BuildConfig.cmake)
+
 add_subdirectory(extern)
 add_subdirectory(src)
