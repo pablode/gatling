@@ -22,7 +22,7 @@ You need to
 
 - install the <a href="https://vulkan.lunarg.com/">Vulkan SDK</a>
 - download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.1.2</a> binaries
-- build my <a href="https://github.com/pablode/USD/tree/mtlx-1.38.4-adsk-dev">USD 22.05 fork</a> with MaterialX support
+- build the <a href="https://github.com/PixarAnimationStudios/USD/tree/dev">USD dev</a> branch with MaterialX support
 
 > Note: EXR export requires building USD with OpenImageIO support.
 
