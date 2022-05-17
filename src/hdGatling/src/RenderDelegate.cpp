@@ -17,16 +17,24 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
                                                  const MaterialNetworkTranslator& translator)
   : m_translator(translator)
+  , m_resourceRegistry(std::make_shared<HdResourceRegistry>())
 {
-  m_resourceRegistry = std::make_shared<HdResourceRegistry>();
-
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Samples per pixel", HdGatlingSettingsTokens->spp, VtValue{8} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max bounces", HdGatlingSettingsTokens->max_bounces, VtValue{4} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette bounce offset", HdGatlingSettingsTokens->rr_bounce_offset, VtValue{3} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette inverse minimum terminate probability", HdGatlingSettingsTokens->rr_inv_min_term_prob, VtValue{0.95f} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max sample value", HdGatlingSettingsTokens->max_sample_value, VtValue{10.0f} });
 
+  m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Triangle postponing", HdGatlingSettingsTokens->triangle_postponing, VtValue{true} });
+  m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->next_event_estimation, VtValue{true} });
+
+#ifndef NDEBUG
+  m_settingDescriptors.insert(m_settingDescriptors.end(), m_debugSettingDescriptors.begin(), m_debugSettingDescriptors.end());
+#endif
   _PopulateDefaultSettings(m_settingDescriptors);
+#ifdef NDEBUG
+  _PopulateDefaultSettings(m_debugSettingDescriptors);
+#endif
 
   for (const auto& setting : settingsMap)
   {
@@ -44,6 +52,21 @@ HdGatlingRenderDelegate::~HdGatlingRenderDelegate()
 HdRenderSettingDescriptorList HdGatlingRenderDelegate::GetRenderSettingDescriptors() const
 {
   return m_settingDescriptors;
+}
+
+void HdGatlingRenderDelegate::SetRenderSetting(TfToken const& key, VtValue const& value)
+{
+#ifdef NDEBUG
+  // Disallow changing debug render settings in release config.
+  for (const HdRenderSettingDescriptor& descriptor : m_debugSettingDescriptors)
+  {
+    if (key == descriptor.key)
+    {
+      return;
+    }
+  }
+#endif
+  HdRenderDelegate::SetRenderSetting(key, value);
 }
 
 HdRenderPassSharedPtr HdGatlingRenderDelegate::CreateRenderPass(HdRenderIndex* index,

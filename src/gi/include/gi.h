@@ -56,8 +56,10 @@ struct gi_geom_cache_params
 
 struct gi_shader_cache_params
 {
-  enum gi_aov_id aov_id;
+  enum gi_aov_id        aov_id;
   struct gi_geom_cache* geom_cache;
+  bool                  triangle_postponing;
+  bool                  next_event_estimation;
 };
 
 struct gi_render_params

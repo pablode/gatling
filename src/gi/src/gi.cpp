@@ -334,12 +334,14 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   uint32_t max_stack_size = max_bvh_stack_size + max_postponed_tris;
 
   sg::ShaderGen::MainShaderParams shaderParams;
-  shaderParams.aovId         = params->aov_id;
-  shaderParams.numThreadsX   = WORKGROUP_SIZE_X;
-  shaderParams.numThreadsY   = WORKGROUP_SIZE_Y;
-  shaderParams.postponeRatio = postpone_ratio;
-  shaderParams.maxStackSize  = max_stack_size;
-  shaderParams.materials     = geom_cache->materials;
+  shaderParams.aovId               = params->aov_id;
+  shaderParams.numThreadsX         = WORKGROUP_SIZE_X;
+  shaderParams.numThreadsY         = WORKGROUP_SIZE_Y;
+  shaderParams.postponeRatio       = postpone_ratio;
+  shaderParams.maxStackSize        = max_stack_size;
+  shaderParams.materials           = geom_cache->materials;
+  shaderParams.trianglePostponing  = params->triangle_postponing;
+  shaderParams.nextEventEstimation = params->next_event_estimation;
 
   std::vector<uint8_t> spv;
   std::string shader_entry_point;

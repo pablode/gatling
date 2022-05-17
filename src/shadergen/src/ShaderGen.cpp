@@ -175,14 +175,18 @@ namespace sg
     ss << "#define DEBUG_PRINTF\n";
 #endif
 
-  #define APPEND_CONSTANT(name, cvar) \
+#define APPEND_CONSTANT(name, cvar) \
     ss << "#define " << name << " " << params->cvar << "\n";
+#define APPEND_DEFINE(name, cvar) \
+    if (params->cvar) ss << "#define " << name << "\n";
 
     APPEND_CONSTANT("AOV_ID", aovId)
     APPEND_CONSTANT("NUM_THREADS_X", numThreadsX)
     APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
     APPEND_CONSTANT("MAX_STACK_SIZE", maxStackSize)
     APPEND_CONSTANT("POSTPONE_RATIO", postponeRatio)
+    APPEND_DEFINE("TRIANGLE_POSTPONING", trianglePostponing)
+    APPEND_DEFINE("NEXT_EVENT_ESTIMATION", nextEventEstimation)
 
     std::string genMdl;
     if (!_sgGenerateMainShaderMdlHlsl(*m_mdlHlslCodeGen, params->materials, genMdl))

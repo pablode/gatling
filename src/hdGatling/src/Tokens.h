@@ -4,32 +4,34 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#define HD_GATLING_SETTINGS_TOKENS                  \
-  ((spp, "spp"))                                    \
-  ((max_bounces, "max-bounces"))                    \
-  ((rr_bounce_offset, "rr-bounce-offset"))          \
-  ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))  \
-  ((max_sample_value, "max-sample-value"))
+#define HD_GATLING_SETTINGS_TOKENS                   \
+  ((spp, "spp"))                                     \
+  ((max_bounces, "max-bounces"))                     \
+  ((rr_bounce_offset, "rr-bounce-offset"))           \
+  ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))   \
+  ((max_sample_value, "max-sample-value"))           \
+  ((triangle_postponing, "triangle-postponing"))     \
+  ((next_event_estimation, "next-event-estimation"))
 
 // mtlx node identifier is given by usdMtlx.
-#define HD_GATLING_NODE_IDENTIFIER_TOKENS           \
+#define HD_GATLING_NODE_IDENTIFIER_TOKENS            \
   (mtlx)
 
-#define HD_GATLING_SOURCE_TYPE_TOKENS               \
+#define HD_GATLING_SOURCE_TYPE_TOKENS                \
   (mtlx)
 
-#define HD_GATLING_DISCOVERY_TYPE_TOKENS            \
+#define HD_GATLING_DISCOVERY_TYPE_TOKENS             \
   (mtlx)
 
-#define HD_GATLING_RENDER_CONTEXT_TOKENS            \
+#define HD_GATLING_RENDER_CONTEXT_TOKENS             \
   (mtlx)
 
-#define HD_GATLING_NODE_CONTEXT_TOKENS              \
+#define HD_GATLING_NODE_CONTEXT_TOKENS               \
   (mtlx)
 
-#define HD_GATLING_AOV_TOKENS                       \
-  ((debug_nee, "debug:nee"))                        \
-  ((debug_bvh_steps, "debug:bvh_steps"))            \
+#define HD_GATLING_AOV_TOKENS                        \
+  ((debug_nee, "debug:nee"))                         \
+  ((debug_bvh_steps, "debug:bvh_steps"))             \
   ((debug_tri_tests, "debug:tri_tests"))
 
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingSettingsTokens, HD_GATLING_SETTINGS_TOKENS);

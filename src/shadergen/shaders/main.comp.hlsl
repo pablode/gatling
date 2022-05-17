@@ -34,8 +34,7 @@ struct Sample_state
     float3 value;
 };
 
-bool shade_hit(inout Sample_state state,
-               in Hit_info hit)
+bool shade_hit(inout Sample_state state, in Hit_info hit)
 {
     face f = faces[hit.face_idx];
     fvertex v_0 = vertices[f.v_0];
@@ -178,6 +177,7 @@ float3 evaluate_sample(inout uint4 rng_state,
         }
 
         /* NEE */
+#ifdef NEXT_EVENT_ESTIMATION
         {
             /* Sample light from global list. */
             float4 random4 = pcg4d_next(state.rng_state);
@@ -213,6 +213,10 @@ float3 evaluate_sample(inout uint4 rng_state,
             break;
 #endif
         }
+#elif AOV_ID == AOV_ID_DEBUG_NEE
+        state.value = float3(0.0, 0.0, 0.0);
+        break;
+#endif
 
         bool continue_sampling = shade_hit(state, hit_info);
 

@@ -186,10 +186,13 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
             face_group.y = (hitmask & 0x00FFFFFF);
         }
 
+#ifdef TRIANGLE_POSTPONING
         uint active_inv_count1 = WaveActiveCountBits(true);
+#endif
 
         while (face_group.y != 0)
         {
+#ifdef TRIANGLE_POSTPONING
             uint threshold = uint(active_inv_count1 * POSTPONE_RATIO);
 
             uint active_inv_count2 = WaveActiveCountBits(true);
@@ -204,6 +207,7 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
                 stack_size++;
                 break;
             }
+#endif
 
             uint face_rel_index = firstbithigh(face_group.y);
 

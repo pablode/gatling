@@ -366,7 +366,15 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     m_rootMatrix = viewMatrix;
   }
 
-  if (m_geomCache && (!m_shaderCache || aovChanged))
+  bool rebuildShaderCache = !m_shaderCache || aovChanged;
+#ifndef NDEBUG
+  // HACK: the render settings that require shader recompilation are currently only enabled in non-release builds.
+  // After the transition to wavefront, and parallel shader compilation, most of them should be backed by preprocessor
+  // defines instead of push constants. Recompilation would then be always required.
+  rebuildShaderCache |= renderSettingsChanged;
+#endif
+
+  if (m_geomCache && rebuildShaderCache)
   {
     if (m_shaderCache)
     {
@@ -379,6 +387,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     gi_shader_cache_params shaderParams;
     shaderParams.aov_id = aovId;
     shaderParams.geom_cache = m_geomCache;
+    shaderParams.triangle_postponing = m_settings.find(HdGatlingSettingsTokens->triangle_postponing)->second.Get<bool>();
+    shaderParams.next_event_estimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");

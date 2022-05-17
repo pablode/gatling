@@ -17,6 +17,8 @@ public:
 public:
   HdRenderSettingDescriptorList GetRenderSettingDescriptors() const override;
 
+  void SetRenderSetting(TfToken const& key, VtValue const& value) override;
+
 public:
   HdRenderPassSharedPtr CreateRenderPass(HdRenderIndex* index,
                                          const HdRprimCollection& collection) override;
@@ -71,8 +73,9 @@ public:
 
 private:
   const MaterialNetworkTranslator& m_translator;
-  HdRenderSettingDescriptorList m_settingDescriptors;
   HdResourceRegistrySharedPtr m_resourceRegistry;
+  HdRenderSettingDescriptorList m_settingDescriptors;
+  HdRenderSettingDescriptorList m_debugSettingDescriptors;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

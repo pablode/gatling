@@ -39,6 +39,8 @@ namespace sg
       float postponeRatio;
       uint32_t maxStackSize;
       std::vector<Material*> materials;
+      bool trianglePostponing;
+      bool nextEventEstimation;
     };
 
     bool generateMainShader(const struct MainShaderParams* params,
