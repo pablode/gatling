@@ -23,7 +23,7 @@ target_link_libraries(
   PRIVATE
     volk
     vma-c
-    spirv-reflect
+    spirv-reflect-static
 )
 
 set_target_properties(

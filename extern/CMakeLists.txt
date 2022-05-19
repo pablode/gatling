@@ -120,8 +120,7 @@ target_include_directories(turbojpeg-static PUBLIC $<BUILD_INTERFACE:${CMAKE_CUR
 #
 # SPIRV-Reflect
 #
-add_library(
-  spirv-reflect STATIC
-  SPIRV-Reflect/spirv_reflect.c
-)
-target_include_directories(spirv-reflect PUBLIC SPIRV-Reflect)
+set(SPIRV_REFLECT_EXECUTABLE OFF)
+set(SPIRV_REFLECT_EXAMPLES OFF)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+add_subdirectory(SPIRV-Reflect)
