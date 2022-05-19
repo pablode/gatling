@@ -10,7 +10,8 @@ bool cgpu_perform_shader_reflection(uint64_t size,
                                     cgpu_shader_reflection* p_reflection)
 {
   SpvReflectShaderModule shader_module = {0};
-  if (spvReflectCreateShaderModule(size, p_spv, &shader_module) != SPV_REFLECT_RESULT_SUCCESS)
+  SpvReflectModuleFlags flags = SPV_REFLECT_MODULE_FLAG_NO_COPY;
+  if (spvReflectCreateShaderModule2(flags, size, p_spv, &shader_module) != SPV_REFLECT_RESULT_SUCCESS)
   {
     return false;
   }
