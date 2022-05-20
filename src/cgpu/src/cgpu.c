@@ -823,7 +823,18 @@ CgpuResult cgpu_create_device(
   );
 
   uint32_t enabled_device_extension_count = 0;
-  const char* enabled_device_extensions[2];
+  const char* enabled_device_extensions[32];
+
+  if (cgpu_find_device_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, device_ext_count, device_extensions))
+  {
+    enabled_device_extensions[enabled_device_extension_count] = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
+    enabled_device_extension_count++;
+  }
+  else
+  {
+    resource_store_free_handle(&idevice_store, p_device->handle);
+    return CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET;
+  }
 
   const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
   if (cgpu_find_device_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, device_ext_count, device_extensions))
@@ -886,9 +897,33 @@ CgpuResult cgpu_create_device(
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
+  VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features = {0};
+  descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+  descriptor_indexing_features.pNext = NULL;
+  descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing = VK_FALSE;
+  descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing = VK_FALSE;
+  descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing = VK_FALSE;
+  descriptor_indexing_features.shaderUniformBufferArrayNonUniformIndexing = VK_FALSE;
+  descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+  descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = VK_FALSE;
+  descriptor_indexing_features.shaderStorageImageArrayNonUniformIndexing = VK_TRUE;
+  descriptor_indexing_features.shaderInputAttachmentArrayNonUniformIndexing = VK_FALSE;
+  descriptor_indexing_features.shaderUniformTexelBufferArrayNonUniformIndexing = VK_FALSE;
+  descriptor_indexing_features.shaderStorageTexelBufferArrayNonUniformIndexing = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingUniformBufferUpdateAfterBind = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingSampledImageUpdateAfterBind = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingStorageImageUpdateAfterBind = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingStorageBufferUpdateAfterBind = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingUniformTexelBufferUpdateAfterBind = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingPartiallyBound = VK_FALSE;
+  descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+  descriptor_indexing_features.runtimeDescriptorArray = VK_FALSE;
+
   VkPhysicalDeviceFeatures2 device_features2;
   device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  device_features2.pNext = NULL;
+  device_features2.pNext = &descriptor_indexing_features;
   device_features2.features.robustBufferAccess = VK_FALSE;
   device_features2.features.fullDrawIndexUint32 = VK_FALSE;
   device_features2.features.imageCubeArray = VK_FALSE;
