@@ -357,7 +357,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   shaderParams.maxStackSize        = max_stack_size;
   shaderParams.materials           = geom_cache->materials;
   shaderParams.trianglePostponing  = params->triangle_postponing;
-  shaderParams.nextEventEstimation = params->next_event_estimation;
+  shaderParams.nextEventEstimation = params->next_event_estimation && params->geom_cache->light_count > 0;
 
   std::vector<uint8_t> spv;
   std::string shader_entry_point;
