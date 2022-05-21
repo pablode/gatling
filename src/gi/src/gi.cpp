@@ -40,6 +40,7 @@ struct gi_shader_cache
   uint32_t      aov_id;
   cgpu_shader   shader;
   cgpu_pipeline pipeline;
+  bool          nee_enabled;
 };
 
 struct gi_material
@@ -135,6 +136,11 @@ static uint64_t giAlignBuffer(uint64_t alignment,
                                 uint64_t buffer_size,
                                 uint64_t* total_size)
 {
+  if (buffer_size == 0)
+  {
+    return *total_size;
+  }
+
   const uint64_t offset = ((*total_size) + alignment - 1) / alignment * alignment;
 
   (*total_size) = offset + buffer_size;
@@ -221,7 +227,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   uint64_t node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
   uint64_t face_buf_size = bvh8.faces.size() * sizeof(gi_face);
-  uint64_t emissive_face_indices_buf_size = emissive_face_indices.empty() ? offset_align : (emissive_face_indices.size() * sizeof(uint32_t));
+  uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
   uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
 
   uint64_t node_buf_offset = giAlignBuffer(offset_align, node_buf_size, &buf_size);
@@ -257,7 +263,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   memcpy(&mapped_staging_mem[node_buf_offset], bvh8c.nodes.data(), node_buf_size);
   memcpy(&mapped_staging_mem[face_buf_offset], bvh8.faces.data(), face_buf_size);
-  if (!emissive_face_indices.empty())
+  if (emissive_face_indices.size() > 0)
   {
     memcpy(&mapped_staging_mem[emissive_face_indices_buf_offset], emissive_face_indices.data(), emissive_face_indices_buf_size);
   }
@@ -348,6 +354,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   uint32_t max_bvh_stack_size = (bvh_node_count < 3) ? 1 : (2 * bvh_depth);
   uint32_t max_postponed_tris = int(s_device_limits.subgroupSize * postpone_ratio) - 1;
   uint32_t max_stack_size = max_bvh_stack_size + max_postponed_tris;
+  bool nee_enabled = params->next_event_estimation && geom_cache->light_count > 0;
 
   sg::ShaderGen::MainShaderParams shaderParams;
   shaderParams.aovId               = params->aov_id;
@@ -357,7 +364,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   shaderParams.maxStackSize        = max_stack_size;
   shaderParams.materials           = geom_cache->materials;
   shaderParams.trianglePostponing  = params->triangle_postponing;
-  shaderParams.nextEventEstimation = params->next_event_estimation && params->geom_cache->light_count > 0;
+  shaderParams.nextEventEstimation = nee_enabled;
 
   std::vector<uint8_t> spv;
   std::string shader_entry_point;
@@ -383,6 +390,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   cache->aov_id = params->aov_id;
   cache->shader = shader;
   cache->pipeline = pipeline;
+  cache->nee_enabled = nee_enabled;
 
   return cache;
 }
@@ -456,14 +464,17 @@ int giRender(const gi_render_params* params,
     /* uint   */ *((float*)&params->geom_cache->light_count)
   };
 
-  cgpu_shader_resource_buffer buffers[] = {
-    { 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE },
-    { 1, params->geom_cache->buffer,                  params->geom_cache->node_buf_offset,                  params->geom_cache->node_buf_size },
-    { 2, params->geom_cache->buffer,                  params->geom_cache->face_buf_offset,                  params->geom_cache->face_buf_size },
-    { 3, params->geom_cache->buffer, params->geom_cache->emissive_face_indices_buf_offset, params->geom_cache->emissive_face_indices_buf_size },
-    { 4, params->geom_cache->buffer,                params->geom_cache->vertex_buf_offset,                params->geom_cache->vertex_buf_size },
-  };
-  const uint32_t buffer_count = sizeof(buffers) / sizeof(buffers[0]);
+  std::vector<cgpu_shader_resource_buffer> buffers;
+  buffers.reserve(16);
+
+  buffers.push_back({ 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE });
+  buffers.push_back({ 1, params->geom_cache->buffer,                  params->geom_cache->node_buf_offset,                  params->geom_cache->node_buf_size });
+  buffers.push_back({ 2, params->geom_cache->buffer,                  params->geom_cache->face_buf_offset,                  params->geom_cache->face_buf_size });
+  if (params->shader_cache->nee_enabled)
+  {
+    buffers.push_back({ 3, params->geom_cache->buffer, params->geom_cache->emissive_face_indices_buf_offset, params->geom_cache->emissive_face_indices_buf_size });
+  }
+  buffers.push_back({ 4, params->geom_cache->buffer,                params->geom_cache->vertex_buf_offset,                params->geom_cache->vertex_buf_size });
 
   const uint32_t image_count = 0;
   const cgpu_shader_resource_image* images = NULL;
@@ -471,8 +482,8 @@ int giRender(const gi_render_params* params,
   c_result = cgpu_update_resources(
     s_device,
     params->shader_cache->pipeline,
-    buffer_count,
-    buffers,
+    buffers.size(),
+    buffers.data(),
     image_count,
     images
   );

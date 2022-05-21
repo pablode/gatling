@@ -64,8 +64,12 @@ StructuredBuffer<bvh_node> bvh_nodes;
 [[vk::binding(2)]]
 StructuredBuffer<face> faces;
 
+#ifdef NEXT_EVENT_ESTIMATION
+
 [[vk::binding(3)]]
 StructuredBuffer<uint> emissive_face_indices;
+
+#endif
 
 [[vk::binding(4)]]
 StructuredBuffer<fvertex> vertices;
