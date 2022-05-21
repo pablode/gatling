@@ -32,7 +32,6 @@ target_link_libraries(
   PRIVATE
     cgpu
     shadergen
-    ${C_MATH_LIBRARY}
     gml
 )
 

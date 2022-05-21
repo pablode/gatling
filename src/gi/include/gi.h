@@ -41,6 +41,8 @@ struct gi_face
   uint32_t mat_index;
 };
 
+struct gi_material;
+
 struct gi_geom_cache;
 struct gi_shader_cache;
 
