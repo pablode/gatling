@@ -58,7 +58,7 @@ namespace sg
 #ifdef NDEBUG
     const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_ERROR;
 #else
-    const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_DEBUG;
+    const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_INFO;
 #endif
     if (level <= minLogLevel)
     {
