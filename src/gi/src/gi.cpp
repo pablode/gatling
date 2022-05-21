@@ -405,6 +405,10 @@ void giDestroyShaderCache(gi_shader_cache* cache)
 int giRender(const gi_render_params* params,
              float* rgba_img)
 {
+  const gi_geom_cache* geom_cache = params->geom_cache;
+  const gi_shader_cache* shader_cache = params->shader_cache;
+
+  /* Init state for goto error handling. */
   int result = GI_ERROR;
   CgpuResult c_result;
 
@@ -461,27 +465,27 @@ int giRender(const gi_render_params* params,
     /* float  */ params->max_sample_value,
     /* uint   */ *((float*)&params->rr_bounce_offset),
     /* float  */ params->rr_inv_min_term_prob,
-    /* uint   */ *((float*)&params->geom_cache->light_count)
+    /* uint   */ *((float*)&geom_cache->light_count)
   };
 
   std::vector<cgpu_shader_resource_buffer> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE });
-  buffers.push_back({ 1, params->geom_cache->buffer,                  params->geom_cache->node_buf_offset,                  params->geom_cache->node_buf_size });
-  buffers.push_back({ 2, params->geom_cache->buffer,                  params->geom_cache->face_buf_offset,                  params->geom_cache->face_buf_size });
-  if (params->shader_cache->nee_enabled)
+  buffers.push_back({ 0,      output_buffer,                                            0,                            CGPU_WHOLE_SIZE });
+  buffers.push_back({ 1, geom_cache->buffer,                  geom_cache->node_buf_offset,                  geom_cache->node_buf_size });
+  buffers.push_back({ 2, geom_cache->buffer,                  geom_cache->face_buf_offset,                  geom_cache->face_buf_size });
+  if (shader_cache->nee_enabled)
   {
-    buffers.push_back({ 3, params->geom_cache->buffer, params->geom_cache->emissive_face_indices_buf_offset, params->geom_cache->emissive_face_indices_buf_size });
+    buffers.push_back({ 3, geom_cache->buffer, geom_cache->emissive_face_indices_buf_offset, geom_cache->emissive_face_indices_buf_size });
   }
-  buffers.push_back({ 4, params->geom_cache->buffer,                params->geom_cache->vertex_buf_offset,                params->geom_cache->vertex_buf_size });
+  buffers.push_back({ 4, geom_cache->buffer,                geom_cache->vertex_buf_offset,                geom_cache->vertex_buf_size });
 
   const uint32_t image_count = 0;
   const cgpu_shader_resource_image* images = NULL;
 
   c_result = cgpu_update_resources(
     s_device,
-    params->shader_cache->pipeline,
+    shader_cache->pipeline,
     buffers.size(),
     buffers.data(),
     image_count,
@@ -496,13 +500,13 @@ int giRender(const gi_render_params* params,
   c_result = cgpu_begin_command_buffer(command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
 
-  c_result = cgpu_cmd_bind_pipeline(command_buffer, params->shader_cache->pipeline);
+  c_result = cgpu_cmd_bind_pipeline(command_buffer, shader_cache->pipeline);
   if (c_result != CGPU_OK) goto cleanup;
 
   /* Trace rays. */
   c_result = cgpu_cmd_push_constants(
     command_buffer,
-    params->shader_cache->pipeline,
+    shader_cache->pipeline,
     &push_data
   );
   if (c_result != CGPU_OK) goto cleanup;
@@ -579,8 +583,8 @@ int giRender(const gi_render_params* params,
   if (c_result != CGPU_OK) goto cleanup;
 
   /* Normalize image for debug AOVs. */
-  if (params->shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
-      params->shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS)
+  if (shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
+      shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS)
   {
     const int value_count = pixel_count * COLOR_COMPONENT_COUNT;
 
