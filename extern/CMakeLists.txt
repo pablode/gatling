@@ -11,6 +11,8 @@ add_subdirectory(volk)
 #
 # MaterialX
 #
+if(NOT ${GATLING_BUILD_HDGATLING})
+
 set(MATERIALX_BUILD_GEN_GLSL OFF)
 set(MATERIALX_BUILD_GEN_OSL OFF)
 set(MATERIALX_BUILD_RENDER OFF)
@@ -33,6 +35,8 @@ install(
   PATTERN "*.mdl"
   PATTERN "*.mtlx"
 )
+
+endif()
 
 #
 # VulkanMemoryAllocator

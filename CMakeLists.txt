@@ -22,11 +22,15 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${OUTPUT_DIR})
 endforeach()
 
+option(GATLING_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
 option(GATLING_USE_EMBREE "Use Embree for BVH building." ON)
 cmake_dependent_option(GATLING_USE_DXC "Use DXC instead of glslang" OFF WIN32 OFF)
 
 find_package(Vulkan REQUIRED)
-find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
+if(${GATLING_BUILD_HDGATLING})
+  find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
+  find_package(MaterialX REQUIRED HINTS ${USD_ROOT})
+endif()
 find_package(MDL REQUIRED)
 
 if(${GATLING_USE_DXC})
