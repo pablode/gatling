@@ -221,7 +221,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   uint64_t node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
   uint64_t face_buf_size = bvh8.faces.size() * sizeof(gi_face);
-  uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
+  uint64_t emissive_face_indices_buf_size = emissive_face_indices.empty() ? offset_align : (emissive_face_indices.size() * sizeof(uint32_t));
   uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
 
   uint64_t node_buf_offset = giAlignBuffer(offset_align, node_buf_size, &buf_size);
@@ -257,7 +257,10 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   memcpy(&mapped_staging_mem[node_buf_offset], bvh8c.nodes.data(), node_buf_size);
   memcpy(&mapped_staging_mem[face_buf_offset], bvh8.faces.data(), face_buf_size);
-  memcpy(&mapped_staging_mem[emissive_face_indices_buf_offset], emissive_face_indices.data(), emissive_face_indices_buf_size);
+  if (!emissive_face_indices.empty())
+  {
+    memcpy(&mapped_staging_mem[emissive_face_indices_buf_offset], emissive_face_indices.data(), emissive_face_indices_buf_size);
+  }
   memcpy(&mapped_staging_mem[vertex_buf_offset], params->vertices, vertex_buf_size);
 
   c_result = cgpu_unmap_buffer(s_device, staging_buffer);
