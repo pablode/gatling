@@ -190,28 +190,45 @@ float3 evaluate_sample(inout uint4 rng_state,
             fvertex v1 = vertices[f.v_1];
             fvertex v2 = vertices[f.v_2];
 
+            float3 p0 = v0.field1.xyz;
+            float3 p1 = v1.field1.xyz;
+            float3 p2 = v2.field1.xyz;
+
             /* Sample point on light surface.
              * See: Ray Tracing Gems Chapter 16: Sampling Transformations Zoo 16.5.2.1 */
             float beta = 1.0 - sqrt(random4.y);
             float gamma = (1.0 - beta) * random4.z;
             float alpha = 1.0 - beta - gamma;
-            float3 P = alpha * v0.field1.xyz + beta * v1.field1.xyz + gamma * v2.field1.xyz;
+            float3 P = alpha * p0 + beta * p1 + gamma * p2;
 
-            float3 to_light = normalize(P - hit_info.pos);
-            float3 hit_offset = offset_ray_origin(hit_info.pos, to_light);
-            float3 light_offset = offset_ray_origin(P, -to_light);
+            /* Don't continue if we are on the same plane as the triangle. Seen from the side,
+             * it would be infinitely thin - and would therefore have no emissive area. */
+            float3 to_light = P - hit_info.pos;
 
-            ray.origin = hit_offset;
-            ray.dir = to_light;
-            ray.tmin = 0.0;
-            ray.tmax = length(light_offset - hit_offset);
-            bool is_occluded = bvh_find_hit_any(ray);
+            float3 geom_normal = normalize(cross(p1 - p0, p2 - p0));
 
-            /* Occlusion debug visualization. */
+            bool is_orthogonal = dot(geom_normal, to_light) == 0.0;
+
+            float light_dist = length(to_light);
+
+            if (light_dist > 0.0 && !is_orthogonal)
+            {
+                to_light /= light_dist;
+                float3 hit_offset = offset_ray_origin(hit_info.pos, to_light);
+                float3 light_offset = offset_ray_origin(P, -to_light);
+
+                ray.origin = hit_offset;
+                ray.dir = to_light;
+                ray.tmin = 0.0;
+                ray.tmax = length(light_offset - hit_offset);
+                bool is_occluded = bvh_find_hit_any(ray);
+
+                /* Occlusion debug visualization. */
 #if AOV_ID == AOV_ID_DEBUG_NEE
-            state.value = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
-            break;
+                state.value = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
+                break;
 #endif
+            }
         }
 #elif AOV_ID == AOV_ID_DEBUG_NEE
         state.value = float3(0.0, 0.0, 0.0);
