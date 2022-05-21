@@ -455,7 +455,6 @@ int giRender(const gi_render_params* params,
     /* float  */ params->rr_inv_min_term_prob,
     /* uint   */ *((float*)&params->geom_cache->light_count)
   };
-  uint32_t push_data_size = sizeof(push_data);
 
   cgpu_shader_resource_buffer buffers[] = {
     { 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE },
@@ -493,7 +492,6 @@ int giRender(const gi_render_params* params,
   c_result = cgpu_cmd_push_constants(
     command_buffer,
     params->shader_cache->pipeline,
-    push_data_size,
     &push_data
   );
   if (c_result != CGPU_OK) goto cleanup;

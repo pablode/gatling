@@ -2250,7 +2250,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
 CgpuResult cgpu_cmd_push_constants(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline,
-  uint32_t size,
   const void* p_data)
 {
   cgpu_icommand_buffer* icommand_buffer;
@@ -2265,12 +2264,16 @@ CgpuResult cgpu_cmd_push_constants(
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+  cgpu_ishader* ishader;
+  if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
   idevice->table.vkCmdPushConstants(
     icommand_buffer->command_buffer,
     ipipeline->layout,
     VK_SHADER_STAGE_COMPUTE_BIT,
     0,
-    size,
+    ishader->reflection.push_constants_size,
     p_data
   );
   return CGPU_OK;
