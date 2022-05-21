@@ -200,9 +200,9 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   /* Build list of emissive faces. */
   std::vector<uint32_t> emissive_face_indices;
   emissive_face_indices.reserve(1024);
-  for (uint32_t i = 0; i < params->face_count; i++)
+  for (uint32_t i = 0; i < bvh8.faces.size(); i++)
   {
-    const gi_material* mat = params->materials[params->faces[i].mat_index];
+    const gi_material* mat = params->materials[bvh8.faces[i].mat_index];
     if (s_shaderGen->isMaterialEmissive(mat->sg_mat))
     {
       emissive_face_indices.push_back(i);
@@ -220,7 +220,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   const uint64_t offset_align = s_device_limits.minStorageBufferOffsetAlignment;
 
   uint64_t node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
-  uint64_t face_buf_size = params->face_count * sizeof(gi_face);
+  uint64_t face_buf_size = bvh8.faces.size() * sizeof(gi_face);
   uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
   uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
 
