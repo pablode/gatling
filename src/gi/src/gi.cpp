@@ -37,9 +37,9 @@ struct gi_geom_cache
 
 struct gi_shader_cache
 {
-  uint32_t    aov_id;
-  cgpu_shader shader;
-  std::string shader_entry_point;
+  uint32_t      aov_id;
+  cgpu_shader   shader;
+  cgpu_pipeline pipeline;
 };
 
 struct gi_material
@@ -356,10 +356,17 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     return NULL;
   }
 
+  cgpu_pipeline pipeline;
+  if (cgpu_create_pipeline(s_device, shader, shader_entry_point.c_str(), &pipeline) != CGPU_OK)
+  {
+    cgpu_destroy_shader(s_device, shader);
+    return NULL;
+  }
+
   gi_shader_cache* cache = new gi_shader_cache;
   cache->aov_id = params->aov_id;
-  cache->shader_entry_point = shader_entry_point;
   cache->shader = shader;
+  cache->pipeline = pipeline;
 
   return cache;
 }
@@ -367,6 +374,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 void giDestroyShaderCache(gi_shader_cache* cache)
 {
   cgpu_destroy_shader(s_device, cache->shader);
+  cgpu_destroy_pipeline(s_device, cache->pipeline);
   delete cache;
 }
 
@@ -378,7 +386,6 @@ int giRender(const gi_render_params* params,
 
   cgpu_buffer output_buffer = { CGPU_INVALID_HANDLE };
   cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
-  cgpu_pipeline pipeline = { CGPU_INVALID_HANDLE };
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
   cgpu_fence fence = { CGPU_INVALID_HANDLE };
 
@@ -425,6 +432,16 @@ int giRender(const gi_render_params* params,
   const uint32_t image_count = 0;
   const cgpu_shader_resource_image* images = NULL;
 
+  c_result = cgpu_update_resources(
+    s_device,
+    params->shader_cache->pipeline,
+    buffer_count,
+    buffers,
+    image_count,
+    images
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
   gml_vec3 cam_forward, cam_up;
   gml_vec3_normalize(params->camera->forward, cam_forward);
   gml_vec3_normalize(params->camera->up, cam_up);
@@ -446,25 +463,6 @@ int giRender(const gi_render_params* params,
   };
   uint32_t push_data_size = sizeof(push_data);
 
-  /* Set up pipeline and resources. */
-  c_result = cgpu_create_pipeline(
-    s_device,
-    params->shader_cache->shader,
-    params->shader_cache->shader_entry_point.c_str(),
-    &pipeline
-  );
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_update_resources(
-    s_device,
-    pipeline,
-    buffer_count,
-    buffers,
-    image_count,
-    images
-  );
-  if (c_result != CGPU_OK) goto cleanup;
-
   /* Set up command buffer. */
   c_result = cgpu_create_command_buffer(s_device, &command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
@@ -472,13 +470,13 @@ int giRender(const gi_render_params* params,
   c_result = cgpu_begin_command_buffer(command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
 
-  c_result = cgpu_cmd_bind_pipeline(command_buffer, pipeline);
+  c_result = cgpu_cmd_bind_pipeline(command_buffer, params->shader_cache->pipeline);
   if (c_result != CGPU_OK) goto cleanup;
 
   /* Trace rays. */
   c_result = cgpu_cmd_push_constants(
     command_buffer,
-    pipeline,
+    params->shader_cache->pipeline,
     push_data_size,
     &push_data
   );
@@ -576,7 +574,6 @@ int giRender(const gi_render_params* params,
 cleanup:
   cgpu_destroy_fence(s_device, fence);
   cgpu_destroy_command_buffer(s_device, command_buffer);
-  cgpu_destroy_pipeline(s_device, pipeline);
   cgpu_destroy_buffer(s_device, staging_buffer);
   cgpu_destroy_buffer(s_device, output_buffer);
 
