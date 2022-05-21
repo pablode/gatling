@@ -51,8 +51,8 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     // Unfortunately SPIRV-Reflect lacks this functionality:
     // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
     const SpvReflectTypeDescription* type_description = binding->type_description;
-    sr_res->write_access = ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
-    sr_res->read_access = true;
+    sr_res->write_access = binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+    sr_res->read_access = binding->accessed;
 
     sr_res->binding = binding->binding;
   }
