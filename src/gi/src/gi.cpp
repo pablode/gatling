@@ -341,7 +341,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
   float postpone_ratio = 0.2f;
   uint32_t bvh_node_count = geom_cache->bvh_node_count;
-  uint32_t bvh_depth = std::ceil(log(bvh_node_count) / log(8));
+  uint32_t bvh_depth = ceilf(log(bvh_node_count) / log(8));
   uint32_t max_bvh_stack_size = (bvh_node_count < 3) ? 1 : (2 * bvh_depth);
   uint32_t max_postponed_tris = int(s_device_limits.subgroupSize * postpone_ratio) - 1;
   uint32_t max_stack_size = max_bvh_stack_size + max_postponed_tris;
@@ -433,6 +433,27 @@ int giRender(const gi_render_params* params,
   }
 
   /* Set up GPU data. */
+  gml_vec3 cam_forward, cam_up;
+  gml_vec3_normalize(params->camera->forward, cam_forward);
+  gml_vec3_normalize(params->camera->up, cam_up);
+
+  float push_data[] = {
+    /* float3 */ params->camera->position[0], params->camera->position[1], params->camera->position[2],
+    /* uint   */ *((float*)&params->image_width),
+    /* float3 */ cam_forward[0], cam_forward[1], cam_forward[2],
+    /* uint   */ *((float*)&params->image_height),
+    /* float3 */ cam_up[0], cam_up[1], cam_up[2],
+    /* float  */ params->camera->vfov,
+    /* float4 */ params->bg_color[0], params->bg_color[1], params->bg_color[2], params->bg_color[3],
+    /* uint   */ *((float*)&params->spp),
+    /* uint   */ *((float*)&params->max_bounces),
+    /* float  */ params->max_sample_value,
+    /* uint   */ *((float*)&params->rr_bounce_offset),
+    /* float  */ params->rr_inv_min_term_prob,
+    /* uint   */ *((float*)&params->geom_cache->light_count)
+  };
+  uint32_t push_data_size = sizeof(push_data);
+
   cgpu_shader_resource_buffer buffers[] = {
     { 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE },
     { 1, params->geom_cache->buffer,                  params->geom_cache->node_buf_offset,                  params->geom_cache->node_buf_size },
@@ -454,27 +475,6 @@ int giRender(const gi_render_params* params,
     images
   );
   if (c_result != CGPU_OK) goto cleanup;
-
-  gml_vec3 cam_forward, cam_up;
-  gml_vec3_normalize(params->camera->forward, cam_forward);
-  gml_vec3_normalize(params->camera->up, cam_up);
-
-  float push_data[] = {
-    /* float3 */ params->camera->position[0], params->camera->position[1], params->camera->position[2],
-    /* uint   */ *((float*)&params->image_width),
-    /* float3 */ cam_forward[0], cam_forward[1], cam_forward[2],
-    /* uint   */ *((float*)&params->image_height),
-    /* float3 */ cam_up[0], cam_up[1], cam_up[2],
-    /* float  */ params->camera->vfov,
-    /* float4 */ params->bg_color[0], params->bg_color[1], params->bg_color[2], params->bg_color[3],
-    /* uint   */ *((float*)&params->spp),
-    /* uint   */ *((float*)&params->max_bounces),
-    /* float  */ params->max_sample_value,
-    /* uint   */ *((float*)&params->rr_bounce_offset),
-    /* float  */ params->rr_inv_min_term_prob,
-    /* uint   */ *((float*)&params->geom_cache->light_count)
-  };
-  uint32_t push_data_size = sizeof(push_data);
 
   /* Set up command buffer. */
   c_result = cgpu_create_command_buffer(s_device, &command_buffer);
@@ -566,10 +566,9 @@ int giRender(const gi_render_params* params,
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  bool normalizeImage = (params->shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
-                         params->shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS);
-
-  if (normalizeImage)
+  /* Normalize image for debug AOVs. */
+  if (params->shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
+      params->shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS)
   {
     const int value_count = pixel_count * COLOR_COMPONENT_COUNT;
 
