@@ -40,11 +40,6 @@ bool cgpu_perform_shader_reflection(uint64_t size,
   {
     const SpvReflectDescriptorBinding* binding = bindings[i];
 
-    if (!binding->accessed)
-    {
-      continue;
-    }
-
     cgpu_shader_reflection_resource* sr_res = &p_reflection->resources[p_reflection->resource_count++];
     sr_res->descriptor_type = (int) binding->descriptor_type;
 
@@ -53,6 +48,12 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     const SpvReflectTypeDescription* type_description = binding->type_description;
     sr_res->write_access = binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
     sr_res->read_access = binding->accessed;
+
+    sr_res->is_array = binding->array.dims_count > 0;
+    if (sr_res->is_array)
+    {
+      sr_res->array_size = binding->array.dims[0];
+    }
 
     sr_res->binding = binding->binding;
   }

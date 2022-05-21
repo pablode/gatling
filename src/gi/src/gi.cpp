@@ -412,7 +412,19 @@ int giRender(const gi_render_params* params,
     return GI_ERROR;
   }
 
-  /* Set up pipeline. */
+  /* Set up GPU data. */
+  cgpu_shader_resource_buffer buffers[] = {
+    { 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE },
+    { 1, params->geom_cache->buffer,                  params->geom_cache->node_buf_offset,                  params->geom_cache->node_buf_size },
+    { 2, params->geom_cache->buffer,                  params->geom_cache->face_buf_offset,                  params->geom_cache->face_buf_size },
+    { 3, params->geom_cache->buffer, params->geom_cache->emissive_face_indices_buf_offset, params->geom_cache->emissive_face_indices_buf_size },
+    { 4, params->geom_cache->buffer,                params->geom_cache->vertex_buf_offset,                params->geom_cache->vertex_buf_size },
+  };
+  const uint32_t buffer_count = sizeof(buffers) / sizeof(buffers[0]);
+
+  const uint32_t image_count = 0;
+  const cgpu_shader_resource_image* images = NULL;
+
   gml_vec3 cam_forward, cam_up;
   gml_vec3_normalize(params->camera->forward, cam_forward);
   gml_vec3_normalize(params->camera->up, cam_up);
@@ -434,27 +446,22 @@ int giRender(const gi_render_params* params,
   };
   uint32_t push_data_size = sizeof(push_data);
 
-  cgpu_shader_resource_buffer buffers[] = {
-    { 0,              output_buffer,                                                    0,                                    CGPU_WHOLE_SIZE },
-    { 1, params->geom_cache->buffer,                  params->geom_cache->node_buf_offset,                  params->geom_cache->node_buf_size },
-    { 2, params->geom_cache->buffer,                  params->geom_cache->face_buf_offset,                  params->geom_cache->face_buf_size },
-    { 3, params->geom_cache->buffer, params->geom_cache->emissive_face_indices_buf_offset, params->geom_cache->emissive_face_indices_buf_size },
-    { 4, params->geom_cache->buffer,                params->geom_cache->vertex_buf_offset,                params->geom_cache->vertex_buf_size },
-  };
-  const uint32_t buffer_count = sizeof(buffers) / sizeof(buffers[0]);
-
-  const uint32_t image_count = 0;
-  const cgpu_shader_resource_image* images = NULL;
-
+  /* Set up pipeline and resources. */
   c_result = cgpu_create_pipeline(
     s_device,
-    buffer_count,
-    buffers,
-    image_count,
-    images,
     params->shader_cache->shader,
     params->shader_cache->shader_entry_point.c_str(),
     &pipeline
+  );
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_update_resources(
+    s_device,
+    pipeline,
+    buffer_count,
+    buffers,
+    image_count,
+    images
   );
   if (c_result != CGPU_OK) goto cleanup;
 

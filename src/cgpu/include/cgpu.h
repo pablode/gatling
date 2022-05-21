@@ -666,10 +666,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_unmap_image(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
   cgpu_device device,
-  uint32_t buffer_resource_count,
-  const cgpu_shader_resource_buffer* p_buffer_resources,
-  uint32_t image_resource_count,
-  const cgpu_shader_resource_image* p_image_resources,
   cgpu_shader shader,
   const char* p_shader_entry_point,
   cgpu_pipeline* p_pipeline
@@ -678,6 +674,15 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(
 CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_pipeline(
   cgpu_device device,
   cgpu_pipeline pipeline
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_update_resources(
+  cgpu_device device,
+  cgpu_pipeline pipeline,
+  uint32_t buffer_resource_count,
+  const cgpu_shader_resource_buffer* p_buffer_resources,
+  uint32_t image_resource_count,
+  const cgpu_shader_resource_image* p_image_resources
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_command_buffer(
