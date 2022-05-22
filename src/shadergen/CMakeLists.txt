@@ -8,6 +8,8 @@ add_library(
   src/MtlxMdlCodeGen.cpp
   src/MdlHlslCodeGen.h
   src/MdlHlslCodeGen.cpp
+  src/MdlEntityResolver.h
+  src/MdlEntityResolver.cpp
   src/MdlLogger.h
   src/MdlLogger.cpp
   src/MdlMaterialCompiler.h
