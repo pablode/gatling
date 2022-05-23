@@ -63,7 +63,6 @@ float4 uint_unpack_float4(uint u)
 
 bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
 {
-    float t_min = ray.tmin;
     float t_max = ray.tmax;
     float3 inv_dir = 1.0 / ray.dir;
 
@@ -165,7 +164,7 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
                 [unroll(4)]
                 for (uint child_idx = 0; child_idx < 4; ++child_idx)
                 {
-                    float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], t_min));
+                    float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], 0.0));
                     float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], t_max));
 
                     bool is_intersected = bmin <= bmax;
@@ -263,7 +262,6 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
 
 bool bvh_find_hit_any(in RayInfo ray)
 {
-  float t_min = ray.tmin;
   float t_max = ray.tmax;
   float3 inv_dir = 1.0 / ray.dir;
 
@@ -352,7 +350,7 @@ bool bvh_find_hit_any(in RayInfo ray)
         [unroll(4)]
         for (uint child_idx = 0; child_idx < 4; ++child_idx)
         {
-          float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], t_min));
+          float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], 0.0));
           float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], t_max));
 
           bool is_intersected = bmin <= bmax;

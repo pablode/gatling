@@ -154,9 +154,8 @@ float3 evaluate_sample(inout uint4 rng_state,
     {
         RayInfo ray;
         ray.origin = state.ray_origin;
-        ray.tmin   = 0.0;
-        ray.dir    = state.ray_dir;
         ray.tmax   = FLOAT_MAX;
+        ray.dir    = state.ray_dir;
 
         Hit_info hit_info;
 
@@ -219,7 +218,6 @@ float3 evaluate_sample(inout uint4 rng_state,
 
                 ray.origin = hit_offset;
                 ray.dir = to_light;
-                ray.tmin = 0.0;
                 ray.tmax = length(light_offset - hit_offset);
                 bool is_occluded = bvh_find_hit_any(ray);
 

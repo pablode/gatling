@@ -38,9 +38,9 @@ struct bvh_node
 struct RayInfo
 {
   float3 origin;
-  float  tmin;
-  float3 dir;
   float  tmax;
+  float3 dir;
+  float  padding;
 };
 
 struct Hit_info
