@@ -21,11 +21,11 @@ const uint32_t WORKGROUP_SIZE_Y = 16;
 
 struct gi_geom_cache
 {
+  uint64_t                   bvh_node_buf_offset;
+  uint64_t                   bvh_node_buf_size;
   uint32_t                   bvh_node_count;
   cgpu_buffer                buffer;
   uint32_t                   light_count;
-  uint64_t                   node_buf_offset;
-  uint64_t                   node_buf_size;
   uint64_t                   face_buf_offset;
   uint64_t                   face_buf_size;
   uint64_t                   emissive_face_indices_buf_offset;
@@ -105,7 +105,7 @@ gi_material* giCreateMaterialFromMtlx(const char* doc_str)
   sg::Material* sg_mat = s_shaderGen->createMaterialFromMtlx(doc_str);
   if (!sg_mat)
   {
-    return NULL;
+    return nullptr;
   }
 
   gi_material* mat = new gi_material;
@@ -118,7 +118,7 @@ gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_
   sg::Material* sg_mat = s_shaderGen->createMaterialFromMdlFile(file_path, sub_identifier);
   if (!sg_mat)
   {
-    return NULL;
+    return nullptr;
   }
 
   gi_material* mat = new gi_material;
@@ -154,7 +154,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
    * being a leaf, requiring special handling in the traversal algorithm. */
   if (params->face_count <= 3)
   {
-    return NULL;
+    return nullptr;
   }
 
   /* Build BVH. */
@@ -198,7 +198,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   gi::bvh::Bvh<8> bvh8;
   if (!gi::bvh::collapse_bvh2(bvh, bvh8_params, bvh8))
   {
-    return NULL;
+    return nullptr;
   }
 
   gi::bvh::Bvh8c bvh8c = gi::bvh::compress_bvh8(bvh8);
@@ -216,7 +216,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   }
 
   /* Upload to GPU buffer. */
-  gi_geom_cache* cache = NULL;
+  gi_geom_cache* cache = nullptr;
   cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
   cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
@@ -225,12 +225,12 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   uint64_t buf_size = 0;
   const uint64_t offset_align = s_device_limits.minStorageBufferOffsetAlignment;
 
-  uint64_t node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
+  uint64_t bvh_node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
   uint64_t face_buf_size = bvh8.faces.size() * sizeof(gi_face);
   uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
   uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
 
-  uint64_t node_buf_offset = giAlignBuffer(offset_align, node_buf_size, &buf_size);
+  uint64_t bvh_node_buf_offset = giAlignBuffer(offset_align, bvh_node_buf_size, &buf_size);
   uint64_t face_buf_offset = giAlignBuffer(offset_align, face_buf_size, &buf_size);
   uint64_t emissive_face_indices_buf_offset = giAlignBuffer(offset_align, emissive_face_indices_buf_size, &buf_size);
   uint64_t vertex_buf_offset = giAlignBuffer(offset_align, vertex_buf_size, &buf_size);
@@ -261,7 +261,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  memcpy(&mapped_staging_mem[node_buf_offset], bvh8c.nodes.data(), node_buf_size);
+  memcpy(&mapped_staging_mem[bvh_node_buf_offset], bvh8c.nodes.data(), bvh_node_buf_size);
   memcpy(&mapped_staging_mem[face_buf_offset], bvh8.faces.data(), face_buf_size);
   if (emissive_face_indices.size() > 0)
   {
@@ -310,11 +310,11 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cache->bvh_node_count = bvh8c.nodes.size();
   cache->buffer = buffer;
   cache->light_count = emissive_face_indices.size();
-  cache->node_buf_size = node_buf_size;
+  cache->bvh_node_buf_size = bvh_node_buf_size;
   cache->face_buf_size = face_buf_size;
   cache->emissive_face_indices_buf_size = emissive_face_indices_buf_size;
   cache->vertex_buf_size = vertex_buf_size;
-  cache->node_buf_offset = node_buf_offset;
+  cache->bvh_node_buf_offset = bvh_node_buf_offset;
   cache->face_buf_offset = face_buf_offset;
   cache->emissive_face_indices_buf_offset = emissive_face_indices_buf_offset;
   cache->vertex_buf_offset = vertex_buf_offset;
@@ -370,20 +370,20 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   std::string shader_entry_point;
   if (!s_shaderGen->generateMainShader(&shaderParams, spv, shader_entry_point))
   {
-    return NULL;
+    return nullptr;
   }
 
   cgpu_shader shader;
   if (cgpu_create_shader(s_device, spv.size(), spv.data(), &shader) != CGPU_OK)
   {
-    return NULL;
+    return nullptr;
   }
 
   cgpu_pipeline pipeline;
   if (cgpu_create_pipeline(s_device, shader, shader_entry_point.c_str(), &pipeline) != CGPU_OK)
   {
     cgpu_destroy_shader(s_device, shader);
-    return NULL;
+    return nullptr;
   }
 
   gi_shader_cache* cache = new gi_shader_cache;
@@ -472,7 +472,7 @@ int giRender(const gi_render_params* params,
   buffers.reserve(16);
 
   buffers.push_back({ 0,      output_buffer,                                            0,                            CGPU_WHOLE_SIZE });
-  buffers.push_back({ 1, geom_cache->buffer,                  geom_cache->node_buf_offset,                  geom_cache->node_buf_size });
+  buffers.push_back({ 1, geom_cache->buffer,              geom_cache->bvh_node_buf_offset,              geom_cache->bvh_node_buf_size });
   buffers.push_back({ 2, geom_cache->buffer,                  geom_cache->face_buf_offset,                  geom_cache->face_buf_size });
   if (shader_cache->nee_enabled)
   {
@@ -481,7 +481,7 @@ int giRender(const gi_render_params* params,
   buffers.push_back({ 4, geom_cache->buffer,                geom_cache->vertex_buf_offset,                geom_cache->vertex_buf_size });
 
   const uint32_t image_count = 0;
-  const cgpu_shader_resource_image* images = NULL;
+  const cgpu_shader_resource_image* images = nullptr;
 
   c_result = cgpu_update_resources(
     s_device,
@@ -529,9 +529,9 @@ int giRender(const gi_render_params* params,
 
   c_result = cgpu_cmd_pipeline_barrier(
     command_buffer,
-    0, NULL,
+    0, nullptr,
     1, &barrier,
-    0, NULL
+    0, nullptr
   );
   if (c_result != CGPU_OK) goto cleanup;
 
