@@ -6,8 +6,6 @@
 typedef struct cgpu_shader_reflection_resource {
   uint32_t binding;
   int descriptor_type;
-  bool is_array;
-  uint32_t array_size;
   bool write_access;
   bool read_access;
 } cgpu_shader_reflection_resource;

@@ -1636,7 +1636,6 @@ CgpuResult cgpu_create_pipeline(
   }
 
   VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
-  VkDescriptorBindingFlagsEXT binding_flags[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
 
   for (uint32_t i = 0; i < shader_reflection->resource_count; i++)
   {
@@ -1649,24 +1648,11 @@ CgpuResult cgpu_create_pipeline(
     descriptor_set_layout_binding->descriptorCount = 1;
     descriptor_set_layout_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
-
-    bool is_image = (descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) ||
-                    (descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE) ||
-                    (descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    bool variable_image_array = is_image && resource->is_array && resource->array_size == 0;
-
-    binding_flags[i] = variable_image_array ? VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT : 0;
   }
-
-  VkDescriptorSetLayoutBindingFlagsCreateInfoEXT binding_flags_create_info;
-  binding_flags_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO;
-  binding_flags_create_info.pNext = NULL;
-  binding_flags_create_info.bindingCount = shader_reflection->resource_count;
-  binding_flags_create_info.pBindingFlags = binding_flags;
 
   VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  descriptor_set_layout_create_info.pNext = &binding_flags_create_info;
+  descriptor_set_layout_create_info.pNext = NULL;
   descriptor_set_layout_create_info.flags = 0;
   descriptor_set_layout_create_info.bindingCount = shader_reflection->resource_count;
   descriptor_set_layout_create_info.pBindings = descriptor_set_layout_bindings;
