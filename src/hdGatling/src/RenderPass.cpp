@@ -332,7 +332,13 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastBackgroundColor = backgroundColor;
   m_lastAovId = aovId;
 
-  if (!m_geomCache)
+  bool rebuildGeomCache = !m_geomCache;
+#ifndef NDEBUG
+  // BVH tri threshold could have been changed - see comment below.
+  rebuildGeomCache |= renderSettingsChanged;
+#endif
+
+  if (rebuildGeomCache)
   {
     if (m_geomCache)
     {
@@ -353,6 +359,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     _BakeMeshes(renderIndex, viewMatrix, vertices, faces, materials);
 
     gi_geom_cache_params geomParams;
+    geomParams.bvh_tri_threshold = m_settings.find(HdGatlingSettingsTokens->bvh_tri_threshold)->second.Get<int>();
+    geomParams.next_event_estimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
     geomParams.face_count = faces.size();
     geomParams.faces = faces.data();
     geomParams.material_count = materials.size();
@@ -388,7 +396,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     shaderParams.aov_id = aovId;
     shaderParams.geom_cache = m_geomCache;
     shaderParams.triangle_postponing = m_settings.find(HdGatlingSettingsTokens->triangle_postponing)->second.Get<bool>();
-    shaderParams.next_event_estimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");

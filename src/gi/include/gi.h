@@ -48,6 +48,8 @@ struct gi_shader_cache;
 
 struct gi_geom_cache_params
 {
+  uint32_t                   bvh_tri_threshold;
+  bool                       next_event_estimation;
   uint32_t                   face_count;
   struct gi_face*            faces;
   uint32_t                   material_count;
@@ -61,7 +63,6 @@ struct gi_shader_cache_params
   enum gi_aov_id        aov_id;
   struct gi_geom_cache* geom_cache;
   bool                  triangle_postponing;
-  bool                  next_event_estimation;
 };
 
 struct gi_render_params

@@ -35,6 +35,7 @@ namespace sg
     struct MainShaderParams
     {
       uint32_t aovId;
+      bool bvh;
       uint32_t numThreadsX;
       uint32_t numThreadsY;
       float postponeRatio;
@@ -43,6 +44,7 @@ namespace sg
       bool trianglePostponing;
       bool nextEventEstimation;
       uint32_t emissiveFaceCount;
+      uint32_t faceCount;
     };
 
     bool generateMainShader(const struct MainShaderParams* params,

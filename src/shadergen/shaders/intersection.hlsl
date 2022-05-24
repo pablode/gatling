@@ -44,6 +44,8 @@ bool test_face(
     return true;
 }
 
+#ifdef BVH_ENABLED
+
 uint sign_to_byte_mask4(uint a)
 {
     a = a & 0x80808080;
@@ -61,7 +63,7 @@ float4 uint_unpack_float4(uint u)
   return float4(extract_byte(u, 0), extract_byte(u, 1), extract_byte(u, 2), extract_byte(u, 3));
 }
 
-bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
+bool find_hit_closest(in RayInfo ray, out Hit_info hit)
 {
     float t_max = ray.tmax;
     float3 inv_dir = 1.0 / ray.dir;
@@ -260,7 +262,7 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
     }
 }
 
-bool bvh_find_hit_any(in RayInfo ray)
+bool find_hit_any(in RayInfo ray)
 {
   float t_max = ray.tmax;
   float3 inv_dir = 1.0 / ray.dir;
@@ -425,3 +427,74 @@ bool bvh_find_hit_any(in RayInfo ray)
     return false;
   }
 }
+
+#else
+
+bool find_hit_closest(in RayInfo ray, out Hit_info hit)
+{
+  float t_max = ray.tmax;
+#if AOV_ID == AOV_ID_DEBUG_TRI_TESTS
+  hit.tri_tests = 0;
+#endif
+
+  for (int face_index = 0; face_index < FACE_COUNT; face_index++)
+  {
+    float t_tmp;
+    float2 bc_tmp;
+
+    bool has_hit = test_face(
+      ray.origin,
+      ray.dir,
+      t_max,
+      face_index,
+      t_tmp,
+      bc_tmp
+    );
+
+#if AOV_ID == AOV_ID_DEBUG_TRI_TESTS
+    hit.tri_tests++;
+#endif
+
+    if (has_hit)
+    {
+      t_max = t_tmp;
+      hit.bc = bc_tmp;
+      hit.face_idx = face_index;
+    }
+  }
+
+  if (t_max == ray.tmax)
+  {
+    return false;
+  }
+
+  hit.pos = ray.origin + ray.dir * t_max;
+  return true;
+}
+
+bool find_hit_any(in RayInfo ray)
+{
+  for (int face_index = 0; face_index < FACE_COUNT; face_index++)
+  {
+    float t_tmp;
+    float2 bc_tmp;
+
+    bool has_hit = test_face(
+      ray.origin,
+      ray.dir,
+      ray.tmax,
+      face_index,
+      t_tmp,
+      bc_tmp
+    );
+
+    if (has_hit)
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+#endif

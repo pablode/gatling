@@ -10,6 +10,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((rr_bounce_offset, "rr-bounce-offset"))           \
   ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))   \
   ((max_sample_value, "max-sample-value"))           \
+  ((bvh_tri_threshold, "bvh-tri-threshold"))         \
   ((triangle_postponing, "triangle-postponing"))     \
   ((next_event_estimation, "next-event-estimation"))
 

@@ -26,14 +26,16 @@ struct face
     uint mat_idx;
 };
 
-struct bvh_node
-{
-    uint4 f1;
-    uint4 f2;
-    uint4 f3;
-    uint4 f4;
-    uint4 f5;
-};
+#ifdef BVH_ENABLED
+  struct bvh_node
+  {
+      uint4 f1;
+      uint4 f2;
+      uint4 f3;
+      uint4 f4;
+      uint4 f5;
+  };
+#endif
 
 struct RayInfo
 {
@@ -58,17 +60,17 @@ struct Hit_info
 [[vk::binding(0)]]
 RWStructuredBuffer<float4> pixels;
 
-[[vk::binding(1)]]
-StructuredBuffer<bvh_node> bvh_nodes;
+#ifdef BVH_ENABLED
+  [[vk::binding(1)]]
+  StructuredBuffer<bvh_node> bvh_nodes;
+#endif
 
 [[vk::binding(2)]]
 StructuredBuffer<face> faces;
 
 #ifdef NEXT_EVENT_ESTIMATION
-
-[[vk::binding(3)]]
-StructuredBuffer<uint> emissive_face_indices;
-
+  [[vk::binding(3)]]
+  StructuredBuffer<uint> emissive_face_indices;
 #endif
 
 [[vk::binding(4)]]

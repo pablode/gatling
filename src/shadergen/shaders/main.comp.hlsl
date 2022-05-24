@@ -1,5 +1,4 @@
 #include "common.hlsl"
-#include "bvh.hlsl"
 
 struct PushConstants
 {
@@ -23,6 +22,8 @@ struct PushConstants
 #else
 [[vk::push_constant]] ConstantBuffer<PushConstants> PC;
 #endif
+
+#include "intersection.hlsl"
 
 struct Sample_state
 {
@@ -158,7 +159,7 @@ float3 evaluate_sample(inout uint4 rng_state,
 
         Hit_info hit_info;
 
-        bool found_hit = bvh_find_hit_closest(ray, hit_info);
+        bool found_hit = find_hit_closest(ray, hit_info);
 
 #if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
         state.value = float3(float(hit_info.bvh_steps), 0.0, 0.0);
@@ -218,7 +219,7 @@ float3 evaluate_sample(inout uint4 rng_state,
                 ray.origin = hit_offset;
                 ray.dir = to_light;
                 ray.tmax = length(light_offset - hit_offset);
-                bool is_occluded = bvh_find_hit_any(ray);
+                bool is_occluded = find_hit_any(ray);
 
                 /* Occlusion debug visualization. */
 #if AOV_ID == AOV_ID_DEBUG_NEE

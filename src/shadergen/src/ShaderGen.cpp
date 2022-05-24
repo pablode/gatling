@@ -198,7 +198,9 @@ namespace sg
     APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
     APPEND_CONSTANT("MAX_STACK_SIZE", maxStackSize)
     APPEND_CONSTANT("POSTPONE_RATIO", postponeRatio)
+    APPEND_CONSTANT("FACE_COUNT", faceCount)
     APPEND_CONSTANT("EMISSIVE_FACE_COUNT", emissiveFaceCount)
+    APPEND_DEFINE("BVH_ENABLED", bvh)
     APPEND_DEFINE("TRIANGLE_POSTPONING", trianglePostponing)
     APPEND_DEFINE("NEXT_EVENT_ESTIMATION", nextEventEstimation)
 
