@@ -42,6 +42,7 @@ namespace sg
       std::vector<Material*> materials;
       bool trianglePostponing;
       bool nextEventEstimation;
+      uint32_t emissiveFaceCount;
     };
 
     bool generateMainShader(const struct MainShaderParams* params,

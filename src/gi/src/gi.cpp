@@ -21,15 +21,15 @@ const uint32_t WORKGROUP_SIZE_Y = 16;
 
 struct gi_geom_cache
 {
+  cgpu_buffer                buffer;
   uint64_t                   bvh_node_buf_offset;
   uint64_t                   bvh_node_buf_size;
   uint32_t                   bvh_node_count;
-  cgpu_buffer                buffer;
-  uint32_t                   light_count;
   uint64_t                   face_buf_offset;
   uint64_t                   face_buf_size;
   uint64_t                   emissive_face_indices_buf_offset;
   uint64_t                   emissive_face_indices_buf_size;
+  uint32_t                   emissive_face_count;
   uint64_t                   vertex_buf_offset;
   uint64_t                   vertex_buf_size;
   std::vector<sg::Material*> materials;
@@ -307,16 +307,16 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   if (c_result != CGPU_OK) goto cleanup;
 
   cache = new gi_geom_cache;
-  cache->bvh_node_count = bvh8c.nodes.size();
   cache->buffer = buffer;
-  cache->light_count = emissive_face_indices.size();
   cache->bvh_node_buf_size = bvh_node_buf_size;
-  cache->face_buf_size = face_buf_size;
-  cache->emissive_face_indices_buf_size = emissive_face_indices_buf_size;
-  cache->vertex_buf_size = vertex_buf_size;
   cache->bvh_node_buf_offset = bvh_node_buf_offset;
+  cache->bvh_node_count = bvh8c.nodes.size();
+  cache->face_buf_size = face_buf_size;
   cache->face_buf_offset = face_buf_offset;
+  cache->emissive_face_indices_buf_size = emissive_face_indices_buf_size;
   cache->emissive_face_indices_buf_offset = emissive_face_indices_buf_offset;
+  cache->emissive_face_count = emissive_face_indices.size();
+  cache->vertex_buf_size = vertex_buf_size;
   cache->vertex_buf_offset = vertex_buf_offset;
 
   /* Copy materials. */
@@ -354,7 +354,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   uint32_t max_bvh_stack_size = (bvh_node_count < 3) ? 1 : (2 * bvh_depth);
   uint32_t max_postponed_tris = int(s_device_limits.subgroupSize * postpone_ratio) - 1;
   uint32_t max_stack_size = max_bvh_stack_size + max_postponed_tris;
-  bool nee_enabled = params->next_event_estimation && geom_cache->light_count > 0;
+  bool nee_enabled = params->next_event_estimation && geom_cache->emissive_face_count > 0;
 
   sg::ShaderGen::MainShaderParams shaderParams;
   shaderParams.aovId               = params->aov_id;
@@ -365,6 +365,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   shaderParams.materials           = geom_cache->materials;
   shaderParams.trianglePostponing  = params->triangle_postponing;
   shaderParams.nextEventEstimation = nee_enabled;
+  shaderParams.emissiveFaceCount   = geom_cache->emissive_face_count;
 
   std::vector<uint8_t> spv;
   std::string shader_entry_point;
@@ -464,8 +465,7 @@ int giRender(const gi_render_params* params,
     /* uint   */ *((float*)&params->max_bounces),
     /* float  */ params->max_sample_value,
     /* uint   */ *((float*)&params->rr_bounce_offset),
-    /* float  */ params->rr_inv_min_term_prob,
-    /* uint   */ *((float*)&geom_cache->light_count)
+    /* float  */ params->rr_inv_min_term_prob
   };
 
   std::vector<cgpu_shader_resource_buffer> buffers;

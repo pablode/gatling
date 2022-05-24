@@ -15,7 +15,6 @@ struct PushConstants
   float  MAX_SAMPLE_VALUE;
   uint   RR_BOUNCE_OFFSET;
   float  RR_INV_MIN_TERM_PROB;
-  uint   LIGHT_COUNT;
 };
 
 // Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
@@ -181,7 +180,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             /* Sample light from global list. */
             float4 random4 = pcg4d_next(state.rng_state);
 
-            uint light_idx = min(PC.LIGHT_COUNT - 1, uint(random4.x * PC.LIGHT_COUNT));
+            uint light_idx = min(EMISSIVE_FACE_COUNT - 1, uint(random4.x * float(EMISSIVE_FACE_COUNT)));
             uint face_index = emissive_face_indices[light_idx];
 
             face f = faces[face_index];
