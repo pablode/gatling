@@ -31,7 +31,7 @@ struct Sample_state
     float3 ray_origin;
     float3 ray_dir;
     float3 throughput;
-    float3 value;
+    float3 radiance;
 };
 
 bool shade_hit(inout Sample_state state, in Hit_info hit)
@@ -60,7 +60,7 @@ bool shade_hit(inout Sample_state state, in Hit_info hit)
     );
 
 #if AOV_ID == AOV_ID_NORMAL
-    state.value = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
+    state.radiance = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
     return false;
 #endif
 
@@ -105,7 +105,7 @@ bool shade_hit(inout Sample_state state, in Hit_info hit)
     mdl_bsdf_scattering_sample(f.mat_idx, bsdf_sample_data, shading_state_material);
 
     /* Handle results. */
-    state.value += state.throughput * edf_evaluate_data.edf * emission_intensity;
+    state.radiance += state.throughput * edf_evaluate_data.edf * emission_intensity;
 
     if ((bsdf_sample_data.event_type & BSDF_EVENT_ABSORB) != 0)
     {
@@ -147,7 +147,7 @@ float3 evaluate_sample(inout uint4 rng_state,
     state.ray_origin = ray_origin;
     state.ray_dir    = ray_dir;
     state.throughput = float3(1.0, 1.0, 1.0);
-    state.value      = float3(0.0, 0.0, 0.0);
+    state.radiance   = float3(0.0, 0.0, 0.0);
     state.rng_state  = rng_state;
 
     for (uint bounce = 0; bounce < (PC.MAX_BOUNCES + 1); bounce++)
@@ -162,16 +162,16 @@ float3 evaluate_sample(inout uint4 rng_state,
         bool found_hit = find_hit_closest(ray, hit_info);
 
 #if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
-        state.value = float3(float(hit_info.bvh_steps), 0.0, 0.0);
+        state.radiance = float3(float(hit_info.bvh_steps), 0.0, 0.0);
         break;
 #elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
-        state.value = float3(0.0, 0.0, float(hit_info.tri_tests));
+        state.radiance = float3(0.0, 0.0, float(hit_info.tri_tests));
         break;
 #endif
 
         if (!found_hit)
         {
-            state.value += state.throughput * PC.BACKGROUND_COLOR.rgb;
+            state.radiance += state.throughput * PC.BACKGROUND_COLOR.rgb;
             break;
         }
 
@@ -223,13 +223,13 @@ float3 evaluate_sample(inout uint4 rng_state,
 
                 /* Occlusion debug visualization. */
 #if AOV_ID == AOV_ID_DEBUG_NEE
-                state.value = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
+                state.radiance = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
                 break;
 #endif
             }
         }
 #elif AOV_ID == AOV_ID_DEBUG_NEE
-        state.value = float3(0.0, 0.0, 0.0);
+        state.radiance = float3(0.0, 0.0, 0.0);
         break;
 #endif
 
@@ -249,9 +249,7 @@ float3 evaluate_sample(inout uint4 rng_state,
         }
     }
 
-    float3 min_sample_value = float3(0.0, 0.0, 0.0);
-    float3 max_sample_value = float3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE);
-    return clamp(state.value, min_sample_value, max_sample_value);
+    return clamp(state.radiance, float3(0.0, 0.0, 0.0), float3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE));
 }
 
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
