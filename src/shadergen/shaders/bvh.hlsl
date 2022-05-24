@@ -250,7 +250,7 @@ bool bvh_find_hit_closest(in RayInfo ray, out Hit_info hit)
             continue;
         }
 
-        if (t_max != FLOAT_MAX)
+        if (t_max != ray.tmax)
         {
             hit.pos = ray.origin + ray.dir * t_max;
             return true;
