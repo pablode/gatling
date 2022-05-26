@@ -107,13 +107,17 @@ float4 pcg4d_next(inout uint4 rng_state)
 
 // From: "A Fast and Robust Method for Avoiding Self-Intersection"
 // Wächter and Binder, Ch. 6 in Ray Tracing Gems I.
-float3 offset_ray_origin(float3 p, float3 n)
+float3 offset_ray_origin(float3 p, float3 geom_normal)
 {
-    const float ORIGIN = 1.0 / 32.0;
-    const float FLOAT_SCALE = 1.0 / 65536.0;
-    const float INT_SCALE = 256.0;
+    const float origin = 1.0 / 32.0;
+    const float float_scale = 1.0 / 65536.0;
+    const float int_scale = 256.0;
 
-    int3 of_i = int3(INT_SCALE * n.x, INT_SCALE * n.y, INT_SCALE * n.z);
+    int3 of_i = int3(
+        int_scale * geom_normal.x,
+        int_scale * geom_normal.y,
+        int_scale * geom_normal.z
+    );
 
     float3 p_i = float3(
         asfloat(asint(p.x) + ((p.x < 0.0) ? -of_i.x : of_i.x)),
@@ -122,8 +126,8 @@ float3 offset_ray_origin(float3 p, float3 n)
     );
 
     return float3(
-        abs(p.x) < ORIGIN ? (p.x + FLOAT_SCALE * n.x) : p_i.x,
-        abs(p.y) < ORIGIN ? (p.y + FLOAT_SCALE * n.y) : p_i.y,
-        abs(p.z) < ORIGIN ? (p.z + FLOAT_SCALE * n.z) : p_i.z
+        abs(p.x) < origin ? (p.x + float_scale * geom_normal.x) : p_i.x,
+        abs(p.y) < origin ? (p.y + float_scale * geom_normal.y) : p_i.y,
+        abs(p.z) < origin ? (p.z + float_scale * geom_normal.z) : p_i.z
     );
 }

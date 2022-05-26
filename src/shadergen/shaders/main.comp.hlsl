@@ -122,9 +122,9 @@ float3 evaluate_sample(inout uint4 rng_state,
             float4 random4 = pcg4d_next(state.rng_state);
 
             uint light_idx = min(EMISSIVE_FACE_COUNT - 1, uint(random4.x * float(EMISSIVE_FACE_COUNT)));
-            uint face_index = emissive_face_indices[light_idx];
+            uint lface_index = emissive_face_indices[light_idx];
 
-            face fl = faces[face_index];
+            face fl = faces[lface_index];
             float3 pl_0 = vertices[fl.v_0].field1.xyz;
             float3 pl_1 = vertices[fl.v_1].field1.xyz;
             float3 pl_2 = vertices[fl.v_2].field1.xyz;
@@ -140,18 +140,21 @@ float3 evaluate_sample(inout uint4 rng_state,
              * it would be infinitely thin - and would therefore have no emissive area. */
             float3 to_light = P - hit_pos;
 
-            bool is_orthogonal = dot(geom_normal, to_light) == 0.0;
+            float3 lgeom_normal = normalize(cross(pl_1 - pl_0, pl_2 - pl_0));
+            if (dot(lgeom_normal, to_light) > 0.0) { lgeom_normal *= -1.0f; }
+
+            bool is_orthogonal = dot(lgeom_normal, to_light) == 0.0;
 
             float light_dist = length(to_light);
 
             if (light_dist > 0.0 && !is_orthogonal)
             {
                 to_light /= light_dist;
-                float3 hit_offset = offset_ray_origin(hit_pos, to_light);
-                float3 light_offset = offset_ray_origin(P, -to_light);
+                float3 hit_offset = offset_ray_origin(hit_pos, geom_normal);
+                float3 light_offset = offset_ray_origin(P, lgeom_normal);
 
                 ray.origin = hit_offset;
-                ray.dir = to_light;
+                ray.dir = normalize(light_offset - hit_offset);
                 ray.tmax = length(light_offset - hit_offset);
                 bool is_occluded = find_hit_any(ray);
 
