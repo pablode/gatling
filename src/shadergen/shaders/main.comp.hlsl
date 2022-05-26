@@ -86,8 +86,34 @@ float3 evaluate_sample(inout uint4 rng_state,
             break;
         }
 
+        /* Calculate hit point properties. */
         float3 bc = float3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
-        float3 hit_pos = bc.x * p0 + bc.y * p1 + bc.z * p2;
+
+        face f = faces[hit.face_idx];
+        fvertex v_0 = vertices[f.v_0];
+        fvertex v_1 = vertices[f.v_1];
+        fvertex v_2 = vertices[f.v_2];
+
+        float3 p_0 = v_0.field1.xyz;
+        float3 p_1 = v_1.field1.xyz;
+        float3 p_2 = v_2.field1.xyz;
+
+        float3 n_0 = v_0.field2.xyz;
+        float3 n_1 = v_1.field2.xyz;
+        float3 n_2 = v_2.field2.xyz;
+
+        float3 hit_pos = bc.x * p_0 + bc.y * p_1 + bc.z * p_2;
+
+        float3 geom_normal = normalize(cross(p_1 - p_0, p_2 - p_0));
+        if (dot(geom_normal, state.ray_dir) > 0.0) { geom_normal *= -1.0f; }
+
+        float3 normal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
+        if (dot(normal, state.ray_dir) > 0.0) { normal *= -1.0f; }
+
+#if AOV_ID == AOV_ID_NORMAL
+        state.radiance = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
+        break;
+#endif
 
         /* NEE */
 #ifdef NEXT_EVENT_ESTIMATION
@@ -98,27 +124,21 @@ float3 evaluate_sample(inout uint4 rng_state,
             uint light_idx = min(EMISSIVE_FACE_COUNT - 1, uint(random4.x * float(EMISSIVE_FACE_COUNT)));
             uint face_index = emissive_face_indices[light_idx];
 
-            face f = faces[face_index];
-            fvertex v0 = vertices[f.v_0];
-            fvertex v1 = vertices[f.v_1];
-            fvertex v2 = vertices[f.v_2];
-
-            float3 p0 = v0.field1.xyz;
-            float3 p1 = v1.field1.xyz;
-            float3 p2 = v2.field1.xyz;
+            face fl = faces[face_index];
+            float3 pl_0 = vertices[fl.v_0].field1.xyz;
+            float3 pl_1 = vertices[fl.v_1].field1.xyz;
+            float3 pl_2 = vertices[fl.v_2].field1.xyz;
 
             /* Sample point on light surface.
              * See: Ray Tracing Gems Chapter 16: Sampling Transformations Zoo 16.5.2.1 */
             float beta = 1.0 - sqrt(random4.y);
             float gamma = (1.0 - beta) * random4.z;
             float alpha = 1.0 - beta - gamma;
-            float3 P = alpha * p0 + beta * p1 + gamma * p2;
+            float3 P = alpha * pl_0 + beta * pl_1 + gamma * pl_2;
 
             /* Don't continue if we are on the same plane as the triangle. Seen from the side,
              * it would be infinitely thin - and would therefore have no emissive area. */
             float3 to_light = P - hit_pos;
-
-            float3 geom_normal = normalize(cross(p1 - p0, p2 - p0));
 
             bool is_orthogonal = dot(geom_normal, to_light) == 0.0;
 
@@ -148,43 +168,10 @@ float3 evaluate_sample(inout uint4 rng_state,
 #endif
 
         {
-            face f = faces[hit.face_idx];
-            fvertex v_0 = vertices[f.v_0];
-            fvertex v_1 = vertices[f.v_1];
-            fvertex v_2 = vertices[f.v_2];
-
-            /* Geometric normal. */
-            float3 p_0 = v_0.field1.xyz;
-            float3 p_1 = v_1.field1.xyz;
-            float3 p_2 = v_2.field1.xyz;
-            float3 geom_normal = normalize(cross(p_1 - p_0, p_2 - p_0));
-
-            /* Shading normal. */
-            float3 n_0 = v_0.field2.xyz;
-            float3 n_1 = v_1.field2.xyz;
-            float3 n_2 = v_2.field2.xyz;
-
-            float3 normal = normalize(n_0 * bc.x + n_1 * bc.y + n_2 * bc.z);
-
-        #if AOV_ID == AOV_ID_NORMAL
-            state.radiance = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
-            break;
-        #endif
-
             /* Tangent and bitangent. */
             float3 L = abs(normal.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
             float3 tangent = normalize(cross(L, normal));
             float3 bitangent = cross(normal, tangent);
-
-            /* Flip normals to side of incident ray. */
-            if (dot(geom_normal, state.ray_dir) > 0.0)
-            {
-                geom_normal *= -1.0f;
-            }
-            if (dot(normal, state.ray_dir) > 0.0)
-            {
-                normal *= -1.0f;
-            }
 
             /* EDF evaluation. */
             Shading_state_material shading_state_material;
