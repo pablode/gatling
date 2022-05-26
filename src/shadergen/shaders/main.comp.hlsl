@@ -136,36 +136,24 @@ float3 evaluate_sample(inout uint4 rng_state,
             float alpha = 1.0 - beta - gamma;
             float3 P = alpha * pl_0 + beta * pl_1 + gamma * pl_2;
 
-            /* Don't continue if we are on the same plane as the triangle. Seen from the side,
-             * it would be infinitely thin - and would therefore have no emissive area. */
             float3 to_light = P - hit_pos;
-
             float3 lgeom_normal = normalize(cross(pl_1 - pl_0, pl_2 - pl_0));
             if (dot(lgeom_normal, to_light) > 0.0) { lgeom_normal *= -1.0f; }
 
-            bool is_orthogonal = dot(lgeom_normal, to_light) == 0.0;
+            float3 hit_offset = offset_ray_origin(hit_pos, geom_normal);
+            float3 light_offset = offset_ray_origin(P, lgeom_normal);
 
+            to_light = light_offset - hit_offset;
             float light_dist = length(to_light);
 
-            if (light_dist > 0.0 && !is_orthogonal)
-            {
-                to_light /= light_dist;
-                float3 hit_offset = offset_ray_origin(hit_pos, geom_normal);
-                float3 light_offset = offset_ray_origin(P, lgeom_normal);
+            ray.origin = hit_offset;
+            ray.dir = (light_offset - hit_offset) / light_dist;
+            ray.tmax = light_dist;
+            bool is_occluded = find_hit_any(ray);
 
-                ray.origin = hit_offset;
-                ray.dir = normalize(light_offset - hit_offset);
-                ray.tmax = length(light_offset - hit_offset);
-                bool is_occluded = find_hit_any(ray);
-
-                /* Occlusion debug visualization. */
 #if AOV_ID == AOV_ID_DEBUG_NEE
-                state.radiance = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
-                break;
-#endif
-            }
-#if AOV_ID == AOV_ID_DEBUG_NEE
-            state.radiance = float3(0.0, 0.0, 0.0);
+            /* Occlusion debug visualization. */
+            state.radiance = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
             break;
 #endif
         }
