@@ -1,20 +1,16 @@
 /* Möller-Trumbore triangle intersection. */
 bool test_face(
-    in float3 ray_origin,
-    in float3 ray_dir,
-    in float t_max,
-    in uint face_index,
+    in RayInfo ray,
+    in float3 p0,
+    in float3 p1,
+    in float3 p2,
     out float t,
     out float2 bc)
 {
-    face f = faces[face_index];
-    float3 p0 = vertices[f.v_0].field1.xyz;
-    float3 p1 = vertices[f.v_1].field1.xyz;
-    float3 p2 = vertices[f.v_2].field1.xyz;
     float3 e1 = p1 - p0;
     float3 e2 = p2 - p0;
 
-    float3 p = cross(ray_dir, e2);
+    float3 p = cross(ray.dir, e2);
     float det = dot(e1, p);
 
     if (abs(det) < TRI_EPS) {
@@ -22,7 +18,7 @@ bool test_face(
     }
 
     float inv_det = 1.0 / det;
-    float3 tvec = ray_origin - p0;
+    float3 tvec = ray.origin - p0;
 
     bc.x = dot(tvec, p) * inv_det;
     if (bc.x < 0.0 || bc.x > 1.0) {
@@ -30,14 +26,13 @@ bool test_face(
     }
 
     float3 q = cross(tvec, e1);
-    bc.y = dot(ray_dir, q) * inv_det;
+    bc.y = dot(ray.dir, q) * inv_det;
     if (bc.y < 0.0 || (bc.x + bc.y > 1.0)) {
         return false;
     }
 
     t = dot(e2, q) * inv_det;
-
-    if (t <= 0.0 || t >= t_max) {
+    if (t <= 0.0 || t >= ray.tmax) {
         return false;
     }
 
@@ -63,9 +58,8 @@ float4 uint_unpack_float4(uint u)
   return float4(extract_byte(u, 0), extract_byte(u, 1), extract_byte(u, 2), extract_byte(u, 3));
 }
 
-bool find_hit_closest(in RayInfo ray, out Hit_info hit)
+bool find_hit_closest(inout RayInfo ray, out Hit_info hit)
 {
-    float t_max = ray.tmax;
     float3 inv_dir = 1.0 / ray.dir;
 
     uint3 oct_inv = uint3(
@@ -80,6 +74,7 @@ bool find_hit_closest(in RayInfo ray, out Hit_info hit)
     uint2 stack[MAX_STACK_SIZE];
     uint stack_size = 0;
 
+    hit.face_idx = 0xFFFFFFFF;
 #if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
     hit.bvh_steps = 0;
 #elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
@@ -167,7 +162,7 @@ bool find_hit_closest(in RayInfo ray, out Hit_info hit)
                 for (uint child_idx = 0; child_idx < 4; ++child_idx)
                 {
                     float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], 0.0));
-                    float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], t_max));
+                    float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], ray.tmax));
 
                     bool is_intersected = bmin <= bmax;
 
@@ -216,21 +211,18 @@ bool find_hit_closest(in RayInfo ray, out Hit_info hit)
 
             uint face_index = face_group.x + face_rel_index;
 
+            face f = faces[face_index];
+            float3 p0 = vertices[f.v_0].field1.xyz;
+            float3 p1 = vertices[f.v_1].field1.xyz;
+            float3 p2 = vertices[f.v_2].field1.xyz;
+
             float temp_t;
             float2 temp_bc;
-
-            bool has_hit = test_face(
-                ray.origin,
-                ray.dir,
-                t_max,
-                face_index,
-                temp_t,
-                temp_bc
-            );
+            bool has_hit = test_face(ray, p0, p1, p2, temp_t, temp_bc);
 
             if (has_hit)
             {
-                t_max = temp_t;
+                ray.tmax = temp_t;
                 hit.bc = temp_bc;
                 hit.face_idx = face_index;
             }
@@ -252,9 +244,9 @@ bool find_hit_closest(in RayInfo ray, out Hit_info hit)
             continue;
         }
 
-        if (t_max != ray.tmax)
+        if (hit.face_idx != 0xFFFFFFFF)
         {
-            hit.pos = ray.origin + ray.dir * t_max;
+            hit.pos = ray.origin + ray.dir * ray.tmax;
             return true;
         }
 
@@ -264,7 +256,6 @@ bool find_hit_closest(in RayInfo ray, out Hit_info hit)
 
 bool find_hit_any(in RayInfo ray)
 {
-  float t_max = ray.tmax;
   float3 inv_dir = 1.0 / ray.dir;
 
   uint3 oct_inv = uint3(
@@ -353,7 +344,7 @@ bool find_hit_any(in RayInfo ray)
         for (uint child_idx = 0; child_idx < 4; ++child_idx)
         {
           float bmin = max(max(t_min_x[child_idx], t_min_y[child_idx]), max(t_min_z[child_idx], 0.0));
-          float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], t_max));
+          float bmax = min(min(t_max_x[child_idx], t_max_y[child_idx]), min(t_max_z[child_idx], ray.tmax));
 
           bool is_intersected = bmin <= bmax;
 
@@ -392,19 +383,14 @@ bool find_hit_any(in RayInfo ray)
 
       face_group.y &= ~(1u << face_rel_index);
 
-      uint face_index = face_group.x + face_rel_index;
+      face f = faces[face_group.x + face_rel_index];
+      float3 p0 = vertices[f.v_0].field1.xyz;
+      float3 p1 = vertices[f.v_1].field1.xyz;
+      float3 p2 = vertices[f.v_2].field1.xyz;
 
       float temp_t;
       float2 temp_bc;
-
-      bool has_hit = test_face(
-        ray.origin,
-        ray.dir,
-        t_max,
-        face_index,
-        temp_t,
-        temp_bc
-      );
+      bool has_hit = test_face(ray, p0, p1, p2, temp_t, temp_bc);
 
       if (has_hit)
       {
@@ -432,24 +418,21 @@ bool find_hit_any(in RayInfo ray)
 
 bool find_hit_closest(in RayInfo ray, out Hit_info hit)
 {
-  float t_max = ray.tmax;
+  hit.face_idx = 0xFFFFFFFF;
 #if AOV_ID == AOV_ID_DEBUG_TRI_TESTS
   hit.tri_tests = 0;
 #endif
 
   for (int face_index = 0; face_index < FACE_COUNT; face_index++)
   {
-    float t_tmp;
-    float2 bc_tmp;
+    face f = faces[face_index];
+    float3 p0 = vertices[f.v_0].field1.xyz;
+    float3 p1 = vertices[f.v_1].field1.xyz;
+    float3 p2 = vertices[f.v_2].field1.xyz;
 
-    bool has_hit = test_face(
-      ray.origin,
-      ray.dir,
-      t_max,
-      face_index,
-      t_tmp,
-      bc_tmp
-    );
+    float temp_t;
+    float2 temp_bc;
+    bool has_hit = test_face(ray, p0, p1, p2, temp_t, temp_bc);
 
 #if AOV_ID == AOV_ID_DEBUG_TRI_TESTS
     hit.tri_tests++;
@@ -457,18 +440,18 @@ bool find_hit_closest(in RayInfo ray, out Hit_info hit)
 
     if (has_hit)
     {
-      t_max = t_tmp;
-      hit.bc = bc_tmp;
+      ray.tmax = temp_t;
+      hit.bc = temp_bc;
       hit.face_idx = face_index;
     }
   }
 
-  if (t_max == ray.tmax)
+  if (hit.face_idx == 0xFFFFFFFF)
   {
     return false;
   }
 
-  hit.pos = ray.origin + ray.dir * t_max;
+  hit.pos = ray.origin + ray.dir * ray.tmax;
   return true;
 }
 
@@ -476,17 +459,14 @@ bool find_hit_any(in RayInfo ray)
 {
   for (int face_index = 0; face_index < FACE_COUNT; face_index++)
   {
-    float t_tmp;
-    float2 bc_tmp;
+    face f = faces[face_index];
+    float3 p0 = vertices[f.v_0].field1.xyz;
+    float3 p1 = vertices[f.v_1].field1.xyz;
+    float3 p2 = vertices[f.v_2].field1.xyz;
 
-    bool has_hit = test_face(
-      ray.origin,
-      ray.dir,
-      ray.tmax,
-      face_index,
-      t_tmp,
-      bc_tmp
-    );
+    float temp_t;
+    float2 temp_bc;
+    bool has_hit = test_face(ray, p0, p1, p2, temp_t, temp_bc);
 
     if (has_hit)
     {
