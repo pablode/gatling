@@ -61,7 +61,7 @@ float3 evaluate_sample(inout uint4 rng_state,
     state.radiance   = float3(0.0, 0.0, 0.0);
     state.rng_state  = rng_state;
 
-    for (uint bounce = 0; bounce < (PC.MAX_BOUNCES + 1); bounce++)
+    for (uint bounce = 1; bounce <= PC.MAX_BOUNCES; bounce++)
     {
         RayInfo ray;
         ray.origin = state.ray_origin;
@@ -161,11 +161,17 @@ float3 evaluate_sample(inout uint4 rng_state,
                 break;
 #endif
             }
-        }
-#elif AOV_ID == AOV_ID_DEBUG_NEE
-        state.radiance = float3(0.0, 0.0, 0.0);
-        break;
+#if AOV_ID == AOV_ID_DEBUG_NEE
+            state.radiance = float3(0.0, 0.0, 0.0);
+            break;
 #endif
+        }
+#endif
+
+        if (bounce == PC.MAX_BOUNCES)
+        {
+            break;
+        }
 
         {
             /* Tangent and bitangent. */
