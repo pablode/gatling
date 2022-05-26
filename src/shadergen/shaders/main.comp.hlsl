@@ -86,6 +86,9 @@ float3 evaluate_sample(inout uint4 rng_state,
             break;
         }
 
+        float3 bc = float3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
+        float3 hit_pos = bc.x * p0 + bc.y * p1 + bc.z * p2;
+
         /* NEE */
 #ifdef NEXT_EVENT_ESTIMATION
         {
@@ -113,7 +116,7 @@ float3 evaluate_sample(inout uint4 rng_state,
 
             /* Don't continue if we are on the same plane as the triangle. Seen from the side,
              * it would be infinitely thin - and would therefore have no emissive area. */
-            float3 to_light = P - hit.pos;
+            float3 to_light = P - hit_pos;
 
             float3 geom_normal = normalize(cross(p1 - p0, p2 - p0));
 
@@ -124,7 +127,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             if (light_dist > 0.0 && !is_orthogonal)
             {
                 to_light /= light_dist;
-                float3 hit_offset = offset_ray_origin(hit.pos, to_light);
+                float3 hit_offset = offset_ray_origin(hit_pos, to_light);
                 float3 light_offset = offset_ray_origin(P, -to_light);
 
                 ray.origin = hit_offset;
@@ -161,12 +164,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             float3 n_1 = v_1.field2.xyz;
             float3 n_2 = v_2.field2.xyz;
 
-            float2 bc = hit.bc;
-            float3 normal = normalize(
-                n_0 * (1.0 - bc.x - bc.y) +
-                n_1 * bc.x +
-                n_2 * bc.y
-            );
+            float3 normal = normalize(n_0 * bc.x + n_1 * bc.y + n_2 * bc.z);
 
         #if AOV_ID == AOV_ID_NORMAL
             state.radiance = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
@@ -192,7 +190,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             Shading_state_material shading_state_material;
             shading_state_material.normal = normal;
             shading_state_material.geom_normal = geom_normal;
-            shading_state_material.position = hit.pos;
+            shading_state_material.position = hit_pos;
             shading_state_material.tangent_u[0] = tangent;
             shading_state_material.tangent_v[0] = bitangent;
             shading_state_material.animation_time = 0.0;
@@ -227,7 +225,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             bool is_transmission = ((bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0);
 
             state.ray_dir = bsdf_sample_data.k2;
-            state.ray_origin = offset_ray_origin(hit.pos, geom_normal * (is_transmission ? -1.0 : 1.0));
+            state.ray_origin = offset_ray_origin(hit_pos, geom_normal * (is_transmission ? -1.0 : 1.0));
         }
 
         if (bounce >= PC.RR_BOUNCE_OFFSET)

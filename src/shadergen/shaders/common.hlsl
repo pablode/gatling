@@ -47,7 +47,6 @@ struct RayInfo
 
 struct Hit_info
 {
-    float3 pos;
     uint face_idx;
     float2 bc;
 #if AOV_ID == AOV_ID_DEBUG_BVH_STEPS

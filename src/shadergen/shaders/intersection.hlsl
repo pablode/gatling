@@ -225,7 +225,6 @@ bool find_hit_closest(inout RayInfo ray, out Hit_info hit)
                 ray.tmax = temp_t;
                 hit.bc = temp_bc;
                 hit.face_idx = face_index;
-                hit.pos = (1.0 - temp_bc.x - temp_bc.y) * p0 + temp_bc.x * p1 + temp_bc.y * p2;
             }
 
 #if AOV_ID == AOV_ID_DEBUG_TRI_TESTS
@@ -443,7 +442,6 @@ bool find_hit_closest(in RayInfo ray, out Hit_info hit)
       ray.tmax = temp_t;
       hit.bc = temp_bc;
       hit.face_idx = face_index;
-      hit.pos = (1.0 - temp_bc.x - temp_bc.y) * p0 + temp_bc.x * p1 + temp_bc.y * p2;
     }
   }
 
