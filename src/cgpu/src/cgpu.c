@@ -2220,7 +2220,8 @@ CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_idevice* idevice,
     const cgpu_shader_reflection_resource* res_refl = &reflection->resources[i];
 
     VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    if (res_refl->descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+    if (res_refl->descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+        res_refl->descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
       new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
