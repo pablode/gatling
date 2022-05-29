@@ -12,6 +12,17 @@ add_library(
   src/mmap.c
 )
 
+set_target_properties(
+  imgio
+  PROPERTIES
+    LINKER_LANGUAGE C
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+    # Required since library is linked into hdGatling DSO
+    POSITION_INDEPENDENT_CODE ON
+)
+
 target_include_directories(
   imgio
   PUBLIC
