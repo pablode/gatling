@@ -159,8 +159,9 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   /* We don't support single-node BVHs, as this requires special handling in the traversal algorithm.
    * Instead, we make sure the number of triangles exceeds the root node's maximum, requiring a child node. */
   uint32_t bvh_tri_threshold = std::max(4u, params->bvh_tri_threshold);
+  bool bvh_enabled = (params->face_count >= bvh_tri_threshold);
 
-  if (params->face_count >= bvh_tri_threshold)
+  if (bvh_enabled)
   {
     float node_traversal_cost = 1.0f;
     float face_intersection_cost = 0.3f;
@@ -175,7 +176,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     bvh_params.vertex_count = params->vertex_count;
     bvh_params.vertices = params->vertices;
 
-    gi::bvh::Bvh2 bvh = gi::bvh::build_bvh2_embree(bvh_params);
+    gi::bvh::Bvh2 bvh2 = gi::bvh::build_bvh2_embree(bvh_params);
 #else
     gi::bvh::BvhBuildParams bvh_params;
     bvh_params.face_batch_size = 1;
@@ -191,7 +192,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     bvh_params.vertex_count = params->vertex_count;
     bvh_params.vertices = params->vertices;
 
-    gi::bvh::Bvh2 bvh = gi::bvh::build_bvh2(bvh_params);
+    gi::bvh::Bvh2 bvh2 = gi::bvh::build_bvh2(bvh_params);
 #endif
 
     gi::bvh::CollapseParams bvh8_params;
@@ -199,7 +200,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     bvh8_params.node_traversal_cost = node_traversal_cost;
     bvh8_params.face_intersection_cost = face_intersection_cost;
 
-    if (!gi::bvh::collapse_bvh2(bvh, bvh8_params, bvh8))
+    if (!gi::bvh::collapse_bvh2(bvh2, bvh8_params, bvh8))
     {
       return nullptr;
     }
@@ -207,8 +208,8 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     bvh8c = gi::bvh::compress_bvh8(bvh8);
   }
 
-  uint32_t face_count = params->face_count;
-  const gi_face* faces = bvh8.faces.size() > 0 ? bvh8.faces.data() : params->faces;
+  uint32_t face_count = bvh_enabled ? bvh8.faces.size() : params->face_count;
+  const gi_face* faces = bvh_enabled ? bvh8.faces.data() : params->faces;
 
   /* Build list of emissive faces. */
   std::vector<uint32_t> emissive_face_indices;

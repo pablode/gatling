@@ -1102,12 +1102,12 @@ namespace impl
 
       gml_aabb_make_from_triangle(v_a.pos, v_b.pos, v_c.pos, &face_ref.aabb);
 
-      bool is_tri_degenerate =
+      bool is_one_dimensional =
         (face_ref.aabb.min[0] == face_ref.aabb.max[0] && face_ref.aabb.min[1] == face_ref.aabb.max[1]) ||
         (face_ref.aabb.min[1] == face_ref.aabb.max[1] && face_ref.aabb.min[2] == face_ref.aabb.max[2]) ||
         (face_ref.aabb.min[2] == face_ref.aabb.max[2] && face_ref.aabb.min[0] == face_ref.aabb.max[0]);
 
-      if (is_tri_degenerate)
+      if (is_one_dimensional)
       {
         continue;
       }
