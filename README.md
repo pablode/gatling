@@ -102,11 +102,11 @@ Ingo Wald. 2007. On fast Construction of SAH-based Bounding Volume Hierarchies. 
 
 ### License
 
-Gatling is licensed under the GPL v3, as included in the [LICENSE](LICENSE) file.
+Gatling is licensed under the GNU General Public License, as included in the [LICENSE](LICENSE) file.
 
 ```
 
-    Copyright (C) 2021 Pablo Delgado Krämer
+    Copyright (C) 2019-2022 Pablo Delgado Krämer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
