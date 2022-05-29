@@ -96,7 +96,7 @@ endif()
 #
 # miniz
 #
-set(BUILD_SHARED_LIBS OFF CACHE PATH "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(miniz)
 
 #
