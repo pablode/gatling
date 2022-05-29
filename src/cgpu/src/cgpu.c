@@ -133,8 +133,7 @@ static VkMemoryPropertyFlags cgpu_translate_memory_properties(CgpuMemoryProperty
   return mem_flags;
 }
 
-static VkAccessFlags cgpu_translate_access_flags(
-  CgpuMemoryAccessFlags flags)
+static VkAccessFlags cgpu_translate_access_flags(CgpuMemoryAccessFlags flags)
 {
   VkAccessFlags vk_flags = 0;
   if ((flags & CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ) == CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ) {
@@ -195,9 +194,8 @@ static CgpuSampleCountFlags cgpu_translate_sample_count_flags(
   return flags;
 }
 
-static cgpu_physical_device_limits cgpu_translate_physical_device_limits(
-  VkPhysicalDeviceLimits vk_limits,
-  VkPhysicalDeviceSubgroupProperties vk_subgroup_props)
+static cgpu_physical_device_limits cgpu_translate_physical_device_limits(VkPhysicalDeviceLimits vk_limits,
+                                                                         VkPhysicalDeviceSubgroupProperties vk_subgroup_props)
 {
   cgpu_physical_device_limits limits;
   limits.maxImageDimension1D = vk_limits.maxImageDimension1D;
@@ -286,26 +284,16 @@ static cgpu_physical_device_limits cgpu_translate_physical_device_limits(
   limits.maxFramebufferWidth = vk_limits.maxFramebufferWidth;
   limits.maxFramebufferHeight = vk_limits.maxFramebufferHeight;
   limits.maxFramebufferLayers = vk_limits.maxFramebufferLayers;
-  limits.framebufferColorSampleCounts =
-      cgpu_translate_sample_count_flags(vk_limits.framebufferColorSampleCounts);
-  limits.framebufferDepthSampleCounts =
-      cgpu_translate_sample_count_flags(vk_limits.framebufferDepthSampleCounts);
-  limits.framebufferStencilSampleCounts = cgpu_translate_sample_count_flags(
-      vk_limits.framebufferStencilSampleCounts);
-  limits.framebufferNoAttachmentsSampleCounts =
-      cgpu_translate_sample_count_flags(
-          vk_limits.framebufferNoAttachmentsSampleCounts);
+  limits.framebufferColorSampleCounts = cgpu_translate_sample_count_flags(vk_limits.framebufferColorSampleCounts);
+  limits.framebufferDepthSampleCounts = cgpu_translate_sample_count_flags(vk_limits.framebufferDepthSampleCounts);
+  limits.framebufferStencilSampleCounts = cgpu_translate_sample_count_flags(vk_limits.framebufferStencilSampleCounts);
+  limits.framebufferNoAttachmentsSampleCounts = cgpu_translate_sample_count_flags(vk_limits.framebufferNoAttachmentsSampleCounts);
   limits.maxColorAttachments = vk_limits.maxColorAttachments;
-  limits.sampledImageColorSampleCounts = cgpu_translate_sample_count_flags(
-      vk_limits.sampledImageColorSampleCounts);
-  limits.sampledImageIntegerSampleCounts = cgpu_translate_sample_count_flags(
-      vk_limits.sampledImageIntegerSampleCounts);
-  limits.sampledImageDepthSampleCounts = cgpu_translate_sample_count_flags(
-      vk_limits.sampledImageDepthSampleCounts);
-  limits.sampledImageStencilSampleCounts = cgpu_translate_sample_count_flags(
-      vk_limits.sampledImageStencilSampleCounts);
-  limits.storageImageSampleCounts =
-      cgpu_translate_sample_count_flags(vk_limits.storageImageSampleCounts);
+  limits.sampledImageColorSampleCounts = cgpu_translate_sample_count_flags(vk_limits.sampledImageColorSampleCounts);
+  limits.sampledImageIntegerSampleCounts = cgpu_translate_sample_count_flags(vk_limits.sampledImageIntegerSampleCounts);
+  limits.sampledImageDepthSampleCounts = cgpu_translate_sample_count_flags(vk_limits.sampledImageDepthSampleCounts);
+  limits.sampledImageStencilSampleCounts = cgpu_translate_sample_count_flags(vk_limits.sampledImageStencilSampleCounts);
+  limits.storageImageSampleCounts = cgpu_translate_sample_count_flags(vk_limits.storageImageSampleCounts);
   limits.maxSampleMaskWords = vk_limits.maxSampleMaskWords;
   limits.timestampComputeAndGraphics = vk_limits.timestampComputeAndGraphics;
   limits.timestampPeriod = vk_limits.timestampPeriod;
@@ -324,294 +312,261 @@ static cgpu_physical_device_limits cgpu_translate_physical_device_limits(
   return limits;
 }
 
-static VkFormat cgpu_translate_image_format(
-  CgpuImageFormat image_format)
+static VkFormat cgpu_translate_image_format(CgpuImageFormat image_format)
 {
-  if (image_format == CGPU_IMAGE_FORMAT_UNDEFINED) { return VK_FORMAT_UNDEFINED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R4G4_UNORM_PACK8) { return VK_FORMAT_R4G4_UNORM_PACK8; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R4G4B4A4_UNORM_PACK16) { return VK_FORMAT_R4G4B4A4_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B4G4R4A4_UNORM_PACK16) { return VK_FORMAT_B4G4R4A4_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R5G6B5_UNORM_PACK16) { return VK_FORMAT_R5G6B5_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B5G6R5_UNORM_PACK16) { return VK_FORMAT_B5G6R5_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R5G5B5A1_UNORM_PACK16) { return VK_FORMAT_R5G5B5A1_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B5G5R5A1_UNORM_PACK16) { return VK_FORMAT_B5G5R5A1_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A1R5G5B5_UNORM_PACK16) { return VK_FORMAT_A1R5G5B5_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8_UNORM) { return VK_FORMAT_R8_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8_SNORM) { return VK_FORMAT_R8_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8_USCALED) { return VK_FORMAT_R8_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8_SSCALED) { return VK_FORMAT_R8_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8_UINT) { return VK_FORMAT_R8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8_SINT) { return VK_FORMAT_R8_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8_SRGB) { return VK_FORMAT_R8_SRGB; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8_UNORM) { return VK_FORMAT_R8G8_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8_SNORM) { return VK_FORMAT_R8G8_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8_USCALED) { return VK_FORMAT_R8G8_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8_SSCALED) { return VK_FORMAT_R8G8_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8_UINT) { return VK_FORMAT_R8G8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8_SINT) { return VK_FORMAT_R8G8_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8_SRGB) { return VK_FORMAT_R8G8_SRGB; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8_UNORM) { return VK_FORMAT_R8G8B8_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8_SNORM) { return VK_FORMAT_R8G8B8_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8_USCALED) { return VK_FORMAT_R8G8B8_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8_SSCALED) { return VK_FORMAT_R8G8B8_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8_UINT) { return VK_FORMAT_R8G8B8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8_SINT) { return VK_FORMAT_R8G8B8_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8_SRGB) { return VK_FORMAT_R8G8B8_SRGB; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8_UNORM) { return VK_FORMAT_B8G8R8_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8_SNORM) { return VK_FORMAT_B8G8R8_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8_USCALED) { return VK_FORMAT_B8G8R8_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8_SSCALED) { return VK_FORMAT_B8G8R8_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8_UINT) { return VK_FORMAT_B8G8R8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8_SINT) { return VK_FORMAT_B8G8R8_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8_SRGB) { return VK_FORMAT_B8G8R8_SRGB; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM) { return VK_FORMAT_R8G8B8A8_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8A8_SNORM) { return VK_FORMAT_R8G8B8A8_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8A8_USCALED) { return VK_FORMAT_R8G8B8A8_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8A8_SSCALED) { return VK_FORMAT_R8G8B8A8_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8A8_UINT) { return VK_FORMAT_R8G8B8A8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8A8_SINT) { return VK_FORMAT_R8G8B8A8_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R8G8B8A8_SRGB) { return VK_FORMAT_R8G8B8A8_SRGB; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8A8_UNORM) { return VK_FORMAT_B8G8R8A8_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8A8_SNORM) { return VK_FORMAT_B8G8R8A8_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8A8_USCALED) { return VK_FORMAT_B8G8R8A8_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8A8_SSCALED) { return VK_FORMAT_B8G8R8A8_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8A8_UINT) { return VK_FORMAT_B8G8R8A8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8A8_SINT) { return VK_FORMAT_B8G8R8A8_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8A8_SRGB) { return VK_FORMAT_B8G8R8A8_SRGB; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A8B8G8R8_UNORM_PACK32) { return VK_FORMAT_A8B8G8R8_UNORM_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A8B8G8R8_SNORM_PACK32) { return VK_FORMAT_A8B8G8R8_SNORM_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A8B8G8R8_USCALED_PACK32) { return VK_FORMAT_A8B8G8R8_USCALED_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A8B8G8R8_SSCALED_PACK32) { return VK_FORMAT_A8B8G8R8_SSCALED_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A8B8G8R8_UINT_PACK32) { return VK_FORMAT_A8B8G8R8_UINT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A8B8G8R8_SINT_PACK32) { return VK_FORMAT_A8B8G8R8_SINT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A8B8G8R8_SRGB_PACK32) { return VK_FORMAT_A8B8G8R8_SRGB_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32) { return VK_FORMAT_A2R10G10B10_UNORM_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2R10G10B10_SNORM_PACK32) { return VK_FORMAT_A2R10G10B10_SNORM_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2R10G10B10_USCALED_PACK32) { return VK_FORMAT_A2R10G10B10_USCALED_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2R10G10B10_SSCALED_PACK32) { return VK_FORMAT_A2R10G10B10_SSCALED_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2R10G10B10_UINT_PACK32) { return VK_FORMAT_A2R10G10B10_UINT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2R10G10B10_SINT_PACK32) { return VK_FORMAT_A2R10G10B10_SINT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32) { return VK_FORMAT_A2B10G10R10_UNORM_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2B10G10R10_SNORM_PACK32) { return VK_FORMAT_A2B10G10R10_SNORM_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2B10G10R10_USCALED_PACK32) { return VK_FORMAT_A2B10G10R10_USCALED_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2B10G10R10_SSCALED_PACK32) { return VK_FORMAT_A2B10G10R10_SSCALED_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2B10G10R10_UINT_PACK32) { return VK_FORMAT_A2B10G10R10_UINT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_A2B10G10R10_SINT_PACK32) { return VK_FORMAT_A2B10G10R10_SINT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16_UNORM) { return VK_FORMAT_R16_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16_SNORM) { return VK_FORMAT_R16_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16_USCALED) { return VK_FORMAT_R16_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16_SSCALED) { return VK_FORMAT_R16_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16_UINT) { return VK_FORMAT_R16_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16_SINT) { return VK_FORMAT_R16_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16_SFLOAT) { return VK_FORMAT_R16_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16_UNORM) { return VK_FORMAT_R16G16_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16_SNORM) { return VK_FORMAT_R16G16_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16_USCALED) { return VK_FORMAT_R16G16_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16_SSCALED) { return VK_FORMAT_R16G16_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16_UINT) { return VK_FORMAT_R16G16_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16_SINT) { return VK_FORMAT_R16G16_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16_SFLOAT) { return VK_FORMAT_R16G16_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16_UNORM) { return VK_FORMAT_R16G16B16_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16_SNORM) { return VK_FORMAT_R16G16B16_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16_USCALED) { return VK_FORMAT_R16G16B16_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16_SSCALED) { return VK_FORMAT_R16G16B16_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16_UINT) { return VK_FORMAT_R16G16B16_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16_SINT) { return VK_FORMAT_R16G16B16_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16_SFLOAT) { return VK_FORMAT_R16G16B16_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16A16_UNORM) { return VK_FORMAT_R16G16B16A16_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16A16_SNORM) { return VK_FORMAT_R16G16B16A16_SNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16A16_USCALED) { return VK_FORMAT_R16G16B16A16_USCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16A16_SSCALED) { return VK_FORMAT_R16G16B16A16_SSCALED; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16A16_UINT) { return VK_FORMAT_R16G16B16A16_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16A16_SINT) { return VK_FORMAT_R16G16B16A16_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R16G16B16A16_SFLOAT) { return VK_FORMAT_R16G16B16A16_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32_UINT) { return VK_FORMAT_R32_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32_SINT) { return VK_FORMAT_R32_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32_SFLOAT) { return VK_FORMAT_R32_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32_UINT) { return VK_FORMAT_R32G32_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32_SINT) { return VK_FORMAT_R32G32_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32_SFLOAT) { return VK_FORMAT_R32G32_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32B32_UINT) { return VK_FORMAT_R32G32B32_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32B32_SINT) { return VK_FORMAT_R32G32B32_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32B32_SFLOAT) { return VK_FORMAT_R32G32B32_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32B32A32_UINT) { return VK_FORMAT_R32G32B32A32_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32B32A32_SINT) { return VK_FORMAT_R32G32B32A32_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R32G32B32A32_SFLOAT) { return VK_FORMAT_R32G32B32A32_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64_UINT) { return VK_FORMAT_R64_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64_SINT) { return VK_FORMAT_R64_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64_SFLOAT) { return VK_FORMAT_R64_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64_UINT) { return VK_FORMAT_R64G64_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64_SINT) { return VK_FORMAT_R64G64_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64_SFLOAT) { return VK_FORMAT_R64G64_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64B64_UINT) { return VK_FORMAT_R64G64B64_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64B64_SINT) { return VK_FORMAT_R64G64B64_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64B64_SFLOAT) { return VK_FORMAT_R64G64B64_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64B64A64_UINT) { return VK_FORMAT_R64G64B64A64_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64B64A64_SINT) { return VK_FORMAT_R64G64B64A64_SINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R64G64B64A64_SFLOAT) { return VK_FORMAT_R64G64B64A64_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B10G11R11_UFLOAT_PACK32) { return VK_FORMAT_B10G11R11_UFLOAT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_E5B9G9R9_UFLOAT_PACK32) { return VK_FORMAT_E5B9G9R9_UFLOAT_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_D16_UNORM) { return VK_FORMAT_D16_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_X8_D24_UNORM_PACK32) { return VK_FORMAT_X8_D24_UNORM_PACK32; }
-  else if (image_format == CGPU_IMAGE_FORMAT_D32_SFLOAT) { return VK_FORMAT_D32_SFLOAT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_S8_UINT) { return VK_FORMAT_S8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_D16_UNORM_S8_UINT) { return VK_FORMAT_D16_UNORM_S8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_D24_UNORM_S8_UINT) { return VK_FORMAT_D24_UNORM_S8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_D32_SFLOAT_S8_UINT) { return VK_FORMAT_D32_SFLOAT_S8_UINT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC1_RGB_UNORM_BLOCK) { return VK_FORMAT_BC1_RGB_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC1_RGB_SRGB_BLOCK) { return VK_FORMAT_BC1_RGB_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC1_RGBA_UNORM_BLOCK) { return VK_FORMAT_BC1_RGBA_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC1_RGBA_SRGB_BLOCK) { return VK_FORMAT_BC1_RGBA_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC2_UNORM_BLOCK) { return VK_FORMAT_BC2_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC2_SRGB_BLOCK) { return VK_FORMAT_BC2_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC3_UNORM_BLOCK) { return VK_FORMAT_BC3_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC3_SRGB_BLOCK) { return VK_FORMAT_BC3_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC4_UNORM_BLOCK) { return VK_FORMAT_BC4_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC4_SNORM_BLOCK) { return VK_FORMAT_BC4_SNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC5_UNORM_BLOCK) { return VK_FORMAT_BC5_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC5_SNORM_BLOCK) { return VK_FORMAT_BC5_SNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC6H_UFLOAT_BLOCK) { return VK_FORMAT_BC6H_UFLOAT_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC6H_SFLOAT_BLOCK) { return VK_FORMAT_BC6H_SFLOAT_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC7_UNORM_BLOCK) { return VK_FORMAT_BC7_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_BC7_SRGB_BLOCK) { return VK_FORMAT_BC7_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ETC2_R8G8B8_UNORM_BLOCK) { return VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ETC2_R8G8B8_SRGB_BLOCK) { return VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK) { return VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK) { return VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK) { return VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK) { return VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_EAC_R11_UNORM_BLOCK) { return VK_FORMAT_EAC_R11_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_EAC_R11_SNORM_BLOCK) { return VK_FORMAT_EAC_R11_SNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_EAC_R11G11_UNORM_BLOCK) { return VK_FORMAT_EAC_R11G11_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_EAC_R11G11_SNORM_BLOCK) { return VK_FORMAT_EAC_R11G11_SNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_4x4_UNORM_BLOCK) { return VK_FORMAT_ASTC_4x4_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_4x4_SRGB_BLOCK) { return VK_FORMAT_ASTC_4x4_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_5x4_UNORM_BLOCK) { return VK_FORMAT_ASTC_5x4_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_5x4_SRGB_BLOCK) { return VK_FORMAT_ASTC_5x4_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_5x5_UNORM_BLOCK) { return VK_FORMAT_ASTC_5x5_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_5x5_SRGB_BLOCK) { return VK_FORMAT_ASTC_5x5_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_6x5_UNORM_BLOCK) { return VK_FORMAT_ASTC_6x5_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_6x5_SRGB_BLOCK) { return VK_FORMAT_ASTC_6x5_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_6x6_UNORM_BLOCK) { return VK_FORMAT_ASTC_6x6_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_6x6_SRGB_BLOCK) { return VK_FORMAT_ASTC_6x6_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x5_UNORM_BLOCK) { return VK_FORMAT_ASTC_8x5_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x5_SRGB_BLOCK) { return VK_FORMAT_ASTC_8x5_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x6_UNORM_BLOCK) { return VK_FORMAT_ASTC_8x6_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x6_SRGB_BLOCK) { return VK_FORMAT_ASTC_8x6_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x8_UNORM_BLOCK) { return VK_FORMAT_ASTC_8x8_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x8_SRGB_BLOCK) { return VK_FORMAT_ASTC_8x8_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x5_UNORM_BLOCK) { return VK_FORMAT_ASTC_10x5_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x5_SRGB_BLOCK) { return VK_FORMAT_ASTC_10x5_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x6_UNORM_BLOCK) { return VK_FORMAT_ASTC_10x6_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x6_SRGB_BLOCK) { return VK_FORMAT_ASTC_10x6_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x8_UNORM_BLOCK) { return VK_FORMAT_ASTC_10x8_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x8_SRGB_BLOCK) { return VK_FORMAT_ASTC_10x8_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x10_UNORM_BLOCK) { return VK_FORMAT_ASTC_10x10_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x10_SRGB_BLOCK) { return VK_FORMAT_ASTC_10x10_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_12x10_UNORM_BLOCK) { return VK_FORMAT_ASTC_12x10_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_12x10_SRGB_BLOCK) { return VK_FORMAT_ASTC_12x10_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_12x12_UNORM_BLOCK) { return VK_FORMAT_ASTC_12x12_UNORM_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK) { return VK_FORMAT_ASTC_12x12_SRGB_BLOCK; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8B8G8R8_422_UNORM) { return VK_FORMAT_G8B8G8R8_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8G8_422_UNORM) { return VK_FORMAT_B8G8R8G8_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_420_UNORM) { return VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8R8_2PLANE_420_UNORM) { return VK_FORMAT_G8_B8R8_2PLANE_420_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_422_UNORM) { return VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8R8_2PLANE_422_UNORM) { return VK_FORMAT_G8_B8R8_2PLANE_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_444_UNORM) { return VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R10X6_UNORM_PACK16) { return VK_FORMAT_R10X6_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R10X6G10X6_UNORM_2PACK16) { return VK_FORMAT_R10X6G10X6_UNORM_2PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16) { return VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16) { return VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16) { return VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16) { return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16) { return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16) { return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16) { return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16) { return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R12X4_UNORM_PACK16) { return VK_FORMAT_R12X4_UNORM_PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R12X4G12X4_UNORM_2PACK16) { return VK_FORMAT_R12X4G12X4_UNORM_2PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16) { return VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16) { return VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16) { return VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16) { return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16) { return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16) { return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16) { return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16) { return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16B16G16R16_422_UNORM) { return VK_FORMAT_G16B16G16R16_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B16G16R16G16_422_UNORM) { return VK_FORMAT_B16G16R16G16_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_420_UNORM) { return VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_420_UNORM) { return VK_FORMAT_G16_B16R16_2PLANE_420_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_422_UNORM) { return VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_422_UNORM) { return VK_FORMAT_G16_B16R16_2PLANE_422_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_444_UNORM) { return VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG) { return VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG) { return VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG) { return VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG) { return VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG) { return VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG) { return VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG) { return VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG) { return VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_4x4_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_4x4_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_5x4_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_5x4_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_5x5_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_5x5_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_6x5_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_6x5_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_6x6_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_6x6_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x5_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_8x5_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x6_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_8x6_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_8x8_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_8x8_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x5_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_10x5_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x6_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_10x6_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x8_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_10x8_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_10x10_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_10x10_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_12x10_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_12x10_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_ASTC_12x12_SFLOAT_BLOCK_EXT) { return VK_FORMAT_ASTC_12x12_SFLOAT_BLOCK_EXT; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8B8G8R8_422_UNORM_KHR) { return VK_FORMAT_G8B8G8R8_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B8G8R8G8_422_UNORM_KHR) { return VK_FORMAT_B8G8R8G8_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_420_UNORM_KHR) { return VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8R8_2PLANE_420_UNORM_KHR) { return VK_FORMAT_G8_B8R8_2PLANE_420_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_422_UNORM_KHR) { return VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8R8_2PLANE_422_UNORM_KHR) { return VK_FORMAT_G8_B8R8_2PLANE_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_444_UNORM_KHR) { return VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R10X6_UNORM_PACK16_KHR) { return VK_FORMAT_R10X6_UNORM_PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R10X6G10X6_UNORM_2PACK16_KHR) { return VK_FORMAT_R10X6G10X6_UNORM_2PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR) { return VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR) { return VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR) { return VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR) { return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR) { return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR) { return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR) { return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR) { return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R12X4_UNORM_PACK16_KHR) { return VK_FORMAT_R12X4_UNORM_PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R12X4G12X4_UNORM_2PACK16_KHR) { return VK_FORMAT_R12X4G12X4_UNORM_2PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR) { return VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR) { return VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16_KHR) { return VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR) { return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR) { return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR) { return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR) { return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR) { return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16B16G16R16_422_UNORM_KHR) { return VK_FORMAT_G16B16G16R16_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_B16G16R16G16_422_UNORM_KHR) { return VK_FORMAT_B16G16R16G16_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_420_UNORM_KHR) { return VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_420_UNORM_KHR) { return VK_FORMAT_G16_B16R16_2PLANE_420_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_422_UNORM_KHR) { return VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_422_UNORM_KHR) { return VK_FORMAT_G16_B16R16_2PLANE_422_UNORM_KHR; }
-  else if (image_format == CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_444_UNORM_KHR) { return VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM_KHR; }
-  return VK_FORMAT_UNDEFINED;
+  switch (image_format)
+  {
+  case CGPU_IMAGE_FORMAT_UNDEFINED: return VK_FORMAT_UNDEFINED;
+  case CGPU_IMAGE_FORMAT_R4G4_UNORM_PACK8: return VK_FORMAT_R4G4_UNORM_PACK8;
+  case CGPU_IMAGE_FORMAT_R4G4B4A4_UNORM_PACK16: return VK_FORMAT_R4G4B4A4_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_B4G4R4A4_UNORM_PACK16: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_R5G6B5_UNORM_PACK16: return VK_FORMAT_R5G6B5_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_B5G6R5_UNORM_PACK16: return VK_FORMAT_B5G6R5_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_R5G5B5A1_UNORM_PACK16: return VK_FORMAT_R5G5B5A1_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_B5G5R5A1_UNORM_PACK16: return VK_FORMAT_B5G5R5A1_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_A1R5G5B5_UNORM_PACK16: return VK_FORMAT_A1R5G5B5_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_R8_UNORM: return VK_FORMAT_R8_UNORM;
+  case CGPU_IMAGE_FORMAT_R8_SNORM: return VK_FORMAT_R8_SNORM;
+  case CGPU_IMAGE_FORMAT_R8_USCALED: return VK_FORMAT_R8_USCALED;
+  case CGPU_IMAGE_FORMAT_R8_SSCALED: return VK_FORMAT_R8_SSCALED;
+  case CGPU_IMAGE_FORMAT_R8_UINT: return VK_FORMAT_R8_UINT;
+  case CGPU_IMAGE_FORMAT_R8_SINT: return VK_FORMAT_R8_SINT;
+  case CGPU_IMAGE_FORMAT_R8_SRGB: return VK_FORMAT_R8_SRGB;
+  case CGPU_IMAGE_FORMAT_R8G8_UNORM: return VK_FORMAT_R8G8_UNORM;
+  case CGPU_IMAGE_FORMAT_R8G8_SNORM: return VK_FORMAT_R8G8_SNORM;
+  case CGPU_IMAGE_FORMAT_R8G8_USCALED: return VK_FORMAT_R8G8_USCALED;
+  case CGPU_IMAGE_FORMAT_R8G8_SSCALED: return VK_FORMAT_R8G8_SSCALED;
+  case CGPU_IMAGE_FORMAT_R8G8_UINT: return VK_FORMAT_R8G8_UINT;
+  case CGPU_IMAGE_FORMAT_R8G8_SINT: return VK_FORMAT_R8G8_SINT;
+  case CGPU_IMAGE_FORMAT_R8G8_SRGB: return VK_FORMAT_R8G8_SRGB;
+  case CGPU_IMAGE_FORMAT_R8G8B8_UNORM: return VK_FORMAT_R8G8B8_UNORM;
+  case CGPU_IMAGE_FORMAT_R8G8B8_SNORM: return VK_FORMAT_R8G8B8_SNORM;
+  case CGPU_IMAGE_FORMAT_R8G8B8_USCALED: return VK_FORMAT_R8G8B8_USCALED;
+  case CGPU_IMAGE_FORMAT_R8G8B8_SSCALED: return VK_FORMAT_R8G8B8_SSCALED;
+  case CGPU_IMAGE_FORMAT_R8G8B8_UINT: return VK_FORMAT_R8G8B8_UINT;
+  case CGPU_IMAGE_FORMAT_R8G8B8_SINT: return VK_FORMAT_R8G8B8_SINT;
+  case CGPU_IMAGE_FORMAT_R8G8B8_SRGB: return VK_FORMAT_R8G8B8_SRGB;
+  case CGPU_IMAGE_FORMAT_B8G8R8_UNORM: return VK_FORMAT_B8G8R8_UNORM;
+  case CGPU_IMAGE_FORMAT_B8G8R8_SNORM: return VK_FORMAT_B8G8R8_SNORM;
+  case CGPU_IMAGE_FORMAT_B8G8R8_USCALED: return VK_FORMAT_B8G8R8_USCALED;
+  case CGPU_IMAGE_FORMAT_B8G8R8_SSCALED: return VK_FORMAT_B8G8R8_SSCALED;
+  case CGPU_IMAGE_FORMAT_B8G8R8_UINT: return VK_FORMAT_B8G8R8_UINT;
+  case CGPU_IMAGE_FORMAT_B8G8R8_SINT: return VK_FORMAT_B8G8R8_SINT;
+  case CGPU_IMAGE_FORMAT_B8G8R8_SRGB: return VK_FORMAT_B8G8R8_SRGB;
+  case CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM: return VK_FORMAT_R8G8B8A8_UNORM;
+  case CGPU_IMAGE_FORMAT_R8G8B8A8_SNORM: return VK_FORMAT_R8G8B8A8_SNORM;
+  case CGPU_IMAGE_FORMAT_R8G8B8A8_USCALED: return VK_FORMAT_R8G8B8A8_USCALED;
+  case CGPU_IMAGE_FORMAT_R8G8B8A8_SSCALED: return VK_FORMAT_R8G8B8A8_SSCALED;
+  case CGPU_IMAGE_FORMAT_R8G8B8A8_UINT: return VK_FORMAT_R8G8B8A8_UINT;
+  case CGPU_IMAGE_FORMAT_R8G8B8A8_SINT: return VK_FORMAT_R8G8B8A8_SINT;
+  case CGPU_IMAGE_FORMAT_R8G8B8A8_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
+  case CGPU_IMAGE_FORMAT_B8G8R8A8_UNORM: return VK_FORMAT_B8G8R8A8_UNORM;
+  case CGPU_IMAGE_FORMAT_B8G8R8A8_SNORM: return VK_FORMAT_B8G8R8A8_SNORM;
+  case CGPU_IMAGE_FORMAT_B8G8R8A8_USCALED: return VK_FORMAT_B8G8R8A8_USCALED;
+  case CGPU_IMAGE_FORMAT_B8G8R8A8_SSCALED: return VK_FORMAT_B8G8R8A8_SSCALED;
+  case CGPU_IMAGE_FORMAT_B8G8R8A8_UINT: return VK_FORMAT_B8G8R8A8_UINT;
+  case CGPU_IMAGE_FORMAT_B8G8R8A8_SINT: return VK_FORMAT_B8G8R8A8_SINT;
+  case CGPU_IMAGE_FORMAT_B8G8R8A8_SRGB: return VK_FORMAT_B8G8R8A8_SRGB;
+  case CGPU_IMAGE_FORMAT_A8B8G8R8_UNORM_PACK32: return VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+  case CGPU_IMAGE_FORMAT_A8B8G8R8_SNORM_PACK32: return VK_FORMAT_A8B8G8R8_SNORM_PACK32;
+  case CGPU_IMAGE_FORMAT_A8B8G8R8_USCALED_PACK32: return VK_FORMAT_A8B8G8R8_USCALED_PACK32;
+  case CGPU_IMAGE_FORMAT_A8B8G8R8_SSCALED_PACK32: return VK_FORMAT_A8B8G8R8_SSCALED_PACK32;
+  case CGPU_IMAGE_FORMAT_A8B8G8R8_UINT_PACK32: return VK_FORMAT_A8B8G8R8_UINT_PACK32;
+  case CGPU_IMAGE_FORMAT_A8B8G8R8_SINT_PACK32: return VK_FORMAT_A8B8G8R8_SINT_PACK32;
+  case CGPU_IMAGE_FORMAT_A8B8G8R8_SRGB_PACK32: return VK_FORMAT_A8B8G8R8_SRGB_PACK32;
+  case CGPU_IMAGE_FORMAT_A2R10G10B10_UNORM_PACK32: return VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+  case CGPU_IMAGE_FORMAT_A2R10G10B10_SNORM_PACK32: return VK_FORMAT_A2R10G10B10_SNORM_PACK32;
+  case CGPU_IMAGE_FORMAT_A2R10G10B10_USCALED_PACK32: return VK_FORMAT_A2R10G10B10_USCALED_PACK32;
+  case CGPU_IMAGE_FORMAT_A2R10G10B10_SSCALED_PACK32: return VK_FORMAT_A2R10G10B10_SSCALED_PACK32;
+  case CGPU_IMAGE_FORMAT_A2R10G10B10_UINT_PACK32: return VK_FORMAT_A2R10G10B10_UINT_PACK32;
+  case CGPU_IMAGE_FORMAT_A2R10G10B10_SINT_PACK32: return VK_FORMAT_A2R10G10B10_SINT_PACK32;
+  case CGPU_IMAGE_FORMAT_A2B10G10R10_UNORM_PACK32: return VK_FORMAT_A2B10G10R10_UNORM_PACK32;
+  case CGPU_IMAGE_FORMAT_A2B10G10R10_SNORM_PACK32: return VK_FORMAT_A2B10G10R10_SNORM_PACK32;
+  case CGPU_IMAGE_FORMAT_A2B10G10R10_USCALED_PACK32: return VK_FORMAT_A2B10G10R10_USCALED_PACK32;
+  case CGPU_IMAGE_FORMAT_A2B10G10R10_SSCALED_PACK32: return VK_FORMAT_A2B10G10R10_SSCALED_PACK32;
+  case CGPU_IMAGE_FORMAT_A2B10G10R10_UINT_PACK32: return VK_FORMAT_A2B10G10R10_UINT_PACK32;
+  case CGPU_IMAGE_FORMAT_A2B10G10R10_SINT_PACK32: return VK_FORMAT_A2B10G10R10_SINT_PACK32;
+  case CGPU_IMAGE_FORMAT_R16_UNORM: return VK_FORMAT_R16_UNORM;
+  case CGPU_IMAGE_FORMAT_R16_SNORM: return VK_FORMAT_R16_SNORM;
+  case CGPU_IMAGE_FORMAT_R16_USCALED: return VK_FORMAT_R16_USCALED;
+  case CGPU_IMAGE_FORMAT_R16_SSCALED: return VK_FORMAT_R16_SSCALED;
+  case CGPU_IMAGE_FORMAT_R16_UINT: return VK_FORMAT_R16_UINT;
+  case CGPU_IMAGE_FORMAT_R16_SINT: return VK_FORMAT_R16_SINT;
+  case CGPU_IMAGE_FORMAT_R16_SFLOAT: return VK_FORMAT_R16_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R16G16_UNORM: return VK_FORMAT_R16G16_UNORM;
+  case CGPU_IMAGE_FORMAT_R16G16_SNORM: return VK_FORMAT_R16G16_SNORM;
+  case CGPU_IMAGE_FORMAT_R16G16_USCALED: return VK_FORMAT_R16G16_USCALED;
+  case CGPU_IMAGE_FORMAT_R16G16_SSCALED: return VK_FORMAT_R16G16_SSCALED;
+  case CGPU_IMAGE_FORMAT_R16G16_UINT: return VK_FORMAT_R16G16_UINT;
+  case CGPU_IMAGE_FORMAT_R16G16_SINT: return VK_FORMAT_R16G16_SINT;
+  case CGPU_IMAGE_FORMAT_R16G16_SFLOAT: return VK_FORMAT_R16G16_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R16G16B16_UNORM: return VK_FORMAT_R16G16B16_UNORM;
+  case CGPU_IMAGE_FORMAT_R16G16B16_SNORM: return VK_FORMAT_R16G16B16_SNORM;
+  case CGPU_IMAGE_FORMAT_R16G16B16_USCALED: return VK_FORMAT_R16G16B16_USCALED;
+  case CGPU_IMAGE_FORMAT_R16G16B16_SSCALED: return VK_FORMAT_R16G16B16_SSCALED;
+  case CGPU_IMAGE_FORMAT_R16G16B16_UINT: return VK_FORMAT_R16G16B16_UINT;
+  case CGPU_IMAGE_FORMAT_R16G16B16_SINT: return VK_FORMAT_R16G16B16_SINT;
+  case CGPU_IMAGE_FORMAT_R16G16B16_SFLOAT: return VK_FORMAT_R16G16B16_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R16G16B16A16_UNORM: return VK_FORMAT_R16G16B16A16_UNORM;
+  case CGPU_IMAGE_FORMAT_R16G16B16A16_SNORM: return VK_FORMAT_R16G16B16A16_SNORM;
+  case CGPU_IMAGE_FORMAT_R16G16B16A16_USCALED: return VK_FORMAT_R16G16B16A16_USCALED;
+  case CGPU_IMAGE_FORMAT_R16G16B16A16_SSCALED: return VK_FORMAT_R16G16B16A16_SSCALED;
+  case CGPU_IMAGE_FORMAT_R16G16B16A16_UINT: return VK_FORMAT_R16G16B16A16_UINT;
+  case CGPU_IMAGE_FORMAT_R16G16B16A16_SINT: return VK_FORMAT_R16G16B16A16_SINT;
+  case CGPU_IMAGE_FORMAT_R16G16B16A16_SFLOAT: return VK_FORMAT_R16G16B16A16_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R32_UINT: return VK_FORMAT_R32_UINT;
+  case CGPU_IMAGE_FORMAT_R32_SINT: return VK_FORMAT_R32_SINT;
+  case CGPU_IMAGE_FORMAT_R32_SFLOAT: return VK_FORMAT_R32_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R32G32_UINT: return VK_FORMAT_R32G32_UINT;
+  case CGPU_IMAGE_FORMAT_R32G32_SINT: return VK_FORMAT_R32G32_SINT;
+  case CGPU_IMAGE_FORMAT_R32G32_SFLOAT: return VK_FORMAT_R32G32_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R32G32B32_UINT: return VK_FORMAT_R32G32B32_UINT;
+  case CGPU_IMAGE_FORMAT_R32G32B32_SINT: return VK_FORMAT_R32G32B32_SINT;
+  case CGPU_IMAGE_FORMAT_R32G32B32_SFLOAT: return VK_FORMAT_R32G32B32_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R32G32B32A32_UINT: return VK_FORMAT_R32G32B32A32_UINT;
+  case CGPU_IMAGE_FORMAT_R32G32B32A32_SINT: return VK_FORMAT_R32G32B32A32_SINT;
+  case CGPU_IMAGE_FORMAT_R32G32B32A32_SFLOAT: return VK_FORMAT_R32G32B32A32_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R64_UINT: return VK_FORMAT_R64_UINT;
+  case CGPU_IMAGE_FORMAT_R64_SINT: return VK_FORMAT_R64_SINT;
+  case CGPU_IMAGE_FORMAT_R64_SFLOAT: return VK_FORMAT_R64_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R64G64_UINT: return VK_FORMAT_R64G64_UINT;
+  case CGPU_IMAGE_FORMAT_R64G64_SINT: return VK_FORMAT_R64G64_SINT;
+  case CGPU_IMAGE_FORMAT_R64G64_SFLOAT: return VK_FORMAT_R64G64_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R64G64B64_UINT: return VK_FORMAT_R64G64B64_UINT;
+  case CGPU_IMAGE_FORMAT_R64G64B64_SINT: return VK_FORMAT_R64G64B64_SINT;
+  case CGPU_IMAGE_FORMAT_R64G64B64_SFLOAT: return VK_FORMAT_R64G64B64_SFLOAT;
+  case CGPU_IMAGE_FORMAT_R64G64B64A64_UINT: return VK_FORMAT_R64G64B64A64_UINT;
+  case CGPU_IMAGE_FORMAT_R64G64B64A64_SINT: return VK_FORMAT_R64G64B64A64_SINT;
+  case CGPU_IMAGE_FORMAT_R64G64B64A64_SFLOAT: return VK_FORMAT_R64G64B64A64_SFLOAT;
+  case CGPU_IMAGE_FORMAT_B10G11R11_UFLOAT_PACK32: return VK_FORMAT_B10G11R11_UFLOAT_PACK32;
+  case CGPU_IMAGE_FORMAT_E5B9G9R9_UFLOAT_PACK32: return VK_FORMAT_E5B9G9R9_UFLOAT_PACK32;
+  case CGPU_IMAGE_FORMAT_D16_UNORM: return VK_FORMAT_D16_UNORM;
+  case CGPU_IMAGE_FORMAT_X8_D24_UNORM_PACK32: return VK_FORMAT_X8_D24_UNORM_PACK32;
+  case CGPU_IMAGE_FORMAT_D32_SFLOAT: return VK_FORMAT_D32_SFLOAT;
+  case CGPU_IMAGE_FORMAT_S8_UINT: return VK_FORMAT_S8_UINT;
+  case CGPU_IMAGE_FORMAT_D16_UNORM_S8_UINT: return VK_FORMAT_D16_UNORM_S8_UINT;
+  case CGPU_IMAGE_FORMAT_D24_UNORM_S8_UINT: return VK_FORMAT_D24_UNORM_S8_UINT;
+  case CGPU_IMAGE_FORMAT_D32_SFLOAT_S8_UINT: return VK_FORMAT_D32_SFLOAT_S8_UINT;
+  case CGPU_IMAGE_FORMAT_BC1_RGB_UNORM_BLOCK: return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC1_RGB_SRGB_BLOCK: return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC1_RGBA_UNORM_BLOCK: return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC1_RGBA_SRGB_BLOCK: return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC2_UNORM_BLOCK: return VK_FORMAT_BC2_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC2_SRGB_BLOCK: return VK_FORMAT_BC2_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC3_UNORM_BLOCK: return VK_FORMAT_BC3_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC3_SRGB_BLOCK: return VK_FORMAT_BC3_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC4_UNORM_BLOCK: return VK_FORMAT_BC4_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC4_SNORM_BLOCK: return VK_FORMAT_BC4_SNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC5_UNORM_BLOCK: return VK_FORMAT_BC5_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC5_SNORM_BLOCK: return VK_FORMAT_BC5_SNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC6H_UFLOAT_BLOCK: return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC6H_SFLOAT_BLOCK: return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC7_UNORM_BLOCK: return VK_FORMAT_BC7_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_BC7_SRGB_BLOCK: return VK_FORMAT_BC7_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8_UNORM_BLOCK: return VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8_SRGB_BLOCK: return VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK: return VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK: return VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK: return VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK: return VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_EAC_R11_UNORM_BLOCK: return VK_FORMAT_EAC_R11_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_EAC_R11_SNORM_BLOCK: return VK_FORMAT_EAC_R11_SNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_EAC_R11G11_UNORM_BLOCK: return VK_FORMAT_EAC_R11G11_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_EAC_R11G11_SNORM_BLOCK: return VK_FORMAT_EAC_R11G11_SNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_4x4_UNORM_BLOCK: return VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_4x4_SRGB_BLOCK: return VK_FORMAT_ASTC_4x4_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_5x4_UNORM_BLOCK: return VK_FORMAT_ASTC_5x4_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_5x4_SRGB_BLOCK: return VK_FORMAT_ASTC_5x4_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_5x5_UNORM_BLOCK: return VK_FORMAT_ASTC_5x5_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_5x5_SRGB_BLOCK: return VK_FORMAT_ASTC_5x5_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_6x5_UNORM_BLOCK: return VK_FORMAT_ASTC_6x5_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_6x5_SRGB_BLOCK: return VK_FORMAT_ASTC_6x5_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_6x6_UNORM_BLOCK: return VK_FORMAT_ASTC_6x6_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_6x6_SRGB_BLOCK: return VK_FORMAT_ASTC_6x6_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_8x5_UNORM_BLOCK: return VK_FORMAT_ASTC_8x5_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_8x5_SRGB_BLOCK: return VK_FORMAT_ASTC_8x5_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_8x6_UNORM_BLOCK: return VK_FORMAT_ASTC_8x6_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_8x6_SRGB_BLOCK: return VK_FORMAT_ASTC_8x6_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_8x8_UNORM_BLOCK: return VK_FORMAT_ASTC_8x8_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_8x8_SRGB_BLOCK: return VK_FORMAT_ASTC_8x8_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x5_UNORM_BLOCK: return VK_FORMAT_ASTC_10x5_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x5_SRGB_BLOCK: return VK_FORMAT_ASTC_10x5_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x6_UNORM_BLOCK: return VK_FORMAT_ASTC_10x6_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x6_SRGB_BLOCK: return VK_FORMAT_ASTC_10x6_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x8_UNORM_BLOCK: return VK_FORMAT_ASTC_10x8_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x8_SRGB_BLOCK: return VK_FORMAT_ASTC_10x8_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x10_UNORM_BLOCK: return VK_FORMAT_ASTC_10x10_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_10x10_SRGB_BLOCK: return VK_FORMAT_ASTC_10x10_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_12x10_UNORM_BLOCK: return VK_FORMAT_ASTC_12x10_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_12x10_SRGB_BLOCK: return VK_FORMAT_ASTC_12x10_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_12x12_UNORM_BLOCK: return VK_FORMAT_ASTC_12x12_UNORM_BLOCK;
+  case CGPU_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK: return VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
+  case CGPU_IMAGE_FORMAT_G8B8G8R8_422_UNORM: return VK_FORMAT_G8B8G8R8_422_UNORM;
+  case CGPU_IMAGE_FORMAT_B8G8R8G8_422_UNORM: return VK_FORMAT_B8G8R8G8_422_UNORM;
+  case CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_420_UNORM: return VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
+  case CGPU_IMAGE_FORMAT_G8_B8R8_2PLANE_420_UNORM: return VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
+  case CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_422_UNORM: return VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM;
+  case CGPU_IMAGE_FORMAT_G8_B8R8_2PLANE_422_UNORM: return VK_FORMAT_G8_B8R8_2PLANE_422_UNORM;
+  case CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_444_UNORM: return VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM;
+  case CGPU_IMAGE_FORMAT_R10X6_UNORM_PACK16: return VK_FORMAT_R10X6_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_R10X6G10X6_UNORM_2PACK16: return VK_FORMAT_R10X6G10X6_UNORM_2PACK16;
+  case CGPU_IMAGE_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16: return VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16;
+  case CGPU_IMAGE_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16: return VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16;
+  case CGPU_IMAGE_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16: return VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16;
+  case CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16: return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16: return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16: return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16: return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16: return VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_R12X4_UNORM_PACK16: return VK_FORMAT_R12X4_UNORM_PACK16;
+  case CGPU_IMAGE_FORMAT_R12X4G12X4_UNORM_2PACK16: return VK_FORMAT_R12X4G12X4_UNORM_2PACK16;
+  case CGPU_IMAGE_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16: return VK_FORMAT_R12X4G12X4B12X4A12X4_UNORM_4PACK16;
+  case CGPU_IMAGE_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16: return VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16;
+  case CGPU_IMAGE_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16: return VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16;
+  case CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16: return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16: return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16: return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16: return VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16: return VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16;
+  case CGPU_IMAGE_FORMAT_G16B16G16R16_422_UNORM: return VK_FORMAT_G16B16G16R16_422_UNORM;
+  case CGPU_IMAGE_FORMAT_B16G16R16G16_422_UNORM: return VK_FORMAT_B16G16R16G16_422_UNORM;
+  case CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_420_UNORM: return VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM;
+  case CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_420_UNORM: return VK_FORMAT_G16_B16R16_2PLANE_420_UNORM;
+  case CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_422_UNORM: return VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM;
+  case CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_422_UNORM: return VK_FORMAT_G16_B16R16_2PLANE_422_UNORM;
+  case CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_444_UNORM: return VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM;
+  case CGPU_IMAGE_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG;
+  case CGPU_IMAGE_FORMAT_ASTC_4x4_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_4x4_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_5x4_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_5x4_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_5x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_5x5_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_6x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_6x5_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_6x6_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_6x6_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_8x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_8x5_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_8x6_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_8x6_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_8x8_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_8x8_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_10x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x5_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_10x6_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x6_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_10x8_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x8_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_10x10_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x10_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_12x10_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_12x10_SFLOAT_BLOCK_EXT;
+  case CGPU_IMAGE_FORMAT_ASTC_12x12_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_12x12_SFLOAT_BLOCK_EXT;
+  default: return VK_FORMAT_UNDEFINED;
+  }
 }
 
 /* API method implementation. */
 
-CgpuResult cgpu_initialize(
-  const char* p_app_name,
-  uint32_t version_major,
-  uint32_t version_minor,
-  uint32_t version_patch)
+CgpuResult cgpu_initialize(const char* p_app_name,
+                           uint32_t version_major,
+                           uint32_t version_minor,
+                           uint32_t version_patch)
 {
   VkResult result = volkInitialize();
 
@@ -728,9 +683,8 @@ static bool cgpu_find_device_extension(const char* extension_name,
   return false;
 }
 
-CgpuResult cgpu_create_device(
-  uint32_t index,
-  cgpu_device* p_device)
+CgpuResult cgpu_create_device(uint32_t index,
+                              cgpu_device* p_device)
 {
   p_device->handle = resource_store_create_handle(&idevice_store);
 
@@ -843,7 +797,7 @@ CgpuResult cgpu_create_device(
     enabled_device_extension_count++;
   }
 #if !defined(NDEBUG) && !defined(__APPLE__)
-  // Required for shader printf feature.
+  /* Required for shader printf feature. */
   if (cgpu_find_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions))
   {
     enabled_device_extensions[enabled_device_extension_count] = VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME;
@@ -1181,8 +1135,7 @@ CgpuResult cgpu_create_device(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy_device(
-  cgpu_device device)
+CgpuResult cgpu_destroy_device(cgpu_device device)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1218,11 +1171,10 @@ CgpuResult cgpu_destroy_device(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_create_shader(
-  cgpu_device device,
-  uint64_t size,
-  const uint8_t* p_source,
-  cgpu_shader* p_shader)
+CgpuResult cgpu_create_shader(cgpu_device device,
+                              uint64_t size,
+                              const uint8_t* p_source,
+                              cgpu_shader* p_shader)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1268,9 +1220,8 @@ CgpuResult cgpu_create_shader(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy_shader(
-  cgpu_device device,
-  cgpu_shader shader)
+CgpuResult cgpu_destroy_shader(cgpu_device device,
+                               cgpu_shader shader)
 {
   cgpu_idevice* idevice;
   cgpu_ishader* ishader;
@@ -1294,12 +1245,11 @@ CgpuResult cgpu_destroy_shader(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_create_buffer(
-  cgpu_device device,
-  CgpuBufferUsageFlags usage,
-  CgpuMemoryPropertyFlags memory_properties,
-  uint64_t size,
-  cgpu_buffer* p_buffer)
+CgpuResult cgpu_create_buffer(cgpu_device device,
+                              CgpuBufferUsageFlags usage,
+                              CgpuMemoryPropertyFlags memory_properties,
+                              uint64_t size,
+                              cgpu_buffer* p_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1365,9 +1315,8 @@ CgpuResult cgpu_create_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy_buffer(
-  cgpu_device device,
-  cgpu_buffer buffer)
+CgpuResult cgpu_destroy_buffer(cgpu_device device,
+                               cgpu_buffer buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1385,10 +1334,9 @@ CgpuResult cgpu_destroy_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_map_buffer(
-  cgpu_device device,
-  cgpu_buffer buffer,
-  void** pp_mapped_mem)
+CgpuResult cgpu_map_buffer(cgpu_device device,
+                           cgpu_buffer buffer,
+                           void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1404,9 +1352,8 @@ CgpuResult cgpu_map_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_unmap_buffer(
-  cgpu_device device,
-  cgpu_buffer buffer)
+CgpuResult cgpu_unmap_buffer(cgpu_device device,
+                             cgpu_buffer buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1420,14 +1367,13 @@ CgpuResult cgpu_unmap_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_create_image(
-  cgpu_device device,
-  uint32_t width,
-  uint32_t height,
-  CgpuImageFormat format,
-  CgpuImageUsageFlags usage,
-  CgpuMemoryPropertyFlags memory_properties,
-  cgpu_image* p_image)
+CgpuResult cgpu_create_image(cgpu_device device,
+                             uint32_t width,
+                             uint32_t height,
+                             CgpuImageFormat format,
+                             CgpuImageUsageFlags usage,
+                             CgpuMemoryPropertyFlags memory_properties,
+                             cgpu_image* p_image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1545,9 +1491,8 @@ CgpuResult cgpu_create_image(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy_image(
-  cgpu_device device,
-  cgpu_image image)
+CgpuResult cgpu_destroy_image(cgpu_device device,
+                              cgpu_image image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1571,10 +1516,9 @@ CgpuResult cgpu_destroy_image(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_map_image(
-  cgpu_device device,
-  cgpu_image image,
-  void** pp_mapped_mem)
+CgpuResult cgpu_map_image(cgpu_device device,
+                          cgpu_image image,
+                          void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1590,9 +1534,8 @@ CgpuResult cgpu_map_image(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_unmap_image(
-  cgpu_device device,
-  cgpu_image image)
+CgpuResult cgpu_unmap_image(cgpu_device device,
+                            cgpu_image image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1606,11 +1549,10 @@ CgpuResult cgpu_unmap_image(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_create_pipeline(
-  cgpu_device device,
-  cgpu_shader shader,
-  const char* p_shader_entry_point,
-  cgpu_pipeline* p_pipeline)
+CgpuResult cgpu_create_pipeline(cgpu_device device,
+                                cgpu_shader shader,
+                                const char* p_shader_entry_point,
+                                cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1866,9 +1808,8 @@ CgpuResult cgpu_create_pipeline(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy_pipeline(
-  cgpu_device device,
-  cgpu_pipeline pipeline)
+CgpuResult cgpu_destroy_pipeline(cgpu_device device,
+                                 cgpu_pipeline pipeline)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1905,13 +1846,12 @@ CgpuResult cgpu_destroy_pipeline(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_update_resources(
-  cgpu_device device,
-  cgpu_pipeline pipeline,
-  uint32_t buffer_resource_count,
-  const cgpu_shader_resource_buffer* p_buffer_resources,
-  uint32_t image_resource_count,
-  const cgpu_shader_resource_image* p_image_resources)
+CgpuResult cgpu_update_resources(cgpu_device device,
+                                 cgpu_pipeline pipeline,
+                                 uint32_t buffer_resource_count,
+                                 const cgpu_shader_resource_buffer* p_buffer_resources,
+                                 uint32_t image_resource_count,
+                                 const cgpu_shader_resource_image* p_image_resources)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2004,9 +1944,8 @@ CgpuResult cgpu_update_resources(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_create_command_buffer(
-  cgpu_device device,
-  cgpu_command_buffer* p_command_buffer)
+CgpuResult cgpu_create_command_buffer(cgpu_device device,
+                                      cgpu_command_buffer* p_command_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2041,9 +1980,8 @@ CgpuResult cgpu_create_command_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy_command_buffer(
-  cgpu_device device,
-  cgpu_command_buffer command_buffer)
+CgpuResult cgpu_destroy_command_buffer(cgpu_device device,
+                                       cgpu_command_buffer command_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2065,8 +2003,7 @@ CgpuResult cgpu_destroy_command_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_begin_command_buffer(
-  cgpu_command_buffer command_buffer)
+CgpuResult cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2094,9 +2031,8 @@ CgpuResult cgpu_begin_command_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_cmd_bind_pipeline(
-  cgpu_command_buffer command_buffer,
-  cgpu_pipeline pipeline)
+CgpuResult cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
+                                  cgpu_pipeline pipeline)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2132,13 +2068,12 @@ CgpuResult cgpu_cmd_bind_pipeline(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_cmd_copy_buffer(
-  cgpu_command_buffer command_buffer,
-  cgpu_buffer source_buffer,
-  uint64_t source_offset,
-  cgpu_buffer destination_buffer,
-  uint64_t destination_offset,
-  uint64_t size)
+CgpuResult cgpu_cmd_copy_buffer(cgpu_command_buffer command_buffer,
+                                cgpu_buffer source_buffer,
+                                uint64_t source_offset,
+                                cgpu_buffer destination_buffer,
+                                uint64_t destination_offset,
+                                uint64_t size)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2173,10 +2108,9 @@ CgpuResult cgpu_cmd_copy_buffer(
   return CGPU_OK;
 }
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
-  cgpu_command_buffer command_buffer,
-  cgpu_buffer buffer,
-  cgpu_image image)
+CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
+                                         cgpu_buffer buffer,
+                                         cgpu_image image)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2233,10 +2167,9 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_cmd_push_constants(
-  cgpu_command_buffer command_buffer,
-  cgpu_pipeline pipeline,
-  const void* p_data)
+CgpuResult cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
+                                   cgpu_pipeline pipeline,
+                                   const void* p_data)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2265,9 +2198,8 @@ CgpuResult cgpu_cmd_push_constants(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_transition_image_layouts_for_shader(
-  cgpu_idevice* idevice,
-  cgpu_icommand_buffer* icommand_buffer)
+CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_idevice* idevice,
+                                                    cgpu_icommand_buffer* icommand_buffer)
 {
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(icommand_buffer->pipeline, &ipipeline)) {
@@ -2281,7 +2213,7 @@ CgpuResult cgpu_transition_image_layouts_for_shader(
   VkImageMemoryBarrier barriers[MAX_IMAGE_MEMORY_BARRIERS];
   uint32_t barrier_count = 0;
 
-  // TODO: this has quadratic complexity...
+  /* TODO: this has quadratic complexity... */
   const cgpu_shader_reflection* reflection = &ishader->reflection;
   for (uint32_t i = 0; i < reflection->resource_count; i++)
   {
@@ -2298,11 +2230,11 @@ CgpuResult cgpu_transition_image_layouts_for_shader(
     }
     else
     {
-      // Not an image.
+      /* Not an image. */
       continue;
     }
 
-    // Image layout needs transitioning.
+    /* Image layout needs transitioning. */
     cgpu_shader_resource_image* res_img = NULL;
     for (uint32_t j = 0; j < ipipeline->image_resource_count; j++)
     {
@@ -2375,11 +2307,10 @@ CgpuResult cgpu_transition_image_layouts_for_shader(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_cmd_dispatch(
-  cgpu_command_buffer command_buffer,
-  uint32_t dim_x,
-  uint32_t dim_y,
-  uint32_t dim_z)
+CgpuResult cgpu_cmd_dispatch(cgpu_command_buffer command_buffer,
+                             uint32_t dim_x,
+                             uint32_t dim_y,
+                             uint32_t dim_z)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2407,14 +2338,13 @@ CgpuResult cgpu_cmd_dispatch(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_cmd_pipeline_barrier(
-  cgpu_command_buffer command_buffer,
-  uint32_t barrier_count,
-  const cgpu_memory_barrier* p_barriers,
-  uint32_t buffer_barrier_count,
-  const cgpu_buffer_memory_barrier* p_buffer_barriers,
-  uint32_t image_barrier_count,
-  const cgpu_image_memory_barrier* p_image_barriers)
+CgpuResult cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
+                                     uint32_t barrier_count,
+                                     const cgpu_memory_barrier* p_barriers,
+                                     uint32_t buffer_barrier_count,
+                                     const cgpu_buffer_memory_barrier* p_buffer_barriers,
+                                     uint32_t image_barrier_count,
+                                     const cgpu_image_memory_barrier* p_image_barriers)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2507,10 +2437,9 @@ CgpuResult cgpu_cmd_pipeline_barrier(
   return CGPU_OK;
 }
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_reset_timestamps(
-  cgpu_command_buffer command_buffer,
-  uint32_t offset,
-  uint32_t count)
+CgpuResult cgpu_cmd_reset_timestamps(cgpu_command_buffer command_buffer,
+                                     uint32_t offset,
+                                     uint32_t count)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2531,9 +2460,8 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_reset_timestamps(
   return CGPU_OK;
 }
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_write_timestamp(
-  cgpu_command_buffer command_buffer,
-  uint32_t timestamp_index)
+CgpuResult cgpu_cmd_write_timestamp(cgpu_command_buffer command_buffer,
+                                    uint32_t timestamp_index)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2554,12 +2482,11 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_write_timestamp(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_cmd_copy_timestamps(
-  cgpu_command_buffer command_buffer,
-  cgpu_buffer buffer,
-  uint32_t offset,
-  uint32_t count,
-  bool wait_until_available)
+CgpuResult cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
+                                    cgpu_buffer buffer,
+                                    uint32_t offset,
+                                    uint32_t count,
+                                    bool wait_until_available)
 {
   if ((offset + count) > MAX_TIMESTAMP_QUERIES) {
     return CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED;
@@ -2593,8 +2520,7 @@ CgpuResult cgpu_cmd_copy_timestamps(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_end_command_buffer(
-  cgpu_command_buffer command_buffer)
+CgpuResult cgpu_end_command_buffer(cgpu_command_buffer command_buffer)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
@@ -2608,9 +2534,8 @@ CgpuResult cgpu_end_command_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_create_fence(
-  cgpu_device device,
-  cgpu_fence* p_fence)
+CgpuResult cgpu_create_fence(cgpu_device device,
+                             cgpu_fence* p_fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2642,9 +2567,8 @@ CgpuResult cgpu_create_fence(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_destroy_fence(
-  cgpu_device device,
-  cgpu_fence fence)
+CgpuResult cgpu_destroy_fence(cgpu_device device,
+                              cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2663,9 +2587,8 @@ CgpuResult cgpu_destroy_fence(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_reset_fence(
-  cgpu_device device,
-  cgpu_fence fence)
+CgpuResult cgpu_reset_fence(cgpu_device device,
+                            cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2686,9 +2609,7 @@ CgpuResult cgpu_reset_fence(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_wait_for_fence(
-  cgpu_device device,
-  cgpu_fence fence)
+CgpuResult cgpu_wait_for_fence(cgpu_device device, cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2711,10 +2632,9 @@ CgpuResult cgpu_wait_for_fence(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_submit_command_buffer(
-  cgpu_device device,
-  cgpu_command_buffer command_buffer,
-  cgpu_fence fence)
+CgpuResult cgpu_submit_command_buffer(cgpu_device device,
+                                      cgpu_command_buffer command_buffer,
+                                      cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2753,11 +2673,10 @@ CgpuResult cgpu_submit_command_buffer(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_flush_mapped_memory(
-  cgpu_device device,
-  cgpu_buffer buffer,
-  uint64_t offset,
-  uint64_t size)
+CgpuResult cgpu_flush_mapped_memory(cgpu_device device,
+                                    cgpu_buffer buffer,
+                                    uint64_t offset,
+                                    uint64_t size)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2781,11 +2700,10 @@ CgpuResult cgpu_flush_mapped_memory(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_invalidate_mapped_memory(
-  cgpu_device device,
-  cgpu_buffer buffer,
-  uint64_t offset,
-  uint64_t size)
+CgpuResult cgpu_invalidate_mapped_memory(cgpu_device device,
+                                         cgpu_buffer buffer,
+                                         uint64_t offset,
+                                         uint64_t size)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -2809,9 +2727,8 @@ CgpuResult cgpu_invalidate_mapped_memory(
   return CGPU_OK;
 }
 
-CgpuResult cgpu_get_physical_device_limits(
-  cgpu_device device,
-  cgpu_physical_device_limits* p_limits)
+CgpuResult cgpu_get_physical_device_limits(cgpu_device device,
+                                           cgpu_physical_device_limits* p_limits)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {

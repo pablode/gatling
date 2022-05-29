@@ -14,7 +14,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((triangle_postponing, "triangle-postponing"))     \
   ((next_event_estimation, "next-event-estimation"))
 
-// mtlx node identifier is given by usdMtlx.
+// mtlx node identifier is given by UsdMtlx.
 #define HD_GATLING_NODE_IDENTIFIER_TOKENS            \
   (mdl)                                              \
   (mtlx)

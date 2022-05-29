@@ -2,8 +2,7 @@
 
 #include <assert.h>
 
-void handle_store_create(
-  handle_store* store)
+void handle_store_create(handle_store* store)
 {
   store->max_index = 0;
   store->free_index_count = 0;
@@ -13,15 +12,13 @@ void handle_store_create(
   store->versions = malloc(store->version_capacity * sizeof(uint32_t));
 }
 
-void handle_store_destroy(
-  handle_store* store)
+void handle_store_destroy(handle_store* store)
 {
   free(store->versions);
   free(store->free_indices);
 }
 
-uint64_t handle_store_create_handle(
-  handle_store* store)
+uint64_t handle_store_create_handle(handle_store* store)
 {
   assert(store->max_index < ~0u);
 
@@ -59,9 +56,8 @@ uint64_t handle_store_create_handle(
   return handle;
 }
 
-bool handle_store_is_handle_valid(
-  const handle_store* store,
-  uint64_t handle)
+bool handle_store_is_handle_valid(const handle_store* store,
+                                  uint64_t handle)
 {
   const uint32_t version = (uint32_t) (handle >> 32ul);
   const uint32_t index =   (uint32_t) (handle);
@@ -77,9 +73,8 @@ bool handle_store_is_handle_valid(
   return true;
 }
 
-void handle_store_free_handle(
-  handle_store* store,
-  uint64_t handle)
+void handle_store_free_handle(handle_store* store,
+                              uint64_t handle)
 {
   const uint32_t index = handle_store_get_index(handle);
   uint32_t version = store->versions[index];
@@ -102,8 +97,7 @@ void handle_store_free_handle(
   store->free_indices[store->free_index_count - 1] = index;
 }
 
-uint32_t handle_store_get_index(
-  uint64_t handle)
+uint32_t handle_store_get_index(uint64_t handle)
 {
   return (uint32_t) handle;
 }

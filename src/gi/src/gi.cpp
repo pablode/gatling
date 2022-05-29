@@ -73,7 +73,7 @@ int giInitialize(const gi_init_params* params)
     return GI_ERROR;
   }
 
-  /* Set up GPU device. */
+  // Set up GPU device.
   CgpuResult c_result;
 
   uint32_t device_count;
@@ -152,12 +152,12 @@ static uint64_t giAlignBuffer(uint64_t alignment,
 
 gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 {
-  /* Build the BVH. */
+  // Build the BVH.
   gi::bvh::Bvh<8> bvh8;
   gi::bvh::Bvh8c bvh8c;
 
-  /* We don't support single-node BVHs, as this requires special handling in the traversal algorithm.
-   * Instead, we make sure the number of triangles exceeds the root node's maximum, requiring a child node. */
+  // We don't support single-node BVHs, as this requires special handling in the traversal algorithm.
+  // Instead, we make sure the number of triangles exceeds the root node's maximum, requiring a child node.
   uint32_t bvh_tri_threshold = std::max(4u, params->bvh_tri_threshold);
   bool bvh_enabled = (params->face_count >= bvh_tri_threshold);
 
@@ -188,7 +188,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     bvh_params.object_binning_threshold = 1024;
     bvh_params.object_bin_count = 16;
     bvh_params.spatial_bin_count = 32;
-    bvh_params.spatial_split_alpha = 1.0f; /* Temporarily disabled. */
+    bvh_params.spatial_split_alpha = 1.0f; // Temporarily disabled.
     bvh_params.vertex_count = params->vertex_count;
     bvh_params.vertices = params->vertices;
 
@@ -211,7 +211,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   uint32_t face_count = bvh_enabled ? bvh8.faces.size() : params->face_count;
   const gi_face* faces = bvh_enabled ? bvh8.faces.data() : params->faces;
 
-  /* Build list of emissive faces. */
+  // Build list of emissive faces.
   std::vector<uint32_t> emissive_face_indices;
   if (params->next_event_estimation)
   {
@@ -226,7 +226,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     }
   }
 
-  /* Upload to GPU buffer. */
+  // Upload to GPU buffer.
   gi_geom_cache* cache = nullptr;
   cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
   cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
@@ -337,7 +337,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cache->vertex_buf_size = vertex_buf_size;
   cache->vertex_buf_offset = vertex_buf_offset;
 
-  /* Copy materials. */
+  // Copy materials.
   cache->materials.resize(params->material_count);
   for (int i = 0; i < cache->materials.size(); i++)
   {
@@ -431,7 +431,7 @@ int giRender(const gi_render_params* params,
   const gi_geom_cache* geom_cache = params->geom_cache;
   const gi_shader_cache* shader_cache = params->shader_cache;
 
-  /* Init state for goto error handling. */
+  // Init state for goto error handling.
   int result = GI_ERROR;
   CgpuResult c_result;
 
@@ -440,7 +440,7 @@ int giRender(const gi_render_params* params,
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
   cgpu_fence fence = { CGPU_INVALID_HANDLE };
 
-  /* Set up buffers. */
+  // Set up buffers.
   const int COLOR_COMPONENT_COUNT = 4;
   const int pixel_count = params->image_width * params->image_height;
   const uint64_t buffer_size = pixel_count * COLOR_COMPONENT_COUNT * sizeof(float);
@@ -470,24 +470,24 @@ int giRender(const gi_render_params* params,
     return GI_ERROR;
   }
 
-  /* Set up GPU data. */
+  // Set up GPU data.
   gml_vec3 cam_forward, cam_up;
   gml_vec3_normalize(params->camera->forward, cam_forward);
   gml_vec3_normalize(params->camera->up, cam_up);
 
   float push_data[] = {
-    /* float3 */ params->camera->position[0], params->camera->position[1], params->camera->position[2],
-    /* uint   */ *((float*)&params->image_width),
-    /* float3 */ cam_forward[0], cam_forward[1], cam_forward[2],
-    /* uint   */ *((float*)&params->image_height),
-    /* float3 */ cam_up[0], cam_up[1], cam_up[2],
-    /* float  */ params->camera->vfov,
-    /* float4 */ params->bg_color[0], params->bg_color[1], params->bg_color[2], params->bg_color[3],
-    /* uint   */ *((float*)&params->spp),
-    /* uint   */ *((float*)&params->max_bounces),
-    /* float  */ params->max_sample_value,
-    /* uint   */ *((float*)&params->rr_bounce_offset),
-    /* float  */ params->rr_inv_min_term_prob
+    params->camera->position[0], params->camera->position[1], params->camera->position[2], // float3
+    *((float*)&params->image_width),                                                       // uint
+    cam_forward[0], cam_forward[1], cam_forward[2],                                        // float3
+    *((float*)&params->image_height),                                                      // uint
+    cam_up[0], cam_up[1], cam_up[2],                                                       // float3
+    params->camera->vfov,                                                                  // float
+    params->bg_color[0], params->bg_color[1], params->bg_color[2], params->bg_color[3],    // float4
+    *((float*)&params->spp),                                                               // uint
+    *((float*)&params->max_bounces),                                                       // uint
+    params->max_sample_value,                                                              // float
+    *((float*)&params->rr_bounce_offset),                                                  // uint
+    params->rr_inv_min_term_prob                                                           // float
   };
 
   std::vector<cgpu_shader_resource_buffer> buffers;
@@ -518,7 +518,7 @@ int giRender(const gi_render_params* params,
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  /* Set up command buffer. */
+  // Set up command buffer.
   c_result = cgpu_create_command_buffer(s_device, &command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
 
@@ -528,7 +528,7 @@ int giRender(const gi_render_params* params,
   c_result = cgpu_cmd_bind_pipeline(command_buffer, shader_cache->pipeline);
   if (c_result != CGPU_OK) goto cleanup;
 
-  /* Trace rays. */
+  // Trace rays.
   c_result = cgpu_cmd_push_constants(
     command_buffer,
     shader_cache->pipeline,
@@ -544,7 +544,7 @@ int giRender(const gi_render_params* params,
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  /* Copy output buffer to staging buffer. */
+  // Copy output buffer to staging buffer.
   cgpu_buffer_memory_barrier barrier;
   barrier.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   barrier.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
@@ -570,7 +570,7 @@ int giRender(const gi_render_params* params,
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  /* Submit command buffer. */
+  // Submit command buffer.
   c_result = cgpu_end_command_buffer(command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
 
@@ -590,7 +590,7 @@ int giRender(const gi_render_params* params,
   c_result = cgpu_wait_for_fence(s_device, fence);
   if (c_result != CGPU_OK) goto cleanup;
 
-  /* Read data from GPU to image. */
+  // Read data from GPU to image.
   uint8_t* mapped_staging_mem;
   c_result = cgpu_map_buffer(
     s_device,
@@ -607,7 +607,7 @@ int giRender(const gi_render_params* params,
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  /* Normalize image for debug AOVs. */
+  // Normalize image for debug AOVs.
   if (shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
       shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS)
   {

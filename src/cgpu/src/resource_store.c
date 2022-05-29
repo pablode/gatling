@@ -4,10 +4,9 @@
 #include <string.h>
 #include <assert.h>
 
-void resource_store_create(
-    resource_store* store,
-    uint32_t item_byte_size,
-    uint32_t initial_capacity)
+void resource_store_create(resource_store* store,
+                           uint32_t item_byte_size,
+                           uint32_t initial_capacity)
 {
   assert(initial_capacity != 0);
   handle_store_create(&store->handle_store);

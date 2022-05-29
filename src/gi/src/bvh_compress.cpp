@@ -71,7 +71,7 @@ namespace impl
       {
         dest_node.meta[i] = 0;
 
-        /* Let's make sure the output is deterministic. */
+        // Let's make sure the output is deterministic.
         dest_node.q_lo_x[i] = 0;
         dest_node.q_lo_y[i] = 0;
         dest_node.q_lo_z[i] = 0;

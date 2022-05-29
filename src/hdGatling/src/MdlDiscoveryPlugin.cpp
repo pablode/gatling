@@ -11,14 +11,14 @@ NdrNodeDiscoveryResultVec HdGatlingMdlDiscoveryPlugin::DiscoverNodes(const Conte
   NdrNodeDiscoveryResultVec result;
 
   NdrNodeDiscoveryResult mdlNode(
-    /* identifier    */ HdGatlingNodeIdentifiers->mdl,
-    /* version       */ NdrVersion(1),
-    /* name          */ HdGatlingNodeIdentifiers->mdl,
-    /* family        */ TfToken(),
-    /* discoveryType */ HdGatlingDiscoveryTypes->mdl,
-    /* sourceType    */ HdGatlingSourceTypes->mdl,
-    /* uri           */ std::string(),
-    /* resolvedUri   */ std::string()
+    HdGatlingNodeIdentifiers->mdl, // identifier
+    NdrVersion(1),                 // version
+    HdGatlingNodeIdentifiers->mdl, // name
+    TfToken(),                     // family
+    HdGatlingDiscoveryTypes->mdl,  // discoveryType
+    HdGatlingSourceTypes->mdl,     // sourceType
+    std::string(),                 // uri
+    std::string()                  // resolvedUri
   );
   result.push_back(mdlNode);
 

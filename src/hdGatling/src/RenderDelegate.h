@@ -35,14 +35,14 @@ public:
   HdAovDescriptor GetDefaultAovDescriptor(const TfToken& name) const override;
 
 public:
-  /* Rprim */
+  // Rprim
   const TfTokenVector& GetSupportedRprimTypes() const override;
 
   HdRprim* CreateRprim(const TfToken& typeId, const SdfPath& rprimId) override;
 
   void DestroyRprim(HdRprim* rPrim) override;
 
-  /* Sprim */
+  // Sprim
   const TfTokenVector& GetSupportedSprimTypes() const override;
 
   HdSprim* CreateSprim(const TfToken& typeId, const SdfPath& sprimId) override;
@@ -51,7 +51,7 @@ public:
 
   void DestroySprim(HdSprim* sprim) override;
 
-  /* Bprim */
+  // Bprim
   const TfTokenVector& GetSupportedBprimTypes() const override;
 
   HdBprim* CreateBprim(const TfToken& typeId, const SdfPath& bprimId) override;

@@ -13,12 +13,12 @@ namespace gi
     struct BvhNode2
     {
       gml_aabb aabb;
-      /* If this node is a leaf, the face offset. Otherwise, the offset
-       * to the left child node. */
+      // If this node is a leaf, the face offset. Otherwise, the offset
+      // to the left child node.
       uint32_t field1;
-      /* If the first bit of this field is set, this node is a leaf.
-       * The remaining 31 bits encode the number of faces if the node
-       * is a leaf or the offset to the right child node, if it's not. */
+      // If the first bit of this field is set, this node is a leaf.
+      // The remaining 31 bits encode the number of faces if the node
+      // is a leaf or the offset to the right child node, if it's not.
       uint32_t field2;
     };
 

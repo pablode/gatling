@@ -5,17 +5,17 @@
 #include <assert.h>
 #include <array>
 
-/*
- * This file implements construction of an N-wide BVH from a binary BVH as described
- * by Ylitie, Karras and Laine.
- * It works by first calculating SAH costs for representing the contents of each subtree
- * as a forest of at most i BVHs. By doing this bottom-up, previous results can be reused.
- * For each node and subtree count, we store the minimal cost in an N * (I-1) table, where
- * N is the number of nodes and I is the width of the BVH.
- * In a second pass, we traverse top-down and trace the decisions leading to the minimal
- * costs stored in the table. We inline DISTRIBUTE splits and combine leaf nodes. For each
- * INTERNAL split decision, we recurse further down.
- */
+//
+// This file implements construction of an N-wide BVH from a binary BVH as described
+// by Ylitie, Karras and Laine.
+// It works by first calculating SAH costs for representing the contents of each subtree
+// as a forest of at most i BVHs. By doing this bottom-up, previous results can be reused.
+// For each node and subtree count, we store the minimal cost in an N * (I-1) table, where
+// N is the number of nodes and I is the width of the BVH.
+// In a second pass, we traverse top-down and trace the decisions leading to the minimal
+// costs stored in the table. We inline DISTRIBUTE splits and combine leaf nodes. For each
+// INTERNAL split decision, we recurse further down.
+//
 namespace gi
 {
   namespace bvh
