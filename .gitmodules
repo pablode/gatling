@@ -28,9 +28,9 @@
 [submodule "extern/miniz"]
 	path = extern/miniz
 	url = https://github.com/richgel999/miniz.git
-[submodule "extern/libjpeg-turbo"]
-	path = extern/libjpeg-turbo
-	url = https://github.com/libjpeg-turbo/libjpeg-turbo.git
 [submodule "extern/SPIRV-Reflect"]
 	path = extern/SPIRV-Reflect
 	url = https://github.com/KhronosGroup/SPIRV-Reflect
+[submodule "extern/libjpeg-turbo"]
+	path = extern/libjpeg-turbo
+	url = https://github.com/pablode/libjpeg-turbo
