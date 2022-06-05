@@ -4,16 +4,16 @@
 RWStructuredBuffer<float4> pixels;
 
 #ifdef BVH_ENABLED
-  [[vk::binding(1)]]
-  StructuredBuffer<bvh_node> bvh_nodes;
+[[vk::binding(1)]]
+StructuredBuffer<bvh_node> bvh_nodes;
 #endif
 
 [[vk::binding(2)]]
 StructuredBuffer<face> faces;
 
 #ifdef NEXT_EVENT_ESTIMATION
-  [[vk::binding(3)]]
-  StructuredBuffer<uint> emissive_face_indices;
+[[vk::binding(3)]]
+StructuredBuffer<uint> emissive_face_indices;
 #endif
 
 [[vk::binding(4)]]
@@ -21,18 +21,18 @@ StructuredBuffer<fvertex> vertices;
 
 struct PushConstants
 {
-  float3 CAMERA_POSITION;
-  uint   IMAGE_WIDTH;
-  float3 CAMERA_FORWARD;
-  uint   IMAGE_HEIGHT;
-  float3 CAMERA_UP;
-  float  CAMERA_VFOV;
-  float4 BACKGROUND_COLOR;
-  uint   SAMPLE_COUNT;
-  uint   MAX_BOUNCES;
-  float  MAX_SAMPLE_VALUE;
-  uint   RR_BOUNCE_OFFSET;
-  float  RR_INV_MIN_TERM_PROB;
+    float3 CAMERA_POSITION;
+    uint   IMAGE_WIDTH;
+    float3 CAMERA_FORWARD;
+    uint   IMAGE_HEIGHT;
+    float3 CAMERA_UP;
+    float  CAMERA_VFOV;
+    float4 BACKGROUND_COLOR;
+    uint   SAMPLE_COUNT;
+    uint   MAX_BOUNCES;
+    float  MAX_SAMPLE_VALUE;
+    uint   RR_BOUNCE_OFFSET;
+    float  RR_INV_MIN_TERM_PROB;
 };
 
 // Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
@@ -60,7 +60,7 @@ bool russian_roulette(in float random_float, inout float3 throughput)
 
     if (random_float > p)
     {
-      return true;
+        return true;
     }
 
     throughput /= p;

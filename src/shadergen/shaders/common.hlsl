@@ -27,22 +27,22 @@ struct face
 };
 
 #ifdef BVH_ENABLED
-  struct bvh_node
-  {
-      uint4 f1;
-      uint4 f2;
-      uint4 f3;
-      uint4 f4;
-      uint4 f5;
-  };
+struct bvh_node
+{
+    uint4 f1;
+    uint4 f2;
+    uint4 f3;
+    uint4 f4;
+    uint4 f5;
+};
 #endif
 
 struct RayInfo
 {
-  float3 origin;
-  float  tmax;
-  float3 dir;
-  float  padding;
+    float3 origin;
+    float  tmax;
+    float3 dir;
+    float  padding;
 };
 
 struct Hit_info
