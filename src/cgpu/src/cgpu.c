@@ -1796,25 +1796,24 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
     return CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE;
   }
 
-  uint32_t buffer_resource_count = 0;
-  uint32_t image_resource_count = 0;
+  uint32_t buffer_count = 0;
+  uint32_t storage_image_count = 0;
+  uint32_t sampled_image_count = 0;
+  uint32_t combined_image_sampler_count = 0;
+  uint32_t sampler_count = 0;
 
   for (uint32_t i = 0; i < shader_reflection->resource_count; i++)
   {
     const cgpu_shader_reflection_resource* resource = &shader_reflection->resources[i];
 
-    if (resource->descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+    switch (resource->descriptor_type)
     {
-      buffer_resource_count++;
-    }
-    else if (resource->descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
-             resource->descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
-             resource->descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-    {
-      image_resource_count++;
-    }
-    else
-    {
+    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: buffer_count++; break;
+    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storage_image_count++; break;
+    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampled_image_count++; break;
+    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: combined_image_sampler_count++; break;
+    case VK_DESCRIPTOR_TYPE_SAMPLER: sampler_count++; break;
+    default: {
       resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
       idevice->table.vkDestroyPipelineLayout(
         idevice->logical_device,
@@ -1828,21 +1827,40 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       );
       return CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE;
     }
+    }
   }
 
   uint32_t pool_size_count = 0;
-  VkDescriptorPoolSize pool_sizes[2];
+  VkDescriptorPoolSize pool_sizes[16];
 
-  if (buffer_resource_count > 0)
+  if (buffer_count > 0)
   {
     pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    pool_sizes[pool_size_count].descriptorCount = buffer_resource_count;
+    pool_sizes[pool_size_count].descriptorCount = buffer_count;
     pool_size_count++;
   }
-  if (image_resource_count > 0)
+  if (storage_image_count > 0)
   {
     pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    pool_sizes[pool_size_count].descriptorCount = image_resource_count;
+    pool_sizes[pool_size_count].descriptorCount = storage_image_count;
+    pool_size_count++;
+  }
+  if (sampled_image_count > 0)
+  {
+    pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    pool_sizes[pool_size_count].descriptorCount = sampled_image_count;
+    pool_size_count++;
+  }
+  if (combined_image_sampler_count > 0)
+  {
+    pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    pool_sizes[pool_size_count].descriptorCount = combined_image_sampler_count;
+    pool_size_count++;
+  }
+  if (sampler_count > 0)
+  {
+    pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    pool_sizes[pool_size_count].descriptorCount = sampler_count;
     pool_size_count++;
   }
 
