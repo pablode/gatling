@@ -130,12 +130,6 @@ namespace sg
       return false;
     }
 
-    if (targetCode->get_texture_count() > 0)
-    {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "Textures not supported, aborting\n");
-      return false;
-    }
-
     std::stringstream ss;
     ss << targetCode->get_code();
 

@@ -234,6 +234,7 @@ namespace sg
     }
 
     ss << "#include \"mdl_types.hlsl\"\n";
+    ss << "#include \"mdl_interface.hlsl\"\n";
     ss << genMdl;
     ss << fileSrc;
 
