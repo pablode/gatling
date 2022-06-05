@@ -113,7 +113,8 @@ typedef enum CgpuResult {
   CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET = -34,
   CGPU_FAIL_UNABLE_TO_INITIALIZE_VMA = -35,
   CGPU_FAIL_UNABLE_TO_REFLECT_SHADER = -36,
-  CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH = -37
+  CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH = -37,
+  CGPU_FAIL_UNABLE_TO_CREATE_SAMPLER = -38
 } CgpuResult;
 
 typedef uint32_t CgpuBufferUsageFlags;
@@ -416,6 +417,13 @@ typedef enum CgpuMemoryAccessFlagBits {
   CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE = 256
 } CgpuMemoryAccessFlagBits;
 
+typedef enum CgpuSamplerAddressMode {
+  CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE = 0,
+  CGPU_SAMPLER_ADDRESS_MODE_REPEAT = 1,
+  CGPU_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT = 2,
+  CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK = 3
+} CgpuSamplerAddressMode;
+
 typedef struct cgpu_instance       { uint64_t handle; } cgpu_instance;
 typedef struct cgpu_device         { uint64_t handle; } cgpu_device;
 typedef struct cgpu_buffer         { uint64_t handle; } cgpu_buffer;
@@ -424,6 +432,7 @@ typedef struct cgpu_shader         { uint64_t handle; } cgpu_shader;
 typedef struct cgpu_pipeline       { uint64_t handle; } cgpu_pipeline;
 typedef struct cgpu_fence          { uint64_t handle; } cgpu_fence;
 typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
+typedef struct cgpu_sampler        { uint64_t handle; } cgpu_sampler;
 
 typedef struct cgpu_shader_resource_buffer {
   uint32_t binding;
@@ -645,6 +654,19 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_map_image(
 CGPU_API CgpuResult CGPU_CDECL cgpu_unmap_image(
   cgpu_device device,
   cgpu_image image
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_sampler(
+  cgpu_device device,
+  CgpuSamplerAddressMode address_mode_u,
+  CgpuSamplerAddressMode address_mode_v,
+  CgpuSamplerAddressMode address_mode_w,
+  cgpu_sampler* p_sampler
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_sampler(
+  cgpu_device device,
+  cgpu_sampler sampler
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_pipeline(

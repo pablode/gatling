@@ -103,6 +103,10 @@ typedef struct cgpu_icommand_buffer {
   cgpu_pipeline   pipeline;
 } cgpu_icommand_buffer;
 
+typedef struct cgpu_isampler {
+  VkSampler sampler;
+} cgpu_isampler;
+
 /* Handle and structure storage. */
 
 static resource_store idevice_store;
@@ -112,6 +116,7 @@ static resource_store iimage_store;
 static resource_store ipipeline_store;
 static resource_store icommand_buffer_store;
 static resource_store ifence_store;
+static resource_store isampler_store;
 static cgpu_iinstance iinstance;
 
 /* Helper functions. */
@@ -131,6 +136,7 @@ CGPU_RESOLVE_HANDLE(         image,          cgpu_image,          cgpu_iimage,  
 CGPU_RESOLVE_HANDLE(      pipeline,       cgpu_pipeline,       cgpu_ipipeline,       ipipeline_store)
 CGPU_RESOLVE_HANDLE(         fence,          cgpu_fence,          cgpu_ifence,          ifence_store)
 CGPU_RESOLVE_HANDLE(command_buffer, cgpu_command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
+CGPU_RESOLVE_HANDLE(       sampler,        cgpu_sampler,        cgpu_isampler,        isampler_store)
 
 static VkMemoryPropertyFlags cgpu_translate_memory_properties(CgpuMemoryPropertyFlags memory_properties)
 {
@@ -578,6 +584,18 @@ static VkFormat cgpu_translate_image_format(CgpuImageFormat image_format)
   }
 }
 
+static VkSamplerAddressMode cgpu_translate_address_mode(CgpuSamplerAddressMode mode)
+{
+  switch (mode)
+  {
+  case CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  case CGPU_SAMPLER_ADDRESS_MODE_REPEAT: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  case CGPU_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+  case CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  default: return VK_SAMPLER_ADDRESS_MODE_MAX_ENUM;
+  }
+}
+
 /* API method implementation. */
 
 CgpuResult cgpu_initialize(const char* p_app_name,
@@ -655,6 +673,7 @@ CgpuResult cgpu_initialize(const char* p_app_name,
   resource_store_create(&ipipeline_store, sizeof(cgpu_ipipeline), 8);
   resource_store_create(&icommand_buffer_store, sizeof(cgpu_icommand_buffer), 16);
   resource_store_create(&ifence_store, sizeof(cgpu_ifence), 8);
+  resource_store_create(&isampler_store, sizeof(cgpu_isampler), 64);
 
   return CGPU_OK;
 }
@@ -668,6 +687,7 @@ CgpuResult cgpu_terminate(void)
   resource_store_destroy(&ipipeline_store);
   resource_store_destroy(&icommand_buffer_store);
   resource_store_destroy(&ifence_store);
+  resource_store_destroy(&isampler_store);
 
   vkDestroyInstance(iinstance.instance, NULL);
 
@@ -1563,6 +1583,83 @@ CgpuResult cgpu_unmap_image(cgpu_device device,
     return CGPU_FAIL_INVALID_HANDLE;
   }
   vmaUnmapMemory(idevice->allocator, iimage->allocation);
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_create_sampler(cgpu_device device,
+                               CgpuSamplerAddressMode address_mode_u,
+                               CgpuSamplerAddressMode address_mode_v,
+                               CgpuSamplerAddressMode address_mode_w,
+                               cgpu_sampler* p_sampler)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  p_sampler->handle = resource_store_create_handle(&isampler_store);
+
+  cgpu_isampler* isampler;
+  if (!cgpu_resolve_sampler(*p_sampler, &isampler)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  // Emulate MDL's clip wrap mode if necessary; use optimal mode (according to ARM) if not.
+  bool clampToBlack = (address_mode_u == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
+                      (address_mode_v == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
+                      (address_mode_w == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK);
+
+  VkSamplerCreateInfo create_info;
+  create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  create_info.pNext = NULL;
+  create_info.flags = 0;
+  create_info.magFilter = VK_FILTER_LINEAR;
+  create_info.minFilter = VK_FILTER_LINEAR;
+  create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  create_info.addressModeU = cgpu_translate_address_mode(address_mode_u);
+  create_info.addressModeV = cgpu_translate_address_mode(address_mode_v);
+  create_info.addressModeW = cgpu_translate_address_mode(address_mode_w);
+  create_info.mipLodBias = 0.0f;
+  create_info.anisotropyEnable = VK_FALSE;
+  create_info.maxAnisotropy = 1.0f;
+  create_info.compareEnable = VK_FALSE;
+  create_info.compareOp = VK_COMPARE_OP_NEVER;
+  create_info.minLod = 0.0f;
+  create_info.maxLod = VK_LOD_CLAMP_NONE;
+  create_info.borderColor = clampToBlack ? VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+  create_info.unnormalizedCoordinates = VK_FALSE;
+
+  VkResult result = idevice->table.vkCreateSampler(
+    idevice->logical_device,
+    &create_info,
+    NULL,
+    &isampler->sampler
+  );
+
+  if (result != VK_SUCCESS) {
+    resource_store_free_handle(&isampler_store, p_sampler->handle);
+    return CGPU_FAIL_UNABLE_TO_CREATE_SAMPLER;
+  }
+
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_destroy_sampler(cgpu_device device,
+                                cgpu_sampler sampler)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_isampler* isampler;
+  if (!cgpu_resolve_sampler(sampler, &isampler)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  idevice->table.vkDestroySampler(idevice->logical_device, isampler->sampler, NULL);
+
+  resource_store_free_handle(&isampler_store, sampler.handle);
+
   return CGPU_OK;
 }
 
