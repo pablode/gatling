@@ -109,15 +109,15 @@ typedef struct cgpu_isampler {
 
 /* Handle and structure storage. */
 
+static cgpu_iinstance iinstance;
 static resource_store idevice_store;
-static resource_store ishader_store;
 static resource_store ibuffer_store;
 static resource_store iimage_store;
+static resource_store ishader_store;
 static resource_store ipipeline_store;
-static resource_store icommand_buffer_store;
 static resource_store ifence_store;
+static resource_store icommand_buffer_store;
 static resource_store isampler_store;
-static cgpu_iinstance iinstance;
 
 /* Helper functions. */
 
@@ -131,8 +131,8 @@ static cgpu_iinstance iinstance;
 
 CGPU_RESOLVE_HANDLE(        device,         cgpu_device,         cgpu_idevice,         idevice_store)
 CGPU_RESOLVE_HANDLE(        buffer,         cgpu_buffer,         cgpu_ibuffer,         ibuffer_store)
-CGPU_RESOLVE_HANDLE(        shader,         cgpu_shader,         cgpu_ishader,         ishader_store)
 CGPU_RESOLVE_HANDLE(         image,          cgpu_image,          cgpu_iimage,          iimage_store)
+CGPU_RESOLVE_HANDLE(        shader,         cgpu_shader,         cgpu_ishader,         ishader_store)
 CGPU_RESOLVE_HANDLE(      pipeline,       cgpu_pipeline,       cgpu_ipipeline,       ipipeline_store)
 CGPU_RESOLVE_HANDLE(         fence,          cgpu_fence,          cgpu_ifence,          ifence_store)
 CGPU_RESOLVE_HANDLE(command_buffer, cgpu_command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
