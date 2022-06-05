@@ -1,5 +1,24 @@
 #include "common.hlsl"
 
+[[vk::binding(0)]]
+RWStructuredBuffer<float4> pixels;
+
+#ifdef BVH_ENABLED
+  [[vk::binding(1)]]
+  StructuredBuffer<bvh_node> bvh_nodes;
+#endif
+
+[[vk::binding(2)]]
+StructuredBuffer<face> faces;
+
+#ifdef NEXT_EVENT_ESTIMATION
+  [[vk::binding(3)]]
+  StructuredBuffer<uint> emissive_face_indices;
+#endif
+
+[[vk::binding(4)]]
+StructuredBuffer<fvertex> vertices;
+
 struct PushConstants
 {
   float3 CAMERA_POSITION;

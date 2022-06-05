@@ -56,25 +56,6 @@ struct Hit_info
 #endif
 };
 
-[[vk::binding(0)]]
-RWStructuredBuffer<float4> pixels;
-
-#ifdef BVH_ENABLED
-  [[vk::binding(1)]]
-  StructuredBuffer<bvh_node> bvh_nodes;
-#endif
-
-[[vk::binding(2)]]
-StructuredBuffer<face> faces;
-
-#ifdef NEXT_EVENT_ESTIMATION
-  [[vk::binding(3)]]
-  StructuredBuffer<uint> emissive_face_indices;
-#endif
-
-[[vk::binding(4)]]
-StructuredBuffer<fvertex> vertices;
-
 // RNG producing on a four-element vector.
 // From: "Hash Functions for GPU Rendering" by Jarzynski and Olano.
 // Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/
