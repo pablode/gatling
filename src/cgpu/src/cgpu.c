@@ -78,14 +78,16 @@ typedef struct cgpu_iimage {
 } cgpu_iimage;
 
 typedef struct cgpu_ipipeline {
-  VkPipeline                 pipeline;
-  VkPipelineLayout           layout;
-  VkDescriptorPool           descriptor_pool;
-  VkDescriptorSet            descriptor_set;
-  VkDescriptorSetLayout      descriptor_set_layout;
-  cgpu_shader_resource_image image_resources[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
-  uint32_t                   image_resource_count;
-  cgpu_shader                shader;
+  VkPipeline                   pipeline;
+  VkPipelineLayout             layout;
+  VkDescriptorPool             descriptor_pool;
+  VkDescriptorSet              descriptor_set;
+  VkDescriptorSetLayout        descriptor_set_layout;
+  VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
+  uint32_t                     descriptor_set_layout_binding_count;
+  cgpu_shader_resource_image   image_resources[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
+  uint32_t                     image_resource_count;
+  cgpu_shader                  shader;
 } cgpu_ipipeline;
 
 typedef struct cgpu_ishader {
@@ -1691,13 +1693,13 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
     return CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_LAYOUT;
   }
 
-  VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
+  ipipeline->descriptor_set_layout_binding_count = shader_reflection->resource_count;
 
   for (uint32_t i = 0; i < shader_reflection->resource_count; i++)
   {
     const cgpu_shader_reflection_resource* resource = &shader_reflection->resources[i];
 
-    VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &descriptor_set_layout_bindings[i];
+    VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
     descriptor_set_layout_binding->binding = resource->binding;
     descriptor_set_layout_binding->descriptorType = resource->descriptor_type;
     descriptor_set_layout_binding->descriptorCount = resource->count;
@@ -1710,7 +1712,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
   descriptor_set_layout_create_info.pNext = NULL;
   descriptor_set_layout_create_info.flags = 0;
   descriptor_set_layout_create_info.bindingCount = shader_reflection->resource_count;
-  descriptor_set_layout_create_info.pBindings = descriptor_set_layout_bindings;
+  descriptor_set_layout_create_info.pBindings = ipipeline->descriptor_set_layout_bindings;
 
   VkResult result = idevice->table.vkCreateDescriptorSetLayout(
     idevice->logical_device,
@@ -2035,6 +2037,8 @@ CgpuResult cgpu_update_resources(cgpu_device device,
     write_desc_set_count++;
   }
 
+  ipipeline->image_resource_count = image_resource_count;
+
   for (uint32_t i = 0; i < image_resource_count; ++i)
   {
     const cgpu_shader_resource_image* shader_resource_image = &p_image_resources[i];
@@ -2045,10 +2049,26 @@ CgpuResult cgpu_update_resources(cgpu_device device,
       return CGPU_FAIL_INVALID_HANDLE;
     }
 
+    int32_t descriptor_binding_idx = -1;
+    for (uint32_t j = 0; j < ipipeline->descriptor_set_layout_binding_count; j++)
+    {
+      if (ipipeline->descriptor_set_layout_bindings[j].binding == shader_resource_image->binding)
+      {
+        descriptor_binding_idx = j;
+        break;
+      }
+    }
+    if (descriptor_binding_idx == -1)
+    {
+      return CGPU_FAIL_RESOURCE_BINDING_MISMATCH;
+    }
+
+    const VkDescriptorSetLayoutBinding* descriptor_binding = &ipipeline->descriptor_set_layout_bindings[descriptor_binding_idx];
+
     VkDescriptorImageInfo* descriptor_image_info = &descriptor_image_infos[i];
     descriptor_image_info->sampler = idevice->sampler;
     descriptor_image_info->imageView = iimage->image_view;
-    descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    descriptor_image_info->imageLayout = iimage->layout;
 
     VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2056,12 +2076,14 @@ CgpuResult cgpu_update_resources(cgpu_device device,
     write_descriptor_set->dstSet = ipipeline->descriptor_set;
     write_descriptor_set->dstBinding = shader_resource_image->binding;
     write_descriptor_set->dstArrayElement = 0;
-    write_descriptor_set->descriptorCount = 1;
-    write_descriptor_set->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    write_descriptor_set->descriptorCount = descriptor_binding->descriptorCount;
+    write_descriptor_set->descriptorType = descriptor_binding->descriptorType;
     write_descriptor_set->pImageInfo = descriptor_image_info;
     write_descriptor_set->pBufferInfo = NULL;
     write_descriptor_set->pTexelBufferView = NULL;
     write_desc_set_count++;
+
+    ipipeline->image_resources[i] = *shader_resource_image;
   }
 
   idevice->table.vkUpdateDescriptorSets(
