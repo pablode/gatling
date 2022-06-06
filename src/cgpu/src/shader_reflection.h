@@ -25,6 +25,7 @@ typedef struct cgpu_shader_reflection_resource {
   int descriptor_type;
   bool write_access;
   bool read_access;
+  int count;
 } cgpu_shader_reflection_resource;
 
 typedef struct cgpu_shader_reflection {

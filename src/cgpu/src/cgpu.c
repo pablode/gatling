@@ -1696,12 +1696,11 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
   for (uint32_t i = 0; i < shader_reflection->resource_count; i++)
   {
     const cgpu_shader_reflection_resource* resource = &shader_reflection->resources[i];
-    VkDescriptorType descriptor_type = resource->descriptor_type;
 
     VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &descriptor_set_layout_bindings[i];
     descriptor_set_layout_binding->binding = resource->binding;
-    descriptor_set_layout_binding->descriptorType = descriptor_type;
-    descriptor_set_layout_binding->descriptorCount = 1;
+    descriptor_set_layout_binding->descriptorType = resource->descriptor_type;
+    descriptor_set_layout_binding->descriptorCount = resource->count;
     descriptor_set_layout_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }

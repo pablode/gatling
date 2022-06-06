@@ -65,6 +65,7 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     sr_res->write_access = binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
     sr_res->read_access = binding->accessed;
     sr_res->binding = binding->binding;
+    sr_res->count = binding->count;
   }
 
   assert(shader_module.push_constant_block_count == 1);
