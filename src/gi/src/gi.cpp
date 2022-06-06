@@ -456,6 +456,7 @@ int giRender(const gi_render_params* params,
   cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
   cgpu_fence fence = { CGPU_INVALID_HANDLE };
+  cgpu_image dummy_image = { CGPU_INVALID_HANDLE };
 
   // Set up buffers.
   const int COLOR_COMPONENT_COUNT = 4;
@@ -484,6 +485,18 @@ int giRender(const gi_render_params* params,
   if (c_result != CGPU_OK)
   {
     cgpu_destroy_buffer(s_device, staging_buffer);
+    return GI_ERROR;
+  }
+
+  c_result = cgpu_create_image(s_device,
+    1, 1, CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM,
+    CGPU_IMAGE_USAGE_FLAG_STORAGE, CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    &dummy_image
+  );
+  if (c_result != CGPU_OK)
+  {
+    cgpu_destroy_buffer(s_device, staging_buffer);
+    cgpu_destroy_buffer(s_device, output_buffer);
     return GI_ERROR;
   }
 
@@ -522,16 +535,16 @@ int giRender(const gi_render_params* params,
   }
   buffers.push_back({ 4, geom_cache->buffer, geom_cache->vertex_buf_offset, geom_cache->vertex_buf_size });
 
-  const uint32_t image_count = 0;
-  const cgpu_shader_resource_image* images = nullptr;
+  std::vector<cgpu_shader_resource_image> images;
+  images.push_back({ 5, dummy_image });
 
   c_result = cgpu_update_resources(
     s_device,
     shader_cache->pipeline,
     buffers.size(),
     buffers.data(),
-    image_count,
-    images
+    images.size(),
+    images.data()
   );
   if (c_result != CGPU_OK) goto cleanup;
 
@@ -642,6 +655,7 @@ int giRender(const gi_render_params* params,
   result = GI_OK;
 
 cleanup:
+  cgpu_destroy_image(s_device, dummy_image);
   cgpu_destroy_fence(s_device, fence);
   cgpu_destroy_command_buffer(s_device, command_buffer);
   cgpu_destroy_buffer(s_device, staging_buffer);

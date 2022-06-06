@@ -2,7 +2,7 @@
 
 float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
 {
-    return float4(float(tex & 1), float(tex & 2), float(tex & 4), 1.0); // TODO
+    return images[0].Load(int2(0, 0)); // TODO
 }
 
 float3 tex_lookup_float3_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
@@ -22,7 +22,7 @@ float tex_lookup_float_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wr
 
 float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
 {
-    return float4(float(tex & 1), float(tex & 2), float(tex & 4), 1.0); // TODO
+    return images[0].Load(int2(0, 0)); // TODO
 }
 
 float3 tex_lookup_float3_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
@@ -52,7 +52,7 @@ float3 tex_lookup_color_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float
 
 float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
 {
-    return float4(float(tex & 1), float(tex & 2), float(tex & 4), 1.0); // TODO
+    return images[0].Load(int2(0, 0)); // TODO
 }
 
 float3 tex_texel_float3_3d(uint tex, int3 coord, float frame)
@@ -77,7 +77,7 @@ float3 tex_texel_color_3d(uint tex, int3 coord, float frame)
 
 float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
 {
-    return float4(float(tex & 1), float(tex & 2), float(tex & 4), 1.0); // TODO
+    return images[0].Load(int2(0, 0)); // TODO
 }
 
 float3 tex_texel_float3_2d(uint tex, int2 coord, int2 uv_tile, float frame)

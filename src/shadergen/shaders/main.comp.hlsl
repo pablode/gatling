@@ -1,6 +1,5 @@
 #include "common.hlsl"
 #include "mdl_types.hlsl"
-#include "mdl_interface.hlsl"
 
 [[vk::binding(0)]]
 RWStructuredBuffer<float4> pixels;
@@ -20,6 +19,9 @@ StructuredBuffer<uint> emissive_face_indices;
 
 [[vk::binding(4)]]
 StructuredBuffer<fvertex> vertices;
+
+[[vk::binding(5)]]
+RWTexture2D<float4> images[1];
 
 struct PushConstants
 {
@@ -43,6 +45,8 @@ struct PushConstants
 #else
 [[vk::push_constant]] ConstantBuffer<PushConstants> PC;
 #endif
+
+#include "mdl_interface.hlsl"
 
 #include "intersection.hlsl"
 
