@@ -233,9 +233,11 @@ namespace sg
       return false;
     }
 
-    ss << "#include \"mdl_types.hlsl\"\n";
-    ss << "#include \"mdl_interface.hlsl\"\n";
-    ss << genMdl;
+    std::string mdlLocMarker = "MDL_GENERATED_CODE";
+    size_t mdlInjectionLoc = fileSrc.find(mdlLocMarker);
+    assert(mdlInjectionLoc != std::string::npos);
+    fileSrc.replace(mdlInjectionLoc, mdlLocMarker.size(), genMdl);
+
     ss << fileSrc;
 
     entryPoint = "CSMain";

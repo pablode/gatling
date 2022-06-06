@@ -1,4 +1,6 @@
 #include "common.hlsl"
+#include "mdl_types.hlsl"
+#include "mdl_interface.hlsl"
 
 [[vk::binding(0)]]
 RWStructuredBuffer<float4> pixels;
@@ -43,6 +45,8 @@ struct PushConstants
 #endif
 
 #include "intersection.hlsl"
+
+MDL_GENERATED_CODE
 
 struct Sample_state
 {
