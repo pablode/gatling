@@ -54,7 +54,6 @@ typedef struct cgpu_idevice {
   VkQueue                     compute_queue;
   VkCommandPool               command_pool;
   VkQueryPool                 timestamp_pool;
-  VkSampler                   sampler;
   struct VolkDeviceTable      table;
   cgpu_physical_device_limits limits;
   VmaAllocator                allocator;
@@ -1034,48 +1033,6 @@ CgpuResult cgpu_create_device(uint32_t index,
     return CGPU_FAIL_CAN_NOT_CREATE_COMMAND_POOL;
   }
 
-  VkSamplerCreateInfo sampler_info;
-  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  sampler_info.pNext = NULL;
-  sampler_info.flags = 0;
-  sampler_info.magFilter = VK_FILTER_LINEAR;
-  sampler_info.minFilter = VK_FILTER_LINEAR;
-  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-  sampler_info.mipLodBias = 0.0f;
-  sampler_info.anisotropyEnable = VK_TRUE;
-  sampler_info.maxAnisotropy = 16.0f;
-  sampler_info.compareEnable = VK_FALSE;
-  sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
-  sampler_info.minLod = 0.0f;
-  sampler_info.maxLod = 0.0f;
-  sampler_info.borderColor = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
-  sampler_info.unnormalizedCoordinates = VK_FALSE;
-
-  result = idevice->table.vkCreateSampler(
-    idevice->logical_device,
-    &sampler_info,
-    NULL,
-    &idevice->sampler
-  );
-  if (result != VK_SUCCESS)
-  {
-    resource_store_free_handle(&idevice_store, p_device->handle);
-
-    idevice->table.vkDestroyCommandPool(
-      idevice->logical_device,
-      idevice->command_pool,
-      NULL
-    );
-    idevice->table.vkDestroyDevice(
-      idevice->logical_device,
-      NULL
-    );
-    return CGPU_FAIL_CAN_NOT_CREATE_COMMAND_POOL;
-  }
-
   VkQueryPoolCreateInfo timestamp_pool_info;
   timestamp_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
   timestamp_pool_info.pNext = NULL;
@@ -1095,11 +1052,6 @@ CgpuResult cgpu_create_device(uint32_t index,
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
 
-    idevice->table.vkDestroySampler(
-      idevice->logical_device,
-      idevice->sampler,
-      NULL
-    );
     idevice->table.vkDestroyCommandPool(
       idevice->logical_device,
       idevice->command_pool,
@@ -1154,11 +1106,6 @@ CgpuResult cgpu_create_device(uint32_t index,
       idevice->timestamp_pool,
       NULL
     );
-    idevice->table.vkDestroySampler(
-      idevice->logical_device,
-      idevice->sampler,
-      NULL
-    );
     idevice->table.vkDestroyCommandPool(
       idevice->logical_device,
       idevice->command_pool,
@@ -1188,19 +1135,11 @@ CgpuResult cgpu_destroy_device(cgpu_device device)
     idevice->timestamp_pool,
     NULL
   );
-
-  idevice->table.vkDestroySampler(
-    idevice->logical_device,
-    idevice->sampler,
-    NULL
-  );
-
   idevice->table.vkDestroyCommandPool(
     idevice->logical_device,
     idevice->command_pool,
     NULL
   );
-
   idevice->table.vkDestroyDevice(
     idevice->logical_device,
     NULL
@@ -2066,7 +2005,7 @@ CgpuResult cgpu_update_resources(cgpu_device device,
     const VkDescriptorSetLayoutBinding* descriptor_binding = &ipipeline->descriptor_set_layout_bindings[descriptor_binding_idx];
 
     VkDescriptorImageInfo* descriptor_image_info = &descriptor_image_infos[i];
-    descriptor_image_info->sampler = idevice->sampler;
+    descriptor_image_info->sampler = VK_NULL_HANDLE;
     descriptor_image_info->imageView = iimage->image_view;
     descriptor_image_info->imageLayout = iimage->layout;
 
