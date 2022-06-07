@@ -60,6 +60,14 @@ namespace sg
       return false;
     }
 
+    auto pluginConfigApi = mi::base::Handle<mi::neuraylib::IPlugin_configuration>(m_neuray->get_api_component<mi::neuraylib::IPlugin_configuration>());
+    std::string pluginFilePath = std::string(resourcePath) + std::string("/mdl-image-plugin" MI_BASE_DLL_FILE_EXT);
+    if (pluginConfigApi->load_plugin_library(pluginFilePath.c_str()) != 0)
+    {
+      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Unable to load image plugin");
+      return false;
+    }
+
     if (m_neuray->start() != 0)
     {
       m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Unable to start Neuray");

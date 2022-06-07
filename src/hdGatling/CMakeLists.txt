@@ -78,6 +78,8 @@ file(
     ${PLUGINFO}
 )
 
+add_dependencies(hdGatling mdl-image-plugin)
+
 install(
   FILES
     "${PLUGINFO_PATH}"
