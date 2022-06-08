@@ -100,7 +100,8 @@ namespace sg
   }
 
   bool MdlHlslCodeGen::translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
-                                 std::string& hlslSrc)
+                                 std::string& hlslSrc,
+                                 std::vector<TextureResource>& textureResources)
   {
     mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), m_context.get()));
     m_logger->flushContextMessages(m_context.get());
@@ -128,6 +129,66 @@ namespace sg
     if (!targetCode)
     {
       return false;
+    }
+
+    int texCount = targetCode->get_body_texture_count();
+    textureResources.reserve(texCount);
+
+    // Index 0 always is the invalid texture.
+    for (int i = 1; i < texCount; i++)
+    {
+      const char* texDbName = targetCode->get_texture(i);
+      assert(texDbName);
+      mi::base::Handle<const mi::neuraylib::ITexture> texture(m_transaction->access<mi::neuraylib::ITexture>(texDbName));
+      mi::base::Handle<const mi::neuraylib::IImage> image(m_transaction->access<mi::neuraylib::IImage>(texture->get_image()));
+
+      TextureResource textureResource;
+      textureResource.binding = i;
+
+      uint32_t frameId = 0;
+      uint32_t uvTileId = 0;
+      uint32_t level = 0;
+
+      switch (targetCode->get_texture_shape(i))
+      {
+      case mi::neuraylib::ITarget_code::Texture_shape_2d: {
+        textureResource.width = image->resolution_x(frameId, uvTileId, level);
+        textureResource.height = image->resolution_y(frameId, uvTileId, level);
+        textureResource.filePath = image->get_filename(frameId, uvTileId);
+        break;
+      }
+      case mi::neuraylib::ITarget_code::Texture_shape_bsdf_data: {
+        mi::base::Handle<const mi::neuraylib::ICanvas> canvas(image->get_canvas(frameId, uvTileId, level));
+        assert(canvas);
+
+        textureResource.width = canvas->get_resolution_x();
+        textureResource.height = canvas->get_resolution_y();
+
+        size_t size = textureResource.width * textureResource.height * 4;
+        mi::base::Handle<const mi::neuraylib::ITile> tile(canvas->get_tile(0));
+
+        std::vector<uint8_t>& data = textureResource.data;
+        data.resize(size);
+        memcpy(&data[0], tile->get_data(), data.size());
+        break;
+      }
+      case mi::neuraylib::ITarget_code::Texture_shape_3d:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "3d textures not supported");
+        return false;
+      case mi::neuraylib::ITarget_code::Texture_shape_cube:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Cube maps not supported");
+        return false;
+      case mi::neuraylib::ITarget_code::Texture_shape_ptex:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Ptex textures not supported");
+        return false;
+      case mi::neuraylib::ITarget_code::Texture_shape_invalid:
+      default:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Unknown texture type");
+        assert(false);
+        return false;
+      }
+
+      textureResources.push_back(textureResource);
     }
 
     std::stringstream ss;

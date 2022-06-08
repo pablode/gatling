@@ -28,6 +28,15 @@ namespace sg
 {
   struct Material;
 
+  struct TextureResource
+  {
+    uint32_t binding;
+    uint32_t width;
+    uint32_t height;
+    std::vector<uint8_t> data;
+    std::string filePath;
+  };
+
   class ShaderGen
   {
   public:
@@ -39,6 +48,14 @@ namespace sg
       std::string_view mtlxmdlPath;
     };
 
+    struct MainShaderResult
+    {
+      std::vector<uint8_t> spv;
+      std::string entryPoint;
+      std::vector<TextureResource> textureResources;
+    };
+
+  public:
     bool init(const InitParams& params);
     ~ShaderGen();
 
@@ -65,8 +82,7 @@ namespace sg
     };
 
     bool generateMainShader(const struct MainShaderParams* params,
-                            std::vector<uint8_t>& spv,
-                            std::string& entryPoint);
+                            MainShaderResult& result);
 
   private:
     class MdlRuntime* m_mdlRuntime = nullptr;

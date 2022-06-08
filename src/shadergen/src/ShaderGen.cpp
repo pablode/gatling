@@ -162,20 +162,6 @@ namespace sg
     return mat->isEmissive;
   }
 
-  bool _sgGenerateMainShaderMdlHlsl(MdlHlslCodeGen& codeGen,
-                                    const std::vector<Material*>& materials,
-                                    std::string& hlsl)
-  {
-    std::vector<const mi::neuraylib::ICompiled_material*> compiledMaterials;
-
-    for (uint32_t i = 0; i < materials.size(); i++)
-    {
-      compiledMaterials.push_back(materials[i]->compiledMaterial.get());
-    }
-
-    return codeGen.translate(compiledMaterials, hlsl);
-  }
-
   bool _sgReadTextFromFile(const std::string& filePath, std::string& text)
   {
     std::ifstream file(filePath, std::ios_base::in | std::ios_base::binary);
@@ -191,8 +177,7 @@ namespace sg
   }
 
   bool ShaderGen::generateMainShader(const MainShaderParams* params,
-                                     std::vector<uint8_t>& spv,
-                                     std::string& entryPoint)
+                                     MainShaderResult& result)
   {
     std::string fileName = "main.comp.hlsl";
     std::string filePath = m_shaderPath + "/" + fileName;
@@ -221,8 +206,14 @@ namespace sg
     APPEND_DEFINE("TRIANGLE_POSTPONING", trianglePostponing)
     APPEND_DEFINE("NEXT_EVENT_ESTIMATION", nextEventEstimation)
 
+    std::vector<const mi::neuraylib::ICompiled_material*> compiledMaterials;
+    for (uint32_t i = 0; i < params->materials.size(); i++)
+    {
+      compiledMaterials.push_back(params->materials[i]->compiledMaterial.get());
+    }
+
     std::string genMdl;
-    if (!_sgGenerateMainShaderMdlHlsl(*m_mdlHlslCodeGen, params->materials, genMdl))
+    if (!m_mdlHlslCodeGen->translate(compiledMaterials, genMdl, result.textureResources))
     {
       return false;
     }
@@ -240,7 +231,7 @@ namespace sg
 
     ss << fileSrc;
 
-    entryPoint = "CSMain";
-    return m_shaderCompiler->compileHlslToSpv(ss.str(), filePath, entryPoint, spv);
+    result.entryPoint = "CSMain";
+    return m_shaderCompiler->compileHlslToSpv(ss.str(), filePath, result.entryPoint, result.spv);
   }
 }

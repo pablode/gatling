@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include "ShaderGen.h"
 #include "MdlRuntime.h"
 #include "MdlLogger.h"
 
@@ -40,7 +41,8 @@ namespace sg
     bool init(MdlRuntime& runtime);
 
     bool translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
-                   std::string& hlslSrc);
+                   std::string& hlslSrc,
+                   std::vector<TextureResource>& textureResources);
 
   private:
     bool appendMaterialToLinkUnit(uint32_t idx,

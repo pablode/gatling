@@ -405,21 +405,20 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   shaderParams.faceCount           = geom_cache->face_count;
   shaderParams.emissiveFaceCount   = geom_cache->emissive_face_count;
 
-  std::vector<uint8_t> spv;
-  std::string shader_entry_point;
-  if (!s_shaderGen->generateMainShader(&shaderParams, spv, shader_entry_point))
+  sg::ShaderGen::MainShaderResult mainShader;
+  if (!s_shaderGen->generateMainShader(&shaderParams, mainShader))
   {
     return nullptr;
   }
 
   cgpu_shader shader;
-  if (cgpu_create_shader(s_device, spv.size(), spv.data(), &shader) != CGPU_OK)
+  if (cgpu_create_shader(s_device, mainShader.spv.size(), mainShader.spv.data(), &shader) != CGPU_OK)
   {
     return nullptr;
   }
 
   cgpu_pipeline pipeline;
-  if (cgpu_create_pipeline(s_device, shader, shader_entry_point.c_str(), &pipeline) != CGPU_OK)
+  if (cgpu_create_pipeline(s_device, shader, mainShader.entryPoint.c_str(), &pipeline) != CGPU_OK)
   {
     cgpu_destroy_shader(s_device, shader);
     return nullptr;
