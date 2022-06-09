@@ -25,6 +25,7 @@
 #include <assert.h>
 #include <atomic>
 #include <iterator>
+#include <cmath>
 
 using namespace gi;
 using namespace gi::bvh;
