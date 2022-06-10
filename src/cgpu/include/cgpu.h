@@ -362,6 +362,7 @@ typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
 typedef struct cgpu_sampler        { uint64_t handle; } cgpu_sampler;
 
 typedef struct cgpu_buffer_binding {
+  uint32_t binding;
   uint32_t index;
   cgpu_buffer buffer;
   uint64_t offset;
@@ -369,11 +370,13 @@ typedef struct cgpu_buffer_binding {
 } cgpu_buffer_binding;
 
 typedef struct cgpu_image_binding {
+  uint32_t binding;
   uint32_t index;
   cgpu_image image;
 } cgpu_image_binding;
 
 typedef struct cgpu_sampler_binding {
+  uint32_t binding;
   uint32_t index;
   cgpu_sampler sampler;
 } cgpu_sampler_binding;
@@ -583,6 +586,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_bind_pipeline(
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_update_bindings(
   cgpu_command_buffer command_buffer,
+  cgpu_pipeline pipeline,
   const cgpu_bindings* bindings
 );
 

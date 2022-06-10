@@ -55,14 +55,19 @@ bool cgpu_perform_shader_reflection(uint64_t size,
   for (uint32_t i = 0; i < binding_count; i++)
   {
     const SpvReflectDescriptorBinding* src_binding = bindings[i];
+    if (!src_binding->accessed)
+    {
+      continue;
+    }
+
     cgpu_shader_reflection_binding* dst_binding = &p_reflection->bindings[p_reflection->binding_count++];
 
     /* Unfortunately SPIRV-Reflect lacks this functionality:
      * https://github.com/KhronosGroup/SPIRV-Reflect/issues/99 */
     const SpvReflectTypeDescription* type_description = src_binding->type_description;
-    dst_binding->write_access = src_binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
-    dst_binding->read_access = src_binding->accessed;
-    dst_binding->index = src_binding->binding;
+    dst_binding->write_access = ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+    dst_binding->read_access = true;
+    dst_binding->binding = src_binding->binding;
     dst_binding->count = src_binding->count;
     dst_binding->descriptor_type = (int) src_binding->descriptor_type;
   }

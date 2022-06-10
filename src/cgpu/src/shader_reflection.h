@@ -21,11 +21,11 @@
 #include "cgpu.h"
 
 typedef struct cgpu_shader_reflection_binding {
-  uint32_t index;
+  uint32_t binding;
   int descriptor_type;
   bool write_access;
   bool read_access;
-  int count;
+  uint32_t count;
 } cgpu_shader_reflection_binding;
 
 typedef struct cgpu_shader_reflection {

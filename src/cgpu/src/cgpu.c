@@ -83,8 +83,6 @@ typedef struct cgpu_ipipeline {
   VkDescriptorSetLayout        descriptor_set_layout;
   VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
   uint32_t                     descriptor_set_layout_binding_count;
-  cgpu_image_binding           image_bindings[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
-  uint32_t                     image_resource_count;
   cgpu_shader                  shader;
 } cgpu_ipipeline;
 
@@ -100,7 +98,6 @@ typedef struct cgpu_ifence {
 typedef struct cgpu_icommand_buffer {
   VkCommandBuffer command_buffer;
   cgpu_device     device;
-  cgpu_pipeline   pipeline;
 } cgpu_icommand_buffer;
 
 typedef struct cgpu_isampler {
@@ -1479,7 +1476,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
     const cgpu_shader_reflection_binding* binding = &shader_reflection->bindings[i];
 
     VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
-    descriptor_set_layout_binding->binding = binding->index;
+    descriptor_set_layout_binding->binding = binding->binding;
     descriptor_set_layout_binding->descriptorType = binding->descriptor_type;
     descriptor_set_layout_binding->descriptorCount = binding->count;
     descriptor_set_layout_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -1579,7 +1576,6 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
   uint32_t buffer_count = 0;
   uint32_t storage_image_count = 0;
   uint32_t sampled_image_count = 0;
-  uint32_t combined_image_sampler_count = 0;
   uint32_t sampler_count = 0;
 
   for (uint32_t i = 0; i < shader_reflection->binding_count; i++)
@@ -1591,7 +1587,6 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
     case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: buffer_count++; break;
     case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storage_image_count++; break;
     case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampled_image_count++; break;
-    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: combined_image_sampler_count++; break;
     case VK_DESCRIPTOR_TYPE_SAMPLER: sampler_count++; break;
     default: {
       resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
@@ -1629,12 +1624,6 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
   {
     pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     pool_sizes[pool_size_count].descriptorCount = sampled_image_count;
-    pool_size_count++;
-  }
-  if (combined_image_sampler_count > 0)
-  {
-    pool_sizes[pool_size_count].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    pool_sizes[pool_size_count].descriptorCount = combined_image_sampler_count;
     pool_size_count++;
   }
   if (sampler_count > 0)
@@ -1773,7 +1762,6 @@ CgpuResult cgpu_create_command_buffer(cgpu_device device,
     return CGPU_FAIL_INVALID_HANDLE;
   }
   icommand_buffer->device.handle = device.handle;
-  icommand_buffer->pipeline.handle = CGPU_INVALID_HANDLE;
 
   VkCommandBufferAllocateInfo cmdbuf_alloc_info;
   cmdbuf_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1877,12 +1865,125 @@ CgpuResult cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
     0
   );
 
-  icommand_buffer->pipeline = pipeline;
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
+                                                    cgpu_icommand_buffer* icommand_buffer,
+                                                    uint32_t image_count,
+                                                    const cgpu_image_binding* p_images)
+{
+  cgpu_ishader* ishader;
+  if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  VkImageMemoryBarrier barriers[MAX_IMAGE_MEMORY_BARRIERS];
+  uint32_t barrier_count = 0;
+
+  /* FIXME: this has quadratic complexity */
+  const cgpu_shader_reflection* reflection = &ishader->reflection;
+  for (uint32_t i = 0; i < reflection->binding_count; i++)
+  {
+    const cgpu_shader_reflection_binding* binding = &reflection->bindings[i];
+
+    VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (binding->descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+    {
+      new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    }
+    else if (binding->descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+    {
+      new_layout = VK_IMAGE_LAYOUT_GENERAL;
+    }
+    else
+    {
+      /* Not an image. */
+      continue;
+    }
+
+    for (uint32_t j = 0; j < binding->count; j++)
+    {
+      /* Image layout needs transitioning. */
+      const cgpu_image_binding* image_binding = NULL;
+      for (uint32_t k = 0; k < image_count; k++)
+      {
+        if (p_images[k].binding == binding->binding && p_images[k].index == j)
+        {
+          image_binding = &p_images[k];
+          break;
+        }
+      }
+      if (!image_binding)
+      {
+        return CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH;
+      }
+
+      cgpu_iimage* iimage;
+      if (!cgpu_resolve_image(image_binding->image, &iimage)) {
+        return CGPU_FAIL_INVALID_HANDLE;
+      }
+
+      VkImageLayout old_layout = iimage->layout;
+      if (new_layout == old_layout)
+      {
+        continue;
+      }
+
+      VkAccessFlags access_mask = 0;
+      if (binding->read_access) {
+        access_mask |= VK_ACCESS_SHADER_READ_BIT;
+      }
+      if (binding->write_access) {
+        access_mask |= VK_ACCESS_SHADER_WRITE_BIT;
+      }
+
+      VkImageMemoryBarrier* barrier = &barriers[barrier_count++];
+      barrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      barrier->pNext = NULL;
+      barrier->srcAccessMask = iimage->access_mask;
+      barrier->dstAccessMask = access_mask;
+      barrier->oldLayout = old_layout;
+      barrier->newLayout = new_layout;
+      barrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier->image = iimage->image;
+      barrier->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      barrier->subresourceRange.baseMipLevel = 0;
+      barrier->subresourceRange.levelCount = 1;
+      barrier->subresourceRange.baseArrayLayer = 0;
+      barrier->subresourceRange.layerCount = 1;
+
+      iimage->access_mask = access_mask;
+      iimage->layout = new_layout;
+    }
+  }
+
+  if (barrier_count > 0)
+  {
+    idevice->table.vkCmdPipelineBarrier(
+      icommand_buffer->command_buffer,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      0,
+      0,
+      NULL,
+      0,
+      NULL,
+      barrier_count,
+      barriers
+    );
+  }
 
   return CGPU_OK;
 }
 
 CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
+                                    cgpu_pipeline pipeline,
                                     const cgpu_bindings* bindings
 )
 {
@@ -1895,130 +1996,159 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
     return CGPU_FAIL_INVALID_HANDLE;
   }
   cgpu_ipipeline* ipipeline;
-  if (!cgpu_resolve_pipeline(icommand_buffer->pipeline, &ipipeline)) {
+  if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
-  VkDescriptorBufferInfo descriptor_buffer_infos[MAX_DESCRIPTOR_BUFFER_INFOS];
-  VkDescriptorImageInfo descriptor_image_infos[MAX_DESCRIPTOR_IMAGE_INFOS];
+  CgpuResult c_result = cgpu_transition_image_layouts_for_shader(
+    ipipeline,
+    icommand_buffer,
+    bindings->image_count,
+    bindings->p_images
+  );
+  if (c_result != CGPU_OK) {
+    return c_result;
+  }
+
+  VkDescriptorBufferInfo buffer_infos[MAX_DESCRIPTOR_BUFFER_INFOS];
+  uint32_t buffer_info_count = 0;
+  VkDescriptorImageInfo image_infos[MAX_DESCRIPTOR_IMAGE_INFOS];
+  uint32_t image_info_count = 0;
+
   VkWriteDescriptorSet write_descriptor_sets[MAX_WRITE_DESCRIPTOR_SETS];
+  uint32_t write_descriptor_set_count = 0;
 
-  uint32_t write_desc_set_count = 0;
-
-  for (uint32_t i = 0; i < bindings->buffer_count; ++i)
+  /* FIXME: this has a rather high complexity */
+  for (uint32_t i = 0; i < ipipeline->descriptor_set_layout_binding_count; i++)
   {
-    const cgpu_buffer_binding* buffer_binding = &bindings->p_buffers[i];
+    const VkDescriptorSetLayoutBinding* layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
 
-    cgpu_ibuffer* ibuffer;
-    cgpu_buffer buffer = buffer_binding->buffer;
-    if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-      return CGPU_FAIL_INVALID_HANDLE;
-    }
-
-    if ((buffer_binding->offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
-      return CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED;
-    }
-
-    VkDescriptorBufferInfo* descriptor_buffer_info = &descriptor_buffer_infos[i];
-    descriptor_buffer_info->buffer = ibuffer->buffer;
-    descriptor_buffer_info->offset = buffer_binding->offset;
-    descriptor_buffer_info->range = (buffer_binding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - buffer_binding->offset) : buffer_binding->size;
-
-    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
+    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_descriptor_set_count++];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_descriptor_set->pNext = NULL;
     write_descriptor_set->dstSet = ipipeline->descriptor_set;
-    write_descriptor_set->dstBinding = buffer_binding->index;
+    write_descriptor_set->dstBinding = layout_binding->binding;
     write_descriptor_set->dstArrayElement = 0;
-    write_descriptor_set->descriptorCount = 1;
-    write_descriptor_set->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    write_descriptor_set->pImageInfo = NULL;
-    write_descriptor_set->pBufferInfo = descriptor_buffer_info;
+    write_descriptor_set->descriptorCount = layout_binding->descriptorCount;
+    write_descriptor_set->descriptorType = layout_binding->descriptorType;
     write_descriptor_set->pTexelBufferView = NULL;
-    write_desc_set_count++;
-  }
+    write_descriptor_set->pBufferInfo = NULL;
+    write_descriptor_set->pImageInfo = NULL;
 
-  ipipeline->image_resource_count = bindings->image_count;
-
-  for (uint32_t i = 0; i < bindings->image_count; ++i)
-  {
-    const cgpu_image_binding* image_binding = &bindings->p_images[i];
-
-    cgpu_iimage* iimage;
-    cgpu_image image = image_binding->image;
-    if (!cgpu_resolve_image(image, &iimage)) {
-      return CGPU_FAIL_INVALID_HANDLE;
-    }
-
-    int32_t descriptor_binding_idx = -1;
-    for (uint32_t j = 0; j < ipipeline->descriptor_set_layout_binding_count; j++)
+    for (uint32_t j = 0; j < layout_binding->descriptorCount; j++)
     {
-      if (ipipeline->descriptor_set_layout_bindings[j].binding == image_binding->index)
+
+      bool slotHandled = false;
+
+      if (layout_binding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
       {
-        descriptor_binding_idx = j;
-        break;
+        for (uint32_t k = 0; k < bindings->buffer_count; ++k)
+        {
+          const cgpu_buffer_binding* buffer_binding = &bindings->p_buffers[k];
+
+          if (buffer_binding->binding != layout_binding->binding || buffer_binding->index != j)
+          {
+            continue;
+          }
+
+          cgpu_ibuffer* ibuffer;
+          cgpu_buffer buffer = buffer_binding->buffer;
+          if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
+            return CGPU_FAIL_INVALID_HANDLE;
+          }
+
+          if ((buffer_binding->offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
+            return CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED;
+          }
+
+          VkDescriptorBufferInfo* buffer_info = &buffer_infos[buffer_info_count++];
+          buffer_info->buffer = ibuffer->buffer;
+          buffer_info->offset = buffer_binding->offset;
+          buffer_info->range = (buffer_binding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - buffer_binding->offset) : buffer_binding->size;
+
+          if (j == 0)
+          {
+            write_descriptor_set->pBufferInfo = buffer_info;
+          }
+
+          slotHandled = true;
+          break;
+        }
+      }
+      else if (layout_binding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+               layout_binding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+      {
+        for (uint32_t k = 0; k < bindings->image_count; k++)
+        {
+          const cgpu_image_binding* image_binding = &bindings->p_images[k];
+
+          if (image_binding->binding != layout_binding->binding || image_binding->index != j)
+          {
+            continue;
+          }
+
+          cgpu_iimage* iimage;
+          cgpu_image image = image_binding->image;
+          if (!cgpu_resolve_image(image, &iimage)) {
+            return CGPU_FAIL_INVALID_HANDLE;
+          }
+
+          VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
+          image_info->sampler = VK_NULL_HANDLE;
+          image_info->imageView = iimage->image_view;
+          image_info->imageLayout = iimage->layout;
+
+          if (j == 0)
+          {
+            write_descriptor_set->pImageInfo = image_info;
+          }
+
+          slotHandled = true;
+          break;
+        }
+      }
+      else if (layout_binding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
+      {
+        for (uint32_t k = 0; k < bindings->sampler_count; k++)
+        {
+          const cgpu_sampler_binding* sampler_binding = &bindings->p_samplers[k];
+
+          if (sampler_binding->binding != layout_binding->binding || sampler_binding->index != j)
+          {
+            continue;
+          }
+
+          cgpu_isampler* isampler;
+          cgpu_sampler sampler = sampler_binding->sampler;
+          if (!cgpu_resolve_sampler(sampler, &isampler)) {
+            return CGPU_FAIL_INVALID_HANDLE;
+          }
+
+          VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
+          image_info->sampler = isampler->sampler;
+          image_info->imageView = VK_NULL_HANDLE;
+          image_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+          if (j == 0)
+          {
+            write_descriptor_set->pImageInfo = image_info;
+          }
+
+          slotHandled = true;
+          break;
+        }
+      }
+
+      if (!slotHandled)
+      {
+        return CGPU_FAIL_RESOURCE_BINDING_MISMATCH;
       }
     }
-    if (descriptor_binding_idx == -1)
-    {
-      return CGPU_FAIL_RESOURCE_BINDING_MISMATCH;
-    }
-
-    const VkDescriptorSetLayoutBinding* descriptor_binding = &ipipeline->descriptor_set_layout_bindings[descriptor_binding_idx];
-
-    VkDescriptorImageInfo* descriptor_image_info = &descriptor_image_infos[i];
-    descriptor_image_info->sampler = VK_NULL_HANDLE;
-    descriptor_image_info->imageView = iimage->image_view;
-    descriptor_image_info->imageLayout = iimage->layout;
-
-    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
-    write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write_descriptor_set->pNext = NULL;
-    write_descriptor_set->dstSet = ipipeline->descriptor_set;
-    write_descriptor_set->dstBinding = image_binding->index;
-    write_descriptor_set->dstArrayElement = 0;
-    write_descriptor_set->descriptorCount = descriptor_binding->descriptorCount;
-    write_descriptor_set->descriptorType = descriptor_binding->descriptorType;
-    write_descriptor_set->pImageInfo = descriptor_image_info;
-    write_descriptor_set->pBufferInfo = NULL;
-    write_descriptor_set->pTexelBufferView = NULL;
-    write_desc_set_count++;
-
-    ipipeline->image_bindings[i] = *image_binding;
-  }
-
-  for (uint32_t i = 0; i < bindings->sampler_count; i++)
-  {
-    const cgpu_sampler_binding* shader_resource_sampler = &bindings->p_samplers[i];
-
-    cgpu_isampler* isampler;
-    cgpu_sampler sampler = shader_resource_sampler->sampler;
-    if (!cgpu_resolve_sampler(sampler, &isampler)) {
-      return CGPU_FAIL_INVALID_HANDLE;
-    }
-
-    VkDescriptorImageInfo* descriptor_image_info = &descriptor_image_infos[bindings->image_count + i];
-    descriptor_image_info->sampler = isampler->sampler;
-    descriptor_image_info->imageView = VK_NULL_HANDLE;
-    descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
-    write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write_descriptor_set->pNext = NULL;
-    write_descriptor_set->dstSet = ipipeline->descriptor_set;
-    write_descriptor_set->dstBinding = shader_resource_sampler->index;
-    write_descriptor_set->dstArrayElement = 0;
-    write_descriptor_set->descriptorCount = 1;
-    write_descriptor_set->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
-    write_descriptor_set->pImageInfo = descriptor_image_info;
-    write_descriptor_set->pBufferInfo = NULL;
-    write_descriptor_set->pTexelBufferView = NULL;
-    write_desc_set_count++;
   }
 
   idevice->table.vkUpdateDescriptorSets(
     idevice->logical_device,
-    write_desc_set_count,
+    write_descriptor_set_count,
     write_descriptor_sets,
     0,
     NULL
@@ -2157,116 +2287,6 @@ CgpuResult cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
   return CGPU_OK;
 }
 
-CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_idevice* idevice,
-                                                    cgpu_icommand_buffer* icommand_buffer)
-{
-  cgpu_ipipeline* ipipeline;
-  if (!cgpu_resolve_pipeline(icommand_buffer->pipeline, &ipipeline)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-  cgpu_ishader* ishader;
-  if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-
-  VkImageMemoryBarrier barriers[MAX_IMAGE_MEMORY_BARRIERS];
-  uint32_t barrier_count = 0;
-
-  /* FIXME: this has quadratic complexity */
-  const cgpu_shader_reflection* reflection = &ishader->reflection;
-  for (uint32_t i = 0; i < reflection->binding_count; i++)
-  {
-    const cgpu_shader_reflection_binding* binding = &reflection->bindings[i];
-
-    VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    if (binding->descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
-        binding->descriptor_type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-    {
-      new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    }
-    else if (binding->descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-    {
-      new_layout = VK_IMAGE_LAYOUT_GENERAL;
-    }
-    else
-    {
-      /* Not an image. */
-      continue;
-    }
-
-    /* Image layout needs transitioning. */
-    cgpu_image_binding* image_binding = NULL;
-    for (uint32_t j = 0; j < ipipeline->image_resource_count; j++)
-    {
-      if (ipipeline->image_bindings[j].index == binding->index)
-      {
-        image_binding = &ipipeline->image_bindings[j];
-        break;
-      }
-    }
-    if (!image_binding)
-    {
-      return CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH;
-    }
-
-    cgpu_iimage* iimage;
-    if (!cgpu_resolve_image(image_binding->image, &iimage)) {
-      return CGPU_FAIL_INVALID_HANDLE;
-    }
-
-    VkImageLayout old_layout = iimage->layout;
-    if (new_layout == old_layout)
-    {
-      continue;
-    }
-
-    VkAccessFlags access_mask = 0;
-    if (binding->read_access) {
-      access_mask |= VK_ACCESS_SHADER_READ_BIT;
-    }
-    if (binding->write_access) {
-      access_mask |= VK_ACCESS_SHADER_WRITE_BIT;
-    }
-
-    VkImageMemoryBarrier* barrier = &barriers[barrier_count++];
-    barrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier->pNext = NULL;
-    barrier->srcAccessMask = iimage->access_mask;
-    barrier->dstAccessMask = access_mask;
-    barrier->oldLayout = old_layout;
-    barrier->newLayout = new_layout;
-    barrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier->image = iimage->image;
-    barrier->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier->subresourceRange.baseMipLevel = 0;
-    barrier->subresourceRange.levelCount = 1;
-    barrier->subresourceRange.baseArrayLayer = 0;
-    barrier->subresourceRange.layerCount = 1;
-
-    iimage->access_mask = access_mask;
-    iimage->layout = new_layout;
-  }
-
-  if (barrier_count > 0)
-  {
-    idevice->table.vkCmdPipelineBarrier(
-      icommand_buffer->command_buffer,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-      0,
-      0,
-      NULL,
-      0,
-      NULL,
-      barrier_count,
-      barriers
-    );
-  }
-
-  return CGPU_OK;
-}
-
 CgpuResult cgpu_cmd_dispatch(cgpu_command_buffer command_buffer,
                              uint32_t dim_x,
                              uint32_t dim_y,
@@ -2279,14 +2299,6 @@ CgpuResult cgpu_cmd_dispatch(cgpu_command_buffer command_buffer,
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
-  }
-
-  CgpuResult c_result = cgpu_transition_image_layouts_for_shader(
-    idevice,
-    icommand_buffer
-  );
-  if (c_result != CGPU_OK) {
-    return c_result;
   }
 
   idevice->table.vkCmdDispatch(
