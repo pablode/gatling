@@ -33,7 +33,6 @@
 #define MAX_PHYSICAL_DEVICES 32
 #define MAX_DEVICE_EXTENSIONS 1024
 #define MAX_QUEUE_FAMILIES 64
-#define MAX_TIMESTAMP_QUERIES 32
 #define MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS 128
 #define MAX_DESCRIPTOR_BUFFER_INFOS 64
 #define MAX_DESCRIPTOR_IMAGE_INFOS 64
@@ -217,70 +216,70 @@ static CgpuSampleCountFlags cgpu_translate_sample_count_flags(VkSampleCountFlags
   return flags;
 }
 
-static cgpu_physical_device_limits cgpu_translate_physical_device_limits(VkPhysicalDeviceLimits vk_limits,
-                                                                         VkPhysicalDeviceSubgroupProperties vk_subgroup_props)
+static cgpu_physical_device_limits cgpu_translate_physical_device_limits(const VkPhysicalDeviceLimits* vk_limits,
+                                                                         const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props)
 {
   cgpu_physical_device_limits limits;
-  limits.maxImageDimension1D = vk_limits.maxImageDimension1D;
-  limits.maxImageDimension2D = vk_limits.maxImageDimension2D;
-  limits.maxImageDimension3D = vk_limits.maxImageDimension3D;
-  limits.maxImageDimensionCube = vk_limits.maxImageDimensionCube;
-  limits.maxImageArrayLayers = vk_limits.maxImageArrayLayers;
-  limits.maxUniformBufferRange = vk_limits.maxUniformBufferRange;
-  limits.maxStorageBufferRange = vk_limits.maxStorageBufferRange;
-  limits.maxPushConstantsSize = vk_limits.maxPushConstantsSize;
-  limits.maxMemoryAllocationCount = vk_limits.maxMemoryAllocationCount;
-  limits.maxSamplerAllocationCount = vk_limits.maxSamplerAllocationCount;
-  limits.bufferImageGranularity = vk_limits.bufferImageGranularity;
-  limits.sparseAddressSpaceSize = vk_limits.sparseAddressSpaceSize;
-  limits.maxBoundDescriptorSets = vk_limits.maxBoundDescriptorSets;
-  limits.maxPerStageDescriptorSamplers = vk_limits.maxPerStageDescriptorSamplers;
-  limits.maxPerStageDescriptorUniformBuffers = vk_limits.maxPerStageDescriptorUniformBuffers;
-  limits.maxPerStageDescriptorStorageBuffers = vk_limits.maxPerStageDescriptorStorageBuffers;
-  limits.maxPerStageDescriptorSampledImages = vk_limits.maxPerStageDescriptorSampledImages;
-  limits.maxPerStageDescriptorStorageImages = vk_limits.maxPerStageDescriptorStorageImages;
-  limits.maxPerStageDescriptorInputAttachments = vk_limits.maxPerStageDescriptorInputAttachments;
-  limits.maxPerStageResources = vk_limits.maxPerStageResources;
-  limits.maxDescriptorSetSamplers = vk_limits.maxDescriptorSetSamplers;
-  limits.maxDescriptorSetUniformBuffers = vk_limits.maxDescriptorSetUniformBuffers;
-  limits.maxDescriptorSetUniformBuffersDynamic = vk_limits.maxDescriptorSetUniformBuffersDynamic;
-  limits.maxDescriptorSetStorageBuffers = vk_limits.maxDescriptorSetStorageBuffers;
-  limits.maxDescriptorSetStorageBuffersDynamic = vk_limits.maxDescriptorSetStorageBuffersDynamic;
-  limits.maxDescriptorSetSampledImages = vk_limits.maxDescriptorSetSampledImages;
-  limits.maxDescriptorSetStorageImages = vk_limits.maxDescriptorSetStorageImages;
-  limits.maxDescriptorSetInputAttachments = vk_limits.maxDescriptorSetInputAttachments;
-  limits.maxComputeSharedMemorySize = vk_limits.maxComputeSharedMemorySize;
-  limits.maxComputeWorkGroupCount[0] = vk_limits.maxComputeWorkGroupCount[0];
-  limits.maxComputeWorkGroupCount[1] = vk_limits.maxComputeWorkGroupCount[1];
-  limits.maxComputeWorkGroupCount[2] = vk_limits.maxComputeWorkGroupCount[2];
-  limits.maxComputeWorkGroupInvocations = vk_limits.maxComputeWorkGroupInvocations;
-  limits.maxComputeWorkGroupSize[0] = vk_limits.maxComputeWorkGroupSize[0];
-  limits.maxComputeWorkGroupSize[1] = vk_limits.maxComputeWorkGroupSize[1];
-  limits.maxComputeWorkGroupSize[2] = vk_limits.maxComputeWorkGroupSize[2];
-  limits.mipmapPrecisionBits = vk_limits.mipmapPrecisionBits;
-  limits.maxSamplerLodBias = vk_limits.maxSamplerLodBias;
-  limits.maxSamplerAnisotropy = vk_limits.maxSamplerAnisotropy;
-  limits.minMemoryMapAlignment = vk_limits.minMemoryMapAlignment;
-  limits.minUniformBufferOffsetAlignment = vk_limits.minUniformBufferOffsetAlignment;
-  limits.minStorageBufferOffsetAlignment = vk_limits.minStorageBufferOffsetAlignment;
-  limits.minTexelOffset = vk_limits.minTexelOffset;
-  limits.maxTexelOffset = vk_limits.maxTexelOffset;
-  limits.minTexelGatherOffset = vk_limits.minTexelGatherOffset;
-  limits.maxTexelGatherOffset = vk_limits.maxTexelGatherOffset;
-  limits.minInterpolationOffset = vk_limits.minInterpolationOffset;
-  limits.maxInterpolationOffset = vk_limits.maxInterpolationOffset;
-  limits.subPixelInterpolationOffsetBits = vk_limits.subPixelInterpolationOffsetBits;
-  limits.sampledImageColorSampleCounts = cgpu_translate_sample_count_flags(vk_limits.sampledImageColorSampleCounts);
-  limits.sampledImageIntegerSampleCounts = cgpu_translate_sample_count_flags(vk_limits.sampledImageIntegerSampleCounts);
-  limits.storageImageSampleCounts = cgpu_translate_sample_count_flags(vk_limits.storageImageSampleCounts);
-  limits.maxSampleMaskWords = vk_limits.maxSampleMaskWords;
-  limits.timestampComputeAndGraphics = vk_limits.timestampComputeAndGraphics;
-  limits.timestampPeriod = vk_limits.timestampPeriod;
-  limits.discreteQueuePriorities = vk_limits.discreteQueuePriorities;
-  limits.optimalBufferCopyOffsetAlignment = vk_limits.optimalBufferCopyOffsetAlignment;
-  limits.optimalBufferCopyRowPitchAlignment = vk_limits.optimalBufferCopyRowPitchAlignment;
-  limits.nonCoherentAtomSize = vk_limits.nonCoherentAtomSize;
-  limits.subgroupSize = vk_subgroup_props.subgroupSize;
+  limits.maxImageDimension1D = vk_limits->maxImageDimension1D;
+  limits.maxImageDimension2D = vk_limits->maxImageDimension2D;
+  limits.maxImageDimension3D = vk_limits->maxImageDimension3D;
+  limits.maxImageDimensionCube = vk_limits->maxImageDimensionCube;
+  limits.maxImageArrayLayers = vk_limits->maxImageArrayLayers;
+  limits.maxUniformBufferRange = vk_limits->maxUniformBufferRange;
+  limits.maxStorageBufferRange = vk_limits->maxStorageBufferRange;
+  limits.maxPushConstantsSize = vk_limits->maxPushConstantsSize;
+  limits.maxMemoryAllocationCount = vk_limits->maxMemoryAllocationCount;
+  limits.maxSamplerAllocationCount = vk_limits->maxSamplerAllocationCount;
+  limits.bufferImageGranularity = vk_limits->bufferImageGranularity;
+  limits.sparseAddressSpaceSize = vk_limits->sparseAddressSpaceSize;
+  limits.maxBoundDescriptorSets = vk_limits->maxBoundDescriptorSets;
+  limits.maxPerStageDescriptorSamplers = vk_limits->maxPerStageDescriptorSamplers;
+  limits.maxPerStageDescriptorUniformBuffers = vk_limits->maxPerStageDescriptorUniformBuffers;
+  limits.maxPerStageDescriptorStorageBuffers = vk_limits->maxPerStageDescriptorStorageBuffers;
+  limits.maxPerStageDescriptorSampledImages = vk_limits->maxPerStageDescriptorSampledImages;
+  limits.maxPerStageDescriptorStorageImages = vk_limits->maxPerStageDescriptorStorageImages;
+  limits.maxPerStageDescriptorInputAttachments = vk_limits->maxPerStageDescriptorInputAttachments;
+  limits.maxPerStageResources = vk_limits->maxPerStageResources;
+  limits.maxDescriptorSetSamplers = vk_limits->maxDescriptorSetSamplers;
+  limits.maxDescriptorSetUniformBuffers = vk_limits->maxDescriptorSetUniformBuffers;
+  limits.maxDescriptorSetUniformBuffersDynamic = vk_limits->maxDescriptorSetUniformBuffersDynamic;
+  limits.maxDescriptorSetStorageBuffers = vk_limits->maxDescriptorSetStorageBuffers;
+  limits.maxDescriptorSetStorageBuffersDynamic = vk_limits->maxDescriptorSetStorageBuffersDynamic;
+  limits.maxDescriptorSetSampledImages = vk_limits->maxDescriptorSetSampledImages;
+  limits.maxDescriptorSetStorageImages = vk_limits->maxDescriptorSetStorageImages;
+  limits.maxDescriptorSetInputAttachments = vk_limits->maxDescriptorSetInputAttachments;
+  limits.maxComputeSharedMemorySize = vk_limits->maxComputeSharedMemorySize;
+  limits.maxComputeWorkGroupCount[0] = vk_limits->maxComputeWorkGroupCount[0];
+  limits.maxComputeWorkGroupCount[1] = vk_limits->maxComputeWorkGroupCount[1];
+  limits.maxComputeWorkGroupCount[2] = vk_limits->maxComputeWorkGroupCount[2];
+  limits.maxComputeWorkGroupInvocations = vk_limits->maxComputeWorkGroupInvocations;
+  limits.maxComputeWorkGroupSize[0] = vk_limits->maxComputeWorkGroupSize[0];
+  limits.maxComputeWorkGroupSize[1] = vk_limits->maxComputeWorkGroupSize[1];
+  limits.maxComputeWorkGroupSize[2] = vk_limits->maxComputeWorkGroupSize[2];
+  limits.mipmapPrecisionBits = vk_limits->mipmapPrecisionBits;
+  limits.maxSamplerLodBias = vk_limits->maxSamplerLodBias;
+  limits.maxSamplerAnisotropy = vk_limits->maxSamplerAnisotropy;
+  limits.minMemoryMapAlignment = vk_limits->minMemoryMapAlignment;
+  limits.minUniformBufferOffsetAlignment = vk_limits->minUniformBufferOffsetAlignment;
+  limits.minStorageBufferOffsetAlignment = vk_limits->minStorageBufferOffsetAlignment;
+  limits.minTexelOffset = vk_limits->minTexelOffset;
+  limits.maxTexelOffset = vk_limits->maxTexelOffset;
+  limits.minTexelGatherOffset = vk_limits->minTexelGatherOffset;
+  limits.maxTexelGatherOffset = vk_limits->maxTexelGatherOffset;
+  limits.minInterpolationOffset = vk_limits->minInterpolationOffset;
+  limits.maxInterpolationOffset = vk_limits->maxInterpolationOffset;
+  limits.subPixelInterpolationOffsetBits = vk_limits->subPixelInterpolationOffsetBits;
+  limits.sampledImageColorSampleCounts = cgpu_translate_sample_count_flags(vk_limits->sampledImageColorSampleCounts);
+  limits.sampledImageIntegerSampleCounts = cgpu_translate_sample_count_flags(vk_limits->sampledImageIntegerSampleCounts);
+  limits.storageImageSampleCounts = cgpu_translate_sample_count_flags(vk_limits->storageImageSampleCounts);
+  limits.maxSampleMaskWords = vk_limits->maxSampleMaskWords;
+  limits.timestampComputeAndGraphics = vk_limits->timestampComputeAndGraphics;
+  limits.timestampPeriod = vk_limits->timestampPeriod;
+  limits.discreteQueuePriorities = vk_limits->discreteQueuePriorities;
+  limits.optimalBufferCopyOffsetAlignment = vk_limits->optimalBufferCopyOffsetAlignment;
+  limits.optimalBufferCopyRowPitchAlignment = vk_limits->optimalBufferCopyRowPitchAlignment;
+  limits.nonCoherentAtomSize = vk_limits->nonCoherentAtomSize;
+  limits.subgroupSize = vk_subgroup_props->subgroupSize;
   return limits;
 }
 
@@ -419,60 +418,8 @@ static VkFormat cgpu_translate_image_format(CgpuImageFormat image_format)
   case CGPU_IMAGE_FORMAT_D16_UNORM_S8_UINT: return VK_FORMAT_D16_UNORM_S8_UINT;
   case CGPU_IMAGE_FORMAT_D24_UNORM_S8_UINT: return VK_FORMAT_D24_UNORM_S8_UINT;
   case CGPU_IMAGE_FORMAT_D32_SFLOAT_S8_UINT: return VK_FORMAT_D32_SFLOAT_S8_UINT;
-  case CGPU_IMAGE_FORMAT_BC1_RGB_UNORM_BLOCK: return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC1_RGB_SRGB_BLOCK: return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC1_RGBA_UNORM_BLOCK: return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC1_RGBA_SRGB_BLOCK: return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC2_UNORM_BLOCK: return VK_FORMAT_BC2_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC2_SRGB_BLOCK: return VK_FORMAT_BC2_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC3_UNORM_BLOCK: return VK_FORMAT_BC3_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC3_SRGB_BLOCK: return VK_FORMAT_BC3_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC4_UNORM_BLOCK: return VK_FORMAT_BC4_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC4_SNORM_BLOCK: return VK_FORMAT_BC4_SNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC5_UNORM_BLOCK: return VK_FORMAT_BC5_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC5_SNORM_BLOCK: return VK_FORMAT_BC5_SNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC6H_UFLOAT_BLOCK: return VK_FORMAT_BC6H_UFLOAT_BLOCK;
-  case CGPU_IMAGE_FORMAT_BC6H_SFLOAT_BLOCK: return VK_FORMAT_BC6H_SFLOAT_BLOCK;
   case CGPU_IMAGE_FORMAT_BC7_UNORM_BLOCK: return VK_FORMAT_BC7_UNORM_BLOCK;
   case CGPU_IMAGE_FORMAT_BC7_SRGB_BLOCK: return VK_FORMAT_BC7_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8_UNORM_BLOCK: return VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8_SRGB_BLOCK: return VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK: return VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK: return VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK: return VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK: return VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_EAC_R11_UNORM_BLOCK: return VK_FORMAT_EAC_R11_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_EAC_R11_SNORM_BLOCK: return VK_FORMAT_EAC_R11_SNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_EAC_R11G11_UNORM_BLOCK: return VK_FORMAT_EAC_R11G11_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_EAC_R11G11_SNORM_BLOCK: return VK_FORMAT_EAC_R11G11_SNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_4x4_UNORM_BLOCK: return VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_4x4_SRGB_BLOCK: return VK_FORMAT_ASTC_4x4_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_5x4_UNORM_BLOCK: return VK_FORMAT_ASTC_5x4_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_5x4_SRGB_BLOCK: return VK_FORMAT_ASTC_5x4_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_5x5_UNORM_BLOCK: return VK_FORMAT_ASTC_5x5_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_5x5_SRGB_BLOCK: return VK_FORMAT_ASTC_5x5_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_6x5_UNORM_BLOCK: return VK_FORMAT_ASTC_6x5_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_6x5_SRGB_BLOCK: return VK_FORMAT_ASTC_6x5_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_6x6_UNORM_BLOCK: return VK_FORMAT_ASTC_6x6_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_6x6_SRGB_BLOCK: return VK_FORMAT_ASTC_6x6_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_8x5_UNORM_BLOCK: return VK_FORMAT_ASTC_8x5_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_8x5_SRGB_BLOCK: return VK_FORMAT_ASTC_8x5_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_8x6_UNORM_BLOCK: return VK_FORMAT_ASTC_8x6_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_8x6_SRGB_BLOCK: return VK_FORMAT_ASTC_8x6_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_8x8_UNORM_BLOCK: return VK_FORMAT_ASTC_8x8_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_8x8_SRGB_BLOCK: return VK_FORMAT_ASTC_8x8_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x5_UNORM_BLOCK: return VK_FORMAT_ASTC_10x5_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x5_SRGB_BLOCK: return VK_FORMAT_ASTC_10x5_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x6_UNORM_BLOCK: return VK_FORMAT_ASTC_10x6_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x6_SRGB_BLOCK: return VK_FORMAT_ASTC_10x6_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x8_UNORM_BLOCK: return VK_FORMAT_ASTC_10x8_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x8_SRGB_BLOCK: return VK_FORMAT_ASTC_10x8_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x10_UNORM_BLOCK: return VK_FORMAT_ASTC_10x10_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_10x10_SRGB_BLOCK: return VK_FORMAT_ASTC_10x10_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_12x10_UNORM_BLOCK: return VK_FORMAT_ASTC_12x10_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_12x10_SRGB_BLOCK: return VK_FORMAT_ASTC_12x10_SRGB_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_12x12_UNORM_BLOCK: return VK_FORMAT_ASTC_12x12_UNORM_BLOCK;
-  case CGPU_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK: return VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
   case CGPU_IMAGE_FORMAT_G8B8G8R8_422_UNORM: return VK_FORMAT_G8B8G8R8_422_UNORM;
   case CGPU_IMAGE_FORMAT_B8G8R8G8_422_UNORM: return VK_FORMAT_B8G8R8G8_422_UNORM;
   case CGPU_IMAGE_FORMAT_G8_B8_R8_3PLANE_420_UNORM: return VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
@@ -507,28 +454,6 @@ static VkFormat cgpu_translate_image_format(CgpuImageFormat image_format)
   case CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_422_UNORM: return VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM;
   case CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_422_UNORM: return VK_FORMAT_G16_B16R16_2PLANE_422_UNORM;
   case CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_444_UNORM: return VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM;
-  case CGPU_IMAGE_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG: return VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG: return VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG;
-  case CGPU_IMAGE_FORMAT_ASTC_4x4_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_4x4_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_5x4_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_5x4_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_5x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_5x5_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_6x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_6x5_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_6x6_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_6x6_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_8x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_8x5_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_8x6_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_8x6_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_8x8_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_8x8_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_10x5_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x5_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_10x6_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x6_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_10x8_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x8_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_10x10_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_10x10_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_12x10_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_12x10_SFLOAT_BLOCK_EXT;
-  case CGPU_IMAGE_FORMAT_ASTC_12x12_SFLOAT_BLOCK_EXT: return VK_FORMAT_ASTC_12x12_SFLOAT_BLOCK_EXT;
   default: return VK_FORMAT_UNDEFINED;
   }
 }
@@ -582,16 +507,9 @@ CgpuResult cgpu_initialize(const char* p_app_name,
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pNext = NULL;
   app_info.pApplicationName = p_app_name;
-  app_info.applicationVersion = VK_MAKE_VERSION(
-    version_major,
-    version_minor,
-    version_patch
-  );
+  app_info.applicationVersion = VK_MAKE_VERSION(version_major, version_minor, version_patch);
   app_info.pEngineName = p_app_name;
-  app_info.engineVersion = VK_MAKE_VERSION(
-    version_major,
-    version_minor,
-    version_patch);
+  app_info.engineVersion = VK_MAKE_VERSION(version_major, version_minor, version_patch);
   app_info.apiVersion = MIN_VK_API_VERSION;
 
   VkInstanceCreateInfo create_info;
@@ -604,11 +522,7 @@ CgpuResult cgpu_initialize(const char* p_app_name,
   create_info.enabledExtensionCount = instance_extension_count;
   create_info.ppEnabledExtensionNames = instance_extensions;
 
-  result = vkCreateInstance(
-    &create_info,
-    NULL,
-    &iinstance.instance
-  );
+  result = vkCreateInstance(&create_info, NULL, &iinstance.instance);
   if (result != VK_SUCCESS) {
     return CGPU_FAIL_UNABLE_TO_INITIALIZE_VULKAN;
   }
@@ -643,16 +557,6 @@ CgpuResult cgpu_terminate(void)
   return CGPU_OK;
 }
 
-CgpuResult cgpu_get_device_count(uint32_t* p_device_count)
-{
-  vkEnumeratePhysicalDevices(
-    iinstance.instance,
-    p_device_count,
-    NULL
-  );
-  return CGPU_OK;
-}
-
 static bool cgpu_find_device_extension(const char* extension_name,
                                        uint32_t extension_count,
                                        VkExtensionProperties* extensions)
@@ -669,8 +573,7 @@ static bool cgpu_find_device_extension(const char* extension_name,
   return false;
 }
 
-CgpuResult cgpu_create_device(uint32_t index,
-                              cgpu_device* p_device)
+CgpuResult cgpu_create_device(cgpu_device* p_device)
 {
   p_device->handle = resource_store_create_handle(&idevice_store);
 
@@ -692,11 +595,10 @@ CgpuResult cgpu_create_device(uint32_t index,
     return CGPU_FAIL_MAX_PHYSICAL_DEVICES_REACHED;
   }
 
-  if (phys_device_count == 0 ||
-      index >= phys_device_count)
+  if (phys_device_count == 0)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_NO_DEVICE_AT_INDEX;
+    return CGPU_FAIL_NO_DEVICE_FOUND;
   }
 
   VkPhysicalDevice phys_devices[MAX_PHYSICAL_DEVICES];
@@ -707,7 +609,7 @@ CgpuResult cgpu_create_device(uint32_t index,
     phys_devices
   );
 
-  idevice->physical_device = phys_devices[index];
+  idevice->physical_device = phys_devices[0];
 
   VkPhysicalDeviceSubgroupProperties subgroup_properties;
   subgroup_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
@@ -717,10 +619,7 @@ CgpuResult cgpu_create_device(uint32_t index,
   device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
   device_properties.pNext = &subgroup_properties;
 
-  vkGetPhysicalDeviceProperties2(
-    idevice->physical_device,
-    &device_properties
-  );
+  vkGetPhysicalDeviceProperties2(idevice->physical_device, &device_properties);
 
   if (device_properties.properties.apiVersion < MIN_VK_API_VERSION)
   {
@@ -736,8 +635,8 @@ CgpuResult cgpu_create_device(uint32_t index,
     return CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET;
   }
 
-  idevice->limits =
-    cgpu_translate_physical_device_limits(device_properties.properties.limits, subgroup_properties);
+  const VkPhysicalDeviceLimits* limits = &device_properties.properties.limits;
+  idevice->limits = cgpu_translate_physical_device_limits(limits, &subgroup_properties);
 
   uint32_t device_ext_count;
   vkEnumerateDeviceExtensionProperties(
@@ -942,7 +841,7 @@ CgpuResult cgpu_create_device(uint32_t index,
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_CAN_NOT_CREATE_LOGICAL_DEVICE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_LOGICAL_DEVICE;
   }
 
   volkLoadDeviceTable(
@@ -978,7 +877,7 @@ CgpuResult cgpu_create_device(uint32_t index,
       idevice->logical_device,
       NULL
     );
-    return CGPU_FAIL_CAN_NOT_CREATE_COMMAND_POOL;
+    return CGPU_FAIL_UNABLE_TO_CREATE_COMMAND_POOL;
   }
 
   VkQueryPoolCreateInfo timestamp_pool_info;
@@ -986,7 +885,7 @@ CgpuResult cgpu_create_device(uint32_t index,
   timestamp_pool_info.pNext = NULL;
   timestamp_pool_info.flags = 0;
   timestamp_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  timestamp_pool_info.queryCount = MAX_TIMESTAMP_QUERIES;
+  timestamp_pool_info.queryCount = CGPU_MAX_TIMESTAMP_QUERIES;
   timestamp_pool_info.pipelineStatistics = 0;
 
   result = idevice->table.vkCreateQueryPool(
@@ -1121,7 +1020,7 @@ CgpuResult cgpu_create_shader(cgpu_device device,
   shader_module_create_info.codeSize = size;
   shader_module_create_info.pCode = (uint32_t*) p_source;
 
-  const VkResult result = idevice->table.vkCreateShaderModule(
+  VkResult result = idevice->table.vkCreateShaderModule(
     idevice->logical_device,
     &shader_module_create_info,
     NULL,
@@ -1201,12 +1100,6 @@ CgpuResult cgpu_create_buffer(cgpu_device device,
   }
   if ((usage & CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER) == CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER) {
     vk_buffer_usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-  }
-  if ((usage & CGPU_BUFFER_USAGE_FLAG_UNIFORM_TEXEL_BUFFER) == CGPU_BUFFER_USAGE_FLAG_UNIFORM_TEXEL_BUFFER) {
-    vk_buffer_usage |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
-  }
-  if ((usage & CGPU_BUFFER_USAGE_FLAG_STORAGE_TEXEL_BUFFER) == CGPU_BUFFER_USAGE_FLAG_STORAGE_TEXEL_BUFFER) {
-    vk_buffer_usage |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
   }
 
   VkBufferCreateInfo buffer_info;
@@ -1298,7 +1191,6 @@ CgpuResult cgpu_create_image(cgpu_device device,
                              uint32_t height,
                              CgpuImageFormat format,
                              CgpuImageUsageFlags usage,
-                             CgpuMemoryPropertyFlags memory_properties,
                              cgpu_image* p_image)
 {
   cgpu_idevice* idevice;
@@ -1354,7 +1246,7 @@ CgpuResult cgpu_create_image(cgpu_device device,
   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VmaAllocationCreateInfo alloc_info = { 0 };
-  alloc_info.requiredFlags = cgpu_translate_memory_properties(memory_properties);
+  alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
   VkResult result = vmaCreateImage(
     idevice->allocator,
@@ -2039,7 +1931,7 @@ CgpuResult cgpu_create_command_buffer(cgpu_device device,
   cmdbuf_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   cmdbuf_alloc_info.commandBufferCount = 1;
 
-  const VkResult result = idevice->table.vkAllocateCommandBuffers(
+  VkResult result = idevice->table.vkAllocateCommandBuffers(
     idevice->logical_device,
     &cmdbuf_alloc_info,
     &icommand_buffer->command_buffer
@@ -2091,7 +1983,7 @@ CgpuResult cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
   command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
   command_buffer_begin_info.pInheritanceInfo = NULL;
 
-  const VkResult result = idevice->table.vkBeginCommandBuffer(
+  VkResult result = idevice->table.vkBeginCommandBuffer(
     icommand_buffer->command_buffer,
     &command_buffer_begin_info
   );
@@ -2284,7 +2176,7 @@ CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_idevice* idevice,
   VkImageMemoryBarrier barriers[MAX_IMAGE_MEMORY_BARRIERS];
   uint32_t barrier_count = 0;
 
-  /* TODO: this has quadratic complexity... */
+  /* FIXME: this has quadratic complexity */
   const cgpu_shader_reflection* reflection = &ishader->reflection;
   for (uint32_t i = 0; i < reflection->resource_count; i++)
   {
@@ -2560,7 +2452,7 @@ CgpuResult cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
                                     uint32_t count,
                                     bool wait_until_available)
 {
-  if ((offset + count) > MAX_TIMESTAMP_QUERIES) {
+  if ((offset + count) > CGPU_MAX_TIMESTAMP_QUERIES) {
     return CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED;
   }
 
@@ -2577,6 +2469,8 @@ CgpuResult cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
+  VkQueryResultFlags wait_flag = wait_until_available ? VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
+
   idevice->table.vkCmdCopyQueryPoolResults(
     icommand_buffer->command_buffer,
     idevice->timestamp_pool,
@@ -2585,8 +2479,7 @@ CgpuResult cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
     ibuffer->buffer,
     0,
     sizeof(uint64_t),
-    VK_QUERY_RESULT_64_BIT | (wait_until_available ?
-      VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT)
+    VK_QUERY_RESULT_64_BIT | wait_flag
   );
 
   return CGPU_OK;
@@ -2626,12 +2519,13 @@ CgpuResult cgpu_create_fence(cgpu_device device,
   fence_create_info.pNext = NULL;
   fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-  const VkResult result = idevice->table.vkCreateFence(
+  VkResult result = idevice->table.vkCreateFence(
     idevice->logical_device,
     &fence_create_info,
     NULL,
     &ifence->fence
   );
+
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ifence_store, p_fence->handle);
     return CGPU_FAIL_UNABLE_TO_CREATE_FENCE;
@@ -2670,7 +2564,7 @@ CgpuResult cgpu_reset_fence(cgpu_device device,
   if (!cgpu_resolve_fence(fence, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  const VkResult result = idevice->table.vkResetFences(
+  VkResult result = idevice->table.vkResetFences(
     idevice->logical_device,
     1,
     &ifence->fence
@@ -2691,7 +2585,7 @@ CgpuResult cgpu_wait_for_fence(cgpu_device device, cgpu_fence fence)
   if (!cgpu_resolve_fence(fence, &ifence)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  const VkResult result = idevice->table.vkWaitForFences(
+  VkResult result = idevice->table.vkWaitForFences(
     idevice->logical_device,
     1,
     &ifence->fence,
@@ -2732,7 +2626,7 @@ CgpuResult cgpu_submit_command_buffer(cgpu_device device,
   submit_info.signalSemaphoreCount = 0;
   submit_info.pSignalSemaphores = NULL;
 
-  const VkResult result = idevice->table.vkQueueSubmit(
+  VkResult result = idevice->table.vkQueueSubmit(
     idevice->compute_queue,
     1,
     &submit_info,
