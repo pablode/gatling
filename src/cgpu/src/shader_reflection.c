@@ -34,7 +34,6 @@ bool cgpu_perform_shader_reflection(uint64_t size,
   }
 
   SpvReflectDescriptorBinding** bindings = NULL;
-  p_reflection->resources = NULL;
   bool result = false;
 
   uint32_t binding_count;
@@ -50,22 +49,22 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     goto fail;
   }
 
-  p_reflection->resource_count = 0;
-  p_reflection->resources = (cgpu_shader_reflection_resource*) malloc(sizeof(cgpu_shader_reflection_resource) * binding_count);
+  p_reflection->binding_count = 0;
+  p_reflection->bindings = (cgpu_shader_reflection_binding*) malloc(sizeof(cgpu_shader_reflection_binding) * binding_count);
 
   for (uint32_t i = 0; i < binding_count; i++)
   {
-    const SpvReflectDescriptorBinding* binding = bindings[i];
-    cgpu_shader_reflection_resource* sr_res = &p_reflection->resources[p_reflection->resource_count++];
-    sr_res->descriptor_type = (int) binding->descriptor_type;
+    const SpvReflectDescriptorBinding* src_binding = bindings[i];
+    cgpu_shader_reflection_binding* dst_binding = &p_reflection->bindings[p_reflection->binding_count++];
 
     /* Unfortunately SPIRV-Reflect lacks this functionality:
      * https://github.com/KhronosGroup/SPIRV-Reflect/issues/99 */
-    const SpvReflectTypeDescription* type_description = binding->type_description;
-    sr_res->write_access = binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
-    sr_res->read_access = binding->accessed;
-    sr_res->binding = binding->binding;
-    sr_res->count = binding->count;
+    const SpvReflectTypeDescription* type_description = src_binding->type_description;
+    dst_binding->write_access = src_binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+    dst_binding->read_access = src_binding->accessed;
+    dst_binding->index = src_binding->binding;
+    dst_binding->count = src_binding->count;
+    dst_binding->descriptor_type = (int) src_binding->descriptor_type;
   }
 
   assert(shader_module.push_constant_block_count == 1);
@@ -75,10 +74,6 @@ bool cgpu_perform_shader_reflection(uint64_t size,
   result = true;
 
 fail:
-  if (!result)
-  {
-    free(p_reflection->resources);
-  }
   free(bindings);
   spvReflectDestroyShaderModule(&shader_module);
   return result;
@@ -86,5 +81,5 @@ fail:
 
 void cgpu_destroy_shader_reflection(cgpu_shader_reflection* p_reflection)
 {
-  free(p_reflection->resources);
+  free(p_reflection->bindings);
 }

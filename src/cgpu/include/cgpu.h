@@ -361,22 +361,31 @@ typedef struct cgpu_fence          { uint64_t handle; } cgpu_fence;
 typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
 typedef struct cgpu_sampler        { uint64_t handle; } cgpu_sampler;
 
-typedef struct cgpu_shader_resource_buffer {
-  uint32_t binding;
+typedef struct cgpu_buffer_binding {
+  uint32_t index;
   cgpu_buffer buffer;
   uint64_t offset;
   uint64_t size;
-} cgpu_shader_resource_buffer;
+} cgpu_buffer_binding;
 
-typedef struct cgpu_shader_resource_image {
-  uint32_t binding;
+typedef struct cgpu_image_binding {
+  uint32_t index;
   cgpu_image image;
-} cgpu_shader_resource_image;
+} cgpu_image_binding;
 
-typedef struct cgpu_shader_resource_sampler {
-  uint32_t binding;
+typedef struct cgpu_sampler_binding {
+  uint32_t index;
   cgpu_sampler sampler;
-} cgpu_shader_resource_sampler;
+} cgpu_sampler_binding;
+
+typedef struct cgpu_bindings {
+  uint32_t buffer_count;
+  const cgpu_buffer_binding* p_buffers;
+  uint32_t image_count;
+  const cgpu_image_binding* p_images;
+  uint32_t sampler_count;
+  const cgpu_sampler_binding* p_samplers;
+} cgpu_bindings;
 
 typedef struct cgpu_memory_barrier {
   CgpuMemoryAccessFlags src_access_flags;
@@ -558,15 +567,10 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_pipeline(
   cgpu_pipeline pipeline
 );
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_update_resources(
+CGPU_API CgpuResult CGPU_CDECL cgpu_update_bindings(
   cgpu_device device,
   cgpu_pipeline pipeline,
-  uint32_t buffer_resource_count,
-  const cgpu_shader_resource_buffer* p_buffer_resources,
-  uint32_t image_resource_count,
-  const cgpu_shader_resource_image* p_image_resources,
-  uint32_t sampler_count,
-  const cgpu_shader_resource_sampler* p_samplers
+  const cgpu_bindings* bindings
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_command_buffer(

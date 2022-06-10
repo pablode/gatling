@@ -20,18 +20,18 @@
 
 #include "cgpu.h"
 
-typedef struct cgpu_shader_reflection_resource {
-  uint32_t binding;
+typedef struct cgpu_shader_reflection_binding {
+  uint32_t index;
   int descriptor_type;
   bool write_access;
   bool read_access;
   int count;
-} cgpu_shader_reflection_resource;
+} cgpu_shader_reflection_binding;
 
 typedef struct cgpu_shader_reflection {
   uint32_t push_constants_size;
-  uint32_t resource_count;
-  cgpu_shader_reflection_resource* resources;
+  uint32_t binding_count;
+  cgpu_shader_reflection_binding* bindings;
 } cgpu_shader_reflection;
 
 bool cgpu_perform_shader_reflection(
