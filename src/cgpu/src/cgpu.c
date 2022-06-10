@@ -1871,7 +1871,9 @@ CgpuResult cgpu_update_resources(cgpu_device device,
                                  uint32_t buffer_resource_count,
                                  const cgpu_shader_resource_buffer* p_buffer_resources,
                                  uint32_t image_resource_count,
-                                 const cgpu_shader_resource_image* p_image_resources)
+                                 const cgpu_shader_resource_image* p_image_resources,
+                                 uint32_t sampler_count,
+                                 const cgpu_shader_resource_sampler* p_samplers)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1971,6 +1973,35 @@ CgpuResult cgpu_update_resources(cgpu_device device,
     write_desc_set_count++;
 
     ipipeline->image_resources[i] = *shader_resource_image;
+  }
+
+  for (uint32_t i = 0; i < sampler_count; i++)
+  {
+    const cgpu_shader_resource_sampler* shader_resource_sampler = &p_samplers[i];
+
+    cgpu_isampler* isampler;
+    cgpu_sampler sampler = shader_resource_sampler->sampler;
+    if (!cgpu_resolve_sampler(sampler, &isampler)) {
+      return CGPU_FAIL_INVALID_HANDLE;
+    }
+
+    VkDescriptorImageInfo* descriptor_image_info = &descriptor_image_infos[image_resource_count + i];
+    descriptor_image_info->sampler = isampler->sampler;
+    descriptor_image_info->imageView = VK_NULL_HANDLE;
+    descriptor_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_desc_set_count];
+    write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write_descriptor_set->pNext = NULL;
+    write_descriptor_set->dstSet = ipipeline->descriptor_set;
+    write_descriptor_set->dstBinding = shader_resource_sampler->binding;
+    write_descriptor_set->dstArrayElement = 0;
+    write_descriptor_set->descriptorCount = 1;
+    write_descriptor_set->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+    write_descriptor_set->pImageInfo = descriptor_image_info;
+    write_descriptor_set->pBufferInfo = NULL;
+    write_descriptor_set->pTexelBufferView = NULL;
+    write_desc_set_count++;
   }
 
   idevice->table.vkUpdateDescriptorSets(

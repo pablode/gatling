@@ -447,6 +447,11 @@ typedef struct cgpu_shader_resource_image {
   cgpu_image image;
 } cgpu_shader_resource_image;
 
+typedef struct cgpu_shader_resource_sampler {
+  uint32_t binding;
+  cgpu_sampler sampler;
+} cgpu_shader_resource_sampler;
+
 typedef struct cgpu_memory_barrier {
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
@@ -639,7 +644,9 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_update_resources(
   uint32_t buffer_resource_count,
   const cgpu_shader_resource_buffer* p_buffer_resources,
   uint32_t image_resource_count,
-  const cgpu_shader_resource_image* p_image_resources
+  const cgpu_shader_resource_image* p_image_resources,
+  uint32_t sampler_count,
+  const cgpu_shader_resource_sampler* p_samplers
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_command_buffer(
