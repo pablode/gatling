@@ -567,12 +567,6 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_destroy_pipeline(
   cgpu_pipeline pipeline
 );
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_update_bindings(
-  cgpu_device device,
-  cgpu_pipeline pipeline,
-  const cgpu_bindings* bindings
-);
-
 CGPU_API CgpuResult CGPU_CDECL cgpu_create_command_buffer(
   cgpu_device device,
   cgpu_command_buffer* p_command_buffer
@@ -585,6 +579,11 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_begin_command_buffer(
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_bind_pipeline(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_update_bindings(
+  cgpu_command_buffer command_buffer,
+  const cgpu_bindings* bindings
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer(

@@ -1758,17 +1758,144 @@ CgpuResult cgpu_destroy_pipeline(cgpu_device device,
   return CGPU_OK;
 }
 
-CgpuResult cgpu_update_bindings(cgpu_device device,
-                                cgpu_pipeline pipeline,
-                                const cgpu_bindings* bindings
-)
+CgpuResult cgpu_create_command_buffer(cgpu_device device,
+                                      cgpu_command_buffer* p_command_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
+
+  p_command_buffer->handle = resource_store_create_handle(&icommand_buffer_store);
+
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(*p_command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  icommand_buffer->device.handle = device.handle;
+  icommand_buffer->pipeline.handle = CGPU_INVALID_HANDLE;
+
+  VkCommandBufferAllocateInfo cmdbuf_alloc_info;
+  cmdbuf_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  cmdbuf_alloc_info.pNext = NULL;
+  cmdbuf_alloc_info.commandPool = idevice->command_pool;
+  cmdbuf_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  cmdbuf_alloc_info.commandBufferCount = 1;
+
+  VkResult result = idevice->table.vkAllocateCommandBuffers(
+    idevice->logical_device,
+    &cmdbuf_alloc_info,
+    &icommand_buffer->command_buffer
+  );
+  if (result != VK_SUCCESS) {
+    return CGPU_FAIL_UNABLE_TO_ALLOCATE_COMMAND_BUFFER;
+  }
+
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_destroy_command_buffer(cgpu_device device,
+                                       cgpu_command_buffer command_buffer)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  idevice->table.vkFreeCommandBuffers(
+    idevice->logical_device,
+    idevice->command_pool,
+    1,
+    &icommand_buffer->command_buffer
+  );
+
+  resource_store_free_handle(&icommand_buffer_store, command_buffer.handle);
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  VkCommandBufferBeginInfo command_buffer_begin_info;
+  command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  command_buffer_begin_info.pNext = NULL;
+  command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+  command_buffer_begin_info.pInheritanceInfo = NULL;
+
+  VkResult result = idevice->table.vkBeginCommandBuffer(
+    icommand_buffer->command_buffer,
+    &command_buffer_begin_info
+  );
+
+  if (result != VK_SUCCESS) {
+    return CGPU_FAIL_UNABLE_TO_BEGIN_COMMAND_BUFFER;
+  }
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
+                                  cgpu_pipeline pipeline)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+
+  idevice->table.vkCmdBindPipeline(
+    icommand_buffer->command_buffer,
+    VK_PIPELINE_BIND_POINT_COMPUTE,
+    ipipeline->pipeline
+  );
+  idevice->table.vkCmdBindDescriptorSets(
+    icommand_buffer->command_buffer,
+    VK_PIPELINE_BIND_POINT_COMPUTE,
+    ipipeline->layout,
+    0,
+    1,
+    &ipipeline->descriptor_set,
+    0,
+    0
+  );
+
+  icommand_buffer->pipeline = pipeline;
+
+  return CGPU_OK;
+}
+
+CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
+                                    const cgpu_bindings* bindings
+)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  cgpu_ipipeline* ipipeline;
+  if (!cgpu_resolve_pipeline(icommand_buffer->pipeline, &ipipeline)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
@@ -1896,130 +2023,6 @@ CgpuResult cgpu_update_bindings(cgpu_device device,
     0,
     NULL
   );
-
-  return CGPU_OK;
-}
-
-CgpuResult cgpu_create_command_buffer(cgpu_device device,
-                                      cgpu_command_buffer* p_command_buffer)
-{
-  cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-
-  p_command_buffer->handle = resource_store_create_handle(&icommand_buffer_store);
-
-  cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(*p_command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-  icommand_buffer->device.handle = device.handle;
-  icommand_buffer->pipeline.handle = CGPU_INVALID_HANDLE;
-
-  VkCommandBufferAllocateInfo cmdbuf_alloc_info;
-  cmdbuf_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmdbuf_alloc_info.pNext = NULL;
-  cmdbuf_alloc_info.commandPool = idevice->command_pool;
-  cmdbuf_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cmdbuf_alloc_info.commandBufferCount = 1;
-
-  VkResult result = idevice->table.vkAllocateCommandBuffers(
-    idevice->logical_device,
-    &cmdbuf_alloc_info,
-    &icommand_buffer->command_buffer
-  );
-  if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_ALLOCATE_COMMAND_BUFFER;
-  }
-
-  return CGPU_OK;
-}
-
-CgpuResult cgpu_destroy_command_buffer(cgpu_device device,
-                                       cgpu_command_buffer command_buffer)
-{
-  cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-  cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-
-  idevice->table.vkFreeCommandBuffers(
-    idevice->logical_device,
-    idevice->command_pool,
-    1,
-    &icommand_buffer->command_buffer
-  );
-
-  resource_store_free_handle(&icommand_buffer_store, command_buffer.handle);
-  return CGPU_OK;
-}
-
-CgpuResult cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
-{
-  cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-  cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-
-  VkCommandBufferBeginInfo command_buffer_begin_info;
-  command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  command_buffer_begin_info.pNext = NULL;
-  command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-  command_buffer_begin_info.pInheritanceInfo = NULL;
-
-  VkResult result = idevice->table.vkBeginCommandBuffer(
-    icommand_buffer->command_buffer,
-    &command_buffer_begin_info
-  );
-
-  if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_BEGIN_COMMAND_BUFFER;
-  }
-  return CGPU_OK;
-}
-
-CgpuResult cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
-                                  cgpu_pipeline pipeline)
-{
-  cgpu_icommand_buffer* icommand_buffer;
-  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-  cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-  cgpu_ipipeline* ipipeline;
-  if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
-    return CGPU_FAIL_INVALID_HANDLE;
-  }
-
-  idevice->table.vkCmdBindPipeline(
-    icommand_buffer->command_buffer,
-    VK_PIPELINE_BIND_POINT_COMPUTE,
-    ipipeline->pipeline
-  );
-  idevice->table.vkCmdBindDescriptorSets(
-    icommand_buffer->command_buffer,
-    VK_PIPELINE_BIND_POINT_COMPUTE,
-    ipipeline->layout,
-    0,
-    1,
-    &ipipeline->descriptor_set,
-    0,
-    0
-  );
-
-  icommand_buffer->pipeline = pipeline;
 
   return CGPU_OK;
 }
