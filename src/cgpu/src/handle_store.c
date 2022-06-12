@@ -35,6 +35,19 @@ void handle_store_destroy(handle_store* store)
   free(store->free_indices);
 }
 
+// See: https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+uint32_t handle_store_next_power_of_two(uint32_t v)
+{
+  v--;
+  v |= v >> 1;
+  v |= v >> 2;
+  v |= v >> 4;
+  v |= v >> 8;
+  v |= v >> 16;
+  v++;
+  return v;
+}
+
 uint64_t handle_store_create_handle(handle_store* store)
 {
   assert(store->max_index < ~0u);
@@ -49,8 +62,7 @@ uint64_t handle_store_create_handle(handle_store* store)
 
     if (index >= store->version_capacity)
     {
-      uint32_t next_multiple_of_two = ((store->version_capacity + 1) / 2) * 2;
-      store->version_capacity = next_multiple_of_two;
+      store->version_capacity = handle_store_next_power_of_two(index + 1);
       store->versions = realloc(store->versions, sizeof(uint32_t) * store->version_capacity);
     }
 
