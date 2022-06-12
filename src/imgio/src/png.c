@@ -21,6 +21,7 @@
 
 #include "error_codes.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <spng.h>
 
@@ -59,6 +60,7 @@ int imgio_png_decode(size_t size,
     goto ihdr_fail;
   }
 
+  assert(ihdr.bit_depth == 8);
   img->width = ihdr.width;
   img->height = ihdr.height;
 

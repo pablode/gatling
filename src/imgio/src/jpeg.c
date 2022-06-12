@@ -44,12 +44,13 @@ int imgio_jpeg_decode(size_t size,
     return IMGIO_ERR_UNSUPPORTED_ENCODING;
   }
 
-  img->size = img->width * img->height * 4;
+  int pixelFormat = TJPF_RGBA;
+  img->size = img->width * img->height * tjPixelSize[pixelFormat];
   img->data = malloc(img->size);
 
   int result = tjDecompress2(instance, mem, size, (unsigned char*) img->data,
                              (int) img->width, 0, (int) img->height,
-                             TJPF_RGBA, TJFLAG_ACCURATEDCT);
+                             pixelFormat, TJFLAG_ACCURATEDCT);
   tjDestroy(instance);
 
   if (result < 0)
