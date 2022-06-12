@@ -1936,10 +1936,10 @@ CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
 
       VkAccessFlags access_mask = 0;
       if (binding->read_access) {
-        access_mask |= VK_ACCESS_SHADER_READ_BIT;
+        access_mask = VK_ACCESS_SHADER_READ_BIT;
       }
       if (binding->write_access) {
-        access_mask |= VK_ACCESS_SHADER_WRITE_BIT;
+        access_mask = VK_ACCESS_SHADER_WRITE_BIT;
       }
 
       VkImageMemoryBarrier* barrier = &barriers[barrier_count++];
@@ -2218,6 +2218,44 @@ CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
+  if (iimage->layout != VK_IMAGE_LAYOUT_GENERAL)
+  {
+    VkAccessFlags access_mask = iimage->access_mask | VK_ACCESS_MEMORY_WRITE_BIT;
+    VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkImageMemoryBarrier barrier;
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.pNext = NULL;
+    barrier.srcAccessMask = iimage->access_mask;
+    barrier.dstAccessMask = access_mask;
+    barrier.oldLayout = iimage->layout;
+    barrier.newLayout = layout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = iimage->image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    idevice->table.vkCmdPipelineBarrier(
+      icommand_buffer->command_buffer,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      0,
+      0,
+      NULL,
+      0,
+      NULL,
+      1,
+      &barrier
+    );
+
+    iimage->layout = layout;
+    iimage->access_mask = access_mask;
+  }
+
   VkImageSubresourceLayers layers;
   layers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   layers.mipLevel = 0;
@@ -2246,12 +2284,10 @@ CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
     icommand_buffer->command_buffer,
     ibuffer->buffer,
     iimage->image,
-    VK_IMAGE_LAYOUT_GENERAL,
+    iimage->layout,
     1,
     &region
   );
-
-  iimage->layout = VK_IMAGE_LAYOUT_GENERAL;
 
   return CGPU_OK;
 }
