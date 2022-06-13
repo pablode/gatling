@@ -93,17 +93,7 @@ int giInitialize(const gi_init_params* params)
   // Set up GPU device.
   CgpuResult c_result;
 
-  uint32_t device_count;
-  c_result = cgpu_get_device_count(&device_count);
-  if (c_result != CGPU_OK) return GI_ERROR;
-
-  if (device_count == 0)
-  {
-    fprintf(stderr, "No device found!\n");
-    return GI_ERROR;
-  }
-
-  c_result = cgpu_create_device(0, &s_device);
+  c_result = cgpu_create_device(&s_device);
   if (c_result != CGPU_OK) return GI_ERROR;
 
   c_result = cgpu_get_physical_device_limits(s_device, &s_device_limits);
@@ -489,7 +479,7 @@ int giRender(const gi_render_params* params,
 
   c_result = cgpu_create_image(s_device,
     1, 1, CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM,
-    CGPU_IMAGE_USAGE_FLAG_STORAGE, CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    CGPU_IMAGE_USAGE_FLAG_STORAGE,
     &dummy_image
   );
   if (c_result != CGPU_OK)
@@ -519,39 +509,42 @@ int giRender(const gi_render_params* params,
     params->rr_inv_min_term_prob                                                           // float
   };
 
-  std::vector<cgpu_shader_resource_buffer> buffers;
+  std::vector<cgpu_buffer_binding> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ 0, output_buffer, 0, CGPU_WHOLE_SIZE });
+  buffers.push_back({ 0, 0, output_buffer, 0, CGPU_WHOLE_SIZE });
   if (shader_cache->bvh_enabled)
   {
-    buffers.push_back({ 1, geom_cache->buffer, geom_cache->bvh_node_buf_offset, geom_cache->bvh_node_buf_size });
+    buffers.push_back({ 1, 0, geom_cache->buffer, geom_cache->bvh_node_buf_offset, geom_cache->bvh_node_buf_size });
   }
-  buffers.push_back({ 2, geom_cache->buffer, geom_cache->face_buf_offset, geom_cache->face_buf_size });
+  buffers.push_back({ 2, 0, geom_cache->buffer, geom_cache->face_buf_offset, geom_cache->face_buf_size });
   if (shader_cache->nee_enabled)
   {
-    buffers.push_back({ 3, geom_cache->buffer, geom_cache->emissive_face_indices_buf_offset, geom_cache->emissive_face_indices_buf_size });
+    buffers.push_back({ 3, 0, geom_cache->buffer, geom_cache->emissive_face_indices_buf_offset, geom_cache->emissive_face_indices_buf_size });
   }
-  buffers.push_back({ 4, geom_cache->buffer, geom_cache->vertex_buf_offset, geom_cache->vertex_buf_size });
+  buffers.push_back({ 4, 0, geom_cache->buffer, geom_cache->vertex_buf_offset, geom_cache->vertex_buf_size });
 
-  std::vector<cgpu_shader_resource_image> images;
-  images.push_back({ 5, dummy_image });
+  std::vector<cgpu_image_binding> images;
+  images.push_back({ 5, 0, dummy_image });
 
-  c_result = cgpu_update_resources(
-    s_device,
-    shader_cache->pipeline,
-    buffers.size(),
-    buffers.data(),
-    images.size(),
-    images.data()
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  cgpu_bindings bindings= {
+    (uint32_t) buffers.size(), buffers.data(),
+    (uint32_t) images.size(), images.data(),
+    0, NULL
+  };
 
   // Set up command buffer.
   c_result = cgpu_create_command_buffer(s_device, &command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_begin_command_buffer(command_buffer);
+  if (c_result != CGPU_OK) goto cleanup;
+
+  c_result = cgpu_cmd_update_bindings(
+    command_buffer,
+    shader_cache->pipeline,
+    &bindings
+  );
   if (c_result != CGPU_OK) goto cleanup;
 
   c_result = cgpu_cmd_bind_pipeline(command_buffer, shader_cache->pipeline);
