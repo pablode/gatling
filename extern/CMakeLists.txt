@@ -21,6 +21,8 @@ set(MATERIALX_INSTALL_PYTHON OFF)
 set(MATERIALX_TEST_RENDER OFF)
 add_subdirectory(MaterialX)
 
+endif()
+
 install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/MaterialX/source/MaterialXGenMdl/mdl/materialx"
   DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mtlxmdl"
@@ -35,8 +37,6 @@ install(
   PATTERN "*.mdl"
   PATTERN "*.mtlx"
 )
-
-endif()
 
 #
 # VulkanMemoryAllocator
