@@ -182,30 +182,6 @@ namespace sg
     std::string fileName = "main.comp.hlsl";
     std::string filePath = m_shaderPath + "/" + fileName;
 
-    std::stringstream ss;
-    ss << std::showpoint;
-    ss << std::setprecision(std::numeric_limits<float>::digits10);
-
-#if !defined(NDEBUG) && !defined(__APPLE__)
-    ss << "#define DEBUG_PRINTF\n";
-#endif
-
-#define APPEND_CONSTANT(name, cvar) \
-    ss << "#define " << name << " " << params->cvar << "\n";
-#define APPEND_DEFINE(name, cvar) \
-    if (params->cvar) ss << "#define " << name << "\n";
-
-    APPEND_CONSTANT("AOV_ID", aovId)
-    APPEND_CONSTANT("NUM_THREADS_X", numThreadsX)
-    APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
-    APPEND_CONSTANT("MAX_STACK_SIZE", maxStackSize)
-    APPEND_CONSTANT("POSTPONE_RATIO", postponeRatio)
-    APPEND_CONSTANT("FACE_COUNT", faceCount)
-    APPEND_CONSTANT("EMISSIVE_FACE_COUNT", emissiveFaceCount)
-    APPEND_DEFINE("BVH_ENABLED", bvh)
-    APPEND_DEFINE("TRIANGLE_POSTPONING", trianglePostponing)
-    APPEND_DEFINE("NEXT_EVENT_ESTIMATION", nextEventEstimation)
-
     std::vector<const mi::neuraylib::ICompiled_material*> compiledMaterials;
     for (uint32_t i = 0; i < params->materials.size(); i++)
     {
@@ -228,6 +204,37 @@ namespace sg
     size_t mdlInjectionLoc = fileSrc.find(mdlLocMarker);
     assert(mdlInjectionLoc != std::string::npos);
     fileSrc.replace(mdlInjectionLoc, mdlLocMarker.size(), genMdl);
+
+    std::stringstream ss;
+    ss << std::showpoint;
+    ss << std::setprecision(std::numeric_limits<float>::digits10);
+
+    int textureCount = result.textureResources.size();
+    if (textureCount > 0)
+    {
+      ss << "#define HAS_TEXTURES\n";
+      ss << "#define TEXTURE_COUNT " << textureCount << "\n";
+    }
+
+#if !defined(NDEBUG) && !defined(__APPLE__)
+    ss << "#define DEBUG_PRINTF\n";
+#endif
+
+#define APPEND_CONSTANT(name, cvar) \
+    ss << "#define " << name << " " << params->cvar << "\n";
+#define APPEND_DEFINE(name, cvar) \
+    if (params->cvar) ss << "#define " << name << "\n";
+
+    APPEND_CONSTANT("AOV_ID", aovId)
+    APPEND_CONSTANT("NUM_THREADS_X", numThreadsX)
+    APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
+    APPEND_CONSTANT("MAX_STACK_SIZE", maxStackSize)
+    APPEND_CONSTANT("POSTPONE_RATIO", postponeRatio)
+    APPEND_CONSTANT("FACE_COUNT", faceCount)
+    APPEND_CONSTANT("EMISSIVE_FACE_COUNT", emissiveFaceCount)
+    APPEND_DEFINE("BVH_ENABLED", bvh)
+    APPEND_DEFINE("TRIANGLE_POSTPONING", trianglePostponing)
+    APPEND_DEFINE("NEXT_EVENT_ESTIMATION", nextEventEstimation)
 
     ss << fileSrc;
 

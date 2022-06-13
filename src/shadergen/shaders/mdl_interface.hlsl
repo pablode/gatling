@@ -1,5 +1,7 @@
 // See also: https://github.com/NVIDIA/MDL-SDK/blob/master/examples/mdl_sdk/dxr/content/mdl_renderer_runtime.hlsl
 
+#ifdef HAS_TEXTURES
+
 float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
 {
     if (tex == 0)
@@ -9,7 +11,7 @@ float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int 
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
-    return textures[0].SampleLevel(tex_sampler, coord.xy, lod, offset);
+    return textures[NonUniformResourceIndex(tex - 1)].SampleLevel(tex_sampler, coord.xy, lod, offset);
 }
 
 float3 tex_lookup_float3_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
@@ -36,7 +38,7 @@ float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, floa
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
-    return textures[0].SampleLevel(tex_sampler, coord.xy, lod, offset);
+    return textures[NonUniformResourceIndex(tex - 1)].SampleLevel(tex_sampler, coord.xy, lod, offset);
 }
 
 float3 tex_lookup_float3_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
@@ -72,7 +74,7 @@ float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
     }
 
     int mipmapLevel = 0;
-    return textures[0].Load(int3(coord.xy, mipmapLevel));
+    return textures[NonUniformResourceIndex(tex - 1)].Load(int3(coord.xy, mipmapLevel));
 }
 
 float3 tex_texel_float3_3d(uint tex, int3 coord, float frame)
@@ -103,7 +105,7 @@ float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
     }
 
     int mipmapLevel = 0;
-    return textures[0].Load(int3(coord.xy, mipmapLevel));
+    return textures[NonUniformResourceIndex(tex - 1)].Load(int3(coord.xy, mipmapLevel));
 }
 
 float3 tex_texel_float3_2d(uint tex, int2 coord, int2 uv_tile, float frame)
@@ -134,7 +136,7 @@ uint2 tex_resolution_2d(uint tex, int2 uv_tile, float frame)
     }
 
     uint2 res = uint2(0, 0);
-    textures[0].GetDimensions(res.x, res.y);
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
     return res;
 }
 
@@ -147,3 +149,5 @@ uint tex_height_2d(uint tex, int2 uv_tile, float frame)
 {
     return tex_resolution_2d(tex, uv_tile, frame).y;
 }
+
+#endif

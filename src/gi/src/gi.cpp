@@ -55,11 +55,12 @@ struct gi_geom_cache
 
 struct gi_shader_cache
 {
-  uint32_t      aov_id;
-  cgpu_shader   shader;
-  cgpu_pipeline pipeline;
-  bool          nee_enabled;
-  bool          bvh_enabled;
+  uint32_t                aov_id;
+  cgpu_shader             shader;
+  cgpu_pipeline           pipeline;
+  bool                    nee_enabled;
+  bool                    bvh_enabled;
+  std::vector<cgpu_image> images;
 };
 
 struct gi_material
@@ -421,18 +422,42 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     return nullptr;
   }
 
+  uint32_t texCount = mainShader.textureResources.size();
+
+  std::vector<cgpu_image> images;
+  images.reserve(texCount);
+
+  for (int i = 0; i < texCount; i++)
+  {
+    cgpu_image image = { CGPU_INVALID_HANDLE };
+
+    CgpuResult c_result = cgpu_create_image(s_device,
+      1, 1, CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM,
+      CGPU_IMAGE_USAGE_FLAG_SAMPLED,
+      &image
+    );
+    assert(c_result == CGPU_OK);
+
+    images.push_back(image);
+  }
+
   gi_shader_cache* cache = new gi_shader_cache;
   cache->aov_id = params->aov_id;
   cache->shader = shader;
   cache->pipeline = pipeline;
   cache->nee_enabled = nee_enabled;
   cache->bvh_enabled = bvh_enabled;
+  cache->images = std::move(images);
 
   return cache;
 }
 
 void giDestroyShaderCache(gi_shader_cache* cache)
 {
+  for (cgpu_image image : cache->images)
+  {
+    cgpu_destroy_image(s_device, image);
+  }
   cgpu_destroy_shader(s_device, cache->shader);
   cgpu_destroy_pipeline(s_device, cache->pipeline);
   delete cache;
@@ -452,7 +477,6 @@ int giRender(const gi_render_params* params,
   cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
   cgpu_fence fence = { CGPU_INVALID_HANDLE };
-  cgpu_image dummy_tex = { CGPU_INVALID_HANDLE };
 
   // Set up buffers.
   const int COLOR_COMPONENT_COUNT = 4;
@@ -481,18 +505,6 @@ int giRender(const gi_render_params* params,
   if (c_result != CGPU_OK)
   {
     cgpu_destroy_buffer(s_device, staging_buffer);
-    return GI_ERROR;
-  }
-
-  c_result = cgpu_create_image(s_device,
-    1, 1, CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM,
-    CGPU_IMAGE_USAGE_FLAG_SAMPLED,
-    &dummy_tex
-  );
-  if (c_result != CGPU_OK)
-  {
-    cgpu_destroy_buffer(s_device, staging_buffer);
-    cgpu_destroy_buffer(s_device, output_buffer);
     return GI_ERROR;
   }
 
@@ -531,8 +543,15 @@ int giRender(const gi_render_params* params,
   }
   buffers.push_back({ 4, 0, geom_cache->buffer, geom_cache->vertex_buf_offset, geom_cache->vertex_buf_size });
 
+  uint32_t texCount = shader_cache->images.size();
+
   std::vector<cgpu_image_binding> images;
-  images.push_back({ 5, 0, dummy_tex });
+  images.reserve(texCount);
+
+  for (uint32_t i = 0; i < texCount; i++)
+  {
+    images.push_back({ 5, i, shader_cache->images[i] });
+  }
 
   cgpu_sampler_binding sampler = { 6, 0, s_tex_sampler };
 
@@ -656,7 +675,6 @@ int giRender(const gi_render_params* params,
   result = GI_OK;
 
 cleanup:
-  cgpu_destroy_image(s_device, dummy_tex);
   cgpu_destroy_fence(s_device, fence);
   cgpu_destroy_command_buffer(s_device, command_buffer);
   cgpu_destroy_buffer(s_device, staging_buffer);

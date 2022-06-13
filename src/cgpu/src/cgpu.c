@@ -794,7 +794,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   device_features2.features.shaderStorageImageReadWithoutFormat = VK_FALSE;
   device_features2.features.shaderStorageImageWriteWithoutFormat = VK_FALSE;
   device_features2.features.shaderUniformBufferArrayDynamicIndexing = VK_FALSE;
-  device_features2.features.shaderSampledImageArrayDynamicIndexing = VK_FALSE;
+  device_features2.features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
   device_features2.features.shaderStorageBufferArrayDynamicIndexing = VK_FALSE;
   device_features2.features.shaderStorageImageArrayDynamicIndexing = VK_FALSE;
   device_features2.features.shaderClipDistance = VK_FALSE;
