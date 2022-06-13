@@ -2,12 +2,54 @@
 
 #ifdef HAS_TEXTURES
 
+float apply_wrap_and_crop(float coord, int wrap, float2 crop, int res)
+{
+    if (wrap == TEX_WRAP_REPEAT)
+    {
+        if (all(crop != float2(0.0, 1.0)))
+        {
+            return coord;
+        }
+        coord -= floor(coord);
+    }
+    else
+    {
+        if (wrap == TEX_WRAP_MIRRORED_REPEAT)
+        {
+            float tmp = floor(coord);
+
+            if ((int(tmp) & 1) != 0)
+            {
+                coord = 1.0 - (coord - tmp);
+            }
+            else
+            {
+                coord -= tmp;
+            }
+        }
+
+        float inv_hdim = 0.5 / float(res);
+        coord = clamp(coord, inv_hdim, 1.0 - inv_hdim);
+    }
+    return coord * (crop.y - crop.x) + crop.x;
+}
+
 float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
 {
-    if (tex == 0)
+    if ((tex == 0) ||
+        (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
+        (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)) ||
+        (wrap_w == TEX_WRAP_CLIP && (coord.z < 0.0 || coord.z > 1.0)))
     {
         return float4(0, 0, 0, 0);
     }
+
+    // TODO: 3d texture
+
+    uint width, height;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
+    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, width);
+    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, height);
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
@@ -31,10 +73,17 @@ float tex_lookup_float_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wr
 
 float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
 {
-    if (tex == 0)
+    if ((tex == 0) ||
+        (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
+        (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
     {
         return float4(0, 0, 0, 0);
     }
+
+    uint width, height;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
+    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, width);
+    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, height);
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
@@ -73,6 +122,15 @@ float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
         return float4(0, 0, 0, 0);
     }
 
+    // TODO: 3d texture
+
+    uint width, height;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
+    if (coord.x < 0 || coord.x >= width || coord.y < 0 || coord.y >= height)
+    {
+        return float4(0, 0, 0, 0);
+    }
+
     int mipmapLevel = 0;
     return textures[NonUniformResourceIndex(tex - 1)].Load(int3(coord.xy, mipmapLevel));
 }
@@ -100,6 +158,13 @@ float3 tex_texel_color_3d(uint tex, int3 coord, float frame)
 float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
 {
     if (tex == 0)
+    {
+        return float4(0, 0, 0, 0);
+    }
+
+    uint width, height;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
+    if (coord.x < 0 || coord.x >= width || coord.y < 0 || coord.y >= height)
     {
         return float4(0, 0, 0, 0);
     }
