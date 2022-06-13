@@ -69,14 +69,29 @@ struct gi_material
 
 cgpu_device s_device;
 cgpu_physical_device_limits s_device_limits;
+cgpu_sampler s_tex_sampler;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
 
 int giInitialize(const gi_init_params* params)
 {
-  if (cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH) != CGPU_OK)
-  {
-    return GI_ERROR;
-  }
+  CgpuResult c_result;
+
+  c_result = cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH);
+  if (c_result != CGPU_OK) return GI_ERROR;
+
+  c_result = cgpu_create_device(&s_device);
+  if (c_result != CGPU_OK) return GI_ERROR;
+
+  c_result = cgpu_get_physical_device_limits(s_device, &s_device_limits);
+  if (c_result != CGPU_OK) return GI_ERROR;
+
+  c_result = cgpu_create_sampler(s_device,
+    CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+    CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+    CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+    &s_tex_sampler
+  );
+  if (c_result != CGPU_OK) return GI_ERROR;
 
   sg::ShaderGen::InitParams sgParams;
   sgParams.resourcePath = params->resource_path;
@@ -90,21 +105,13 @@ int giInitialize(const gi_init_params* params)
     return GI_ERROR;
   }
 
-  // Set up GPU device.
-  CgpuResult c_result;
-
-  c_result = cgpu_create_device(&s_device);
-  if (c_result != CGPU_OK) return GI_ERROR;
-
-  c_result = cgpu_get_physical_device_limits(s_device, &s_device_limits);
-  if (c_result != CGPU_OK) return GI_ERROR;
-
   return GI_OK;
 }
 
 void giTerminate()
 {
   s_shaderGen.reset();
+  cgpu_destroy_sampler(s_device, s_tex_sampler);
   cgpu_destroy_device(s_device);
   cgpu_terminate();
 }
@@ -445,7 +452,7 @@ int giRender(const gi_render_params* params,
   cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
   cgpu_fence fence = { CGPU_INVALID_HANDLE };
-  cgpu_image dummy_image = { CGPU_INVALID_HANDLE };
+  cgpu_image dummy_tex = { CGPU_INVALID_HANDLE };
 
   // Set up buffers.
   const int COLOR_COMPONENT_COUNT = 4;
@@ -479,8 +486,8 @@ int giRender(const gi_render_params* params,
 
   c_result = cgpu_create_image(s_device,
     1, 1, CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM,
-    CGPU_IMAGE_USAGE_FLAG_STORAGE,
-    &dummy_image
+    CGPU_IMAGE_USAGE_FLAG_SAMPLED,
+    &dummy_tex
   );
   if (c_result != CGPU_OK)
   {
@@ -525,12 +532,14 @@ int giRender(const gi_render_params* params,
   buffers.push_back({ 4, 0, geom_cache->buffer, geom_cache->vertex_buf_offset, geom_cache->vertex_buf_size });
 
   std::vector<cgpu_image_binding> images;
-  images.push_back({ 5, 0, dummy_image });
+  images.push_back({ 5, 0, dummy_tex });
+
+  cgpu_sampler_binding sampler = { 6, 0, s_tex_sampler };
 
   cgpu_bindings bindings= {
     (uint32_t) buffers.size(), buffers.data(),
     (uint32_t) images.size(), images.data(),
-    0, NULL
+    1, &sampler
   };
 
   // Set up command buffer.
@@ -647,7 +656,7 @@ int giRender(const gi_render_params* params,
   result = GI_OK;
 
 cleanup:
-  cgpu_destroy_image(s_device, dummy_image);
+  cgpu_destroy_image(s_device, dummy_tex);
   cgpu_destroy_fence(s_device, fence);
   cgpu_destroy_command_buffer(s_device, command_buffer);
   cgpu_destroy_buffer(s_device, staging_buffer);

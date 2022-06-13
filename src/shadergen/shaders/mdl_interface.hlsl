@@ -2,7 +2,14 @@
 
 float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
 {
-    return images[0].Load(int2(0, 0)); // TODO
+    if (tex == 0)
+    {
+        return float4(0, 0, 0, 0);
+    }
+
+    float lod = 0.0;
+    int2 offset = int2(0, 0);
+    return textures[0].SampleLevel(tex_sampler, coord.xy, lod, offset);
 }
 
 float3 tex_lookup_float3_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
@@ -22,7 +29,14 @@ float tex_lookup_float_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wr
 
 float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
 {
-    return images[0].Load(int2(0, 0)); // TODO
+    if (tex == 0)
+    {
+        return float4(0, 0, 0, 0);
+    }
+
+    float lod = 0.0;
+    int2 offset = int2(0, 0);
+    return textures[0].SampleLevel(tex_sampler, coord.xy, lod, offset);
 }
 
 float3 tex_lookup_float3_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
@@ -52,7 +66,13 @@ float3 tex_lookup_color_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float
 
 float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
 {
-    return images[0].Load(int2(0, 0)); // TODO
+    if (tex == 0)
+    {
+        return float4(0, 0, 0, 0);
+    }
+
+    int mipmapLevel = 0;
+    return textures[0].Load(int3(coord.xy, mipmapLevel));
 }
 
 float3 tex_texel_float3_3d(uint tex, int3 coord, float frame)
@@ -77,7 +97,13 @@ float3 tex_texel_color_3d(uint tex, int3 coord, float frame)
 
 float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
 {
-    return images[0].Load(int2(0, 0)); // TODO
+    if (tex == 0)
+    {
+        return float4(0, 0, 0, 0);
+    }
+
+    int mipmapLevel = 0;
+    return textures[0].Load(int3(coord.xy, mipmapLevel));
 }
 
 float3 tex_texel_float3_2d(uint tex, int2 coord, int2 uv_tile, float frame)
@@ -102,8 +128,13 @@ float3 tex_texel_color_2d(uint tex, int2 coord, int2 uv_tile, float frame)
 
 uint2 tex_resolution_2d(uint tex, int2 uv_tile, float frame)
 {
-    uint2 res = uint2(16, 16);
-    // TODO: textures[NonUniformResourceIndex(tex)].GetDimensions(res.x, res.y);
+    if (tex == 0)
+    {
+        return uint2(0, 0);
+    }
+
+    uint2 res = uint2(0, 0);
+    textures[0].GetDimensions(res.x, res.y);
     return res;
 }
 

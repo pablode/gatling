@@ -21,7 +21,10 @@ StructuredBuffer<uint> emissive_face_indices;
 StructuredBuffer<fvertex> vertices;
 
 [[vk::binding(5)]]
-RWTexture2D<float4> images[1];
+Texture2D textures[1];
+
+[[vk::binding(6)]]
+SamplerState tex_sampler;
 
 struct PushConstants
 {

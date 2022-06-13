@@ -788,7 +788,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   device_features2.features.vertexPipelineStoresAndAtomics = VK_FALSE;
   device_features2.features.fragmentStoresAndAtomics = VK_FALSE;
   device_features2.features.shaderTessellationAndGeometryPointSize = VK_FALSE;
-  device_features2.features.shaderImageGatherExtended = VK_FALSE;
+  device_features2.features.shaderImageGatherExtended = VK_TRUE;
   device_features2.features.shaderStorageImageExtendedFormats = VK_FALSE;
   device_features2.features.shaderStorageImageMultisample = VK_FALSE;
   device_features2.features.shaderStorageImageReadWithoutFormat = VK_FALSE;
