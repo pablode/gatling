@@ -25,7 +25,7 @@
 
 struct imgio_img
 {
-  void* data;
+  uint8_t* data;
   size_t size;
   uint32_t width;
   uint32_t height;

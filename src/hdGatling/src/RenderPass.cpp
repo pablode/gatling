@@ -268,41 +268,36 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_c
   giCamera.vfov = camera.GetVFov();
 }
 
+const std::unordered_map<TfToken, gi_aov_id, TfToken::HashFunctor> s_aovIdMappings {
+  { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
+  { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
+#ifndef NDEBUG
+  { HdGatlingAovTokens->debug_nee,          GI_AOV_ID_DEBUG_NEE          },
+  { HdGatlingAovTokens->debug_bvh_steps,    GI_AOV_ID_DEBUG_BVH_STEPS    },
+  { HdGatlingAovTokens->debug_tri_tests,    GI_AOV_ID_DEBUG_TRI_TESTS    },
+  { HdGatlingAovTokens->debug_barycentrics, GI_AOV_ID_DEBUG_BARYCENTRICS },
+  { HdGatlingAovTokens->debug_texcoords,    GI_AOV_ID_DEBUG_TEXCOORDS    },
+#endif
+};
+
 const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVector& aovBindings)
 {
   for (const HdRenderPassAovBinding& aovBinding : aovBindings)
   {
-    if (aovBinding.aovName != HdAovTokens->color
-        && aovBinding.aovName != HdAovTokens->normal
-#ifndef NDEBUG
-        && aovBinding.aovName != HdGatlingAovTokens->debug_nee
-        && aovBinding.aovName != HdGatlingAovTokens->debug_bvh_steps
-        && aovBinding.aovName != HdGatlingAovTokens->debug_tri_tests
-        && aovBinding.aovName != HdGatlingAovTokens->debug_barycentrics
-        && aovBinding.aovName != HdGatlingAovTokens->debug_texcoords
-#endif
-       )
+    bool aovSupported = s_aovIdMappings.count(aovBinding.aovName) > 0;
+
+    if (aovSupported)
     {
-      HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
-      renderBuffer->SetConverged(true);
-      continue;
+      return &aovBinding;
     }
 
-    return &aovBinding;
+    HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
+    renderBuffer->SetConverged(true);
+    continue;
   }
 
   return nullptr;
 }
-
-const std::unordered_map<TfToken, gi_aov_id, TfToken::HashFunctor> s_aovIdMappings {
- { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
- { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
- { HdGatlingAovTokens->debug_nee,          GI_AOV_ID_DEBUG_NEE          },
- { HdGatlingAovTokens->debug_bvh_steps,    GI_AOV_ID_DEBUG_BVH_STEPS    },
- { HdGatlingAovTokens->debug_tri_tests,    GI_AOV_ID_DEBUG_TRI_TESTS    },
- { HdGatlingAovTokens->debug_barycentrics, GI_AOV_ID_DEBUG_BARYCENTRICS },
- { HdGatlingAovTokens->debug_texcoords,    GI_AOV_ID_DEBUG_TEXCOORDS    }
-};
 
 gi_aov_id _GetAovId(const TfToken& aovName)
 {
@@ -363,7 +358,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   GfVec4f backgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
   if (aovBinding->clearValue.IsHolding<GfVec4f>())
   {
-    backgroundColor = aovBinding->clearValue.Get<GfVec4f>();
+    backgroundColor = aovBinding->clearValue.UncheckedGet<GfVec4f>();
   }
 
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();

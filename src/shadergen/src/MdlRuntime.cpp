@@ -16,10 +16,9 @@
 //
 
 #include "MdlRuntime.h"
+#include "MdlEntityResolver.h"
 
 #include <mi/mdl_sdk.h>
-
-#include "MdlEntityResolver.h"
 
 namespace sg
 {
@@ -56,7 +55,7 @@ namespace sg
 
     if (m_config->add_mdl_path(mtlxmdlPath))
     {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MaterialX MDL file path not found, translation not possible");
+      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MaterialX MDL file path not found");
       return false;
     }
 

@@ -131,6 +131,8 @@ namespace sg
       return false;
     }
 
+    assert(targetCode->get_ro_data_segment_count() == 0);
+
     int texCount = targetCode->get_body_texture_count();
     textureResources.reserve(texCount);
 
@@ -163,6 +165,7 @@ namespace sg
 
         textureResource.width = canvas->get_resolution_x();
         textureResource.height = canvas->get_resolution_y();
+        assert(canvas->get_layers_size() == 1);
 
         size_t size = textureResource.width * textureResource.height * 4;
         mi::base::Handle<const mi::neuraylib::ITile> tile(canvas->get_tile(0));

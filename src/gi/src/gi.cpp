@@ -272,7 +272,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   c_result = cgpu_create_buffer(
     s_device,
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
     buf_size,
     &staging_buffer
@@ -485,7 +485,7 @@ int giRender(const gi_render_params* params,
 
   c_result = cgpu_create_buffer(
     s_device,
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
     buffer_size,
     &staging_buffer

@@ -105,11 +105,9 @@ float3 evaluate_sample(inout uint4 rng_state,
         bool found_hit = find_hit_closest(ray, hit);
 
 #if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
-        state.radiance = float3(float(hit.bvh_steps), 0.0, 0.0);
-        break;
+        return float3(float(hit.bvh_steps), 0.0, 0.0);
 #elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
-        state.radiance = float3(0.0, 0.0, float(hit.tri_tests));
-        break;
+        return float3(0.0, 0.0, float(hit.tri_tests));
 #endif
 
         if (!found_hit)
@@ -151,8 +149,7 @@ float3 evaluate_sample(inout uint4 rng_state,
         if (dot(normal, state.ray_dir) > 0.0) { normal *= -1.0f; }
 
 #if AOV_ID == AOV_ID_NORMAL
-        state.radiance = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
-        break;
+        return (normal + float3(1.0, 1.0, 1.0)) * 0.5;
 #endif
 
         float2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
@@ -199,10 +196,11 @@ float3 evaluate_sample(inout uint4 rng_state,
 
 #if AOV_ID == AOV_ID_DEBUG_NEE
             /* Occlusion debug visualization. */
-            state.radiance = is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
-            break;
+            return is_occluded ? float3(1.0, 0.0, 0.0) : float3(0.0, 1.0, 0.0);
 #endif
         }
+#elif AOV_ID == AOV_ID_DEBUG_NEE
+        return float3(0.0, 0.0, 0.0);
 #endif
 
         if (bounce == PC.MAX_BOUNCES)
