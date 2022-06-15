@@ -23,6 +23,7 @@
 #ifdef GATLING_USE_EMBREE
 #include "bvh_embree.h"
 #endif
+#include "stager.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +72,7 @@ struct gi_material
 cgpu_device s_device;
 cgpu_physical_device_limits s_device_limits;
 cgpu_sampler s_tex_sampler;
+std::unique_ptr<gi::Stager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
 
 int giInitialize(const gi_init_params* params)
@@ -94,6 +96,12 @@ int giInitialize(const gi_init_params* params)
   );
   if (c_result != CGPU_OK) return GI_ERROR;
 
+  s_stager = std::make_unique<gi::Stager>(s_device);
+  if (!s_stager->allocate())
+  {
+    return GI_ERROR;
+  }
+
   sg::ShaderGen::InitParams sgParams;
   sgParams.resourcePath = params->resource_path;
   sgParams.shaderPath = params->shader_path;
@@ -112,6 +120,8 @@ int giInitialize(const gi_init_params* params)
 void giTerminate()
 {
   s_shaderGen.reset();
+  s_stager->free();
+  s_stager.reset();
   cgpu_destroy_sampler(s_device, s_tex_sampler);
   cgpu_destroy_device(s_device);
   cgpu_terminate();
@@ -438,8 +448,13 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     );
     assert(c_result == CGPU_OK);
 
+    uint8_t black[4] = { 0, 0, 0, 0 };
+    s_stager->stageToImage(black, 4, image);
+
     images.push_back(image);
   }
+
+  s_stager->flush();
 
   gi_shader_cache* cache = new gi_shader_cache;
   cache->aov_id = params->aov_id;
