@@ -21,6 +21,7 @@
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hd/smoothNormals.h>
 #include <pxr/imaging/hd/instancer.h>
+#include <pxr/imaging/hd/vtBufferSource.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -84,9 +85,9 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     return;
   }
 
-  m_faces.clear();
-  m_points.clear();
-  m_normals.clear();
+  m_faces = {};
+  m_points = {};
+  m_normals = {};
 
   _UpdateGeometry(sceneDelegate);
 }
@@ -97,53 +98,27 @@ void HdGatlingMesh::_UpdateGeometry(HdSceneDelegate* sceneDelegate)
   const SdfPath& id = GetId();
   HdMeshUtil meshUtil(&topology, id);
 
-  VtVec3iArray indices;
   VtIntArray primitiveParams;
-  meshUtil.ComputeTriangleIndices(&indices, &primitiveParams);
+  meshUtil.ComputeTriangleIndices(&m_faces, &primitiveParams);
 
-  VtVec3fArray points;
-  VtVec3fArray normals;
   bool indexedNormals;
-  _PullPrimvars(sceneDelegate, points, normals, indexedNormals, m_color, m_hasColor);
-
-  for (int i = 0; i < indices.size(); i++)
-  {
-    GfVec3i newFaceIndices(i * 3 + 0, i * 3 + 1, i * 3 + 2);
-    m_faces.push_back(newFaceIndices);
-
-    const GfVec3i& faceIndices = indices[i];
-    m_points.push_back(points[faceIndices[0]]);
-    m_points.push_back(points[faceIndices[1]]);
-    m_points.push_back(points[faceIndices[2]]);
-    m_normals.push_back(normals[indexedNormals ? faceIndices[0] : newFaceIndices[0]]);
-    m_normals.push_back(normals[indexedNormals ? faceIndices[1] : newFaceIndices[1]]);
-    m_normals.push_back(normals[indexedNormals ? faceIndices[2] : newFaceIndices[2]]);
-  }
+  _PullPrimvars(sceneDelegate, primitiveParams, m_color, m_hasColor);
 }
 
 bool HdGatlingMesh::_FindPrimvar(HdSceneDelegate* sceneDelegate,
-                                 TfToken primvarName,
+                                 TfToken name,
                                  HdInterpolation& interpolation) const
 {
-  HdInterpolation interpolations[] = {
-    HdInterpolation::HdInterpolationVertex,
-    HdInterpolation::HdInterpolationFaceVarying,
-    HdInterpolation::HdInterpolationConstant,
-    HdInterpolation::HdInterpolationUniform,
-    HdInterpolation::HdInterpolationVarying,
-    HdInterpolation::HdInterpolationInstance
-  };
-
-  for (HdInterpolation i : interpolations)
+  for (int i = 0; i < int(HdInterpolationCount); i++)
   {
-    const auto& primvarDescs = GetPrimvarDescriptors(sceneDelegate, i);
+    interpolation = (HdInterpolation) i;
+
+    const auto& primvarDescs = GetPrimvarDescriptors(sceneDelegate, interpolation);
 
     for (const HdPrimvarDescriptor& primvar : primvarDescs)
     {
-      if (primvar.name == primvarName)
+      if (primvar.name == name)
       {
-        interpolation = i;
-
         return true;
       }
     }
@@ -152,20 +127,112 @@ bool HdGatlingMesh::_FindPrimvar(HdSceneDelegate* sceneDelegate,
   return false;
 }
 
+template<typename T>
+VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, int elementExpansion)
+{
+  VtArray<T> result(buffer.GetNumElements() * elementExpansion);
+
+  for (int i = 0; i < buffer.GetNumElements(); i++)
+  {
+    for (int j = 0; j < elementExpansion; j++)
+    {
+      result[i * elementExpansion + j] = ((T*) buffer.GetData())[i];
+    }
+  }
+
+  return VtValue(std::move(result));
+}
+
+VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, HdType type, int elementExpansion)
+{
+  if (type == HdTypeFloatVec3)
+  {
+    return _ExpandBufferElements<GfVec3f>(buffer, elementExpansion);
+  }
+  else if (type == HdTypeFloatVec2)
+  {
+    return _ExpandBufferElements<GfVec2f>(buffer, elementExpansion);
+  }
+  assert(false);
+  return VtValue();
+}
+
+bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
+                                             VtIntArray primitiveParams,
+                                             TfToken name,
+                                             HdType type,
+                                             bool& isIndexed,
+                                             VtValue& result) const
+{
+  HdInterpolation interpolation;
+  if (!_FindPrimvar(sceneDelegate, name, interpolation))
+  {
+    return false;
+  }
+
+  const SdfPath& id = GetId();
+
+  VtValue boxedValues = sceneDelegate->Get(id, name);
+  HdVtBufferSource buffer(name, boxedValues);
+
+  if (interpolation == HdInterpolationVertex)
+  {
+    result = boxedValues;
+    isIndexed = true;
+  }
+  else if (interpolation == HdInterpolationConstant)
+  {
+    result = _ExpandBufferElements(buffer, type, primitiveParams.size());
+    isIndexed = true;
+  }
+  else if (interpolation == HdInterpolationFaceVarying)
+  {
+    HdMeshTopology topology = GetMeshTopology(sceneDelegate);
+    HdMeshUtil meshUtil(&topology, id);
+    if (!meshUtil.ComputeTriangulatedFaceVaryingPrimvar(buffer.GetData(),
+                                                        buffer.GetNumElements(),
+                                                        type,
+                                                        &result))
+    {
+      return false;
+    }
+    isIndexed = false;
+  }
+  else if (interpolation == HdInterpolationUniform)
+  {
+    result = _ExpandBufferElements(buffer, type, 3);
+    uint8_t* dstPtr = (uint8_t*) HdGetValueData(result);
+    uint8_t* srcPtr = (uint8_t*) HdGetValueData(boxedValues);
+    size_t elementSize = HdDataSizeOfType(type);
+
+    for (int faceIndex = 0; faceIndex < primitiveParams.size(); faceIndex++)
+    {
+      int oldFaceIndex = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[faceIndex]);
+
+      memcpy(&dstPtr[(faceIndex * 3 + 0) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+      memcpy(&dstPtr[(faceIndex * 3 + 1) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+      memcpy(&dstPtr[(faceIndex * 3 + 2) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+    }
+    isIndexed = false;
+  }
+  else
+  {
+    return false;
+  }
+
+  return true;
+}
+
 void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
-                                  VtVec3fArray& points,
-                                  VtVec3fArray& normals,
-                                  bool& indexedNormals,
+                                  VtIntArray primitiveParams,
                                   GfVec3f& color,
-                                  bool& hasColor) const
+                                  bool& hasColor)
 {
   const SdfPath& id = GetId();
 
-  // Handle points.
+  // Points: required per vertex.
   HdInterpolation pointInterpolation;
-  bool foundPoints = _FindPrimvar(sceneDelegate,
-                                  HdTokens->points,
-                                  pointInterpolation);
+  bool foundPoints = _FindPrimvar(sceneDelegate, HdTokens->points, pointInterpolation);
 
   if (!foundPoints)
   {
@@ -179,13 +246,11 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
   }
 
   VtValue boxedPoints = sceneDelegate->Get(id, HdTokens->points);
-  points = boxedPoints.Get<VtVec3fArray>();
+  m_points = boxedPoints.Get<VtVec3fArray>();
 
-  // Handle color.
+  // Colors: only support constant interpolation because we can create a material for it.
   HdInterpolation colorInterpolation;
-  bool foundColor = _FindPrimvar(sceneDelegate,
-                                 HdTokens->displayColor,
-                                 colorInterpolation);
+  bool foundColor = _FindPrimvar(sceneDelegate, HdTokens->displayColor, colorInterpolation);
 
   if (foundColor && colorInterpolation == HdInterpolation::HdInterpolationConstant)
   {
@@ -195,75 +260,45 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
     hasColor = true;
   }
 
-  // Handle normals.
-  HdInterpolation normalInterpolation;
-  bool foundNormals = _FindPrimvar(sceneDelegate,
-                                   HdTokens->normals,
-                                   normalInterpolation);
+  // Normals: calculate them from the topology if no primvar exists.
+  VtValue boxedNormals;
+  bool areNormalsIndexed;
+  bool foundNormals = _ReadTriangulatedPrimvar(sceneDelegate,
+                                               primitiveParams,
+                                               HdTokens->normals,
+                                               HdTypeFloatVec3,
+                                               areNormalsIndexed,
+                                               boxedNormals);
 
-  if (foundNormals &&
-      normalInterpolation == HdInterpolation::HdInterpolationVertex)
+  if (foundNormals)
   {
-    VtValue boxedNormals = sceneDelegate->Get(id, HdTokens->normals);
-    normals = boxedNormals.Get<VtVec3fArray>();
-    indexedNormals = true;
-    return;
+    m_normals.array = boxedNormals.Get<VtVec3fArray>();
+    m_normals.indexed = areNormalsIndexed;
   }
-
-  HdMeshTopology topology = GetMeshTopology(sceneDelegate);
-
-  if (foundNormals &&
-      normalInterpolation == HdInterpolation::HdInterpolationFaceVarying)
+  else
   {
-    VtValue boxedFvNormals = sceneDelegate->Get(id, HdTokens->normals);
-    const VtVec3fArray& fvNormals = boxedFvNormals.Get<VtVec3fArray>();
+    HdMeshTopology topology = GetMeshTopology(sceneDelegate);
 
-    HdMeshUtil meshUtil(&topology, id);
-    VtValue boxedTriangulatedNormals;
-    if (!meshUtil.ComputeTriangulatedFaceVaryingPrimvar(
-        fvNormals.cdata(),
-        fvNormals.size(),
-        HdTypeFloatVec3,
-        &boxedTriangulatedNormals))
-    {
-      TF_CODING_ERROR("Unable to triangulate face-varying normals of %s", id.GetText());
-    }
-
-    normals = boxedTriangulatedNormals.Get<VtVec3fArray>();
-    indexedNormals = false;
-    return;
+    Hd_VertexAdjacency adjacency;
+    adjacency.BuildAdjacencyTable(&topology);
+    m_normals.array = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, m_points.size(), m_points.cdata());
+    m_normals.indexed = false;
   }
-
-  Hd_VertexAdjacency adjacency;
-  adjacency.BuildAdjacencyTable(&topology);
-  normals = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, points.size(), points.cdata());
-  indexedNormals = true;
 }
 
-const TfTokenVector BUILTIN_PRIMVAR_NAMES =
+const VtVec3iArray& HdGatlingMesh::GetFaces() const
 {
-  HdTokens->points,
-  HdTokens->normals
-};
-
-const TfTokenVector& HdGatlingMesh::GetBuiltinPrimvarNames() const
-{
-  return BUILTIN_PRIMVAR_NAMES;
+  return m_faces;
 }
 
-const std::vector<GfVec3f>& HdGatlingMesh::GetPoints() const
+const VtVec3fArray& HdGatlingMesh::GetPoints() const
 {
   return m_points;
 }
 
-const std::vector<GfVec3f>& HdGatlingMesh::GetNormals() const
+const HdGatlingMesh::VertexAttr<GfVec3f>& HdGatlingMesh::GetNormals() const
 {
   return m_normals;
-}
-
-const std::vector<GfVec3i>& HdGatlingMesh::GetFaces() const
-{
-  return m_faces;
 }
 
 const GfMatrix4d& HdGatlingMesh::GetPrototypeTransform() const

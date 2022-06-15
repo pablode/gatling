@@ -26,6 +26,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdGatlingMesh final : public HdMesh
 {
 public:
+  template<typename T>
+  struct VertexAttr
+  {
+    VtArray<T> array;
+    bool indexed;
+  };
+
+public:
   HdGatlingMesh(const SdfPath& id);
 
   ~HdGatlingMesh() override;
@@ -38,18 +46,13 @@ public:
 
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
-  const TfTokenVector& GetBuiltinPrimvarNames() const override;
-
-  const std::vector<GfVec3f>& GetPoints() const;
-
-  const std::vector<GfVec3f>& GetNormals() const;
-
-  const std::vector<GfVec3i>& GetFaces() const;
+  const VtVec3iArray& GetFaces() const;
+  const VtVec3fArray& GetPoints() const;
+  const VertexAttr<GfVec3f>& GetNormals() const;
 
   const GfMatrix4d& GetPrototypeTransform() const;
 
   const GfVec3f& GetColor() const;
-
   bool HasColor() const;
 
 protected:
@@ -62,21 +65,26 @@ private:
   void _UpdateGeometry(HdSceneDelegate* sceneDelegate);
 
   bool _FindPrimvar(HdSceneDelegate* sceneDelegate,
-                    TfToken primvarName,
+                    TfToken name,
                     HdInterpolation& interpolation) const;
 
+  bool _ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
+                                VtIntArray primitiveParams,
+                                TfToken name,
+                                HdType type,
+                                bool& sequentiallyIndexed,
+                                VtValue& result) const;
+
   void _PullPrimvars(HdSceneDelegate* sceneDelegate,
-                     VtVec3fArray& points,
-                     VtVec3fArray& normals,
-                     bool& indexedNormals,
+                     VtIntArray primitiveParams,
                      GfVec3f& color,
-                     bool& hasColor) const;
+                     bool& hasColor);
 
 private:
   GfMatrix4d m_prototypeTransform;
-  std::vector<GfVec3f> m_points;
-  std::vector<GfVec3f> m_normals;
-  std::vector<GfVec3i> m_faces;
+  VtVec3iArray m_faces;
+  VtVec3fArray m_points;
+  VertexAttr<GfVec3f> m_normals;
   GfVec3f m_color;
   bool m_hasColor;
 };

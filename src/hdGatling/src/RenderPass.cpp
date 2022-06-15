@@ -79,6 +79,26 @@ bool HdGatlingRenderPass::IsConverged() const
   return m_isConverged;
 }
 
+gi_vertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal)
+{
+  GfVec3f newPoint = transform.Transform(point);
+
+  GfVec3f newNormal = normalMatrix.TransformDir(normal);
+  newNormal.Normalize();
+
+  gi_vertex vertex;
+  vertex.pos[0] = newPoint[0];
+  vertex.pos[1] = newPoint[1];
+  vertex.pos[2] = newPoint[2];
+  vertex.norm[0] = newNormal[0];
+  vertex.norm[1] = newNormal[1];
+  vertex.norm[2] = newNormal[2];
+  vertex.u = 0.0f;
+  vertex.v = 0.0f;
+
+  return vertex;
+}
+
 void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
                                             GfMatrix4d transform,
                                             uint32_t materialIndex,
@@ -87,43 +107,48 @@ void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
 {
   GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
 
-  const std::vector<GfVec3f>& meshPoints = mesh->GetPoints();
-  const std::vector<GfVec3f>& meshNormals = mesh->GetNormals();
-  const std::vector<GfVec3i>& meshFaces = mesh->GetFaces();
-  TF_VERIFY(meshPoints.size() == meshNormals.size());
+  const VtVec3iArray& meshFaces = mesh->GetFaces();
+  const VtVec3fArray& meshPoints = mesh->GetPoints();
+  const auto& meshNormals = mesh->GetNormals();
+  bool isAnyPrimvarNotIndexed = !meshNormals.indexed;
 
   uint32_t vertexOffset = vertices.size();
 
-  for (size_t j = 0; j < meshFaces.size(); j++)
+  for (size_t i = 0; i < meshFaces.size(); i++)
   {
-    const GfVec3i& vertexIndices = meshFaces[j];
+    const GfVec3i& vertexIndices = meshFaces[i];
 
     gi_face face;
-    face.v_i[0] = vertexOffset + vertexIndices[0];
-    face.v_i[1] = vertexOffset + vertexIndices[1];
-    face.v_i[2] = vertexOffset + vertexIndices[2];
+    face.v_i[0] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 0) : vertexIndices[0]);
+    face.v_i[1] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 1) : vertexIndices[1]);
+    face.v_i[2] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 2) : vertexIndices[2]);
     face.mat_index = materialIndex;
 
+    // We always need three unique vertices per face.
+    for (size_t j = 0; isAnyPrimvarNotIndexed && j < 3; j++)
+    {
+      const GfVec3f& point = meshPoints[vertexIndices[j]];
+      const GfVec3f& normal = meshNormals.array[meshNormals.indexed ? vertexIndices[j] : (i * 3 + j)];
+
+      gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal);
+      vertices.push_back(vertex);
+    }
+
     faces.push_back(face);
+  }
+
+  // Early-out if the vertices are not indexed.
+  if (isAnyPrimvarNotIndexed)
+  {
+    return;
   }
 
   for (size_t j = 0; j < meshPoints.size(); j++)
   {
     const GfVec3f& point = meshPoints[j];
-    const GfVec3f& normal = meshNormals[j];
+    const GfVec3f& normal = meshNormals.array[j];
 
-    GfVec3f newPoint = transform.Transform(point);
-    GfVec3f newNormal = normalMatrix.TransformDir(normal);
-    newNormal.Normalize();
-
-    gi_vertex vertex;
-    vertex.pos[0] = newPoint[0];
-    vertex.pos[1] = newPoint[1];
-    vertex.pos[2] = newPoint[2];
-    vertex.norm[0] = newNormal[0];
-    vertex.norm[1] = newNormal[1];
-    vertex.norm[2] = newNormal[2];
-
+    gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal);
     vertices.push_back(vertex);
   }
 }
