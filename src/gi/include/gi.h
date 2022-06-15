@@ -29,11 +29,13 @@ extern "C" {
 
 enum gi_aov_id
 {
-  GI_AOV_ID_COLOR           = 0,
-  GI_AOV_ID_NORMAL          = 1,
-  GI_AOV_ID_DEBUG_NEE       = 2,
-  GI_AOV_ID_DEBUG_BVH_STEPS = 3,
-  GI_AOV_ID_DEBUG_TRI_TESTS = 4
+  GI_AOV_ID_COLOR              = 0,
+  GI_AOV_ID_NORMAL             = 1,
+  GI_AOV_ID_DEBUG_NEE          = 2,
+  GI_AOV_ID_DEBUG_BVH_STEPS    = 3,
+  GI_AOV_ID_DEBUG_TRI_TESTS    = 4,
+  GI_AOV_ID_DEBUG_BARYCENTRICS = 5,
+  GI_AOV_ID_DEBUG_TEXCOORDS    = 6
 };
 
 struct gi_camera

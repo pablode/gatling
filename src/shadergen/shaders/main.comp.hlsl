@@ -121,6 +121,10 @@ float3 evaluate_sample(inout uint4 rng_state,
         /* Calculate hit point properties. */
         float3 bc = float3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
 
+#if AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
+        return bc;
+#endif
+
         face f = faces[hit.face_idx];
         fvertex v_0 = vertices[f.v_0];
         fvertex v_1 = vertices[f.v_1];
@@ -146,11 +150,15 @@ float3 evaluate_sample(inout uint4 rng_state,
         float3 normal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
         if (dot(normal, state.ray_dir) > 0.0) { normal *= -1.0f; }
 
-        float2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
-
 #if AOV_ID == AOV_ID_NORMAL
         state.radiance = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
         break;
+#endif
+
+        float2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
+
+#if AOV_ID == AOV_ID_DEBUG_TEXCOORDS
+        return float3(uv, 0.0);
 #endif
 
         /* NEE */

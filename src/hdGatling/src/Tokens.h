@@ -58,7 +58,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define HD_GATLING_AOV_TOKENS                        \
   ((debug_nee, "debug:nee"))                         \
   ((debug_bvh_steps, "debug:bvh_steps"))             \
-  ((debug_tri_tests, "debug:tri_tests"))
+  ((debug_tri_tests, "debug:tri_tests"))             \
+  ((debug_barycentrics, "debug:barycentrics"))       \
+  ((debug_texcoords, "debug:texcoords"))
 
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingSettingsTokens, HD_GATLING_SETTINGS_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingNodeIdentifiers, HD_GATLING_NODE_IDENTIFIER_TOKENS);

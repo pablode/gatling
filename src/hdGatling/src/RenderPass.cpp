@@ -278,6 +278,8 @@ const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVect
         && aovBinding.aovName != HdGatlingAovTokens->debug_nee
         && aovBinding.aovName != HdGatlingAovTokens->debug_bvh_steps
         && aovBinding.aovName != HdGatlingAovTokens->debug_tri_tests
+        && aovBinding.aovName != HdGatlingAovTokens->debug_barycentrics
+        && aovBinding.aovName != HdGatlingAovTokens->debug_texcoords
 #endif
        )
     {
@@ -292,24 +294,29 @@ const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVect
   return nullptr;
 }
 
+const std::unordered_map<TfToken, gi_aov_id, TfToken::HashFunctor> s_aovIdMappings {
+ { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
+ { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
+ { HdGatlingAovTokens->debug_nee,          GI_AOV_ID_DEBUG_NEE          },
+ { HdGatlingAovTokens->debug_bvh_steps,    GI_AOV_ID_DEBUG_BVH_STEPS    },
+ { HdGatlingAovTokens->debug_tri_tests,    GI_AOV_ID_DEBUG_TRI_TESTS    },
+ { HdGatlingAovTokens->debug_barycentrics, GI_AOV_ID_DEBUG_BARYCENTRICS },
+ { HdGatlingAovTokens->debug_texcoords,    GI_AOV_ID_DEBUG_TEXCOORDS    }
+};
+
 gi_aov_id _GetAovId(const TfToken& aovName)
 {
   gi_aov_id id = GI_AOV_ID_COLOR;
 
-  if (aovName == HdAovTokens->normal) {
-    id = GI_AOV_ID_NORMAL;
+  auto iter = s_aovIdMappings.find(aovName);
+
+  if (iter != s_aovIdMappings.end())
+  {
+    id = iter->second;
   }
-  else if (aovName == HdGatlingAovTokens->debug_nee) {
-    id = GI_AOV_ID_DEBUG_NEE;
-  }
-  else if (aovName == HdGatlingAovTokens->debug_bvh_steps) {
-    id = GI_AOV_ID_DEBUG_BVH_STEPS;
-  }
-  else if (aovName == HdGatlingAovTokens->debug_tri_tests) {
-    id = GI_AOV_ID_DEBUG_TRI_TESTS;
-  }
-  else if (aovName != HdAovTokens->color) {
-    TF_CODING_ERROR("Invalid AOV id");
+  else
+  {
+    TF_CODING_ERROR(TfStringPrintf("Invalid AOV id %s", aovName.GetText()));
   }
 
   return id;
