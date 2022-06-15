@@ -9,6 +9,8 @@ add_library(
   src/bvh_collapse.inl
   src/bvh_compress.cpp
   src/bvh_compress.h
+  src/stager.h
+  src/stager.cpp
 )
 
 target_include_directories(
