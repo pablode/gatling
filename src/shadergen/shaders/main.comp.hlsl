@@ -134,6 +134,10 @@ float3 evaluate_sample(inout uint4 rng_state,
         float3 n_1 = v_1.field2.xyz;
         float3 n_2 = v_2.field2.xyz;
 
+        float2 uv_0 = float2(v_0.field1.w, v_0.field2.w);
+        float2 uv_1 = float2(v_1.field1.w, v_1.field2.w);
+        float2 uv_2 = float2(v_2.field1.w, v_2.field2.w);
+
         float3 hit_pos = bc.x * p_0 + bc.y * p_1 + bc.z * p_2;
 
         float3 geom_normal = normalize(cross(p_1 - p_0, p_2 - p_0));
@@ -141,6 +145,8 @@ float3 evaluate_sample(inout uint4 rng_state,
 
         float3 normal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
         if (dot(normal, state.ray_dir) > 0.0) { normal *= -1.0f; }
+
+        float2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
 
 #if AOV_ID == AOV_ID_NORMAL
         state.radiance = (normal + float3(1.0, 1.0, 1.0)) * 0.5;
@@ -210,6 +216,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             shading_state_material.tangent_u[0] = tangent;
             shading_state_material.tangent_v[0] = bitangent;
             shading_state_material.animation_time = 0.0;
+            shading_state_material.text_coords[0] = float3(uv, 0.0);
 
             Edf_evaluate_data edf_evaluate_data;
             edf_evaluate_data.k1 = -state.ray_dir;

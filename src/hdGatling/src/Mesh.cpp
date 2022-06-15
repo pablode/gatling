@@ -22,8 +22,18 @@
 #include <pxr/imaging/hd/smoothNormals.h>
 #include <pxr/imaging/hd/instancer.h>
 #include <pxr/imaging/hd/vtBufferSource.h>
+#include <pxr/usd/usdUtils/pipeline.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_PRIVATE_TOKENS(
+  _tokens,
+  (st)
+  (st0)
+  (st_0)
+  (st1)
+  (st_1)
+);
 
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
   : HdMesh(id)
@@ -88,6 +98,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   m_faces = {};
   m_points = {};
   m_normals = {};
+  m_texCoords = {};
 
   _UpdateGeometry(sceneDelegate);
 }
@@ -284,6 +295,35 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
     m_normals.array = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, m_points.size(), m_points.cdata());
     m_normals.indexed = false;
   }
+
+  // Tex Coords: since there is no standardization in respect to multiple sets, we have to guess.
+  TfToken defaultUvPrimvarName = UsdUtilsGetPrimaryUVSetName();
+
+  TfToken texcoordPrimvarNames[] = {
+    defaultUvPrimvarName,
+    _tokens->st,
+    _tokens->st0,
+    _tokens->st_0,
+    _tokens->st1,
+    _tokens->st_1
+  };
+
+  VtValue boxedTexCoords;
+  for (const TfToken& name : texcoordPrimvarNames)
+  {
+    bool isIndexed;
+    if (_ReadTriangulatedPrimvar(sceneDelegate,
+                                 primitiveParams,
+                                 name,
+                                 HdTypeFloatVec2,
+                                 isIndexed,
+                                 boxedTexCoords))
+    {
+      m_texCoords.array = boxedTexCoords.Get<VtVec2fArray>();
+      m_texCoords.indexed = isIndexed;
+      break;
+    }
+  }
 }
 
 const VtVec3iArray& HdGatlingMesh::GetFaces() const
@@ -299,6 +339,11 @@ const VtVec3fArray& HdGatlingMesh::GetPoints() const
 const HdGatlingMesh::VertexAttr<GfVec3f>& HdGatlingMesh::GetNormals() const
 {
   return m_normals;
+}
+
+const HdGatlingMesh::VertexAttr<GfVec2f>& HdGatlingMesh::GetTexCoords() const
+{
+  return m_texCoords;
 }
 
 const GfMatrix4d& HdGatlingMesh::GetPrototypeTransform() const

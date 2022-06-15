@@ -79,7 +79,7 @@ bool HdGatlingRenderPass::IsConverged() const
   return m_isConverged;
 }
 
-gi_vertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal)
+gi_vertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal, const GfVec2f& texCoords)
 {
   GfVec3f newPoint = transform.Transform(point);
 
@@ -93,8 +93,8 @@ gi_vertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfV
   vertex.norm[0] = newNormal[0];
   vertex.norm[1] = newNormal[1];
   vertex.norm[2] = newNormal[2];
-  vertex.u = 0.0f;
-  vertex.v = 0.0f;
+  vertex.u = texCoords[0];
+  vertex.v = 1.0f - texCoords[1];
 
   return vertex;
 }
@@ -110,7 +110,8 @@ void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
   const VtVec3iArray& meshFaces = mesh->GetFaces();
   const VtVec3fArray& meshPoints = mesh->GetPoints();
   const auto& meshNormals = mesh->GetNormals();
-  bool isAnyPrimvarNotIndexed = !meshNormals.indexed;
+  const auto& meshTexCoords = mesh->GetTexCoords();
+  bool isAnyPrimvarNotIndexed = !meshNormals.indexed || !meshTexCoords.indexed;
 
   uint32_t vertexOffset = vertices.size();
 
@@ -130,7 +131,10 @@ void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
       const GfVec3f& point = meshPoints[vertexIndices[j]];
       const GfVec3f& normal = meshNormals.array[meshNormals.indexed ? vertexIndices[j] : (i * 3 + j)];
 
-      gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal);
+      bool hasTexCoords = meshTexCoords.array.size() > 0;
+      GfVec2f texCoords = hasTexCoords ? meshTexCoords.array[meshTexCoords.indexed ? vertexIndices[j] : (i * 3 + j)] : GfVec2f();
+
+      gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
       vertices.push_back(vertex);
     }
 
@@ -148,7 +152,10 @@ void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
     const GfVec3f& point = meshPoints[j];
     const GfVec3f& normal = meshNormals.array[j];
 
-    gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal);
+    bool hasTexCoords = meshTexCoords.array.size() > 0;
+    GfVec2f texCoords = hasTexCoords ? meshTexCoords.array[j] : GfVec2f();
+
+    gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
     vertices.push_back(vertex);
   }
 }

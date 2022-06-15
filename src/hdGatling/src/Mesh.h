@@ -18,6 +18,7 @@
 #pragma once
 
 #include <pxr/imaging/hd/mesh.h>
+#include <pxr/base/gf/vec2f.h>
 
 #include <gi.h>
 
@@ -49,6 +50,7 @@ public:
   const VtVec3iArray& GetFaces() const;
   const VtVec3fArray& GetPoints() const;
   const VertexAttr<GfVec3f>& GetNormals() const;
+  const VertexAttr<GfVec2f>& GetTexCoords() const;
 
   const GfMatrix4d& GetPrototypeTransform() const;
 
@@ -85,6 +87,7 @@ private:
   VtVec3iArray m_faces;
   VtVec3fArray m_points;
   VertexAttr<GfVec3f> m_normals;
+  VertexAttr<GfVec2f> m_texCoords;
   GfVec3f m_color;
   bool m_hasColor;
 };
