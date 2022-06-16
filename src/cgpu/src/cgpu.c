@@ -2199,6 +2199,7 @@ CgpuResult cgpu_cmd_copy_buffer(cgpu_command_buffer command_buffer,
 
 CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
                                          cgpu_buffer buffer,
+                                         uint64_t buffer_offset,
                                          cgpu_image image)
 {
   cgpu_icommand_buffer* icommand_buffer;
@@ -2273,7 +2274,7 @@ CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
   extent.depth = 1;
 
   VkBufferImageCopy region;
-  region.bufferOffset = 0;
+  region.bufferOffset = buffer_offset;
   region.bufferRowLength = 0;
   region.bufferImageHeight = 0;
   region.imageSubresource = layers;

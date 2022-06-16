@@ -602,6 +602,7 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer(
 CGPU_API CgpuResult CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
   cgpu_command_buffer command_buffer,
   cgpu_buffer buffer,
+  uint64_t buffer_offset,
   cgpu_image image
 );
 
