@@ -89,6 +89,8 @@ namespace sg
       return false;
     }
 
+    m_backend->set_option("enable_exceptions", "off");
+
     m_logger = mi::base::Handle<MdlLogger>(runtime.getLogger());
 
     mi::base::Handle<mi::neuraylib::IMdl_factory> factory(runtime.getFactory());
