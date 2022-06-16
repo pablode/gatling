@@ -80,7 +80,6 @@ namespace sg
       L"-E", wEntryPoint.c_str(),
       L"-T", L"cs_6_6",  // Compute shader with Shading Model 6.6
 #ifndef NDEBUG
-      L"-WX",            // Treat warnings as errors
       L"-Zi",            // Enable debug information.
       L"-Ges",           // Enable strict mode
       L"-Gis",           // Force IEEE strictness
