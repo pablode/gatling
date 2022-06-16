@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <vector>
+#include <unordered_map>
 
 #include <cgpu.h>
 #include <imgio.h>
@@ -75,6 +76,8 @@ cgpu_physical_device_limits s_device_limits;
 cgpu_sampler s_tex_sampler;
 std::unique_ptr<gi::Stager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
+// FIXME: implement a proper CPU and GPU-aware texture cache with eviction strategy
+std::unordered_map<std::string, cgpu_image> s_imageCache;
 
 int giInitialize(const gi_init_params* params)
 {
@@ -120,6 +123,11 @@ int giInitialize(const gi_init_params* params)
 
 void giTerminate()
 {
+  for (const auto& pathImagePair : s_imageCache)
+  {
+    cgpu_destroy_image(s_device, pathImagePair.second);
+  }
+  s_imageCache.clear();
   s_shaderGen.reset();
   s_stager->free();
   s_stager.reset();
@@ -388,6 +396,97 @@ void giDestroyGeomCache(gi_geom_cache* cache)
   delete cache;
 }
 
+bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
+                   std::vector<cgpu_image>& images)
+{
+  uint32_t texCount = textureResources.size();
+
+  for (int i = 0; i < texCount; i++)
+  {
+    bool result;
+    cgpu_image image = { CGPU_INVALID_HANDLE };
+
+    CgpuImageFormat imageFormat = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+    CgpuImageUsageFlags imageFlags = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
+
+    auto& textureResource = textureResources[i];
+    auto& payload = textureResource.data;
+
+    if (payload.size() > 0)
+    {
+      result = cgpu_create_image_2d(s_device, textureResource.width, textureResource.height, imageFormat, imageFlags, &image) == CGPU_OK;
+      if (!result) return false;
+
+      result = s_stager->stageToImage(payload.data(), payload.size(), image);
+      if (!result) return false;
+
+      images.push_back(image);
+      continue;
+    }
+
+    const char* filePath = textureResource.filePath.c_str();
+
+    auto cacheResult = s_imageCache.find(filePath);
+    if (cacheResult != s_imageCache.end())
+    {
+      images.push_back(cacheResult->second);
+      continue;
+    }
+
+    imgio_img image_data;
+    if (imgio_load_img(filePath, &image_data) == IMGIO_OK)
+    {
+      result = cgpu_create_image_2d(s_device, image_data.width, image_data.height, imageFormat, imageFlags, &image) == CGPU_OK;
+      if (!result) return false;
+
+      result = s_stager->stageToImage(image_data.data, image_data.size, image);
+      if (!result) return false;
+
+      imgio_free_img(&image_data);
+
+      s_imageCache[filePath] = image;
+
+      images.push_back(image);
+      continue;
+    }
+
+    result = cgpu_create_image_2d(s_device, 1, 1, imageFormat, imageFlags, &image) == CGPU_OK;
+    if (!result) return false;
+
+    uint8_t black[4] = { 0, 0, 0, 0 };
+    result = s_stager->stageToImage(black, 4, image);
+    if (!result) return false;
+
+    images.push_back(image);
+  }
+
+  return s_stager->flush();
+}
+
+void giDestroyUncachedImages(const std::vector<cgpu_image>& images)
+{
+  for (cgpu_image image : images)
+  {
+    bool isCached = false;
+
+    for (const auto& pathImagePair : s_imageCache)
+    {
+      cgpu_image cachedImage = pathImagePair.second;
+
+      if (cachedImage.handle == image.handle)
+      {
+        isCached = true;
+        break;
+      }
+    }
+
+    if (!isCached)
+    {
+      cgpu_destroy_image(s_device, image);
+    }
+  }
+}
+
 gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 {
   const gi_geom_cache* geom_cache = params->geom_cache;
@@ -433,55 +532,14 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     return nullptr;
   }
 
-  uint32_t texCount = mainShader.textureResources.size();
-
   std::vector<cgpu_image> images;
-  images.reserve(texCount);
-
-  for (int i = 0; i < texCount; i++)
+  if (!giStageImages(mainShader.textureResources, images))
   {
-    CgpuResult c_result;
-    cgpu_image image = { CGPU_INVALID_HANDLE };
-
-    CgpuImageFormat imageFormat = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-    CgpuImageUsageFlags imageFlags = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
-
-    auto& textureResource = mainShader.textureResources[i];
-    auto& payload = textureResource.data;
-
-    if (payload.size() > 0)
-    {
-      c_result = cgpu_create_image_2d(s_device, textureResource.width, textureResource.height, imageFormat, imageFlags, &image);
-
-      s_stager->stageToImage(payload.data(), payload.size(), image);
-    }
-    else
-    {
-      imgio_img image_data;
-      int r = imgio_load_img(textureResource.filePath.c_str(), &image_data);
-
-      if (r == IMGIO_OK)
-      {
-        c_result = cgpu_create_image_2d(s_device, image_data.width, image_data.height, imageFormat, imageFlags, &image);
-
-        s_stager->stageToImage(image_data.data, image_data.size, image);
-
-        imgio_free_img(&image_data);
-      }
-      else
-      {
-        c_result = cgpu_create_image_2d(s_device, 1, 1, imageFormat, imageFlags, &image);
-
-        uint8_t black[4] = { 0, 0, 0, 0 };
-        s_stager->stageToImage(black, 4, image);
-      }
-    }
-    assert(c_result == CGPU_OK);
-
-    images.push_back(image);
+    giDestroyUncachedImages(images);
+    cgpu_destroy_shader(s_device, shader);
+    cgpu_destroy_pipeline(s_device, pipeline);
+    return nullptr;
   }
-
-  s_stager->flush();
 
   gi_shader_cache* cache = new gi_shader_cache;
   cache->aov_id = params->aov_id;
@@ -496,10 +554,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
 void giDestroyShaderCache(gi_shader_cache* cache)
 {
-  for (cgpu_image image : cache->images)
-  {
-    cgpu_destroy_image(s_device, image);
-  }
+  giDestroyUncachedImages(cache->images);
   cgpu_destroy_shader(s_device, cache->shader);
   cgpu_destroy_pipeline(s_device, cache->pipeline);
   delete cache;
