@@ -520,10 +520,20 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_unmap_buffer(
   cgpu_buffer buffer
 );
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_create_image(
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_image_2d(
   cgpu_device device,
   uint32_t width,
   uint32_t height,
+  CgpuImageFormat format,
+  CgpuImageUsageFlags usage,
+  cgpu_image* p_image
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_image_3d(
+  cgpu_device device,
+  uint32_t width,
+  uint32_t height,
+  uint32_t depth,
   CgpuImageFormat format,
   CgpuImageUsageFlags usage,
   cgpu_image* p_image

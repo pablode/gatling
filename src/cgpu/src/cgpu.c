@@ -71,6 +71,7 @@ typedef struct cgpu_iimage {
   uint64_t      size;
   uint32_t      width;
   uint32_t      height;
+  uint32_t      depth;
   VkImageLayout layout;
   VkAccessFlags access_mask;
 } cgpu_iimage;
@@ -1183,12 +1184,13 @@ CgpuResult cgpu_unmap_buffer(cgpu_device device,
   return CGPU_OK;
 }
 
-CgpuResult cgpu_create_image(cgpu_device device,
-                             uint32_t width,
-                             uint32_t height,
-                             CgpuImageFormat format,
-                             CgpuImageUsageFlags usage,
-                             cgpu_image* p_image)
+static CgpuResult cgpu_create_image(cgpu_device device,
+                                    uint32_t width,
+                                    uint32_t height,
+                                    uint32_t depth,
+                                    CgpuImageFormat format,
+                                    CgpuImageUsageFlags usage,
+                                    cgpu_image* p_image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1223,15 +1225,17 @@ CgpuResult cgpu_create_image(cgpu_device device,
 
   VkFormat vk_format = cgpu_translate_image_format(format);
 
+  bool is_2d_image = (depth == 0);
+
   VkImageCreateInfo image_info;
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.pNext = NULL;
   image_info.flags = 0;
-  image_info.imageType = VK_IMAGE_TYPE_2D;
+  image_info.imageType = is_2d_image ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
   image_info.format = vk_format;
   image_info.extent.width = width;
   image_info.extent.height = height;
-  image_info.extent.depth = 1;
+  image_info.extent.depth = is_2d_image ? 1 : depth;
   image_info.mipLevels = 1;
   image_info.arrayLayers = 1;
   image_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1242,7 +1246,7 @@ CgpuResult cgpu_create_image(cgpu_device device,
   image_info.pQueueFamilyIndices = NULL;
   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  VmaAllocationCreateInfo alloc_info = { 0 };
+  VmaAllocationCreateInfo alloc_info = {0};
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
   VkResult result = vmaCreateImage(
@@ -1273,7 +1277,7 @@ CgpuResult cgpu_create_image(cgpu_device device,
   image_view_info.pNext = NULL;
   image_view_info.flags = 0;
   image_view_info.image = iimage->image;
-  image_view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  image_view_info.viewType = is_2d_image ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D;
   image_view_info.format = vk_format;
   image_view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
   image_view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1300,10 +1304,36 @@ CgpuResult cgpu_create_image(cgpu_device device,
 
   iimage->width = width;
   iimage->height = height;
+  iimage->depth = is_2d_image ? 1 : depth;
   iimage->layout = VK_IMAGE_LAYOUT_UNDEFINED;
   iimage->access_mask = 0;
 
   return CGPU_OK;
+}
+
+CgpuResult cgpu_create_image_2d(cgpu_device device,
+                                uint32_t width,
+                                uint32_t height,
+                                CgpuImageFormat format,
+                                CgpuImageUsageFlags usage,
+                                cgpu_image* p_image)
+{
+  return cgpu_create_image(device, width, height, 0, format, usage, p_image);
+}
+
+CgpuResult cgpu_create_image_3d(cgpu_device device,
+                                uint32_t width,
+                                uint32_t height,
+                                uint32_t depth,
+                                CgpuImageFormat format,
+                                CgpuImageUsageFlags usage,
+                                cgpu_image* p_image)
+{
+  if (depth == 0)
+  {
+    return CGPU_FAIL_UNABLE_TO_CREATE_IMAGE;
+  }
+  return cgpu_create_image(device, width, height, depth, format, usage, p_image);
 }
 
 CgpuResult cgpu_destroy_image(cgpu_device device,
@@ -1868,10 +1898,10 @@ CgpuResult cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
   return CGPU_OK;
 }
 
-CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
-                                                    cgpu_icommand_buffer* icommand_buffer,
-                                                    uint32_t image_count,
-                                                    const cgpu_image_binding* p_images)
+static CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
+                                                           cgpu_icommand_buffer* icommand_buffer,
+                                                           uint32_t image_count,
+                                                           const cgpu_image_binding* p_images)
 {
   cgpu_ishader* ishader;
   if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
@@ -2271,7 +2301,7 @@ CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
   VkExtent3D extent;
   extent.width = iimage->width;
   extent.height = iimage->height;
-  extent.depth = 1;
+  extent.depth = iimage->depth;
 
   VkBufferImageCopy region;
   region.bufferOffset = buffer_offset;

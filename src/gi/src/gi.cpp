@@ -451,7 +451,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
     if (payload.size() > 0)
     {
-      c_result = cgpu_create_image(s_device, textureResource.width, textureResource.height, imageFormat, imageFlags, &image);
+      c_result = cgpu_create_image_2d(s_device, textureResource.width, textureResource.height, imageFormat, imageFlags, &image);
 
       s_stager->stageToImage(payload.data(), payload.size(), image);
     }
@@ -462,7 +462,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
       if (r == IMGIO_OK)
       {
-        c_result = cgpu_create_image(s_device, image_data.width, image_data.height, imageFormat, imageFlags, &image);
+        c_result = cgpu_create_image_2d(s_device, image_data.width, image_data.height, imageFormat, imageFlags, &image);
 
         s_stager->stageToImage(image_data.data, image_data.size, image);
 
@@ -470,7 +470,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       }
       else
       {
-        c_result = cgpu_create_image(s_device, 1, 1, imageFormat, imageFlags, &image);
+        c_result = cgpu_create_image_2d(s_device, 1, 1, imageFormat, imageFlags, &image);
 
         uint8_t black[4] = { 0, 0, 0, 0 };
         s_stager->stageToImage(black, 4, image);
