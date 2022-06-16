@@ -93,7 +93,9 @@ float3 evaluate_sample(inout uint4 rng_state,
     state.radiance   = float3(0.0, 0.0, 0.0);
     state.rng_state  = rng_state;
 
-    for (uint bounce = 1; bounce <= PC.MAX_BOUNCES; bounce++)
+    uint bounce = 1;
+
+    while (bounce <= PC.MAX_BOUNCES)
     {
         RayInfo ray;
         ray.origin = state.ray_origin;
@@ -264,7 +266,13 @@ float3 evaluate_sample(inout uint4 rng_state,
                 break;
             }
         }
+
+        bounce++;
     }
+
+#if AOV_ID == AOV_ID_DEBUG_BOUNCES
+    return float3(1.0, 1.0, 1.0) * float(bounce);
+#endif
 
     return clamp(state.radiance, float3(0.0, 0.0, 0.0), float3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE));
 }

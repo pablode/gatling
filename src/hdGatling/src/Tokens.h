@@ -60,7 +60,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((debug_bvh_steps, "debug:bvh_steps"))             \
   ((debug_tri_tests, "debug:tri_tests"))             \
   ((debug_barycentrics, "debug:barycentrics"))       \
-  ((debug_texcoords, "debug:texcoords"))
+  ((debug_texcoords, "debug:texcoords"))             \
+  ((debug_bounces, "debug:bounces"))
 
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingSettingsTokens, HD_GATLING_SETTINGS_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingNodeIdentifiers, HD_GATLING_NODE_IDENTIFIER_TOKENS);

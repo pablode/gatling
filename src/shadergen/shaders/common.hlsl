@@ -11,6 +11,7 @@ const static float TRI_EPS = 0.000000001;
 #define AOV_ID_DEBUG_TRI_TESTS 4
 #define AOV_ID_DEBUG_BARYCENTRICS 5
 #define AOV_ID_DEBUG_TEXCOORDS 6
+#define AOV_ID_DEBUG_BOUNCES 7
 
 struct fvertex
 {

@@ -701,7 +701,8 @@ int giRender(const gi_render_params* params,
 
   // Normalize image for debug AOVs.
   if (shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
-      shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS)
+      shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS ||
+      shader_cache->aov_id == GI_AOV_ID_DEBUG_BOUNCES)
   {
     const int value_count = pixel_count * COLOR_COMPONENT_COUNT;
 
