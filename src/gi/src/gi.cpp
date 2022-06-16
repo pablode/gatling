@@ -32,6 +32,7 @@
 #include <vector>
 
 #include <cgpu.h>
+#include <imgio.h>
 #include <ShaderGen.h>
 
 const uint32_t WORKGROUP_SIZE_X = 16;
@@ -439,17 +440,43 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
   for (int i = 0; i < texCount; i++)
   {
+    CgpuResult c_result;
     cgpu_image image = { CGPU_INVALID_HANDLE };
 
-    CgpuResult c_result = cgpu_create_image(s_device,
-      1, 1, CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM,
-      CGPU_IMAGE_USAGE_FLAG_SAMPLED,
-      &image
-    );
-    assert(c_result == CGPU_OK);
+    CgpuImageFormat imageFormat = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+    CgpuImageUsageFlags imageFlags = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
-    uint8_t black[4] = { 0, 0, 0, 0 };
-    s_stager->stageToImage(black, 4, image);
+    auto& textureResource = mainShader.textureResources[i];
+    auto& payload = textureResource.data;
+
+    if (payload.size() > 0)
+    {
+      c_result = cgpu_create_image(s_device, textureResource.width, textureResource.height, imageFormat, imageFlags, &image);
+
+      s_stager->stageToImage(payload.data(), payload.size(), image);
+    }
+    else
+    {
+      imgio_img image_data;
+      int r = imgio_load_img(textureResource.filePath.c_str(), &image_data);
+
+      if (r == IMGIO_OK)
+      {
+        c_result = cgpu_create_image(s_device, image_data.width, image_data.height, imageFormat, imageFlags, &image);
+
+        s_stager->stageToImage(image_data.data, image_data.size, image);
+
+        imgio_free_img(&image_data);
+      }
+      else
+      {
+        c_result = cgpu_create_image(s_device, 1, 1, imageFormat, imageFlags, &image);
+
+        uint8_t black[4] = { 0, 0, 0, 0 };
+        s_stager->stageToImage(black, 4, image);
+      }
+    }
+    assert(c_result == CGPU_OK);
 
     images.push_back(image);
   }

@@ -35,6 +35,7 @@ target_link_libraries(
     cgpu
     shadergen
     gml
+    imgio
 )
 
 if(${GATLING_USE_EMBREE})
