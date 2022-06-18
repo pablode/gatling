@@ -263,9 +263,6 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   // Upload to GPU buffer.
   gi_geom_cache* cache = nullptr;
   cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
-  cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
-  cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
-  cgpu_fence fence = { CGPU_INVALID_HANDLE };
 
   uint64_t buf_size = 0;
   const uint64_t offset_align = s_device_limits.minStorageBufferOffsetAlignment;
@@ -280,82 +277,23 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   uint64_t emissive_face_indices_buf_offset = giAlignBuffer(offset_align, emissive_face_indices_buf_size, &buf_size);
   uint64_t vertex_buf_offset = giAlignBuffer(offset_align, vertex_buf_size, &buf_size);
 
-  CgpuResult c_result = cgpu_create_buffer(
-    s_device,
-    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    buf_size,
-    &buffer
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+  CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
 
-  c_result = cgpu_create_buffer(
-    s_device,
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    buf_size,
-    &staging_buffer
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  bool result = cgpu_create_buffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer) == CGPU_OK;
+  if (!result) goto cleanup;
 
-  uint8_t* mapped_staging_mem;
-  c_result = cgpu_map_buffer(
-    s_device,
-    staging_buffer,
-    (void**) &mapped_staging_mem
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  result = s_stager->stageToBuffer((uint8_t*) bvh8c.nodes.data(), bvh_node_buf_size, buffer, bvh_node_buf_offset);
+  if (!result) goto cleanup;
+  result = s_stager->stageToBuffer((uint8_t*) faces, face_buf_size, buffer, face_buf_offset);
+  if (!result) goto cleanup;
+  result = s_stager->stageToBuffer((uint8_t*) emissive_face_indices.data(), emissive_face_indices_buf_size, buffer, emissive_face_indices_buf_offset);
+  if (!result) goto cleanup;
+  result = s_stager->stageToBuffer((uint8_t*) params->vertices, vertex_buf_size, buffer, vertex_buf_offset);
+  if (!result) goto cleanup;
 
-  // from memcpy docs: "If either dest or src is an invalid or null pointer, the behavior is undefined, even if count is zero."
-  if (bvh8c.nodes.size() > 0) {
-    memcpy(&mapped_staging_mem[bvh_node_buf_offset], bvh8c.nodes.data(), bvh_node_buf_size);
-  }
-  if (face_count > 0) {
-    memcpy(&mapped_staging_mem[face_buf_offset], faces, face_buf_size);
-  }
-  if (emissive_face_indices.size() > 0) {
-    memcpy(&mapped_staging_mem[emissive_face_indices_buf_offset], emissive_face_indices.data(), emissive_face_indices_buf_size);
-  }
-  if (params->vertex_count > 0) {
-    memcpy(&mapped_staging_mem[vertex_buf_offset], params->vertices, vertex_buf_size);
-  }
-
-  c_result = cgpu_unmap_buffer(s_device, staging_buffer);
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_create_command_buffer(s_device, &command_buffer);
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_begin_command_buffer(command_buffer);
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_cmd_copy_buffer(
-    command_buffer,
-    staging_buffer,
-    0,
-    buffer,
-    0,
-    buf_size
-  );
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_end_command_buffer(command_buffer);
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_create_fence(s_device, &fence);
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_reset_fence(s_device, fence);
-
-  c_result = cgpu_submit_command_buffer(
-    s_device,
-    command_buffer,
-    fence
-  );
-  if (c_result != CGPU_OK) goto cleanup;
-
-  c_result = cgpu_wait_for_fence(s_device, fence);
-  if (c_result != CGPU_OK) goto cleanup;
+  result = s_stager->flush();
+  if (!result) goto cleanup;
 
   cache = new gi_geom_cache;
   cache->buffer = buffer;
@@ -379,14 +317,10 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   }
 
 cleanup:
-  cgpu_destroy_fence(s_device, fence);
-  cgpu_destroy_command_buffer(s_device, command_buffer);
-  cgpu_destroy_buffer(s_device, staging_buffer);
   if (!cache)
   {
     cgpu_destroy_buffer(s_device, buffer);
   }
-
   return cache;
 }
 
