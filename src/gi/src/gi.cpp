@@ -71,13 +71,18 @@ struct gi_material
   sg::Material* sg_mat;
 };
 
-cgpu_device s_device;
+cgpu_device s_device = { CGPU_INVALID_HANDLE };
 cgpu_physical_device_limits s_device_limits;
-cgpu_sampler s_tex_sampler;
+cgpu_sampler s_tex_sampler = { CGPU_INVALID_HANDLE };
 std::unique_ptr<gi::Stager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
 // FIXME: implement a proper CPU and GPU-aware texture cache with eviction strategy
 std::unordered_map<std::string, cgpu_image> s_imageCache;
+
+cgpu_buffer s_outputBuffer = { CGPU_INVALID_HANDLE };
+cgpu_buffer s_outputStagingBuffer = { CGPU_INVALID_HANDLE };
+uint32_t s_outputBufferWidth = 0;
+uint32_t s_outputBufferHeight = 0;
 
 int giInitialize(const gi_init_params* params)
 {
@@ -123,6 +128,10 @@ int giInitialize(const gi_init_params* params)
 
 void giTerminate()
 {
+  cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
+  cgpu_destroy_buffer(s_device, s_outputBuffer);
+  s_outputBufferWidth = 0;
+  s_outputBufferHeight = 0;
   for (const auto& pathImagePair : s_imageCache)
   {
     cgpu_destroy_image(s_device, pathImagePair.second);
@@ -504,39 +513,42 @@ int giRender(const gi_render_params* params,
   int result = GI_ERROR;
   CgpuResult c_result;
 
-  cgpu_buffer output_buffer = { CGPU_INVALID_HANDLE };
-  cgpu_buffer staging_buffer = { CGPU_INVALID_HANDLE };
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
   cgpu_fence fence = { CGPU_INVALID_HANDLE };
 
-  // Set up buffers.
-  const int COLOR_COMPONENT_COUNT = 4;
-  const int pixel_count = params->image_width * params->image_height;
-  const uint64_t buffer_size = pixel_count * COLOR_COMPONENT_COUNT * sizeof(float);
+  // Set up output buffer.
+  int color_component_count = 4;
+  int pixel_count = params->image_width * params->image_height;
+  uint64_t output_buffer_size = pixel_count * color_component_count * sizeof(float);
 
-  c_result = cgpu_create_buffer(
-    s_device,
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-    buffer_size,
-    &staging_buffer
-  );
-  if (c_result != CGPU_OK)
-  {
-    return GI_ERROR;
-  }
+  bool reallocOutputBuffer = s_outputBufferWidth != params->image_width ||
+                             s_outputBufferHeight != params->image_height;
 
-  c_result = cgpu_create_buffer(
-    s_device,
-    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    buffer_size,
-    &output_buffer
-  );
-  if (c_result != CGPU_OK)
+  if (reallocOutputBuffer)
   {
-    cgpu_destroy_buffer(s_device, staging_buffer);
-    return GI_ERROR;
+    cgpu_destroy_buffer(s_device, s_outputBuffer);
+    cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
+
+    c_result = cgpu_create_buffer(
+      s_device,
+      CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+      CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+      output_buffer_size,
+      &s_outputBuffer
+    );
+    if (c_result != CGPU_OK) return GI_ERROR;
+
+    c_result = cgpu_create_buffer(
+      s_device,
+      CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+      CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+      output_buffer_size,
+      &s_outputStagingBuffer
+    );
+    if (c_result != CGPU_OK) return GI_ERROR;
+
+    s_outputBufferWidth = params->image_width;
+    s_outputBufferHeight = params->image_height;
   }
 
   // Set up GPU data.
@@ -562,7 +574,7 @@ int giRender(const gi_render_params* params,
   std::vector<cgpu_buffer_binding> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ 0, 0, output_buffer, 0, CGPU_WHOLE_SIZE });
+  buffers.push_back({ 0, 0, s_outputBuffer, 0, output_buffer_size });
   if (shader_cache->bvh_enabled)
   {
     buffers.push_back({ 1, 0, geom_cache->buffer, geom_cache->bvh_node_buf_offset, geom_cache->bvh_node_buf_size });
@@ -629,7 +641,7 @@ int giRender(const gi_render_params* params,
   cgpu_buffer_memory_barrier barrier;
   barrier.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
   barrier.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
-  barrier.buffer = output_buffer;
+  barrier.buffer = s_outputBuffer;
   barrier.offset = 0;
   barrier.size = CGPU_WHOLE_SIZE;
 
@@ -643,13 +655,14 @@ int giRender(const gi_render_params* params,
 
   c_result = cgpu_cmd_copy_buffer(
     command_buffer,
-    output_buffer,
+    s_outputBuffer,
     0,
-    staging_buffer,
+    s_outputStagingBuffer,
     0,
-    buffer_size
+    output_buffer_size
   );
   if (c_result != CGPU_OK) goto cleanup;
+
 
   // Submit command buffer.
   c_result = cgpu_end_command_buffer(command_buffer);
@@ -675,17 +688,14 @@ int giRender(const gi_render_params* params,
   uint8_t* mapped_staging_mem;
   c_result = cgpu_map_buffer(
     s_device,
-    staging_buffer,
+    s_outputStagingBuffer,
     (void**) &mapped_staging_mem
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-  memcpy(rgba_img, mapped_staging_mem, buffer_size);
+  memcpy(rgba_img, mapped_staging_mem, output_buffer_size);
 
-  c_result = cgpu_unmap_buffer(
-    s_device,
-    staging_buffer
-  );
+  c_result = cgpu_unmap_buffer(s_device, s_outputStagingBuffer);
   if (c_result != CGPU_OK) goto cleanup;
 
   // Normalize image for debug AOVs.
@@ -693,7 +703,7 @@ int giRender(const gi_render_params* params,
       shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS ||
       shader_cache->aov_id == GI_AOV_ID_DEBUG_BOUNCES)
   {
-    const int value_count = pixel_count * COLOR_COMPONENT_COUNT;
+    const int value_count = pixel_count * color_component_count;
 
     float max_value = 0.0f;
     for (int i = 0; i < value_count; i++) {
@@ -709,8 +719,6 @@ int giRender(const gi_render_params* params,
 cleanup:
   cgpu_destroy_fence(s_device, fence);
   cgpu_destroy_command_buffer(s_device, command_buffer);
-  cgpu_destroy_buffer(s_device, staging_buffer);
-  cgpu_destroy_buffer(s_device, output_buffer);
 
   return result;
 }
