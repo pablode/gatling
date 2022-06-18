@@ -30,15 +30,15 @@
 
 /* Array and pool allocation limits. */
 
-#define MAX_PHYSICAL_DEVICES 32
+#define MAX_PHYSICAL_DEVICES 8
 #define MAX_DEVICE_EXTENSIONS 1024
 #define MAX_QUEUE_FAMILIES 64
 #define MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS 128
 #define MAX_DESCRIPTOR_BUFFER_INFOS 64
-#define MAX_DESCRIPTOR_IMAGE_INFOS 64
+#define MAX_DESCRIPTOR_IMAGE_INFOS 2048
 #define MAX_WRITE_DESCRIPTOR_SETS 128
 #define MAX_BUFFER_MEMORY_BARRIERS 64
-#define MAX_IMAGE_MEMORY_BARRIERS 64
+#define MAX_IMAGE_MEMORY_BARRIERS 2048
 #define MAX_MEMORY_BARRIERS 128
 
 /* Internal structures. */
@@ -187,33 +187,6 @@ static VkAccessFlags cgpu_translate_access_flags(CgpuMemoryAccessFlags flags)
   return vk_flags;
 }
 
-static CgpuSampleCountFlags cgpu_translate_sample_count_flags(VkSampleCountFlags vk_flags)
-{
-  CgpuSampleCountFlags flags = 0;
-  if ((vk_flags & VK_SAMPLE_COUNT_1_BIT) == VK_SAMPLE_COUNT_1_BIT) {
-    flags |= CGPU_SAMPLE_COUNT_FLAG_1;
-  }
-  if ((vk_flags & VK_SAMPLE_COUNT_2_BIT) == VK_SAMPLE_COUNT_2_BIT) {
-    flags |= CGPU_SAMPLE_COUNT_FLAG_2;
-  }
-  if ((vk_flags & VK_SAMPLE_COUNT_4_BIT) == VK_SAMPLE_COUNT_4_BIT) {
-    flags |= CGPU_SAMPLE_COUNT_FLAG_4;
-  }
-  if ((vk_flags & VK_SAMPLE_COUNT_8_BIT) == VK_SAMPLE_COUNT_8_BIT) {
-    flags |= CGPU_SAMPLE_COUNT_FLAG_8;
-  }
-  if ((vk_flags & VK_SAMPLE_COUNT_16_BIT) == VK_SAMPLE_COUNT_16_BIT) {
-    flags |= CGPU_SAMPLE_COUNT_FLAG_16;
-  }
-  if ((vk_flags & VK_SAMPLE_COUNT_32_BIT) == VK_SAMPLE_COUNT_32_BIT) {
-    flags |= CGPU_SAMPLE_COUNT_FLAG_32;
-  }
-  if ((vk_flags & VK_SAMPLE_COUNT_64_BIT) == VK_SAMPLE_COUNT_64_BIT) {
-    flags |= CGPU_SAMPLE_COUNT_FLAG_64;
-  }
-  return flags;
-}
-
 static cgpu_physical_device_limits cgpu_translate_physical_device_limits(const VkPhysicalDeviceLimits* vk_limits,
                                                                          const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props)
 {
@@ -267,9 +240,6 @@ static cgpu_physical_device_limits cgpu_translate_physical_device_limits(const V
   limits.minInterpolationOffset = vk_limits->minInterpolationOffset;
   limits.maxInterpolationOffset = vk_limits->maxInterpolationOffset;
   limits.subPixelInterpolationOffsetBits = vk_limits->subPixelInterpolationOffsetBits;
-  limits.sampledImageColorSampleCounts = cgpu_translate_sample_count_flags(vk_limits->sampledImageColorSampleCounts);
-  limits.sampledImageIntegerSampleCounts = cgpu_translate_sample_count_flags(vk_limits->sampledImageIntegerSampleCounts);
-  limits.storageImageSampleCounts = cgpu_translate_sample_count_flags(vk_limits->storageImageSampleCounts);
   limits.maxSampleMaskWords = vk_limits->maxSampleMaskWords;
   limits.timestampComputeAndGraphics = vk_limits->timestampComputeAndGraphics;
   limits.timestampPeriod = vk_limits->timestampPeriod;
@@ -590,7 +560,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (phys_device_count > MAX_PHYSICAL_DEVICES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_MAX_PHYSICAL_DEVICES_REACHED;
+    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
   }
 
   if (phys_device_count == 0)
@@ -622,7 +592,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (device_properties.properties.apiVersion < MIN_VK_API_VERSION)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_VK_VERSION_NOT_SUPPORTED;
+    return CGPU_FAIL_VULKAN_VERSION_NOT_SUPPORTED;
   }
 
   if ((subgroup_properties.supportedStages & VK_QUEUE_COMPUTE_BIT) != VK_QUEUE_COMPUTE_BIT ||
@@ -647,7 +617,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (device_ext_count > MAX_DEVICE_EXTENSIONS)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_MAX_DEVICE_EXTENSIONS_REACHED;
+    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
   }
 
   VkExtensionProperties device_extensions[MAX_DEVICE_EXTENSIONS];
@@ -698,7 +668,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (queue_family_count > MAX_QUEUE_FAMILIES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_MAX_QUEUE_FAMILIES_REACHED;
+    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
   }
 
   VkQueueFamilyProperties queue_families[MAX_QUEUE_FAMILIES];
@@ -839,7 +809,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_LOGICAL_DEVICE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   volkLoadDeviceTable(
@@ -875,7 +845,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
       idevice->logical_device,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_COMMAND_POOL;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   VkQueryPoolCreateInfo timestamp_pool_info;
@@ -906,7 +876,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
       idevice->logical_device,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_QUERY_POOL;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   VmaVulkanFunctions vulkan_functions = {0};
@@ -1026,7 +996,7 @@ CgpuResult cgpu_create_shader(cgpu_device device,
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ishader_store, p_shader->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_SHADER_MODULE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   if (!cgpu_perform_shader_reflection(size, (uint32_t*) p_source, &ishader->reflection))
@@ -1124,7 +1094,7 @@ CgpuResult cgpu_create_buffer(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ibuffer_store, p_buffer->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_BUFFER;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   ibuffer->size = size;
@@ -1260,7 +1230,7 @@ static CgpuResult cgpu_create_image(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&iimage_store, p_image->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_IMAGE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   VmaAllocationInfo allocation_info;
@@ -1299,7 +1269,7 @@ static CgpuResult cgpu_create_image(cgpu_device device,
   {
     resource_store_free_handle(&iimage_store, p_image->handle);
     vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
-    return CGPU_FAIL_UNABLE_TO_CREATE_IMAGE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   iimage->width = width;
@@ -1331,7 +1301,7 @@ CgpuResult cgpu_create_image_3d(cgpu_device device,
 {
   if (depth == 0)
   {
-    return CGPU_FAIL_UNABLE_TO_CREATE_IMAGE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
   return cgpu_create_image(device, width, height, depth, format, usage, p_image);
 }
@@ -1446,7 +1416,7 @@ CgpuResult cgpu_create_sampler(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&isampler_store, p_sampler->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_SAMPLER;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   return CGPU_OK;
@@ -1496,7 +1466,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
 
   if (shader_reflection->binding_count >= MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS)
   {
-    return CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_LAYOUT;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   ipipeline->descriptor_set_layout_binding_count = shader_reflection->binding_count;
@@ -1529,7 +1499,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_LAYOUT;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   VkPushConstantRange push_const_range;
@@ -1559,7 +1529,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_PIPELINE_LAYOUT;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
@@ -1600,7 +1570,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   uint32_t buffer_count = 0;
@@ -1630,7 +1600,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
         ipipeline->descriptor_set_layout,
         NULL
       );
-      return CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE;
+      return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
     }
     }
   }
@@ -1694,7 +1664,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_POOL;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
   VkDescriptorSetAllocateInfo descriptor_set_allocate_info;
@@ -1972,6 +1942,10 @@ static CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipe
         access_mask = VK_ACCESS_SHADER_WRITE_BIT;
       }
 
+      if (barrier_count >= MAX_IMAGE_MEMORY_BARRIERS) {
+        return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+      }
+
       VkImageMemoryBarrier* barrier = &barriers[barrier_count++];
       barrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
       barrier->pNext = NULL;
@@ -2053,6 +2027,10 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
   {
     const VkDescriptorSetLayoutBinding* layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
 
+    if (write_descriptor_set_count >= MAX_WRITE_DESCRIPTOR_SETS) {
+      return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+    }
+
     VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_descriptor_set_count++];
     write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_descriptor_set->pNext = NULL;
@@ -2091,6 +2069,10 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             return CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED;
           }
 
+          if (image_info_count >= MAX_DESCRIPTOR_BUFFER_INFOS) {
+            return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+          }
+
           VkDescriptorBufferInfo* buffer_info = &buffer_infos[buffer_info_count++];
           buffer_info->buffer = ibuffer->buffer;
           buffer_info->offset = buffer_binding->offset;
@@ -2123,6 +2105,10 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             return CGPU_FAIL_INVALID_HANDLE;
           }
 
+          if (image_info_count >= MAX_DESCRIPTOR_IMAGE_INFOS) {
+            return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+          }
+
           VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
           image_info->sampler = VK_NULL_HANDLE;
           image_info->imageView = iimage->image_view;
@@ -2152,6 +2138,10 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
           cgpu_sampler sampler = sampler_binding->sampler;
           if (!cgpu_resolve_sampler(sampler, &isampler)) {
             return CGPU_FAIL_INVALID_HANDLE;
+          }
+
+          if (image_info_count >= MAX_DESCRIPTOR_IMAGE_INFOS) {
+            return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
           }
 
           VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
@@ -2394,6 +2384,13 @@ CgpuResult cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
     return CGPU_FAIL_INVALID_HANDLE;
   }
 
+  if (barrier_count >= MAX_MEMORY_BARRIERS ||
+      buffer_barrier_count >= MAX_BUFFER_MEMORY_BARRIERS ||
+      image_barrier_count >= MAX_IMAGE_MEMORY_BARRIERS)
+  {
+    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+  }
+
   VkMemoryBarrier vk_memory_barriers[MAX_MEMORY_BARRIERS];
 
   for (uint32_t i = 0; i < barrier_count; ++i)
@@ -2527,8 +2524,9 @@ CgpuResult cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
                                     uint32_t count,
                                     bool wait_until_available)
 {
-  if ((offset + count) > CGPU_MAX_TIMESTAMP_QUERIES) {
-    return CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED;
+  uint32_t last_index = offset + count;
+  if (last_index >= CGPU_MAX_TIMESTAMP_QUERIES) {
+    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
   }
 
   cgpu_icommand_buffer* icommand_buffer;
@@ -2603,7 +2601,7 @@ CgpuResult cgpu_create_fence(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ifence_store, p_fence->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_FENCE;
+    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
   return CGPU_OK;
 }

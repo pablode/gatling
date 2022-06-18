@@ -79,45 +79,31 @@ extern "C" {
 
 typedef enum CgpuResult {
   CGPU_OK = 0,
-  CGPU_FAIL_INVALID_HANDLE = -1,
-  CGPU_FAIL_NO_DEVICE_FOUND = -2,
-  CGPU_FAIL_DEVICE_EXTENSION_NOT_SUPPORTED = -3,
-  CGPU_FAIL_DEVICE_HAS_NO_COMPUTE_QUEUE_FAMILY = -4,
-  CGPU_FAIL_UNABLE_TO_CREATE_LOGICAL_DEVICE = -5,
-  CGPU_FAIL_UNABLE_TO_CREATE_COMMAND_POOL = -6,
-  CGPU_FAIL_UNABLE_TO_CREATE_SHADER_MODULE = -7,
-  CGPU_FAIL_UNABLE_TO_CREATE_BUFFER = -8,
-  CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY = -9,
-  CGPU_FAIL_UNABLE_TO_MAP_MEMORY = -10,
-  CGPU_FAIL_UNABLE_TO_CREATE_IMAGE = -11,
-  CGPU_FAIL_UNABLE_TO_BEGIN_COMMAND_BUFFER = -12,
-  CGPU_FAIL_UNABLE_TO_CREATE_FENCE = -13,
-  CGPU_FAIL_UNABLE_TO_RESET_FENCE = -14,
-  CGPU_FAIL_UNABLE_TO_WAIT_FOR_FENCE = -15,
-  CGPU_FAIL_UNABLE_TO_SUBMIT_COMMAND_BUFFER = -16,
-  CGPU_FAIL_UNABLE_TO_ALLOCATE_COMMAND_BUFFER = -17,
-  CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_LAYOUT = -18,
-  CGPU_FAIL_UNABLE_TO_CREATE_PIPELINE_LAYOUT = -19,
-  CGPU_FAIL_UNABLE_TO_CREATE_COMPUTE_PIPELINE = -20,
-  CGPU_FAIL_UNABLE_TO_CREATE_DESCRIPTOR_POOL = -21,
-  CGPU_FAIL_UNABLE_TO_ALLOCATE_DESCRIPTOR_SET = -22,
-  CGPU_FAIL_UNABLE_TO_INITIALIZE_VOLK = -23,
-  CGPU_FAIL_UNABLE_TO_INITIALIZE_VULKAN = -24,
-  CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE = -25,
-  CGPU_FAIL_UNABLE_TO_INVALIDATE_MEMORY = -26,
-  CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED = -27,
-  CGPU_FAIL_UNABLE_TO_CREATE_QUERY_POOL = -28,
-  CGPU_FAIL_MAX_PHYSICAL_DEVICES_REACHED = -29,
-  CGPU_FAIL_MAX_DEVICE_EXTENSIONS_REACHED = -30,
-  CGPU_FAIL_MAX_QUEUE_FAMILIES_REACHED = -31,
-  CGPU_FAIL_MAX_TIMESTAMP_QUERY_INDEX_REACHED = -32,
-  CGPU_FAIL_VK_VERSION_NOT_SUPPORTED = -33,
-  CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET = -34,
-  CGPU_FAIL_UNABLE_TO_INITIALIZE_VMA = -35,
-  CGPU_FAIL_UNABLE_TO_REFLECT_SHADER = -36,
-  CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH = -37,
-  CGPU_FAIL_UNABLE_TO_CREATE_SAMPLER = -38,
-  CGPU_FAIL_RESOURCE_BINDING_MISMATCH = -39
+  CGPU_FAIL_INVALID_HANDLE,
+  CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE,
+  CGPU_FAIL_INTERNAL_LIMIT_REACHED,
+  CGPU_FAIL_NO_DEVICE_FOUND,
+  CGPU_FAIL_DEVICE_EXTENSION_NOT_SUPPORTED,
+  CGPU_FAIL_DEVICE_HAS_NO_COMPUTE_QUEUE_FAMILY,
+  CGPU_FAIL_UNABLE_TO_ALLOCATE_MEMORY,
+  CGPU_FAIL_UNABLE_TO_MAP_MEMORY,
+  CGPU_FAIL_UNABLE_TO_BEGIN_COMMAND_BUFFER,
+  CGPU_FAIL_UNABLE_TO_RESET_FENCE,
+  CGPU_FAIL_UNABLE_TO_WAIT_FOR_FENCE,
+  CGPU_FAIL_UNABLE_TO_SUBMIT_COMMAND_BUFFER,
+  CGPU_FAIL_UNABLE_TO_ALLOCATE_COMMAND_BUFFER,
+  CGPU_FAIL_UNABLE_TO_ALLOCATE_DESCRIPTOR_SET,
+  CGPU_FAIL_UNABLE_TO_INITIALIZE_VOLK,
+  CGPU_FAIL_UNABLE_TO_INITIALIZE_VULKAN,
+  CGPU_FAIL_NO_SUITABLE_MEMORY_TYPE,
+  CGPU_FAIL_UNABLE_TO_INVALIDATE_MEMORY,
+  CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED,
+  CGPU_FAIL_VULKAN_VERSION_NOT_SUPPORTED,
+  CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET,
+  CGPU_FAIL_UNABLE_TO_INITIALIZE_VMA,
+  CGPU_FAIL_UNABLE_TO_REFLECT_SHADER,
+  CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH,
+  CGPU_FAIL_RESOURCE_BINDING_MISMATCH
 } CgpuResult;
 
 typedef uint32_t CgpuBufferUsageFlags;
@@ -317,18 +303,6 @@ typedef enum CgpuImageFormat {
   CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_444_UNORM = 1000156033
 } CgpuImageFormat;
 
-typedef uint32_t CgpuSampleCountFlags;
-
-typedef enum CgpuSampleCountFlagBits {
-  CGPU_SAMPLE_COUNT_FLAG_1 = 1,
-  CGPU_SAMPLE_COUNT_FLAG_2 = 2,
-  CGPU_SAMPLE_COUNT_FLAG_4 = 4,
-  CGPU_SAMPLE_COUNT_FLAG_8 = 8,
-  CGPU_SAMPLE_COUNT_FLAG_16 = 16,
-  CGPU_SAMPLE_COUNT_FLAG_32 = 32,
-  CGPU_SAMPLE_COUNT_FLAG_64 = 64
-} CgpuSampleCountFlagBits;
-
 typedef uint32_t CgpuMemoryAccessFlags;
 
 typedef enum CgpuMemoryAccessFlagBits {
@@ -409,62 +383,59 @@ typedef struct cgpu_image_memory_barrier {
 } cgpu_image_memory_barrier;
 
 typedef struct cgpu_physical_device_limits {
-  uint32_t             maxImageDimension1D;
-  uint32_t             maxImageDimension2D;
-  uint32_t             maxImageDimension3D;
-  uint32_t             maxImageDimensionCube;
-  uint32_t             maxImageArrayLayers;
-  uint32_t             maxUniformBufferRange;
-  uint32_t             maxStorageBufferRange;
-  uint32_t             maxPushConstantsSize;
-  uint32_t             maxMemoryAllocationCount;
-  uint32_t             maxSamplerAllocationCount;
-  uint64_t             bufferImageGranularity;
-  uint64_t             sparseAddressSpaceSize;
-  uint32_t             maxBoundDescriptorSets;
-  uint32_t             maxPerStageDescriptorSamplers;
-  uint32_t             maxPerStageDescriptorUniformBuffers;
-  uint32_t             maxPerStageDescriptorStorageBuffers;
-  uint32_t             maxPerStageDescriptorSampledImages;
-  uint32_t             maxPerStageDescriptorStorageImages;
-  uint32_t             maxPerStageDescriptorInputAttachments;
-  uint32_t             maxPerStageResources;
-  uint32_t             maxDescriptorSetSamplers;
-  uint32_t             maxDescriptorSetUniformBuffers;
-  uint32_t             maxDescriptorSetUniformBuffersDynamic;
-  uint32_t             maxDescriptorSetStorageBuffers;
-  uint32_t             maxDescriptorSetStorageBuffersDynamic;
-  uint32_t             maxDescriptorSetSampledImages;
-  uint32_t             maxDescriptorSetStorageImages;
-  uint32_t             maxDescriptorSetInputAttachments;
-  uint32_t             maxComputeSharedMemorySize;
-  uint32_t             maxComputeWorkGroupCount[3];
-  uint32_t             maxComputeWorkGroupInvocations;
-  uint32_t             maxComputeWorkGroupSize[3];
-  uint32_t             mipmapPrecisionBits;
-  float                maxSamplerLodBias;
-  float                maxSamplerAnisotropy;
-  size_t               minMemoryMapAlignment;
-  uint64_t             minUniformBufferOffsetAlignment;
-  uint64_t             minStorageBufferOffsetAlignment;
-  int32_t              minTexelOffset;
-  uint32_t             maxTexelOffset;
-  int32_t              minTexelGatherOffset;
-  uint32_t             maxTexelGatherOffset;
-  float                minInterpolationOffset;
-  float                maxInterpolationOffset;
-  uint32_t             subPixelInterpolationOffsetBits;
-  CgpuSampleCountFlags sampledImageColorSampleCounts;
-  CgpuSampleCountFlags sampledImageIntegerSampleCounts;
-  CgpuSampleCountFlags storageImageSampleCounts;
-  uint32_t             maxSampleMaskWords;
-  bool                 timestampComputeAndGraphics;
-  float                timestampPeriod;
-  uint32_t             discreteQueuePriorities;
-  uint64_t             optimalBufferCopyOffsetAlignment;
-  uint64_t             optimalBufferCopyRowPitchAlignment;
-  uint64_t             nonCoherentAtomSize;
-  uint32_t             subgroupSize;
+  uint32_t maxImageDimension1D;
+  uint32_t maxImageDimension2D;
+  uint32_t maxImageDimension3D;
+  uint32_t maxImageDimensionCube;
+  uint32_t maxImageArrayLayers;
+  uint32_t maxUniformBufferRange;
+  uint32_t maxStorageBufferRange;
+  uint32_t maxPushConstantsSize;
+  uint32_t maxMemoryAllocationCount;
+  uint32_t maxSamplerAllocationCount;
+  uint64_t bufferImageGranularity;
+  uint64_t sparseAddressSpaceSize;
+  uint32_t maxBoundDescriptorSets;
+  uint32_t maxPerStageDescriptorSamplers;
+  uint32_t maxPerStageDescriptorUniformBuffers;
+  uint32_t maxPerStageDescriptorStorageBuffers;
+  uint32_t maxPerStageDescriptorSampledImages;
+  uint32_t maxPerStageDescriptorStorageImages;
+  uint32_t maxPerStageDescriptorInputAttachments;
+  uint32_t maxPerStageResources;
+  uint32_t maxDescriptorSetSamplers;
+  uint32_t maxDescriptorSetUniformBuffers;
+  uint32_t maxDescriptorSetUniformBuffersDynamic;
+  uint32_t maxDescriptorSetStorageBuffers;
+  uint32_t maxDescriptorSetStorageBuffersDynamic;
+  uint32_t maxDescriptorSetSampledImages;
+  uint32_t maxDescriptorSetStorageImages;
+  uint32_t maxDescriptorSetInputAttachments;
+  uint32_t maxComputeSharedMemorySize;
+  uint32_t maxComputeWorkGroupCount[3];
+  uint32_t maxComputeWorkGroupInvocations;
+  uint32_t maxComputeWorkGroupSize[3];
+  uint32_t mipmapPrecisionBits;
+  float    maxSamplerLodBias;
+  float    maxSamplerAnisotropy;
+  size_t   minMemoryMapAlignment;
+  uint64_t minUniformBufferOffsetAlignment;
+  uint64_t minStorageBufferOffsetAlignment;
+  int32_t  minTexelOffset;
+  uint32_t maxTexelOffset;
+  int32_t  minTexelGatherOffset;
+  uint32_t maxTexelGatherOffset;
+  float    minInterpolationOffset;
+  float    maxInterpolationOffset;
+  uint32_t subPixelInterpolationOffsetBits;
+  uint32_t maxSampleMaskWords;
+  bool     timestampComputeAndGraphics;
+  float    timestampPeriod;
+  uint32_t discreteQueuePriorities;
+  uint64_t optimalBufferCopyOffsetAlignment;
+  uint64_t optimalBufferCopyRowPitchAlignment;
+  uint64_t nonCoherentAtomSize;
+  uint32_t subgroupSize;
 } cgpu_physical_device_limits;
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_initialize(
