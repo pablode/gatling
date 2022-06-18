@@ -138,6 +138,7 @@ namespace sg
 
     auto flags = mi::neuraylib::IMaterial_instance::DEFAULT_OPTIONS; // Instance compilation, no class compilation.
     compiledMaterial = mi::base::Handle<mi::neuraylib::ICompiled_material>(matInstance->create_compiled_material(flags, context));
-    return true;
+
+    return compiledMaterial != nullptr;
   }
 }
