@@ -728,9 +728,17 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_FALSE;
   descriptor_indexing_features.runtimeDescriptorArray = VK_FALSE;
 
+  VkPhysicalDevice16BitStorageFeatures device_16bit_storage_featurs = {0};
+  device_16bit_storage_featurs.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
+  device_16bit_storage_featurs.pNext = &descriptor_indexing_features;
+  device_16bit_storage_featurs.storageBuffer16BitAccess = VK_TRUE;
+  device_16bit_storage_featurs.uniformAndStorageBuffer16BitAccess = VK_FALSE;
+  device_16bit_storage_featurs.storagePushConstant16 = VK_FALSE;
+  device_16bit_storage_featurs.storageInputOutput16 = VK_FALSE;
+
   VkPhysicalDeviceFeatures2 device_features2;
   device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  device_features2.pNext = &descriptor_indexing_features;
+  device_features2.pNext = &device_16bit_storage_featurs;
   device_features2.features.robustBufferAccess = VK_FALSE;
   device_features2.features.fullDrawIndexUint32 = VK_FALSE;
   device_features2.features.imageCubeArray = VK_FALSE;
