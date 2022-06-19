@@ -725,7 +725,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   descriptor_indexing_features.descriptorBindingStorageTexelBufferUpdateAfterBind = VK_FALSE;
   descriptor_indexing_features.descriptorBindingUpdateUnusedWhilePending = VK_FALSE;
   descriptor_indexing_features.descriptorBindingPartiallyBound = VK_FALSE;
-  descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+  descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_FALSE;
   descriptor_indexing_features.runtimeDescriptorArray = VK_FALSE;
 
   VkPhysicalDeviceFeatures2 device_features2;
