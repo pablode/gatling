@@ -277,6 +277,9 @@ float3 evaluate_sample(inout uint4 rng_state,
     return clamp(state.radiance, float3(0.0, 0.0, 0.0), float3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE));
 }
 
+// Tracing rays in Morton order requires us to reorder the results for coalesced framebuffer memory accesses.
+groupshared float3 gs_reorder[NUM_THREADS_X * NUM_THREADS_Y];
+
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
 void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 {
@@ -287,56 +290,64 @@ void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3
 
     float3 pixel_color = float3(0.0, 0.0, 0.0);
 
-    if (pixel_pos.x >= PC.IMAGE_WIDTH ||
-        pixel_pos.y >= PC.IMAGE_HEIGHT)
+    if (pixel_pos.x < PC.IMAGE_WIDTH && pixel_pos.y < PC.IMAGE_HEIGHT)
     {
-        return;
+        uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
+
+        float3 camera_right = cross(PC.CAMERA_FORWARD, PC.CAMERA_UP);
+
+        float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
+
+        float H = 1.0;
+        float W = H * aspect_ratio;
+        float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
+
+        float WX = W / float(PC.IMAGE_WIDTH);
+        float HY = H / float(PC.IMAGE_HEIGHT);
+
+        float3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
+        float3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
+
+        float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
+
+        for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
+        {
+            uint4 rng_state = pcg4d_init(pixel_pos.xy, s);
+            float4 r = pcg4d_next(rng_state);
+
+            float3 P =
+                L +
+                (float(pixel_pos.x) + r.x) * camera_right * WX +
+                (float(pixel_pos.y) + r.y) * PC.CAMERA_UP * HY;
+
+            float3 ray_origin = PC.CAMERA_POSITION;
+            float3 ray_direction = P - ray_origin;
+
+            /* Beware: a single direction component must not be zero.
+             * This is because we often take the inverse of the direction. */
+            if (ray_direction.x == 0.0) ray_direction.x = FLOAT_MIN;
+            if (ray_direction.y == 0.0) ray_direction.y = FLOAT_MIN;
+            if (ray_direction.z == 0.0) ray_direction.z = FLOAT_MIN;
+
+            ray_direction = normalize(ray_direction);
+
+            /* Path trace sample and accumulate color. */
+            float3 sample_color = evaluate_sample(rng_state, r.z, ray_origin, ray_direction);
+            pixel_color += sample_color * inv_sample_count;
+        }
     }
 
-    uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
+    uint gs_idx = local_pixel_pos.x + local_pixel_pos.y * NUM_THREADS_X;
+    gs_reorder[gs_idx] = pixel_color;
 
-    float3 camera_right = cross(PC.CAMERA_FORWARD, PC.CAMERA_UP);
-
-    float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
-
-    float H = 1.0;
-    float W = H * aspect_ratio;
-    float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
-
-    float WX = W / float(PC.IMAGE_WIDTH);
-    float HY = H / float(PC.IMAGE_HEIGHT);
-
-    float3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
-    float3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
-
-    float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
-
-    for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
-    {
-        uint4 rng_state = pcg4d_init(pixel_pos.xy, s);
-        float4 r = pcg4d_next(rng_state);
-
-        float3 P =
-            L +
-            (float(pixel_pos.x) + r.x) * camera_right * WX +
-            (float(pixel_pos.y) + r.y) * PC.CAMERA_UP * HY;
-
-        float3 ray_origin = PC.CAMERA_POSITION;
-        float3 ray_direction = P - ray_origin;
-
-        /* Beware: a single direction component must not be zero.
-         * This is because we often take the inverse of the direction. */
-        if (ray_direction.x == 0.0) ray_direction.x = FLOAT_MIN;
-        if (ray_direction.y == 0.0) ray_direction.y = FLOAT_MIN;
-        if (ray_direction.z == 0.0) ray_direction.z = FLOAT_MIN;
-
-        ray_direction = normalize(ray_direction);
-
-        /* Path trace sample and accumulate color. */
-        float3 sample_color = evaluate_sample(rng_state, r.z, ray_origin, ray_direction);
-        pixel_color += sample_color * inv_sample_count;
-    }
+    GroupMemoryBarrierWithGroupSync();
 
     uint2 new_pixel_pos = group_base_pixel_pos + group_thread_id.xy;
-    pixels[pixel_index] = float4(pixel_color, 1.0);
+
+    if (new_pixel_pos.x < PC.IMAGE_WIDTH && new_pixel_pos.y < PC.IMAGE_HEIGHT)
+    {
+        float4 new_pixel_color = float4(gs_reorder[group_index], 1.0);
+        uint new_pixel_index = new_pixel_pos.x + new_pixel_pos.y * PC.IMAGE_WIDTH;
+        pixels[new_pixel_index] = new_pixel_color;
+    }
 }
