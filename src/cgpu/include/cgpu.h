@@ -335,6 +335,15 @@ typedef struct cgpu_fence          { uint64_t handle; } cgpu_fence;
 typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
 typedef struct cgpu_sampler        { uint64_t handle; } cgpu_sampler;
 
+typedef struct cgpu_image_description {
+  bool is3d;
+  uint32_t width;
+  uint32_t height;
+  uint32_t depth;
+  CgpuImageFormat format;
+  CgpuImageUsageFlags usage;
+} cgpu_image_description;
+
 typedef struct cgpu_buffer_binding {
   uint32_t binding;
   uint32_t index;
@@ -491,22 +500,9 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_unmap_buffer(
   cgpu_buffer buffer
 );
 
-CGPU_API CgpuResult CGPU_CDECL cgpu_create_image_2d(
+CGPU_API CgpuResult CGPU_CDECL cgpu_create_image(
   cgpu_device device,
-  uint32_t width,
-  uint32_t height,
-  CgpuImageFormat format,
-  CgpuImageUsageFlags usage,
-  cgpu_image* p_image
-);
-
-CGPU_API CgpuResult CGPU_CDECL cgpu_create_image_3d(
-  cgpu_device device,
-  uint32_t width,
-  uint32_t height,
-  uint32_t depth,
-  CgpuImageFormat format,
-  CgpuImageUsageFlags usage,
+  const cgpu_image_description* image_desc,
   cgpu_image* p_image
 );
 

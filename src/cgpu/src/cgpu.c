@@ -1154,13 +1154,9 @@ CgpuResult cgpu_unmap_buffer(cgpu_device device,
   return CGPU_OK;
 }
 
-static CgpuResult cgpu_create_image(cgpu_device device,
-                                    uint32_t width,
-                                    uint32_t height,
-                                    uint32_t depth,
-                                    CgpuImageFormat format,
-                                    CgpuImageUsageFlags usage,
-                                    cgpu_image* p_image)
+CgpuResult cgpu_create_image(cgpu_device device,
+                             const cgpu_image_description* image_desc,
+                             cgpu_image* p_image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1175,37 +1171,37 @@ static CgpuResult cgpu_create_image(cgpu_device device,
   }
 
   VkImageTiling vk_image_tiling = VK_IMAGE_TILING_OPTIMAL;
-  if (usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC || usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) {
+  if (image_desc->usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC ||
+      image_desc->usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST)
+  {
     vk_image_tiling = VK_IMAGE_TILING_LINEAR;
   }
 
   VkImageUsageFlags vk_image_usage = 0;
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) {
+  if ((image_desc->usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) {
     vk_image_usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   }
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) {
+  if ((image_desc->usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST) {
     vk_image_usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   }
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_SAMPLED) == CGPU_IMAGE_USAGE_FLAG_SAMPLED) {
+  if ((image_desc->usage & CGPU_IMAGE_USAGE_FLAG_SAMPLED) == CGPU_IMAGE_USAGE_FLAG_SAMPLED) {
     vk_image_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
   }
-  if ((usage & CGPU_IMAGE_USAGE_FLAG_STORAGE) == CGPU_IMAGE_USAGE_FLAG_STORAGE) {
+  if ((image_desc->usage & CGPU_IMAGE_USAGE_FLAG_STORAGE) == CGPU_IMAGE_USAGE_FLAG_STORAGE) {
     vk_image_usage |= VK_IMAGE_USAGE_STORAGE_BIT;
   }
 
-  VkFormat vk_format = cgpu_translate_image_format(format);
-
-  bool is_2d_image = (depth == 0);
+  VkFormat vk_format = cgpu_translate_image_format(image_desc->format);
 
   VkImageCreateInfo image_info;
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   image_info.pNext = NULL;
   image_info.flags = 0;
-  image_info.imageType = is_2d_image ? VK_IMAGE_TYPE_2D : VK_IMAGE_TYPE_3D;
+  image_info.imageType = image_desc->is3d ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
   image_info.format = vk_format;
-  image_info.extent.width = width;
-  image_info.extent.height = height;
-  image_info.extent.depth = is_2d_image ? 1 : depth;
+  image_info.extent.width = image_desc->width;
+  image_info.extent.height = image_desc->height;
+  image_info.extent.depth = image_desc->is3d ? image_desc->depth : 1;
   image_info.mipLevels = 1;
   image_info.arrayLayers = 1;
   image_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -1247,7 +1243,7 @@ static CgpuResult cgpu_create_image(cgpu_device device,
   image_view_info.pNext = NULL;
   image_view_info.flags = 0;
   image_view_info.image = iimage->image;
-  image_view_info.viewType = is_2d_image ? VK_IMAGE_VIEW_TYPE_2D : VK_IMAGE_VIEW_TYPE_3D;
+  image_view_info.viewType = image_desc->is3d ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
   image_view_info.format = vk_format;
   image_view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
   image_view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1272,38 +1268,13 @@ static CgpuResult cgpu_create_image(cgpu_device device,
     return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
   }
 
-  iimage->width = width;
-  iimage->height = height;
-  iimage->depth = is_2d_image ? 1 : depth;
+  iimage->width = image_desc->width;
+  iimage->height = image_desc->height;
+  iimage->depth = image_desc->is3d ? image_desc->depth : 1;
   iimage->layout = VK_IMAGE_LAYOUT_UNDEFINED;
   iimage->access_mask = 0;
 
   return CGPU_OK;
-}
-
-CgpuResult cgpu_create_image_2d(cgpu_device device,
-                                uint32_t width,
-                                uint32_t height,
-                                CgpuImageFormat format,
-                                CgpuImageUsageFlags usage,
-                                cgpu_image* p_image)
-{
-  return cgpu_create_image(device, width, height, 0, format, usage, p_image);
-}
-
-CgpuResult cgpu_create_image_3d(cgpu_device device,
-                                uint32_t width,
-                                uint32_t height,
-                                uint32_t depth,
-                                CgpuImageFormat format,
-                                CgpuImageUsageFlags usage,
-                                cgpu_image* p_image)
-{
-  if (depth == 0)
-  {
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
-  }
-  return cgpu_create_image(device, width, height, depth, format, usage, p_image);
 }
 
 CgpuResult cgpu_destroy_image(cgpu_device device,

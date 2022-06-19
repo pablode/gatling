@@ -347,15 +347,20 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     bool result;
     cgpu_image image = { CGPU_INVALID_HANDLE };
 
-    CgpuImageFormat imageFormat = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-    CgpuImageUsageFlags imageFlags = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
+    cgpu_image_description image_desc;
+    image_desc.is3d = false;
+    image_desc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+    image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
     auto& textureResource = textureResources[i];
     auto& payload = textureResource.data;
 
     if (payload.size() > 0)
     {
-      result = cgpu_create_image_2d(s_device, textureResource.width, textureResource.height, imageFormat, imageFlags, &image) == CGPU_OK;
+      image_desc.width = textureResource.width;
+      image_desc.height = textureResource.height;
+
+      result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
       if (!result) return false;
 
       result = s_stager->stageToImage(payload.data(), payload.size(), image);
@@ -377,7 +382,10 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     imgio_img image_data;
     if (imgio_load_img(filePath, &image_data) == IMGIO_OK)
     {
-      result = cgpu_create_image_2d(s_device, image_data.width, image_data.height, imageFormat, imageFlags, &image) == CGPU_OK;
+      image_desc.width = image_data.width;
+      image_desc.height = image_data.height;
+
+      result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
       if (!result) return false;
 
       result = s_stager->stageToImage(image_data.data, image_data.size, image);
@@ -391,7 +399,10 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
       continue;
     }
 
-    result = cgpu_create_image_2d(s_device, 1, 1, imageFormat, imageFlags, &image) == CGPU_OK;
+    image_desc.width = 1;
+    image_desc.height = 1;
+
+    result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
     if (!result) return false;
 
     uint8_t black[4] = { 0, 0, 0, 0 };
