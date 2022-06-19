@@ -280,7 +280,7 @@ float3 evaluate_sample(inout uint4 rng_state,
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
 void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
-    const uint2 pixel_pos = GlobalInvocationID.xy;
+    uint2 pixel_pos = GlobalInvocationID.xy;
 
     if (pixel_pos.x >= PC.IMAGE_WIDTH ||
         pixel_pos.y >= PC.IMAGE_HEIGHT)
@@ -288,23 +288,23 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         return;
     }
 
-    const uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
+    uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
 
     float3 camera_right = cross(PC.CAMERA_FORWARD, PC.CAMERA_UP);
 
-    const float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
+    float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
 
-    const float H = 1.0;
-    const float W = H * aspect_ratio;
-    const float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
+    float H = 1.0;
+    float W = H * aspect_ratio;
+    float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
 
-    const float WX = W / float(PC.IMAGE_WIDTH);
-    const float HY = H / float(PC.IMAGE_HEIGHT);
+    float WX = W / float(PC.IMAGE_WIDTH);
+    float HY = H / float(PC.IMAGE_HEIGHT);
 
-    const float3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
-    const float3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
+    float3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
+    float3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
 
-    const float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
+    float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
 
     float3 pixel_color = float3(0.0, 0.0, 0.0);
 
@@ -313,7 +313,7 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         uint4 rng_state = pcg4d_init(pixel_pos.xy, s);
         float4 r = pcg4d_next(rng_state);
 
-        const float3 P =
+        float3 P =
             L +
             (float(pixel_pos.x) + r.x) * camera_right * WX +
             (float(pixel_pos.y) + r.y) * PC.CAMERA_UP * HY;
@@ -330,7 +330,7 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         ray_direction = normalize(ray_direction);
 
         /* Path trace sample and accumulate color. */
-        const float3 sample_color = evaluate_sample(rng_state, r.z, ray_origin, ray_direction);
+        float3 sample_color = evaluate_sample(rng_state, r.z, ray_origin, ray_direction);
         pixel_color += sample_color * inv_sample_count;
     }
 

@@ -177,9 +177,7 @@ void giDestroyMaterial(gi_material* mat)
   delete mat;
 }
 
-static uint64_t giAlignBuffer(uint64_t alignment,
-                                uint64_t buffer_size,
-                                uint64_t* total_size)
+uint64_t giAlignBuffer(uint64_t alignment, uint64_t buffer_size, uint64_t* total_size)
 {
   if (buffer_size == 0)
   {
