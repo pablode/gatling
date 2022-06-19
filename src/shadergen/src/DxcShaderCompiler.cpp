@@ -86,7 +86,8 @@ namespace sg
 #endif
       // Target SPIR-V instead of DXIL
       L"-spirv",
-      L"-fspv-target-env=vulkan1.1"
+      L"-fspv-target-env=vulkan1.1",
+      L"-enable-16bit-types"
     };
 
     CComPtr<IDxcResult> result;

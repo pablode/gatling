@@ -772,7 +772,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   device_features2.features.shaderCullDistance = VK_FALSE;
   device_features2.features.shaderFloat64 = VK_FALSE;
   device_features2.features.shaderInt64 = VK_FALSE;
-  device_features2.features.shaderInt16 = VK_FALSE;
+  device_features2.features.shaderInt16 = VK_TRUE;
   device_features2.features.shaderResourceResidency = VK_FALSE;
   device_features2.features.shaderResourceMinLod = VK_FALSE;
   device_features2.features.sparseBinding = VK_FALSE;
