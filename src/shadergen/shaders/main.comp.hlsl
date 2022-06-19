@@ -284,7 +284,8 @@ groupshared float3 gs_reorder[NUM_THREADS_X * NUM_THREADS_Y];
 void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 {
     // Remap to Morton order within workgroup.
-    uint2 local_pixel_pos = uint2(MORTON_2D_LUT_32x8_X[group_index], MORTON_2D_LUT_32x8_Y[group_index]);
+    uint morton_code = MORTON_2D_LUT_32x8[group_index];
+    uint2 local_pixel_pos = uint2(morton_code >> 16, morton_code & 0xFFFF);
     uint2 group_base_pixel_pos = uint2(group_id.x * NUM_THREADS_X, group_id.y * NUM_THREADS_Y);
     uint2 pixel_pos = group_base_pixel_pos + local_pixel_pos;
 
