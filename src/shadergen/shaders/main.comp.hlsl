@@ -278,9 +278,14 @@ float3 evaluate_sample(inout uint4 rng_state,
 }
 
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
-void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
+void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 {
-    uint2 pixel_pos = GlobalInvocationID.xy;
+    // Remap to Morton order within workgroup.
+    uint2 local_pixel_pos = uint2(MORTON_2D_LUT_32x8_X[group_index], MORTON_2D_LUT_32x8_Y[group_index]);
+    uint2 group_base_pixel_pos = uint2(group_id.x * NUM_THREADS_X, group_id.y * NUM_THREADS_Y);
+    uint2 pixel_pos = group_base_pixel_pos + local_pixel_pos;
+
+    float3 pixel_color = float3(0.0, 0.0, 0.0);
 
     if (pixel_pos.x >= PC.IMAGE_WIDTH ||
         pixel_pos.y >= PC.IMAGE_HEIGHT)
@@ -305,8 +310,6 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
     float3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
 
     float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
-
-    float3 pixel_color = float3(0.0, 0.0, 0.0);
 
     for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
     {
@@ -334,5 +337,6 @@ void CSMain(uint3 GlobalInvocationID : SV_DispatchThreadID)
         pixel_color += sample_color * inv_sample_count;
     }
 
+    uint2 new_pixel_pos = group_base_pixel_pos + group_thread_id.xy;
     pixels[pixel_index] = float4(pixel_color, 1.0);
 }
