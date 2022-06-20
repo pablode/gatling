@@ -25,7 +25,7 @@ StructuredBuffer<fvertex> vertices;
 SamplerState tex_sampler;
 
 [[vk::binding(6)]]
-StructuredBuffer<uint> tex_mappings;
+StructuredBuffer<uint16_t> tex_mappings;
 #endif
 
 #ifdef HAS_TEXTURES_2D

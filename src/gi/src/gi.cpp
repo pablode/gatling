@@ -349,7 +349,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     return true;
   }
 
-  std::vector<uint32_t> imageMappings;
+  std::vector<uint16_t> imageMappings;
   imageMappings.reserve(texCount);
 
   bool result;
@@ -425,7 +425,9 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     images.push_back(image);
   }
 
-  uint64_t imageMappingsSize = imageMappings.size() * sizeof(uint32_t);
+  assert(imageMappings.size() < UINT16_MAX);
+
+  uint64_t imageMappingsSize = imageMappings.size() * sizeof(uint16_t);
   result = cgpu_create_buffer(
     s_device,
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
