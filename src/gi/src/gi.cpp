@@ -610,7 +610,7 @@ int giRender(const gi_render_params* params,
   cgpu_bindings bindings= {
     (uint32_t) buffers.size(), buffers.data(),
     (uint32_t) images.size(), images.data(),
-    1, &sampler
+    (uint32_t) (texCount ? 1 : 0), &sampler
   };
 
   // Set up command buffer.
