@@ -212,8 +212,8 @@ namespace sg
     int textureCount = result.textureResources.size();
     if (textureCount > 0)
     {
-      ss << "#define HAS_TEXTURES\n";
-      ss << "#define TEXTURE_COUNT " << textureCount << "\n";
+      ss << "#define HAS_TEXTURES_2D\n";
+      ss << "#define TEXTURE_COUNT_2D " << textureCount << "\n";
     }
 
 #if !defined(NDEBUG) && !defined(__APPLE__)

@@ -1,7 +1,5 @@
 // See also: https://github.com/NVIDIA/MDL-SDK/blob/master/examples/mdl_sdk/dxr/content/mdl_renderer_runtime.hlsl
 
-#ifdef HAS_TEXTURES
-
 float apply_wrap_and_crop(float coord, int wrap, float2 crop, int res)
 {
     if (wrap == TEX_WRAP_REPEAT)
@@ -34,6 +32,8 @@ float apply_wrap_and_crop(float coord, int wrap, float2 crop, int res)
     return coord * (crop.y - crop.x) + crop.x;
 }
 
+#ifdef HAS_TEXTURES_3D
+
 float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
 {
     if ((tex == 0) ||
@@ -44,18 +44,17 @@ float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int 
         return float4(0, 0, 0, 0);
     }
 
-    // TODO: 3d texture
-
     uint array_idx = tex_mappings[tex - 1];
 
-    uint2 res;
-    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
+    uint3 res;
+    textures_3d[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y, res.z);
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
+    coord.z = apply_wrap_and_crop(coord.z, wrap_w, crop_w, res.z);
 
     float lod = 0.0;
-    int2 offset = int2(0, 0);
-    return textures[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord.xy, lod, offset);
+    int3 offset = int3(0, 0, 0);
+    return textures_3d[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord, lod, offset);
 }
 
 float3 tex_lookup_float3_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
@@ -73,50 +72,9 @@ float tex_lookup_float_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wr
     return tex_lookup_float4_3d(tex, coord, wrap_u, wrap_v, wrap_w, crop_u, crop_v, crop_w, frame).x;
 }
 
-float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
-{
-    if ((tex == 0) ||
-        (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
-        (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
-    {
-        return float4(0, 0, 0, 0);
-    }
-
-    uint array_idx = tex_mappings[tex - 1];
-
-    uint2 res;
-    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
-    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
-    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
-
-    float lod = 0.0;
-    int2 offset = int2(0, 0);
-    return textures[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord.xy, lod, offset);
-}
-
-float3 tex_lookup_float3_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
-{
-    return tex_lookup_float4_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame).xyz;
-}
-
-float2 tex_lookup_float2_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
-{
-    return tex_lookup_float4_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame).xy;
-}
-
-float tex_lookup_float_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
-{
-    return tex_lookup_float4_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame).x;
-}
-
 float3 tex_lookup_color_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
 {
     return tex_lookup_float3_3d(tex, coord, wrap_u, wrap_v, wrap_v, crop_u, crop_v, crop_w, frame);
-}
-
-float3 tex_lookup_color_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
-{
-    return tex_lookup_float3_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame);
 }
 
 float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
@@ -126,19 +84,17 @@ float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
         return float4(0, 0, 0, 0);
     }
 
-    // TODO: 3d texture
-
     uint array_idx = tex_mappings[tex - 1];
 
-    uint2 res;
-    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
-    if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y)
+    uint3 res;
+    textures_3d[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y, res.z);
+    if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y || coord.z < 0 || coord.z >= res.z)
     {
         return float4(0, 0, 0, 0);
     }
 
     int mipmapLevel = 0;
-    return textures[NonUniformResourceIndex(array_idx)].Load(int3(coord.xy, mipmapLevel));
+    return textures_3d[NonUniformResourceIndex(array_idx)].Load(int4(coord, mipmapLevel));
 }
 
 float3 tex_texel_float3_3d(uint tex, int3 coord, float frame)
@@ -161,6 +117,51 @@ float3 tex_texel_color_3d(uint tex, int3 coord, float frame)
     return tex_texel_float3_3d(tex, coord, frame);
 }
 
+#endif
+
+#ifdef HAS_TEXTURES_2D
+
+float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
+{
+    if ((tex == 0) ||
+        (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
+        (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
+    {
+        return float4(0, 0, 0, 0);
+    }
+
+    uint array_idx = tex_mappings[tex - 1];
+
+    uint2 res;
+    textures_2d[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
+    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
+    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
+
+    float lod = 0.0;
+    int2 offset = int2(0, 0);
+    return textures_2d[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord, lod, offset);
+}
+
+float3 tex_lookup_float3_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
+{
+    return tex_lookup_float4_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame).xyz;
+}
+
+float2 tex_lookup_float2_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
+{
+    return tex_lookup_float4_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame).xy;
+}
+
+float tex_lookup_float_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
+{
+    return tex_lookup_float4_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame).x;
+}
+
+float3 tex_lookup_color_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
+{
+    return tex_lookup_float3_2d(tex, coord, wrap_u, wrap_v, crop_u, crop_v, frame);
+}
+
 float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
 {
     if (tex == 0)
@@ -171,14 +172,14 @@ float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
     uint array_idx = tex_mappings[tex - 1];
 
     uint2 res;
-    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
+    textures_2d[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y)
     {
         return float4(0, 0, 0, 0);
     }
 
     int mipmapLevel = 0;
-    return textures[NonUniformResourceIndex(array_idx)].Load(int3(coord.xy, mipmapLevel));
+    return textures_2d[NonUniformResourceIndex(array_idx)].Load(int3(coord, mipmapLevel));
 }
 
 float3 tex_texel_float3_2d(uint tex, int2 coord, int2 uv_tile, float frame)
@@ -211,7 +212,7 @@ uint2 tex_resolution_2d(uint tex, int2 uv_tile, float frame)
     uint array_idx = tex_mappings[tex - 1];
 
     uint2 res;
-    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
+    textures_2d[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     return res;
 }
 

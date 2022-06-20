@@ -20,15 +20,22 @@ StructuredBuffer<uint> emissive_face_indices;
 [[vk::binding(4)]]
 StructuredBuffer<fvertex> vertices;
 
-#ifdef HAS_TEXTURES
+#if defined(HAS_TEXTURES_2D) || defined(HAS_TEXTURES_3D)
 [[vk::binding(5)]]
 SamplerState tex_sampler;
 
 [[vk::binding(6)]]
 StructuredBuffer<uint> tex_mappings;
+#endif
 
+#ifdef HAS_TEXTURES_2D
 [[vk::binding(7)]]
-Texture2D textures[TEXTURE_COUNT];
+Texture2D textures_2d[TEXTURE_COUNT_2D];
+#endif
+
+#ifdef HAS_TEXTURES_3D
+[[vk::binding(8)]]
+Texture3D textures_3d[TEXTURE_COUNT_3D];
 #endif
 
 struct PushConstants
