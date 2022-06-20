@@ -46,14 +46,16 @@ float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int 
 
     // TODO: 3d texture
 
+    uint array_idx = tex_mappings[tex - 1];
+
     uint2 res;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
-    return textures[NonUniformResourceIndex(tex - 1)].SampleLevel(tex_sampler, coord.xy, lod, offset);
+    return textures[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord.xy, lod, offset);
 }
 
 float3 tex_lookup_float3_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
@@ -80,14 +82,16 @@ float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, floa
         return float4(0, 0, 0, 0);
     }
 
+    uint array_idx = tex_mappings[tex - 1];
+
     uint2 res;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
-    return textures[NonUniformResourceIndex(tex - 1)].SampleLevel(tex_sampler, coord.xy, lod, offset);
+    return textures[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord.xy, lod, offset);
 }
 
 float3 tex_lookup_float3_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
@@ -124,15 +128,17 @@ float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
 
     // TODO: 3d texture
 
+    uint array_idx = tex_mappings[tex - 1];
+
     uint2 res;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y)
     {
         return float4(0, 0, 0, 0);
     }
 
     int mipmapLevel = 0;
-    return textures[NonUniformResourceIndex(tex - 1)].Load(int3(coord.xy, mipmapLevel));
+    return textures[NonUniformResourceIndex(array_idx)].Load(int3(coord.xy, mipmapLevel));
 }
 
 float3 tex_texel_float3_3d(uint tex, int3 coord, float frame)
@@ -162,15 +168,17 @@ float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
         return float4(0, 0, 0, 0);
     }
 
+    uint array_idx = tex_mappings[tex - 1];
+
     uint2 res;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y)
     {
         return float4(0, 0, 0, 0);
     }
 
     int mipmapLevel = 0;
-    return textures[NonUniformResourceIndex(tex - 1)].Load(int3(coord.xy, mipmapLevel));
+    return textures[NonUniformResourceIndex(array_idx)].Load(int3(coord.xy, mipmapLevel));
 }
 
 float3 tex_texel_float3_2d(uint tex, int2 coord, int2 uv_tile, float frame)
@@ -200,8 +208,10 @@ uint2 tex_resolution_2d(uint tex, int2 uv_tile, float frame)
         return uint2(0, 0);
     }
 
+    uint array_idx = tex_mappings[tex - 1];
+
     uint2 res;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    textures[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     return res;
 }
 

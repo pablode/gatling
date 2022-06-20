@@ -22,10 +22,13 @@ StructuredBuffer<fvertex> vertices;
 
 #ifdef HAS_TEXTURES
 [[vk::binding(5)]]
-Texture2D textures[TEXTURE_COUNT];
+SamplerState tex_sampler;
 
 [[vk::binding(6)]]
-SamplerState tex_sampler;
+StructuredBuffer<uint> tex_mappings;
+
+[[vk::binding(7)]]
+Texture2D textures[TEXTURE_COUNT];
 #endif
 
 struct PushConstants

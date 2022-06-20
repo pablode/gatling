@@ -64,6 +64,7 @@ struct gi_shader_cache
   bool                    nee_enabled;
   bool                    bvh_enabled;
   std::vector<cgpu_image> images;
+  cgpu_buffer             image_mappings;
 };
 
 struct gi_material
@@ -338,14 +339,26 @@ void giDestroyGeomCache(gi_geom_cache* cache)
 }
 
 bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
-                   std::vector<cgpu_image>& images)
+                   std::vector<cgpu_image>& images,
+                   cgpu_buffer& imageMappingBuffer)
 {
   uint32_t texCount = textureResources.size();
 
+  if (texCount == 0)
+  {
+    return true;
+  }
+
+  std::vector<uint32_t> imageMappings;
+  imageMappings.reserve(texCount);
+
+  bool result;
+
   for (int i = 0; i < texCount; i++)
   {
-    bool result;
     cgpu_image image = { CGPU_INVALID_HANDLE };
+
+    imageMappings.push_back(i);
 
     cgpu_image_description image_desc;
     image_desc.is3d = false;
@@ -411,6 +424,19 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
 
     images.push_back(image);
   }
+
+  uint64_t imageMappingsSize = imageMappings.size() * sizeof(uint32_t);
+  result = cgpu_create_buffer(
+    s_device,
+    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+    imageMappingsSize,
+    &imageMappingBuffer
+  ) == CGPU_OK;
+  if (!result) return false;
+
+  result = s_stager->stageToBuffer((uint8_t*) imageMappings.data(), imageMappingsSize, imageMappingBuffer, 0);
+  if (!result) return false;
 
   return s_stager->flush();
 }
@@ -485,9 +511,11 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   }
 
   std::vector<cgpu_image> images;
-  if (!giStageImages(mainShader.textureResources, images))
+  cgpu_buffer imageMappingBuffer = { CGPU_INVALID_HANDLE };
+  if (!giStageImages(mainShader.textureResources, images, imageMappingBuffer))
   {
     giDestroyUncachedImages(images);
+    cgpu_destroy_buffer(s_device, imageMappingBuffer);
     cgpu_destroy_shader(s_device, shader);
     cgpu_destroy_pipeline(s_device, pipeline);
     return nullptr;
@@ -500,6 +528,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   cache->nee_enabled = nee_enabled;
   cache->bvh_enabled = bvh_enabled;
   cache->images = std::move(images);
+  cache->image_mappings = imageMappingBuffer;
 
   return cache;
 }
@@ -507,6 +536,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 void giDestroyShaderCache(gi_shader_cache* cache)
 {
   giDestroyUncachedImages(cache->images);
+  cgpu_destroy_buffer(s_device, cache->image_mappings);
   cgpu_destroy_shader(s_device, cache->shader);
   cgpu_destroy_pipeline(s_device, cache->pipeline);
   delete cache;
@@ -600,12 +630,17 @@ int giRender(const gi_render_params* params,
   std::vector<cgpu_image_binding> images;
   images.reserve(texCount);
 
-  for (uint32_t i = 0; i < texCount; i++)
+  cgpu_sampler_binding sampler = { 5, 0, s_tex_sampler };
+
+  if (texCount > 0)
   {
-    images.push_back({ 5, i, shader_cache->images[i] });
+    buffers.push_back({ 6, 0, shader_cache->image_mappings, 0, CGPU_WHOLE_SIZE });
   }
 
-  cgpu_sampler_binding sampler = { 6, 0, s_tex_sampler };
+  for (uint32_t i = 0; i < texCount; i++)
+  {
+    images.push_back({ 7, i, shader_cache->images[i] });
+  }
 
   cgpu_bindings bindings= {
     (uint32_t) buffers.size(), buffers.data(),
