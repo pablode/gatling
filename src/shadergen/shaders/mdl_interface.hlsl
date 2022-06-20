@@ -46,10 +46,10 @@ float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int 
 
     // TODO: 3d texture
 
-    uint width, height;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
-    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, width);
-    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, height);
+    uint2 res;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
+    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
@@ -80,10 +80,10 @@ float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, floa
         return float4(0, 0, 0, 0);
     }
 
-    uint width, height;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
-    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, width);
-    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, height);
+    uint2 res;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
+    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
@@ -124,9 +124,9 @@ float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
 
     // TODO: 3d texture
 
-    uint width, height;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
-    if (coord.x < 0 || coord.x >= width || coord.y < 0 || coord.y >= height)
+    uint2 res;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y)
     {
         return float4(0, 0, 0, 0);
     }
@@ -162,9 +162,9 @@ float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
         return float4(0, 0, 0, 0);
     }
 
-    uint width, height;
-    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(width, height);
-    if (coord.x < 0 || coord.x >= width || coord.y < 0 || coord.y >= height)
+    uint2 res;
+    textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
+    if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y)
     {
         return float4(0, 0, 0, 0);
     }
@@ -200,7 +200,7 @@ uint2 tex_resolution_2d(uint tex, int2 uv_tile, float frame)
         return uint2(0, 0);
     }
 
-    uint2 res = uint2(0, 0);
+    uint2 res;
     textures[NonUniformResourceIndex(tex - 1)].GetDimensions(res.x, res.y);
     return res;
 }
