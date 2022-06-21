@@ -348,16 +348,17 @@ void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3
         }
     }
 
-    uint gs_idx = local_pixel_pos.x + local_pixel_pos.y * NUM_THREADS_X;
-    gs_reorder[gs_idx] = pixel_color;
+    gs_reorder[group_index] = pixel_color;
 
     GroupMemoryBarrierWithGroupSync();
 
-    uint2 new_pixel_pos = group_base_pixel_pos + group_thread_id.xy;
+    uint2 new_local_pixel_pos = group_thread_id.xy;
+    uint2 new_pixel_pos = group_base_pixel_pos + new_local_pixel_pos;
 
     if (new_pixel_pos.x < PC.IMAGE_WIDTH && new_pixel_pos.y < PC.IMAGE_HEIGHT)
     {
-        float4 new_pixel_color = float4(gs_reorder[group_index], 1.0);
+        uint gs_idx = MORTON_2D_LUT_32x8_REV[new_local_pixel_pos.x + new_local_pixel_pos.y * NUM_THREADS_X];
+        float4 new_pixel_color = float4(gs_reorder[gs_idx], 1.0);
         uint new_pixel_index = new_pixel_pos.x + new_pixel_pos.y * PC.IMAGE_WIDTH;
         pixels[new_pixel_index] = new_pixel_color;
     }
