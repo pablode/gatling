@@ -294,8 +294,8 @@ groupshared float3 gs_reorder[NUM_THREADS_X * NUM_THREADS_Y];
 void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3 group_thread_id : SV_GroupThreadID)
 {
     // Remap to Morton order within workgroup.
-    uint morton_code = MORTON_2D_LUT_32x8[group_index];
-    uint2 local_pixel_pos = uint2(morton_code >> 16, morton_code & 0xFFFF);
+    uint morton_code = uint(MORTON_2D_LUT_32x8[group_index]);
+    uint2 local_pixel_pos = uint2(morton_code >> 8, morton_code & 0xFF);
     uint2 group_base_pixel_pos = uint2(group_id.x * NUM_THREADS_X, group_id.y * NUM_THREADS_Y);
     uint2 pixel_pos = group_base_pixel_pos + local_pixel_pos;
 
@@ -357,7 +357,7 @@ void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3
 
     if (new_pixel_pos.x < PC.IMAGE_WIDTH && new_pixel_pos.y < PC.IMAGE_HEIGHT)
     {
-        uint gs_idx = MORTON_2D_LUT_32x8_REV[new_local_pixel_pos.x + new_local_pixel_pos.y * NUM_THREADS_X];
+        uint gs_idx = uint(MORTON_2D_LUT_32x8_REV[new_local_pixel_pos.x + new_local_pixel_pos.y * NUM_THREADS_X]);
         float4 new_pixel_color = float4(gs_reorder[gs_idx], 1.0);
         uint new_pixel_index = new_pixel_pos.x + new_pixel_pos.y * PC.IMAGE_WIDTH;
         pixels[new_pixel_index] = new_pixel_color;
