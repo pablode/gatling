@@ -8,13 +8,13 @@
 #
 
 find_path(DXC_INCLUDE_DIRS
-  NAMES dxcapi.h
-  PATH_SUFFIXES inc
+  NAMES dxc/dxcapi.h
+  PATH_SUFFIXES inc include
   HINTS ${DXC_ROOT})
 
 find_library(DXC_LIBRARIES
   NAMES dxcompiler
-  PATH_SUFFIXES lib/x64
+  PATH_SUFFIXES lib/x64 lib
   HINTS ${DXC_ROOT})
 
 include(FindPackageHandleStandardArgs)

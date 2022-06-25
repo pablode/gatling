@@ -22,7 +22,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <atlbase.h>
-#include <dxcapi.h>
+#include <dxc/dxcapi.h>
 
 namespace sg
 {

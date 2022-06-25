@@ -33,7 +33,8 @@ if(${GATLING_BUILD_HDGATLING})
 endif()
 find_package(MDL REQUIRED)
 
-if(${GATLING_USE_DXC})
+if(NOT ${GATLING_USE_GLSLANG})
+  set(DXC_ROOT "$ENV{VULKAN_SDK}")
   find_package(DXC REQUIRED)
 endif()
 
