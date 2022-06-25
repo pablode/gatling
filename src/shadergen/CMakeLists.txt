@@ -20,10 +20,10 @@ add_library(
   src/MdlRuntime.cpp
 )
 
-if(${GATLING_USE_DXC})
-  target_sources(shadergen PRIVATE src/DxcShaderCompiler.h src/DxcShaderCompiler.cpp)
-else()
+if(${GATLING_USE_GLSLANG})
   target_sources(shadergen PRIVATE src/GlslangShaderCompiler.h src/GlslangShaderCompiler.cpp)
+else()
+  target_sources(shadergen PRIVATE src/DxcShaderCompiler.h src/DxcShaderCompiler.cpp)
 endif()
 
 set_target_properties(
@@ -50,11 +50,11 @@ target_link_libraries(
     MaterialXGenMdl
 )
 
-if(${GATLING_USE_DXC})
-  target_link_libraries(shadergen PRIVATE DXC)
-  target_compile_definitions(shadergen PRIVATE GATLING_USE_DXC)
-else()
+if(${GATLING_USE_GLSLANG})
   target_link_libraries(shadergen PRIVATE shaderc shaderc_util)
+  target_compile_definitions(shadergen PRIVATE GATLING_USE_GLSLANG)
+else()
+  target_link_libraries(shadergen PRIVATE DXC)
 endif()
 
 install(

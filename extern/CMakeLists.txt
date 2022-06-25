@@ -48,7 +48,7 @@ add_subdirectory(VulkanMemoryAllocator)
 #
 # shaderc dependencies. The revisions are taken from the repo/DEPS.
 #
-if(NOT ${GATLING_USE_DXC})
+if(${GATLING_USE_GLSLANG})
 
 # SPIRV-Headers
 set(SPIRV_HEADERS_SKIP_EXAMPLES ON)

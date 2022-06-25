@@ -24,7 +24,10 @@ endforeach()
 
 option(GATLING_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
 option(GATLING_USE_EMBREE "Use Embree for BVH building." ON)
-option(GATLING_USE_DXC "Use DXC instead of glslang" OFF)
+# Currently, glslang lacks support for 16-bit integers and it fails to compile
+# HLSL code generated from the MDL SDK. We leave the infrastructure for this
+# alternative compiler in place, since these issues could get fixed some time.
+option(GATLING_USE_GLSLANG "Use glslang instead of DXC" OFF)
 
 find_package(Vulkan REQUIRED)
 if(${GATLING_BUILD_HDGATLING})

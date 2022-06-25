@@ -22,10 +22,10 @@
 #include "MdlMaterialCompiler.h"
 #include "MdlHlslCodeGen.h"
 
-#ifdef GATLING_USE_DXC
-#include "DxcShaderCompiler.h"
-#else
+#ifdef GATLING_USE_GLSLANG
 #include "GlslangShaderCompiler.h"
+#else
+#include "DxcShaderCompiler.h"
 #endif
 
 #include <string>
@@ -61,10 +61,10 @@ namespace sg
 
     m_mdlMaterialCompiler = new sg::MdlMaterialCompiler(*m_mdlRuntime);
 
-  #ifdef GATLING_USE_DXC
-    m_shaderCompiler = new sg::DxcShaderCompiler(m_shaderPath);
-  #else
+  #ifdef GATLING_USE_GLSLANG
     m_shaderCompiler = new sg::GlslangShaderCompiler(m_shaderPath);
+  #else
+    m_shaderCompiler = new sg::DxcShaderCompiler(m_shaderPath);
   #endif
     if (!m_shaderCompiler->init())
     {
