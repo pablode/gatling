@@ -19,6 +19,25 @@
 
 #include <cassert>
 
+// Code from DXC's WinAdapter.cpp to fix linker error.
+// Licensed under the University of Illinois Open Source License.
+const char *CPToLocale(uint32_t CodePage) {
+#ifdef __APPLE__
+  static const char *utf8 = "en_US.UTF-8";
+  static const char *iso88591 = "en_US.ISO8859-1";
+#else
+  static const char *utf8 = "en_US.utf8";
+  static const char *iso88591 = "en_US.iso88591";
+#endif
+  if (CodePage == CP_UTF8) {
+    return utf8;
+  } else if (CodePage == CP_ACP) {
+    // Experimentation suggests that ACP is expected to be ISO-8859-1
+    return iso88591;
+  }
+  return nullptr;
+}
+
 namespace sg
 {
   DxcShaderCompiler::DxcShaderCompiler(std::string_view shaderPath)
@@ -48,10 +67,14 @@ namespace sg
 
   std::wstring _convertCStrToWString(const char* cStr)
   {
-    int wstrLen = MultiByteToWideChar(CP_UTF8, 0, cStr, -1, nullptr, 0);
     std::wstring wstr;
+#ifdef _WIN32
+    int wstrLen = MultiByteToWideChar(CP_UTF8, 0, cStr, -1, nullptr, 0);
     wstr.resize(wstrLen, L' ');
     MultiByteToWideChar(CP_UTF8, 0, cStr, -1, wstr.data(), wstr.size());
+#else
+    wstr = CA2WEX(cStr);
+#endif
     return wstr;
   }
 
@@ -98,8 +121,12 @@ namespace sg
       return false;
     }
 
-    CComPtr<IDxcBlobUtf8> errorMsgBlob;
+#ifdef _WIN32
     CComPtr<IDxcBlobUtf16> outputName;
+#else
+    CComPtr<IDxcBlobWide> outputName;
+#endif
+    CComPtr<IDxcBlobUtf8> errorMsgBlob;
     if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errorMsgBlob), &outputName)))
     {
       if (errorMsgBlob && errorMsgBlob->GetStringLength() > 0)

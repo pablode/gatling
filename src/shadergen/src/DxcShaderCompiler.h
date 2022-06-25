@@ -19,9 +19,14 @@
 
 #include "IShaderCompiler.h"
 
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <atlbase.h>
+#elif defined(__APPLE__)
+#define __EMULATE_UUID 1
+#endif
+
 #include <dxc/dxcapi.h>
 
 namespace sg

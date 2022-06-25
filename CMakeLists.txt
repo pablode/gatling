@@ -24,7 +24,7 @@ endforeach()
 
 option(GATLING_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
 option(GATLING_USE_EMBREE "Use Embree for BVH building." ON)
-cmake_dependent_option(GATLING_USE_DXC "Use DXC instead of glslang" OFF WIN32 OFF)
+option(GATLING_USE_DXC "Use DXC instead of glslang" OFF)
 
 find_package(Vulkan REQUIRED)
 if(${GATLING_BUILD_HDGATLING})
