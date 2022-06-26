@@ -55,7 +55,7 @@ struct PushConstants
 };
 
 // Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
-#if defined(_DXC)
+#ifdef __hlsl_dx_compiler
 [[vk::push_constant]] PushConstants PC;
 #else
 [[vk::push_constant]] ConstantBuffer<PushConstants> PC;
