@@ -48,7 +48,7 @@ namespace sg
     m_shaderPath = std::string(params.shaderPath);
 
     m_mdlRuntime = new sg::MdlRuntime();
-    if (!m_mdlRuntime->init(params.resourcePath.data(), params.mtlxmdlPath.data()))
+    if (!m_mdlRuntime->init(params.resourcePath.data(), params.mdlLibPath.data()))
     {
       return false;
     }
@@ -71,7 +71,7 @@ namespace sg
       return false;
     }
 
-    m_mtlxMdlCodeGen = new sg::MtlxMdlCodeGen(params.mtlxlibPath.data());
+    m_mtlxMdlCodeGen = new sg::MtlxMdlCodeGen(params.mtlxLibPath.data());
 
     return true;
   }

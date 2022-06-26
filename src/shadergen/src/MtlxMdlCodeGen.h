@@ -29,13 +29,13 @@ namespace sg
   class MtlxMdlCodeGen
   {
   public:
-    explicit MtlxMdlCodeGen(const char* mtlxlibPath);
+    explicit MtlxMdlCodeGen(const char* mtlxLibPath);
 
   public:
     bool translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier);
 
   private:
-    const MaterialX::FileSearchPath m_mtlxlibPath;
+    const MaterialX::FileSearchPath m_mtlxLibPath;
     MaterialX::DocumentPtr m_stdLib;
     MaterialX::ShaderGeneratorPtr m_shaderGen;
   };

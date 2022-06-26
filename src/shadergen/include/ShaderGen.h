@@ -44,8 +44,8 @@ namespace sg
     {
       std::string_view resourcePath;
       std::string_view shaderPath;
-      std::string_view mtlxlibPath;
-      std::string_view mtlxmdlPath;
+      std::string_view mtlxLibPath;
+      std::string_view mdlLibPath;
     };
 
     struct MainShaderResult

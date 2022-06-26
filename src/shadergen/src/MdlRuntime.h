@@ -41,7 +41,7 @@ namespace sg
 
   public:
     bool init(const char* resourcePath,
-              const char* mtlxmdlPath);
+              const char* mdlLibPath);
 
     mi::base::Handle<MdlLogger> getLogger();
     mi::base::Handle<mi::neuraylib::IDatabase> getDatabase();

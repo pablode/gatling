@@ -37,16 +37,16 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 
   const std::string& resourcePath = plugin->GetResourcePath();
   std::string shaderPath = resourcePath + "/shaders";
-  std::string mtlxmdlPath = resourcePath + "/mtlxmdl";
-  std::string mtlxlibPath = resourcePath + "/mtlxlib";
+  std::string mdlLibPath = resourcePath + "/mdl";
+  std::string mtlxLibPath = resourcePath + "/materialx";
 
-  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxlibPath);
+  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxLibPath);
 
   gi_init_params params;
   params.resource_path = resourcePath.c_str();
   params.shader_path = shaderPath.c_str();
-  params.mtlxlib_path = mtlxlibPath.c_str();
-  params.mtlxmdl_path = mtlxmdlPath.c_str();
+  params.mtlx_lib_path = mtlxLibPath.c_str();
+  params.mdl_lib_path = mdlLibPath.c_str();
 
   int initResult = giInitialize(&params);
 

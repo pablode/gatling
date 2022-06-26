@@ -115,8 +115,8 @@ int giInitialize(const gi_init_params* params)
   sg::ShaderGen::InitParams sgParams;
   sgParams.resourcePath = params->resource_path;
   sgParams.shaderPath = params->shader_path;
-  sgParams.mtlxlibPath = params->mtlxlib_path;
-  sgParams.mtlxmdlPath = params->mtlxmdl_path;
+  sgParams.mtlxLibPath = params->mtlx_lib_path;
+  sgParams.mdlLibPath = params->mdl_lib_path;
 
   s_shaderGen = std::make_unique<sg::ShaderGen>();
   if (!s_shaderGen->init(sgParams))

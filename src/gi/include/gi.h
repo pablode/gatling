@@ -104,8 +104,8 @@ struct gi_init_params
 {
   const char* resource_path;
   const char* shader_path;
-  const char* mtlxlib_path;
-  const char* mtlxmdl_path;
+  const char* mtlx_lib_path;
+  const char* mdl_lib_path;
 };
 
 int giInitialize(const struct gi_init_params* params);

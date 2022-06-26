@@ -25,16 +25,15 @@ endif()
 
 install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/MaterialX/source/MaterialXGenMdl/mdl/materialx"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mtlxmdl"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mdl"
   COMPONENT hdGatling
 )
 
 install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/MaterialX/libraries/"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mtlxlib"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/materialx"
   COMPONENT hdGatling
   FILES_MATCHING
-  PATTERN "*.mdl"
   PATTERN "*.mtlx"
 )
 

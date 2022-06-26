@@ -35,8 +35,8 @@ namespace mx = MaterialX;
 
 namespace sg
 {
-  MtlxMdlCodeGen::MtlxMdlCodeGen(const char* mtlxlibPath)
-    : m_mtlxlibPath(mtlxlibPath)
+  MtlxMdlCodeGen::MtlxMdlCodeGen(const char* mtlxLibPath)
+    : m_mtlxLibPath(mtlxLibPath)
   {
     // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
@@ -45,7 +45,7 @@ namespace sg
     // MaterialX libs.
     m_stdLib = mx::createDocument();
     mx::FilePathVec libFolders;
-    mx::loadLibraries(libFolders, m_mtlxlibPath, m_stdLib);
+    mx::loadLibraries(libFolders, m_mtlxLibPath, m_stdLib);
 
     // Color management.
     mx::DefaultColorManagementSystemPtr colorSystem = mx::DefaultColorManagementSystem::create(target);
@@ -103,7 +103,7 @@ namespace sg
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
-    context.registerSourceCodeSearchPath(m_mtlxlibPath);
+    context.registerSourceCodeSearchPath(m_mtlxLibPath);
 
     mx::GenOptions& contextOptions = context.getOptions();
     contextOptions.targetDistanceUnit = "meter";

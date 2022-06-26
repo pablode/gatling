@@ -39,7 +39,7 @@ namespace sg
   }
 
   bool MdlRuntime::init(const char* resourcePath,
-                        const char* mtlxmdlPath)
+                        const char* mdlLibPath)
   {
     m_loader = std::make_unique<MdlNeurayLoader>();
     if (!m_loader->init(resourcePath))
@@ -53,9 +53,9 @@ namespace sg
     m_logger = mi::base::Handle<MdlLogger>(new MdlLogger());
     m_config->set_logger(m_logger.get());
 
-    if (m_config->add_mdl_path(mtlxmdlPath))
+    if (m_config->add_mdl_path(mdlLibPath))
     {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MaterialX MDL file path not found");
+      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MDL library files not found");
       return false;
     }
 
