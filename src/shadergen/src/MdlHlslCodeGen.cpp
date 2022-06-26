@@ -156,9 +156,19 @@ namespace sg
       switch (targetCode->get_texture_shape(i))
       {
       case mi::neuraylib::ITarget_code::Texture_shape_2d: {
-        textureResource.width = image->resolution_x(frameId, uvTileId, level);
-        textureResource.height = image->resolution_y(frameId, uvTileId, level);
-        textureResource.filePath = image->get_filename(frameId, uvTileId);
+        uint32_t width = image->resolution_x(frameId, uvTileId, level);
+        uint32_t height = image->resolution_y(frameId, uvTileId, level);
+
+        textureResource.width = width;
+        textureResource.height = height;
+
+        const char* filePath = image->get_filename(frameId, uvTileId);
+        if (filePath) {
+          textureResource.filePath = filePath;
+        }
+        else {
+          textureResource.data.resize(4, 0);
+        }
         break;
       }
       case mi::neuraylib::ITarget_code::Texture_shape_bsdf_data: {
@@ -189,7 +199,6 @@ namespace sg
       case mi::neuraylib::ITarget_code::Texture_shape_invalid:
       default:
         m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Unknown texture type");
-        assert(false);
         return false;
       }
 
