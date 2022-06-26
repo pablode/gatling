@@ -30,9 +30,11 @@ namespace sg
 
   struct TextureResource
   {
+    bool is3dImage;
     uint32_t binding;
     uint32_t width;
     uint32_t height;
+    uint32_t depth;
     std::vector<uint8_t> data;
     std::string filePath;
   };

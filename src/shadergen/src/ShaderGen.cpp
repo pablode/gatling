@@ -209,11 +209,21 @@ namespace sg
     ss << std::showpoint;
     ss << std::setprecision(std::numeric_limits<float>::digits10);
 
-    int textureCount = result.textureResources.size();
-    if (textureCount > 0)
+    int textureCount2d = 0;
+    int textureCount3d = 0;
+    for (auto& texResource : result.textureResources)
+    {
+      (texResource.is3dImage ? textureCount3d : textureCount2d)++;
+    }
+    if (textureCount2d > 0)
     {
       ss << "#define HAS_TEXTURES_2D\n";
-      ss << "#define TEXTURE_COUNT_2D " << textureCount << "\n";
+      ss << "#define TEXTURE_COUNT_2D " << textureCount2d << "\n";
+    }
+    if (textureCount3d > 0)
+    {
+      ss << "#define HAS_TEXTURES_3D\n";
+      ss << "#define TEXTURE_COUNT_3D " << textureCount3d << "\n";
     }
 
 #if !defined(NDEBUG) && !defined(__APPLE__)

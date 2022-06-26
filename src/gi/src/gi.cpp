@@ -63,7 +63,8 @@ struct gi_shader_cache
   cgpu_pipeline           pipeline;
   bool                    nee_enabled;
   bool                    bvh_enabled;
-  std::vector<cgpu_image> images;
+  std::vector<cgpu_image> images_2d;
+  std::vector<cgpu_image> images_3d;
   cgpu_buffer             image_mappings;
 };
 
@@ -344,7 +345,8 @@ void giDestroyGeomCache(gi_geom_cache* cache)
 }
 
 bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
-                   std::vector<cgpu_image>& images,
+                   std::vector<cgpu_image>& images_2d,
+                   std::vector<cgpu_image>& images_3d,
                    cgpu_buffer& imageMappingBuffer)
 {
   uint32_t texCount = textureResources.size();
@@ -356,6 +358,8 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
 
   std::vector<uint16_t> imageMappings;
   imageMappings.reserve(texCount);
+  images_2d.reserve(texCount);
+  images_3d.reserve(texCount);
 
   bool result;
 
@@ -363,20 +367,22 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
   {
     cgpu_image image = { CGPU_INVALID_HANDLE };
 
-    imageMappings.push_back(i);
+    auto& textureResource = textureResources[i];
+    auto& payload = textureResource.data;
 
     cgpu_image_description image_desc;
-    image_desc.is3d = false;
+    image_desc.is3d = textureResource.is3dImage;
     image_desc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
     image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
-    auto& textureResource = textureResources[i];
-    auto& payload = textureResource.data;
+    auto& imageVector = image_desc.is3d ? images_3d : images_2d;
+    imageMappings.push_back(imageVector.size());
 
     if (payload.size() > 0)
     {
       image_desc.width = textureResource.width;
       image_desc.height = textureResource.height;
+      image_desc.depth = textureResource.depth;
 
       result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
       if (!result) return false;
@@ -384,7 +390,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
       result = s_stager->stageToImage(payload.data(), payload.size(), image);
       if (!result) return false;
 
-      images.push_back(image);
+      imageVector.push_back(image);
       continue;
     }
 
@@ -393,7 +399,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     auto cacheResult = s_imageCache.find(filePath);
     if (cacheResult != s_imageCache.end())
     {
-      images.push_back(cacheResult->second);
+      imageVector.push_back(cacheResult->second);
       continue;
     }
 
@@ -402,6 +408,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     {
       image_desc.width = image_data.width;
       image_desc.height = image_data.height;
+      image_desc.depth = 1;
 
       result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
       if (!result) return false;
@@ -413,12 +420,13 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
 
       s_imageCache[filePath] = image;
 
-      images.push_back(image);
+      imageVector.push_back(image);
       continue;
     }
 
     image_desc.width = 1;
     image_desc.height = 1;
+    image_desc.depth = 1;
 
     result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
     if (!result) return false;
@@ -427,7 +435,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     result = s_stager->stageToImage(black, 4, image);
     if (!result) return false;
 
-    images.push_back(image);
+    imageVector.push_back(image);
   }
 
   assert(imageMappings.size() < UINT16_MAX);
@@ -517,12 +525,14 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     return nullptr;
   }
 
-  std::vector<cgpu_image> images;
+  std::vector<cgpu_image> images_2d;
+  std::vector<cgpu_image> images_3d;
   cgpu_buffer imageMappingBuffer = { CGPU_INVALID_HANDLE };
-  if (!giStageImages(mainShader.textureResources, images, imageMappingBuffer))
+  if (!giStageImages(mainShader.textureResources, images_2d, images_3d, imageMappingBuffer))
   {
-    giDestroyUncachedImages(images);
     cgpu_destroy_buffer(s_device, imageMappingBuffer);
+    giDestroyUncachedImages(images_2d);
+    giDestroyUncachedImages(images_3d);
     cgpu_destroy_shader(s_device, shader);
     cgpu_destroy_pipeline(s_device, pipeline);
     return nullptr;
@@ -534,7 +544,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   cache->pipeline = pipeline;
   cache->nee_enabled = nee_enabled;
   cache->bvh_enabled = bvh_enabled;
-  cache->images = std::move(images);
+  cache->images_2d = std::move(images_2d);
+  cache->images_3d = std::move(images_3d);
   cache->image_mappings = imageMappingBuffer;
 
   return cache;
@@ -542,7 +553,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
 void giDestroyShaderCache(gi_shader_cache* cache)
 {
-  giDestroyUncachedImages(cache->images);
+  giDestroyUncachedImages(cache->images_2d);
+  giDestroyUncachedImages(cache->images_3d);
   cgpu_destroy_buffer(s_device, cache->image_mappings);
   cgpu_destroy_shader(s_device, cache->shader);
   cgpu_destroy_pipeline(s_device, cache->pipeline);
@@ -632,27 +644,32 @@ int giRender(const gi_render_params* params,
   }
   buffers.push_back({ 4, 0, geom_cache->buffer, geom_cache->vertex_buf_offset, geom_cache->vertex_buf_size });
 
-  uint32_t texCount = shader_cache->images.size();
+  uint32_t image_count = shader_cache->images_2d.size() + shader_cache->images_3d.size();
 
   std::vector<cgpu_image_binding> images;
-  images.reserve(texCount);
+  images.reserve(image_count);
 
   cgpu_sampler_binding sampler = { 5, 0, s_tex_sampler };
 
-  if (texCount > 0)
+  if (image_count > 0)
   {
     buffers.push_back({ 6, 0, shader_cache->image_mappings, 0, CGPU_WHOLE_SIZE });
   }
 
-  for (uint32_t i = 0; i < texCount; i++)
+  for (uint32_t i = 0; i < shader_cache->images_2d.size(); i++)
   {
-    images.push_back({ 7, i, shader_cache->images[i] });
+    images.push_back({ 7, i, shader_cache->images_2d[i] });
+  }
+
+  for (uint32_t i = 0; i < shader_cache->images_3d.size(); i++)
+  {
+    images.push_back({ 8, i, shader_cache->images_3d[i] });
   }
 
   cgpu_bindings bindings= {
     (uint32_t) buffers.size(), buffers.data(),
     (uint32_t) images.size(), images.data(),
-    (uint32_t) (texCount ? 1 : 0), &sampler
+    (uint32_t) (image_count ? 1 : 0), &sampler
   };
 
   // Set up command buffer.

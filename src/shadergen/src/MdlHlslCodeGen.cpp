@@ -159,8 +159,10 @@ namespace sg
         uint32_t width = image->resolution_x(frameId, uvTileId, level);
         uint32_t height = image->resolution_y(frameId, uvTileId, level);
 
+        textureResource.is3dImage = false;
         textureResource.width = width;
         textureResource.height = height;
+        textureResource.depth = 1;
 
         const char* filePath = image->get_filename(frameId, uvTileId);
         if (filePath) {
@@ -172,19 +174,19 @@ namespace sg
         break;
       }
       case mi::neuraylib::ITarget_code::Texture_shape_bsdf_data: {
-        mi::base::Handle<const mi::neuraylib::ICanvas> canvas(image->get_canvas(frameId, uvTileId, level));
-        assert(canvas);
+        mi::Size width, height, depth;
+        const mi::Float32* dataPtr = targetCode->get_texture_df_data(i, width, height, depth);
+        assert(dataPtr);
 
-        textureResource.width = canvas->get_resolution_x();
-        textureResource.height = canvas->get_resolution_y();
-        assert(canvas->get_layers_size() == 1);
+        textureResource.is3dImage = true;
+        textureResource.width = width;
+        textureResource.height = height;
+        textureResource.depth = depth;
 
-        size_t size = textureResource.width * textureResource.height * 4;
-        mi::base::Handle<const mi::neuraylib::ITile> tile(canvas->get_tile(0));
-
+        uint64_t size = width * height * depth * sizeof(mi::Float32);
         std::vector<uint8_t>& data = textureResource.data;
         data.resize(size);
-        memcpy(&data[0], tile->get_data(), data.size());
+        memcpy(&data[0], dataPtr, data.size());
         break;
       }
       case mi::neuraylib::ITarget_code::Texture_shape_3d:
