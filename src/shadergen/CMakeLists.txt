@@ -74,3 +74,12 @@ install(
   COMPONENT
     hdGatling
 )
+
+install(
+  DIRECTORY
+    "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
+  DESTINATION
+    "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mdl"
+  COMPONENT
+    hdGatling
+)

@@ -1,0 +1,870 @@
+/***************************************************************************************************
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **************************************************************************************************/
+
+
+mdl 1.4;
+import ::df::*;
+import ::state::*;
+import ::math::*;
+import ::base::*;
+import ::tex::*;
+import ::anno::*;
+
+import ::nvidia::core_definitions::file_texture;
+import ::nvidia::core_definitions::normalmap_texture;
+
+
+uniform float4x4 rotation_translation_scale(
+    uniform float3 rotation = float3(0.)
+        [[ anno::description("Rotation applied to every UVW coordinate") ]],
+    uniform float3 translation = float3(0.)
+        [[ anno::description("Offset applied to every UVW coordinate") ]],
+    uniform float3 scaling = float3(1.)
+        [[ anno::description("Scale applied to every UVW coordinate") ]]
+)
+[[
+    anno::description("Construct transformation matrix from Euler rotation, translation and scale"),
+    anno::hidden()
+]]
+{
+    float4x4 scale =
+        float4x4(scaling.x        , 0.               , 0.               , 0.,
+                 0.               , scaling.y        , 0.               , 0.,
+                 0.               , 0.               , scaling.z        , 0.,
+                 translation.x, translation.y, translation.z, 1.);
+
+    float3 s = math::sin(rotation);
+    float3 c = math::cos(rotation);
+    float4x4 rotate =
+        float4x4(  c.y*c.z ,  -c.x*s.z + s.x*s.y*c.z ,  s.x*s.z + c.x*s.y*c.z , 0.0,
+                   c.y*s.z ,   c.x*c.z + s.x*s.y*s.z , -s.x*c.z + c.x*s.y*s.z , 0.0,
+                  -s.y     ,   s.x*c.y               ,  c.x*c.y               , 0.0,
+                   0.     ,   0                   ,  0                   , 1.);
+
+    return   scale*rotate;
+}
+
+// Returns the normal n in tangent space, given n is in internal space.
+float3 transform_internal_to_tangent(float3 n)
+{
+	/* flip_tangent_v */
+    return
+        n.x* float3(state::texture_tangent_u(0).x,-state::texture_tangent_v(0).x,state::normal().x)+
+        n.y* float3(state::texture_tangent_u(0).y,-state::texture_tangent_v(0).y,state::normal().y)+
+        n.z* float3(state::texture_tangent_u(0).z,-state::texture_tangent_v(0).z,state::normal().z);
+}
+
+// Returns the normal n in internal space, given n is in tangent space.
+float3 transform_tangent_to_internal(float3 n)
+{
+    return  state::texture_tangent_u(0) * n.x -
+            state::texture_tangent_v(0) * n.y + /* flip_tangent_v */
+            state::normal() * n.z ;
+}
+
+// Returns a normal by adding a detail normal to a global normal.
+export float3 add_detail_normal(float3 nd = state::normal(), float3 n = state::normal())
+{
+    // http://blog.selfshadow.com/publications/blending-in-detail/
+    float3 n_t = transform_internal_to_tangent(n);
+    float3 nd_t = transform_internal_to_tangent(nd);
+
+    n_t=n_t + float3(0.,0.,1.);
+    nd_t = nd_t *  float3(-1.,-1.,1.);
+
+    n = n_t*math::dot(n_t, nd_t)/n_t.z - nd_t;
+    return math::normalize(transform_tangent_to_internal(n));
+}
+
+
+base::texture_return multiply_colors(
+    color color_1 = color(1.0, 1.0, 1.0),
+    color color_2 = color(.5, .5, .5),
+	float weight  = 1.0
+) [[ 
+    anno::hidden() 
+]]
+{
+    return base::blend_color_layers(
+                layers: base::color_layer[](
+                    base::color_layer(
+                        layer_color:    color_2,
+                        weight:         weight,
+                        mode:           base::color_layer_multiply
+                        )),
+                base: color_1
+    );
+}
+
+
+base::texture_return add_colors(
+    color color_1 = color(.5, .5, .5),
+    color color_2 = color(.5, .5, .5),
+	float weight  = 1.0
+) [[ 
+    anno::hidden(), 
+	anno::unused()
+]]
+{
+    return base::blend_color_layers(
+                layers: base::color_layer[](
+                    base::color_layer(
+                        layer_color:    color_2,
+                        weight:         weight,
+                        mode:           base::color_layer_add
+                        )),
+                base: color_1
+    );
+}
+
+base::texture_return blend_colors(
+    color color_1 = color(1.0, 1.0, 1.0),
+    color color_2 = color(.5, .5, .5),
+	float weight  = 1.0
+) [[ 
+    anno::hidden(),
+	anno::unused()
+]]
+{
+    return base::blend_color_layers(
+                layers: base::color_layer[](
+                    base::color_layer(
+                        layer_color:    color_2,
+                        weight:         weight,
+                        mode:           base::color_layer_blend
+                        )),
+                base: color_1
+    );
+}
+
+
+export material OmniPBR_ClearCoat_Opacity(
+
+	color diffuse_color_constant = color(0.2f)
+	[[
+		anno::display_name("Base Color"),
+		anno::description("This is the base color"),
+		anno::in_group("Albedo")
+	]],
+	uniform texture_2d diffuse_texture = texture_2d()
+	[[
+		anno::display_name("Albedo Map"),
+		anno::in_group("Albedo")
+	]],
+	float albedo_desaturation = float(0.0)
+	[[
+		anno::display_name("Albedo Desaturation"),
+		anno::soft_range(float(0.0f), float(1.0f)),
+		anno::description("Desaturates the diffuse color"),
+		anno::in_group("Albedo")
+	]],
+	float albedo_add = float(0.0)
+	[[
+		anno::display_name("Albedo Add"),
+		anno::soft_range(float(-1.0f), float(1.0f)),
+		anno::description("Adds a constant value to the diffuse color "),
+		anno::in_group("Albedo")
+	]],	
+	float albedo_brightness = float(1.0)
+	[[
+		anno::display_name("Albedo Brightness"),
+		anno::soft_range(float(0.0f), float(1.0f)),
+		anno::description("Multiplier for the diffuse color "),
+		anno::in_group("Albedo")
+	]],	
+	color diffuse_tint = color(1.0f)
+	[[
+		anno::display_name("Color Tint"),
+		anno::description("When enabled, this color value is multiplied over the final albedo color"),
+		anno::in_group("Albedo")
+	]],
+	
+
+	// -------------------- REFLECTIVITY ----------------------
+	
+	
+	
+	float reflection_roughness_constant = 0.5f
+	[[
+		anno::display_name("Roughness Amount"),
+		anno::hard_range(0.0,1.),
+		anno::description("Higher roughness values lead to more blurry reflections"),
+		anno::in_group("Reflectivity")
+	]],
+	float reflection_roughness_texture_influence = 0.0f
+	[[
+		anno::display_name("Roughness Map Influence"),
+		anno::hard_range(0.0, 1.),
+		anno::description("Blends between the constant value and the lookup of the roughness texture"),
+		anno::in_group("Reflectivity")
+	]],
+	uniform texture_2d reflectionroughness_texture = texture_2d()
+	[[
+		anno::display_name("Roughness Map"),
+		anno::in_group("Reflectivity")
+	]],
+	
+	
+	float metallic_constant = 0.f
+	[[
+		anno::display_name("Metallic Amount"),
+		anno::hard_range(0.0,1.),
+		anno::description("Metallic Material"),
+		anno::in_group("Reflectivity")
+	]],	
+	float metallic_texture_influence = 0.0f
+	[[
+		anno::display_name("Metallic Map Influence"),
+		anno::hard_range(0.0, 1.),
+		anno::description("Blends between the constant value and the lookup of the metallic texture"),
+		anno::in_group("Reflectivity")
+	]],
+	uniform texture_2d metallic_texture = texture_2d()
+	[[
+		anno::display_name("Metallic Map"),
+		anno::in_group("Reflectivity")
+	]], 
+	float specular_level = float(0.5)
+	[[
+		anno::display_name("Specular"),
+		anno::soft_range(float(0.0f), float(1.0f)),
+		anno::description("The specular level (intensity) of the material"),
+		anno::in_group("Reflectivity")
+	]],
+	// -------------------- ORM ----------------------
+	uniform bool enable_ORM_texture = false
+	[[
+		anno::display_name("Enable ORM Texture"),
+		anno::description("When True the ORM texture will be used to extract the Occlusion, Roughness and Metallic Map"),
+		anno::in_group("Reflectivity")
+	]],
+	uniform texture_2d ORM_texture = texture_2d()
+	[[
+		anno::display_name("ORM Map"),
+		anno::description("Texture that hae Occlusion, Roughness and Metallic map stored in the respective r, g and b channels"),
+		anno::in_group("Reflectivity")
+	]],
+	
+	// -------------------- AO Group ----------------------
+
+	float ao_to_diffuse = 0.0
+	[[
+		anno::display_name("AO to Diffuse"),
+		anno::description("Controls the amount of ambient occlusion multiplied into the diffuse color channel"),
+		anno::in_group("AO"),
+		anno::hard_range(0.0f, 1.0f)
+	]],
+	uniform texture_2d ao_texture         = texture_2d()
+	[[
+		anno::display_name("Ambient Occlusion Map"),
+		anno::description("The Ambient Occlusion texture for the material"),
+		anno::in_group("AO")
+	]],
+	
+	
+	// -------------------- EMISSIVE ----------------------
+	
+	
+	uniform bool enable_emission = false
+	[[
+        anno::display_name("Enable Emission"),
+		anno::description("Enables the emission of light from the material"),
+		anno::in_group("Emissive")
+	]],
+	
+	color emissive_color    = color(1.0, 0.1, 0.1)
+	[[
+		anno::enable_if("enable_emission == true"),
+		anno::display_name("Emissive Color"),
+		anno::description("The emission color"),
+		anno::in_group("Emissive")
+	
+	]],
+
+    uniform texture_2d emissive_color_texture = texture_2d() 
+	[[ 
+        anno::enable_if("enable_emission == true"),
+		anno::display_name("Emissive Color map"),
+        anno::in_group("Emissive"),
+		anno::description("The emissive color texture")
+    ]],
+
+	uniform texture_2d emissive_mask_texture    = texture_2d()
+	[[
+		anno::enable_if("enable_emission == true"),
+		anno::display_name("Emissive Mask map"),
+		anno::description("The texture masking the emissive color"),
+		anno::in_group("Emissive")
+	]],
+	uniform float emissive_intensity = 40.f
+	[[
+		anno::enable_if("enable_emission == true"),
+		anno::display_name("Emissive Intensity"),    
+		anno::description("Intensity of the emission"),
+		anno::in_group("Emissive")
+	]],
+
+	// Cutout Opacity
+	uniform bool enable_opacity = true
+	[[
+		anno::display_name("Enable Opacity"),
+		anno::description("Enables the use of cutout opacity"),
+		anno::in_group("Opacity")
+	]],
+	uniform bool enable_opacity_texture = false
+	[[
+		anno::display_name("Enable Opacity Texture"),
+		anno::description("Enables or disables the usage of the opacity texture map"),
+		anno::in_group("Opacity")
+	]],
+	uniform float opacity_constant = 1.f
+	[[
+		anno::hard_range(0.0, 1.0),
+		anno::display_name("Opacity Amount"),    
+		anno::description("Opacity value between 0 and 1, when Opacity Map is not valid"),
+		anno::in_group("Opacity")
+	]],
+	uniform texture_2d opacity_texture = texture_2d()
+	[[
+		anno::display_name("Opacity Map"),
+		anno::in_group("Opacity")
+	]],
+	uniform base::mono_mode opacity_mode = base::mono_average
+	[[
+		anno::display_name("Opacity Mono Source"),
+		anno::in_group("Opacity"),
+		anno::description("Determines how to lookup opacity from the supplied texture. mono_alpha, mono_average, mono_luminance, mono_maximum")
+	]],
+	uniform float opacity_threshold = 0.f
+	[[
+		anno::hard_range(0.0, 1.0),
+		anno::display_name("Opacity Threshold"),
+		anno::description("If 0, use fractional opacity values 'as is'; if > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
+		anno::in_group("Opacity")
+	]],
+	
+	// -------------------- Clearcoat ----------------------
+	uniform bool enable_clearcoat = false
+	[[
+		anno::display_name("Enable Clearcoat Layer"),
+		anno::description("Adds a  clearcoat layer on top of the material when enabled"),
+		anno::in_group("Clearcoat")
+	]],
+	color clearcoat_tint = color(1.0f)
+	[[
+		anno::display_name("Clearcoat Tint"),
+		anno::description("Clearcoat is tinted and affects the underlying material"),
+		anno::in_group("Clearcoat")
+	]],
+	float clearcoat_transparency = 1.0f
+	[[
+		anno::display_name("Clearcoat Transparency"),
+		anno::description("Adjusts the transparency of the clearcoat. Can be turned into a fully opaque clearcoat "
+		"covering the underlying layer"),
+		anno::in_group("Clearcoat"),
+		anno::hard_range(0.0f, 1.0f)
+	]],
+	float clearcoat_reflection_roughness = 0.0f
+	[[
+		anno::display_name("Clearcoat Roughness"),
+		anno::description("Higher roughness values lead to more blurry reflections"),
+		anno::hard_range(0.0f, 1.0f),
+		anno::in_group("Clearcoat")
+	]],
+	float clearcoat_weight = 1.0f
+	[[
+		anno::display_name("Clearcoat Weight"),
+		anno::description("Sets the weight for clearcoat layer"),
+		anno::hard_range(0.0f, 1.0f),
+		anno::in_group("Clearcoat")
+	]],
+	float clearcoat_flatten = 1.0f
+	[[
+		anno::display_name("Clearcoat Flatten"),
+		anno::description("Flattens the clearcoat to even out the underlying bump maps"),
+		anno::hard_range(0.0f, 1.0f),
+		anno::in_group("Clearcoat")
+	]],
+	float clearcoat_ior = 1.56f
+	[[
+		anno::display_name("Clearcoat IOR"),
+		anno::description("Sets the Index of refraction for the clearcoat layer"),
+		anno::soft_range(1.0f, 4.0f),
+		anno::in_group("Clearcoat")
+	]],
+		uniform float clearcoat_bump_factor = 1.f
+	[[
+		anno::display_name("Clearcoat Normal Map Strength"),
+		anno::description("Strength of normal map."),
+		anno::in_group("Clearcoat"),
+		anno::soft_range(0.0f, 1.0f)
+	]],
+	uniform texture_2d clearcoat_normalmap_texture = texture_2d()
+	[[
+		anno::display_name("Clearcoat Normal Map"),
+		anno::description("Enables the usage of the normalmap texture"),
+		anno::in_group("Clearcoat")
+	]], 
+	
+	// -------------------- Normal ----------------------
+	
+	
+	
+	/*
+	uniform bool enable_normalmap_texture = false
+	[[
+		anno::display_name("Enable Normal Texture"),
+		anno::description("Enables the usage of the normalmap texture"),
+		anno::in_group("Features")
+	]],
+	*/
+		uniform float bump_factor = 1.f
+	[[
+		anno::display_name("Normal Map Strength"),
+		anno::description("Strength of normal map."),
+		anno::in_group("Normal"),
+		anno::soft_range(0.0f, 1.0f)
+	]],
+	
+	uniform texture_2d normalmap_texture = texture_2d()
+	[[
+		anno::display_name("Normal Map"),
+		anno::description("Enables the usage of the normalmap texture"),
+		anno::in_group("Normal")
+	]], 
+	
+
+	
+/*	uniform bool enable_detail_normalmap_texture = false
+	[[
+		anno::display_name("Enable Detail Normal Texture"),
+		anno::in_group("Features"),
+		anno::description("Enables the usage of the detail normalmap texture")
+	]],
+*/
+	uniform float detail_bump_factor = .3f
+	[[
+		anno::display_name("Detail Normal Strength"),
+		anno::in_group("Normal"),
+		anno::soft_range(0.0f, 1.0f),
+		anno::description("Strength of the detail normal")
+	]],
+	uniform texture_2d detail_normalmap_texture = texture_2d()
+	[[
+		anno::display_name("Detail Normal Map"),
+		anno::in_group("Normal")
+	]],
+	uniform bool flip_tangent_u = false  [[
+        anno::display_name("Normal Map Flip U Tangent"),
+        anno::in_group("Normal")
+    ]],
+	uniform bool flip_tangent_v = true [[
+        anno::display_name("Normal Map Flip V Tangent"),
+        anno::in_group("Normal")
+    ]],
+
+	// UV Projection Group
+	uniform bool project_uvw = false
+	[[
+		anno::display_name("Enable Project UVW Coordinates"),
+		anno::description("When enabled, UV coordinates will be generated by projecting them from a coordinate system"),
+		anno::in_group("UV")
+	]],
+	uniform bool world_or_object = false
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("Enable World Space"),
+		anno::description("When set to 'true' uses world space for projection, when 'false' object space is used"),
+		anno::in_group("UV")
+	]],
+	
+	uniform int uv_space_index =  0
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("UV Space Index"),
+		anno::description("UV Space Index."),
+		anno::in_group("UV"),
+		anno::hard_range(0, 3)
+	]],
+	
+	// Adjustments Group
+	uniform float2 texture_translate =  float2(0.0f)
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("Texture Translate"),
+		anno::description("Controls position of texture."),
+		anno::in_group("UV")
+	]],
+	uniform float texture_rotate =  0.f
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("Texture Rotate"),
+		anno::description("Rotates angle of texture in degrees."),
+		anno::in_group("UV")
+	]],
+	uniform float2 texture_scale =  float2(1.0f)
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("Texture Scale"),
+		anno::description("Larger number increases size of texture."),
+		anno::in_group("UV")
+	]],
+	
+	uniform float2 detail_texture_translate =  float2(0.0f)
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("Detail Texture Translate"),
+		anno::description("Controls the position of the detail texture."),
+		anno::in_group("UV")
+	]],
+	uniform float detail_texture_rotate =  0.f
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("Detail Texture Rotate"),
+		anno::description("Rotates angle of the detail texture in degrees."),
+		anno::in_group("UV")
+	]],
+	uniform float2 detail_texture_scale =  float2(1.0f)
+	[[
+		anno::enable_if("project_uvw == true"),
+		anno::display_name("Detail Texture Scale"),
+		anno::description("Larger numbers increase the size of the detail texture"),
+		anno::in_group("UV")
+	]],
+	
+	uniform float2 clearcoat_texture_translate =  float2(0.0f)
+	[[
+		anno::display_name("Clearcoat Texture Translate"),
+		anno::description("Controls the position of the detail texture."),
+		anno::in_group("UV")
+	]],
+	uniform float clearcoat_texture_rotate =  0.f
+	[[
+		anno::display_name("Clearcoat Texture Rotate"),
+		anno::description("Rotates angle of the detail texture in degrees."),
+		anno::in_group("UV")
+	]],
+	uniform float2 clearcoat_texture_scale =  float2(1.0f)
+	[[
+		anno::display_name("Clearcoat Texture Scale"),
+		anno::description("Larger numbers increase the size of the detail texture"),
+		anno::in_group("UV")
+	]]
+	
+) 
+[[
+	anno::display_name("OmniPBR ClearCoat Opacity"),
+	anno::description("OmniPBR with ClearCoat. Supports opacity and ORM textures."),
+	anno::version( 2, 1, 0),
+	anno::author("NVIDIA CORPORATION"), 
+	anno::key_words(string[]("omni", "PBR", "opacity", "omniverse", "generic"))
+]]
+ = let{
+
+	// UVW lookup and transformation
+	base::texture_coordinate_system the_system = world_or_object ? base::texture_coordinate_world : base::texture_coordinate_object;
+	
+	
+	base::texture_coordinate_info uvw = project_uvw ? 
+											base::coordinate_projection(
+												coordinate_system: the_system,
+												texture_space: uv_space_index,
+												projection_type: base::projection_cubic ) :
+											base::coordinate_source(
+												coordinate_system: base::texture_coordinate_uvw,
+												texture_space: uv_space_index
+	);							
+											
+	
+	base::texture_coordinate_info  transformed_uvw =  base::transform_coordinate(
+								transform: rotation_translation_scale(
+									scaling: float3(texture_scale.x, texture_scale.y, 1.0),
+									rotation: float3(0.0, 0.0, texture_rotate/180.*math::PI ),
+									translation: float3(texture_translate.x, texture_translate.y, 0.0)
+								),
+								coordinate: uvw
+	);
+	
+	
+	base::texture_coordinate_info  detail_transformed_uvw =  base::transform_coordinate(
+								transform: rotation_translation_scale(
+									scaling: float3(detail_texture_scale.x, detail_texture_scale.y, 1.0),
+									rotation: float3(0.0, 0.0, detail_texture_rotate/180.*math::PI ),
+									translation: float3(detail_texture_translate.x, detail_texture_translate.y, 0.0)
+								),
+								coordinate: uvw
+	);
+	
+	base::texture_coordinate_info  clearcoat_transformed_uvw = base::transform_coordinate(
+							transform: rotation_translation_scale(
+								scaling: float3(clearcoat_texture_scale.x, clearcoat_texture_scale.y, 1.0),
+								rotation: float3(0.0, 0.0, clearcoat_texture_rotate/180.*math::PI ),
+								translation: float3(clearcoat_texture_translate.x, clearcoat_texture_translate.y, 0.f)
+							),
+							coordinate: uvw
+	);
+	
+	// Normal calculations
+	float3 the_normal =  tex::texture_isvalid(normalmap_texture) ?
+							base::tangent_space_normal_texture(
+							texture:        normalmap_texture,
+							factor:         bump_factor,
+							uvw:            transformed_uvw,
+							flip_tangent_u: flip_tangent_u,
+							flip_tangent_v: flip_tangent_v	// true for dx, false for opengl
+							//flip_tangent_v: true
+							): state::normal() ;				
+	
+
+	float3 detail_normal = tex::texture_isvalid(detail_normalmap_texture) ?
+							base::tangent_space_normal_texture(
+							texture:        detail_normalmap_texture,
+							factor:         detail_bump_factor,
+							uvw:            detail_transformed_uvw,
+							flip_tangent_u: flip_tangent_u,
+							flip_tangent_v: flip_tangent_v	// true for dx, false for opengl
+							): state::normal() ;
+
+							
+	float3 clearcoat_normal = tex::texture_isvalid(clearcoat_normalmap_texture) ?
+								base::tangent_space_normal_texture(
+								texture:        clearcoat_normalmap_texture,
+								factor:         clearcoat_bump_factor,
+								uvw:            clearcoat_transformed_uvw,
+								flip_tangent_u: flip_tangent_u,
+								flip_tangent_v: flip_tangent_v	// true for dx, false for opengl
+							) : state::normal();
+
+
+	float3 diffuse_gloss_normal = tex::texture_isvalid(detail_normalmap_texture) ?	add_detail_normal(detail_normal, the_normal) : the_normal;
+	
+	float3 flattened_clearcoat_normal = ::math::lerp(diffuse_gloss_normal, ::state::normal(), clearcoat_flatten);
+	
+	float3 final_clearcoat_normal = tex::texture_isvalid(clearcoat_normalmap_texture) ?	add_detail_normal(flattened_clearcoat_normal, clearcoat_normal) : flattened_clearcoat_normal;
+
+	
+	// -------------------- ORM Handling -------------------- 
+	float3 ORM_lookup = tex::lookup_float3(
+						tex: ORM_texture,
+						coord: float2(transformed_uvw.position.x, transformed_uvw.position.y)
+	);
+	 
+	float3 roughness_lookup = tex::lookup_float3(
+							tex: reflectionroughness_texture,
+							coord: float2(transformed_uvw.position.x, transformed_uvw.position.y)		
+	);
+	
+	float roughness_selection = enable_ORM_texture ? ORM_lookup.y : roughness_lookup.x;
+	 
+	float reflection_roughness_1 =  math::lerp(reflection_roughness_constant, roughness_selection, reflection_roughness_texture_influence);
+ 
+	
+	// Diffuse Color Lookup and AO
+	
+	base::texture_return base_lookup = base::file_texture(
+							texture: diffuse_texture,
+							color_offset: color(albedo_add),
+							color_scale: color(albedo_brightness),
+							mono_source: base::mono_luminance,
+							uvw: transformed_uvw,
+							clip: false		
+	);
+	
+	base::texture_return ao_lookup = base::file_texture(
+							texture: ao_texture,
+							color_offset: color(0.0, 0.0, 0.0),
+							color_scale: color(1.0, 1.0, 1.0),
+							mono_source: base::mono_average,
+							uvw: transformed_uvw,
+							clip: false		
+	);
+	
+	// checking whether the ORM texture or the AO texture is supposed to be used
+	color ao_color = enable_ORM_texture ? color(ORM_lookup.x) : ao_lookup.tint;
+	
+	color desaturated_base = math::lerp(base_lookup.tint, color(base_lookup.mono), albedo_desaturation);
+	
+	color diffuse_color =  tex::texture_isvalid(diffuse_texture)? desaturated_base : diffuse_color_constant;
+	
+	//color diffuse_color = desaturated_base ;
+	
+	color tinted_diffuse_color = multiply_colors(diffuse_color, diffuse_tint, 1.0).tint ;
+	
+	color base_color = multiply_colors(
+								color_1: tinted_diffuse_color,
+								color_2: ao_color,
+								weight:  ao_to_diffuse
+	).tint;
+	
+	float3 metallic_lookup = tex::lookup_float3(
+						tex: metallic_texture,
+						coord: float2(transformed_uvw.position.x, transformed_uvw.position.y)
+	);
+					
+	// Choose between ORM or metallic map
+	float metallic_selection = enable_ORM_texture ? ORM_lookup.z : metallic_lookup.x;
+	
+	// blend between the constant metallic value and the map lookup
+	float metallic =  math::lerp(metallic_constant, metallic_selection, metallic_texture_influence);
+	
+	
+	bsdf diffuse_bsdf = df::weighted_layer(
+		weight: 1.0,
+		layer: df::diffuse_reflection_bsdf(
+			tint: base_color,
+			roughness: 0.f ),
+		base: bsdf(),
+		normal: enable_clearcoat ? diffuse_gloss_normal : state::normal()
+	);
+
+	// The glossy reflection BSDF
+	bsdf ggx_smith_bsdf = df::microfacet_ggx_smith_bsdf(
+		roughness_u:reflection_roughness_1 * reflection_roughness_1,
+		roughness_v:reflection_roughness_1 * reflection_roughness_1,
+		tint: color(1.0, 1.0, 1.0),
+		mode: df::scatter_reflect
+	);
+	
+	
+	bsdf custom_curve_layer_bsdf = df::custom_curve_layer(
+		normal_reflectivity:  0.08,		
+		grazing_reflectivity: 1.0,
+		exponent:	          5.0,
+		weight:	              specular_level,
+		layer:                ggx_smith_bsdf,
+		base:	              diffuse_bsdf,
+		normal:               enable_clearcoat ? diffuse_gloss_normal : state::normal()
+	);
+	
+	// Replaced by tinting as this reproduces the UE4 behavior more faithfully
+	 // bsdf directional_factor_bsdf = df::directional_factor(
+		 // normal_tint:  base_color,
+		 // grazing_tint: base_color,     //color(1.0, 1.0, 1.0),
+		 // exponent: 3.0f,
+		 // base: ggx_smith_bsdf
+	 // );
+	
+	bsdf directional_factor_bsdf = df::tint(base_color, ggx_smith_bsdf);
+	
+	
+	// CLEARCOAT 
+
+	
+	bsdf omni_PBR_bsdf = df::weighted_layer(
+        weight: metallic,
+        layer:	directional_factor_bsdf,
+		base:	custom_curve_layer_bsdf,
+		normal: enable_clearcoat ? diffuse_gloss_normal : state::normal()
+	);
+	
+	bsdf clearcoat_bsdf = df::microfacet_ggx_smith_bsdf(
+		roughness_u: clearcoat_reflection_roughness * clearcoat_reflection_roughness,
+		roughness_v: clearcoat_reflection_roughness * clearcoat_reflection_roughness,
+		tint:        color(1.0f),
+		mode:        df::scatter_reflect
+	);
+	
+	// bsdf omni_PBR_coated_bsdf = df::custom_curve_layer(
+		// normal_reflectivity:  clearcoat_reflectivity * 0.08,
+		// grazing_reflectivity: 1.0,
+		// weight:               clearcoat_weight,
+		// layer:                clearcoat_bsdf,
+		// base:                 omni_PBR_bsdf,
+		// normal:               final_clearcoat_normal
+	// );
+	
+	bsdf opaque_clearcoat = df::weighted_layer(
+        weight: clearcoat_transparency,
+		layer:	::df::tint( 
+					tint: clearcoat_tint,
+					base: omni_PBR_bsdf),
+		base:	::df::diffuse_reflection_bsdf(
+					tint: clearcoat_tint)
+	);
+	
+	bsdf omni_PBR_coated_bsdf = df::fresnel_layer(
+		ior:     clearcoat_ior,
+		weight:  clearcoat_weight,
+		layer:   clearcoat_bsdf,
+		base:    opaque_clearcoat,
+		normal:  final_clearcoat_normal
+	);
+	
+	
+	bsdf final_bsdf = enable_clearcoat ? omni_PBR_coated_bsdf : omni_PBR_bsdf;
+
+	// Emission
+	color emissive_color_tx = tex::texture_isvalid(emissive_color_texture) ?
+                        base::file_texture(
+                            texture: emissive_color_texture,
+                            color_offset: color(0.0, 0.0, 0.0),
+                            color_scale: color(1.0, 1.0, 1.0),
+                            mono_source: base::mono_average,
+                            uvw: transformed_uvw,
+                            clip: false        
+    ).tint : emissive_color;
+
+    color emissive_mask = tex::texture_isvalid(emissive_mask_texture) ?
+                        base::file_texture(
+                            texture: emissive_mask_texture,
+                            color_offset: color(0.0, 0.0, 0.0),
+                            color_scale: color(1.0, 1.0, 1.0),
+                            mono_source: base::mono_average,
+                            uvw: transformed_uvw,
+                            clip: false        
+    ).tint : color(1.0);
+	
+	float opacity_value = enable_opacity_texture ? base::file_texture(
+                                                texture: 	 opacity_texture,
+												mono_source: opacity_mode,
+                                                uvw: 		 transformed_uvw
+							).mono : opacity_constant;
+
+	// The opacity_threshold is interpreted as follows:
+	// 1. opacity_threshold > 0: binary opacity masking mode
+	//   i.e.: if opacity_value > opacity_threshold we remap opacity_value to 1.0, otherwise to 0.0
+	// 2. opacity_threshold == 0: fractional opacity mode. Leaves the opacity_value untouched,
+	//   allowing the renderer to use fractional cutout_opacity values, if it supports this feature
+	//
+	// NOTE: when the renderer does not enable 'fractional cutout opacity' it interprets
+	// cutout_opacity values of 1.0 as opaque and anything below as fully transparent
+    float local_cutout_opacity = enable_opacity ? ((opacity_threshold == 0.0) ? opacity_value : ((opacity_value >= opacity_threshold) ? 1.0 : 0)) : 1.0;
+
+} in material(
+	surface: material_surface(
+		scattering: final_bsdf,
+		emission:  material_emission (
+            df::diffuse_edf(),
+            intensity: enable_emission? emissive_color_tx * emissive_mask * color(emissive_intensity) : color(0)
+		)
+	),
+	geometry: material_geometry(
+		normal: enable_clearcoat ? state::normal() : diffuse_gloss_normal,
+		cutout_opacity: local_cutout_opacity
+	)
+);

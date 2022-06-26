@@ -1,0 +1,236 @@
+/***************************************************************************************************
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **************************************************************************************************/
+
+mdl 1.4;
+import ::anno::*;
+import ::base::*;
+
+using OmniGlass_Opacity import OmniGlass_Opacity;
+export annotation distill_off();
+
+export material OmniGlass(
+	color absorption_coeff = color(0.f, 0.f, 0.f)  // hiding this parameter as it does not exist in the new material
+	[[
+		anno::hidden(),
+		anno::unused()
+	]],
+	uniform bool use_glass_color_texture = false
+	[[
+		anno::hidden(),
+		anno::unused()
+	]],
+	uniform color glass_color = color(1.f, 1.f, 1.f) [[
+		anno::display_name("Glass Color"),
+		anno::description("Sets the color of the glass"),
+		anno::hard_range(color(0.0), color(1.0)),
+		anno::in_group("Color")
+	]],
+	uniform texture_2d glass_color_texture = texture_2d() [[
+		anno::display_name("Glass Color Texture"),
+		anno::description("Specifies the texture to be used for the glass color of the material"),
+		anno::in_group("Color")
+	]],
+	float frosting_roughness = 0.f [[
+		anno::display_name("Glass Roughness"),
+		anno::description("Sets the roughness of the glass material "),
+		anno::hard_range(0.0, 1.0),
+		anno::in_group("Roughness")
+	]],
+	uniform float glass_ior = 1.491f [[
+		anno::display_name("Glass IOR"),
+		anno::description("Sets IOR of the glass material "),
+		anno::soft_range(1.0f, 4.0f),
+		anno::in_group("Refraction")
+	]],
+	uniform bool thin_walled = false [[
+		anno::display_name("Thin Walled"),
+		anno::description("When enabled, the material is considered thin-walled. Use this, when you have glass surfaces that are modeled with a single plane"),
+		anno::in_group("Refraction")
+	]],
+	
+	// NEW PARAMETERS
+	uniform float depth = 0.001f [[	
+		anno::description("Controls how much light is absorbed through the surface"),
+		anno::display_name("Volume Absorption Scale"),
+		anno::in_group("Color"),
+		anno::soft_range(0.f, 1.f),
+		anno::hard_range(0.f, 1000.f)
+	]],
+	float roughness_texture_influence = 1.f [[
+		anno::display_name("Roughness Texture Influence"),
+		anno::in_group("Roughness"),
+		anno::hard_range(0.0f, 1.0f)
+	]],
+	uniform texture_2d roughness_texture = texture_2d() [[
+		anno::description("The roughness texture"),
+		anno::display_name("Roughness Texture"),
+		anno::in_group("Roughness"),
+		anno::usage("")
+	]],
+	uniform texture_2d reflection_color_texture = texture_2d() [[
+		anno::description("The reflection color texture"),
+		anno::display_name("Reflection Color Texture"),
+		anno::in_group("Reflection")
+	]],
+	uniform color reflection_color = color(1.f, 1.f, 1.f) [[
+		anno::display_name("Reflection Color"),
+		anno::in_group("Reflection")
+	]],
+	uniform texture_2d normal_map_texture = texture_2d() [[
+		anno::description("The normal map texture"),
+		anno::display_name("Normal Map Texture"),
+		anno::in_group("Normal"),
+		anno::usage("")
+	]],
+	uniform float normal_map_strength = 1.0 [[
+		anno::description("Determines the degree of bumpiness"),
+		anno::display_name("Normal Map Strength"),
+		anno::in_group("Normal"),
+		anno::usage(""),
+		anno::soft_range(0.f, 1.f)
+	]],
+	uniform bool flip_tangent_u = false  [[
+        anno::display_name("Normal Map Flip U Tangent"),
+        anno::in_group("Normal")
+    ]],
+	uniform bool flip_tangent_v = false [[
+        anno::display_name("Normal Map Flip V Tangent"),
+        anno::in_group("Normal")
+    ]],
+
+	// Cutout Opacity
+	uniform bool enable_opacity = false
+	[[
+		anno::display_name("Enable Opacity"),
+		anno::description("Enables the use of cutout opacity"),
+		anno::in_group("Opacity")
+	]],
+	uniform float cutout_opacity = 1.0f [[
+		anno::hard_range(0.0, 1.0),
+		anno::display_name("Opacity Amount"),
+		anno::description("Opacity value between 0 and 1, when Opacity Map is not valid"),
+		anno::in_group("Opacity")
+	]],	
+	uniform texture_2d cutout_opacity_texture = texture_2d() [[
+		anno::description("The opacity map"),
+		anno::display_name("Opacity Map"),
+		anno::in_group("Opacity")
+	]],
+	uniform base::mono_mode cutout_opacity_mono_source = base::mono_alpha [[
+		anno::description("Determines how to lookup opacity from the supplied texture. mono_alpha, mono_average, mono_luminance, mono_maximum"),
+		anno::display_name("Opacity Mono Source"),
+		anno::in_group("Opacity"),
+		anno::usage("")
+	]],
+	uniform float opacity_threshold = 0.f
+	[[
+		anno::hard_range(0.0, 1.0),
+		anno::display_name("Opacity Threshold"),
+		anno::description("If negative, disable cutout_opacity; if 0, use fractional opacity values 'as is'; if > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
+		anno::in_group("Opacity")
+	]],
+
+	//
+	// End of new
+	//
+	// UV Projection Group
+	//
+	uniform bool project_uvw = false
+	[[
+		anno::display_name("Enable Project UVW Coordinates"),
+		anno::description("When enabled, UV coordinates will be generated by projecting them from a coordinate system"),
+		anno::in_group("UV")
+	]],
+	uniform bool world_or_object = false
+	[[
+		anno::display_name("Enable World Space"),
+		anno::description("When set to 'true' uses world space for projection, when 'false' object space is used"),
+		anno::in_group("UV")
+	]],
+	
+	// UV Space selector
+	uniform int uv_space_index =  0
+	[[
+		anno::display_name("UV Space Index"),
+		anno::description("Choose the UV Space Index to be used"),
+		anno::in_group("UV"),
+		anno::hard_range(0, 3)
+	]],
+	uniform float2 texture_translate =  float2(0.0f)
+	[[
+		anno::display_name("Texture Translate"),
+		anno::description("Controls the position of the texture."),
+		anno::in_group("UV")
+	]],
+	uniform float texture_rotate =  0.f
+	[[
+		anno::display_name("Texture Rotate"),
+		anno::description("Rotates angle of the texture in degrees."),
+		anno::in_group("UV")
+	]],
+	uniform float2 texture_scale =  float2(1.0f)
+	[[
+		anno::display_name("Texture Scale"),
+		anno::description("Larger numbers increase the size."),
+		anno::in_group("UV")
+	]])
+[[ 
+	anno::author("NVIDIA CORPORATION"),
+	anno::display_name("Omni Glass"),
+	anno::version( 1, 0, 0),
+	anno::description("Omni Glass Material V2"),
+	anno::key_words(string[]("omni", "omniverse", "glass", "transparent", "window", "transparency", "workflow")),
+	distill_off()
+]]
+ = OmniGlass_Opacity(
+	glass_color: glass_color,
+	glass_color_texture: glass_color_texture,
+	frosting_roughness: frosting_roughness,
+	glass_ior: glass_ior,
+	thin_walled: thin_walled,
+	depth: depth,
+	roughness_texture_influence: roughness_texture_influence,
+	roughness_texture: roughness_texture,
+	reflection_color_texture: reflection_color_texture,
+	reflection_color: reflection_color,
+	normal_map_texture: normal_map_texture,
+	normal_map_strength: normal_map_strength,
+	flip_tangent_u: flip_tangent_u,
+	flip_tangent_v: flip_tangent_v,
+	enable_opacity: enable_opacity,
+	cutout_opacity: cutout_opacity,
+	cutout_opacity_texture: cutout_opacity_texture,
+	cutout_opacity_mono_source: cutout_opacity_mono_source,
+	opacity_threshold: opacity_threshold,
+	project_uvw: project_uvw,
+	world_or_object: world_or_object,
+	uv_space_index:  uv_space_index,
+	texture_translate:  texture_translate,
+	texture_rotate:  texture_rotate,
+	texture_scale:  texture_scale
+	);

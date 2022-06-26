@@ -1,0 +1,900 @@
+/***************************************************************************************************
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **************************************************************************************************/
+ 
+// Wrapper for OmniHairBase material
+
+mdl 1.7;
+
+import ::anno::*;
+import ::base::*;
+import ::limits::*;
+import ::state::*;
+import ::tex::*;
+
+import ::OmniSurface::OmniHairBase::*;
+import ::OmniSurface::OmniShared::*;
+import ::OmniSurface::OmniImage::*;
+
+export material OmniHair(
+
+    //Color
+    //
+    float base_color_weight = float(1.0) [[ 
+        anno::display_name("Base Color Weight"),
+        anno::in_group("Color"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d base_color_weight_image = texture_2d() [[ 
+        anno::display_name("Base Color Weight Image"),
+        anno::in_group("Color")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode base_color_weight_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Base Color Weight Image Alpha Mode"),
+        anno::in_group("Color")
+    ]],
+
+    color base_color = color(1.0) [[
+        anno::display_name("Base Color"),
+        anno::in_group("Color")
+    ]],
+
+    uniform texture_2d base_color_image = texture_2d() [[ 
+        anno::display_name("Base Color Image"),
+        anno::in_group("Color")
+    ]],
+
+    uniform ::OmniSurface::OmniShared::melanin_concentration_presets melanin_concentration_preset = 
+        ::OmniSurface::OmniShared::melanin_concentration_custom [[
+        anno::display_name("Melanin Presets"),
+        anno::in_group("Color")
+    ]],
+
+    float melanin_concentration = float(1.0) [[ 
+        anno::display_name("Melanin Concentration"),
+        anno::in_group("Color"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d melanin_concentration_image = texture_2d() [[ 
+        anno::display_name("Melanin Concentration Image"),
+        anno::in_group("Color")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode melanin_concentration_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Melanin Concentration Image Alpha Mode"),
+        anno::in_group("Color")
+    ]],
+
+    float melanin_redness = float(0.5) [[ 
+        anno::display_name("Melanin Redness (Pheomelanin)"),
+        anno::in_group("Color"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d melanin_redness_image = texture_2d() [[ 
+        anno::display_name("Melanin Redness Image"),
+        anno::in_group("Color")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode melanin_redness_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Melanin Redness Image Alpha Mode"),
+        anno::in_group("Color")
+    ]],
+
+    float melanin_concentration_randomize = float(0.0) [[ 
+        anno::display_name("Melanin Randomize"),
+        anno::in_group("Color")
+    ]],
+
+    uniform texture_2d melanin_concentration_randomize_image = texture_2d() [[ 
+        anno::display_name("Melanin Randomize Image"),
+        anno::in_group("Color")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode melanin_concentration_randomize_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Melanin Randomize Image Alpha Mode"),
+        anno::in_group("Color")
+    ]],
+
+    //Specular
+    //
+    float specular_reflection_roughness = float(0.2) [[ 
+        anno::display_name("Roughness"),
+        anno::in_group("Specular"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d specular_reflection_roughness_image = texture_2d() [[ 
+        anno::display_name("Roughness Image"),
+        anno::in_group("Specular")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode specular_reflection_roughness_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Roughness Image Alpha Mode"),
+        anno::in_group("Specular")
+    ]],
+
+    uniform bool specular_reflection_anisotropic_roughness = false [[ 
+        anno::display_name("Azimuthal Anisotropic Roughness"),
+        anno::in_group("Specular")
+    ]],
+
+    float specular_reflection_azimuthal_roughness = float(0.2) [[ 
+        anno::display_name("Azimuthal Roughness"),
+        anno::in_group("Specular"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d specular_reflection_azimuthal_roughness_image = texture_2d() [[ 
+        anno::display_name("Azimuthal Roughness Image"),
+        anno::in_group("Specular")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode specular_reflection_azimuthal_roughness_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Azimuthal Roughness Image Alpha Mode"),
+        anno::in_group("Specular")
+    ]],
+
+    uniform float specular_reflection_ior = float(1.55) [[ 
+        anno::display_name("IOR"),    
+        anno::in_group("Specular"),
+        anno::soft_range(0.0f, 5.0f),
+        anno::hard_range(0.0f, limits::FLOAT_MAX)
+    ]],
+
+    float specular_reflection_shift = float(3.0) [[ 
+        anno::display_name("Shift (degree)"),    
+        anno::in_group("Specular"),
+        anno::soft_range(0.0f, 20.0f),
+        anno::hard_range(-90.0f, 90.0f)
+    ]],
+
+    uniform texture_2d specular_reflection_shift_image = texture_2d() [[ 
+        anno::display_name("Shift Image"),
+        anno::in_group("Specular")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode specular_reflection_shift_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Shift Image Alpha Mode"),
+        anno::in_group("Specular")
+    ]],
+
+    //Diffuse Reflection
+    //
+    float diffuse_reflection_weight = float(0.0) [[ 
+        anno::display_name("Weight"),
+        anno::in_group("Diffuse"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d diffuse_reflection_weight_image = texture_2d() [[ 
+        anno::display_name("Weight Image"),
+        anno::in_group("Diffuse")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode diffuse_reflection_weight_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Weight Image Alpha Mode"),
+        anno::in_group("Diffuse")
+    ]],
+
+    color diffuse_reflection_color = color(1.0) [[
+        anno::display_name("Color"),
+        anno::in_group("Diffuse")
+    ]],
+
+    uniform texture_2d diffuse_reflection_color_image = texture_2d() [[ 
+        anno::display_name("Color Image"),
+        anno::in_group("Diffuse")
+    ]],
+
+    //Emission
+    //
+    float emission_weight = float(0.0) [[ 
+        anno::display_name("Weight"),
+        anno::in_group("Emission"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d emission_weight_image = texture_2d() [[ 
+        anno::display_name("Weight Image"),
+        anno::in_group("Emission")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode emission_weight_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Weight Image Alpha Mode"),
+        anno::in_group("Emission")
+    ]],
+
+    uniform ::OmniSurface::OmniShared::emission_mode emission_mode = 
+        ::OmniSurface::OmniShared::emission_lx [[
+        anno::display_name("Emission Mode"),
+        anno::in_group("Emission")
+    ]],
+
+    float emission_intensity = float(1.0) [[
+        anno::display_name("Intensity"),
+        anno::in_group("Emission"),
+        anno::soft_range(0.0f, 1000.0f)
+    ]],
+
+    uniform texture_2d emission_intensity_image = texture_2d() [[ 
+        anno::display_name("Intensity Image"),
+        anno::in_group("Emission")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode emission_intensity_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Intensity Image Alpha Mode"),
+        anno::in_group("Emission")
+    ]],
+
+    color emission_color = color(1.0) [[
+        anno::display_name("Color"),
+        anno::in_group("Emission")
+    ]],
+
+    uniform texture_2d emission_color_image = texture_2d() [[ 
+        anno::display_name("Color Image"),
+        anno::in_group("Emission")
+    ]],
+
+    uniform bool emission_use_temperature = false [[ 
+        anno::display_name("Use Temperature"),
+        anno::in_group("Emission")
+    ]],
+
+    float emission_temperature = float(6500.0) [[
+        anno::display_name("Temperature (kelvin)"),
+        anno::in_group("Emission"),
+        anno::soft_range(0.0f, 10000.0f)
+    ]],
+
+    uniform texture_2d emission_temperature_image = texture_2d() [[ 
+        anno::display_name("Temperature Image"),
+        anno::in_group("Emission")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode emission_temperature_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Temperature Image Alpha Mode"),
+        anno::in_group("Emission")
+    ]],
+
+    //Geometry
+    //
+    uniform bool enable_opacity = false [[
+        anno::display_name("Enable Opacity"),
+        anno::description("Enables the use of cutout opacity"),
+        anno::in_group("Geometry")
+    ]],
+
+    float geometry_opacity = float(1.0) [[
+        anno::display_name("Opacity"),
+        anno::in_group("Geometry"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d geometry_opacity_image = texture_2d() [[ 
+        anno::display_name("Opacity Image"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode geometry_opacity_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Opacity Image Alpha Mode"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform float geometry_opacity_threshold = float(0.0) [[
+        anno::display_name("Opacity Threshold"),
+        anno::description("If > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
+        anno::in_group("Geometry"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform float geometry_normal_strength = float(1.0) [[ 
+        anno::display_name("Geometry Normal Strength"),
+        anno::in_group("Geometry"),
+        anno::soft_range(0.0f, 1.0f),
+        anno::hard_range(0.0f, limits::FLOAT_MAX)
+    ]],
+
+    float3 geometry_normal = state::normal() [[
+        anno::display_name("Geometry Normal"),
+        anno::in_group("Geometry"),
+        anno::usage("normal")
+    ]],
+
+    uniform texture_2d geometry_normal_image = texture_2d() [[ 
+        anno::display_name("Geometry Normal Map Image"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform bool geometry_normal_image_flip_r_channel = false [[
+        anno::display_name("Normal Map Flip R Channel"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform bool geometry_normal_image_flip_g_channel = false [[
+        anno::display_name("Normal Map Flip G Channel"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform bool geometry_normal_image_flip_b_channel = false [[
+        anno::display_name("Normal Map Flip B Channel"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::tangent_bitangent_mapping geometry_tangent_bitangent_mapping = 
+        ::OmniSurface::OmniImage::red_green [[
+        anno::display_name("Tangent Bitangent Mapping"),
+        anno::in_group("Geometry")
+    ]],
+
+    //Displacement
+    float3 geometry_displacement = float3(0.0) [[
+        anno::display_name("Displacement"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform ::OmniSurface::OmniShared::displacement_mode geometry_displacement_mode = 
+        ::OmniSurface::OmniShared::displacement_height [[
+        anno::display_name("Displacement Mode"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform texture_2d geometry_displacement_image = texture_2d() [[ 
+        anno::display_name("Displacement Image"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode geometry_displacement_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Displacement Image Alpha Mode"),
+        anno::in_group("Geometry")
+    ]],
+
+    float geometry_displacement_scale = float(1.0) [[
+        anno::display_name("Displacement Scale"),
+        anno::in_group("Geometry"),
+        anno::soft_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d geometry_displacement_scale_image = texture_2d() [[ 
+        anno::display_name("Displacement Scale Image"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode geometry_displacement_scale_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Displacement Scale Image Alpha Mode"),
+        anno::in_group("Geometry")
+    ]],
+
+    float geometry_displacement_scalar_zero_value = float(0.0) [[
+        anno::display_name("Displacement Scalar Zero Value"),
+        anno::in_group("Geometry"),
+        anno::soft_range(0.0f, 1.0f)
+    ]],
+
+    //UVW
+    //
+    uniform base::texture_coordinate_system uvw_texture_coordinate_system = 
+        base::texture_coordinate_uvw [[
+        anno::display_name("Texture Coordinate"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform int uvw_uv_set = 0 [[
+        anno::display_name("UV Set"),
+        anno::in_group("UVW Coordinates"),
+        anno::hard_range(0, 4)
+    ]],
+
+    uniform bool uvw_ignore_missing_textures = false [[
+        anno::display_name("Ignore Missing Images"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    color uvw_missing_texture_color = color(0.0, 0.0, 0.0) [[
+        anno::display_name("Missing Image Color"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform bool uvw_use_uv_coords = false [[
+        anno::display_name("Use UV Coords"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    float2 uvw_uv_coords = float2(0.0) [[
+        anno::display_name("UV Coords"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float uvw_s_offset = 0.0f [[
+        anno::display_name("Offset U"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(-1.0f, 1.0f)
+    ]],
+
+    uniform float uvw_t_offset = 0.0f [[
+        anno::display_name("Offset V"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(-1.0f, 1.0f)
+    ]],
+
+    uniform ::OmniSurface::OmniImage::wrap_mode uvw_s_wrap = 
+        ::OmniSurface::OmniImage::wrap_periodic [[
+        anno::display_name("Wrap U"),
+        anno::in_group("UVW Coordinates")
+    ]],
+    
+    uniform ::OmniSurface::OmniImage::wrap_mode uvw_t_wrap = 
+        ::OmniSurface::OmniImage::wrap_periodic [[
+        anno::display_name("Wrap V"),
+        anno::in_group("UVW Coordinates")
+    ]],
+    
+    uniform float uvw_s_scale = 1.0f [[
+        anno::display_name("Scale U"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(0.0f, 100.0f)
+    ]],
+
+    uniform float uvw_t_scale = 1.0f [[
+        anno::display_name("Scale V"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(0.0f, 100.0f)
+    ]],
+
+    uniform bool uvw_s_flip = false [[
+        anno::display_name("Flip U"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform bool uvw_t_flip = false [[
+        anno::display_name("Flip V"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform bool uvw_swap_st = false [[
+        anno::display_name("Swap UV"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    //Projection Coordinates (Local / World)
+    uniform ::OmniSurface::OmniImage::projection_mode uvw_projection_mode = 
+        ::OmniSurface::OmniImage::projection_cubic [[
+        anno::display_name("Projection Mode"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float3 uvw_projection_translate = float3(0.0) [[
+        anno::display_name("Translate"),
+        anno::description("Translate the projected texture."),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float3 uvw_projection_rotate = float3(0.0) [[
+        anno::display_name("Rotate"),
+        anno::description("Rotate the projected texture."),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float3 uvw_projection_scale = float3(1.0) [[
+        anno::display_name("Scale"),
+        anno::description("Scale the projected texture."),
+        anno::in_group("UVW Coordinates")
+    ]]
+)
+[[  
+    anno::display_name("OmniHairBase"),
+    anno::description("A base material for modeling a variety of hairs, furs, and fibers."),
+    anno::author("NVIDIA Corporation"), 
+    anno::key_words(string[]("generic", "hair", "fur", "fiber")),
+    anno::version(1, 0, 0, "")
+
+]] = let {
+
+    base::texture_coordinate_info texture_coordinate_info = ::OmniSurface::OmniImage::compute_texture_coordinate_2(
+        uvw_texture_coordinate_system,
+        uvw_uv_set,
+        uvw_s_offset,
+        uvw_t_offset,
+        uvw_s_scale,
+        uvw_t_scale,
+        uvw_s_flip,
+        uvw_t_flip,
+        uvw_swap_st,
+        uvw_projection_mode,
+        uvw_projection_translate,
+        uvw_projection_rotate,
+        uvw_projection_scale);
+
+    material base = ::OmniSurface::OmniHairBase::OmniHairBase (
+
+        //Color
+        //
+        base_color_weight: tex::texture_isvalid(base_color_weight_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    base_color_weight_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                base_color_weight_image_alpha_mode
+            ).mono :
+            base_color_weight,
+
+        base_color: tex::texture_isvalid(base_color_image) ? 
+            ::OmniSurface::OmniImage::texture_lookup_2(
+                base_color_image,
+                uvw_ignore_missing_textures,
+                uvw_missing_texture_color,
+                uvw_use_uv_coords,
+                uvw_uv_coords,
+                uvw_s_wrap,
+                uvw_t_wrap,
+                texture_coordinate_info
+            ).tint :
+            base_color,
+
+
+        //Melanin
+        //
+        melanin_concentration_preset: melanin_concentration_preset,
+
+        melanin_concentration: tex::texture_isvalid(melanin_concentration_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    melanin_concentration_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                melanin_concentration_image_alpha_mode
+            ).mono :
+            melanin_concentration,
+
+        melanin_redness: tex::texture_isvalid(melanin_redness_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    melanin_redness_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                melanin_redness_image_alpha_mode
+            ).mono :
+            melanin_redness,
+
+        melanin_concentration_randomize: tex::texture_isvalid(melanin_concentration_randomize_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    melanin_concentration_randomize_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                melanin_concentration_randomize_image_alpha_mode
+            ).mono :
+            melanin_concentration_randomize,
+
+        //Specular reflection
+        //
+        specular_reflection_roughness: tex::texture_isvalid(specular_reflection_roughness_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    specular_reflection_roughness_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                specular_reflection_roughness_image_alpha_mode
+            ).mono :
+            specular_reflection_roughness,
+
+        specular_reflection_anisotropic_roughness: specular_reflection_anisotropic_roughness,
+
+        specular_reflection_azimuthal_roughness: tex::texture_isvalid(specular_reflection_azimuthal_roughness_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    specular_reflection_azimuthal_roughness_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                specular_reflection_azimuthal_roughness_image_alpha_mode
+            ).mono :
+            specular_reflection_azimuthal_roughness,
+
+        specular_reflection_ior: specular_reflection_ior,
+
+        specular_reflection_shift: tex::texture_isvalid(specular_reflection_shift_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    specular_reflection_shift_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                specular_reflection_shift_image_alpha_mode
+            ).mono :
+            specular_reflection_shift,
+
+        //Diffuse Reflection
+        //
+        diffuse_reflection_weight: tex::texture_isvalid(diffuse_reflection_weight_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    diffuse_reflection_weight_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                diffuse_reflection_weight_image_alpha_mode
+            ).mono :
+            diffuse_reflection_weight,
+
+        diffuse_reflection_color: tex::texture_isvalid(diffuse_reflection_color_image) ? 
+            ::OmniSurface::OmniImage::texture_lookup_2(
+                diffuse_reflection_color_image,
+                uvw_ignore_missing_textures,
+                uvw_missing_texture_color,
+                uvw_use_uv_coords,
+                uvw_uv_coords,
+                uvw_s_wrap,
+                uvw_t_wrap,
+                texture_coordinate_info
+            ).tint :
+            diffuse_reflection_color,
+
+        //Emission
+        //
+        emission_weight: tex::texture_isvalid(emission_weight_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    emission_weight_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                emission_weight_image_alpha_mode
+            ).mono :
+            emission_weight,
+
+        emission_mode: emission_mode,
+
+        emission_intensity: tex::texture_isvalid(emission_intensity_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    emission_intensity_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                emission_intensity_image_alpha_mode
+            ).mono :
+            emission_intensity,
+
+        emission_color: tex::texture_isvalid(emission_color_image) ?
+            ::OmniSurface::OmniImage::texture_lookup_2(
+                emission_color_image,
+                uvw_ignore_missing_textures,
+                uvw_missing_texture_color,
+                uvw_use_uv_coords,
+                uvw_uv_coords,
+                uvw_s_wrap,
+                uvw_t_wrap,
+                texture_coordinate_info
+            ).tint :
+        emission_color,
+
+        emission_use_temperature: emission_use_temperature,
+
+        emission_temperature: tex::texture_isvalid(emission_temperature_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    emission_temperature_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                emission_temperature_image_alpha_mode
+            ).mono :
+            emission_temperature,
+
+        //Geometry
+        //
+        enable_opacity: enable_opacity,
+        
+        geometry_opacity: tex::texture_isvalid(geometry_opacity_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    geometry_opacity_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                geometry_opacity_image_alpha_mode
+            ).mono :
+            geometry_opacity,
+
+        geometry_opacity_threshold: geometry_opacity_threshold,
+
+        geometry_normal: tex::texture_isvalid(geometry_normal_image) ?
+            ::OmniSurface::OmniImage::normal_mapping(
+                ::OmniSurface::OmniImage::tangent_space_normal_lookup_2(
+                    geometry_normal_image,
+                    uvw_ignore_missing_textures,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    uvw_s_flip,
+                    uvw_t_flip,
+                    geometry_normal_strength,
+                    geometry_normal_image_flip_r_channel,
+                    geometry_normal_image_flip_g_channel,
+                    geometry_normal_image_flip_b_channel,
+                    texture_coordinate_info
+                ),
+                geometry_tangent_bitangent_mapping,
+                geometry_normal
+            ):
+            geometry_normal,
+            
+        geometry_displacement: tex::texture_isvalid(geometry_displacement_image) ?
+            ::OmniSurface::OmniShared::displacement_adjustment(
+                (geometry_displacement_mode == ::OmniSurface::OmniShared::displacement_height) ?
+                    float3(::OmniSurface::OmniImage::texture_adjustment_2(
+                        OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                            ::OmniSurface::OmniImage::texture_lookup_2(
+                                geometry_displacement_image,
+                                uvw_ignore_missing_textures,
+                                uvw_missing_texture_color,
+                                uvw_use_uv_coords,
+                                uvw_uv_coords,
+                                uvw_s_wrap,
+                                uvw_t_wrap,
+                                texture_coordinate_info
+                            ),
+                            geometry_displacement_image_alpha_mode
+                        ),
+                        0.0f,       //exposure
+                        color(0.5), //default_color
+                        color(1.0), //color_gain
+                        color(0.0), //color_offset
+                        1.0f,       //alpha_gain
+                        -1.0f * geometry_displacement_scalar_zero_value, //alpha_offset
+                        false,      //invert
+                        0.0f        //blend_factor
+                    ).mono) :
+
+                    float3(::OmniSurface::OmniImage::texture_lookup_2(
+                            geometry_displacement_image,
+                            uvw_ignore_missing_textures,
+                            uvw_missing_texture_color,
+                            uvw_use_uv_coords,
+                            uvw_uv_coords,
+                            uvw_s_wrap,
+                            uvw_t_wrap,
+                            texture_coordinate_info
+                        ).tint
+                    ),
+
+                geometry_displacement_mode,
+
+                tex::texture_isvalid(geometry_displacement_scale_image) ?
+                    ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                        ::OmniSurface::OmniImage::texture_lookup_2(
+                            geometry_displacement_scale_image,
+                            uvw_ignore_missing_textures,
+                            uvw_missing_texture_color,
+                            uvw_use_uv_coords,
+                            uvw_uv_coords,
+                            uvw_s_wrap,
+                            uvw_t_wrap,
+                            texture_coordinate_info
+                        ),
+                        geometry_displacement_scale_image_alpha_mode
+                    ).mono :
+                    geometry_displacement_scale
+            ):
+            geometry_displacement
+    );
+     
+} in material(
+    thin_walled: base.thin_walled,
+    ior: base.ior,
+    surface: base.surface,
+    backface: base.backface,
+    volume: base.volume,
+    geometry: base.geometry,
+    hair: base.hair
+);
