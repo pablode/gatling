@@ -48,7 +48,7 @@ namespace sg
     m_shaderPath = std::string(params.shaderPath);
 
     m_mdlRuntime = new sg::MdlRuntime();
-    if (!m_mdlRuntime->init(params.resourcePath.data(), params.mdlLibPath.data()))
+    if (!m_mdlRuntime->init(params.resourcePath.data()))
     {
       return false;
     }
@@ -59,7 +59,7 @@ namespace sg
       return false;
     }
 
-    m_mdlMaterialCompiler = new sg::MdlMaterialCompiler(*m_mdlRuntime);
+    m_mdlMaterialCompiler = new sg::MdlMaterialCompiler(*m_mdlRuntime, params.mdlLibPath.data());
 
   #ifdef GATLING_USE_GLSLANG
     m_shaderCompiler = new sg::GlslangShaderCompiler(m_shaderPath);

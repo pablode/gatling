@@ -38,8 +38,7 @@ namespace sg
     }
   }
 
-  bool MdlRuntime::init(const char* resourcePath,
-                        const char* mdlLibPath)
+  bool MdlRuntime::init(const char* resourcePath)
   {
     m_loader = std::make_unique<MdlNeurayLoader>();
     if (!m_loader->init(resourcePath))
@@ -52,12 +51,6 @@ namespace sg
     m_config = mi::base::Handle<mi::neuraylib::IMdl_configuration>(m_neuray->get_api_component<mi::neuraylib::IMdl_configuration>());
     m_logger = mi::base::Handle<MdlLogger>(new MdlLogger());
     m_config->set_logger(m_logger.get());
-
-    if (m_config->add_mdl_path(mdlLibPath))
-    {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MDL library files not found");
-      return false;
-    }
 
     auto pluginConfigApi = mi::base::Handle<mi::neuraylib::IPlugin_configuration>(m_neuray->get_api_component<mi::neuraylib::IPlugin_configuration>());
     std::string pluginFilePath = std::string(resourcePath) + std::string("/mdl-image-plugin" MI_BASE_DLL_FILE_EXT);

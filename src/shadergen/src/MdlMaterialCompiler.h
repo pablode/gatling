@@ -36,7 +36,7 @@ namespace sg
   class MdlMaterialCompiler
   {
   public:
-    MdlMaterialCompiler(MdlRuntime& runtime);
+    MdlMaterialCompiler(MdlRuntime& runtime, const std::string& mdlLibPath);
 
   public:
     bool compileFromString(std::string_view srcStr,
@@ -59,6 +59,8 @@ namespace sg
                                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
   private:
+    std::string m_mdlLibPath;
+
     mi::base::Handle<MdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;

@@ -36,7 +36,8 @@ namespace sg
     return std::string(MODULE_PREFIX) + std::to_string(uniqueId) + "_" + std::string(identifier);
   }
 
-  MdlMaterialCompiler::MdlMaterialCompiler(MdlRuntime& runtime)
+  MdlMaterialCompiler::MdlMaterialCompiler(MdlRuntime& runtime, const std::string& mdlLibPath)
+    : m_mdlLibPath(mdlLibPath)
   {
     m_logger = mi::base::Handle<MdlLogger>(runtime.getLogger());
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
@@ -52,12 +53,22 @@ namespace sg
   {
     std::string moduleName = _makeModuleName(identifier);
 
+    if (m_config->add_mdl_path(m_mdlLibPath.c_str()))
+    {
+      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MaterialX MDL library files not found");
+      return false;
+    }
+
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
       return m_impExpApi->load_module_from_string(m_transaction.get(), moduleName.c_str(), srcStr.data(), context);
     };
 
-    return compile(identifier, moduleName, modCreateFunc, compiledMaterial);
+    bool result = compile(identifier, moduleName, modCreateFunc, compiledMaterial);
+
+    m_config->remove_mdl_path(m_mdlLibPath.c_str());
+
+    return result;
   }
 
   bool MdlMaterialCompiler::compileFromFile(std::string_view filePath,
@@ -68,6 +79,14 @@ namespace sg
     std::string moduleName = "::" + fs::path(filePath).stem().string();
 
     m_config->add_mdl_path(fileDir.c_str());
+    // The free TurboSquid USD+MDL models, and possibly thousand paid ones too, come with some of the required Omni* files,
+    // but some others are referenced and missing. If we include the directory of the asset as an MDL path after our own Omni*
+    // MDL files, the Omni* files that come with the asset will be loaded instead of ours. They link to the other files that do
+    // not exist, causing compilation to fail. By changing the load order, our complete Omni*-file suite will be used instead.
+    if (m_config->add_mdl_path(m_mdlLibPath.c_str()))
+    {
+      m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "MDL library files not found; code generation may fail");
+    }
 
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
@@ -76,6 +95,7 @@ namespace sg
 
     bool result = compile(identifier, moduleName, modCreateFunc, compiledMaterial);
 
+    m_config->remove_mdl_path(m_mdlLibPath.c_str());
     m_config->remove_mdl_path(fileDir.c_str());
 
     return result;

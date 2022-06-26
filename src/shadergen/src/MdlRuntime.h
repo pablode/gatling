@@ -40,8 +40,7 @@ namespace sg
     ~MdlRuntime();
 
   public:
-    bool init(const char* resourcePath,
-              const char* mdlLibPath);
+    bool init(const char* resourcePath);
 
     mi::base::Handle<MdlLogger> getLogger();
     mi::base::Handle<mi::neuraylib::IDatabase> getDatabase();
