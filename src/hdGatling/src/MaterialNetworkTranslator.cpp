@@ -77,8 +77,24 @@ TF_DEFINE_PRIVATE_TOKENS(
   ((ND_UsdUVTexture_WrapMode_periodic, "periodic"))
 );
 
-bool _ConvertNodesToMaterialXNodes(const HdMaterialNetwork2& network,
-                                   HdMaterialNetwork2& mtlxNetwork)
+static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTypeIdMappings = {
+  { _tokens->UsdPreviewSurface,       _tokens->ND_UsdPreviewSurface_surfaceshader },
+  { _tokens->UsdUVTexture,            _tokens->ND_UsdUVTexture                    },
+  { _tokens->UsdTransform2d,          _tokens->ND_UsdTransform2d                  },
+  { _tokens->UsdPrimvarReader_float,  _tokens->ND_UsdPrimvarReader_float          },
+  { _tokens->UsdPrimvarReader_float2, _tokens->ND_UsdPrimvarReader_vector2        },
+  { _tokens->UsdPrimvarReader_float3, _tokens->ND_UsdPrimvarReader_vector3        },
+  { _tokens->UsdPrimvarReader_float4, _tokens->ND_UsdPrimvarReader_vector4        },
+  { _tokens->UsdPrimvarReader_int,    _tokens->ND_UsdPrimvarReader_integer        },
+  { _tokens->UsdPrimvarReader_string, _tokens->ND_UsdPrimvarReader_string         },
+  { _tokens->UsdPrimvarReader_normal, _tokens->ND_UsdPrimvarReader_vector3        },
+  { _tokens->UsdPrimvarReader_point,  _tokens->ND_UsdPrimvarReader_vector3        },
+  { _tokens->UsdPrimvarReader_vector, _tokens->ND_UsdPrimvarReader_vector3        },
+  { _tokens->UsdPrimvarReader_matrix, _tokens->ND_UsdPrimvarReader_matrix44       }
+};
+
+bool _ConvertUsdNodesToMaterialXNodes(const HdMaterialNetwork2& network,
+                                      HdMaterialNetwork2& mtlxNetwork)
 {
   mtlxNetwork = network;
 
@@ -92,14 +108,15 @@ bool _ConvertNodesToMaterialXNodes(const HdMaterialNetwork2& network,
       continue;
     }
 
-    if (nodeTypeId == _tokens->UsdPreviewSurface)
+    auto mappingIt = _usdMtlxNodeTypeIdMappings.find(nodeTypeId);
+    if (mappingIt == _usdMtlxNodeTypeIdMappings.end())
     {
-      nodeTypeId = _tokens->ND_UsdPreviewSurface_surfaceshader;
+      TF_WARN("Unable to translate material node of type %s to MaterialX counterpart", nodeTypeId.GetText());
+      return false;
     }
-    else if (nodeTypeId == _tokens->UsdUVTexture)
-    {
-      nodeTypeId = _tokens->ND_UsdUVTexture;
 
+    if (nodeTypeId == _tokens->UsdUVTexture)
+    {
       // MaterialX node inputs do not match the USD spec; we need to remap.
       auto convertWrapType = [](VtValue& wrapType)
       {
@@ -139,55 +156,8 @@ bool _ConvertNodesToMaterialXNodes(const HdMaterialNetwork2& network,
         convertWrapType(wrapT->second);
       }
     }
-    else if (nodeTypeId == _tokens->UsdTransform2d)
-    {
-      nodeTypeId = _tokens->ND_UsdTransform2d;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_float)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_float;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_float2)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_vector2;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_float3)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_vector3;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_float4)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_vector4;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_int)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_integer;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_string)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_string;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_normal)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_vector3;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_point)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_vector3;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_vector)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_vector3;
-    }
-    else if (nodeTypeId == _tokens->UsdPrimvarReader_matrix)
-    {
-      nodeTypeId = _tokens->ND_UsdPrimvarReader_matrix44;
-    }
-    else
-    {
-      TF_WARN("Unable to translate material node of type %s to MaterialX counterpart", nodeTypeId.GetText());
-      return false;
-    }
+
+    nodeTypeId = mappingIt->second;
   }
 
   return true;
@@ -270,7 +240,7 @@ gi_material* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwo
 gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   HdMaterialNetwork2 mtlxNetwork;
-  if (!_ConvertNodesToMaterialXNodes(network, mtlxNetwork))
+  if (!_ConvertUsdNodesToMaterialXNodes(network, mtlxNetwork))
   {
     return nullptr;
   }
