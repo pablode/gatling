@@ -293,7 +293,7 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
     Hd_VertexAdjacency adjacency;
     adjacency.BuildAdjacencyTable(&topology);
     m_normals.array = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, m_points.size(), m_points.cdata());
-    m_normals.indexed = false;
+    m_normals.indexed = true;
   }
 
   // Tex Coords: since there is no standardization in respect to multiple sets, we have to guess.
