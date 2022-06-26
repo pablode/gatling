@@ -2,6 +2,8 @@ add_library(
   gi STATIC
   include/gi.h
   src/gi.cpp
+  src/mmap.h
+  src/mmap.cpp
   src/stager.h
   src/stager.cpp
   src/texsys.h

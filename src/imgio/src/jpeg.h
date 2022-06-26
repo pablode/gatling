@@ -24,8 +24,6 @@
 
 struct imgio_img;
 
-int imgio_jpeg_decode(size_t size,
-                      void* data,
-                      imgio_img* img);
+int imgio_jpeg_decode(size_t size, const void* data, imgio_img* img);
 
 #endif

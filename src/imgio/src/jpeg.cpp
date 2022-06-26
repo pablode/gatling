@@ -25,9 +25,7 @@
 #include <stdlib.h>
 #include <turbojpeg.h>
 
-int imgio_jpeg_decode(size_t size,
-                      void* mem,
-                      imgio_img* img)
+int imgio_jpeg_decode(size_t size, const void* data, imgio_img* img)
 {
   tjhandle instance = tjInitDecompress();
   if (!instance)
@@ -37,7 +35,7 @@ int imgio_jpeg_decode(size_t size,
 
   int subsamp;
   int colorspace;
-  if (tjDecompressHeader3(instance, (const unsigned char*) mem, (unsigned long) size,
+  if (tjDecompressHeader3(instance, (const unsigned char*) data, (unsigned long) size,
                           (int*) &img->width, (int*) &img->height,
                           &subsamp, &colorspace) < 0)
   {
@@ -49,7 +47,7 @@ int imgio_jpeg_decode(size_t size,
   img->size = img->width * img->height * tjPixelSize[pixelFormat];
   img->data = (uint8_t*) malloc(img->size);
 
-  int result = tjDecompress2(instance, (const unsigned char*) mem, (unsigned long) size,
+  int result = tjDecompress2(instance, (const unsigned char*) data, (unsigned long) size,
                              (unsigned char*) img->data, (int) img->width, 0,
                              (int) img->height, pixelFormat, TJFLAG_ACCURATEDCT);
   tjDestroy(instance);

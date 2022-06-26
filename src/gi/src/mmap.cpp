@@ -37,28 +37,28 @@
 
 #define MAX_MAPPED_MEM_RANGES 16
 
-struct imgio_mapped_posix_range
+struct gi_mapped_posix_range
 {
   void* addr;
   size_t size;
 };
 
-struct imgio_file
+struct gi_file
 {
-  ImgioFileUsage usage;
-  size_t         size;
+  GiFileUsage usage;
+  size_t      size;
 #if defined(_WIN32)
-  HANDLE         file_handle;
-  HANDLE         mapping_handle;
+  HANDLE      file_handle;
+  HANDLE      mapping_handle;
 #else
-  int            file_descriptor;
-  imgio_mapped_posix_range mapped_ranges[MAX_MAPPED_MEM_RANGES];
+  int         file_descriptor;
+  gi_mapped_posix_range mapped_ranges[MAX_MAPPED_MEM_RANGES];
 #endif
 };
 
 #if defined (_WIN32)
 
-bool imgio_file_create(const char* path, size_t size, imgio_file** file)
+bool gi_file_create(const char* path, size_t size, gi_file** file)
 {
   DWORD creation_disposition = CREATE_ALWAYS;
   DWORD desired_access = GENERIC_READ | GENERIC_WRITE;
@@ -105,8 +105,8 @@ bool imgio_file_create(const char* path, size_t size, imgio_file** file)
     return false;
   }
 
-  (*file) = new imgio_file;
-  (*file)->usage = IMGIO_FILE_USAGE_WRITE;
+  (*file) = new gi_file;
+  (*file)->usage = GI_FILE_USAGE_WRITE;
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
   (*file)->size = size;
@@ -114,18 +114,18 @@ bool imgio_file_create(const char* path, size_t size, imgio_file** file)
   return true;
 }
 
-bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
+bool gi_file_open(const char* path, GiFileUsage usage, gi_file** file)
 {
   DWORD desired_access;
   DWORD share_mode;
   DWORD protection_flags;
-  if (usage == IMGIO_FILE_USAGE_READ)
+  if (usage == GI_FILE_USAGE_READ)
   {
     desired_access = GENERIC_READ;
     share_mode = FILE_SHARE_READ;
     protection_flags = PAGE_READONLY;
   }
-  else if (usage == IMGIO_FILE_USAGE_WRITE)
+  else if (usage == GI_FILE_USAGE_WRITE)
   {
     desired_access = GENERIC_READ | GENERIC_WRITE;
     share_mode = FILE_SHARE_WRITE;
@@ -180,7 +180,7 @@ bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
     return false;
   }
 
-  (*file) = new imgio_file;
+  (*file) = new gi_file;
   (*file)->usage = usage;
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
@@ -189,12 +189,12 @@ bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
   return true;
 }
 
-size_t imgio_file_size(imgio_file* file)
+size_t gi_file_size(gi_file* file)
 {
   return file->size;
 }
 
-bool imgio_file_close(imgio_file* file)
+bool gi_file_close(gi_file* file)
 {
   bool closed_mapping = CloseHandle(file->mapping_handle);
   bool closed_file = CloseHandle(file->file_handle);
@@ -204,7 +204,7 @@ bool imgio_file_close(imgio_file* file)
   return closed_mapping && closed_file;
 }
 
-void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
+void* gi_mmap(gi_file* file, size_t offset, size_t size)
 {
   if (size == 0)
   {
@@ -212,11 +212,11 @@ void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
   }
 
   DWORD desired_access;
-  if (file->usage == IMGIO_FILE_USAGE_WRITE)
+  if (file->usage == GI_FILE_USAGE_WRITE)
   {
     desired_access = FILE_MAP_WRITE;
   }
-  else if (file->usage == IMGIO_FILE_USAGE_READ)
+  else if (file->usage == GI_FILE_USAGE_READ)
   {
     desired_access = FILE_MAP_READ;
   }
@@ -240,14 +240,14 @@ void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
   return mapped_addr;
 }
 
-bool imgio_munmap(imgio_file* file, void* addr)
+bool gi_munmap(gi_file* file, void* addr)
 {
   return UnmapViewOfFile(addr);
 }
 
 #else
 
-bool imgio_file_create(const char* path, size_t size, imgio_file** file)
+bool gi_file_create(const char* path, size_t size, gi_file** file)
 {
   int open_flags = O_RDWR | O_CREAT | O_TRUNC;
   mode_t permission_flags = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -266,23 +266,23 @@ bool imgio_file_create(const char* path, size_t size, imgio_file** file)
     return false;
   }
 
-  (*file) = new imgio_file;
-  (*file)->usage = IMGIO_FILE_USAGE_WRITE;
+  (*file) = new gi_file;
+  (*file)->usage = GI_FILE_USAGE_WRITE;
   (*file)->file_descriptor = file_descriptor;
-  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(imgio_mapped_posix_range));
+  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(gi_mapped_posix_range));
 
   return true;
 }
 
-bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
+bool gi_file_open(const char* path, GiFileUsage usage, gi_file** file)
 {
   int open_flags = 0;
 
-  if (usage == IMGIO_FILE_USAGE_WRITE)
+  if (usage == GI_FILE_USAGE_WRITE)
   {
     open_flags = O_RDWR;
   }
-  else if (usage == IMGIO_FILE_USAGE_READ)
+  else if (usage == GI_FILE_USAGE_READ)
   {
     open_flags = O_RDONLY;
   }
@@ -305,21 +305,21 @@ bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
     return false;
   }
 
-  (*file) = new imgio_file;
+  (*file) = new gi_file;
   (*file)->usage = usage;
   (*file)->file_descriptor = file_descriptor;
   (*file)->size = file_stats.st_size;
-  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(imgio_mapped_posix_range));
+  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(gi_mapped_posix_range));
 
   return true;
 }
 
-size_t imgio_file_size(imgio_file* file)
+size_t gi_file_size(gi_file* file)
 {
   return file->size;
 }
 
-bool imgio_file_close(imgio_file* file)
+bool gi_file_close(gi_file* file)
 {
   int result = close(file->file_descriptor);
 #ifndef NDEBUG
@@ -333,7 +333,7 @@ bool imgio_file_close(imgio_file* file)
   return !result;
 }
 
-void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
+void* gi_mmap(gi_file* file, size_t offset, size_t size)
 {
   if (size == 0)
   {
@@ -341,7 +341,7 @@ void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
   }
 
   /* Try to find an empty mapped range data struct. */
-  imgio_mapped_posix_range* range = NULL;
+  gi_mapped_posix_range* range = NULL;
   for (uint32_t i = 0; i < MAX_MAPPED_MEM_RANGES; ++i)
   {
     if (!file->mapped_ranges[i].addr)
@@ -358,7 +358,7 @@ void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
   /* Map the memory. */
   int protection_flags = PROT_READ;
 
-  if (file->usage == IMGIO_FILE_USAGE_WRITE)
+  if (file->usage == GI_FILE_USAGE_WRITE)
   {
     protection_flags |= PROT_WRITE;
   }
@@ -386,11 +386,11 @@ void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
   return mapped_addr;
 }
 
-bool imgio_munmap(imgio_file* file, void* addr)
+bool gi_munmap(gi_file* file, void* addr)
 {
   for (uint32_t i = 0; i < MAX_MAPPED_MEM_RANGES; ++i)
   {
-    imgio_mapped_posix_range* range = &file->mapped_ranges[i];
+    gi_mapped_posix_range* range = &file->mapped_ranges[i];
     if (range->addr != addr)
     {
       continue;

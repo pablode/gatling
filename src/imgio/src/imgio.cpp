@@ -19,32 +19,14 @@
 
 #include "imgio.h"
 
-#include "mmap.h"
 #include "png.h"
 #include "jpeg.h"
 #include "exr.h"
 
 #include <stdlib.h>
 
-int imgio_load_img(const char* file_path,
-                   imgio_img* img)
+int imgio_load_img(const void* data, size_t size, imgio_img* img)
 {
-  imgio_file* file;
-  if (!imgio_file_open(file_path,
-                       IMGIO_FILE_USAGE_READ,
-                       &file))
-  {
-    return IMGIO_ERR_FILE_NOT_FOUND;
-  }
-
-  size_t size = imgio_file_size(file);
-  void* data = imgio_mmap(file, 0, size);
-  if (!data)
-  {
-    imgio_file_close(file);
-    return IMGIO_ERR_IO;
-  }
-
   int r = imgio_png_decode(size, data, img);
 
   if (r == IMGIO_ERR_UNSUPPORTED_ENCODING)
@@ -56,9 +38,6 @@ int imgio_load_img(const char* file_path,
   {
     r = imgio_exr_decode(size, data, img);
   }
-
-  imgio_munmap(file, data);
-  imgio_file_close(file);
 
   return r;
 }

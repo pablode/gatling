@@ -25,15 +25,13 @@
 #include <stdlib.h>
 #include <spng.h>
 
-int imgio_png_decode(size_t size,
-                     void* mem,
-                     imgio_img* img)
+int imgio_png_decode(size_t size, const void* data, imgio_img* img)
 {
   int err;
 
   spng_ctx* ctx = spng_ctx_new(0);
 
-  err = spng_set_png_buffer(ctx, mem, size);
+  err = spng_set_png_buffer(ctx, data, size);
   if (err != SPNG_OK)
   {
     goto buffer_fail;
@@ -81,7 +79,7 @@ buffer_fail:
   }
   else if (err == SPNG_IO_ERROR || err == SPNG_IO_EOF)
   {
-    return IMGIO_ERR_IO;
+    return IMGIO_ERR_CORRUPT_DATA;
   }
   else
   {

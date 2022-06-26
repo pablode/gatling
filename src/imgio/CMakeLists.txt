@@ -10,8 +10,6 @@ add_library(
   src/jpeg.cpp
   src/png.h
   src/png.cpp
-  src/mmap.h
-  src/mmap.cpp
 )
 
 set_target_properties(

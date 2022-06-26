@@ -18,12 +18,40 @@
 #include "texsys.h"
 
 #include "stager.h"
+#include "mmap.h"
 
 #include <ShaderGen.h>
 #include <imgio.h>
 #include <assert.h>
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
+
+namespace detail
+{
+  bool readImage(const char* filePath, imgio_img* img)
+  {
+    gi_file* file;
+    if (!gi_file_open(filePath, GI_FILE_USAGE_READ, &file))
+    {
+      return false;
+    }
+
+    size_t size = gi_file_size(file);
+    void* data = gi_mmap(file, 0, size);
+    if (!data)
+    {
+      gi_file_close(file);
+      return false;
+    }
+
+    bool loadResult = imgio_load_img(data, size, img) == IMGIO_OK;
+
+    gi_munmap(file, data);
+    gi_file_close(file);
+
+    return loadResult;
+  }
+}
 
 namespace gi
 {
@@ -121,7 +149,7 @@ namespace gi
       }
 
       imgio_img image_data;
-      if (imgio_load_img(filePath, &image_data) == IMGIO_OK)
+      if (detail::readImage(filePath, &image_data))
       {
         printf("image %d read from path %s of size %.2fMiB\n",
           i, filePath, image_data.size * BYTES_TO_MIB);

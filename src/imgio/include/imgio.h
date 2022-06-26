@@ -27,8 +27,7 @@
 extern "C" {
 #endif
 
-int imgio_load_img(const char* file_path,
-                   imgio_img* img);
+int imgio_load_img(const void* data, size_t size, imgio_img* img);
 
 void imgio_free_img(imgio_img* img);
 

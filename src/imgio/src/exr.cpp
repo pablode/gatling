@@ -75,19 +75,17 @@ uint8_t _FloatToByte(float value)
   return std::min(255, std::max(0, result));
 }
 
-int imgio_exr_decode(size_t size,
-                     void* mem,
-                     imgio_img* img)
+int imgio_exr_decode(size_t size, const void* data, imgio_img* img)
 {
   // Do the signature check manually because we can't detect
   // a mismatch based on the exception-based API.
   if (size < 4)
   {
-    return IMGIO_ERR_IO;
+    return IMGIO_ERR_CORRUPT_DATA;
   }
 
   uint8_t signature[] = { 0x76, 0x2F, 0x31, 0x01 };
-  if (memcmp(mem, signature, 4))
+  if (memcmp(data, signature, 4))
   {
     return IMGIO_ERR_UNSUPPORTED_ENCODING;
   }
@@ -96,7 +94,7 @@ int imgio_exr_decode(size_t size,
 
   try
   {
-    MemStream stream((char*) mem, size);
+    MemStream stream((char*) data, size);
 
     Imf::RgbaInputFile file(stream);
 
