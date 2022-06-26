@@ -39,10 +39,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
-  // USD node types
+  // USD node type ids
   (UsdPreviewSurface)
-  (UsdUVTexture)
-  (UsdTransform2d)
   (UsdPrimvarReader_float)
   (UsdPrimvarReader_float2)
   (UsdPrimvarReader_float3)
@@ -53,9 +51,17 @@ TF_DEFINE_PRIVATE_TOKENS(
   (UsdPrimvarReader_point)
   (UsdPrimvarReader_vector)
   (UsdPrimvarReader_matrix)
+  (UsdTransform2d)
+  (UsdUVTexture)
+  ((UsdUVTexture_wrapS, "wrapS"))
+  ((UsdUVTexture_wrapT, "wrapT"))
+  ((UsdUVTexture_WrapMode_black, "black"))
+  ((UsdUVTexture_WrapMode_clamp, "clamp"))
+  ((UsdUVTexture_WrapMode_repeat, "repeat"))
+  ((UsdUVTexture_WrapMode_mirror, "mirror"))
+  ((UsdUVTexture_WrapMode_useMetadata, "useMetdata"))
   // MaterialX USD node type equivalents
   (ND_UsdPreviewSurface_surfaceshader)
-  (ND_UsdUVTexture)
   (ND_UsdPrimvarReader_integer)
   (ND_UsdPrimvarReader_boolean)
   (ND_UsdPrimvarReader_string)
@@ -63,8 +69,12 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_UsdPrimvarReader_vector2)
   (ND_UsdPrimvarReader_vector3)
   (ND_UsdPrimvarReader_vector4)
-  (ND_UsdTransform2d)
   (ND_UsdPrimvarReader_matrix44)
+  (ND_UsdTransform2d)
+  (ND_UsdUVTexture)
+  ((ND_UsdUVTexture_WrapMode_black, "black"))
+  ((ND_UsdUVTexture_WrapMode_clamp, "clamp"))
+  ((ND_UsdUVTexture_WrapMode_periodic, "periodic"))
 );
 
 bool _ConvertNodesToMaterialXNodes(const HdMaterialNetwork2& network,
@@ -89,6 +99,45 @@ bool _ConvertNodesToMaterialXNodes(const HdMaterialNetwork2& network,
     else if (nodeTypeId == _tokens->UsdUVTexture)
     {
       nodeTypeId = _tokens->ND_UsdUVTexture;
+
+      // MaterialX node inputs do not match the USD spec; we need to remap.
+      auto convertWrapType = [](VtValue& wrapType)
+      {
+        auto wrapToken = wrapType.UncheckedGet<TfToken>();
+
+        if (wrapToken == _tokens->UsdUVTexture_WrapMode_black)
+        {
+          // It's internally mapped to 'constant' which uses the fallback color
+          TF_WARN("UsdUVTexture wrap mode black is not fully supported");
+        }
+        else if (wrapToken == _tokens->UsdUVTexture_WrapMode_mirror ||
+                 wrapToken == _tokens->UsdUVTexture_WrapMode_clamp)
+        {
+          // These are valid, do nothing.
+        }
+        else if (wrapToken == _tokens->UsdUVTexture_WrapMode_repeat)
+        {
+          wrapType = _tokens->ND_UsdUVTexture_WrapMode_periodic;
+        }
+        else
+        {
+          TF_WARN("UsdUVTexture node has unsupported wrap mode %s\n", wrapToken.GetText());
+          wrapType = _tokens->ND_UsdUVTexture_WrapMode_periodic;
+        }
+      };
+
+      auto& parameters = nodeIt->second.parameters;
+      auto wrapS = parameters.find(_tokens->UsdUVTexture_wrapS);
+      auto wrapT = parameters.find(_tokens->UsdUVTexture_wrapT);
+
+      if (wrapS != parameters.end())
+      {
+        convertWrapType(wrapS->second);
+      }
+      if (wrapT != parameters.end())
+      {
+        convertWrapType(wrapT->second);
+      }
     }
     else if (nodeTypeId == _tokens->UsdTransform2d)
     {
