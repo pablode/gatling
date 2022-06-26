@@ -198,7 +198,7 @@ MaterialNetworkTranslator::MaterialNetworkTranslator(const std::string& mtlxLibP
 }
 
 gi_material* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,
-                                                     const HdMaterialNetwork2& network) const
+                                                     HdMaterialNetwork2& network) const
 {
   gi_material* result = TryParseMdlNetwork(network);
 
@@ -237,7 +237,7 @@ gi_material* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwo
   return giCreateMaterialFromMdlFile(fileUri.c_str(), subIdentifier.c_str());
 }
 
-gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, HdMaterialNetwork2& network) const
 {
   HdMaterialNetwork2 mtlxNetwork;
   if (!_ConvertUsdNodesToMaterialXNodes(network, mtlxNetwork))
@@ -256,9 +256,31 @@ gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, c
   return giCreateMaterialFromMtlx(docStr.c_str());
 }
 
-mx::DocumentPtr MaterialNetworkTranslator::CreateMaterialXDocumentFromNetwork(const SdfPath& id,
-                                                                              const HdMaterialNetwork2& network) const
+void _ConvertTfTokenToStringParameters(HdMaterialNetwork2& network)
 {
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+
+    for (auto& tokenValuePair : node.parameters)
+    {
+      VtValue& value = tokenValuePair.second;
+
+      if (value.IsHolding<TfToken>())
+      {
+        value = value.Cast<std::string>();
+      }
+    }
+  }
+}
+
+mx::DocumentPtr MaterialNetworkTranslator::CreateMaterialXDocumentFromNetwork(const SdfPath& id,
+                                                                              HdMaterialNetwork2& network) const
+{
+  // Workaround for HdMtlxConvertToString not handling the TfToken type..
+  // https://github.com/PixarAnimationStudios/USD/blob/857ffda41f4f1553fe1019ac7c7b4f08c233a7bb/pxr/imaging/hdMtlx/hdMtlx.cpp#L144-L207
+  _ConvertTfTokenToStringParameters(network);
+
   HdMaterialNode2 terminalNode;
   SdfPath terminalPath;
   if (!_GetMaterialNetworkSurfaceTerminal(network, terminalNode, terminalPath))
