@@ -121,6 +121,8 @@ void giDestroyGeomCache(struct gi_geom_cache* cache);
 struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params* params);
 void giDestroyShaderCache(struct gi_shader_cache* cache);
 
+void giInvalidateFramebuffer();
+
 int giRender(const struct gi_render_params* params,
              float* rgba_img);
 

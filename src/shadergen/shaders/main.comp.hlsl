@@ -52,6 +52,7 @@ struct PushConstants
     float  MAX_SAMPLE_VALUE;
     uint   RR_BOUNCE_OFFSET;
     float  RR_INV_MIN_TERM_PROB;
+    uint   SAMPLE_OFFSET;
 };
 
 // Workaround, see https://github.com/KhronosGroup/glslang/issues/1629#issuecomment-703063873
@@ -323,7 +324,7 @@ void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3
 
         for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
         {
-            uint4 rng_state = pcg4d_init(pixel_pos.xy, s);
+            uint4 rng_state = pcg4d_init(pixel_pos.xy, PC.SAMPLE_OFFSET + s);
             float4 r = pcg4d_next(rng_state);
 
             float3 P =
@@ -360,6 +361,17 @@ void CSMain(uint group_index : SV_GroupIndex, uint3 group_id : SV_GroupID, uint3
         uint gs_idx = uint(MORTON_2D_LUT_32x8_REV[new_local_pixel_pos.x + new_local_pixel_pos.y * NUM_THREADS_X]);
         float4 new_pixel_color = float4(gs_reorder[gs_idx], 1.0);
         uint new_pixel_index = new_pixel_pos.x + new_pixel_pos.y * PC.IMAGE_WIDTH;
+
+        if (PC.SAMPLE_OFFSET > 0)
+        {
+          float inv_total_sample_count = 1.0 / float(PC.SAMPLE_OFFSET + PC.SAMPLE_COUNT);
+
+          float weight_old = float(PC.SAMPLE_OFFSET) * inv_total_sample_count;
+          float weight_new = float(PC.SAMPLE_COUNT) * inv_total_sample_count;
+
+          new_pixel_color = weight_old * pixels[new_pixel_index] + weight_new * new_pixel_color;
+        }
+
         pixels[new_pixel_index] = new_pixel_color;
     }
 }

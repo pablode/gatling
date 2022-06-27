@@ -85,6 +85,7 @@ cgpu_buffer s_outputBuffer = { CGPU_INVALID_HANDLE };
 cgpu_buffer s_outputStagingBuffer = { CGPU_INVALID_HANDLE };
 uint32_t s_outputBufferWidth = 0;
 uint32_t s_outputBufferHeight = 0;
+uint32_t s_sampleOffset = 0;
 
 int giInitialize(const gi_init_params* params)
 {
@@ -561,8 +562,12 @@ void giDestroyShaderCache(gi_shader_cache* cache)
   delete cache;
 }
 
-int giRender(const gi_render_params* params,
-             float* rgba_img)
+void giInvalidateFramebuffer()
+{
+  s_sampleOffset = 0;
+}
+
+int giRender(const gi_render_params* params, float* rgba_img)
 {
   const gi_geom_cache* geom_cache = params->geom_cache;
   const gi_shader_cache* shader_cache = params->shader_cache;
@@ -626,7 +631,8 @@ int giRender(const gi_render_params* params,
     *((float*)&params->max_bounces),                                                       // uint
     params->max_sample_value,                                                              // float
     *((float*)&params->rr_bounce_offset),                                                  // uint
-    params->rr_inv_min_term_prob                                                           // float
+    params->rr_inv_min_term_prob,                                                          // float
+    *((float*)&s_sampleOffset)                                                             // uint
   };
 
   std::vector<cgpu_buffer_binding> buffers;
@@ -731,7 +737,6 @@ int giRender(const gi_render_params* params,
   );
   if (c_result != CGPU_OK) goto cleanup;
 
-
   // Submit command buffer.
   c_result = cgpu_end_command_buffer(command_buffer);
   if (c_result != CGPU_OK) goto cleanup;
@@ -781,6 +786,8 @@ int giRender(const gi_render_params* params,
       rgba_img[i] /= max_value;
     }
   }
+
+  s_sampleOffset += params->spp;
 
   result = GI_OK;
 

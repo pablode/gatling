@@ -326,7 +326,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_isConverged = false;
 
   const auto* camera = dynamic_cast<const HdGatlingCamera*>(renderPassState->GetCamera());
-
   if (!camera)
   {
     return;
@@ -371,13 +370,10 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   bool backgroundColorChanged = (backgroundColor != m_lastBackgroundColor);
   bool aovChanged = (aovId != m_lastAovId);
 
-  if (!sceneChanged && !renderSettingsChanged && !backgroundColorChanged)
+  if (sceneChanged || renderSettingsChanged || backgroundColorChanged || aovChanged)
   {
-    renderBuffer->SetConverged(true);
-    return;
+    giInvalidateFramebuffer();
   }
-
-  renderBuffer->SetConverged(false);
 
   m_lastSceneStateVersion = sceneStateVersion;
   m_lastRenderSettingsVersion = renderSettingsStateVersion;
@@ -487,7 +483,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   TF_VERIFY(result == GI_OK, "Unable to render scene.");
 
   renderBuffer->Unmap();
-  renderBuffer->SetConverged(true);
 
   m_isConverged = true;
 }
