@@ -136,6 +136,12 @@ namespace sg
 
     mx::ShaderStage pixelStage = shader->getStage(mx::Stage::PIXEL);
     mdlSrc = pixelStage.getSourceCode();
+
+    if (getenv("GATLING_DUMP_MDL"))
+    {
+      printf("MDL source: %s\n", mdlSrc.c_str());
+    }
+
     return true;
   }
 }

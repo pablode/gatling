@@ -248,7 +248,13 @@ namespace sg
 
     ss << fileSrc;
 
+    std::string hlslStr = ss.str();
+    if (getenv("GATLING_DUMP_HLSL"))
+    {
+      printf("HLSL source: %s\n", hlslStr.c_str());
+    }
+
     result.entryPoint = "CSMain";
-    return m_shaderCompiler->compileHlslToSpv(ss.str(), filePath, result.entryPoint, result.spv);
+    return m_shaderCompiler->compileHlslToSpv(hlslStr, filePath, result.entryPoint, result.spv);
   }
 }
