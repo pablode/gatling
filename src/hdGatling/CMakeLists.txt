@@ -1,29 +1,29 @@
 add_library(
   hdGatling MODULE
-  include/RendererPlugin.h
-  src/RendererPlugin.cpp
-  src/RenderDelegate.h
-  src/RenderDelegate.cpp
-  src/Camera.h
-  src/Camera.cpp
-  src/Material.h
-  src/Material.cpp
-  src/MaterialNetworkTranslator.h
-  src/MaterialNetworkTranslator.cpp
-  src/MdlDiscoveryPlugin.h
-  src/MdlDiscoveryPlugin.cpp
-  src/MdlParserPlugin.h
-  src/MdlParserPlugin.cpp
-  src/Mesh.h
-  src/Mesh.cpp
-  src/RenderPass.h
-  src/RenderPass.cpp
-  src/Instancer.h
-  src/Instancer.cpp
-  src/RenderBuffer.h
-  src/RenderBuffer.cpp
-  src/Tokens.h
-  src/Tokens.cpp
+  Camera.cpp
+  Camera.h
+  Instancer.cpp
+  Instancer.h
+  Material.cpp
+  Material.h
+  MaterialNetworkTranslator.cpp
+  MaterialNetworkTranslator.h
+  MdlDiscoveryPlugin.cpp
+  MdlDiscoveryPlugin.h
+  MdlParserPlugin.cpp
+  MdlParserPlugin.h
+  Mesh.cpp
+  Mesh.h
+  RenderBuffer.cpp
+  RenderBuffer.h
+  RenderDelegate.cpp
+  RenderDelegate.h
+  RendererPlugin.cpp
+  RendererPlugin.h
+  RenderPass.cpp
+  RenderPass.h
+  Tokens.cpp
+  Tokens.h
 )
 
 set_target_properties(
