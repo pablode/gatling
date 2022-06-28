@@ -38,6 +38,7 @@
 
 const uint32_t WORKGROUP_SIZE_X = 32;
 const uint32_t WORKGROUP_SIZE_Y = 8;
+const float    BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
 struct gi_geom_cache
 {
@@ -196,6 +197,8 @@ uint64_t giAlignBuffer(uint64_t alignment, uint64_t buffer_size, uint64_t* total
 
 gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 {
+  printf("creating geom cache\n");
+
   // Build the BVH.
   gi::bvh::Bvh<8> bvh8;
   gi::bvh::Bvh8c bvh8c;
@@ -255,6 +258,9 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   uint32_t face_count = bvh_enabled ? bvh8.faces.size() : params->face_count;
   const gi_face* faces = bvh_enabled ? bvh8.faces.data() : params->faces;
 
+  printf("faces: %d\n", face_count);
+  printf("vertices: %d\n", params->vertex_count);
+
   // Build list of emissive faces.
   std::vector<uint16_t> emissive_face_indices;
   if (params->next_event_estimation)
@@ -291,6 +297,12 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   uint64_t face_buf_offset = giAlignBuffer(offset_align, face_buf_size, &buf_size);
   uint64_t emissive_face_indices_buf_offset = giAlignBuffer(offset_align, emissive_face_indices_buf_size, &buf_size);
   uint64_t vertex_buf_offset = giAlignBuffer(offset_align, vertex_buf_size, &buf_size);
+
+  printf("total geom buffer size: %.2fMiB\n", buf_size * BYTES_TO_MIB);
+  printf("> %.2fMiB bvh\n", bvh_node_buf_size * BYTES_TO_MIB);
+  printf("> %.2fMiB faces\n", face_buf_size * BYTES_TO_MIB);
+  printf("> %.2fMiB emissive face indices\n", emissive_face_indices_buf_size * BYTES_TO_MIB);
+  printf("> %.2fMiB vertices\n", vertex_buf_size * BYTES_TO_MIB);
 
   CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
   CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
@@ -357,6 +369,8 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     return true;
   }
 
+  printf("staging %d images\n", texCount);
+
   std::vector<uint16_t> imageMappings;
   imageMappings.reserve(texCount);
   images_2d.reserve(texCount);
@@ -379,8 +393,11 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     auto& imageVector = image_desc.is3d ? images_3d : images_2d;
     imageMappings.push_back(imageVector.size());
 
-    if (payload.size() > 0)
+    uint32_t payloadSize = payload.size();
+    if (payloadSize > 0)
     {
+      printf("image %d has binary payload of %.2fMiB\n", i, payloadSize * BYTES_TO_MIB);
+
       image_desc.width = textureResource.width;
       image_desc.height = textureResource.height;
       image_desc.depth = textureResource.depth;
@@ -388,7 +405,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
       result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
       if (!result) return false;
 
-      result = s_stager->stageToImage(payload.data(), payload.size(), image);
+      result = s_stager->stageToImage(payload.data(), payloadSize, image);
       if (!result) return false;
 
       imageVector.push_back(image);
@@ -400,6 +417,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     auto cacheResult = s_imageCache.find(filePath);
     if (cacheResult != s_imageCache.end())
     {
+      printf("image %d found in cache\n", i);
       imageVector.push_back(cacheResult->second);
       continue;
     }
@@ -407,6 +425,9 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
     imgio_img image_data;
     if (imgio_load_img(filePath, &image_data) == IMGIO_OK)
     {
+      printf("image %d read from path %s of size %.2fMiB\n",
+        i, filePath, image_data.size * BYTES_TO_MIB);
+
       image_desc.width = image_data.width;
       image_desc.height = image_data.height;
       image_desc.depth = 1;
@@ -425,6 +446,7 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
       continue;
     }
 
+    fprintf(stderr, "failed to read image %d from path %s\n", i, filePath);
     image_desc.width = 1;
     image_desc.height = 1;
     image_desc.depth = 1;
@@ -483,6 +505,8 @@ void giDestroyUncachedImages(const std::vector<cgpu_image>& images)
 
 gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 {
+  printf("creating shader cache\n");
+
   const gi_geom_cache* geom_cache = params->geom_cache;
 
   float postpone_ratio = 0.2f;
@@ -589,6 +613,9 @@ int giRender(const gi_render_params* params, float* rgba_img)
 
   if (reallocOutputBuffer)
   {
+    printf("recreating output buffer with size %dx%d (%.2fMiB)\n", params->image_width,
+      params->image_height, output_buffer_size * BYTES_TO_MIB);
+
     cgpu_destroy_buffer(s_device, s_outputBuffer);
     cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
 

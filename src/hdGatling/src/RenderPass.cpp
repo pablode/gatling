@@ -236,10 +236,6 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       _BakeMeshInstance(mesh, transform, materialIndex, faces, vertices);
     }
   }
-
-  printf("#Vertices: %zu\n", vertices.size());
-  printf("#Faces: %zu\n", faces.size());
-  fflush(stdout);
 }
 
 void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const
@@ -394,8 +390,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     }
 
     const SdfPath& cameraId = camera->GetId();
-    printf("Building geom cache for camera %s\n", cameraId.GetText());
-    fflush(stdout);
+    printf("rebuilding geom cache for camera %s\n", cameraId.GetText());
 
     std::vector<gi_vertex> vertices;
     std::vector<gi_face> faces;
@@ -436,9 +431,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     {
       giDestroyShaderCache(m_shaderCache);
     }
-
-    printf("Building shader cache...\n");
-    fflush(stdout);
 
     gi_shader_cache_params shaderParams;
     shaderParams.aov_id = aovId;
