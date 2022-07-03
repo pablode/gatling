@@ -11,6 +11,8 @@ add_library(
   src/bvh_compress.h
   src/stager.h
   src/stager.cpp
+  src/texsys.h
+  src/texsys.cpp
 )
 
 target_include_directories(

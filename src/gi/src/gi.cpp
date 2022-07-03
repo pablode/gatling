@@ -24,6 +24,7 @@
 #include "bvh_embree.h"
 #endif
 #include "stager.h"
+#include "texsys.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +34,6 @@
 #include <unordered_map>
 
 #include <cgpu.h>
-#include <imgio.h>
 #include <ShaderGen.h>
 
 const uint32_t WORKGROUP_SIZE_X = 32;
@@ -79,8 +79,7 @@ cgpu_physical_device_limits s_device_limits;
 cgpu_sampler s_tex_sampler = { CGPU_INVALID_HANDLE };
 std::unique_ptr<gi::Stager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
-// FIXME: implement a proper CPU and GPU-aware texture cache with eviction strategy
-std::unordered_map<std::string, cgpu_image> s_imageCache;
+std::unique_ptr<gi::TexSys> s_texSys;
 
 cgpu_buffer s_outputBuffer = { CGPU_INVALID_HANDLE };
 cgpu_buffer s_outputStagingBuffer = { CGPU_INVALID_HANDLE };
@@ -127,6 +126,8 @@ int giInitialize(const gi_init_params* params)
     return GI_ERROR;
   }
 
+  s_texSys = std::make_unique<gi::TexSys>(s_device, *s_stager);
+
   return GI_OK;
 }
 
@@ -136,11 +137,8 @@ void giTerminate()
   cgpu_destroy_buffer(s_device, s_outputBuffer);
   s_outputBufferWidth = 0;
   s_outputBufferHeight = 0;
-  for (const auto& pathImagePair : s_imageCache)
-  {
-    cgpu_destroy_image(s_device, pathImagePair.second);
-  }
-  s_imageCache.clear();
+  s_texSys->destroy();
+  s_texSys.reset();
   s_shaderGen.reset();
   s_stager->free();
   s_stager.reset();
@@ -362,109 +360,19 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
                    std::vector<cgpu_image>& images_3d,
                    cgpu_buffer& imageMappingBuffer)
 {
-  uint32_t texCount = textureResources.size();
-
-  if (texCount == 0)
-  {
-    return true;
-  }
-
-  printf("staging %d images\n", texCount);
-
   std::vector<uint16_t> imageMappings;
-  imageMappings.reserve(texCount);
-  images_2d.reserve(texCount);
-  images_3d.reserve(texCount);
-
-  bool result;
-
-  for (int i = 0; i < texCount; i++)
+  if (!s_texSys->loadTextures(textureResources,
+                              images_2d,
+                              images_3d,
+                              imageMappings))
   {
-    cgpu_image image = { CGPU_INVALID_HANDLE };
-
-    auto& textureResource = textureResources[i];
-    auto& payload = textureResource.data;
-
-    cgpu_image_description image_desc;
-    image_desc.is3d = textureResource.is3dImage;
-    image_desc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-    image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
-
-    auto& imageVector = image_desc.is3d ? images_3d : images_2d;
-    imageMappings.push_back(imageVector.size());
-
-    uint32_t payloadSize = payload.size();
-    if (payloadSize > 0)
-    {
-      printf("image %d has binary payload of %.2fMiB\n", i, payloadSize * BYTES_TO_MIB);
-
-      image_desc.width = textureResource.width;
-      image_desc.height = textureResource.height;
-      image_desc.depth = textureResource.depth;
-
-      result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
-      if (!result) return false;
-
-      result = s_stager->stageToImage(payload.data(), payloadSize, image);
-      if (!result) return false;
-
-      imageVector.push_back(image);
-      continue;
-    }
-
-    const char* filePath = textureResource.filePath.c_str();
-
-    auto cacheResult = s_imageCache.find(filePath);
-    if (cacheResult != s_imageCache.end())
-    {
-      printf("image %d found in cache\n", i);
-      imageVector.push_back(cacheResult->second);
-      continue;
-    }
-
-    imgio_img image_data;
-    if (imgio_load_img(filePath, &image_data) == IMGIO_OK)
-    {
-      printf("image %d read from path %s of size %.2fMiB\n",
-        i, filePath, image_data.size * BYTES_TO_MIB);
-
-      image_desc.width = image_data.width;
-      image_desc.height = image_data.height;
-      image_desc.depth = 1;
-
-      result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
-      if (!result) return false;
-
-      result = s_stager->stageToImage(image_data.data, image_data.size, image);
-      if (!result) return false;
-
-      imgio_free_img(&image_data);
-
-      s_imageCache[filePath] = image;
-
-      imageVector.push_back(image);
-      continue;
-    }
-
-    fprintf(stderr, "failed to read image %d from path %s\n", i, filePath);
-    image_desc.width = 1;
-    image_desc.height = 1;
-    image_desc.depth = 1;
-
-    result = cgpu_create_image(s_device, &image_desc, &image) == CGPU_OK;
-    if (!result) return false;
-
-    uint8_t black[4] = { 0, 0, 0, 0 };
-    result = s_stager->stageToImage(black, 4, image);
-    if (!result) return false;
-
-    imageVector.push_back(image);
+    return false;
   }
 
   assert(imageMappings.size() < UINT16_MAX);
 
   uint64_t imageMappingsSize = imageMappings.size() * sizeof(uint16_t);
-  result = cgpu_create_buffer(
+  bool result = cgpu_create_buffer(
     s_device,
     CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
@@ -477,30 +385,6 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
   if (!result) return false;
 
   return s_stager->flush();
-}
-
-void giDestroyUncachedImages(const std::vector<cgpu_image>& images)
-{
-  for (cgpu_image image : images)
-  {
-    bool isCached = false;
-
-    for (const auto& pathImagePair : s_imageCache)
-    {
-      cgpu_image cachedImage = pathImagePair.second;
-
-      if (cachedImage.handle == image.handle)
-      {
-        isCached = true;
-        break;
-      }
-    }
-
-    if (!isCached)
-    {
-      cgpu_destroy_image(s_device, image);
-    }
-  }
 }
 
 gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
@@ -556,8 +440,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   if (!giStageImages(mainShader.textureResources, images_2d, images_3d, imageMappingBuffer))
   {
     cgpu_destroy_buffer(s_device, imageMappingBuffer);
-    giDestroyUncachedImages(images_2d);
-    giDestroyUncachedImages(images_3d);
+    s_texSys->destroyUncachedImages(images_2d);
+    s_texSys->destroyUncachedImages(images_3d);
     cgpu_destroy_shader(s_device, shader);
     cgpu_destroy_pipeline(s_device, pipeline);
     return nullptr;
@@ -578,8 +462,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
 void giDestroyShaderCache(gi_shader_cache* cache)
 {
-  giDestroyUncachedImages(cache->images_2d);
-  giDestroyUncachedImages(cache->images_3d);
+  s_texSys->destroyUncachedImages(cache->images_2d);
+  s_texSys->destroyUncachedImages(cache->images_3d);
   cgpu_destroy_buffer(s_device, cache->image_mappings);
   cgpu_destroy_shader(s_device, cache->shader);
   cgpu_destroy_pipeline(s_device, cache->pipeline);
