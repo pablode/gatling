@@ -55,7 +55,7 @@ namespace gi
 
     printf("staging %d images\n", texCount);
 
-    imageMappings.reserve(texCount);
+    imageMappings.resize(texCount, 0);
     images2d.reserve(texCount);
     images3d.reserve(texCount);
 
@@ -74,7 +74,10 @@ namespace gi
       image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
       auto& imageVector = image_desc.is3d ? images3d : images2d;
-      imageMappings.push_back(imageVector.size());
+
+      int binding = textureResource.binding;
+      assert(binding < imageMappings.size());
+      imageMappings[binding] = imageVector.size();
 
       uint32_t payloadSize = payload.size();
       if (payloadSize > 0)

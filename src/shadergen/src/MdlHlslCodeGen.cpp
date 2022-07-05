@@ -147,7 +147,7 @@ namespace sg
       mi::base::Handle<const mi::neuraylib::IImage> image(m_transaction->access<mi::neuraylib::IImage>(texture->get_image()));
 
       TextureResource textureResource;
-      textureResource.binding = i;
+      textureResource.binding = i - 1;
 
       uint32_t frameId = 0;
       uint32_t uvTileId = 0;
