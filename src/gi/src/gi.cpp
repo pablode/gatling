@@ -437,14 +437,19 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   std::vector<cgpu_image> images_2d;
   std::vector<cgpu_image> images_3d;
   cgpu_buffer imageMappingBuffer = { CGPU_INVALID_HANDLE };
-  if (!giStageImages(mainShader.textureResources, images_2d, images_3d, imageMappingBuffer))
+
+  const auto& textureResources = mainShader.textureResources;
+  if (textureResources.size() > 0)
   {
-    cgpu_destroy_buffer(s_device, imageMappingBuffer);
-    s_texSys->destroyUncachedImages(images_2d);
-    s_texSys->destroyUncachedImages(images_3d);
-    cgpu_destroy_shader(s_device, shader);
-    cgpu_destroy_pipeline(s_device, pipeline);
-    return nullptr;
+    if (!giStageImages(textureResources, images_2d, images_3d, imageMappingBuffer))
+    {
+      cgpu_destroy_buffer(s_device, imageMappingBuffer);
+      s_texSys->destroyUncachedImages(images_2d);
+      s_texSys->destroyUncachedImages(images_3d);
+      cgpu_destroy_shader(s_device, shader);
+      cgpu_destroy_pipeline(s_device, pipeline);
+      return nullptr;
+    }
   }
 
   gi_shader_cache* cache = new gi_shader_cache;
@@ -455,7 +460,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   cache->bvh_enabled = bvh_enabled;
   cache->images_2d = std::move(images_2d);
   cache->images_3d = std::move(images_3d);
-  cache->image_mappings = imageMappingBuffer;
+  cache->image_mappings = std::move(imageMappingBuffer);
 
   return cache;
 }
