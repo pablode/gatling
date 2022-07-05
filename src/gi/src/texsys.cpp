@@ -21,6 +21,7 @@
 
 #include <ShaderGen.h>
 #include <imgio.h>
+#include <assert.h>
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
