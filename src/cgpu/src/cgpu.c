@@ -1563,10 +1563,10 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
 
     switch (binding->descriptor_type)
     {
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: buffer_count++; break;
-    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storage_image_count++; break;
-    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampled_image_count++; break;
-    case VK_DESCRIPTOR_TYPE_SAMPLER: sampler_count++; break;
+    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: buffer_count += binding->count; break;
+    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storage_image_count += binding->count; break;
+    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampled_image_count += binding->count; break;
+    case VK_DESCRIPTOR_TYPE_SAMPLER: sampler_count += binding->count; break;
     default: {
       resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
       idevice->table.vkDestroyPipelineLayout(
