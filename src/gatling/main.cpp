@@ -185,9 +185,7 @@ int main(int argc, const char* argv[])
 
   HdEngine engine;
   engine.Execute(renderIndex, &tasks);
-
   renderBuffer->Resolve();
-  TF_VERIFY(renderBuffer->IsConverged());
 
   timerRender.Stop();
 
