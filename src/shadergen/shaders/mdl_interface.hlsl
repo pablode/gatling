@@ -32,10 +32,9 @@ float apply_wrap_and_crop(float coord, int wrap, float2 crop, int res)
     return coord * (crop.y - crop.x) + crop.x;
 }
 
-#ifdef HAS_TEXTURES_3D
-
 float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
 {
+#ifdef HAS_TEXTURES_3D
     if ((tex == 0) ||
         (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
         (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)) ||
@@ -54,7 +53,12 @@ float4 tex_lookup_float4_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int 
 
     float lod = 0.0;
     int3 offset = int3(0, 0, 0);
+    ASSERT(array_idx < TEXTURE_COUNT_3D, "Error: invalid texture index\n");
     return textures_3d[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord, lod, offset);
+#else
+    ASSERT(tex == 0, "Error: invalid texture index\n");
+    return float4(0, 0, 0, 0);
+#endif
 }
 
 float3 tex_lookup_float3_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int wrap_w, float2 crop_u, float2 crop_v, float2 crop_w, float frame)
@@ -79,6 +83,7 @@ float3 tex_lookup_color_3d(uint tex, float3 coord, int wrap_u, int wrap_v, int w
 
 float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
 {
+#ifdef HAS_TEXTURES_3D
     if (tex == 0)
     {
         return float4(0, 0, 0, 0);
@@ -94,7 +99,12 @@ float4 tex_texel_float4_3d(uint tex, int3 coord, float frame)
     }
 
     int mipmapLevel = 0;
+    ASSERT(array_idx < TEXTURE_COUNT_3D, "Error: invalid texture index\n");
     return textures_3d[NonUniformResourceIndex(array_idx)].Load(int4(coord, mipmapLevel));
+#else
+    ASSERT(tex == 0, "Error: invalid texture index\n");
+    return float4(0, 0, 0, 0);
+#endif
 }
 
 float3 tex_texel_float3_3d(uint tex, int3 coord, float frame)
@@ -117,12 +127,9 @@ float3 tex_texel_color_3d(uint tex, int3 coord, float frame)
     return tex_texel_float3_3d(tex, coord, frame);
 }
 
-#endif
-
-#ifdef HAS_TEXTURES_2D
-
 float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
 {
+#ifdef HAS_TEXTURES_2D
     if ((tex == 0) ||
         (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
         (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
@@ -139,7 +146,12 @@ float4 tex_lookup_float4_2d(uint tex, float2 coord, int wrap_u, int wrap_v, floa
 
     float lod = 0.0;
     int2 offset = int2(0, 0);
+    ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
     return textures_2d[NonUniformResourceIndex(array_idx)].SampleLevel(tex_sampler, coord, lod, offset);
+#else
+    ASSERT(tex == 0, "Error: invalid texture index\n");
+    return float4(0, 0, 0, 0);
+#endif
 }
 
 float3 tex_lookup_float3_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float2 crop_u, float2 crop_v, float frame)
@@ -164,6 +176,7 @@ float3 tex_lookup_color_2d(uint tex, float2 coord, int wrap_u, int wrap_v, float
 
 float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
 {
+#ifdef HAS_TEXTURES_2D
     if (tex == 0)
     {
         return float4(0, 0, 0, 0);
@@ -179,7 +192,12 @@ float4 tex_texel_float4_2d(uint tex, int2 coord, int2 uv_tile, float frame)
     }
 
     int mipmapLevel = 0;
+    ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
     return textures_2d[NonUniformResourceIndex(array_idx)].Load(int3(coord, mipmapLevel));
+#else
+    ASSERT(tex == 0, "Error: invalid texture index\n");
+    return float4(0, 0, 0, 0);
+#endif
 }
 
 float3 tex_texel_float3_2d(uint tex, int2 coord, int2 uv_tile, float frame)
@@ -204,6 +222,7 @@ float3 tex_texel_color_2d(uint tex, int2 coord, int2 uv_tile, float frame)
 
 uint2 tex_resolution_2d(uint tex, int2 uv_tile, float frame)
 {
+#ifdef HAS_TEXTURES_2D
     if (tex == 0)
     {
         return uint2(0, 0);
@@ -212,8 +231,13 @@ uint2 tex_resolution_2d(uint tex, int2 uv_tile, float frame)
     uint array_idx = tex_mappings[tex - 1];
 
     uint2 res;
+    ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
     textures_2d[NonUniformResourceIndex(array_idx)].GetDimensions(res.x, res.y);
     return res;
+#else
+    ASSERT(tex == 0, "Error: invalid texture index\n");
+    return uint2(0, 0);
+#endif
 }
 
 uint tex_width_2d(uint tex, int2 uv_tile, float frame)
@@ -225,5 +249,3 @@ uint tex_height_2d(uint tex, int2 uv_tile, float frame)
 {
     return tex_resolution_2d(tex, uv_tile, frame).y;
 }
-
-#endif
