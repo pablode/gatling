@@ -104,10 +104,7 @@ bool find_hit_closest(inout RayInfo ray, out Hit_info hit)
 
             if (node_group.y > 0x00FFFFFF)
             {
-#ifdef DEBUG_PRINTF
-                if (stack_size >= MAX_STACK_SIZE)
-                    printf("Error: traversal stack size exceeds maximum capacity\n");
-#endif
+                ASSERT(stack_size < MAX_STACK_SIZE, "Error: traversal stack size exceeds maximum capacity\n");
                 stack[stack_size] = node_group;
                 stack_size++;
             }
@@ -195,10 +192,7 @@ bool find_hit_closest(inout RayInfo ray, out Hit_info hit)
 
             if (active_inv_count2 < threshold)
             {
-#ifdef DEBUG_PRINTF
-                if (stack_size >= MAX_STACK_SIZE)
-                    printf("Error: traversal stack size exceeds maximum capacity\n");
-#endif
+                ASSERT(stack_size < MAX_STACK_SIZE, "Error: traversal stack size exceeds maximum capacity\n");
                 stack[stack_size] = face_group;
                 stack_size++;
                 break;

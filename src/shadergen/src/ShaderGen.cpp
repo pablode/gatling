@@ -226,8 +226,8 @@ namespace sg
       ss << "#define TEXTURE_COUNT_3D " << textureCount3d << "\n";
     }
 
-#if !defined(NDEBUG) && !defined(__APPLE__)
-    ss << "#define DEBUG_PRINTF\n";
+#if defined(NDEBUG) || defined(__APPLE__)
+    ss << "#define NDEBUG\n";
 #endif
 
 #define APPEND_CONSTANT(name, cvar) \

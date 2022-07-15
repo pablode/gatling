@@ -1,3 +1,9 @@
+#ifndef NDEBUG
+#define ASSERT(cond, str) if (!(cond)) printf(str)
+#else
+#define ASSERT(cond, str)
+#endif
+
 #include "common.hlsl"
 #include "mdl_types.hlsl"
 
