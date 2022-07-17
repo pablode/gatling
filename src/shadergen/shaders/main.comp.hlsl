@@ -262,7 +262,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             /* Handle results. */
             state.radiance += state.throughput * edf_evaluate_data.edf * emission_intensity;
 
-            if ((bsdf_sample_data.event_type & BSDF_EVENT_ABSORB) != 0)
+            if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
             {
                 break;
             }
