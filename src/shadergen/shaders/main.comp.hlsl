@@ -253,6 +253,11 @@ float3 evaluate_sample(inout uint4 rng_state,
             float3 emission_intensity = mdl_edf_emission_intensity(f.mat_idx, shading_state_material);
 
             /* BSDF (importance) sampling. */
+
+            /* Reassign normal - it can be changed by the _init() functions.
+             * https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411 */
+            shading_state_material.normal = normal;
+
             Bsdf_sample_data bsdf_sample_data;
             bsdf_sample_data.ior1 = state.inside ? BSDF_USE_MATERIAL_IOR : 1.0;
             bsdf_sample_data.ior2 = state.inside ? 1.0 : BSDF_USE_MATERIAL_IOR;
