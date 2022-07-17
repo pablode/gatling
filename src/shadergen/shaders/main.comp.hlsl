@@ -251,6 +251,7 @@ float3 evaluate_sample(inout uint4 rng_state,
             mdl_edf_emission_evaluate(f.mat_idx, edf_evaluate_data, shading_state_material);
 
             float3 emission_intensity = mdl_edf_emission_intensity(f.mat_idx, shading_state_material);
+            bool thin_walled = mdl_thin_walled(f.mat_idx, shading_state_material);
 
             /* BSDF (importance) sampling. */
 
@@ -259,8 +260,8 @@ float3 evaluate_sample(inout uint4 rng_state,
             shading_state_material.normal = normal;
 
             Bsdf_sample_data bsdf_sample_data;
-            bsdf_sample_data.ior1 = state.inside ? BSDF_USE_MATERIAL_IOR : 1.0;
-            bsdf_sample_data.ior2 = state.inside ? 1.0 : BSDF_USE_MATERIAL_IOR;
+            bsdf_sample_data.ior1 = (state.inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
+            bsdf_sample_data.ior2 = (state.inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
             bsdf_sample_data.k1 = -state.ray_dir;
             bsdf_sample_data.xi = pcg4d_next(state.rng_state);
             mdl_bsdf_scattering_init(f.mat_idx, shading_state_material);
