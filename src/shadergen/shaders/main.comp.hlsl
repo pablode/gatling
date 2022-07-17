@@ -81,6 +81,7 @@ struct Sample_state
     float3 ray_dir;
     float3 throughput;
     float3 radiance;
+    bool inside;
 };
 
 bool russian_roulette(in float random_float, inout float3 throughput)
@@ -109,6 +110,7 @@ float3 evaluate_sample(inout uint4 rng_state,
     state.throughput = float3(1.0, 1.0, 1.0);
     state.radiance   = float3(0.0, 0.0, 0.0);
     state.rng_state  = rng_state;
+    state.inside     = false;
 
     uint bounce = 1;
 
@@ -252,8 +254,8 @@ float3 evaluate_sample(inout uint4 rng_state,
 
             /* BSDF (importance) sampling. */
             Bsdf_sample_data bsdf_sample_data;
-            bsdf_sample_data.ior1 = BSDF_USE_MATERIAL_IOR;
-            bsdf_sample_data.ior2 = BSDF_USE_MATERIAL_IOR;
+            bsdf_sample_data.ior1 = state.inside ? BSDF_USE_MATERIAL_IOR : 1.0;
+            bsdf_sample_data.ior2 = state.inside ? 1.0 : BSDF_USE_MATERIAL_IOR;
             bsdf_sample_data.k1 = -state.ray_dir;
             bsdf_sample_data.xi = pcg4d_next(state.rng_state);
             mdl_bsdf_scattering_init(f.mat_idx, shading_state_material);
@@ -270,10 +272,13 @@ float3 evaluate_sample(inout uint4 rng_state,
             state.throughput *= bsdf_sample_data.bsdf_over_pdf;
 
             /* Prepare next ray. */
-            bool is_transmission = ((bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0);
+            if ((bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0)
+            {
+                state.inside = !state.inside;
+            }
 
             state.ray_dir = bsdf_sample_data.k2;
-            state.ray_origin = offset_ray_origin(hit_pos, geom_normal * (is_transmission ? -1.0 : 1.0));
+            state.ray_origin = offset_ray_origin(hit_pos, geom_normal * (state.inside ? -1.0 : 1.0));
         }
 
         if (bounce >= PC.RR_BOUNCE_OFFSET)
