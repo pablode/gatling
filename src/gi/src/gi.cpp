@@ -670,6 +670,9 @@ int giRender(const gi_render_params* params, float* rgba_img)
   );
   if (c_result != CGPU_OK) goto cleanup;
 
+  // Now is a good time to flush buffered messages (on Windows).
+  fflush(stdout);
+
   c_result = cgpu_wait_for_fence(s_device, fence);
   if (c_result != CGPU_OK) goto cleanup;
 
