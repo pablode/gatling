@@ -77,15 +77,24 @@ namespace sg
 #else
     const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_WARNING;
 #endif
-    if (level <= minLogLevel)
+    if (level > minLogLevel)
     {
-      const char* s_severity = _miMessageSeverityToCStr(level);
-      FILE* os = (level <= mi::base::MESSAGE_SEVERITY_ERROR) ? stderr : stdout;
-      fprintf(os, "[%s] (%s) %s\n", s_severity, moduleCategory, message);
-#ifdef MI_PLATFORM_WINDOWS
-      fflush(stderr);
-#endif
+      return;
     }
+
+    // Ignore log spam from MaterialX MDL code generation.
+    if (strstr(message, "unused parameter") ||
+        strstr(message, "unreferenced local function"))
+    {
+      return;
+    }
+
+    const char* s_severity = _miMessageSeverityToCStr(level);
+    FILE* os = (level <= mi::base::MESSAGE_SEVERITY_ERROR) ? stderr : stdout;
+    fprintf(os, "[%s] (%s) %s\n", s_severity, moduleCategory, message);
+#ifdef MI_PLATFORM_WINDOWS
+    fflush(stderr);
+#endif
   }
 
   void MdlLogger::message(mi::base::Message_severity level,
