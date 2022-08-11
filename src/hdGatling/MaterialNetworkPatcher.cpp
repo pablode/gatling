@@ -22,10 +22,18 @@
 
 #include <memory>
 
+const char* ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS = "GATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_GLOSSINESS";
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_PRIVATE_TOKENS(
+  _tokens,
+  (ND_UsdPreviewSurface_surfaceshader)
+  (glossiness)
+);
+
 namespace detail
 {
-  using namespace PXR_NS;
-
   class PatcherBase
   {
   public:
@@ -70,9 +78,45 @@ namespace detail
       }
     }
   };
-}
 
-PXR_NAMESPACE_OPEN_SCOPE
+  // Some of Sketchfab's auto-converted assets encode the roughness on the UsdPreviewSurface
+  // node with a 'glossiness' input. See "Screen Space Reflection Demo: Follmann 2.OG" scene:
+  // https://sketchfab.com/3d-models/screen-space-reflection-demo-follmann-2og-6164eed28c464c94be8f5268240dc864
+  class UsdPreviewSurfaceGlossinessPatcher : public PatcherBase
+  {
+  public:
+    void PatchNode(HdMaterialNode2& node) override
+    {
+      if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+      {
+        return;
+      }
+
+      auto& parameters = node.parameters;
+
+      auto glossinessParam = parameters.find(_tokens->glossiness);
+      if (glossinessParam == parameters.end())
+      {
+        return;
+      }
+
+      VtValue value = glossinessParam->second;
+      if (!value.IsHolding<float>())
+      {
+        return;
+      }
+
+      TF_WARN("patching UsdPreviewSurface:glossiness input (set %s to disable)",
+        ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS);
+
+      float glossiness = value.UncheckedGet<float>();
+      float roughness = 1.0f - glossiness;
+
+      parameters[TfToken("roughness")] = roughness;
+      parameters.erase(glossinessParam);
+    }
+  };
+}
 
 MaterialNetworkPatcher::MaterialNetworkPatcher()
 {
@@ -85,6 +129,11 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
   std::vector<PatcherBasePtr> patchers;
 
   patchers.push_back(std::make_unique<detail::UsdTypePatcher>());
+
+  if (!getenv(ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS))
+  {
+    patchers.push_back(std::make_unique<detail::UsdPreviewSurfaceGlossinessPatcher>());
+  }
 
   for (auto& patcher : patchers)
   {
