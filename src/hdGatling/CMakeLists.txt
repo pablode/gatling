@@ -6,6 +6,8 @@ add_library(
   Instancer.h
   Material.cpp
   Material.h
+  MaterialNetworkPatcher.cpp
+  MaterialNetworkPatcher.h
   MaterialNetworkTranslator.cpp
   MaterialNetworkTranslator.h
   MdlDiscoveryPlugin.cpp
