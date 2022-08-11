@@ -84,6 +84,7 @@ namespace sg
 
     // Ignore log spam from MaterialX MDL code generation.
     if (strstr(message, "unused parameter") ||
+        strstr(message, "unused variable") ||
         strstr(message, "unreferenced local function"))
     {
       return;
