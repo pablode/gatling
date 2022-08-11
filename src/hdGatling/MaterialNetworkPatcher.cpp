@@ -18,6 +18,7 @@
 #include "MaterialNetworkPatcher.h"
 
 #include <pxr/imaging/hd/material.h>
+#include <pxr/usd/sdf/assetPath.h>
 
 #include <memory>
 
@@ -41,9 +42,7 @@ namespace detail
     }
   };
 
-  // Workaround for HdMtlxConvertToString not handling the TfToken type:
-  // https://github.com/PixarAnimationStudios/USD/blob/3abc46452b1271df7650e9948fef9f0ce602e3b2/pxr/imaging/hdMtlx/hdMtlx.cpp#L117
-  class TfTokenPatcher : public PatcherBase
+  class UsdTypePatcher : public PatcherBase
   {
   public:
     void PatchNode(HdMaterialNode2& node) override
@@ -54,9 +53,19 @@ namespace detail
       {
         VtValue& value = tokenValuePair.second;
 
+        // Workaround for HdMtlxConvertToString not handling the TfToken type:
+        // https://github.com/PixarAnimationStudios/USD/blob/3abc46452b1271df7650e9948fef9f0ce602e3b2/pxr/imaging/hdMtlx/hdMtlx.cpp#L117
         if (value.IsHolding<TfToken>())
         {
           value = value.Cast<std::string>();
+        }
+
+        // When serializing the network to a MaterialX document again, the SdfAssetPath
+        // gets replaced by its non-resolved path and we don't have any other way of resolving
+        // it at a later point in time, since this is done by the Sdf/Ar layer.
+        if (value.IsHolding<SdfAssetPath>())
+        {
+          value = value.UncheckedGet<SdfAssetPath>().GetResolvedPath();
         }
       }
     }
@@ -75,7 +84,7 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
 
   std::vector<PatcherBasePtr> patchers;
 
-  patchers.push_back(std::make_unique<detail::TfTokenPatcher>());
+  patchers.push_back(std::make_unique<detail::UsdTypePatcher>());
 
   for (auto& patcher : patchers)
   {
