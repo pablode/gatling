@@ -40,6 +40,27 @@ namespace detail
     {
     }
   };
+
+  // Workaround for HdMtlxConvertToString not handling the TfToken type:
+  // https://github.com/PixarAnimationStudios/USD/blob/3abc46452b1271df7650e9948fef9f0ce602e3b2/pxr/imaging/hdMtlx/hdMtlx.cpp#L117
+  class TfTokenPatcher : public PatcherBase
+  {
+  public:
+    void PatchNode(HdMaterialNode2& node) override
+    {
+      auto& parameters = node.parameters;
+
+      for (auto& tokenValuePair : parameters)
+      {
+        VtValue& value = tokenValuePair.second;
+
+        if (value.IsHolding<TfToken>())
+        {
+          value = value.Cast<std::string>();
+        }
+      }
+    }
+  };
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -54,7 +75,7 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
 
   std::vector<PatcherBasePtr> patchers;
 
-  // TODO: add patchers
+  patchers.push_back(std::make_unique<detail::TfTokenPatcher>());
 
   for (auto& patcher : patchers)
   {
