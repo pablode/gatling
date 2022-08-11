@@ -64,6 +64,7 @@ namespace gi
 
     for (int i = 0; i < texCount; i++)
     {
+      fflush(stdout);
       cgpu_image image = { CGPU_INVALID_HANDLE };
 
       auto& textureResource = textureResources[i];
