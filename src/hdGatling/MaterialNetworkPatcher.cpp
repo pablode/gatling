@@ -17,19 +17,25 @@
 
 #include "MaterialNetworkPatcher.h"
 
+#include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/material.h>
 #include <pxr/usd/sdf/assetPath.h>
 
 #include <memory>
 
 const char* ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS = "GATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_GLOSSINESS";
+const char* ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_NORMALMAP = "GATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_NORMALMAP";
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
   (ND_UsdPreviewSurface_surfaceshader)
+  (ND_UsdUVTexture)
   (glossiness)
+  (normal)
+  (bias)
+  (scale)
 );
 
 namespace detail
@@ -116,6 +122,71 @@ namespace detail
       parameters.erase(glossinessParam);
     }
   };
+
+  // J CUBE's Maneki asset tries to read a normal map using a UsdUVTexture node,
+  // however the bias and scale parameters which usually convert the [0, 1] image
+  // values to [-1, 1] vectors are missing: https://j-cube.jp/solutions/multiverse/assets
+  class UsdPreviewSurfaceNormalMapPatcher : public PatcherBase
+  {
+  public:
+    void PatchNetwork(HdMaterialNetwork2& network) override
+    {
+      for (auto& pathNodePair : network.nodes)
+      {
+        HdMaterialNode2& node = pathNodePair.second;
+
+        if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+        {
+          continue;
+        }
+
+        auto& inputs = node.inputConnections;
+
+        for (auto& input : inputs)
+        {
+          const TfToken& inputName = input.first;
+
+          if (inputName != _tokens->normal)
+          {
+            continue;
+          }
+
+          auto& connections = input.second;
+
+          for (HdMaterialConnection2& connection : connections)
+          {
+            PatchNormalInputConnection(network, connection);
+          }
+        }
+      }
+    }
+
+  private:
+    void PatchNormalInputConnection(HdMaterialNetwork2& network, HdMaterialConnection2& connection)
+    {
+      HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
+
+      if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+      {
+        return;
+      }
+
+      auto& upstreamNodeParams = upstreamNode.parameters;
+      bool hasScale = upstreamNodeParams.find(_tokens->scale) != upstreamNodeParams.end();
+      bool hasBias = upstreamNodeParams.find(_tokens->bias) != upstreamNodeParams.end();
+
+      if (hasScale || hasBias)
+      {
+        return;
+      }
+
+      TF_WARN("patching UsdPreviewSurface:normal to have scaled and biased reader (set %s to disable)",
+        ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_NORMALMAP);
+
+      upstreamNodeParams[_tokens->scale] = GfVec4f(2.0f, 2.0f, 2.0f, 1.0f);
+      upstreamNodeParams[_tokens->bias] = GfVec4f(-1.0f, -1.0f, -1.0f, 0.0f);
+    }
+  };
 }
 
 MaterialNetworkPatcher::MaterialNetworkPatcher()
@@ -133,6 +204,10 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
   if (!getenv(ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS))
   {
     patchers.push_back(std::make_unique<detail::UsdPreviewSurfaceGlossinessPatcher>());
+  }
+  if (!getenv(ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_NORMALMAP))
+  {
+    patchers.push_back(std::make_unique<detail::UsdPreviewSurfaceNormalMapPatcher>());
   }
 
   for (auto& patcher : patchers)
