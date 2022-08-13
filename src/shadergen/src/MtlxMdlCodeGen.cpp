@@ -17,6 +17,8 @@
 
 #include "MtlxMdlCodeGen.h"
 
+#include "MtlxDocumentPatcher.h"
+
 #include <MaterialXCore/Definition.h>
 #include <MaterialXCore/Document.h>
 #include <MaterialXCore/Library.h>
@@ -114,6 +116,9 @@ namespace sg
       mx::DocumentPtr doc = mx::createDocument();
       doc->importLibrary(m_stdLib);
       mx::readFromXmlString(doc, mtlxSrc.data());
+
+      MtlxDocumentPatcher patcher;
+      patcher.patch(doc);
 
       mx::TypedElementPtr element = _FindSurfaceShaderElement(doc);
       if (!element)

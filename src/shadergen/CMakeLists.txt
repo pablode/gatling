@@ -4,8 +4,6 @@ add_library(
   src/ShaderGen.cpp
   src/IShaderCompiler.h
   src/IShaderCompiler.cpp
-  src/MtlxMdlCodeGen.h
-  src/MtlxMdlCodeGen.cpp
   src/MdlHlslCodeGen.h
   src/MdlHlslCodeGen.cpp
   src/MdlEntityResolver.h
@@ -18,6 +16,10 @@ add_library(
   src/MdlNeurayLoader.cpp
   src/MdlRuntime.h
   src/MdlRuntime.cpp
+  src/MtlxDocumentPatcher.h
+  src/MtlxDocumentPatcher.cpp
+  src/MtlxMdlCodeGen.h
+  src/MtlxMdlCodeGen.cpp
 )
 
 if(${GATLING_USE_GLSLANG})
