@@ -26,9 +26,6 @@ struct HdMaterialNetwork2;
 class MaterialNetworkPatcher
 {
 public:
-  MaterialNetworkPatcher();
-
-public:
   void Patch(HdMaterialNetwork2& network);
 };
 

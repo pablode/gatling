@@ -2024,7 +2024,6 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
 
     for (uint32_t j = 0; j < layout_binding->descriptorCount; j++)
     {
-
       bool slotHandled = false;
 
       if (layout_binding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)

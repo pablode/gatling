@@ -43,7 +43,7 @@ void _SanitizeFilePath(std::string& path)
   }
 }
 
-void _SanitizeFilePaths(MaterialX::DocumentPtr document)
+void _SanitizeFilePaths(mx::DocumentPtr document)
 {
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
   {

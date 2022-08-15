@@ -23,8 +23,8 @@
 
 #include <memory>
 
-const char* ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS = "GATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_GLOSSINESS";
-const char* ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_NORMALMAP = "GATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_NORMALMAP";
+const char* ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_GLOSSINESS = "HDGATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_GLOSSINESS";
+const char* ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP = "HDGATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_NORMALMAP";
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -113,7 +113,7 @@ namespace detail
       }
 
       TF_WARN("patching UsdPreviewSurface:glossiness input (set %s to disable)",
-        ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS);
+        ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_GLOSSINESS);
 
       float glossiness = value.UncheckedGet<float>();
       float roughness = 1.0f - glossiness;
@@ -134,7 +134,6 @@ namespace detail
       for (auto& pathNodePair : network.nodes)
       {
         HdMaterialNode2& node = pathNodePair.second;
-
         if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
         {
           continue;
@@ -142,21 +141,16 @@ namespace detail
 
         auto& inputs = node.inputConnections;
 
-        for (auto& input : inputs)
+        auto& normalInputIt = inputs.find(_tokens->normal);
+        if (normalInputIt == inputs.end())
         {
-          const TfToken& inputName = input.first;
+          continue;
+        }
 
-          if (inputName != _tokens->normal)
-          {
-            continue;
-          }
-
-          auto& connections = input.second;
-
-          for (HdMaterialConnection2& connection : connections)
-          {
-            PatchNormalInputConnection(network, connection);
-          }
+        auto& connections = normalInputIt->second;
+        for (HdMaterialConnection2& connection : connections)
+        {
+          PatchNormalInputConnection(network, connection);
         }
       }
     }
@@ -181,16 +175,12 @@ namespace detail
       }
 
       TF_WARN("patching UsdPreviewSurface:normal to have scaled and biased reader (set %s to disable)",
-        ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_NORMALMAP);
+        ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP);
 
       upstreamNodeParams[_tokens->scale] = GfVec4f(2.0f, 2.0f, 2.0f, 1.0f);
       upstreamNodeParams[_tokens->bias] = GfVec4f(-1.0f, -1.0f, -1.0f, 0.0f);
     }
   };
-}
-
-MaterialNetworkPatcher::MaterialNetworkPatcher()
-{
 }
 
 void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
@@ -201,11 +191,11 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
 
   patchers.push_back(std::make_unique<detail::UsdTypePatcher>());
 
-  if (!getenv(ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_GLOSSINESS))
+  if (!getenv(ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_GLOSSINESS))
   {
     patchers.push_back(std::make_unique<detail::UsdPreviewSurfaceGlossinessPatcher>());
   }
-  if (!getenv(ENVVAR_DISABLE_PATCHER_USDPREVIEWSURFACE_NORMALMAP))
+  if (!getenv(ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP))
   {
     patchers.push_back(std::make_unique<detail::UsdPreviewSurfaceNormalMapPatcher>());
   }
