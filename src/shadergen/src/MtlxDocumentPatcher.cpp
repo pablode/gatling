@@ -157,11 +157,59 @@ void _PatchColor3Vector3Mismatches(mx::DocumentPtr document)
   }
 }
 
+// HACK/FIXME:
+// One big limitation of the MDL backend is currently that geompropvalue
+// reader nodes are not implemented (they return a value of zero). By
+// removing them, the default geomprop (e.g. UV0) is used, provided by the
+// MDL state, which we can fill by anticipating certain geomprops/primvars
+// on the Hydra side (e.g. the 'st' primvar). This way, we can still get
+// proper texture coordinates in MOST cases, but not all.
+void _PatchGeompropNodes(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node)
+    {
+      continue;
+    }
+
+    mx::NodeDefPtr nodeDef = node->getNodeDef(mx::EMPTY_STRING, true);
+    if (!nodeDef)
+    {
+      continue;
+    }
+
+    std::string nodeDefName = nodeDef->getName();
+    if (strstr(nodeDefName.c_str(), "ND_geompropvalue"))
+    {
+      document->removeNode(node->getName());
+      continue;
+    }
+
+    if (strstr(nodeDefName.c_str(), "ND_image") == nullptr &&
+        strstr(nodeDefName.c_str(), "ND_tiledimage") == nullptr)
+    {
+      continue;
+    }
+
+    auto& texCoordInput = node->getActiveInput("texcoord");
+    if (texCoordInput)
+    {
+      node->removeInput(texCoordInput->getName());
+    }
+  }
+}
+
 namespace sg
 {
   void MtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
   {
     _SanitizeFilePaths(document);
+
+    _PatchGeompropNodes(document);
 
     if (!getenv(ENVVAR_DISABLE_PATCH_COLOR3_VECTOR3_MISMATCH))
     {
