@@ -24,6 +24,7 @@
 namespace mx = MaterialX;
 
 const char* ENVVAR_DISABLE_PATCH_COLOR3_VECTOR3_MISMATCH = "GATLING_DOCPATCH_DISABLE_COLOR3_VECTOR3_MISMATCH";
+const char* ENVVAR_DISABLE_PATCH_USDUVTEXTURE_SOURCECOLORSPACE = "GATLING_DOCPATCH_DISABLE_USDUVTEXTURE_SOURCECOLORSPACE";
 
 const char* TYPE_COLOR3 = "color3";
 const char* TYPE_VECTOR3 = "vector3";
@@ -130,7 +131,9 @@ void _PatchColor3Vector3Mismatch(mx::DocumentPtr document, mx::InputPtr input, m
   mx::InputPtr convertInput = node->addInput("in");
   convertInput->setConnectedOutput(output);
 
-  input->clearContent();
+  // Can't clear because we need to preserve other attributes like 'colorspace'.
+  input->removeAttribute(mx::PortElement::OUTPUT_ATTRIBUTE);
+  input->removeAttribute(mx::PortElement::NODE_GRAPH_ATTRIBUTE);
   input->setType(nodeType);
   input->setConnectedNode(node);
 }
@@ -203,11 +206,86 @@ void _PatchGeompropNodes(mx::DocumentPtr document)
   }
 }
 
+// According to the UsdPreviewSurface spec, the UsdUVTexture node has a sourceColorSpace input,
+// which can take on the values 'raw', 'sRGB' and 'auto':
+// https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html#texture-reader
+//
+// The MaterialX implementation does not provide this input, because color space transformations
+// are supposed to be handled by node _attributes_ instead of inputs. Attributes can not be set
+// dynamically. To work around the incompatibility of both approaches, this function replaces
+// said input with the corresponding 'colorspace' attribute.
+void _PatchUsdUVTextureSourceColorSpace(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::InputPtr textureInput = elem->asA<mx::Input>();
+    if (!textureInput || textureInput->hasColorSpace())
+    {
+      continue;
+    }
+
+    mx::ElementPtr upstreamElem = textureInput->getParent();
+    if (!upstreamElem)
+    {
+      continue;
+    }
+
+    mx::NodePtr upstreamNode = upstreamElem->asA<mx::Node>();
+    mx::NodePtr downstreamNode = textureInput->getConnectedNode();
+    if (!upstreamNode || !downstreamNode || downstreamNode->hasColorSpace())
+    {
+      continue;
+    }
+
+    mx::NodeDefPtr upstreamNodeDef = upstreamNode->getNodeDef(mx::EMPTY_STRING, true);
+    mx::NodeDefPtr downstreamNodeDef = downstreamNode->getNodeDef(mx::EMPTY_STRING, true);
+    if (!upstreamNodeDef || !downstreamNodeDef)
+    {
+      continue;
+    }
+
+    std::string downstreamNodeDefName = downstreamNodeDef->getName();
+    if (!strstr(downstreamNodeDefName.c_str(), "ND_UsdUVTexture")) // strstr because of versioning suffix
+    {
+      continue;
+    }
+
+    mx::InputPtr colorSpaceInput = downstreamNode->getActiveInput("sourceColorSpace");
+    mx::string textureInputName = textureInput->getName();
+
+    std::string colorSpaceString = colorSpaceInput ? colorSpaceInput->getValueString() : "auto";
+
+    bool isSrgbInput = (upstreamNodeDef->getName() == "ND_UsdPreviewSurface_surfaceshader" &&
+      (textureInputName == "diffuseColor" || textureInputName == "emissiveColor" || textureInputName == "specularColor"));
+
+    // Not spec-conform but should be more correct in most cases.
+    bool isSrgbColorSpace = (colorSpaceString == "sRGB") || (colorSpaceString == "auto" && isSrgbInput);
+
+    fprintf(stderr, "setting color space attribute from UsdUVTexture:sourceColorSpace (set %s to disable)\n",
+      ENVVAR_DISABLE_PATCH_USDUVTEXTURE_SOURCECOLORSPACE);
+
+    textureInput->setColorSpace(isSrgbColorSpace ? "srgb_texture" : "lin_rec709");
+
+    // Prevent any other kind of processing.
+    if (colorSpaceInput)
+    {
+      downstreamNode->removeInput(colorSpaceInput->getName());
+    }
+  }
+}
+
 namespace sg
 {
   void MtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
   {
     _SanitizeFilePaths(document);
+
+    if (!getenv(ENVVAR_DISABLE_PATCH_USDUVTEXTURE_SOURCECOLORSPACE))
+    {
+      _PatchUsdUVTextureSourceColorSpace(document);
+    }
 
     _PatchGeompropNodes(document);
 
