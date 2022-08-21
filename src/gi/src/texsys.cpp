@@ -33,6 +33,11 @@ namespace gi
   {
   }
 
+  TexSys::~TexSys()
+  {
+    assert(m_imageCache.empty());
+  }
+
   void TexSys::destroy()
   {
     for (const auto& pathImagePair : m_imageCache)

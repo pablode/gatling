@@ -57,7 +57,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_shaderCache(nullptr)
 {
   m_defaultMaterial = giCreateMaterialFromMtlx(DEFAULT_MTLX_DOC);
-  assert(m_defaultMaterial);
+  TF_AXIOM(m_defaultMaterial);
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
@@ -242,6 +242,9 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_c
 {
   // We transform the scene into camera space at the beginning, so for
   // subsequent camera transforms, we need to 'substract' the initial transform.
+  //
+  // FIXME: don't apply rotation to improve numerical precision
+  // https://pharr.org/matt/blog/2018/03/02/rendering-in-camera-space
   GfMatrix4d absInvViewMatrix = camera.GetTransform();
   GfMatrix4d relViewMatrix = absInvViewMatrix * m_rootMatrix;
 

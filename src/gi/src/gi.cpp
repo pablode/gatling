@@ -460,7 +460,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   cache->bvh_enabled = bvh_enabled;
   cache->images_2d = std::move(images_2d);
   cache->images_3d = std::move(images_3d);
-  cache->image_mappings = std::move(imageMappingBuffer);
+  cache->image_mappings = imageMappingBuffer;
 
   return cache;
 }

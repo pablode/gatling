@@ -134,7 +134,11 @@ namespace sg
     for (uint32_t i = 0; i < materialCount; i++)
     {
       const mi::neuraylib::ICompiled_material* material = materials.at(i);
-      assert(material);
+      if (!material)
+      {
+        assert(false);
+        continue;
+      }
 
       if (!appendMaterialToLinkUnit(i, material, linkUnit.get()))
       {
@@ -158,21 +162,20 @@ namespace sg
     // Index 0 always is the invalid texture.
     for (int i = 1; i < texCount; i++)
     {
-      const char* texDbName = targetCode->get_texture(i);
-      assert(texDbName);
-      mi::base::Handle<const mi::neuraylib::ITexture> texture(m_transaction->access<mi::neuraylib::ITexture>(texDbName));
-      mi::base::Handle<const mi::neuraylib::IImage> image(m_transaction->access<mi::neuraylib::IImage>(texture->get_image()));
-
       TextureResource textureResource;
       textureResource.binding = i - 1;
-
-      uint32_t frameId = 0;
-      uint32_t uvTileId = 0;
-      uint32_t level = 0;
 
       switch (targetCode->get_texture_shape(i))
       {
       case mi::neuraylib::ITarget_code::Texture_shape_2d: {
+        const char* texDbName = targetCode->get_texture(i);
+        assert(texDbName);
+        mi::base::Handle<const mi::neuraylib::ITexture> texture(m_transaction->access<mi::neuraylib::ITexture>(texDbName));
+        assert(texture);
+        mi::base::Handle<const mi::neuraylib::IImage> image(m_transaction->access<mi::neuraylib::IImage>(texture->get_image()));
+        assert(image);
+
+        uint32_t frameId = 0, uvTileId = 0, level = 0;
         uint32_t width = image->resolution_x(frameId, uvTileId, level);
         uint32_t height = image->resolution_y(frameId, uvTileId, level);
 

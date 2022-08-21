@@ -37,6 +37,8 @@ namespace gi
   public:
     TexSys(cgpu_device device, Stager& stager);
 
+    ~TexSys();
+
     void destroy();
 
   public:

@@ -21,7 +21,6 @@
 
 #include "error_codes.h"
 
-#include <assert.h>
 #include <stdlib.h>
 #include <spng.h>
 

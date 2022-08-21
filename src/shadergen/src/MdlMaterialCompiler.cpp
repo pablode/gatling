@@ -78,7 +78,10 @@ namespace sg
     std::string fileDir = fs::path(filePath).parent_path().string();
     std::string moduleName = "::" + fs::path(filePath).stem().string();
 
-    m_config->add_mdl_path(fileDir.c_str());
+    if (m_config->add_mdl_path(fileDir.c_str()))
+    {
+      m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "Unable to add asset MDL files");
+    }
     // The free TurboSquid USD+MDL models, and possibly thousand paid ones too, come with some of the required Omni* files,
     // but some others are referenced and missing. If we include the directory of the asset as an MDL path after our own Omni*
     // MDL files, the Omni* files that come with the asset will be loaded instead of ours. They link to the other files that do
@@ -124,6 +127,7 @@ namespace sg
                                                    mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
     mi::base::Handle<const mi::IString> moduleDbName(m_factory->get_db_module_name(moduleName.data()));
+    assert(moduleDbName);
     mi::base::Handle<const mi::neuraylib::IModule> module(m_transaction->access<mi::neuraylib::IModule>(moduleDbName->get_c_str()));
     assert(module);
 
@@ -143,6 +147,7 @@ namespace sg
     }
 
     mi::base::Handle<const mi::IString> exactMaterialDbName(funcs->get_element<mi::IString>(0));
+    assert(exactMaterialDbName);
     mi::base::Handle<const mi::neuraylib::IMaterial_definition> matDefinition(m_transaction->access<mi::neuraylib::IMaterial_definition>(exactMaterialDbName->get_c_str()));
     if (!matDefinition)
     {

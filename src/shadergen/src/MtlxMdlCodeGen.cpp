@@ -123,6 +123,7 @@ namespace sg
       mx::TypedElementPtr element = _FindSurfaceShaderElement(doc);
       if (!element)
       {
+        fprintf(stderr, "Generation failed: surface shader not found\n");
         return false;
       }
 

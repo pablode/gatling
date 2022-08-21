@@ -106,7 +106,7 @@ int main(int argc, const char* argv[])
   }
 
   HdRenderDelegate* renderDelegate = pluginHandle->CreateRenderDelegate();
-  TF_VERIFY(renderDelegate);
+  TF_AXIOM(renderDelegate);
 
   // Handle cmdline args.
   AppSettings settings;
@@ -137,7 +137,7 @@ int main(int argc, const char* argv[])
   fflush(stdout);
 
   HdRenderIndex* renderIndex = HdRenderIndex::New(renderDelegate, HdDriverVector());
-  TF_VERIFY(renderIndex);
+  TF_AXIOM(renderIndex);
 
   UsdImagingDelegate sceneDelegate(renderIndex, SdfPath::AbsoluteRootPath());
   sceneDelegate.Populate(stage->GetPseudoRoot());
@@ -194,7 +194,7 @@ int main(int argc, const char* argv[])
 
   // Gamma correction.
   float* mappedMem = (float*) renderBuffer->Map();
-  TF_VERIFY(mappedMem != nullptr);
+  TF_AXIOM(mappedMem);
 
   if (settings.gammaCorrection)
   {

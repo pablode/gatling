@@ -164,7 +164,7 @@ VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, HdType type, int e
   {
     return _ExpandBufferElements<GfVec2f>(buffer, elementExpansion);
   }
-  assert(false);
+  TF_VERIFY(false);
   return VtValue();
 }
 

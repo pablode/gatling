@@ -116,7 +116,7 @@ namespace sg
     CComPtr<IDxcResult> result;
     if (FAILED(m_compiler->Compile(&sourceBuf, args, _countof(args), m_includeHandler, IID_PPV_ARGS(&result))))
     {
-      fprintf(stderr, "Internal compilation error\n");
+      fprintf(stderr, "Internal compiler error\n");
       assert(false);
       return false;
     }
@@ -145,6 +145,7 @@ namespace sg
     CComPtr<IDxcBlob> spirvBlob;
     if (FAILED(result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&spirvBlob), &outputName)))
     {
+      assert(false);
       return false;
     }
 

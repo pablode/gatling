@@ -230,7 +230,7 @@ gi_material* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwo
 
   const NdrTokenMap& metadata = sdrNode->GetMetadata();
   const auto& subIdentifierIt = metadata.find(HdGatlingNodeMetadata->subIdentifier);
-  TF_DEV_AXIOM(subIdentifierIt != metadata.end());
+  TF_AXIOM(subIdentifierIt != metadata.end());
 
   const std::string& subIdentifier = (*subIdentifierIt).second;
   const std::string& fileUri = sdrNode->GetResolvedImplementationURI();
