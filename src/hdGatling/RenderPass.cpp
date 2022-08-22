@@ -69,6 +69,15 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   TF_AXIOM(m_defaultMaterial);
 }
 
+void HdGatlingRenderPass::_ClearColorMaterials()
+{
+  for (gi_material* mat : m_colorMaterials)
+  {
+    giDestroyMaterial(mat);
+  }
+  m_colorMaterials.clear();
+}
+
 HdGatlingRenderPass::~HdGatlingRenderPass()
 {
   if (m_geomCache)
@@ -81,6 +90,7 @@ HdGatlingRenderPass::~HdGatlingRenderPass()
   }
 
   giDestroyMaterial(m_defaultMaterial);
+  _ClearColorMaterials();
 }
 
 bool HdGatlingRenderPass::IsConverged() const
@@ -173,13 +183,15 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
                                       std::vector<gi_vertex>& vertices,
                                       std::vector<gi_face>& faces,
-                                      std::vector<const gi_material*>& materials) const
+                                      std::vector<const gi_material*>& materials)
 {
   vertices.clear();
   faces.clear();
 
-  TfHashMap<SdfPath, uint32_t, SdfPath::Hash> materialMapping;
-  materialMapping[SdfPath::EmptyPath()] = 0;
+  _ClearColorMaterials();
+
+  TfHashMap<std::string, uint32_t> materialMap;
+  materialMap[""] = 0;
 
   materials.push_back(m_defaultMaterial);
 
@@ -212,27 +224,48 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     }
 
     const SdfPath& materialId = mesh->GetMaterialId();
+    std::string materialIdStr = materialId.GetAsString();
+
     uint32_t materialIndex = 0;
 
-    if (materialMapping.find(materialId) != materialMapping.end())
+    if (!materialId.IsEmpty() && materialMap.find(materialIdStr) != materialMap.end())
     {
-      materialIndex = materialMapping[materialId];
+      materialIndex = materialMap[materialIdStr];
     }
     else
     {
       HdSprim* sprim = renderIndex->GetSprim(HdPrimTypeTokens->material, materialId);
       HdGatlingMaterial* material = dynamic_cast<HdGatlingMaterial*>(sprim);
+      const gi_material* giMat = material ? material->GetGiMaterial() : nullptr;
 
-      if (material)
+      if (!giMat && mesh->HasColor())
       {
-        const gi_material* giMat = material->GetGiMaterial();
+        // Try to reuse color material by including the RGB value in the name
+        const GfVec3f& color = mesh->GetColor();
+        materialIdStr = TfStringPrintf("color_%f_%f_%f", color[0], color[1], color[2]);
+        std::replace(materialIdStr.begin(), materialIdStr.end(), '.', '_'); // _1.9_ -> _1_9_
 
-        if (giMat)
+        if (materialMap.find(materialIdStr) != materialMap.end())
         {
-          materialIndex = materials.size();
-          materials.push_back(giMat);
-          materialMapping[materialId] = materialIndex;
+          materialIndex = materialMap[materialIdStr];
         }
+        else
+        {
+          std::string colorMatSrc = _MakeMaterialXColorMaterialSrc(color, materialIdStr.c_str());
+          gi_material* giColorMat = giCreateMaterialFromMtlx(colorMatSrc.c_str());
+          if (giColorMat)
+          {
+            m_colorMaterials.push_back(giColorMat);
+            giMat = giColorMat;
+          }
+        }
+      }
+
+      if (giMat)
+      {
+        materialIndex = materials.size();
+        materials.push_back(giMat);
+        materialMap[materialIdStr] = materialIndex;
       }
     }
 
