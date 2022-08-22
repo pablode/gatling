@@ -30,19 +30,26 @@
 
 #include <gi.h>
 
-static const char* DEFAULT_MTLX_DOC =
-  "<?xml version=\"1.0\"?>"
-  "<materialx version=\"1.38\" colorspace=\"lin_rec709\">"
-  "  <UsdPreviewSurface name=\"SR_Invalid\" type=\"surfaceshader\">"
-  "    <input name=\"diffuseColor\" type=\"color3\" value=\"1.0, 0.0, 1.0\" />"
-  "    <input name=\"roughness\" type=\"float\" value=\"1.0\" />"
-  "  </UsdPreviewSurface>"
-  "  <surfacematerial name=\"invalid\" type=\"material\">"
-  "    <input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"SR_Invalid\" />"
-  "  </surfacematerial>"
-  "</materialx>";
-
 PXR_NAMESPACE_OPEN_SCOPE
+
+std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* name)
+{
+  // Prefer UsdPreviewSurface over MDL diffuse or unlit because we want to give a good first
+  // impression (many people will try Pixar's Kitchen scene first), regardless of whether the user
+  // is aware of the use or purpose of the displayColor attribute (as opposed to a preview material).
+  static const char* USDPREVIEWSURFACE_MTLX_DOC =
+    "<?xml version=\"1.0\"?>"
+    "<materialx version=\"1.38\">"
+    "  <UsdPreviewSurface name=\"gatling_SR_%s\" type=\"surfaceshader\">"
+    "    <input name=\"diffuseColor\" type=\"color3\" value=\"%f, %f, %f\" />"
+    "  </UsdPreviewSurface>"
+    "  <surfacematerial name=\"gatling_MAT_%s\" type=\"material\">"
+    "    <input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"gatling_SR_%s\" />"
+    "  </surfacematerial>"
+    "</materialx>";
+
+  return TfStringPrintf(USDPREVIEWSURFACE_MTLX_DOC, name, color[0], color[1], color[2], name, name);
+}
 
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
                                          const HdRprimCollection& collection,
@@ -56,7 +63,9 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_geomCache(nullptr)
   , m_shaderCache(nullptr)
 {
-  m_defaultMaterial = giCreateMaterialFromMtlx(DEFAULT_MTLX_DOC);
+  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(GfVec3f(1.0f, 0.0f, 1.0f), "invalid");
+
+  m_defaultMaterial = giCreateMaterialFromMtlx(defaultMatSrc.c_str());
   TF_AXIOM(m_defaultMaterial);
 }
 
