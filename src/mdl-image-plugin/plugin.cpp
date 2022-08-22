@@ -34,10 +34,10 @@ namespace detail
   public:
     MdlImageTile()
     {
-      // Magenta is the default color.
-      m_data[0] = 255;
+      // 1x1, black pixel.
+      m_data[0] = 0;
       m_data[1] = 0;
-      m_data[2] = 255;
+      m_data[2] = 0;
       m_data[3] = 0;
     }
 
