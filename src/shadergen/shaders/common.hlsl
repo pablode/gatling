@@ -89,6 +89,18 @@ float4 pcg4d_next(inout uint4 rng_state)
     return uint4ToFloat4(pcg4d(rng_state));
 }
 
+// Duff et al. 2017. Building an Orthonormal Basis, Revisited. JCGT.
+// Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/
+void orthonormal_basis(in float3 n, out float3 b1, out float3 b2)
+{
+    float nsign = (n.z >= 0.0 ? 1.0 : -1.0); // sign() intrinsic returns 0.0 for 0.0 :(
+    float a = -1.0 / (nsign + n.z);
+    float b = n.x * n.y * a;
+
+    b1 = float3(1.0 + nsign * n.x * n.x * a, nsign * b, -nsign * n.x);
+    b2 = float3(b, nsign + n.y * n.y * a, -n.y);
+}
+
 // From: "A Fast and Robust Method for Avoiding Self-Intersection"
 // Wächter and Binder, Ch. 6 in Ray Tracing Gems I.
 // Licensed under CC BY-NC-ND 4.0: https://creativecommons.org/licenses/by-nc-nd/4.0/

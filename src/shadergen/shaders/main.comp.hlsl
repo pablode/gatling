@@ -231,9 +231,8 @@ float3 evaluate_sample(inout uint4 rng_state,
 
         {
             /* Tangent and bitangent. */
-            float3 L = abs(normal.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
-            float3 tangent = normalize(cross(L, normal));
-            float3 bitangent = cross(normal, tangent);
+            float3 tangent, bitangent;
+            orthonormal_basis(normal, tangent, bitangent);
 
             /* EDF evaluation. */
             Shading_state_material shading_state_material;
