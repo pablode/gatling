@@ -91,6 +91,7 @@ float4 pcg4d_next(inout uint4 rng_state)
 
 // From: "A Fast and Robust Method for Avoiding Self-Intersection"
 // Wächter and Binder, Ch. 6 in Ray Tracing Gems I.
+// Licensed under CC BY-NC-ND 4.0: https://creativecommons.org/licenses/by-nc-nd/4.0/
 float3 offset_ray_origin(float3 p, float3 geom_normal)
 {
     const float origin = 1.0 / 32.0;
