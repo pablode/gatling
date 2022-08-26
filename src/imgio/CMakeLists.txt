@@ -3,22 +3,18 @@ add_library(
   include/imgio.h
   include/img.h
   include/error_codes.h
-  src/imgio.c
-  src/jpeg.c
+  src/imgio.cpp
   src/jpeg.h
-  src/png.c
+  src/jpeg.cpp
   src/png.h
+  src/png.cpp
   src/mmap.h
-  src/mmap.c
+  src/mmap.cpp
 )
 
 set_target_properties(
   imgio
   PROPERTIES
-    LINKER_LANGUAGE C
-    C_STANDARD 11
-    C_STANDARD_REQUIRED ON
-    C_EXTENSIONS OFF
     # Required since library is linked into hdGatling DSO
     POSITION_INDEPENDENT_CODE ON
 )

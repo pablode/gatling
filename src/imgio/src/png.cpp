@@ -19,6 +19,7 @@
 
 #include "png.h"
 
+#include "img.h"
 #include "error_codes.h"
 
 #include <stdlib.h>
@@ -26,9 +27,9 @@
 
 int imgio_png_decode(size_t size,
                      void* mem,
-                     struct imgio_img* img)
+                     imgio_img* img)
 {
-  enum spng_errno err;
+  int err;
 
   spng_ctx* ctx = spng_ctx_new(0);
 
@@ -44,7 +45,7 @@ int imgio_png_decode(size_t size,
     goto decode_size_fail;
   }
 
-  img->data = malloc(img->size);
+  img->data = (uint8_t*) malloc(img->size);
 
   err = spng_decode_image(ctx, img->data, img->size, SPNG_FMT_RGBA8, 0);
   if (err != SPNG_OK)
@@ -52,7 +53,7 @@ int imgio_png_decode(size_t size,
     goto decode_fail;
   }
 
-  struct spng_ihdr ihdr;
+  spng_ihdr ihdr;
   err = spng_get_ihdr(ctx, &ihdr);
   if (err != SPNG_OK)
   {

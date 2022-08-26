@@ -34,27 +34,27 @@ enum ImgioFileUsage
 bool imgio_file_create(
   const char* path,
   size_t size,
-  struct imgio_file** file
+  imgio_file** file
 );
 
 bool imgio_file_open(
   const char* path,
-  enum ImgioFileUsage usage,
-  struct imgio_file** file
+  ImgioFileUsage usage,
+  imgio_file** file
 );
 
-size_t imgio_file_size(struct imgio_file* file);
+size_t imgio_file_size(imgio_file* file);
 
-bool imgio_file_close(struct imgio_file* file);
+bool imgio_file_close(imgio_file* file);
 
 void* imgio_mmap(
-  struct imgio_file* file,
+  imgio_file* file,
   size_t offset,
   size_t size
 );
 
 bool imgio_munmap(
-  struct imgio_file* file,
+  imgio_file* file,
   void* addr
 );
 

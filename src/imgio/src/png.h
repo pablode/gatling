@@ -22,10 +22,10 @@
 
 #include <stddef.h>
 
-#include "img.h"
+struct imgio_img;
 
 int imgio_png_decode(size_t size,
                      void* data,
-                     struct imgio_img* img);
+                     imgio_img* img);
 
 #endif

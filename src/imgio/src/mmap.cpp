@@ -45,20 +45,20 @@ struct imgio_mapped_posix_range
 
 struct imgio_file
 {
-  enum ImgioFileUsage usage;
-  size_t              size;
+  ImgioFileUsage usage;
+  size_t         size;
 #if defined(_WIN32)
-  HANDLE              file_handle;
-  HANDLE              mapping_handle;
+  HANDLE         file_handle;
+  HANDLE         mapping_handle;
 #else
-  int                 file_descriptor;
-  struct imgio_mapped_posix_range mapped_ranges[MAX_MAPPED_MEM_RANGES];
+  int            file_descriptor;
+  imgio_mapped_posix_range mapped_ranges[MAX_MAPPED_MEM_RANGES];
 #endif
 };
 
 #if defined (_WIN32)
 
-bool imgio_file_create(const char* path, size_t size, struct imgio_file** file)
+bool imgio_file_create(const char* path, size_t size, imgio_file** file)
 {
   DWORD creation_disposition = CREATE_ALWAYS;
   DWORD desired_access = GENERIC_READ | GENERIC_WRITE;
@@ -105,7 +105,7 @@ bool imgio_file_create(const char* path, size_t size, struct imgio_file** file)
     return false;
   }
 
-  (*file) = malloc(sizeof(struct imgio_file));
+  (*file) = new imgio_file;
   (*file)->usage = IMGIO_FILE_USAGE_WRITE;
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
@@ -114,7 +114,7 @@ bool imgio_file_create(const char* path, size_t size, struct imgio_file** file)
   return true;
 }
 
-bool imgio_file_open(const char* path, enum ImgioFileUsage usage, struct imgio_file** file)
+bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
 {
   DWORD desired_access;
   DWORD share_mode;
@@ -180,7 +180,7 @@ bool imgio_file_open(const char* path, enum ImgioFileUsage usage, struct imgio_f
     return false;
   }
 
-  (*file) = malloc(sizeof(struct imgio_file));
+  (*file) = new imgio_file;
   (*file)->usage = usage;
   (*file)->file_handle = file_handle;
   (*file)->mapping_handle = mapping_handle;
@@ -189,20 +189,22 @@ bool imgio_file_open(const char* path, enum ImgioFileUsage usage, struct imgio_f
   return true;
 }
 
-size_t imgio_file_size(struct imgio_file* file)
+size_t imgio_file_size(imgio_file* file)
 {
   return file->size;
 }
 
-bool imgio_file_close(struct imgio_file* file)
+bool imgio_file_close(imgio_file* file)
 {
   bool closed_mapping = CloseHandle(file->mapping_handle);
   bool closed_file = CloseHandle(file->file_handle);
 
+  delete file;
+
   return closed_mapping && closed_file;
 }
 
-void* imgio_mmap(struct imgio_file* file, size_t offset, size_t size)
+void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
 {
   if (size == 0)
   {
@@ -238,14 +240,14 @@ void* imgio_mmap(struct imgio_file* file, size_t offset, size_t size)
   return mapped_addr;
 }
 
-bool imgio_munmap(struct imgio_file* file, void* addr)
+bool imgio_munmap(imgio_file* file, void* addr)
 {
   return UnmapViewOfFile(addr);
 }
 
 #else
 
-bool imgio_file_create(const char* path, size_t size, struct imgio_file** file)
+bool imgio_file_create(const char* path, size_t size, imgio_file** file)
 {
   int open_flags = O_RDWR | O_CREAT | O_TRUNC;
   mode_t permission_flags = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -264,15 +266,15 @@ bool imgio_file_create(const char* path, size_t size, struct imgio_file** file)
     return false;
   }
 
-  (*file) = malloc(sizeof(struct imgio_file));
+  (*file) = new imgio_file;
   (*file)->usage = IMGIO_FILE_USAGE_WRITE;
   (*file)->file_descriptor = file_descriptor;
-  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(struct imgio_mapped_posix_range));
+  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(imgio_mapped_posix_range));
 
   return true;
 }
 
-bool imgio_file_open(const char* path, enum ImgioFileUsage usage, struct imgio_file** file)
+bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
 {
   int open_flags = 0;
 
@@ -296,28 +298,28 @@ bool imgio_file_open(const char* path, enum ImgioFileUsage usage, struct imgio_f
     return false;
   }
 
-  struct stat file_stats;
+  stat file_stats;
   if (fstat(file_descriptor, &file_stats))
   {
     close(file_descriptor);
     return false;
   }
 
-  (*file) = malloc(sizeof(struct imgio_file));
+  (*file) = new imgio_file;
   (*file)->usage = usage;
   (*file)->file_descriptor = file_descriptor;
   (*file)->size = file_stats.st_size;
-  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(struct imgio_mapped_posix_range));
+  memset((*file)->mapped_ranges, 0, MAX_MAPPED_MEM_RANGES * sizeof(imgio_mapped_posix_range));
 
   return true;
 }
 
-size_t imgio_file_size(struct imgio_file* file)
+size_t imgio_file_size(imgio_file* file)
 {
   return file->size;
 }
 
-bool imgio_file_close(struct imgio_file* file)
+bool imgio_file_close(imgio_file* file)
 {
   int result = close(file->file_descriptor);
 #ifndef NDEBUG
@@ -327,11 +329,11 @@ bool imgio_file_close(struct imgio_file* file)
     assert(!file->mapped_ranges[i].addr);
   }
 #endif
-  free(file);
+  delete file;
   return !result;
 }
 
-void* imgio_mmap(struct imgio_file* file, size_t offset, size_t size)
+void* imgio_mmap(imgio_file* file, size_t offset, size_t size)
 {
   if (size == 0)
   {
@@ -339,7 +341,7 @@ void* imgio_mmap(struct imgio_file* file, size_t offset, size_t size)
   }
 
   /* Try to find an empty mapped range data struct. */
-  struct imgio_mapped_posix_range* range = NULL;
+  imgio_mapped_posix_range* range = NULL;
   for (uint32_t i = 0; i < MAX_MAPPED_MEM_RANGES; ++i)
   {
     if (!file->mapped_ranges[i].addr)
@@ -384,11 +386,11 @@ void* imgio_mmap(struct imgio_file* file, size_t offset, size_t size)
   return mapped_addr;
 }
 
-bool imgio_munmap(struct imgio_file* file, void* addr)
+bool imgio_munmap(imgio_file* file, void* addr)
 {
   for (uint32_t i = 0; i < MAX_MAPPED_MEM_RANGES; ++i)
   {
-    struct imgio_mapped_posix_range* range = &file->mapped_ranges[i];
+    imgio_mapped_posix_range* range = &file->mapped_ranges[i];
     if (range->addr != addr)
     {
       continue;

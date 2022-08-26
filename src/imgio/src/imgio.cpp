@@ -26,9 +26,9 @@
 #include <stdlib.h>
 
 int imgio_load_img(const char* file_path,
-                   struct imgio_img* img)
+                   imgio_img* img)
 {
-  struct imgio_file* file;
+  imgio_file* file;
   if (!imgio_file_open(file_path,
                        IMGIO_FILE_USAGE_READ,
                        &file))
@@ -57,7 +57,7 @@ int imgio_load_img(const char* file_path,
   return r;
 }
 
-void imgio_free_img(struct imgio_img* img)
+void imgio_free_img(imgio_img* img)
 {
   free(img->data);
 }

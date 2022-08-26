@@ -19,6 +19,7 @@
 
 #include "jpeg.h"
 
+#include "img.h"
 #include "error_codes.h"
 
 #include <stdlib.h>
@@ -26,7 +27,7 @@
 
 int imgio_jpeg_decode(size_t size,
                       void* mem,
-                      struct imgio_img* img)
+                      imgio_img* img)
 {
   tjhandle instance = tjInitDecompress();
   if (!instance)
@@ -36,7 +37,7 @@ int imgio_jpeg_decode(size_t size,
 
   int subsamp;
   int colorspace;
-  if (tjDecompressHeader3(instance, mem, size,
+  if (tjDecompressHeader3(instance, (const unsigned char*) mem, (unsigned long) size,
                           (int*) &img->width, (int*) &img->height,
                           &subsamp, &colorspace) < 0)
   {
@@ -46,11 +47,11 @@ int imgio_jpeg_decode(size_t size,
 
   int pixelFormat = TJPF_RGBA;
   img->size = img->width * img->height * tjPixelSize[pixelFormat];
-  img->data = malloc(img->size);
+  img->data = (uint8_t*) malloc(img->size);
 
-  int result = tjDecompress2(instance, mem, size, (unsigned char*) img->data,
-                             (int) img->width, 0, (int) img->height,
-                             pixelFormat, TJFLAG_ACCURATEDCT);
+  int result = tjDecompress2(instance, (const unsigned char*) mem, (unsigned long) size,
+                             (unsigned char*) img->data, (int) img->width, 0,
+                             (int) img->height, pixelFormat, TJFLAG_ACCURATEDCT);
   tjDestroy(instance);
 
   if (result < 0)
