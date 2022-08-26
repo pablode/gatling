@@ -70,15 +70,8 @@ target_link_libraries(
 )
 
 set(PLUGINFO_PATH "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json")
-
-file(READ plugInfo.json.in PLUGINFO)
-file(
-  GENERATE
-  OUTPUT
-    "${PLUGINFO_PATH}"
-  CONTENT
-    ${PLUGINFO}
-)
+set(PLUG_INFO_LIBRARY_PATH "../hdGatling${CMAKE_SHARED_LIBRARY_SUFFIX}")
+configure_file(plugInfo.json.in "${PLUGINFO_PATH}" @ONLY)
 
 add_dependencies(hdGatling mdl-image-plugin)
 
