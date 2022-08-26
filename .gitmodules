@@ -31,3 +31,6 @@
 [submodule "extern/libjpeg-turbo"]
 	path = extern/libjpeg-turbo
 	url = https://github.com/pablode/libjpeg-turbo
+[submodule "extern/zlib-ng"]
+	path = extern/zlib-ng
+	url = https://github.com/zlib-ng/zlib-ng

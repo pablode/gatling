@@ -94,18 +94,20 @@ if(${GATLING_USE_EMBREE})
 endif()
 
 #
+# zlib-ng
+#
+set(ZLIB_COMPAT ON)
+set(ZLIB_ENABLE_TESTS OFF)
+add_subdirectory(zlib-ng)
+target_include_directories(zlib PUBLIC zlib-ng $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+
+#
 # libspng
 #
-add_library(
-  spng STATIC
-  libspng/spng/spng.c
-)
+add_library(spng STATIC libspng/spng/spng.c)
 target_include_directories(spng PUBLIC libspng/spng)
-target_link_libraries(spng PRIVATE miniz)
-target_compile_definitions(
-  spng
-  PUBLIC SPNG_STATIC
-)
+target_link_libraries(spng PRIVATE zlib)
+target_compile_definitions(spng PUBLIC SPNG_STATIC)
 
 #
 # libjpeg-turbo
