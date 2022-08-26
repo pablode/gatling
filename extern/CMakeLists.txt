@@ -1,5 +1,7 @@
 include(FetchContent)
 
+set(BUILD_SHARED_LIBS OFF)
+
 # Make option() honor normal variables.
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
