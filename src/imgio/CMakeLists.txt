@@ -4,6 +4,8 @@ add_library(
   include/img.h
   include/error_codes.h
   src/imgio.cpp
+  src/exr.h
+  src/exr.cpp
   src/jpeg.h
   src/jpeg.cpp
   src/png.h
@@ -32,4 +34,5 @@ target_link_libraries(
   PRIVATE
     spng
     turbojpeg-static
+    OpenEXR::OpenEXR
 )

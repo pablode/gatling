@@ -242,6 +242,30 @@ namespace detail
                                   buffer[6] == 0x1A && buffer[7] == 0x0A);
     }
   };
+
+  class ExrImagePlugin : public ImagePlugin
+  {
+  public:
+    const char* get_name() const override
+    {
+      return "gatling_exr_loader";
+    }
+
+    const char* get_file_extension(mi::Uint32 index) const override
+    {
+      switch (index)
+      {
+      case 0: return "exr";
+      default: return nullptr;
+      }
+    }
+
+    bool test(const mi::Uint8* buffer /* 512b */, mi::Uint32 file_size) const override
+    {
+      return (file_size >= 4) && (buffer[0] == 0x76 && buffer[1] == 0x2F &&
+                                  buffer[2] == 0x31 && buffer[3] == 0x01);
+    }
+  };
 }
 
 extern "C" MI_DLL_EXPORT mi::base::Plugin* mi_plugin_factory(mi::Sint32 index, void* context)
@@ -250,6 +274,7 @@ extern "C" MI_DLL_EXPORT mi::base::Plugin* mi_plugin_factory(mi::Sint32 index, v
   {
   case 0: return new detail::JpegImagePlugin();
   case 1: return new detail::PngImagePlugin();
+  case 2: return new detail::ExrImagePlugin();
   default: return nullptr;
   }
 }

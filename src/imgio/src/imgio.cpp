@@ -22,6 +22,7 @@
 #include "mmap.h"
 #include "png.h"
 #include "jpeg.h"
+#include "exr.h"
 
 #include <stdlib.h>
 
@@ -49,6 +50,11 @@ int imgio_load_img(const char* file_path,
   if (r == IMGIO_ERR_UNSUPPORTED_ENCODING)
   {
     r = imgio_jpeg_decode(size, data, img);
+  }
+
+  if (r == IMGIO_ERR_UNSUPPORTED_ENCODING)
+  {
+    r = imgio_exr_decode(size, data, img);
   }
 
   imgio_munmap(file, data);
