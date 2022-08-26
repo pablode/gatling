@@ -117,6 +117,19 @@ add_subdirectory(libjpeg-turbo)
 target_include_directories(turbojpeg-static PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libjpeg-turbo>)
 
 #
+# Imath
+#
+add_subdirectory(Imath)
+
+#
+# OpenEXR
+#
+set(OPENEXR_INSTALL OFF)
+set(OPENEXR_INSTALL_TOOLS OFF)
+set(OPENEXR_INSTALL_EXAMPLES OFF)
+add_subdirectory(OpenEXR)
+
+#
 # SPIRV-Reflect
 #
 set(SPIRV_REFLECT_EXECUTABLE OFF)

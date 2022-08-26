@@ -34,3 +34,9 @@
 [submodule "extern/zlib-ng"]
 	path = extern/zlib-ng
 	url = https://github.com/zlib-ng/zlib-ng
+[submodule "extern/Imath"]
+	path = extern/Imath
+	url = https://github.com/AcademySoftwareFoundation/Imath
+[submodule "extern/openexr"]
+	path = extern/openexr
+	url = https://github.com/AcademySoftwareFoundation/openexr
