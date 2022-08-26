@@ -94,12 +94,6 @@ if(${GATLING_USE_EMBREE})
 endif()
 
 #
-# miniz
-#
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-add_subdirectory(miniz)
-
-#
 # libspng
 #
 add_library(
@@ -110,7 +104,6 @@ target_include_directories(spng PUBLIC libspng/spng)
 target_link_libraries(spng PRIVATE miniz)
 target_compile_definitions(
   spng
-  PRIVATE SPNG_USE_MINIZ
   PUBLIC SPNG_STATIC
 )
 
