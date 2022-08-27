@@ -409,7 +409,7 @@ bool find_hit_any(in RayInfo ray)
 
 #else
 
-bool find_hit_closest(in RayInfo ray, out Hit_info hit)
+bool find_hit_closest(inout RayInfo ray, out Hit_info hit)
 {
     hit.face_idx = 0xFFFFFFFF;
 #if AOV_ID == AOV_ID_DEBUG_TRI_TESTS
