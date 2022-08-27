@@ -149,6 +149,7 @@ namespace sg
 
     Material* mat = new Material();
     mat->compiledMaterial = compiledMaterial;
+    mat->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
     return mat;
   }
 
