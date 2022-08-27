@@ -20,7 +20,7 @@ StructuredBuffer<face> faces;
 
 #ifdef NEXT_EVENT_ESTIMATION
 [[vk::binding(3)]]
-StructuredBuffer<uint16_t> emissive_face_indices;
+StructuredBuffer<uint32_t> emissive_face_indices;
 #endif
 
 [[vk::binding(4)]]

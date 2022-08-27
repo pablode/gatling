@@ -260,21 +260,16 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   printf("vertices: %d\n", params->vertex_count);
 
   // Build list of emissive faces.
-  std::vector<uint16_t> emissive_face_indices;
+  std::vector<uint32_t> emissive_face_indices;
   if (params->next_event_estimation)
   {
-    emissive_face_indices.reserve(128);
+    emissive_face_indices.reserve(1024);
     for (uint32_t i = 0; i < face_count; i++)
     {
       const gi_material* mat = params->materials[faces[i].mat_index];
       if (s_shaderGen->isMaterialEmissive(mat->sg_mat))
       {
         emissive_face_indices.push_back(i);
-      }
-      if (emissive_face_indices.size() == UINT16_MAX)
-      {
-        fprintf(stderr, "Limit of %d lights for NEE reached; ignoring rest\n", int(UINT16_MAX));
-        break;
       }
     }
   }
@@ -288,7 +283,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
 
   uint64_t bvh_node_buf_size = bvh8c.nodes.size() * sizeof(gi::bvh::Bvh8cNode);
   uint64_t face_buf_size = face_count * sizeof(gi_face);
-  uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint16_t);
+  uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
   uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
 
   uint64_t bvh_node_buf_offset = giAlignBuffer(offset_align, bvh_node_buf_size, &buf_size);
