@@ -28,6 +28,7 @@
 #include <ImfRgba.h>
 
 #include <algorithm>
+#include <assert.h>
 
 class MemStream : public Imf::IStream
 {
@@ -45,13 +46,9 @@ public:
   {
   }
 
-  bool isMemoryMapped() const override
-  {
-    return true;
-  }
-
   bool read(char c[], int n) override
   {
+    assert(m_data);
     if (m_pos + n > m_size)
     {
       return false;
@@ -59,17 +56,6 @@ public:
     memcpy(c, (void*) &m_data[m_pos], n);
     m_pos += n;
     return true;
-  }
-
-  char* readMemoryMapped(int n) override
-  {
-    if (m_pos + n > m_size)
-    {
-      throw std::invalid_argument("Trying to read out of bounds");
-    }
-    char* ptr = &m_data[m_pos];
-    m_pos += n;
-    return ptr;
   }
 
   uint64_t tellg() override
@@ -114,21 +100,21 @@ int imgio_exr_decode(size_t size,
 
     Imf::RgbaInputFile file(stream);
 
-    const Imath::Box2i& window = file.dataWindow();
-    img->width = (window.max.x - window.min.x + 1);
-    img->height = (window.max.y - window.min.y + 1);
+    const Imath::Box2i& dw = file.dataWindow();
+    img->width = (dw.max.x - dw.min.x + 1);
+    img->height = (dw.max.y - dw.min.y + 1);
     img->size = img->width * img->height * 4;
     img->data = (uint8_t*) malloc(img->size);
 
-    Imf::Array2D<Imf::Rgba> tmpPixels(img->width, img->height); // values are 16-bit floats
-    file.setFrameBuffer(&tmpPixels[0][0] - window.min.x - window.min.y * img->width, 1, img->width);
-    file.readPixels(window.min.y, window.max.y);
+    Imf::Array2D<Imf::Rgba> tmpPixels(img->height, img->width); // values are 16-bit floats
+    file.setFrameBuffer(&tmpPixels[0][0] - dw.min.x - dw.min.y * img->width, 1, img->width);
+    file.readPixels(dw.min.y, dw.max.y);
 
     for (long h = 0; h < tmpPixels.height(); h++)
     {
       for (long w = 0; w < tmpPixels.width(); w++)
       {
-        const Imf::Rgba& value = tmpPixels[w][h];
+        const Imf::Rgba& value = tmpPixels[h][w];
 
         uint64_t offset = (w + h * img->width) * 4;
         img->data[offset + 0] = _FloatToByte(value.r);
