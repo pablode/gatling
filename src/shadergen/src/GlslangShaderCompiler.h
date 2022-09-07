@@ -33,7 +33,7 @@ namespace sg
   public:
     bool init() override;
 
-    bool compileHlslToSpv(std::string_view source,
+    bool compileGlslToSpv(std::string_view source,
                           std::string_view filePath,
                           std::string_view entryPoint,
                           std::vector<uint8_t>& spv) override;

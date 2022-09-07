@@ -89,7 +89,7 @@ namespace sg
   private:
     class MdlRuntime* m_mdlRuntime = nullptr;
     class MdlMaterialCompiler* m_mdlMaterialCompiler = nullptr;
-    class MdlHlslCodeGen* m_mdlHlslCodeGen = nullptr;
+    class MdlGlslCodeGen* m_mdlGlslCodeGen = nullptr;
     class MtlxMdlCodeGen* m_mtlxMdlCodeGen = nullptr;
     class IShaderCompiler* m_shaderCompiler = nullptr;
     std::string m_shaderPath;

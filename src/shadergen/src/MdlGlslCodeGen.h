@@ -35,13 +35,13 @@
 
 namespace sg
 {
-  class MdlHlslCodeGen
+  class MdlGlslCodeGen
   {
   public:
     bool init(MdlRuntime& runtime);
 
     bool translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
-                   std::string& hlslSrc,
+                   std::string& glslSrc,
                    std::vector<TextureResource>& textureResources);
 
   private:

@@ -583,7 +583,7 @@ int giRender(const gi_render_params* params, float* rgba_img)
     images.push_back({ 8, i, shader_cache->images_3d[i] });
   }
 
-  cgpu_bindings bindings= {
+  cgpu_bindings bindings = {
     (uint32_t) buffers.size(), buffers.data(),
     (uint32_t) images.size(), images.data(),
     (uint32_t) (image_count ? 1 : 0), &sampler

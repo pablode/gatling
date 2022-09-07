@@ -20,13 +20,8 @@
 #include "MtlxMdlCodeGen.h"
 #include "MdlRuntime.h"
 #include "MdlMaterialCompiler.h"
-#include "MdlHlslCodeGen.h"
-
-#ifdef GATLING_USE_GLSLANG
+#include "MdlGlslCodeGen.h"
 #include "GlslangShaderCompiler.h"
-#else
-#include "DxcShaderCompiler.h"
-#endif
 
 #include <string>
 #include <sstream>
@@ -53,19 +48,15 @@ namespace sg
       return false;
     }
 
-    m_mdlHlslCodeGen = new sg::MdlHlslCodeGen();
-    if (!m_mdlHlslCodeGen->init(*m_mdlRuntime))
+    m_mdlGlslCodeGen = new sg::MdlGlslCodeGen();
+    if (!m_mdlGlslCodeGen->init(*m_mdlRuntime))
     {
       return false;
     }
 
     m_mdlMaterialCompiler = new sg::MdlMaterialCompiler(*m_mdlRuntime, params.mdlLibPath.data());
 
-  #ifdef GATLING_USE_GLSLANG
     m_shaderCompiler = new sg::GlslangShaderCompiler(m_shaderPath);
-  #else
-    m_shaderCompiler = new sg::DxcShaderCompiler(m_shaderPath);
-  #endif
     if (!m_shaderCompiler->init())
     {
       return false;
@@ -81,7 +72,7 @@ namespace sg
     delete m_mtlxMdlCodeGen;
     delete m_shaderCompiler;
     delete m_mdlMaterialCompiler;
-    delete m_mdlHlslCodeGen;
+    delete m_mdlGlslCodeGen;
     delete m_mdlRuntime;
   }
 
@@ -180,7 +171,7 @@ namespace sg
   bool ShaderGen::generateMainShader(const MainShaderParams* params,
                                      MainShaderResult& result)
   {
-    std::string fileName = "main.comp.hlsl";
+    std::string fileName = "main.comp.glsl";
     std::string filePath = m_shaderPath + "/" + fileName;
 
     std::vector<const mi::neuraylib::ICompiled_material*> compiledMaterials;
@@ -190,7 +181,7 @@ namespace sg
     }
 
     std::string genMdl;
-    if (!m_mdlHlslCodeGen->translate(compiledMaterials, genMdl, result.textureResources))
+    if (!m_mdlGlslCodeGen->translate(compiledMaterials, genMdl, result.textureResources))
     {
       return false;
     }
@@ -201,14 +192,11 @@ namespace sg
       return false;
     }
 
-    std::string mdlLocMarker = "MDL_GENERATED_CODE";
-    size_t mdlInjectionLoc = fileSrc.find(mdlLocMarker);
-    assert(mdlInjectionLoc != std::string::npos);
-    fileSrc.replace(mdlInjectionLoc, mdlLocMarker.size(), genMdl);
-
     std::stringstream ss;
     ss << std::showpoint;
     ss << std::setprecision(std::numeric_limits<float>::digits10);
+
+    ss << genMdl;
 
     int textureCount2d = 0;
     int textureCount3d = 0;
@@ -249,13 +237,13 @@ namespace sg
 
     ss << fileSrc;
 
-    std::string hlslStr = ss.str();
-    if (getenv("GATLING_DUMP_HLSL"))
+    std::string glslStr = ss.str();
+    if (getenv("GATLING_DUMP_GLSL"))
     {
-      printf("HLSL source: %s\n", hlslStr.c_str());
+      printf("GLSL source: %s\n", glslStr.c_str());
     }
 
-    result.entryPoint = "CSMain";
-    return m_shaderCompiler->compileHlslToSpv(hlslStr, filePath, result.entryPoint, result.spv);
+    result.entryPoint = "main";
+    return m_shaderCompiler->compileGlslToSpv(glslStr, filePath, result.entryPoint, result.spv);
   }
 }

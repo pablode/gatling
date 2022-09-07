@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MdlHlslCodeGen.h"
+#include "MdlGlslCodeGen.h"
 
 #include <mi/mdl_sdk.h>
 
@@ -28,13 +28,13 @@ namespace sg
   const char* EMISSION_FUNC_NAME = "mdl_edf_emission";
   const char* EMISSION_INTENSITY_FUNC_NAME = "mdl_edf_emission_intensity";
   const char* THIN_WALLED_FUNC_NAME = "mdl_thin_walled";
-  const char* MATERIAL_STATE_NAME = "Shading_state_material";
+  const char* MATERIAL_STATE_NAME = "State";
 
   void _generateInitSwitch(std::stringstream& ss,
                            const char* funcName,
                            uint32_t caseCount)
   {
-    ss << "void " << funcName << "_init(in int idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
+    ss << "void " << funcName << "_init(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
     ss << "\tswitch(idx)\n";
     ss << "\t{\n";
@@ -49,7 +49,7 @@ namespace sg
   void _generateEdfIntensitySwitch(std::stringstream& ss,
                                    uint32_t caseCount)
   {
-    ss << "float3 " << EMISSION_INTENSITY_FUNC_NAME << "(in int idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
+    ss << "vec3 " << EMISSION_INTENSITY_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
     ss << "\tswitch(idx)\n";
     ss << "\t{\n";
@@ -58,14 +58,14 @@ namespace sg
       ss << "\t\tcase " << i << ": return " << EMISSION_INTENSITY_FUNC_NAME << "_" << i << "(sIn);\n";
     }
     ss << "\t}\n";
-    ss << "\treturn float3(0.0, 0.0, 0.0);\n";
+    ss << "\treturn vec3(0.0, 0.0, 0.0);\n";
     ss << "}\n";
   }
 
   void _generateThinWalledSwitch(std::stringstream& ss,
                                  uint32_t caseCount)
   {
-    ss << "bool " << THIN_WALLED_FUNC_NAME << "(in int idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
+    ss << "bool " << THIN_WALLED_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
     ss << "\tswitch(idx)\n";
     ss << "\t{\n";
@@ -84,7 +84,7 @@ namespace sg
                              const char* inoutTypeName,
                              uint32_t caseCount)
   {
-    ss << "void " << funcName << "_" << opName << "(in int idx, inout " << inoutTypeName << " sInOut, in " << MATERIAL_STATE_NAME << " sIn)\n";
+    ss << "void " << funcName << "_" << opName << "(in uint idx, inout " << inoutTypeName << " sInOut, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
     ss << "\tswitch(idx)\n";
     ss << "\t{\n";
@@ -96,13 +96,13 @@ namespace sg
     ss << "}\n";
   }
 
-  bool MdlHlslCodeGen::init(MdlRuntime& runtime)
+  bool MdlGlslCodeGen::init(MdlRuntime& runtime)
   {
     mi::base::Handle<mi::neuraylib::IMdl_backend_api> backendApi(runtime.getBackendApi());
-    m_backend = mi::base::Handle<mi::neuraylib::IMdl_backend>(backendApi->get_backend(mi::neuraylib::IMdl_backend_api::MB_HLSL));
+    m_backend = mi::base::Handle<mi::neuraylib::IMdl_backend>(backendApi->get_backend(mi::neuraylib::IMdl_backend_api::MB_GLSL));
     if (!m_backend.is_valid_interface())
     {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "HLSL backend not supported by MDL runtime");
+      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "GLSL backend not supported by MDL runtime");
       return false;
     }
 
@@ -118,8 +118,8 @@ namespace sg
     return true;
   }
 
-  bool MdlHlslCodeGen::translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
-                                 std::string& hlslSrc,
+  bool MdlGlslCodeGen::translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
+                                 std::string& glslSrc,
                                  std::vector<TextureResource>& textureResources)
   {
     mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), m_context.get()));
@@ -239,11 +239,11 @@ namespace sg
     _generateEdfIntensitySwitch(ss, materialCount);
     _generateThinWalledSwitch(ss, materialCount);
 
-    hlslSrc = ss.str();
+    glslSrc = ss.str();
     return true;
   }
 
-  bool MdlHlslCodeGen::appendMaterialToLinkUnit(uint32_t idx,
+  bool MdlGlslCodeGen::appendMaterialToLinkUnit(uint32_t idx,
                                                 const mi::neuraylib::ICompiled_material* compiledMaterial,
                                                 mi::neuraylib::ILink_unit* linkUnit)
   {

@@ -98,7 +98,7 @@ namespace sg
       return false;
     }
 
-    shaderc_compile_options_set_source_language(m_compileOptions, shaderc_source_language_hlsl);
+    shaderc_compile_options_set_source_language(m_compileOptions, shaderc_source_language_glsl);
     shaderc_compile_options_set_optimization_level(m_compileOptions, shaderc_optimization_level_performance);
     shaderc_compile_options_set_target_env(m_compileOptions, shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_1);
     shaderc_compile_options_set_target_spirv(m_compileOptions, shaderc_spirv_version_1_3);
@@ -132,7 +132,7 @@ namespace sg
     }
   }
 
-  bool GlslangShaderCompiler::compileHlslToSpv(std::string_view source,
+  bool GlslangShaderCompiler::compileGlslToSpv(std::string_view source,
                                                std::string_view filePath,
                                                std::string_view entryPoint,
                                                std::vector<uint8_t>& spv)

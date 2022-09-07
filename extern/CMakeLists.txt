@@ -49,7 +49,6 @@ add_subdirectory(VulkanMemoryAllocator)
 #
 # shaderc dependencies. The revisions are taken from the repo/DEPS.
 #
-if(${GATLING_USE_GLSLANG})
 
 # SPIRV-Headers
 set(SPIRV_HEADERS_SKIP_EXAMPLES ON)
@@ -71,8 +70,6 @@ set(SHADERC_SKIP_TESTS ON)
 set(SHADERC_SKIP_INSTALL ON)
 set(SHADERC_ENABLE_SHARED_CRT ON)
 add_subdirectory(shaderc)
-
-endif()
 
 #
 # Embree

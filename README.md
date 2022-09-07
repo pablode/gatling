@@ -14,7 +14,7 @@ This is my toy path tracer I work on in my free time.
 
 It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform, GPU-accelerated, and supports [MaterialX](https://www.materialx.org/index.html), [MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) materials.
 
-Technically, gatling uses the MDL code generation backend of the MaterialX project to support and importance-sample complex BSDFs like the Autodesk Standard Surface or the glTF shading model. The MDL SDK then generates HLSL code which is compiled to SPIR-V for use in [Vulkan](https://www.vulkan.org/). A compressed 8-wide BVH is used to speed up rendering, but hardware ray tracing will be used in the future.
+Technically, gatling uses the MDL code generation backend of the MaterialX project to support and importance-sample complex BSDFs like the Autodesk Standard Surface or the glTF shading model. The MDL SDK then generates GLSL code which is compiled to SPIR-V for use in [Vulkan](https://www.vulkan.org/). A compressed 8-wide BVH is used to speed up rendering, but hardware ray tracing will be used in the future.
 
 ### Build
 
