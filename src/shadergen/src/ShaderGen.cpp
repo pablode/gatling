@@ -196,7 +196,18 @@ namespace sg
     ss << std::showpoint;
     ss << std::setprecision(std::numeric_limits<float>::digits10);
 
-    ss << genMdl;
+    ss << "#version 460 core\n";
+
+    // Remove MDL struct definitions because they're too bloated. We know more about the
+    // data from which the code is generated from and can reduce the memory footprint.
+    size_t mdlCodeOffset = genMdl.find("// user defined structs");
+    assert(mdlCodeOffset != std::string::npos);
+    genMdl = genMdl.substr(mdlCodeOffset, genMdl.size() - mdlCodeOffset);
+
+    std::string mdlLocMarker = "#pragma MDL_GENERATED_CODE";
+    size_t mdlInjectionLoc = fileSrc.find(mdlLocMarker);
+    assert(mdlInjectionLoc != std::string::npos);
+    fileSrc.replace(mdlInjectionLoc, mdlLocMarker.size(), genMdl);
 
     int textureCount2d = 0;
     int textureCount3d = 0;

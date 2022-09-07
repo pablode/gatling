@@ -15,7 +15,9 @@
 #endif
 
 #include "common.glsl"
-#include "mdl_constants.glsl"
+#include "mdl_types.glsl"
+
+#pragma MDL_GENERATED_CODE
 
 layout(binding = 0, std430) buffer PixelsBuffer { vec4 pixels[]; };
 
