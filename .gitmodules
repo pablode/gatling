@@ -25,9 +25,6 @@
 [submodule "extern/libspng"]
 	path = extern/libspng
 	url = https://github.com/randy408/libspng.git
-[submodule "extern/SPIRV-Reflect"]
-	path = extern/SPIRV-Reflect
-	url = https://github.com/KhronosGroup/SPIRV-Reflect
 [submodule "extern/libjpeg-turbo"]
 	path = extern/libjpeg-turbo
 	url = https://github.com/pablode/libjpeg-turbo
@@ -40,3 +37,6 @@
 [submodule "extern/openexr"]
 	path = extern/openexr
 	url = https://github.com/AcademySoftwareFoundation/openexr
+[submodule "extern/SPIRV-Reflect"]
+	path = extern/SPIRV-Reflect
+	url = https://github.com/pablode/SPIRV-Reflect
