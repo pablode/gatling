@@ -149,8 +149,8 @@ namespace sg
 
     if (shaderc_result_get_compilation_status(result) != shaderc_compilation_status_success)
     {
-      shaderc_result_release(result);
       fprintf(stderr, "Failed to compile shader: %s\n", shaderc_result_get_error_message(result));
+      shaderc_result_release(result);
       return false;
     }
 
