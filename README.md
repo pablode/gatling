@@ -21,7 +21,7 @@ Technically, gatling uses the MDL code generation backend of the MaterialX proje
 You need to
 
 - install the <a href="https://vulkan.lunarg.com/">Vulkan SDK</a>
-- download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2021.1.2</a> binaries
+- download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2022.0</a> binaries
 - build <a href="https://github.com/PixarAnimationStudios/USD/releases/tag/v22.08">USD 22.08</a> with MaterialX support
 - have NASM 2.13+ or YASM 1.2.0+ in your PATH
 

@@ -148,21 +148,28 @@ namespace sg
 
     mi::base::Handle<const mi::IString> exactMaterialDbName(funcs->get_element<mi::IString>(0));
     assert(exactMaterialDbName);
-    mi::base::Handle<const mi::neuraylib::IMaterial_definition> matDefinition(m_transaction->access<mi::neuraylib::IMaterial_definition>(exactMaterialDbName->get_c_str()));
-    if (!matDefinition)
+
+    mi::base::Handle<const mi::neuraylib::IFunction_definition> materialDefinition(m_transaction->access<mi::neuraylib::IFunction_definition>(exactMaterialDbName->get_c_str()));
+    if (!materialDefinition)
     {
       return false;
     }
 
     mi::Sint32 result;
-    mi::base::Handle<mi::neuraylib::IMaterial_instance> matInstance(matDefinition->create_material_instance(NULL, &result));
-    if (result != 0 || !matInstance)
+    mi::base::Handle<mi::neuraylib::IFunction_call> materialInstance(materialDefinition->create_function_call(nullptr, &result));
+    if (result != 0 || !materialInstance)
     {
       return false;
     }
 
-    auto flags = mi::neuraylib::IMaterial_instance::DEFAULT_OPTIONS; // Instance compilation, no class compilation.
-    compiledMaterial = mi::base::Handle<mi::neuraylib::ICompiled_material>(matInstance->create_compiled_material(flags, context));
+    mi::base::Handle<mi::neuraylib::IMaterial_instance> materialInstance2(materialInstance->get_interface<mi::neuraylib::IMaterial_instance>());
+    if (!materialInstance2)
+    {
+      return false;
+    }
+
+    auto compileFlags = mi::neuraylib::IMaterial_instance::DEFAULT_OPTIONS; // Instance compilation, no class compilation.
+    compiledMaterial = mi::base::Handle<mi::neuraylib::ICompiled_material>(materialInstance2->create_compiled_material(compileFlags, context));
 
     return compiledMaterial != nullptr;
   }
