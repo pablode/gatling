@@ -7,9 +7,6 @@
 
 #ifndef NDEBUG
 #extension GL_EXT_debug_printf: enable
-#endif
-
-#ifdef GL_EXT_debug_printf
 #define ASSERT(cond, str) if (!(cond)) debugPrintfEXT(str)
 #else
 #define ASSERT(cond, str)
