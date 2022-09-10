@@ -17,13 +17,14 @@
 
 #pragma once
 
-#include "IShaderCompiler.h"
-
 #include <shaderc/shaderc.h>
+
+#include <vector>
+#include <string_view>
 
 namespace sg
 {
-  class GlslangShaderCompiler : public IShaderCompiler
+  class GlslangShaderCompiler
   {
   public:
     GlslangShaderCompiler(const std::string& shaderPath);
@@ -31,12 +32,12 @@ namespace sg
     ~GlslangShaderCompiler();
 
   public:
-    bool init() override;
+    bool init();
 
     bool compileGlslToSpv(std::string_view source,
                           std::string_view filePath,
                           std::string_view entryPoint,
-                          std::vector<uint8_t>& spv) override;
+                          std::vector<uint8_t>& spv);
 
   private:
     shaderc_compiler_t m_compiler = nullptr;

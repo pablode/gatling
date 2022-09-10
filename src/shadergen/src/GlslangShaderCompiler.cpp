@@ -79,7 +79,6 @@ namespace detail
 namespace sg
 {
   GlslangShaderCompiler::GlslangShaderCompiler(const std::string& shaderPath)
-    : IShaderCompiler(shaderPath)
   {
   }
 

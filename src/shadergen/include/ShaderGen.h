@@ -91,7 +91,7 @@ namespace sg
     class MdlMaterialCompiler* m_mdlMaterialCompiler = nullptr;
     class MdlGlslCodeGen* m_mdlGlslCodeGen = nullptr;
     class MtlxMdlCodeGen* m_mtlxMdlCodeGen = nullptr;
-    class IShaderCompiler* m_shaderCompiler = nullptr;
+    class GlslangShaderCompiler* m_shaderCompiler = nullptr;
     std::string m_shaderPath;
   };
 }

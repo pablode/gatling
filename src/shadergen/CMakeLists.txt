@@ -2,8 +2,6 @@ add_library(
   shadergen STATIC
   include/ShaderGen.h
   src/ShaderGen.cpp
-  src/IShaderCompiler.h
-  src/IShaderCompiler.cpp
   src/GlslangShaderCompiler.h
   src/GlslangShaderCompiler.cpp
   src/MdlGlslCodeGen.h
