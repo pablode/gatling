@@ -1,3 +1,4 @@
+#extension GL_GOOGLE_include_directive: require
 #extension GL_EXT_shader_16bit_storage: require
 #extension GL_EXT_samplerless_texture_functions: require
 #extension GL_EXT_control_flow_attributes: require

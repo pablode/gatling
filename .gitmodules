@@ -13,9 +13,6 @@
 [submodule "extern/glslang"]
 	path = extern/glslang
 	url = https://github.com/KhronosGroup/glslang.git
-[submodule "extern/shaderc"]
-	path = extern/shaderc
-	url = https://github.com/google/shaderc
 [submodule "extern/embree"]
 	path = extern/embree
 	url = https://github.com/embree/embree

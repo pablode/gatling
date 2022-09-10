@@ -56,19 +56,20 @@ namespace sg
 
     m_mdlMaterialCompiler = new sg::MdlMaterialCompiler(*m_mdlRuntime, params.mdlLibPath.data());
 
-    m_shaderCompiler = new sg::GlslangShaderCompiler(m_shaderPath);
-    if (!m_shaderCompiler->init())
+    m_mtlxMdlCodeGen = new sg::MtlxMdlCodeGen(params.mtlxLibPath.data());
+
+    if (!sg::GlslangShaderCompiler::init())
     {
       return false;
     }
-
-    m_mtlxMdlCodeGen = new sg::MtlxMdlCodeGen(params.mtlxLibPath.data());
+    m_shaderCompiler = new sg::GlslangShaderCompiler(m_shaderPath);
 
     return true;
   }
 
   ShaderGen::~ShaderGen()
   {
+    sg::GlslangShaderCompiler::deinit();
     delete m_mtlxMdlCodeGen;
     delete m_shaderCompiler;
     delete m_mdlMaterialCompiler;

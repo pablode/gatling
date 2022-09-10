@@ -44,8 +44,8 @@ target_link_libraries(
     MaterialXCore
     MaterialXFormat
     MaterialXGenMdl
-    shaderc
-    shaderc_util
+    glslang
+    SPIRV
 )
 
 install(

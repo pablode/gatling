@@ -46,30 +46,23 @@ set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
 set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF)
 add_subdirectory(VulkanMemoryAllocator)
 
-#
-# shaderc dependencies. The revisions are taken from the repo/DEPS.
-#
-
-# SPIRV-Headers
+# SPIRV-Headers (SPIRV-Tools dependency)
 set(SPIRV_HEADERS_SKIP_EXAMPLES ON)
 set(SPIRV_HEADERS_SKIP_INSTALL ON)
 add_subdirectory(SPIRV-Headers)
 
-# SPIRV-Tools
+# SPIRV-Tools (glslang dependency)
 set(SPIRV_SKIP_EXECUTABLES ON)
 add_subdirectory(SPIRV-Tools)
 
+#
 # glslang
+#
+set(SKIP_GLSLANG_INSTALL OFF)
 set(ENABLE_SPRVREMAPPER OFF)
 set(ENABLE_CTEST OFF)
+set(ENABLE_OPT) # requires SPIRV-Tools-opt target
 add_subdirectory(glslang)
-
-# shaderc
-set(SHADERC_SKIP_EXAMPLES ON)
-set(SHADERC_SKIP_TESTS ON)
-set(SHADERC_SKIP_INSTALL ON)
-set(SHADERC_ENABLE_SHARED_CRT ON)
-add_subdirectory(shaderc)
 
 #
 # Embree

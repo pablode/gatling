@@ -17,8 +17,6 @@
 
 #pragma once
 
-#include <shaderc/shaderc.h>
-
 #include <vector>
 #include <string_view>
 
@@ -32,15 +30,16 @@ namespace sg
     ~GlslangShaderCompiler();
 
   public:
-    bool init();
-
     bool compileGlslToSpv(std::string_view source,
                           std::string_view filePath,
                           std::string_view entryPoint,
                           std::vector<uint8_t>& spv);
 
+    static bool init();
+
+    static void deinit();
+
   private:
-    shaderc_compiler_t m_compiler = nullptr;
-    shaderc_compile_options_t m_compileOptions = nullptr;
+    void* m_fileIncluder;
   };
 }
