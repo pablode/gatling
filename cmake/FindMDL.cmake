@@ -15,7 +15,7 @@ find_path(MDL_INCLUDE_DIR
 if(WIN32)
   set(MDL_BIN_DIR "nt-x86-64")
 elseif(APPLE)
-  set(MDL_BIN_DIR "macosx-x86-64")
+  set(MDL_BIN_DIR "macosx-uni")
 else()
   set(MDL_BIN_DIR "linux-x86-64")
 endif()
