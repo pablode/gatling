@@ -112,7 +112,6 @@ void HdGatlingMesh::_UpdateGeometry(HdSceneDelegate* sceneDelegate)
   VtIntArray primitiveParams;
   meshUtil.ComputeTriangleIndices(&m_faces, &primitiveParams);
 
-  bool indexedNormals;
   _PullPrimvars(sceneDelegate, primitiveParams, m_color, m_hasColor);
 }
 
