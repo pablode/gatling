@@ -58,7 +58,8 @@ add_subdirectory(SPIRV-Tools)
 #
 # glslang
 #
-set(SKIP_GLSLANG_INSTALL OFF)
+set(SKIP_GLSLANG_INSTALL ON)
+set(ENABLE_GLSLANG_BINARIES OFF)
 set(ENABLE_SPRVREMAPPER OFF)
 set(ENABLE_CTEST OFF)
 set(ENABLE_OPT) # requires SPIRV-Tools-opt target
