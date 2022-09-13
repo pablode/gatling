@@ -1,5 +1,5 @@
 add_library(
-  hdGatling MODULE
+  hdGatling SHARED
   Camera.cpp
   Camera.h
   Instancer.cpp
