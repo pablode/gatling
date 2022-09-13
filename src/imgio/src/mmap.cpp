@@ -298,7 +298,7 @@ bool imgio_file_open(const char* path, ImgioFileUsage usage, imgio_file** file)
     return false;
   }
 
-  stat file_stats;
+  struct stat file_stats;
   if (fstat(file_descriptor, &file_stats))
   {
     close(file_descriptor);

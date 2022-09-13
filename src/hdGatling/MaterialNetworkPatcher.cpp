@@ -147,7 +147,7 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
 
     auto& inputs = node.inputConnections;
 
-    auto& normalInputIt = inputs.find(_tokens->normal);
+    auto normalInputIt = inputs.find(_tokens->normal);
     if (normalInputIt == inputs.end())
     {
       continue;

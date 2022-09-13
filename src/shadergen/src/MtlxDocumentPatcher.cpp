@@ -198,7 +198,7 @@ void _PatchGeompropNodes(mx::DocumentPtr document)
       continue;
     }
 
-    auto& texCoordInput = node->getActiveInput("texcoord");
+    auto texCoordInput = node->getActiveInput("texcoord");
     if (texCoordInput)
     {
       node->removeInput(texCoordInput->getName());

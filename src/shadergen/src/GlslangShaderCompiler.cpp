@@ -202,7 +202,7 @@ namespace sg
 
   GlslangShaderCompiler::~GlslangShaderCompiler()
   {
-    delete m_fileIncluder;
+    delete (detail::FileIncluder*) m_fileIncluder;
   }
 
   bool GlslangShaderCompiler::compileGlslToSpv(std::string_view source,
