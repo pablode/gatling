@@ -319,6 +319,7 @@ const std::unordered_map<TfToken, gi_aov_id, TfToken::HashFunctor> s_aovIdMappin
   { HdGatlingAovTokens->debug_barycentrics, GI_AOV_ID_DEBUG_BARYCENTRICS },
   { HdGatlingAovTokens->debug_texcoords,    GI_AOV_ID_DEBUG_TEXCOORDS    },
   { HdGatlingAovTokens->debug_bounces,      GI_AOV_ID_DEBUG_BOUNCES      },
+  { HdGatlingAovTokens->debug_clock_cycles, GI_AOV_ID_DEBUG_CLOCK_CYCLES },
 #endif
 };
 

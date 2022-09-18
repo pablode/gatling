@@ -678,14 +678,23 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
     enabled_device_extensions[enabled_device_extension_count] = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
     enabled_device_extension_count++;
   }
-#if !defined(NDEBUG) && !defined(__APPLE__)
-  /* Required for shader printf feature. */
+
+#ifndef NDEBUG
+  if (cgpu_find_device_extension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, device_ext_count, device_extensions) && features.shaderInt64)
+  {
+    idevice->features.shaderClock = true;
+    enabled_device_extensions[enabled_device_extension_count] = VK_KHR_SHADER_CLOCK_EXTENSION_NAME;
+    enabled_device_extension_count++;
+  }
+
+#ifndef __APPLE__
   if (cgpu_find_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions))
   {
     idevice->features.debugPrintf = true;
     enabled_device_extensions[enabled_device_extension_count] = VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME;
     enabled_device_extension_count++;
   }
+#endif
 #endif
 
   uint32_t queue_family_count = 0;
@@ -734,9 +743,15 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
+  VkPhysicalDeviceShaderClockFeaturesKHR shader_clock_features = {0};
+  shader_clock_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
+  shader_clock_features.pNext = NULL;
+  shader_clock_features.shaderSubgroupClock = VK_TRUE;
+  shader_clock_features.shaderDeviceClock = VK_FALSE;
+
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features = {0};
   descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-  descriptor_indexing_features.pNext = NULL;
+  descriptor_indexing_features.pNext = idevice->features.shaderClock ? &shader_clock_features : NULL;
   descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing = VK_FALSE;
   descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing = VK_FALSE;
   descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing = VK_FALSE;
@@ -809,7 +824,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   device_features2.features.shaderClipDistance = VK_FALSE;
   device_features2.features.shaderCullDistance = VK_FALSE;
   device_features2.features.shaderFloat64 = VK_FALSE;
-  device_features2.features.shaderInt64 = VK_FALSE;
+  device_features2.features.shaderInt64 = idevice->features.shaderClock;
   device_features2.features.shaderInt16 = VK_TRUE;
   device_features2.features.shaderResourceResidency = VK_FALSE;
   device_features2.features.shaderResourceMinLod = VK_FALSE;

@@ -301,6 +301,10 @@ layout(local_size_x = NUM_THREADS_X, local_size_y = NUM_THREADS_Y) in;
 
 void main()
 {
+#if AOV_ID == AOV_ID_DEBUG_CLOCK_CYCLES
+    uint64_t start_cycle_count = clockARB();
+#endif
+
     // Remap to Morton order within workgroup.
     uint morton_code = uint(MORTON_2D_LUT_32x8[gl_LocalInvocationIndex]);
     uvec2 local_pixel_pos = uvec2(morton_code >> 8, morton_code & 0xFF);
@@ -355,6 +359,11 @@ void main()
             pixel_color += sample_color * inv_sample_count;
         }
     }
+
+#if AOV_ID == AOV_ID_DEBUG_CLOCK_CYCLES
+    float cycles_elapsed_norm = float(clockARB() - start_cycle_count) / 4294967295.0;
+    pixel_color = vec3(cycles_elapsed_norm, 0.0, 0.0);
+#endif
 
     gs_reorder[gl_LocalInvocationIndex] = pixel_color;
 

@@ -76,6 +76,7 @@ struct gi_material
 };
 
 cgpu_device s_device = { CGPU_INVALID_HANDLE };
+cgpu_physical_device_features s_device_features;
 cgpu_physical_device_limits s_device_limits;
 cgpu_sampler s_tex_sampler = { CGPU_INVALID_HANDLE };
 std::unique_ptr<gi::Stager> s_stager;
@@ -96,6 +97,9 @@ int giInitialize(const gi_init_params* params)
   if (c_result != CGPU_OK) return GI_ERROR;
 
   c_result = cgpu_create_device(&s_device);
+  if (c_result != CGPU_OK) return GI_ERROR;
+
+  c_result = cgpu_get_physical_device_features(s_device, &s_device_features);
   if (c_result != CGPU_OK) return GI_ERROR;
 
   c_result = cgpu_get_physical_device_limits(s_device, &s_device_limits);
@@ -385,6 +389,14 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
 
 gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 {
+  bool clockCyclesAov = params->aov_id == GI_AOV_ID_DEBUG_CLOCK_CYCLES;
+
+  if (clockCyclesAov && !s_device_features.shaderClock)
+  {
+    fprintf(stderr, "unsupported AOV - device feature missing\n");
+    return nullptr;
+  }
+
   printf("creating shader cache\n");
 
   const gi_geom_cache* geom_cache = params->geom_cache;
@@ -410,6 +422,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   shaderParams.nextEventEstimation = nee_enabled;
   shaderParams.faceCount           = geom_cache->face_count;
   shaderParams.emissiveFaceCount   = geom_cache->emissive_face_count;
+  shaderParams.shaderClockExts     = clockCyclesAov;
 
   sg::ShaderGen::MainShaderResult mainShader;
   if (!s_shaderGen->generateMainShader(&shaderParams, mainShader))
@@ -689,7 +702,8 @@ int giRender(const gi_render_params* params, float* rgba_img)
   // Visualize red channel as heatmap for debug AOVs.
   if (shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
       shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS ||
-      shader_cache->aov_id == GI_AOV_ID_DEBUG_BOUNCES)
+      shader_cache->aov_id == GI_AOV_ID_DEBUG_BOUNCES ||
+      shader_cache->aov_id == GI_AOV_ID_DEBUG_CLOCK_CYCLES)
   {
     int value_count = pixel_count * color_component_count;
 

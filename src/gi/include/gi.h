@@ -36,7 +36,8 @@ enum gi_aov_id
   GI_AOV_ID_DEBUG_TRI_TESTS    = 4,
   GI_AOV_ID_DEBUG_BARYCENTRICS = 5,
   GI_AOV_ID_DEBUG_TEXCOORDS    = 6,
-  GI_AOV_ID_DEBUG_BOUNCES      = 7
+  GI_AOV_ID_DEBUG_BOUNCES      = 7,
+  GI_AOV_ID_DEBUG_CLOCK_CYCLES = 8
 };
 
 struct gi_camera

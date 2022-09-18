@@ -81,6 +81,7 @@ namespace sg
       bool nextEventEstimation;
       uint32_t emissiveFaceCount;
       uint32_t faceCount;
+      bool shaderClockExts;
     };
 
     bool generateMainShader(const struct MainShaderParams* params,

@@ -199,6 +199,13 @@ namespace sg
 
     ss << "#version 460 core\n";
 
+    // FIXME: unfortunately we can't enable #extension requirements using the GLSL preprocessor..
+    if (params->shaderClockExts)
+    {
+      ss << "#extension GL_EXT_shader_explicit_arithmetic_types_int64: require\n";
+      ss << "#extension GL_ARB_shader_clock: require\n";
+    }
+
     // Remove MDL struct definitions because they're too bloated. We know more about the
     // data from which the code is generated from and can reduce the memory footprint.
     size_t mdlCodeOffset = genMdl.find("// user defined structs");

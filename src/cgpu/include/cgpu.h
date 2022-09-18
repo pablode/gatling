@@ -403,6 +403,7 @@ typedef struct cgpu_physical_device_features {
   bool shaderSampledImageArrayDynamicIndexing;
   bool shaderStorageBufferArrayDynamicIndexing;
   bool shaderStorageImageArrayDynamicIndexing;
+  bool shaderClock;
   bool shaderFloat64;
   bool shaderInt64;
   bool shaderInt16;

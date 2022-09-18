@@ -12,6 +12,7 @@ const float TRI_EPS = 0.000000001;
 #define AOV_ID_DEBUG_BARYCENTRICS 5
 #define AOV_ID_DEBUG_TEXCOORDS 6
 #define AOV_ID_DEBUG_BOUNCES 7
+#define AOV_ID_DEBUG_CLOCK_CYCLES 8
 
 struct fvertex
 {
