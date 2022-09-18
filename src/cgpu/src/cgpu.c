@@ -48,14 +48,15 @@ typedef struct cgpu_iinstance {
 } cgpu_iinstance;
 
 typedef struct cgpu_idevice {
-  VkDevice                    logical_device;
-  VkPhysicalDevice            physical_device;
-  VkQueue                     compute_queue;
-  VkCommandPool               command_pool;
-  VkQueryPool                 timestamp_pool;
-  struct VolkDeviceTable      table;
-  cgpu_physical_device_limits limits;
-  VmaAllocator                allocator;
+  VkDevice                      logical_device;
+  VkPhysicalDevice              physical_device;
+  VkQueue                       compute_queue;
+  VkCommandPool                 command_pool;
+  VkQueryPool                   timestamp_pool;
+  struct VolkDeviceTable        table;
+  cgpu_physical_device_features features;
+  cgpu_physical_device_limits   limits;
+  VmaAllocator                  allocator;
 } cgpu_idevice;
 
 typedef struct cgpu_ibuffer {
@@ -187,10 +188,34 @@ static VkAccessFlags cgpu_translate_access_flags(CgpuMemoryAccessFlags flags)
   return vk_flags;
 }
 
+static cgpu_physical_device_features cgpu_translate_physical_device_features(const VkPhysicalDeviceFeatures* vk_features)
+{
+  cgpu_physical_device_features features = {0};
+  features.textureCompressionBC = vk_features->textureCompressionBC;
+  features.pipelineStatisticsQuery = vk_features->pipelineStatisticsQuery;
+  features.shaderImageGatherExtended = vk_features->shaderImageGatherExtended;
+  features.shaderStorageImageExtendedFormats = vk_features->shaderStorageImageExtendedFormats;
+  features.shaderStorageImageReadWithoutFormat = vk_features->shaderStorageImageReadWithoutFormat;
+  features.shaderStorageImageWriteWithoutFormat = vk_features->shaderStorageImageWriteWithoutFormat;
+  features.shaderUniformBufferArrayDynamicIndexing = vk_features->shaderUniformBufferArrayDynamicIndexing;
+  features.shaderSampledImageArrayDynamicIndexing = vk_features->shaderSampledImageArrayDynamicIndexing;
+  features.shaderStorageBufferArrayDynamicIndexing = vk_features->shaderStorageBufferArrayDynamicIndexing;
+  features.shaderStorageImageArrayDynamicIndexing = vk_features->shaderStorageImageArrayDynamicIndexing;
+  features.shaderFloat64 = vk_features->shaderFloat64;
+  features.shaderInt64 = vk_features->shaderInt64;
+  features.shaderInt16 = vk_features->shaderInt16;
+  features.sparseBinding = vk_features->sparseBinding;
+  features.sparseResidencyBuffer = vk_features->sparseResidencyBuffer;
+  features.sparseResidencyImage2D = vk_features->sparseResidencyImage2D;
+  features.sparseResidencyImage3D = vk_features->sparseResidencyImage3D;
+  features.sparseResidencyAliased = vk_features->sparseResidencyAliased;
+  return features;
+}
+
 static cgpu_physical_device_limits cgpu_translate_physical_device_limits(const VkPhysicalDeviceLimits* vk_limits,
                                                                          const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props)
 {
-  cgpu_physical_device_limits limits;
+  cgpu_physical_device_limits limits = {0};
   limits.maxImageDimension1D = vk_limits->maxImageDimension1D;
   limits.maxImageDimension2D = vk_limits->maxImageDimension2D;
   limits.maxImageDimension3D = vk_limits->maxImageDimension3D;
@@ -579,6 +604,10 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
 
   idevice->physical_device = phys_devices[0];
 
+  VkPhysicalDeviceFeatures features;
+  vkGetPhysicalDeviceFeatures(idevice->physical_device, &features);
+  idevice->features = cgpu_translate_physical_device_features(&features);
+
   VkPhysicalDeviceSubgroupProperties subgroup_properties;
   subgroup_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
   subgroup_properties.pNext = NULL;
@@ -653,6 +682,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   /* Required for shader printf feature. */
   if (cgpu_find_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions))
   {
+    idevice->features.debugPrintf = true;
     enabled_device_extensions[enabled_device_extension_count] = VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME;
     enabled_device_extension_count++;
   }
@@ -2744,6 +2774,17 @@ CgpuResult cgpu_invalidate_mapped_memory(cgpu_device device,
   return CGPU_OK;
 }
 
+CgpuResult cgpu_get_physical_device_features(cgpu_device device,
+                                             cgpu_physical_device_features* p_features)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    return CGPU_FAIL_INVALID_HANDLE;
+  }
+  memcpy(p_features, &idevice->features, sizeof(cgpu_physical_device_features));
+  return CGPU_OK;
+}
+
 CgpuResult cgpu_get_physical_device_limits(cgpu_device device,
                                            cgpu_physical_device_limits* p_limits)
 {
@@ -2751,10 +2792,6 @@ CgpuResult cgpu_get_physical_device_limits(cgpu_device device,
   if (!cgpu_resolve_device(device, &idevice)) {
     return CGPU_FAIL_INVALID_HANDLE;
   }
-  memcpy(
-    p_limits,
-    &idevice->limits,
-    sizeof(cgpu_physical_device_limits)
-  );
+  memcpy(p_limits, &idevice->limits, sizeof(cgpu_physical_device_limits));
   return CGPU_OK;
 }

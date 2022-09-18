@@ -391,6 +391,28 @@ typedef struct cgpu_image_memory_barrier {
   CgpuMemoryAccessFlags access_mask;
 } cgpu_image_memory_barrier;
 
+typedef struct cgpu_physical_device_features {
+  bool debugPrintf;
+  bool textureCompressionBC;
+  bool pipelineStatisticsQuery;
+  bool shaderImageGatherExtended;
+  bool shaderStorageImageExtendedFormats;
+  bool shaderStorageImageReadWithoutFormat;
+  bool shaderStorageImageWriteWithoutFormat;
+  bool shaderUniformBufferArrayDynamicIndexing;
+  bool shaderSampledImageArrayDynamicIndexing;
+  bool shaderStorageBufferArrayDynamicIndexing;
+  bool shaderStorageImageArrayDynamicIndexing;
+  bool shaderFloat64;
+  bool shaderInt64;
+  bool shaderInt16;
+  bool sparseBinding;
+  bool sparseResidencyBuffer;
+  bool sparseResidencyImage2D;
+  bool sparseResidencyImage3D;
+  bool sparseResidencyAliased;
+} cgpu_physical_device_features;
+
 typedef struct cgpu_physical_device_limits {
   uint32_t maxImageDimension1D;
   uint32_t maxImageDimension2D;
@@ -672,6 +694,11 @@ CGPU_API CgpuResult CGPU_CDECL cgpu_invalidate_mapped_memory(
   cgpu_buffer buffer,
   uint64_t offset,
   uint64_t size
+);
+
+CGPU_API CgpuResult CGPU_CDECL cgpu_get_physical_device_features(
+  cgpu_device device,
+  cgpu_physical_device_features* p_features
 );
 
 CGPU_API CgpuResult CGPU_CDECL cgpu_get_physical_device_limits(
