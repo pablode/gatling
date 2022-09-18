@@ -118,7 +118,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
 #if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
         return vec3(float(hit.bvh_steps), 0.0, 0.0);
 #elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
-        return vec3(0.0, 0.0, float(hit.tri_tests));
+        return vec3(float(hit.tri_tests), 0.0, 0.0);
 #endif
 
         if (!found_hit)
@@ -288,7 +288,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
     }
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
-    return vec3(1.0, 1.0, 1.0) * float(bounce);
+    return vec3(float(bounce), 0.0, 0.0);
 #endif
 
     return clamp(state.radiance, vec3(0.0, 0.0, 0.0), vec3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE));

@@ -13,6 +13,7 @@ add_library(
   src/stager.cpp
   src/texsys.h
   src/texsys.cpp
+  src/turbo.h
 )
 
 target_include_directories(

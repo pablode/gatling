@@ -25,6 +25,7 @@
 #endif
 #include "stager.h"
 #include "texsys.h"
+#include "turbo.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -685,19 +686,23 @@ int giRender(const gi_render_params* params, float* rgba_img)
   c_result = cgpu_unmap_buffer(s_device, s_outputStagingBuffer);
   if (c_result != CGPU_OK) goto cleanup;
 
-  // Normalize image for debug AOVs.
+  // Visualize red channel as heatmap for debug AOVs.
   if (shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||
       shader_cache->aov_id == GI_AOV_ID_DEBUG_TRI_TESTS ||
       shader_cache->aov_id == GI_AOV_ID_DEBUG_BOUNCES)
   {
-    const int value_count = pixel_count * color_component_count;
+    int value_count = pixel_count * color_component_count;
 
     float max_value = 0.0f;
-    for (int i = 0; i < value_count; i++) {
+    for (int i = 0; i < value_count; i += 4) {
       max_value = std::max(max_value, rgba_img[i]);
     }
-    for (int i = 0; i < value_count && max_value > 0.0f; i++) {
-      rgba_img[i] /= max_value;
+    for (int i = 0; i < value_count && max_value > 0.0f; i += 4) {
+      int val_index = std::min(int((rgba_img[i] / max_value) * 255.0), 255);
+      rgba_img[i + 0] = gi::TURBO_SRGB_FLOATS[val_index][0];
+      rgba_img[i + 1] = gi::TURBO_SRGB_FLOATS[val_index][1];
+      rgba_img[i + 2] = gi::TURBO_SRGB_FLOATS[val_index][2];
+      rgba_img[i + 3] = 255;
     }
   }
 
