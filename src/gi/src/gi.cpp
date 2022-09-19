@@ -142,11 +142,17 @@ void giTerminate()
   cgpu_destroy_buffer(s_device, s_outputBuffer);
   s_outputBufferWidth = 0;
   s_outputBufferHeight = 0;
-  s_texSys->destroy();
-  s_texSys.reset();
+  if (s_texSys)
+  {
+    s_texSys->destroy();
+    s_texSys.reset();
+  }
   s_shaderGen.reset();
-  s_stager->free();
-  s_stager.reset();
+  if (s_stager)
+  {
+    s_stager->free();
+    s_stager.reset();
+  }
   cgpu_destroy_sampler(s_device, s_tex_sampler);
   cgpu_destroy_device(s_device);
   cgpu_terminate();

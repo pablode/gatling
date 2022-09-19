@@ -55,6 +55,10 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 
 HdGatlingRendererPlugin::~HdGatlingRendererPlugin()
 {
+  if (!m_isSupported)
+  {
+    return;
+  }
   giTerminate();
 }
 

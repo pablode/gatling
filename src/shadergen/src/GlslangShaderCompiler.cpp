@@ -185,13 +185,23 @@ namespace detail
 
 namespace sg
 {
+  static bool s_glslangInitialized = false;
+
   bool GlslangShaderCompiler::init()
   {
+    if (s_glslangInitialized)
+    {
+      return true;
+    }
     return glslang::InitializeProcess();
   }
 
   void GlslangShaderCompiler::deinit()
   {
+    if (!s_glslangInitialized)
+    {
+      return;
+    }
     glslang::FinalizeProcess();
   }
 
