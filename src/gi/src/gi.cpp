@@ -94,10 +94,18 @@ int giInitialize(const gi_init_params* params)
   CgpuResult c_result;
 
   c_result = cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH);
-  if (c_result != CGPU_OK) return GI_ERROR;
+  if (c_result != CGPU_OK)
+  {
+    fprintf(stderr, "error: unable to initialize cgpu\n");
+    return GI_ERROR;
+  }
 
   c_result = cgpu_create_device(&s_device);
-  if (c_result != CGPU_OK) return GI_ERROR;
+  if (c_result != CGPU_OK)
+  {
+    fprintf(stderr, "error: graphics device not supported\n");
+    return GI_ERROR;
+  }
 
   c_result = cgpu_get_physical_device_features(s_device, &s_device_features);
   if (c_result != CGPU_OK) return GI_ERROR;
@@ -399,7 +407,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
   if (clockCyclesAov && !s_device_features.shaderClock)
   {
-    fprintf(stderr, "unsupported AOV - device feature missing\n");
+    fprintf(stderr, "error: unsupported AOV - device feature missing\n");
     return nullptr;
   }
 
