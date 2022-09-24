@@ -437,7 +437,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   }
 
   cgpu_shader shader;
-  if (!cgpu_create_shader(s_device, mainShader.spv.size(), mainShader.spv.data(), &shader))
+  if (!cgpu_create_shader(s_device, mainShader.spv.size(), mainShader.spv.data(), CGPU_SHADER_STAGE_COMPUTE, &shader))
   {
     return nullptr;
   }

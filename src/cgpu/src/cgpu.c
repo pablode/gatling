@@ -92,6 +92,7 @@ typedef struct cgpu_ipipeline {
 typedef struct cgpu_ishader {
   VkShaderModule module;
   cgpu_shader_reflection reflection;
+  VkShaderStageFlagBits stage_flags;
 } cgpu_ishader;
 
 typedef struct cgpu_ifence {
@@ -1069,6 +1070,7 @@ bool cgpu_destroy_device(cgpu_device device)
 bool cgpu_create_shader(cgpu_device device,
                         uint64_t size,
                         const uint8_t* p_source,
+                        CgpuShaderStage stage,
                         cgpu_shader* p_shader)
 {
   cgpu_idevice* idevice;
@@ -1112,6 +1114,27 @@ bool cgpu_create_shader(cgpu_device device,
     CGPU_RETURN_ERROR("failed to reflect shader");
   }
 
+  switch (stage)
+  {
+  case CGPU_SHADER_STAGE_COMPUTE:
+    ishader->stage_flags = VK_SHADER_STAGE_COMPUTE_BIT;
+    break;
+  case CGPU_SHADER_STAGE_RAYGEN:
+    ishader->stage_flags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    break;
+  case CGPU_SHADER_STAGE_ANY_HIT:
+    ishader->stage_flags = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+    break;
+  case CGPU_SHADER_STAGE_CLOSEST_HIT:
+    ishader->stage_flags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+    break;
+  case CGPU_SHADER_STAGE_MISS:
+    ishader->stage_flags = VK_SHADER_STAGE_MISS_BIT_KHR;
+    break;
+  default:
+    CGPU_RETURN_ERROR("invalid shader stage");
+  }
+
   return true;
 }
 
@@ -1119,10 +1142,10 @@ bool cgpu_destroy_shader(cgpu_device device,
                          cgpu_shader shader)
 {
   cgpu_idevice* idevice;
-  cgpu_ishader* ishader;
   if (!cgpu_resolve_device(device, &idevice)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
+  cgpu_ishader* ishader;
   if (!cgpu_resolve_shader(shader, &ishader)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
@@ -1518,7 +1541,7 @@ bool cgpu_destroy_sampler(cgpu_device device,
 static bool cgpu_create_pipeline_layout(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, cgpu_ishader* ishader)
 {
   VkPushConstantRange push_const_range;
-  push_const_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+  push_const_range.stageFlags = ishader->stage_flags;
   push_const_range.offset = 0;
   push_const_range.size = ishader->reflection.push_constants_size;
 
@@ -1556,7 +1579,7 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
     descriptor_set_layout_binding->binding = binding->binding;
     descriptor_set_layout_binding->descriptorType = binding->descriptor_type;
     descriptor_set_layout_binding->descriptorCount = binding->count;
-    descriptor_set_layout_binding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    descriptor_set_layout_binding->stageFlags = ishader->stage_flags;
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
@@ -1730,7 +1753,7 @@ bool cgpu_create_pipeline(cgpu_device device,
   pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_shader_stage_create_info.pNext = NULL;
   pipeline_shader_stage_create_info.flags = 0;
-  pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  pipeline_shader_stage_create_info.stage = ishader->stage_flags;
   pipeline_shader_stage_create_info.module = ishader->module;
   pipeline_shader_stage_create_info.pName = "main";
   pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
@@ -2404,7 +2427,7 @@ bool cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
   idevice->table.vkCmdPushConstants(
     icommand_buffer->command_buffer,
     ipipeline->layout,
-    VK_SHADER_STAGE_COMPUTE_BIT,
+    ishader->stage_flags,
     0,
     ishader->reflection.push_constants_size,
     p_data

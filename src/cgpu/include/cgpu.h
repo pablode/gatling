@@ -296,6 +296,14 @@ typedef enum CgpuSamplerAddressMode {
   CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK = 3
 } CgpuSamplerAddressMode;
 
+typedef enum CgpuShaderStage {
+  CGPU_SHADER_STAGE_COMPUTE,
+  CGPU_SHADER_STAGE_RAYGEN,
+  CGPU_SHADER_STAGE_ANY_HIT,
+  CGPU_SHADER_STAGE_CLOSEST_HIT,
+  CGPU_SHADER_STAGE_MISS
+} CgpuShaderStage;
+
 typedef struct cgpu_instance       { uint64_t handle; } cgpu_instance;
 typedef struct cgpu_device         { uint64_t handle; } cgpu_device;
 typedef struct cgpu_buffer         { uint64_t handle; } cgpu_buffer;
@@ -462,6 +470,7 @@ CGPU_API bool CGPU_CDECL cgpu_create_shader(
   cgpu_device device,
   uint64_t size,
   const uint8_t* p_source,
+  CgpuShaderStage stage,
   cgpu_shader* p_shader
 );
 
