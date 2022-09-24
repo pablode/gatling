@@ -519,8 +519,10 @@ int giRender(const gi_render_params* params, float* rgba_img)
     printf("recreating output buffer with size %dx%d (%.2fMiB)\n", params->image_width,
       params->image_height, output_buffer_size * BYTES_TO_MIB);
 
-    cgpu_destroy_buffer(s_device, s_outputBuffer);
-    cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
+    if (s_outputBuffer.handle != CGPU_INVALID_HANDLE)
+      cgpu_destroy_buffer(s_device, s_outputBuffer);
+    if (s_outputStagingBuffer.handle != CGPU_INVALID_HANDLE)
+      cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
 
     if (!cgpu_create_buffer(
         s_device,
