@@ -91,35 +91,26 @@ uint32_t s_sampleOffset = 0;
 
 int giInitialize(const gi_init_params* params)
 {
-  CgpuResult c_result;
+  if (!cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH))
+    return GI_ERROR;
 
-  c_result = cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH);
-  if (c_result != CGPU_OK)
+  if (!cgpu_create_device(&s_device))
+    return GI_ERROR;
+
+  if (!cgpu_get_physical_device_features(s_device, &s_device_features))
+    return GI_ERROR;
+
+  if (!cgpu_get_physical_device_limits(s_device, &s_device_limits))
+    return GI_ERROR;
+
+  if (!cgpu_create_sampler(s_device,
+      CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+      CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+      CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+      &s_tex_sampler))
   {
-    fprintf(stderr, "error: unable to initialize cgpu\n");
     return GI_ERROR;
   }
-
-  c_result = cgpu_create_device(&s_device);
-  if (c_result != CGPU_OK)
-  {
-    fprintf(stderr, "error: graphics device not supported\n");
-    return GI_ERROR;
-  }
-
-  c_result = cgpu_get_physical_device_features(s_device, &s_device_features);
-  if (c_result != CGPU_OK) return GI_ERROR;
-
-  c_result = cgpu_get_physical_device_limits(s_device, &s_device_limits);
-  if (c_result != CGPU_OK) return GI_ERROR;
-
-  c_result = cgpu_create_sampler(s_device,
-    CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-    CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-    CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-    &s_tex_sampler
-  );
-  if (c_result != CGPU_OK) return GI_ERROR;
 
   s_stager = std::make_unique<gi::Stager>(s_device);
   if (!s_stager->allocate())
@@ -319,20 +310,20 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
   CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
 
-  bool result = cgpu_create_buffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer) == CGPU_OK;
-  if (!result) goto cleanup;
+  if (!cgpu_create_buffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer))
+    goto cleanup;
 
-  result = s_stager->stageToBuffer((uint8_t*) bvh8c.nodes.data(), bvh_node_buf_size, buffer, bvh_node_buf_offset);
-  if (!result) goto cleanup;
-  result = s_stager->stageToBuffer((uint8_t*) faces, face_buf_size, buffer, face_buf_offset);
-  if (!result) goto cleanup;
-  result = s_stager->stageToBuffer((uint8_t*) emissive_face_indices.data(), emissive_face_indices_buf_size, buffer, emissive_face_indices_buf_offset);
-  if (!result) goto cleanup;
-  result = s_stager->stageToBuffer((uint8_t*) params->vertices, vertex_buf_size, buffer, vertex_buf_offset);
-  if (!result) goto cleanup;
+  if (!s_stager->stageToBuffer((uint8_t*) bvh8c.nodes.data(), bvh_node_buf_size, buffer, bvh_node_buf_offset))
+    goto cleanup;
+  if (!s_stager->stageToBuffer((uint8_t*) faces, face_buf_size, buffer, face_buf_offset))
+    goto cleanup;
+  if (!s_stager->stageToBuffer((uint8_t*) emissive_face_indices.data(), emissive_face_indices_buf_size, buffer, emissive_face_indices_buf_offset))
+    goto cleanup;
+  if (!s_stager->stageToBuffer((uint8_t*) params->vertices, vertex_buf_size, buffer, vertex_buf_offset))
+    goto cleanup;
 
-  result = s_stager->flush();
-  if (!result) goto cleanup;
+  if (!s_stager->flush())
+    goto cleanup;
 
   cache = new gi_geom_cache;
   cache->buffer = buffer;
@@ -386,17 +377,18 @@ bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
   assert(imageMappings.size() < UINT16_MAX);
 
   uint64_t imageMappingsSize = imageMappings.size() * sizeof(uint16_t);
-  bool result = cgpu_create_buffer(
-    s_device,
-    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-    imageMappingsSize,
-    &imageMappingBuffer
-  ) == CGPU_OK;
-  if (!result) return false;
+  if (!cgpu_create_buffer(
+      s_device,
+      CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+      CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+      imageMappingsSize,
+      &imageMappingBuffer))
+  {
+    return false;
+  }
 
-  result = s_stager->stageToBuffer((uint8_t*) imageMappings.data(), imageMappingsSize, imageMappingBuffer, 0);
-  if (!result) return false;
+  if (!s_stager->stageToBuffer((uint8_t*) imageMappings.data(), imageMappingsSize, imageMappingBuffer, 0))
+    return false;
 
   return s_stager->flush();
 }
@@ -445,13 +437,13 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   }
 
   cgpu_shader shader;
-  if (cgpu_create_shader(s_device, mainShader.spv.size(), mainShader.spv.data(), &shader) != CGPU_OK)
+  if (!cgpu_create_shader(s_device, mainShader.spv.size(), mainShader.spv.data(), &shader))
   {
     return nullptr;
   }
 
   cgpu_pipeline pipeline;
-  if (cgpu_create_pipeline(s_device, shader, mainShader.entryPoint.c_str(), &pipeline) != CGPU_OK)
+  if (!cgpu_create_pipeline(s_device, shader, mainShader.entryPoint.c_str(), &pipeline))
   {
     cgpu_destroy_shader(s_device, shader);
     return nullptr;
@@ -510,7 +502,6 @@ int giRender(const gi_render_params* params, float* rgba_img)
 
   // Init state for goto error handling.
   int result = GI_ERROR;
-  CgpuResult c_result;
 
   cgpu_command_buffer command_buffer = { CGPU_INVALID_HANDLE };
   cgpu_fence fence = { CGPU_INVALID_HANDLE };
@@ -531,23 +522,25 @@ int giRender(const gi_render_params* params, float* rgba_img)
     cgpu_destroy_buffer(s_device, s_outputBuffer);
     cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
 
-    c_result = cgpu_create_buffer(
-      s_device,
-      CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-      CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-      output_buffer_size,
-      &s_outputBuffer
-    );
-    if (c_result != CGPU_OK) return GI_ERROR;
+    if (!cgpu_create_buffer(
+        s_device,
+        CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+        CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+        output_buffer_size,
+        &s_outputBuffer))
+    {
+      return GI_ERROR;
+    }
 
-    c_result = cgpu_create_buffer(
-      s_device,
-      CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-      CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-      output_buffer_size,
-      &s_outputStagingBuffer
-    );
-    if (c_result != CGPU_OK) return GI_ERROR;
+    if (!cgpu_create_buffer(
+        s_device,
+        CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+        CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+        output_buffer_size,
+        &s_outputStagingBuffer))
+    {
+      return GI_ERROR;
+    }
 
     s_outputBufferWidth = params->image_width;
     s_outputBufferHeight = params->image_height;
@@ -618,37 +611,30 @@ int giRender(const gi_render_params* params, float* rgba_img)
   };
 
   // Set up command buffer.
-  c_result = cgpu_create_command_buffer(s_device, &command_buffer);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_create_command_buffer(s_device, &command_buffer))
+    goto cleanup;
 
-  c_result = cgpu_begin_command_buffer(command_buffer);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_begin_command_buffer(command_buffer))
+    goto cleanup;
 
-  c_result = cgpu_cmd_update_bindings(
-    command_buffer,
-    shader_cache->pipeline,
-    &bindings
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_cmd_update_bindings(command_buffer, shader_cache->pipeline, &bindings))
+    goto cleanup;
 
-  c_result = cgpu_cmd_bind_pipeline(command_buffer, shader_cache->pipeline);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_cmd_bind_pipeline(command_buffer, shader_cache->pipeline))
+    goto cleanup;
 
   // Trace rays.
-  c_result = cgpu_cmd_push_constants(
-    command_buffer,
-    shader_cache->pipeline,
-    &push_data
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_cmd_push_constants(command_buffer, shader_cache->pipeline, &push_data))
+    goto cleanup;
 
-  c_result = cgpu_cmd_dispatch(
-    command_buffer,
-    (params->image_width + WORKGROUP_SIZE_X - 1) / WORKGROUP_SIZE_X,
-    (params->image_height + WORKGROUP_SIZE_Y - 1) / WORKGROUP_SIZE_Y,
-    1
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_cmd_dispatch(
+      command_buffer,
+      (params->image_width + WORKGROUP_SIZE_X - 1) / WORKGROUP_SIZE_X,
+      (params->image_height + WORKGROUP_SIZE_Y - 1) / WORKGROUP_SIZE_Y,
+      1))
+  {
+    goto cleanup;
+  }
 
   // Copy output buffer to staging buffer.
   cgpu_buffer_memory_barrier barrier;
@@ -658,60 +644,61 @@ int giRender(const gi_render_params* params, float* rgba_img)
   barrier.offset = 0;
   barrier.size = CGPU_WHOLE_SIZE;
 
-  c_result = cgpu_cmd_pipeline_barrier(
-    command_buffer,
-    0, nullptr,
-    1, &barrier,
-    0, nullptr
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_cmd_pipeline_barrier(
+      command_buffer,
+      0, nullptr,
+      1, &barrier,
+      0, nullptr))
+  {
+    goto cleanup;
+  }
 
-  c_result = cgpu_cmd_copy_buffer(
-    command_buffer,
-    s_outputBuffer,
-    0,
-    s_outputStagingBuffer,
-    0,
-    output_buffer_size
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_cmd_copy_buffer(
+      command_buffer,
+      s_outputBuffer,
+      0,
+      s_outputStagingBuffer,
+      0,
+      output_buffer_size))
+  {
+    goto cleanup;
+  }
 
   // Submit command buffer.
-  c_result = cgpu_end_command_buffer(command_buffer);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_end_command_buffer(command_buffer))
+    goto cleanup;
 
-  c_result = cgpu_create_fence(s_device, &fence);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_create_fence(s_device, &fence))
+    goto cleanup;
 
-  c_result = cgpu_reset_fence(s_device, fence);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_reset_fence(s_device, fence))
+    goto cleanup;
 
-  c_result = cgpu_submit_command_buffer(
-    s_device,
-    command_buffer,
-    fence
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_submit_command_buffer(
+      s_device,
+      command_buffer,
+      fence))
+  {
+    goto cleanup;
+  }
 
   // Now is a good time to flush buffered messages (on Windows).
   fflush(stdout);
 
-  c_result = cgpu_wait_for_fence(s_device, fence);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_wait_for_fence(s_device, fence))
+    goto cleanup;
 
   // Read data from GPU to image.
   uint8_t* mapped_staging_mem;
-  c_result = cgpu_map_buffer(
-    s_device,
-    s_outputStagingBuffer,
-    (void**) &mapped_staging_mem
-  );
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_map_buffer(s_device, s_outputStagingBuffer, (void**) &mapped_staging_mem))
+  {
+    goto cleanup;
+  }
 
   memcpy(rgba_img, mapped_staging_mem, output_buffer_size);
 
-  c_result = cgpu_unmap_buffer(s_device, s_outputStagingBuffer);
-  if (c_result != CGPU_OK) goto cleanup;
+  if (!cgpu_unmap_buffer(s_device, s_outputStagingBuffer))
+    goto cleanup;
 
   // Visualize red channel as heatmap for debug AOVs.
   if (shader_cache->aov_id == GI_AOV_ID_DEBUG_BVH_STEPS ||

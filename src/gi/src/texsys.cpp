@@ -95,8 +95,8 @@ namespace gi
         image_desc.height = textureResource.height;
         image_desc.depth = textureResource.depth;
 
-        result = cgpu_create_image(m_device, &image_desc, &image) == CGPU_OK;
-        if (!result) return false;
+        if (!cgpu_create_image(m_device, &image_desc, &image))
+          return false;
 
         result = m_stager.stageToImage(payload.data(), payloadSize, image);
         if (!result) return false;
@@ -125,8 +125,8 @@ namespace gi
         image_desc.height = image_data.height;
         image_desc.depth = 1;
 
-        result = cgpu_create_image(m_device, &image_desc, &image) == CGPU_OK;
-        if (!result) return false;
+        if (!cgpu_create_image(m_device, &image_desc, &image))
+          return false;
 
         result = m_stager.stageToImage(image_data.data, image_data.size, image);
         if (!result) return false;
@@ -144,8 +144,8 @@ namespace gi
       image_desc.height = 1;
       image_desc.depth = 1;
 
-      result = cgpu_create_image(m_device, &image_desc, &image) == CGPU_OK;
-      if (!result) return false;
+      if (!cgpu_create_image(m_device, &image_desc, &image))
+        return false;
 
       uint8_t black[4] = { 0, 0, 0, 0 };
       result = m_stager.stageToImage(black, 4, image);

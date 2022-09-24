@@ -41,35 +41,36 @@ namespace gi
     m_fence = { CGPU_INVALID_HANDLE };
 
     // Try to use ReBAR if available.
-    CgpuResult c_result = cgpu_create_buffer(m_device,
+    bool bufferCreated = cgpu_create_buffer(m_device,
       CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
       CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE,
       BUFFER_SIZE,
       &m_stagingBuffer
     );
 
-    if (c_result != CGPU_OK)
+    if (!bufferCreated)
     {
-      c_result = cgpu_create_buffer(m_device,
-        CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-        CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-        BUFFER_SIZE,
-        &m_stagingBuffer
-      );
-      if (c_result != CGPU_OK) goto fail;
+      if (!cgpu_create_buffer(m_device,
+          CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+          CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+          BUFFER_SIZE,
+          &m_stagingBuffer))
+      {
+        goto fail;
+      }
     }
 
-    c_result = cgpu_create_command_buffer(m_device, &m_commandBuffer);
-    if (c_result != CGPU_OK) goto fail;
+    if (!cgpu_create_command_buffer(m_device, &m_commandBuffer))
+      goto fail;
 
-    c_result = cgpu_create_fence(m_device, &m_fence);
-    if (c_result != CGPU_OK) goto fail;
+    if (!cgpu_create_fence(m_device, &m_fence))
+      goto fail;
 
-    c_result = cgpu_map_buffer(m_device, m_stagingBuffer, (void**) &m_mappedMem);
-    if (c_result != CGPU_OK) goto fail;
+    if (!cgpu_map_buffer(m_device, m_stagingBuffer, (void**) &m_mappedMem))
+      goto fail;
 
-    c_result = cgpu_begin_command_buffer(m_commandBuffer);
-    if (c_result != CGPU_OK) goto fail;
+    if (!cgpu_begin_command_buffer(m_commandBuffer))
+      goto fail;
 
     return true;
 
@@ -98,25 +99,23 @@ fail:
       return true;
     }
 
-    CgpuResult c_result;
+    if (!cgpu_flush_mapped_memory(m_device, m_stagingBuffer, 0, m_stagedBytes))
+      return false;
 
-    c_result = cgpu_flush_mapped_memory(m_device, m_stagingBuffer, 0, m_stagedBytes);
-    if (c_result != CGPU_OK) return false;
+    if (!cgpu_reset_fence(m_device, m_fence))
+      return false;
 
-    c_result = cgpu_reset_fence(m_device, m_fence);
-    if (c_result != CGPU_OK) return false;
+    if (!cgpu_end_command_buffer(m_commandBuffer))
+      return false;
 
-    c_result = cgpu_end_command_buffer(m_commandBuffer);
-    if (c_result != CGPU_OK) return false;
+    if (!cgpu_submit_command_buffer(m_device, m_commandBuffer, m_fence))
+      return false;
 
-    c_result = cgpu_submit_command_buffer(m_device, m_commandBuffer, m_fence);
-    if (c_result != CGPU_OK) return false;
+    if (!cgpu_wait_for_fence(m_device, m_fence))
+      return false;
 
-    c_result = cgpu_wait_for_fence(m_device, m_fence);
-    if (c_result != CGPU_OK) return false;
-
-    c_result = cgpu_begin_command_buffer(m_commandBuffer);
-    if (c_result != CGPU_OK) return false;
+    if (!cgpu_begin_command_buffer(m_commandBuffer))
+      return false;
 
     m_stagedBytes = 0;
     return true;
@@ -182,8 +181,10 @@ fail:
 
       memcpy(&m_mappedMem[m_stagedBytes], &src[bytesAlreadyCopied], memcpyByteCount);
 
-      CgpuResult c_result = copyFunc(m_stagedBytes, bytesAlreadyCopied, memcpyByteCount);
-      if (c_result != CGPU_OK) return false;
+      if (!copyFunc(m_stagedBytes, bytesAlreadyCopied, memcpyByteCount))
+      {
+        return false;
+      }
 
       m_stagedBytes += memcpyByteCount;
 

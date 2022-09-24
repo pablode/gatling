@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 #include <volk.h>
 
@@ -119,6 +120,18 @@ static resource_store icommand_buffer_store;
 static resource_store isampler_store;
 
 /* Helper functions. */
+
+#define CGPU_RETURN_ERROR(msg)                                        \
+  do {                                                                \
+    fprintf(stderr, "error in %s:%d: %s\n", __FILE__, __LINE__, msg); \
+    return false;                                                     \
+  } while (false)
+
+#define CGPU_RETURN_ERROR_INVALID_HANDLE                              \
+  CGPU_RETURN_ERROR("invalid resource handle");
+
+#define CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED                     \
+  CGPU_RETURN_ERROR("hardcoded limit reached");
 
 #define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)   \
   CGPU_INLINE static bool cgpu_resolve_##RESOURCE_NAME(                                   \
@@ -465,19 +478,15 @@ static VkSamplerAddressMode cgpu_translate_address_mode(CgpuSamplerAddressMode m
 
 /* API method implementation. */
 
-CgpuResult cgpu_initialize(const char* p_app_name,
-                           uint32_t version_major,
-                           uint32_t version_minor,
-                           uint32_t version_patch)
+bool cgpu_initialize(const char* p_app_name,
+                     uint32_t version_major,
+                     uint32_t version_minor,
+                     uint32_t version_patch)
 {
   VkResult result = volkInitialize();
 
-  if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_INITIALIZE_VOLK;
-  }
-
-  if (volkGetInstanceVersion() < MIN_VK_API_VERSION) {
-    return CGPU_FAIL_UNABLE_TO_INITIALIZE_VOLK;
+  if (result != VK_SUCCESS || volkGetInstanceVersion() < MIN_VK_API_VERSION) {
+    CGPU_RETURN_ERROR("failed to initialize volk");
   }
 
 #ifndef NDEBUG
@@ -517,7 +526,7 @@ CgpuResult cgpu_initialize(const char* p_app_name,
 
   result = vkCreateInstance(&create_info, NULL, &iinstance.instance);
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_INITIALIZE_VULKAN;
+    CGPU_RETURN_ERROR("failed to create vulkan instance");
   }
 
   volkLoadInstanceOnly(iinstance.instance);
@@ -531,10 +540,10 @@ CgpuResult cgpu_initialize(const char* p_app_name,
   resource_store_create(&icommand_buffer_store, sizeof(cgpu_icommand_buffer), 16);
   resource_store_create(&isampler_store, sizeof(cgpu_isampler), 64);
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_terminate(void)
+void cgpu_terminate(void)
 {
   resource_store_destroy(&idevice_store);
   resource_store_destroy(&ibuffer_store);
@@ -546,8 +555,6 @@ CgpuResult cgpu_terminate(void)
   resource_store_destroy(&isampler_store);
 
   vkDestroyInstance(iinstance.instance, NULL);
-
-  return CGPU_OK;
 }
 
 static bool cgpu_find_device_extension(const char* extension_name,
@@ -566,13 +573,13 @@ static bool cgpu_find_device_extension(const char* extension_name,
   return false;
 }
 
-CgpuResult cgpu_create_device(cgpu_device* p_device)
+bool cgpu_create_device(cgpu_device* p_device)
 {
   p_device->handle = resource_store_create_handle(&idevice_store);
 
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(*p_device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   uint32_t phys_device_count;
@@ -585,13 +592,13 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (phys_device_count > MAX_PHYSICAL_DEVICES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
   if (phys_device_count == 0)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_NO_DEVICE_FOUND;
+    CGPU_RETURN_ERROR("no physical device found");
   }
 
   VkPhysicalDevice phys_devices[MAX_PHYSICAL_DEVICES];
@@ -621,7 +628,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (device_properties.properties.apiVersion < MIN_VK_API_VERSION)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_VULKAN_VERSION_NOT_SUPPORTED;
+    CGPU_RETURN_ERROR("unsupported vulkan version");
   }
 
   if ((subgroup_properties.supportedStages & VK_QUEUE_COMPUTE_BIT) != VK_QUEUE_COMPUTE_BIT ||
@@ -629,7 +636,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
       (subgroup_properties.supportedOperations & VK_SUBGROUP_FEATURE_BALLOT_BIT) != VK_SUBGROUP_FEATURE_BALLOT_BIT)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET;
+    CGPU_RETURN_ERROR("subgroup features not supported");
   }
 
   const VkPhysicalDeviceLimits* limits = &device_properties.properties.limits;
@@ -646,7 +653,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (device_ext_count > MAX_DEVICE_EXTENSIONS)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
   VkExtensionProperties device_extensions[MAX_DEVICE_EXTENSIONS];
@@ -669,7 +676,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   else
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_FEATURE_REQUIREMENTS_NOT_MET;
+    CGPU_RETURN_ERROR("descriptor indexing not supported");
   }
 
   const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
@@ -707,7 +714,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   if (queue_family_count > MAX_QUEUE_FAMILIES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
   VkQueueFamilyProperties queue_families[MAX_QUEUE_FAMILIES];
@@ -718,20 +725,19 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
     queue_families
   );
 
-  /* Since ray tracing is a continuous, compute-heavy task, we don't need
-     to schedule work or translate command buffers very often. Therefore,
-     we also don't need async execution and can operate on a single queue. */
   int32_t queue_family_index = -1;
-  for (uint32_t i = 0; i < queue_family_count; ++i) {
+  for (uint32_t i = 0; i < queue_family_count; ++i)
+  {
     const VkQueueFamilyProperties* queue_family = &queue_families[i];
-    if ((queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) &&
-        (queue_family->queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+
+    if ((queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) && (queue_family->queueFlags & VK_QUEUE_TRANSFER_BIT))
+    {
       queue_family_index = i;
     }
   }
   if (queue_family_index == -1) {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_DEVICE_HAS_NO_COMPUTE_QUEUE_FAMILY;
+    CGPU_RETURN_ERROR("no suitable queue family");
   }
 
   VkDeviceQueueCreateInfo queue_create_info;
@@ -847,7 +853,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   device_create_info.queueCreateInfoCount = 1;
   device_create_info.pQueueCreateInfos = &queue_create_info;
   /* These two fields are ignored by up-to-date implementations since
-   nowadays, there is no difference to instance validation layers. */
+   * nowadays, there is no difference to instance validation layers. */
   device_create_info.enabledLayerCount = 0;
   device_create_info.ppEnabledLayerNames = NULL;
   device_create_info.enabledExtensionCount = enabled_device_extension_count;
@@ -862,7 +868,7 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&idevice_store, p_device->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create device");
   }
 
   volkLoadDeviceTable(
@@ -898,7 +904,8 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
       idevice->logical_device,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+
+    CGPU_RETURN_ERROR("failed to create command pool");
   }
 
   VkQueryPoolCreateInfo timestamp_pool_info;
@@ -929,7 +936,8 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
       idevice->logical_device,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+
+    CGPU_RETURN_ERROR("failed to create query pool");
   }
 
   VmaVulkanFunctions vulkan_functions = {0};
@@ -983,17 +991,17 @@ CgpuResult cgpu_create_device(cgpu_device* p_device)
       idevice->logical_device,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_INITIALIZE_VMA;
+    CGPU_RETURN_ERROR("failed to create vma allocator");
   }
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_device(cgpu_device device)
+bool cgpu_destroy_device(cgpu_device device)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   vmaDestroyAllocator(idevice->allocator);
@@ -1014,24 +1022,24 @@ CgpuResult cgpu_destroy_device(cgpu_device device)
   );
 
   resource_store_free_handle(&idevice_store, device.handle);
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_create_shader(cgpu_device device,
-                              uint64_t size,
-                              const uint8_t* p_source,
-                              cgpu_shader* p_shader)
+bool cgpu_create_shader(cgpu_device device,
+                        uint64_t size,
+                        const uint8_t* p_source,
+                        cgpu_shader* p_shader)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   p_shader->handle = resource_store_create_handle(&ishader_store);
 
   cgpu_ishader* ishader;
   if (!cgpu_resolve_shader(*p_shader, &ishader)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkShaderModuleCreateInfo shader_module_create_info;
@@ -1049,7 +1057,7 @@ CgpuResult cgpu_create_shader(cgpu_device device,
   );
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ishader_store, p_shader->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create shader module");
   }
 
   if (!cgpu_perform_shader_reflection(size, (uint32_t*) p_source, &ishader->reflection))
@@ -1060,22 +1068,22 @@ CgpuResult cgpu_create_shader(cgpu_device device,
       NULL
     );
     resource_store_free_handle(&ishader_store, p_shader->handle);
-    return CGPU_FAIL_UNABLE_TO_REFLECT_SHADER;
+    CGPU_RETURN_ERROR("failed to reflect shader");
   }
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_shader(cgpu_device device,
-                               cgpu_shader shader)
+bool cgpu_destroy_shader(cgpu_device device,
+                         cgpu_shader shader)
 {
   cgpu_idevice* idevice;
   cgpu_ishader* ishader;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   if (!cgpu_resolve_shader(shader, &ishader)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   cgpu_destroy_shader_reflection(&ishader->reflection);
@@ -1088,25 +1096,25 @@ CgpuResult cgpu_destroy_shader(cgpu_device device,
 
   resource_store_free_handle(&ishader_store, shader.handle);
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_create_buffer(cgpu_device device,
-                              CgpuBufferUsageFlags usage,
-                              CgpuMemoryPropertyFlags memory_properties,
-                              uint64_t size,
-                              cgpu_buffer* p_buffer)
+bool cgpu_create_buffer(cgpu_device device,
+                        CgpuBufferUsageFlags usage,
+                        CgpuMemoryPropertyFlags memory_properties,
+                        uint64_t size,
+                        cgpu_buffer* p_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   p_buffer->handle = resource_store_create_handle(&ibuffer_store);
 
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(*p_buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkBufferUsageFlags vk_buffer_usage = 0;
@@ -1145,82 +1153,83 @@ CgpuResult cgpu_create_buffer(cgpu_device device,
     NULL
   );
 
-  if (result != VK_SUCCESS) {
+  if (result != VK_SUCCESS)
+  {
     resource_store_free_handle(&ibuffer_store, p_buffer->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create buffer");
   }
 
   ibuffer->size = size;
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_buffer(cgpu_device device,
-                               cgpu_buffer buffer)
+bool cgpu_destroy_buffer(cgpu_device device,
+                         cgpu_buffer buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   vmaDestroyBuffer(idevice->allocator, ibuffer->buffer, ibuffer->allocation);
 
   resource_store_free_handle(&ibuffer_store, buffer.handle);
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_map_buffer(cgpu_device device,
-                           cgpu_buffer buffer,
-                           void** pp_mapped_mem)
+bool cgpu_map_buffer(cgpu_device device,
+                     cgpu_buffer buffer,
+                     void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   if (vmaMapMemory(idevice->allocator, ibuffer->allocation, pp_mapped_mem) != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_MAP_MEMORY;
+    CGPU_RETURN_ERROR("failed to map buffer memory");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_unmap_buffer(cgpu_device device,
-                             cgpu_buffer buffer)
+bool cgpu_unmap_buffer(cgpu_device device,
+                       cgpu_buffer buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   vmaUnmapMemory(idevice->allocator, ibuffer->allocation);
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_create_image(cgpu_device device,
-                             const cgpu_image_description* image_desc,
-                             cgpu_image* p_image)
+bool cgpu_create_image(cgpu_device device,
+                       const cgpu_image_description* image_desc,
+                       cgpu_image* p_image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   p_image->handle = resource_store_create_handle(&iimage_store);
 
   cgpu_iimage* iimage;
   if (!cgpu_resolve_image(*p_image, &iimage)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkImageTiling vk_image_tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -1279,7 +1288,7 @@ CgpuResult cgpu_create_image(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&iimage_store, p_image->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create image");
   }
 
   VmaAllocationInfo allocation_info;
@@ -1318,7 +1327,7 @@ CgpuResult cgpu_create_image(cgpu_device device,
   {
     resource_store_free_handle(&iimage_store, p_image->handle);
     vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create image view");
   }
 
   iimage->width = image_desc->width;
@@ -1327,19 +1336,19 @@ CgpuResult cgpu_create_image(cgpu_device device,
   iimage->layout = VK_IMAGE_LAYOUT_UNDEFINED;
   iimage->access_mask = 0;
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_image(cgpu_device device,
-                              cgpu_image image)
+bool cgpu_destroy_image(cgpu_device device,
+                        cgpu_image image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_iimage* iimage;
   if (!cgpu_resolve_image(image, &iimage)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkDestroyImageView(
@@ -1352,58 +1361,58 @@ CgpuResult cgpu_destroy_image(cgpu_device device,
 
   resource_store_free_handle(&iimage_store, image.handle);
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_map_image(cgpu_device device,
-                          cgpu_image image,
-                          void** pp_mapped_mem)
+bool cgpu_map_image(cgpu_device device,
+                    cgpu_image image,
+                    void** pp_mapped_mem)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_iimage* iimage;
   if (!cgpu_resolve_image(image, &iimage)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   if (vmaMapMemory(idevice->allocator, iimage->allocation, pp_mapped_mem) != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_MAP_MEMORY;
+    CGPU_RETURN_ERROR("failed to map image memory");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_unmap_image(cgpu_device device,
-                            cgpu_image image)
+bool cgpu_unmap_image(cgpu_device device,
+                      cgpu_image image)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_iimage* iimage;
   if (!cgpu_resolve_image(image, &iimage)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   vmaUnmapMemory(idevice->allocator, iimage->allocation);
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_create_sampler(cgpu_device device,
-                               CgpuSamplerAddressMode address_mode_u,
-                               CgpuSamplerAddressMode address_mode_v,
-                               CgpuSamplerAddressMode address_mode_w,
-                               cgpu_sampler* p_sampler)
+bool cgpu_create_sampler(cgpu_device device,
+                         CgpuSamplerAddressMode address_mode_u,
+                         CgpuSamplerAddressMode address_mode_v,
+                         CgpuSamplerAddressMode address_mode_w,
+                         cgpu_sampler* p_sampler)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   p_sampler->handle = resource_store_create_handle(&isampler_store);
 
   cgpu_isampler* isampler;
   if (!cgpu_resolve_sampler(*p_sampler, &isampler)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   // Emulate MDL's clip wrap mode if necessary; use optimal mode (according to ARM) if not.
@@ -1440,57 +1449,57 @@ CgpuResult cgpu_create_sampler(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&isampler_store, p_sampler->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create sampler");
   }
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_sampler(cgpu_device device,
-                                cgpu_sampler sampler)
+bool cgpu_destroy_sampler(cgpu_device device,
+                          cgpu_sampler sampler)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_isampler* isampler;
   if (!cgpu_resolve_sampler(sampler, &isampler)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkDestroySampler(idevice->logical_device, isampler->sampler, NULL);
 
   resource_store_free_handle(&isampler_store, sampler.handle);
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_create_pipeline(cgpu_device device,
-                                cgpu_shader shader,
-                                const char* p_shader_entry_point,
-                                cgpu_pipeline* p_pipeline)
+bool cgpu_create_pipeline(cgpu_device device,
+                          cgpu_shader shader,
+                          const char* p_shader_entry_point,
+                          cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ishader* ishader;
   if (!cgpu_resolve_shader(shader, &ishader)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   p_pipeline->handle = resource_store_create_handle(&ipipeline_store);
 
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(*p_pipeline, &ipipeline)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   const cgpu_shader_reflection* shader_reflection = &ishader->reflection;
 
   if (shader_reflection->binding_count >= MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS)
   {
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
   ipipeline->descriptor_set_layout_binding_count = shader_reflection->binding_count;
@@ -1523,7 +1532,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create descriptor set layout");
   }
 
   VkPushConstantRange push_const_range;
@@ -1553,7 +1562,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create pipeline layout");
   }
 
   VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
@@ -1594,7 +1603,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create compute pipeline");
   }
 
   uint32_t buffer_count = 0;
@@ -1624,7 +1633,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
         ipipeline->descriptor_set_layout,
         NULL
       );
-      return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+      CGPU_RETURN_ERROR("invalid descriptor type");
     }
     }
   }
@@ -1688,7 +1697,7 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create descriptor pool");
   }
 
   VkDescriptorSetAllocateInfo descriptor_set_allocate_info;
@@ -1725,24 +1734,24 @@ CgpuResult cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    return CGPU_FAIL_UNABLE_TO_ALLOCATE_DESCRIPTOR_SET;
+    CGPU_RETURN_ERROR("failed to allocate descriptor set");
   }
 
   ipipeline->shader = shader;
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_pipeline(cgpu_device device,
-                                 cgpu_pipeline pipeline)
+bool cgpu_destroy_pipeline(cgpu_device device,
+                           cgpu_pipeline pipeline)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkDestroyDescriptorPool(
@@ -1768,22 +1777,22 @@ CgpuResult cgpu_destroy_pipeline(cgpu_device device,
 
   resource_store_free_handle(&ipipeline_store, pipeline.handle);
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_create_command_buffer(cgpu_device device,
-                                      cgpu_command_buffer* p_command_buffer)
+bool cgpu_create_command_buffer(cgpu_device device,
+                                cgpu_command_buffer* p_command_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   p_command_buffer->handle = resource_store_create_handle(&icommand_buffer_store);
 
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(*p_command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   icommand_buffer->device.handle = device.handle;
 
@@ -1800,22 +1809,22 @@ CgpuResult cgpu_create_command_buffer(cgpu_device device,
     &icommand_buffer->command_buffer
   );
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_ALLOCATE_COMMAND_BUFFER;
+    CGPU_RETURN_ERROR("failed to allocate command buffer");
   }
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_command_buffer(cgpu_device device,
-                                       cgpu_command_buffer command_buffer)
+bool cgpu_destroy_command_buffer(cgpu_device device,
+                                 cgpu_command_buffer command_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkFreeCommandBuffers(
@@ -1826,18 +1835,18 @@ CgpuResult cgpu_destroy_command_buffer(cgpu_device device,
   );
 
   resource_store_free_handle(&icommand_buffer_store, command_buffer.handle);
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
+bool cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkCommandBufferBeginInfo command_buffer_begin_info;
@@ -1852,25 +1861,25 @@ CgpuResult cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
   );
 
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_BEGIN_COMMAND_BUFFER;
+    CGPU_RETURN_ERROR("failed to begin command buffer");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
-                                  cgpu_pipeline pipeline)
+bool cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
+                            cgpu_pipeline pipeline)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkCmdBindPipeline(
@@ -1889,21 +1898,21 @@ CgpuResult cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
     0
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-static CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
-                                                           cgpu_icommand_buffer* icommand_buffer,
-                                                           uint32_t image_count,
-                                                           const cgpu_image_binding* p_images)
+static bool cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
+                                                     cgpu_icommand_buffer* icommand_buffer,
+                                                     uint32_t image_count,
+                                                     const cgpu_image_binding* p_images)
 {
   cgpu_ishader* ishader;
   if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkImageMemoryBarrier barriers[MAX_IMAGE_MEMORY_BARRIERS];
@@ -1944,12 +1953,12 @@ static CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipe
       }
       if (!image_binding)
       {
-        return CGPU_FAIL_DESCRIPTOR_SET_BINDING_MISMATCH;
+        CGPU_RETURN_ERROR("descriptor set binding mismatch");
       }
 
       cgpu_iimage* iimage;
       if (!cgpu_resolve_image(image_binding->image, &iimage)) {
-        return CGPU_FAIL_INVALID_HANDLE;
+        CGPU_RETURN_ERROR_INVALID_HANDLE;
       }
 
       VkImageLayout old_layout = iimage->layout;
@@ -1967,7 +1976,7 @@ static CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipe
       }
 
       if (barrier_count >= MAX_IMAGE_MEMORY_BARRIERS) {
-        return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+        CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
       }
 
       VkImageMemoryBarrier* barrier = &barriers[barrier_count++];
@@ -2007,34 +2016,34 @@ static CgpuResult cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipe
     );
   }
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
-                                    cgpu_pipeline pipeline,
-                                    const cgpu_bindings* bindings
+bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
+                              cgpu_pipeline pipeline,
+                              const cgpu_bindings* bindings
 )
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  CgpuResult c_result = cgpu_transition_image_layouts_for_shader(
+  bool c_result = cgpu_transition_image_layouts_for_shader(
     ipipeline,
     icommand_buffer,
     bindings->image_count,
     bindings->p_images
   );
-  if (c_result != CGPU_OK) {
+  if (c_result != true) {
     return c_result;
   }
 
@@ -2052,7 +2061,7 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
     const VkDescriptorSetLayoutBinding* layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
 
     if (write_descriptor_set_count >= MAX_WRITE_DESCRIPTOR_SETS) {
-      return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+      CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
     }
 
     VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_descriptor_set_count++];
@@ -2085,15 +2094,15 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
           cgpu_ibuffer* ibuffer;
           cgpu_buffer buffer = buffer_binding->buffer;
           if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-            return CGPU_FAIL_INVALID_HANDLE;
+            CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
           if ((buffer_binding->offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
-            return CGPU_FAIL_BUFFER_OFFSET_NOT_ALIGNED;
+            CGPU_RETURN_ERROR("buffer binding offset not aligned");
           }
 
           if (image_info_count >= MAX_DESCRIPTOR_BUFFER_INFOS) {
-            return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+            CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
           }
 
           VkDescriptorBufferInfo* buffer_info = &buffer_infos[buffer_info_count++];
@@ -2125,11 +2134,11 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
           cgpu_iimage* iimage;
           cgpu_image image = image_binding->image;
           if (!cgpu_resolve_image(image, &iimage)) {
-            return CGPU_FAIL_INVALID_HANDLE;
+            CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
           if (image_info_count >= MAX_DESCRIPTOR_IMAGE_INFOS) {
-            return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+            CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
           }
 
           VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
@@ -2160,11 +2169,11 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
           cgpu_isampler* isampler;
           cgpu_sampler sampler = sampler_binding->sampler;
           if (!cgpu_resolve_sampler(sampler, &isampler)) {
-            return CGPU_FAIL_INVALID_HANDLE;
+            CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
           if (image_info_count >= MAX_DESCRIPTOR_IMAGE_INFOS) {
-            return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+            CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
           }
 
           VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
@@ -2184,7 +2193,7 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
 
       if (!slotHandled)
       {
-        return CGPU_FAIL_RESOURCE_BINDING_MISMATCH;
+        CGPU_RETURN_ERROR("resource binding mismatch");
       }
     }
   }
@@ -2197,31 +2206,31 @@ CgpuResult cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
     NULL
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_copy_buffer(cgpu_command_buffer command_buffer,
-                                cgpu_buffer source_buffer,
-                                uint64_t source_offset,
-                                cgpu_buffer destination_buffer,
-                                uint64_t destination_offset,
-                                uint64_t size)
+bool cgpu_cmd_copy_buffer(cgpu_command_buffer command_buffer,
+                          cgpu_buffer source_buffer,
+                          uint64_t source_offset,
+                          cgpu_buffer destination_buffer,
+                          uint64_t destination_offset,
+                          uint64_t size)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* isource_buffer;
   if (!cgpu_resolve_buffer(source_buffer, &isource_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* idestination_buffer;
   if (!cgpu_resolve_buffer(destination_buffer, &idestination_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkBufferCopy region;
@@ -2237,29 +2246,29 @@ CgpuResult cgpu_cmd_copy_buffer(cgpu_command_buffer command_buffer,
     &region
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
-                                         cgpu_buffer buffer,
-                                         uint64_t buffer_offset,
-                                         cgpu_image image)
+bool cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
+                                   cgpu_buffer buffer,
+                                   uint64_t buffer_offset,
+                                   cgpu_image image)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_iimage* iimage;
   if (!cgpu_resolve_image(image, &iimage)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   if (iimage->layout != VK_IMAGE_LAYOUT_GENERAL)
@@ -2333,28 +2342,28 @@ CgpuResult cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
     &region
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
-                                   cgpu_pipeline pipeline,
-                                   const void* p_data)
+bool cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
+                             cgpu_pipeline pipeline,
+                             const void* p_data)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ishader* ishader;
   if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   idevice->table.vkCmdPushConstants(
     icommand_buffer->command_buffer,
@@ -2364,21 +2373,21 @@ CgpuResult cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
     ishader->reflection.push_constants_size,
     p_data
   );
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_dispatch(cgpu_command_buffer command_buffer,
-                             uint32_t dim_x,
-                             uint32_t dim_y,
-                             uint32_t dim_z)
+bool cgpu_cmd_dispatch(cgpu_command_buffer command_buffer,
+                       uint32_t dim_x,
+                       uint32_t dim_y,
+                       uint32_t dim_z)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkCmdDispatch(
@@ -2387,31 +2396,31 @@ CgpuResult cgpu_cmd_dispatch(cgpu_command_buffer command_buffer,
     dim_y,
     dim_z
   );
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
-                                     uint32_t barrier_count,
-                                     const cgpu_memory_barrier* p_barriers,
-                                     uint32_t buffer_barrier_count,
-                                     const cgpu_buffer_memory_barrier* p_buffer_barriers,
-                                     uint32_t image_barrier_count,
-                                     const cgpu_image_memory_barrier* p_image_barriers)
+bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
+                               uint32_t barrier_count,
+                               const cgpu_memory_barrier* p_barriers,
+                               uint32_t buffer_barrier_count,
+                               const cgpu_buffer_memory_barrier* p_buffer_barriers,
+                               uint32_t image_barrier_count,
+                               const cgpu_image_memory_barrier* p_image_barriers)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   if (barrier_count >= MAX_MEMORY_BARRIERS ||
       buffer_barrier_count >= MAX_BUFFER_MEMORY_BARRIERS ||
       image_barrier_count >= MAX_IMAGE_MEMORY_BARRIERS)
   {
-    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
   VkMemoryBarrier vk_memory_barriers[MAX_MEMORY_BARRIERS];
@@ -2435,7 +2444,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
 
     cgpu_ibuffer* ibuffer;
     if (!cgpu_resolve_buffer(b_cgpu->buffer, &ibuffer)) {
-      return CGPU_FAIL_INVALID_HANDLE;
+      CGPU_RETURN_ERROR_INVALID_HANDLE;
     }
 
     VkBufferMemoryBarrier* b_vk = &vk_buffer_memory_barriers[i];
@@ -2456,7 +2465,7 @@ CgpuResult cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
 
     cgpu_iimage* iimage;
     if (!cgpu_resolve_image(b_cgpu->image, &iimage)) {
-      return CGPU_FAIL_INVALID_HANDLE;
+      CGPU_RETURN_ERROR_INVALID_HANDLE;
     }
 
     VkAccessFlags access_mask = cgpu_translate_access_flags(b_cgpu->access_mask);
@@ -2493,20 +2502,20 @@ CgpuResult cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
     vk_image_memory_barriers
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_reset_timestamps(cgpu_command_buffer command_buffer,
-                                     uint32_t offset,
-                                     uint32_t count)
+bool cgpu_cmd_reset_timestamps(cgpu_command_buffer command_buffer,
+                               uint32_t offset,
+                               uint32_t count)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkCmdResetQueryPool(
@@ -2516,19 +2525,19 @@ CgpuResult cgpu_cmd_reset_timestamps(cgpu_command_buffer command_buffer,
     count
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_write_timestamp(cgpu_command_buffer command_buffer,
-                                    uint32_t timestamp_index)
+bool cgpu_cmd_write_timestamp(cgpu_command_buffer command_buffer,
+                              uint32_t timestamp_index)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   idevice->table.vkCmdWriteTimestamp(
@@ -2538,31 +2547,31 @@ CgpuResult cgpu_cmd_write_timestamp(cgpu_command_buffer command_buffer,
     timestamp_index
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
-                                    cgpu_buffer buffer,
-                                    uint32_t offset,
-                                    uint32_t count,
-                                    bool wait_until_available)
+bool cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
+                              cgpu_buffer buffer,
+                              uint32_t offset,
+                              uint32_t count,
+                              bool wait_until_available)
 {
   uint32_t last_index = offset + count;
   if (last_index >= CGPU_MAX_TIMESTAMP_QUERIES) {
-    return CGPU_FAIL_INTERNAL_LIMIT_REACHED;
+    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkQueryResultFlags wait_flag = wait_until_available ? VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
@@ -2578,36 +2587,36 @@ CgpuResult cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
     VK_QUERY_RESULT_64_BIT | wait_flag
   );
 
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_end_command_buffer(cgpu_command_buffer command_buffer)
+bool cgpu_end_command_buffer(cgpu_command_buffer command_buffer)
 {
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   idevice->table.vkEndCommandBuffer(icommand_buffer->command_buffer);
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_create_fence(cgpu_device device,
-                             cgpu_fence* p_fence)
+bool cgpu_create_fence(cgpu_device device,
+                       cgpu_fence* p_fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   p_fence->handle = resource_store_create_handle(&ifence_store);
 
   cgpu_ifence* ifence;
   if (!cgpu_resolve_fence(*p_fence, &ifence)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkFenceCreateInfo fence_create_info;
@@ -2624,21 +2633,21 @@ CgpuResult cgpu_create_fence(cgpu_device device,
 
   if (result != VK_SUCCESS) {
     resource_store_free_handle(&ifence_store, p_fence->handle);
-    return CGPU_FAIL_UNABLE_TO_CREATE_RESOURCE;
+    CGPU_RETURN_ERROR("failed to create fence");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_destroy_fence(cgpu_device device,
-                              cgpu_fence fence)
+bool cgpu_destroy_fence(cgpu_device device,
+                        cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
   if (!cgpu_resolve_fence(fence, &ifence)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   idevice->table.vkDestroyFence(
     idevice->logical_device,
@@ -2646,19 +2655,19 @@ CgpuResult cgpu_destroy_fence(cgpu_device device,
     NULL
   );
   resource_store_free_handle(&ifence_store, fence.handle);
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_reset_fence(cgpu_device device,
-                            cgpu_fence fence)
+bool cgpu_reset_fence(cgpu_device device,
+                      cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
   if (!cgpu_resolve_fence(fence, &ifence)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   VkResult result = idevice->table.vkResetFences(
     idevice->logical_device,
@@ -2666,20 +2675,20 @@ CgpuResult cgpu_reset_fence(cgpu_device device,
     &ifence->fence
   );
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_RESET_FENCE;
+    CGPU_RETURN_ERROR("failed to reset fence");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_wait_for_fence(cgpu_device device, cgpu_fence fence)
+bool cgpu_wait_for_fence(cgpu_device device, cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
   if (!cgpu_resolve_fence(fence, &ifence)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   VkResult result = idevice->table.vkWaitForFences(
     idevice->logical_device,
@@ -2689,26 +2698,26 @@ CgpuResult cgpu_wait_for_fence(cgpu_device device, cgpu_fence fence)
     UINT64_MAX
   );
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_WAIT_FOR_FENCE;
+    CGPU_RETURN_ERROR("failed to wait for fence");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_submit_command_buffer(cgpu_device device,
-                                      cgpu_command_buffer command_buffer,
-                                      cgpu_fence fence)
+bool cgpu_submit_command_buffer(cgpu_device device,
+                                cgpu_command_buffer command_buffer,
+                                cgpu_fence fence)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_icommand_buffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ifence* ifence;
   if (!cgpu_resolve_fence(fence, &ifence)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkSubmitInfo submit_info;
@@ -2730,23 +2739,23 @@ CgpuResult cgpu_submit_command_buffer(cgpu_device device,
   );
 
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_SUBMIT_COMMAND_BUFFER;
+    CGPU_RETURN_ERROR("failed to submit command buffer");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_flush_mapped_memory(cgpu_device device,
-                                    cgpu_buffer buffer,
-                                    uint64_t offset,
-                                    uint64_t size)
+bool cgpu_flush_mapped_memory(cgpu_device device,
+                              cgpu_buffer buffer,
+                              uint64_t offset,
+                              uint64_t size)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkResult result = vmaFlushAllocation(
@@ -2757,23 +2766,23 @@ CgpuResult cgpu_flush_mapped_memory(cgpu_device device,
   );
 
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_INVALIDATE_MEMORY;
+    CGPU_RETURN_ERROR("failed to flush mapped memory");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_invalidate_mapped_memory(cgpu_device device,
-                                         cgpu_buffer buffer,
-                                         uint64_t offset,
-                                         uint64_t size)
+bool cgpu_invalidate_mapped_memory(cgpu_device device,
+                                   cgpu_buffer buffer,
+                                   uint64_t offset,
+                                   uint64_t size)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_ibuffer* ibuffer;
   if (!cgpu_resolve_buffer(buffer, &ibuffer)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkResult result = vmaInvalidateAllocation(
@@ -2784,29 +2793,29 @@ CgpuResult cgpu_invalidate_mapped_memory(cgpu_device device,
   );
 
   if (result != VK_SUCCESS) {
-    return CGPU_FAIL_UNABLE_TO_INVALIDATE_MEMORY;
+    CGPU_RETURN_ERROR("failed to invalidate mapped memory");
   }
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_get_physical_device_features(cgpu_device device,
-                                             cgpu_physical_device_features* p_features)
+bool cgpu_get_physical_device_features(cgpu_device device,
+                                       cgpu_physical_device_features* p_features)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   memcpy(p_features, &idevice->features, sizeof(cgpu_physical_device_features));
-  return CGPU_OK;
+  return true;
 }
 
-CgpuResult cgpu_get_physical_device_limits(cgpu_device device,
-                                           cgpu_physical_device_limits* p_limits)
+bool cgpu_get_physical_device_limits(cgpu_device device,
+                                     cgpu_physical_device_limits* p_limits)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
-    return CGPU_FAIL_INVALID_HANDLE;
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   memcpy(p_limits, &idevice->limits, sizeof(cgpu_physical_device_limits));
-  return CGPU_OK;
+  return true;
 }

@@ -41,7 +41,7 @@ namespace gi
     bool stageToImage(const uint8_t* src, uint64_t size, cgpu_image dst);
 
   private:
-    using CopyFunc = std::function<CgpuResult(uint64_t srcOffset, uint64_t dstOffset, uint64_t size)>;
+    using CopyFunc = std::function<bool(uint64_t srcOffset, uint64_t dstOffset, uint64_t size)>;
 
     bool stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc);
 
