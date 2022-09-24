@@ -665,18 +665,34 @@ bool cgpu_create_device(cgpu_device* p_device)
     device_extensions
   );
 
+  const char* required_extensions[] = {
+    VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+    VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
+    VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
+    VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
+    VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+    VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
+    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME // required by VK_KHR_spirv_1_4
+  };
+  uint32_t required_extension_count = sizeof(required_extensions) / sizeof(required_extensions[0]);
+
   uint32_t enabled_device_extension_count = 0;
   const char* enabled_device_extensions[32];
 
-  if (cgpu_find_device_extension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, device_ext_count, device_extensions))
+  for (uint32_t i = 0; i < required_extension_count; i++)
   {
-    enabled_device_extensions[enabled_device_extension_count] = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
+    const char* extension = required_extensions[i];
+
+    if (!cgpu_find_device_extension(extension, device_ext_count, device_extensions))
+    {
+      resource_store_free_handle(&idevice_store, p_device->handle);
+
+      fprintf(stderr, "error in %s:%d: extension %s not supported\n", __FILE__, __LINE__, extension);
+      return false;
+    }
+
+    enabled_device_extensions[enabled_device_extension_count] = extension;
     enabled_device_extension_count++;
-  }
-  else
-  {
-    resource_store_free_handle(&idevice_store, p_device->handle);
-    CGPU_RETURN_ERROR("descriptor indexing not supported");
   }
 
   const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
@@ -755,9 +771,34 @@ bool cgpu_create_device(cgpu_device* p_device)
   shader_clock_features.shaderSubgroupClock = VK_TRUE;
   shader_clock_features.shaderDeviceClock = VK_FALSE;
 
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features = {0};
+  acceleration_structure_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+  acceleration_structure_features.pNext = idevice->features.shaderClock ? &shader_clock_features : NULL;
+  acceleration_structure_features.accelerationStructure = VK_TRUE;
+  acceleration_structure_features.accelerationStructureCaptureReplay = VK_FALSE;
+  acceleration_structure_features.accelerationStructureIndirectBuild = VK_FALSE;
+  acceleration_structure_features.accelerationStructureHostCommands = VK_FALSE;
+  acceleration_structure_features.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
+
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features = {0};
+  ray_tracing_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+  ray_tracing_pipeline_features.pNext = &acceleration_structure_features;
+  ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
+  ray_tracing_pipeline_features.rayTracingPipelineShaderGroupHandleCaptureReplay = VK_FALSE;
+  ray_tracing_pipeline_features.rayTracingPipelineShaderGroupHandleCaptureReplayMixed = VK_FALSE;
+  ray_tracing_pipeline_features.rayTracingPipelineTraceRaysIndirect = VK_FALSE;
+  ray_tracing_pipeline_features.rayTraversalPrimitiveCulling = VK_FALSE;
+
+  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_features = {0};
+  buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+  buffer_device_address_features.pNext = &ray_tracing_pipeline_features;
+  buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
+  buffer_device_address_features.bufferDeviceAddressCaptureReplay = VK_FALSE;
+  buffer_device_address_features.bufferDeviceAddressMultiDevice = VK_FALSE;
+
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features = {0};
   descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-  descriptor_indexing_features.pNext = idevice->features.shaderClock ? &shader_clock_features : NULL;
+  descriptor_indexing_features.pNext = &buffer_device_address_features;
   descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing = VK_FALSE;
   descriptor_indexing_features.shaderUniformTexelBufferArrayDynamicIndexing = VK_FALSE;
   descriptor_indexing_features.shaderStorageTexelBufferArrayDynamicIndexing = VK_FALSE;
