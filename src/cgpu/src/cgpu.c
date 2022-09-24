@@ -1515,27 +1515,30 @@ bool cgpu_destroy_sampler(cgpu_device device,
   return true;
 }
 
-bool cgpu_create_pipeline(cgpu_device device,
-                          cgpu_shader shader,
-                          const char* p_shader_entry_point,
-                          cgpu_pipeline* p_pipeline)
+static bool cgpu_create_pipeline_layout(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, cgpu_ishader* ishader)
 {
-  cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device, &idevice)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
-  cgpu_ishader* ishader;
-  if (!cgpu_resolve_shader(shader, &ishader)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
+  VkPushConstantRange push_const_range;
+  push_const_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+  push_const_range.offset = 0;
+  push_const_range.size = ishader->reflection.push_constants_size;
 
-  p_pipeline->handle = resource_store_create_handle(&ipipeline_store);
+  VkPipelineLayoutCreateInfo pipeline_layout_create_info;
+  pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipeline_layout_create_info.pNext = NULL;
+  pipeline_layout_create_info.flags = 0;
+  pipeline_layout_create_info.setLayoutCount = 1;
+  pipeline_layout_create_info.pSetLayouts = &ipipeline->descriptor_set_layout;
+  pipeline_layout_create_info.pushConstantRangeCount = push_const_range.size ? 1 : 0;
+  pipeline_layout_create_info.pPushConstantRanges = &push_const_range;
 
-  cgpu_ipipeline* ipipeline;
-  if (!cgpu_resolve_pipeline(*p_pipeline, &ipipeline)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
+  return idevice->table.vkCreatePipelineLayout(idevice->logical_device,
+                                               &pipeline_layout_create_info,
+                                               NULL,
+                                               &ipipeline->layout) == VK_SUCCESS;
+}
 
+static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, cgpu_ishader* ishader)
+{
   const cgpu_shader_reflection* shader_reflection = &ishader->reflection;
 
   if (shader_reflection->binding_count >= MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS)
@@ -1572,79 +1575,7 @@ bool cgpu_create_pipeline(cgpu_device device,
   );
 
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
     CGPU_RETURN_ERROR("failed to create descriptor set layout");
-  }
-
-  VkPushConstantRange push_const_range;
-  push_const_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-  push_const_range.offset = 0;
-  push_const_range.size = ishader->reflection.push_constants_size;
-
-  VkPipelineLayoutCreateInfo pipeline_layout_create_info;
-  pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipeline_layout_create_info.pNext = NULL;
-  pipeline_layout_create_info.flags = 0;
-  pipeline_layout_create_info.setLayoutCount = 1;
-  pipeline_layout_create_info.pSetLayouts = &ipipeline->descriptor_set_layout;
-  pipeline_layout_create_info.pushConstantRangeCount = push_const_range.size ? 1 : 0;
-  pipeline_layout_create_info.pPushConstantRanges = &push_const_range;
-
-  result = idevice->table.vkCreatePipelineLayout(
-    idevice->logical_device,
-    &pipeline_layout_create_info,
-    NULL,
-    &ipipeline->layout
-  );
-  if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-    idevice->table.vkDestroyDescriptorSetLayout(
-      idevice->logical_device,
-      ipipeline->descriptor_set_layout,
-      NULL
-    );
-    CGPU_RETURN_ERROR("failed to create pipeline layout");
-  }
-
-  VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
-  pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  pipeline_shader_stage_create_info.pNext = NULL;
-  pipeline_shader_stage_create_info.flags = 0;
-  pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-  pipeline_shader_stage_create_info.module = ishader->module;
-  pipeline_shader_stage_create_info.pName = p_shader_entry_point;
-  pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
-
-  VkComputePipelineCreateInfo pipeline_create_info;
-  pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-  pipeline_create_info.pNext = NULL;
-  pipeline_create_info.flags = VK_PIPELINE_CREATE_DISPATCH_BASE;
-  pipeline_create_info.stage = pipeline_shader_stage_create_info;
-  pipeline_create_info.layout = ipipeline->layout;
-  pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
-  pipeline_create_info.basePipelineIndex = 0;
-
-  result = idevice->table.vkCreateComputePipelines(
-    idevice->logical_device,
-    VK_NULL_HANDLE,
-    1,
-    &pipeline_create_info,
-    NULL,
-    &ipipeline->pipeline
-  );
-  if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-    idevice->table.vkDestroyPipelineLayout(
-      idevice->logical_device,
-      ipipeline->layout,
-      NULL
-    );
-    idevice->table.vkDestroyDescriptorSetLayout(
-      idevice->logical_device,
-      ipipeline->descriptor_set_layout,
-      NULL
-    );
-    CGPU_RETURN_ERROR("failed to create compute pipeline");
   }
 
   uint32_t buffer_count = 0;
@@ -1663,12 +1594,6 @@ bool cgpu_create_pipeline(cgpu_device device,
     case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampled_image_count += binding->count; break;
     case VK_DESCRIPTOR_TYPE_SAMPLER: sampler_count += binding->count; break;
     default: {
-      resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-      idevice->table.vkDestroyPipelineLayout(
-        idevice->logical_device,
-        ipipeline->layout,
-        NULL
-      );
       idevice->table.vkDestroyDescriptorSetLayout(
         idevice->logical_device,
         ipipeline->descriptor_set_layout,
@@ -1722,17 +1647,6 @@ bool cgpu_create_pipeline(cgpu_device device,
     &ipipeline->descriptor_pool
   );
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
-    idevice->table.vkDestroyPipeline(
-      idevice->logical_device,
-      ipipeline->pipeline,
-      NULL
-    );
-    idevice->table.vkDestroyPipelineLayout(
-      idevice->logical_device,
-      ipipeline->layout,
-      NULL
-    );
     idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
@@ -1754,17 +1668,94 @@ bool cgpu_create_pipeline(cgpu_device device,
     &ipipeline->descriptor_set
   );
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
     idevice->table.vkDestroyDescriptorPool(
       idevice->logical_device,
       ipipeline->descriptor_pool,
       NULL
     );
-    idevice->table.vkDestroyPipeline(
+    idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
-      ipipeline->pipeline,
+      ipipeline->descriptor_set_layout,
       NULL
     );
+    CGPU_RETURN_ERROR("failed to allocate descriptor set");
+  }
+
+  return true;
+}
+
+bool cgpu_create_pipeline(cgpu_device device,
+                          cgpu_shader shader,
+                          const char* p_shader_entry_point,
+                          cgpu_pipeline* p_pipeline)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  cgpu_ishader* ishader;
+  if (!cgpu_resolve_shader(shader, &ishader)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  p_pipeline->handle = resource_store_create_handle(&ipipeline_store);
+
+  cgpu_ipipeline* ipipeline;
+  if (!cgpu_resolve_pipeline(*p_pipeline, &ipipeline)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  if (!cgpu_create_pipeline_descriptors(idevice, ipipeline, ishader))
+  {
+    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
+    CGPU_RETURN_ERROR("failed to create descriptor set layout");
+  }
+
+  if (!cgpu_create_pipeline_layout(idevice, ipipeline, ishader))
+  {
+    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
+    idevice->table.vkDestroyDescriptorSetLayout(
+      idevice->logical_device,
+      ipipeline->descriptor_set_layout,
+      NULL
+    );
+    idevice->table.vkDestroyDescriptorPool(
+      idevice->logical_device,
+      ipipeline->descriptor_pool,
+      NULL
+    );
+    CGPU_RETURN_ERROR("failed to create pipeline layout");
+  }
+
+  VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
+  pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  pipeline_shader_stage_create_info.pNext = NULL;
+  pipeline_shader_stage_create_info.flags = 0;
+  pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  pipeline_shader_stage_create_info.module = ishader->module;
+  pipeline_shader_stage_create_info.pName = p_shader_entry_point;
+  pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
+
+  VkComputePipelineCreateInfo pipeline_create_info;
+  pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  pipeline_create_info.pNext = NULL;
+  pipeline_create_info.flags = VK_PIPELINE_CREATE_DISPATCH_BASE;
+  pipeline_create_info.stage = pipeline_shader_stage_create_info;
+  pipeline_create_info.layout = ipipeline->layout;
+  pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
+  pipeline_create_info.basePipelineIndex = 0;
+
+  VkResult result = idevice->table.vkCreateComputePipelines(
+    idevice->logical_device,
+    VK_NULL_HANDLE,
+    1,
+    &pipeline_create_info,
+    NULL,
+    &ipipeline->pipeline
+  );
+
+  if (result != VK_SUCCESS) {
+    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
     idevice->table.vkDestroyPipelineLayout(
       idevice->logical_device,
       ipipeline->layout,
@@ -1775,7 +1766,12 @@ bool cgpu_create_pipeline(cgpu_device device,
       ipipeline->descriptor_set_layout,
       NULL
     );
-    CGPU_RETURN_ERROR("failed to allocate descriptor set");
+    idevice->table.vkDestroyDescriptorPool(
+      idevice->logical_device,
+      ipipeline->descriptor_pool,
+      NULL
+    );
+    CGPU_RETURN_ERROR("failed to create compute pipeline");
   }
 
   ipipeline->shader = shader;
