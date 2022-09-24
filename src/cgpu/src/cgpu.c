@@ -1686,7 +1686,6 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
 
 bool cgpu_create_pipeline(cgpu_device device,
                           cgpu_shader shader,
-                          const char* p_shader_entry_point,
                           cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
@@ -1733,7 +1732,7 @@ bool cgpu_create_pipeline(cgpu_device device,
   pipeline_shader_stage_create_info.flags = 0;
   pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   pipeline_shader_stage_create_info.module = ishader->module;
-  pipeline_shader_stage_create_info.pName = p_shader_entry_point;
+  pipeline_shader_stage_create_info.pName = "main";
   pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
 
   VkComputePipelineCreateInfo pipeline_create_info;

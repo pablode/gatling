@@ -262,7 +262,6 @@ namespace sg
       printf("GLSL source: %s\n", glslStr.c_str());
     }
 
-    result.entryPoint = "main";
-    return m_shaderCompiler->compileGlslToSpv(glslStr, filePath, result.entryPoint, result.spv);
+    return m_shaderCompiler->compileGlslToSpv(glslStr, filePath, result.spv);
   }
 }

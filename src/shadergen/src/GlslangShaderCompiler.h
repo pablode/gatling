@@ -32,7 +32,6 @@ namespace sg
   public:
     bool compileGlslToSpv(std::string_view source,
                           std::string_view filePath,
-                          std::string_view entryPoint,
                           std::vector<uint8_t>& spv);
 
     static bool init();

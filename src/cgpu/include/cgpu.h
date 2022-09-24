@@ -532,7 +532,6 @@ CGPU_API bool CGPU_CDECL cgpu_destroy_sampler(
 CGPU_API bool CGPU_CDECL cgpu_create_pipeline(
   cgpu_device device,
   cgpu_shader shader,
-  const char* p_shader_entry_point,
   cgpu_pipeline* p_pipeline
 );
 

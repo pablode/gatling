@@ -443,7 +443,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   }
 
   cgpu_pipeline pipeline;
-  if (!cgpu_create_pipeline(s_device, shader, mainShader.entryPoint.c_str(), &pipeline))
+  if (!cgpu_create_pipeline(s_device, shader, &pipeline))
   {
     cgpu_destroy_shader(s_device, shader);
     return nullptr;

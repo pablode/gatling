@@ -217,7 +217,6 @@ namespace sg
 
   bool GlslangShaderCompiler::compileGlslToSpv(std::string_view source,
                                                std::string_view filePath,
-                                               std::string_view entryPoint,
                                                std::vector<uint8_t>& spv)
   {
     glslang::TShader shader(EShLangCompute);
@@ -225,7 +224,7 @@ namespace sg
     const char* sources[] = { source.data() };
     const int sourceLengths[] = { static_cast<int>(source.length()) };
     shader.setStringsWithLengths(sources, sourceLengths, 1);
-    shader.setEntryPoint(entryPoint.data());
+    shader.setEntryPoint("main");
     shader.setEnvClient(glslang::EShClientVulkan, glslang::EshTargetClientVersion::EShTargetVulkan_1_1);
     shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_3);
     shader.setEnvInput(glslang::EShSourceGlsl, EShLangCompute, glslang::EShClient::EShClientVulkan, 450);

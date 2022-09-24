@@ -53,7 +53,6 @@ namespace sg
     struct MainShaderResult
     {
       std::vector<uint8_t> spv;
-      std::string entryPoint;
       std::vector<TextureResource> textureResources;
     };
 
