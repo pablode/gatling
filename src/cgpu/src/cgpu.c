@@ -1772,7 +1772,7 @@ bool cgpu_create_pipeline(cgpu_device device,
   VkComputePipelineCreateInfo pipeline_create_info;
   pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
   pipeline_create_info.pNext = NULL;
-  pipeline_create_info.flags = VK_PIPELINE_CREATE_DISPATCH_BASE;
+  pipeline_create_info.flags = 0;
   pipeline_create_info.stage = pipeline_shader_stage_create_info;
   pipeline_create_info.layout = ipipeline->layout;
   pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
