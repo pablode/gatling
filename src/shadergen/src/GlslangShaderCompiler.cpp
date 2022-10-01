@@ -226,7 +226,7 @@ namespace sg
     shader.setStringsWithLengths(sources, sourceLengths, 1);
     shader.setEntryPoint("main");
     shader.setEnvClient(glslang::EShClientVulkan, glslang::EshTargetClientVersion::EShTargetVulkan_1_1);
-    shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_3);
+    shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_4);
     shader.setEnvInput(glslang::EShSourceGlsl, EShLangCompute, glslang::EShClient::EShClientVulkan, 450);
 
     EShMessages messages = static_cast<EShMessages>(EShMsgVulkanRules | EShMsgSpvRules);
