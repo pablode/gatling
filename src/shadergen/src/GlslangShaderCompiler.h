@@ -25,12 +25,20 @@ namespace sg
   class GlslangShaderCompiler
   {
   public:
+    enum class ShaderStage
+    {
+      Compute,
+      RayGen
+    };
+
+  public:
     GlslangShaderCompiler(const std::string& shaderPath);
 
     ~GlslangShaderCompiler();
 
   public:
-    bool compileGlslToSpv(std::string_view source,
+    bool compileGlslToSpv(ShaderStage stage,
+                          std::string_view source,
                           std::string_view filePath,
                           std::vector<uint8_t>& spv);
 

@@ -181,6 +181,22 @@ namespace detail
       delete result;
     }
   };
+
+  using ShaderStage = sg::GlslangShaderCompiler::ShaderStage;
+
+  EShLanguage getGlslangShaderLanguage(ShaderStage stage)
+  {
+    switch (stage)
+    {
+    case ShaderStage::Compute:
+      return EShLangCompute;
+    case ShaderStage::RayGen:
+      return EShLangRayGen;
+    default:
+      assert(false);
+      return EShLangCount;
+    }
+  }
 }
 
 namespace sg
@@ -215,11 +231,14 @@ namespace sg
     delete (detail::FileIncluder*) m_fileIncluder;
   }
 
-  bool GlslangShaderCompiler::compileGlslToSpv(std::string_view source,
+  bool GlslangShaderCompiler::compileGlslToSpv(ShaderStage stage,
+                                               std::string_view source,
                                                std::string_view filePath,
                                                std::vector<uint8_t>& spv)
   {
-    glslang::TShader shader(EShLangCompute);
+    EShLanguage language = detail::getGlslangShaderLanguage(stage);
+
+    glslang::TShader shader(language);
 
     const char* sources[] = { source.data() };
     const int sourceLengths[] = { static_cast<int>(source.length()) };
@@ -227,7 +246,7 @@ namespace sg
     shader.setEntryPoint("main");
     shader.setEnvClient(glslang::EShClientVulkan, glslang::EshTargetClientVersion::EShTargetVulkan_1_1);
     shader.setEnvTarget(glslang::EShTargetLanguage::EShTargetSpv, glslang::EShTargetLanguageVersion::EShTargetSpv_1_4);
-    shader.setEnvInput(glslang::EShSourceGlsl, EShLangCompute, glslang::EShClient::EShClientVulkan, 450);
+    shader.setEnvInput(glslang::EShSourceGlsl, language, glslang::EShClient::EShClientVulkan, 450);
 
     EShMessages messages = static_cast<EShMessages>(EShMsgVulkanRules | EShMsgSpvRules);
 #ifndef NDEBUG
@@ -273,7 +292,7 @@ namespace sg
     spvOptions.generateDebugInfo = true;
     spvOptions.validate = true;
 #endif
-    glslang::TIntermediate* intermediate = program.getIntermediate(EShLangCompute);
+    glslang::TIntermediate* intermediate = program.getIntermediate(language);
     glslang::GlslangToSpv(*intermediate, *reinterpret_cast<std::vector<unsigned int>*>(&spv), &spvOptions);
     return true;
   }
