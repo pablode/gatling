@@ -41,6 +41,7 @@
 #define MAX_BUFFER_MEMORY_BARRIERS 64
 #define MAX_IMAGE_MEMORY_BARRIERS 2048
 #define MAX_MEMORY_BARRIERS 128
+#define MAX_RAY_RECURSION_DEPTH 31
 
 /* Internal structures. */
 
@@ -616,9 +617,13 @@ bool cgpu_create_device(cgpu_device* p_device)
   vkGetPhysicalDeviceFeatures(idevice->physical_device, &features);
   idevice->features = cgpu_translate_physical_device_features(&features);
 
+  VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_properties = {0};
+  rt_pipeline_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+  rt_pipeline_properties.pNext = NULL;
+
   VkPhysicalDeviceSubgroupProperties subgroup_properties;
   subgroup_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-  subgroup_properties.pNext = NULL;
+  subgroup_properties.pNext = &rt_pipeline_properties;
 
   VkPhysicalDeviceProperties2 device_properties;
   device_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -638,6 +643,12 @@ bool cgpu_create_device(cgpu_device* p_device)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     CGPU_RETURN_ERROR("subgroup features not supported");
+  }
+
+  if (rt_pipeline_properties.maxRayRecursionDepth < MAX_RAY_RECURSION_DEPTH)
+  {
+    fprintf(stderr, "error in %s:%d: max ray recursion depth of %d not supported\n", __FILE__, __LINE__, MAX_RAY_RECURSION_DEPTH);
+    return false;
   }
 
   const VkPhysicalDeviceLimits* limits = &device_properties.properties.limits;
