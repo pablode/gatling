@@ -72,9 +72,17 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     dst_binding->descriptor_type = (int) src_binding->descriptor_type;
   }
 
-  assert(shader_module.push_constant_block_count == 1);
-  const SpvReflectBlockVariable* pc_block = &shader_module.push_constant_blocks[0];
-  p_reflection->push_constants_size = pc_block->size;
+  if (shader_module.push_constant_block_count == 0)
+  {
+    p_reflection->push_constants_size = 0;
+  }
+  else
+  {
+    assert(shader_module.push_constant_block_count == 1);
+
+    const SpvReflectBlockVariable* pc_block = &shader_module.push_constant_blocks[0];
+    p_reflection->push_constants_size = pc_block->size;
+  }
 
   result = true;
 
