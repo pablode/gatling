@@ -88,6 +88,7 @@ typedef struct cgpu_ipipeline {
   VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
   uint32_t                     descriptor_set_layout_binding_count;
   cgpu_shader                  shader;
+  VkPipelineBindPoint          bind_point;
 } cgpu_ipipeline;
 
 typedef struct cgpu_ishader {
@@ -1808,6 +1809,7 @@ bool cgpu_create_pipeline(cgpu_device device,
   }
 
   ipipeline->shader = shader;
+  ipipeline->bind_point = VK_PIPELINE_BIND_POINT_COMPUTE;
 
   return true;
 }
@@ -1954,12 +1956,12 @@ bool cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
 
   idevice->table.vkCmdBindPipeline(
     icommand_buffer->command_buffer,
-    VK_PIPELINE_BIND_POINT_COMPUTE,
+    ipipeline->bind_point,
     ipipeline->pipeline
   );
   idevice->table.vkCmdBindDescriptorSets(
     icommand_buffer->command_buffer,
-    VK_PIPELINE_BIND_POINT_COMPUTE,
+    ipipeline->bind_point,
     ipipeline->layout,
     0,
     1,
