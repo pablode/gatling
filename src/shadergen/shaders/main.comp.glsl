@@ -4,6 +4,8 @@
 #extension GL_EXT_control_flow_attributes: require
 #extension GL_KHR_shader_subgroup_ballot: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
+#extension GL_EXT_ray_tracing: require
+#extension GL_EXT_ray_query: require
 
 #ifndef NDEBUG
 #extension GL_EXT_debug_printf: enable
@@ -44,6 +46,8 @@ layout(binding = 7) uniform texture2D textures_2d[TEXTURE_COUNT_2D];
 #ifdef HAS_TEXTURES_3D
 layout(binding = 8) uniform texture3D textures_3d[TEXTURE_COUNT_3D];
 #endif
+
+layout(binding = 9) uniform accelerationStructureEXT sceneAS;
 
 layout(push_constant) uniform PCBuffer {
     vec3  CAMERA_POSITION;
@@ -112,8 +116,23 @@ vec3 evaluate_sample(inout uvec4 rng_state,
         ray.dir    = state.ray_dir;
 
         Hit_info hit;
-
+#if 0
         bool found_hit = find_hit_closest(ray, hit);
+#else
+        rayQueryEXT ray_query;
+        rayQueryInitializeEXT(ray_query, sceneAS,
+         gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT,
+        0xFF, ray.origin, 0.0, ray.dir, ray.tmax);
+
+        rayQueryProceedEXT(ray_query);
+
+        bool found_hit = (rayQueryGetIntersectionTypeEXT(ray_query, true) == gl_RayQueryCommittedIntersectionTriangleEXT);
+        if (found_hit)
+        {
+            hit.face_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
+            hit.bc = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
+        }
+#endif
 
 #if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
         return vec3(float(hit.bvh_steps), 0.0, 0.0);

@@ -43,19 +43,20 @@ const float    BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
 struct gi_geom_cache
 {
-  cgpu_buffer                buffer;
-  uint64_t                   bvh_node_buf_offset;
-  uint64_t                   bvh_node_buf_size;
-  uint32_t                   bvh_node_count;
-  uint64_t                   face_buf_offset;
-  uint64_t                   face_buf_size;
-  uint32_t                   face_count;
-  uint64_t                   emissive_face_indices_buf_offset;
-  uint64_t                   emissive_face_indices_buf_size;
-  uint32_t                   emissive_face_count;
-  uint64_t                   vertex_buf_offset;
-  uint64_t                   vertex_buf_size;
-  std::vector<sg::Material*> materials;
+  cgpu_acceleration_structure acceleration_structure;
+  cgpu_buffer                 buffer;
+  uint64_t                    bvh_node_buf_offset;
+  uint64_t                    bvh_node_buf_size;
+  uint32_t                    bvh_node_count;
+  uint64_t                    face_buf_offset;
+  uint64_t                    face_buf_size;
+  uint32_t                    face_count;
+  uint64_t                    emissive_face_indices_buf_offset;
+  uint64_t                    emissive_face_indices_buf_size;
+  uint32_t                    emissive_face_count;
+  uint64_t                    vertex_buf_offset;
+  uint64_t                    vertex_buf_size;
+  std::vector<sg::Material*>  materials;
 };
 
 struct gi_shader_cache
@@ -218,6 +219,8 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   uint32_t bvh_tri_threshold = std::max(4u, params->bvh_tri_threshold);
   bool bvh_enabled = (params->face_count >= bvh_tri_threshold);
 
+  bvh_enabled = false; // temporarily disabled so that HW AS faces are not shuffled
+
   if (bvh_enabled)
   {
     float node_traversal_cost = 1.0f;
@@ -348,6 +351,41 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     cache->materials[i] = params->materials[i]->sg_mat;
   }
 
+  // Build HW AS.
+  {
+    std::vector<cgpu_vertex> vertices;
+    vertices.resize(params->vertex_count);
+
+    for (uint32_t i = 0; i < params->vertex_count; i++)
+    {
+      vertices[i].x = params->vertices[i].pos[0];
+      vertices[i].y = params->vertices[i].pos[1];
+      vertices[i].z = params->vertices[i].pos[2];
+    }
+
+    std::vector<uint32_t> indices;
+    indices.reserve(params->face_count * 3);
+
+    for (uint32_t i = 0; i < params->face_count; i++)
+    {
+      const auto* face = &params->faces[i];
+      indices.push_back(face->v_i[0]);
+      indices.push_back(face->v_i[1]);
+      indices.push_back(face->v_i[2]);
+    }
+
+    if (!cgpu_create_acceleration_structure(s_device,
+                                            vertices.size(),
+                                            vertices.data(),
+                                            indices.size(),
+                                            indices.data(),
+                                            &cache->acceleration_structure))
+    {
+      assert(false);
+      goto cleanup;
+    }
+  }
+
 cleanup:
   if (!cache)
   {
@@ -358,6 +396,7 @@ cleanup:
 
 void giDestroyGeomCache(gi_geom_cache* cache)
 {
+  cgpu_destroy_acceleration_structure(s_device, cache->acceleration_structure);
   cgpu_destroy_buffer(s_device, cache->buffer);
   delete cache;
 }
@@ -606,11 +645,17 @@ int giRender(const gi_render_params* params, float* rgba_img)
     images.push_back({ 8, i, shader_cache->images_3d[i] });
   }
 
-  cgpu_bindings bindings = {
-    (uint32_t) buffers.size(), buffers.data(),
-    (uint32_t) images.size(), images.data(),
-    (uint32_t) (image_count ? 1 : 0), &sampler
-  };
+  cgpu_acceleration_structure_binding as = { 9, 0, geom_cache->acceleration_structure };
+
+  cgpu_bindings bindings = {0};
+  bindings.buffer_count = buffers.size();
+  bindings.p_buffers = buffers.data();
+  bindings.image_count = images.size();
+  bindings.p_images = images.data();
+  bindings.sampler_count = image_count ? 1 : 0;
+  bindings.p_samplers = &sampler;
+  bindings.as_count = 1;
+  bindings.p_ases = &as;
 
   // Set up command buffer.
   if (!cgpu_create_command_buffer(s_device, &command_buffer))
