@@ -526,22 +526,20 @@ int giRender(const gi_render_params* params, float* rgba_img)
     if (s_outputStagingBuffer.handle != CGPU_INVALID_HANDLE)
       cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
 
-    if (!cgpu_create_buffer(
-        s_device,
-        CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-        CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-        output_buffer_size,
-        &s_outputBuffer))
+    if (!cgpu_create_buffer(s_device,
+                            CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                            CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                            output_buffer_size,
+                            &s_outputBuffer))
     {
       return GI_ERROR;
     }
 
-    if (!cgpu_create_buffer(
-        s_device,
-        CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-        CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-        output_buffer_size,
-        &s_outputStagingBuffer))
+    if (!cgpu_create_buffer(s_device,
+                            CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                            output_buffer_size,
+                            &s_outputStagingBuffer))
     {
       return GI_ERROR;
     }
