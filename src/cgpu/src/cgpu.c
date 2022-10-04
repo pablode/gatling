@@ -1881,6 +1881,7 @@ bool cgpu_create_command_buffer(cgpu_device device,
     &icommand_buffer->command_buffer
   );
   if (result != VK_SUCCESS) {
+    resource_store_free_handle(&icommand_buffer_store, p_command_buffer->handle);
     CGPU_RETURN_ERROR("failed to allocate command buffer");
   }
 
