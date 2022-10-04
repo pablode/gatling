@@ -83,7 +83,10 @@ typedef enum CgpuBufferUsageFlagBits {
   CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC = 1,
   CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST = 2,
   CGPU_BUFFER_USAGE_FLAG_UNIFORM_BUFFER = 4,
-  CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER = 8
+  CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER = 8,
+  CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS = 16,
+  CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE = 32,
+  CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT = 64
 } CgpuBufferUsageFlagBits;
 
 typedef uint32_t CgpuMemoryPropertyFlags;
@@ -304,15 +307,16 @@ typedef enum CgpuShaderStage {
   CGPU_SHADER_STAGE_MISS
 } CgpuShaderStage;
 
-typedef struct cgpu_instance       { uint64_t handle; } cgpu_instance;
-typedef struct cgpu_device         { uint64_t handle; } cgpu_device;
-typedef struct cgpu_buffer         { uint64_t handle; } cgpu_buffer;
-typedef struct cgpu_image          { uint64_t handle; } cgpu_image;
-typedef struct cgpu_shader         { uint64_t handle; } cgpu_shader;
-typedef struct cgpu_pipeline       { uint64_t handle; } cgpu_pipeline;
-typedef struct cgpu_fence          { uint64_t handle; } cgpu_fence;
-typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
-typedef struct cgpu_sampler        { uint64_t handle; } cgpu_sampler;
+typedef struct cgpu_instance               { uint64_t handle; } cgpu_instance;
+typedef struct cgpu_device                 { uint64_t handle; } cgpu_device;
+typedef struct cgpu_buffer                 { uint64_t handle; } cgpu_buffer;
+typedef struct cgpu_image                  { uint64_t handle; } cgpu_image;
+typedef struct cgpu_shader                 { uint64_t handle; } cgpu_shader;
+typedef struct cgpu_pipeline               { uint64_t handle; } cgpu_pipeline;
+typedef struct cgpu_fence                  { uint64_t handle; } cgpu_fence;
+typedef struct cgpu_command_buffer         { uint64_t handle; } cgpu_command_buffer;
+typedef struct cgpu_sampler                { uint64_t handle; } cgpu_sampler;
+typedef struct cgpu_acceleration_structure { uint64_t handle; } cgpu_acceleration_structure;
 
 typedef struct cgpu_image_description {
   bool is3d;
@@ -343,6 +347,12 @@ typedef struct cgpu_sampler_binding {
   cgpu_sampler sampler;
 } cgpu_sampler_binding;
 
+typedef struct cgpu_acceleration_structure_binding {
+  uint32_t binding;
+  uint32_t index;
+  cgpu_acceleration_structure as;
+} cgpu_acceleration_structure_binding;
+
 typedef struct cgpu_bindings {
   uint32_t buffer_count;
   const cgpu_buffer_binding* p_buffers;
@@ -350,6 +360,8 @@ typedef struct cgpu_bindings {
   const cgpu_image_binding* p_images;
   uint32_t sampler_count;
   const cgpu_sampler_binding* p_samplers;
+  uint32_t as_count;
+  const cgpu_acceleration_structure_binding* p_ases;
 } cgpu_bindings;
 
 typedef struct cgpu_memory_barrier {
@@ -449,6 +461,12 @@ typedef struct cgpu_physical_device_limits {
   uint32_t subgroupSize;
 } cgpu_physical_device_limits;
 
+typedef struct cgpu_vertex {
+  float x;
+  float y;
+  float z;
+} cgpu_vertex;
+
 CGPU_API bool CGPU_CDECL cgpu_initialize(
   const char* p_app_name,
   uint32_t version_major,
@@ -547,6 +565,20 @@ CGPU_API bool CGPU_CDECL cgpu_create_pipeline(
 CGPU_API bool CGPU_CDECL cgpu_destroy_pipeline(
   cgpu_device device,
   cgpu_pipeline pipeline
+);
+
+CGPU_API bool CGPU_CDECL cgpu_create_acceleration_structure(
+  cgpu_device device,
+  uint32_t vertex_count,
+  const cgpu_vertex* vertices,
+  uint32_t index_count,
+  const uint32_t* indices,
+  cgpu_acceleration_structure* p_acceleration_structure
+);
+
+CGPU_API bool CGPU_CDECL cgpu_destroy_acceleration_structure(
+  cgpu_device device,
+  cgpu_acceleration_structure acceleration_structure
 );
 
 CGPU_API bool CGPU_CDECL cgpu_create_command_buffer(
