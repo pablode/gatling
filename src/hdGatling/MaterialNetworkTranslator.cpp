@@ -271,8 +271,12 @@ mx::DocumentPtr MaterialNetworkTranslator::CreateMaterialXDocumentFromNetwork(co
     return nullptr;
   }
 
+#if PXR_VERSION >= 2211
+  HdMtlxTexturePrimvarData mxHdData;
+#else
   std::set<SdfPath> hdTextureNodes;
   mx::StringMap mxHdTextureMap;
+#endif
 
   return HdMtlxCreateMtlxDocumentFromHdNetwork(
     network,
@@ -280,8 +284,12 @@ mx::DocumentPtr MaterialNetworkTranslator::CreateMaterialXDocumentFromNetwork(co
     terminalPath,
     id,
     m_nodeLib,
+#if PXR_VERSION >= 2211
+    &mxHdData
+#else
     &hdTextureNodes,
     &mxHdTextureMap
+#endif
   );
 }
 
