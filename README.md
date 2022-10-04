@@ -12,9 +12,11 @@
 
 This is my toy path tracer I work on in my free time.
 
-It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform, GPU-accelerated, and supports [MaterialX](https://www.materialx.org/index.html), [MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) materials.
+It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform\*, GPU-accelerated, and supports [MaterialX](https://www.materialx.org/index.html), [MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) materials.
 
-Technically, gatling uses the MDL code generation backend of the MaterialX project to support and importance-sample complex BSDFs like the Autodesk Standard Surface or the glTF shading model. The MDL SDK then generates GLSL code which is compiled to SPIR-V for use in [Vulkan](https://www.vulkan.org/). A compressed 8-wide BVH is used to speed up rendering, but hardware ray tracing will be used in the future.
+gatling implements complex BSDFs like Autodesk's Standard Surface and the glTF shading model via MaterialX's MDL code generation backend.  The MDL SDK is then used to generate evaluation and importance sampling functions, which are emitted as GLSL code. This code is compiled to SPIR-V and executed via [Vulkan](https://www.vulkan.org/).
+
+\* hardware ray tracing is required. MacOS will be supported [in the future](https://github.com/KhronosGroup/MoltenVK/issues/427).
 
 ### Build
 
@@ -75,7 +77,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 ### Outlook
 
-Work in progress: texture support, material network patching, NEE/MIS.
+Work in progress: HWRT, texture support, NEE/MIS.
 
 ### License
 
