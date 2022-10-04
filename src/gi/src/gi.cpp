@@ -138,7 +138,9 @@ int giInitialize(const gi_init_params* params)
 void giTerminate()
 {
   cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
+  s_outputStagingBuffer.handle = CGPU_INVALID_HANDLE;
   cgpu_destroy_buffer(s_device, s_outputBuffer);
+  s_outputBuffer.handle = CGPU_INVALID_HANDLE;
   s_outputBufferWidth = 0;
   s_outputBufferHeight = 0;
   if (s_texSys)
