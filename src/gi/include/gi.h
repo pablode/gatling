@@ -32,12 +32,10 @@ enum gi_aov_id
   GI_AOV_ID_COLOR              = 0,
   GI_AOV_ID_NORMAL             = 1,
   GI_AOV_ID_DEBUG_NEE          = 2,
-  GI_AOV_ID_DEBUG_BVH_STEPS    = 3,
-  GI_AOV_ID_DEBUG_TRI_TESTS    = 4,
-  GI_AOV_ID_DEBUG_BARYCENTRICS = 5,
-  GI_AOV_ID_DEBUG_TEXCOORDS    = 6,
-  GI_AOV_ID_DEBUG_BOUNCES      = 7,
-  GI_AOV_ID_DEBUG_CLOCK_CYCLES = 8
+  GI_AOV_ID_DEBUG_BARYCENTRICS = 3,
+  GI_AOV_ID_DEBUG_TEXCOORDS    = 4,
+  GI_AOV_ID_DEBUG_BOUNCES      = 5,
+  GI_AOV_ID_DEBUG_CLOCK_CYCLES = 6
 };
 
 struct gi_camera
@@ -69,7 +67,6 @@ struct gi_shader_cache;
 
 struct gi_geom_cache_params
 {
-  uint32_t                   bvh_tri_threshold;
   bool                       next_event_estimation;
   uint32_t                   face_count;
   struct gi_face*            faces;
@@ -83,7 +80,6 @@ struct gi_shader_cache_params
 {
   enum gi_aov_id        aov_id;
   struct gi_geom_cache* geom_cache;
-  bool                  triangle_postponing;
 };
 
 struct gi_render_params

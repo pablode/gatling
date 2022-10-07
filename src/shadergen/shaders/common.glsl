@@ -7,12 +7,10 @@ const float TRI_EPS = 0.000000001;
 #define AOV_ID_COLOR 0
 #define AOV_ID_NORMAL 1
 #define AOV_ID_DEBUG_NEE 2
-#define AOV_ID_DEBUG_BVH_STEPS 3
-#define AOV_ID_DEBUG_TRI_TESTS 4
-#define AOV_ID_DEBUG_BARYCENTRICS 5
-#define AOV_ID_DEBUG_TEXCOORDS 6
-#define AOV_ID_DEBUG_BOUNCES 7
-#define AOV_ID_DEBUG_CLOCK_CYCLES 8
+#define AOV_ID_DEBUG_BARYCENTRICS 3
+#define AOV_ID_DEBUG_TEXCOORDS 4
+#define AOV_ID_DEBUG_BOUNCES 5
+#define AOV_ID_DEBUG_CLOCK_CYCLES 6
 
 struct fvertex
 {
@@ -30,17 +28,6 @@ struct face
     uint mat_idx;
 };
 
-#ifdef BVH_ENABLED
-struct bvh_node
-{
-    uvec4 f1;
-    uvec4 f2;
-    uvec4 f3;
-    uvec4 f4;
-    uvec4 f5;
-};
-#endif
-
 struct RayInfo
 {
     vec3  origin;
@@ -53,11 +40,6 @@ struct Hit_info
 {
     uint face_idx;
     vec2 bc;
-#if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
-    uint bvh_steps;
-#elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
-    uint tri_tests;
-#endif
 };
 
 // RNG producing on a four-element vector.

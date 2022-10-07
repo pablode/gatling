@@ -70,11 +70,8 @@ namespace sg
     struct MainShaderParams
     {
       uint32_t aovId;
-      bool bvh;
       uint32_t numThreadsX;
       uint32_t numThreadsY;
-      float postponeRatio;
-      uint32_t maxStackSize;
       std::vector<Material*> materials;
       bool trianglePostponing;
       bool nextEventEstimation;

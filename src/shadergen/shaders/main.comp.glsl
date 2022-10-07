@@ -21,33 +21,29 @@
 
 layout(binding = 0, std430) buffer PixelsBuffer { vec4 pixels[]; };
 
-#ifdef BVH_ENABLED
-layout(binding = 1, std430) readonly buffer BvhBuffer { bvh_node bvh_nodes[]; };
-#endif
-
-layout(binding = 2, std430) readonly buffer FacesBuffer { face faces[]; };
+layout(binding = 1, std430) readonly buffer FacesBuffer { face faces[]; };
 
 #ifdef NEXT_EVENT_ESTIMATION
-layout(binding = 3, std430) readonly buffer EmissiveFacesBuffer { uint emissive_face_indices[]; };
+layout(binding = 2, std430) readonly buffer EmissiveFacesBuffer { uint emissive_face_indices[]; };
 #endif
 
-layout(binding = 4, std430) readonly buffer VerticesBuffer { fvertex vertices[]; };
+layout(binding = 3, std430) readonly buffer VerticesBuffer { fvertex vertices[]; };
 
 #if defined(HAS_TEXTURES_2D) || defined(HAS_TEXTURES_3D)
-layout(binding = 5) uniform sampler tex_sampler;
+layout(binding = 4) uniform sampler tex_sampler;
 
-layout(binding = 6, std430) readonly buffer TexMappingsBuffer { uint16_t tex_mappings[]; };
+layout(binding = 5, std430) readonly buffer TexMappingsBuffer { uint16_t tex_mappings[]; };
 #endif
 
 #ifdef HAS_TEXTURES_2D
-layout(binding = 7) uniform texture2D textures_2d[TEXTURE_COUNT_2D];
+layout(binding = 6) uniform texture2D textures_2d[TEXTURE_COUNT_2D];
 #endif
 
 #ifdef HAS_TEXTURES_3D
-layout(binding = 8) uniform texture3D textures_3d[TEXTURE_COUNT_3D];
+layout(binding = 7) uniform texture3D textures_3d[TEXTURE_COUNT_3D];
 #endif
 
-layout(binding = 9) uniform accelerationStructureEXT sceneAS;
+layout(binding = 8) uniform accelerationStructureEXT sceneAS;
 
 layout(push_constant) uniform PCBuffer {
     vec3  CAMERA_POSITION;
@@ -65,7 +61,6 @@ layout(push_constant) uniform PCBuffer {
     uint  SAMPLE_OFFSET;
 } PC;
 
-#include "intersection.glsl"
 #include "mdl_interface.glsl"
 
 struct Sample_state
@@ -115,36 +110,24 @@ vec3 evaluate_sample(inout uvec4 rng_state,
         ray.tmax   = FLOAT_MAX;
         ray.dir    = state.ray_dir;
 
-        Hit_info hit;
-#if 0
-        bool found_hit = find_hit_closest(ray, hit);
-#else
         rayQueryEXT ray_query;
         rayQueryInitializeEXT(ray_query, sceneAS,
-         gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT,
-        0xFF, ray.origin, 0.0, ray.dir, ray.tmax);
+                              gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT,
+                              0xFF, ray.origin, 0.0, ray.dir, ray.tmax);
 
         rayQueryProceedEXT(ray_query);
 
         bool found_hit = (rayQueryGetIntersectionTypeEXT(ray_query, true) == gl_RayQueryCommittedIntersectionTriangleEXT);
-        if (found_hit)
-        {
-            hit.face_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
-            hit.bc = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
-        }
-#endif
-
-#if AOV_ID == AOV_ID_DEBUG_BVH_STEPS
-        return vec3(float(hit.bvh_steps), 0.0, 0.0);
-#elif AOV_ID == AOV_ID_DEBUG_TRI_TESTS
-        return vec3(float(hit.tri_tests), 0.0, 0.0);
-#endif
 
         if (!found_hit)
         {
             state.radiance += state.throughput * PC.BACKGROUND_COLOR.rgb;
             break;
         }
+
+        Hit_info hit;
+        hit.face_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
+        hit.bc = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
 
         /* Calculate hit point properties. */
         vec3 bc = vec3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
@@ -222,7 +205,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
             ray.origin = hit_offset;
             ray.dir = (light_offset - hit_offset) / light_dist;
             ray.tmax = light_dist;
-            bool is_occluded = find_hit_any(ray);
+            bool is_occluded = false; // TODO: shadow test
 
 #if AOV_ID == AOV_ID_DEBUG_NEE
             /* Occlusion debug visualization. */

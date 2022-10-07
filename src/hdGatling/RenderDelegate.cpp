@@ -42,8 +42,6 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette inverse minimum terminate probability", HdGatlingSettingsTokens->rr_inv_min_term_prob, VtValue{0.95f} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max sample value", HdGatlingSettingsTokens->max_sample_value, VtValue{10.0f} });
 
-  m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "BVH triangle threshold", HdGatlingSettingsTokens->bvh_tri_threshold, VtValue{64} });
-  m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Triangle postponing", HdGatlingSettingsTokens->triangle_postponing, VtValue{true} });
   m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->next_event_estimation, VtValue{false} });
 
 #ifndef NDEBUG

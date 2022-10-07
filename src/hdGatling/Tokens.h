@@ -27,8 +27,6 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((rr_bounce_offset, "rr-bounce-offset"))           \
   ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))   \
   ((max_sample_value, "max-sample-value"))           \
-  ((bvh_tri_threshold, "bvh-tri-threshold"))         \
-  ((triangle_postponing, "triangle-postponing"))     \
   ((next_event_estimation, "next-event-estimation"))
 
 // mtlx node identifier is given by UsdMtlx.
@@ -57,8 +55,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define HD_GATLING_AOV_TOKENS                        \
   ((debug_nee, "debug:nee"))                         \
-  ((debug_bvh_steps, "debug:bvh_steps"))             \
-  ((debug_tri_tests, "debug:tri_tests"))             \
   ((debug_barycentrics, "debug:barycentrics"))       \
   ((debug_texcoords, "debug:texcoords"))             \
   ((debug_bounces, "debug:bounces"))                 \

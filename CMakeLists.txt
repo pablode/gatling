@@ -23,7 +23,6 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
 endforeach()
 
 option(GATLING_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
-option(GATLING_USE_EMBREE "Use Embree for BVH building." ON)
 
 find_package(Vulkan REQUIRED)
 if(${GATLING_BUILD_HDGATLING})

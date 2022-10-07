@@ -314,8 +314,6 @@ const std::unordered_map<TfToken, gi_aov_id, TfToken::HashFunctor> s_aovIdMappin
   { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
 #ifndef NDEBUG
   { HdGatlingAovTokens->debug_nee,          GI_AOV_ID_DEBUG_NEE          },
-  { HdGatlingAovTokens->debug_bvh_steps,    GI_AOV_ID_DEBUG_BVH_STEPS    },
-  { HdGatlingAovTokens->debug_tri_tests,    GI_AOV_ID_DEBUG_TRI_TESTS    },
   { HdGatlingAovTokens->debug_barycentrics, GI_AOV_ID_DEBUG_BARYCENTRICS },
   { HdGatlingAovTokens->debug_texcoords,    GI_AOV_ID_DEBUG_TEXCOORDS    },
   { HdGatlingAovTokens->debug_bounces,      GI_AOV_ID_DEBUG_BOUNCES      },
@@ -423,10 +421,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastAovId = aovId;
 
   bool rebuildGeomCache = !m_geomCache;
-#ifndef NDEBUG
-  // BVH tri threshold could have been changed - see comment below.
-  rebuildGeomCache |= renderSettingsChanged;
-#endif
 
   if (rebuildGeomCache)
   {
@@ -448,7 +442,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     _BakeMeshes(renderIndex, viewMatrix, vertices, faces, materials);
 
     gi_geom_cache_params geomParams;
-    geomParams.bvh_tri_threshold = m_settings.find(HdGatlingSettingsTokens->bvh_tri_threshold)->second.Get<int>();
     geomParams.next_event_estimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
     geomParams.face_count = faces.size();
     geomParams.faces = faces.data();
@@ -465,9 +458,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   bool rebuildShaderCache = !m_shaderCache || aovChanged;
 #ifndef NDEBUG
-  // HACK: the render settings that require shader recompilation are currently only enabled in non-release builds.
-  // After the transition to wavefront, and parallel shader compilation, most of them should be backed by preprocessor
-  // defines instead of push constants. Recompilation would then be always required.
+  // HACK: activating the NEE debug render setting requires shader recompilation.
   rebuildShaderCache |= renderSettingsChanged;
 #endif
 
@@ -481,7 +472,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     gi_shader_cache_params shaderParams;
     shaderParams.aov_id = aovId;
     shaderParams.geom_cache = m_geomCache;
-    shaderParams.triangle_postponing = m_settings.find(HdGatlingSettingsTokens->triangle_postponing)->second.Get<bool>();
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");
