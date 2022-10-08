@@ -103,6 +103,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
 
     uint bounce = 1;
 
+    [[dont_unroll]]
     while (bounce <= PC.MAX_BOUNCES)
     {
         RayInfo ray;
