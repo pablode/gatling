@@ -750,6 +750,13 @@ bool cgpu_create_device(cgpu_device* p_device)
   }
 #endif
 #endif
+  if (cgpu_find_device_extension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, device_ext_count, device_extensions) &&
+      cgpu_find_device_extension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, device_ext_count, device_extensions))
+  {
+    idevice->features.pageableDeviceLocalMemory = true;
+    enabled_device_extensions[enabled_device_extension_count++] = VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME;
+    enabled_device_extensions[enabled_device_extension_count++] = VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME;
+  }
 
   uint32_t queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(
@@ -796,15 +803,32 @@ bool cgpu_create_device(cgpu_device* p_device)
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
+  void* pNext = NULL;
+
+  VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageable_memory_features = {0};
+  pageable_memory_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
+  pageable_memory_features.pNext = NULL;
+  pageable_memory_features.pageableDeviceLocalMemory = VK_TRUE;
+
+  if (idevice->features.pageableDeviceLocalMemory)
+  {
+    pNext = &pageable_memory_features;
+  }
+
   VkPhysicalDeviceShaderClockFeaturesKHR shader_clock_features = {0};
   shader_clock_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
-  shader_clock_features.pNext = NULL;
+  shader_clock_features.pNext = pNext;
   shader_clock_features.shaderSubgroupClock = VK_TRUE;
   shader_clock_features.shaderDeviceClock = VK_FALSE;
 
+  if (idevice->features.shaderClock)
+  {
+    pNext = &shader_clock_features;
+  }
+
   VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features = {0};
   acceleration_structure_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-  acceleration_structure_features.pNext = idevice->features.shaderClock ? &shader_clock_features : NULL;
+  acceleration_structure_features.pNext = pNext;
   acceleration_structure_features.accelerationStructure = VK_TRUE;
   acceleration_structure_features.accelerationStructureCaptureReplay = VK_FALSE;
   acceleration_structure_features.accelerationStructureIndirectBuild = VK_FALSE;

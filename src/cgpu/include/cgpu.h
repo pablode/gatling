@@ -383,6 +383,7 @@ typedef struct cgpu_image_memory_barrier {
 } cgpu_image_memory_barrier;
 
 typedef struct cgpu_physical_device_features {
+  bool pageableDeviceLocalMemory;
   bool debugPrintf;
   bool textureCompressionBC;
   bool pipelineStatisticsQuery;
