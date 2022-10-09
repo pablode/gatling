@@ -36,6 +36,7 @@ namespace sg
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
     bool isEmissive;
+    bool isOpaque;
   };
 
   bool ShaderGen::init(const InitParams& params)
@@ -110,6 +111,22 @@ namespace sg
     return v0->get_value() != 0.0f || v1->get_value() != 0.0f || v2->get_value() != 0.0f;
   }
 
+  bool _sgIsMaterialOpaque(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    float opacity = -1.0f;
+
+    return compiledMaterial->get_cutout_opacity(&opacity) && opacity >= 1.0f;
+  }
+
+  Material* _sgMakeMaterial(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    Material* m = new Material();
+    m->compiledMaterial = compiledMaterial;
+    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
+    m->isOpaque = _sgIsMaterialOpaque(compiledMaterial);
+    return m;
+  }
+
   Material* ShaderGen::createMaterialFromMtlx(std::string_view docStr)
   {
     std::string mdlSrc;
@@ -125,10 +142,7 @@ namespace sg
       return nullptr;
     }
 
-    Material* mat = new Material();
-    mat->compiledMaterial = compiledMaterial;
-    mat->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
-    return mat;
+    return _sgMakeMaterial(compiledMaterial);
   }
 
   Material* ShaderGen::createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
@@ -139,10 +153,7 @@ namespace sg
       return nullptr;
     }
 
-    Material* mat = new Material();
-    mat->compiledMaterial = compiledMaterial;
-    mat->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
-    return mat;
+    return _sgMakeMaterial(compiledMaterial);
   }
 
   void ShaderGen::destroyMaterial(Material* mat)
