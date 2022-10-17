@@ -83,6 +83,7 @@ namespace sg
     }
 
     // Ignore log spam from MaterialX MDL code generation.
+    // FIXME: use MDL 'warning' execution context option instead
     if (strstr(message, "unused parameter") ||
         strstr(message, "unused variable") ||
         strstr(message, "unreferenced local function"))
