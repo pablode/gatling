@@ -186,7 +186,8 @@ void _PatchGeompropNodes(mx::DocumentPtr document)
     }
 
     std::string nodeDefName = nodeDef->getName();
-    if (strstr(nodeDefName.c_str(), "ND_geompropvalue"))
+    if (strstr(nodeDefName.c_str(), "ND_geompropvalue") ||
+        strstr(nodeDefName.c_str(), "ND_UsdPrimvarReader"))
     {
       document->removeNode(node->getName());
       continue;
