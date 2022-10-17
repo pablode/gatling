@@ -118,6 +118,102 @@ namespace sg
     return true;
   }
 
+  void MdlGlslCodeGen::extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, std::vector<TextureResource>& textureResources)
+  {
+    int texCount = targetCode->get_body_texture_count();
+    textureResources.reserve(texCount);
+
+    // We start at 1 because index 0 is the invalid texture.
+    for (int i = 1; i < texCount; i++)
+    {
+      TextureResource textureResource;
+      textureResource.binding = i - 1;
+
+      auto setTextureTo1x1Black = [&textureResource]() {
+        textureResource.is3dImage = false;
+        textureResource.width = 1;
+        textureResource.height = 1;
+        textureResource.depth = 1;
+        textureResource.data.resize(4, 0);
+      };
+
+      switch (targetCode->get_texture_shape(i))
+      {
+      case mi::neuraylib::ITarget_code::Texture_shape_2d: {
+        const char* texDbName = targetCode->get_texture(i);
+        if (!texDbName)
+        {
+          m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "2d texture does not exist in DB");
+          setTextureTo1x1Black();
+          break;
+        }
+
+        mi::base::Handle<const mi::neuraylib::ITexture> texture(m_transaction->access<mi::neuraylib::ITexture>(texDbName));
+        assert(texture);
+        mi::base::Handle<const mi::neuraylib::IImage> image(m_transaction->access<mi::neuraylib::IImage>(texture->get_image()));
+        assert(image);
+
+        uint32_t frameId = 0, uvTileId = 0, level = 0;
+        uint32_t width = image->resolution_x(frameId, uvTileId, level);
+        uint32_t height = image->resolution_y(frameId, uvTileId, level);
+
+        textureResource.is3dImage = false;
+        textureResource.width = width;
+        textureResource.height = height;
+        textureResource.depth = 1;
+
+        const char* filePath = image->get_filename(frameId, uvTileId);
+        if (filePath) {
+          textureResource.filePath = filePath;
+        }
+        else {
+          m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "2d texture has invalid path");
+          setTextureTo1x1Black();
+        }
+        break;
+      }
+      case mi::neuraylib::ITarget_code::Texture_shape_bsdf_data: {
+        mi::Size width, height, depth;
+        const mi::Float32* dataPtr = targetCode->get_texture_df_data(i, width, height, depth);
+        assert(dataPtr);
+
+        textureResource.is3dImage = true;
+        textureResource.width = width;
+        textureResource.height = height;
+        textureResource.depth = depth;
+
+        uint64_t size = width * height * depth * sizeof(mi::Float32);
+        std::vector<uint8_t>& data = textureResource.data;
+        data.resize(size);
+        memcpy(&data[0], dataPtr, data.size());
+        break;
+      }
+      case mi::neuraylib::ITarget_code::Texture_shape_3d:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "3d textures not supported");
+        setTextureTo1x1Black();
+        break;
+      case mi::neuraylib::ITarget_code::Texture_shape_cube:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "Cube maps not supported");
+        setTextureTo1x1Black();
+        break;
+      case mi::neuraylib::ITarget_code::Texture_shape_ptex:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "Ptex textures not supported");
+        setTextureTo1x1Black();
+        break;
+      case mi::neuraylib::ITarget_code::Texture_shape_invalid:
+        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "Unknown texture type");
+        setTextureTo1x1Black();
+        break;
+      default:
+        setTextureTo1x1Black();
+        assert(false);
+        break;
+      }
+
+      textureResources.push_back(textureResource);
+    }
+  }
+
   bool MdlGlslCodeGen::translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
                                  std::string& glslSrc,
                                  std::vector<TextureResource>& textureResources)
@@ -156,76 +252,7 @@ namespace sg
 
     assert(targetCode->get_ro_data_segment_count() == 0);
 
-    int texCount = targetCode->get_body_texture_count();
-    textureResources.reserve(texCount);
-
-    // Index 0 always is the invalid texture.
-    for (int i = 1; i < texCount; i++)
-    {
-      TextureResource textureResource;
-      textureResource.binding = i - 1;
-
-      switch (targetCode->get_texture_shape(i))
-      {
-      case mi::neuraylib::ITarget_code::Texture_shape_2d: {
-        const char* texDbName = targetCode->get_texture(i);
-        assert(texDbName);
-        mi::base::Handle<const mi::neuraylib::ITexture> texture(m_transaction->access<mi::neuraylib::ITexture>(texDbName));
-        assert(texture);
-        mi::base::Handle<const mi::neuraylib::IImage> image(m_transaction->access<mi::neuraylib::IImage>(texture->get_image()));
-        assert(image);
-
-        uint32_t frameId = 0, uvTileId = 0, level = 0;
-        uint32_t width = image->resolution_x(frameId, uvTileId, level);
-        uint32_t height = image->resolution_y(frameId, uvTileId, level);
-
-        textureResource.is3dImage = false;
-        textureResource.width = width;
-        textureResource.height = height;
-        textureResource.depth = 1;
-
-        const char* filePath = image->get_filename(frameId, uvTileId);
-        if (filePath) {
-          textureResource.filePath = filePath;
-        }
-        else {
-          textureResource.data.resize(4, 0);
-        }
-        break;
-      }
-      case mi::neuraylib::ITarget_code::Texture_shape_bsdf_data: {
-        mi::Size width, height, depth;
-        const mi::Float32* dataPtr = targetCode->get_texture_df_data(i, width, height, depth);
-        assert(dataPtr);
-
-        textureResource.is3dImage = true;
-        textureResource.width = width;
-        textureResource.height = height;
-        textureResource.depth = depth;
-
-        uint64_t size = width * height * depth * sizeof(mi::Float32);
-        std::vector<uint8_t>& data = textureResource.data;
-        data.resize(size);
-        memcpy(&data[0], dataPtr, data.size());
-        break;
-      }
-      case mi::neuraylib::ITarget_code::Texture_shape_3d:
-        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "3d textures not supported");
-        return false;
-      case mi::neuraylib::ITarget_code::Texture_shape_cube:
-        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Cube maps not supported");
-        return false;
-      case mi::neuraylib::ITarget_code::Texture_shape_ptex:
-        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Ptex textures not supported");
-        return false;
-      case mi::neuraylib::ITarget_code::Texture_shape_invalid:
-      default:
-        m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Unknown texture type");
-        return false;
-      }
-
-      textureResources.push_back(textureResource);
-    }
+    extractTextureInfos(targetCode, textureResources);
 
     std::stringstream ss;
     ss << targetCode->get_code();

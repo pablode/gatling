@@ -45,6 +45,9 @@ namespace sg
                    std::vector<TextureResource>& textureResources);
 
   private:
+    void extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
+                             std::vector<TextureResource>& textureResources);
+
     bool appendMaterialToLinkUnit(uint32_t idx,
                                   const mi::neuraylib::ICompiled_material* compiledMaterial,
                                   mi::neuraylib::ILink_unit* linkUnit);
