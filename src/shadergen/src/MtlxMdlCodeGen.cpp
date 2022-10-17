@@ -74,31 +74,31 @@ namespace sg
     std::vector<mx::TypedElementPtr> renderableElements;
     mx::findRenderableElements(doc, renderableElements);
 
-    if (renderableElements.size() != 1)
+    for (mx::TypedElementPtr elem : renderableElements)
     {
-      return nullptr;
-    }
+      // Extract surface shader node.
+      mx::TypedElementPtr renderableElement = renderableElements.at(0);
+      mx::NodePtr node = renderableElement->asA<mx::Node>();
 
-    // Extract surface shader node.
-    mx::TypedElementPtr renderableElement = renderableElements.at(0);
-    mx::NodePtr node = renderableElement->asA<mx::Node>();
-
-    if (node && node->getType() == mx::MATERIAL_TYPE_STRING)
-    {
-      auto shaderNodes = mx::getShaderNodes(node, mx::SURFACE_SHADER_TYPE_STRING);
-      if (!shaderNodes.empty())
+      if (node && node->getType() == mx::MATERIAL_TYPE_STRING)
       {
-        renderableElement = *shaderNodes.begin();
+        auto shaderNodes = mx::getShaderNodes(node, mx::SURFACE_SHADER_TYPE_STRING);
+        if (!shaderNodes.empty())
+        {
+          renderableElement = *shaderNodes.begin();
+        }
       }
+
+      mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
+      if (!surfaceElement)
+      {
+        return nullptr;
+      }
+
+      return surfaceElement->asA<mx::TypedElement>();
     }
 
-    mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
-    if (!surfaceElement)
-    {
-      return nullptr;
-    }
-
-    return surfaceElement->asA<mx::TypedElement>();
+    return nullptr;
   }
 
   bool MtlxMdlCodeGen::translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier)
