@@ -32,6 +32,11 @@ float apply_wrap_and_crop(float coord, int wrap, vec2 crop, int res)
     return coord * (crop.y - crop.x) + crop.x;
 }
 
+bool tex_texture_isvalid(int tex)
+{
+    return tex != 0;
+}
+
 vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w, vec2 crop_u, vec2 crop_v, vec2 crop_w, float frame)
 {
 #ifdef HAS_TEXTURES_3D

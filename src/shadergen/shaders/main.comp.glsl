@@ -17,8 +17,6 @@
 #include "common.glsl"
 #include "mdl_types.glsl"
 
-#pragma MDL_GENERATED_CODE
-
 layout(binding = 0, std430) buffer PixelsBuffer { vec4 pixels[]; };
 
 layout(binding = 1, std430) readonly buffer FacesBuffer { face faces[]; };
@@ -72,6 +70,8 @@ struct Sample_state
     vec3 radiance;
     bool inside;
 };
+
+#pragma MDL_GENERATED_CODE
 
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
