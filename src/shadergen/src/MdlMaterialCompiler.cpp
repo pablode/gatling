@@ -66,7 +66,7 @@ namespace sg
 
     bool result = compile(identifier, moduleName, modCreateFunc, compiledMaterial);
 
-    m_config->remove_mdl_path(m_mdlLibPath.c_str());
+    m_config->clear_mdl_paths();
 
     return result;
   }
@@ -98,8 +98,7 @@ namespace sg
 
     bool result = compile(identifier, moduleName, modCreateFunc, compiledMaterial);
 
-    m_config->remove_mdl_path(m_mdlLibPath.c_str());
-    m_config->remove_mdl_path(fileDir.c_str());
+    m_config->clear_mdl_paths();
 
     return result;
   }
