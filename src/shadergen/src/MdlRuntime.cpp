@@ -16,7 +16,6 @@
 //
 
 #include "MdlRuntime.h"
-#include "MdlEntityResolver.h"
 
 #include <mi/mdl_sdk.h>
 
@@ -57,10 +56,6 @@ namespace sg
       m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Unable to start Neuray");
       return false;
     }
-
-    auto oldEntityResolver = mi::base::Handle<mi::neuraylib::IMdl_entity_resolver>(m_config->get_entity_resolver());
-    m_entity_resolver = mi::base::Handle<MdlEntityResolver>(new MdlEntityResolver(oldEntityResolver));
-    m_config->set_entity_resolver(m_entity_resolver.get());
 
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(m_neuray->get_api_component<mi::neuraylib::IDatabase>());
     mi::base::Handle<mi::neuraylib::IScope> scope(m_database->get_global_scope());

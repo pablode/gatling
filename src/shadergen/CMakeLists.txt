@@ -6,8 +6,6 @@ add_library(
   src/GlslangShaderCompiler.cpp
   src/MdlGlslCodeGen.h
   src/MdlGlslCodeGen.cpp
-  src/MdlEntityResolver.h
-  src/MdlEntityResolver.cpp
   src/MdlLogger.h
   src/MdlLogger.cpp
   src/MdlMaterialCompiler.h
