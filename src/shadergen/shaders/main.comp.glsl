@@ -61,15 +61,47 @@ layout(push_constant) uniform PCBuffer {
 
 #include "mdl_interface.glsl"
 
-struct Sample_state
+void setup_mdl_shading_state(in Hit_info hit, in vec3 ray_dir, out State state, out uint mat_idx)
 {
-    uvec4 rng_state;
-    vec3 ray_origin;
-    vec3 ray_dir;
-    vec3 throughput;
-    vec3 radiance;
-    bool inside;
-};
+  vec3 bc = vec3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
+
+  face f = faces[hit.face_idx];
+  fvertex v_0 = vertices[f.v_0];
+  fvertex v_1 = vertices[f.v_1];
+  fvertex v_2 = vertices[f.v_2];
+
+  vec3 p_0 = v_0.field1.xyz;
+  vec3 p_1 = v_1.field1.xyz;
+  vec3 p_2 = v_2.field1.xyz;
+  vec3 pos = bc.x * p_0 + bc.y * p_1 + bc.z * p_2;
+  vec3 geom_normal = normalize(cross(p_1 - p_0, p_2 - p_0));
+
+  vec3 n_0 = v_0.field2.xyz;
+  vec3 n_1 = v_1.field2.xyz;
+  vec3 n_2 = v_2.field2.xyz;
+  vec3 normal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
+
+  vec3 tangent, bitangent;
+  orthonormal_basis(normal, tangent, bitangent);
+
+  vec2 uv_0 = vec2(v_0.field1.w, v_0.field2.w);
+  vec2 uv_1 = vec2(v_1.field1.w, v_1.field2.w);
+  vec2 uv_2 = vec2(v_2.field1.w, v_2.field2.w);
+  vec2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
+
+  if (dot(normal, ray_dir) > 0.0) { normal *= -1.0f; }
+  if (dot(geom_normal, ray_dir) > 0.0) { geom_normal *= -1.0f; }
+
+  state.normal = normal;
+  state.geom_normal = geom_normal;
+  state.position = pos;
+  state.tangent_u[0] = tangent;
+  state.tangent_v[0] = bitangent;
+  state.animation_time = 0.0;
+  state.text_coords[0] = vec3(uv, 0.0);
+
+  mat_idx = f.mat_idx;
+}
 
 #pragma MDL_GENERATED_CODE
 
@@ -88,28 +120,38 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     return false;
 }
 
+struct Sample_state
+{
+    uvec4 rng_state;
+    vec3 ray_origin;
+    vec3 ray_dir;
+    vec3 throughput;
+    vec3 radiance;
+    bool inside;
+};
+
 vec3 evaluate_sample(inout uvec4 rng_state,
                      in float random_float,
                      in vec3 ray_origin,
                      in vec3 ray_dir)
 {
-    Sample_state state;
-    state.ray_origin = ray_origin;
-    state.ray_dir    = ray_dir;
-    state.throughput = vec3(1.0, 1.0, 1.0);
-    state.radiance   = vec3(0.0, 0.0, 0.0);
-    state.rng_state  = rng_state;
-    state.inside     = false;
+    Sample_state sample_state;
+    sample_state.ray_origin = ray_origin;
+    sample_state.ray_dir    = ray_dir;
+    sample_state.throughput = vec3(1.0, 1.0, 1.0);
+    sample_state.radiance   = vec3(0.0, 0.0, 0.0);
+    sample_state.inside     = false;
 
     uint bounce = 1;
 
     [[dont_unroll]]
     while (bounce <= PC.MAX_BOUNCES)
     {
+        /* 1. Find hit. */
         RayInfo ray;
-        ray.origin = state.ray_origin;
+        ray.origin = sample_state.ray_origin;
         ray.tmax   = FLOAT_MAX;
-        ray.dir    = state.ray_dir;
+        ray.dir    = sample_state.ray_dir;
 
         rayQueryEXT ray_query;
         rayQueryInitializeEXT(ray_query, sceneAS,
@@ -122,7 +164,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
 
         if (!found_hit)
         {
-            state.radiance += state.throughput * PC.BACKGROUND_COLOR.rgb;
+            sample_state.radiance += sample_state.throughput * PC.BACKGROUND_COLOR.rgb;
             break;
         }
 
@@ -130,162 +172,92 @@ vec3 evaluate_sample(inout uvec4 rng_state,
         hit.face_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
         hit.bc = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
 
-        /* Calculate hit point properties. */
-        vec3 bc = vec3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
+        /* 2. Set up shading state. */
+        State shading_state; // Shading_state_material
+        uint mat_idx;
+        setup_mdl_shading_state(hit, ray.dir, shading_state, mat_idx);
 
-#if AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
-        return bc;
-#endif
+        // we keep a copy of the normal here since it can be changed within the state by *_init() functions:
+        // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
+        const vec3 normal = shading_state.normal;
 
-        face f = faces[hit.face_idx];
-        fvertex v_0 = vertices[f.v_0];
-        fvertex v_1 = vertices[f.v_1];
-        fvertex v_2 = vertices[f.v_2];
-
-        vec3 p_0 = v_0.field1.xyz;
-        vec3 p_1 = v_1.field1.xyz;
-        vec3 p_2 = v_2.field1.xyz;
-
-        vec3 n_0 = v_0.field2.xyz;
-        vec3 n_1 = v_1.field2.xyz;
-        vec3 n_2 = v_2.field2.xyz;
-
-        vec2 uv_0 = vec2(v_0.field1.w, v_0.field2.w);
-        vec2 uv_1 = vec2(v_1.field1.w, v_1.field2.w);
-        vec2 uv_2 = vec2(v_2.field1.w, v_2.field2.w);
-
-        vec3 hit_pos = bc.x * p_0 + bc.y * p_1 + bc.z * p_2;
-
-        vec3 geom_normal = normalize(cross(p_1 - p_0, p_2 - p_0));
-        if (dot(geom_normal, state.ray_dir) > 0.0) { geom_normal *= -1.0f; }
-
-        vec3 normal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
-        if (dot(normal, state.ray_dir) > 0.0) { normal *= -1.0f; }
-
-#if AOV_ID == AOV_ID_NORMAL
-        return (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
-#endif
-
-        vec2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
-
-#if AOV_ID == AOV_ID_DEBUG_TEXCOORDS
-        return vec3(uv, 0.0);
-#endif
-
-        /* NEE */
-#ifdef NEXT_EVENT_ESTIMATION
-        {
-            /* Sample light from global list. */
-            vec4 random4 = pcg4d_next(state.rng_state);
-
-            uint light_idx = min(EMISSIVE_FACE_COUNT - 1, uint(random4.x * float(EMISSIVE_FACE_COUNT)));
-            uint lface_index = emissive_face_indices[light_idx];
-
-            face fl = faces[lface_index];
-            vec3 pl_0 = vertices[fl.v_0].field1.xyz;
-            vec3 pl_1 = vertices[fl.v_1].field1.xyz;
-            vec3 pl_2 = vertices[fl.v_2].field1.xyz;
-
-            /* Sample point on light surface.
-             * See: Ray Tracing Gems Chapter 16: Sampling Transformations Zoo 16.5.2.1 */
-            float beta = 1.0 - sqrt(random4.y);
-            float gamma = (1.0 - beta) * random4.z;
-            float alpha = 1.0 - beta - gamma;
-            vec3 P = alpha * pl_0 + beta * pl_1 + gamma * pl_2;
-
-            vec3 to_light = P - hit_pos;
-            vec3 lgeom_normal = normalize(cross(pl_1 - pl_0, pl_2 - pl_0));
-            if (dot(lgeom_normal, to_light) > 0.0) { lgeom_normal *= -1.0f; }
-
-            vec3 hit_offset = offset_ray_origin(hit_pos, geom_normal);
-            vec3 light_offset = offset_ray_origin(P, lgeom_normal);
-
-            to_light = light_offset - hit_offset;
-            float light_dist = length(to_light);
-
-            ray.origin = hit_offset;
-            ray.dir = (light_offset - hit_offset) / light_dist;
-            ray.tmax = light_dist;
-            bool is_occluded = false; // TODO: shadow test
+        const bool thin_walled = mdl_thin_walled(mat_idx, shading_state);
+        const float ior1 = (sample_state.inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
+        const float ior2 = (sample_state.inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
 #if AOV_ID == AOV_ID_DEBUG_NEE
-            /* Occlusion debug visualization. */
-            return is_occluded ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-#endif
-        }
-#elif AOV_ID == AOV_ID_DEBUG_NEE
         return vec3(0.0, 0.0, 0.0);
+#elif AOV_ID == AOV_ID_NORMAL
+        return (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
+#elif AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
+        return vec3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
+#elif AOV_ID == AOV_ID_DEBUG_TEXCOORDS
+        return shading_state.text_coords[0];
 #endif
 
-        if (bounce == PC.MAX_BOUNCES)
+        /* TODO: 3. apply volume attenuation */
+
+        /* 4. Add Emission */
+        {
+            Edf_evaluate_data edf_evaluate_data;
+            edf_evaluate_data.k1 = -sample_state.ray_dir;
+            mdl_edf_emission_init(mat_idx, shading_state);
+            mdl_edf_emission_evaluate(mat_idx, edf_evaluate_data, shading_state);
+
+            vec3 emission_intensity = mdl_edf_emission_intensity(mat_idx, shading_state);
+
+            sample_state.radiance += sample_state.throughput * edf_evaluate_data.edf * emission_intensity;
+        }
+
+        // reassign normal, see declaration of variable.
+        shading_state.normal = normal;
+
+        /* TODO 5. NEE light sampling */
+
+        /* 6. Russian Roulette */
+        // TODO: don't break here, need test NEE vis & add contrib - but don't do BSDF sampling
+        if (bounce == PC.MAX_BOUNCES - 1)
         {
             break;
         }
-
+        else if (bounce > PC.RR_BOUNCE_OFFSET)
         {
-            /* Tangent and bitangent. */
-            vec3 tangent, bitangent;
-            orthonormal_basis(normal, tangent, bitangent);
+            if (russian_roulette(random_float, sample_state.throughput))
+            {
+                break;
+            }
+        }
 
-            /* EDF evaluation. */
-            State shading_state_material;
-            shading_state_material.normal = normal;
-            shading_state_material.geom_normal = geom_normal;
-            shading_state_material.position = hit_pos;
-            shading_state_material.tangent_u[0] = tangent;
-            shading_state_material.tangent_v[0] = bitangent;
-            shading_state_material.animation_time = 0.0;
-            shading_state_material.text_coords[0] = vec3(uv, 0.0);
-
-            Edf_evaluate_data edf_evaluate_data;
-            edf_evaluate_data.k1 = -state.ray_dir;
-            mdl_edf_emission_init(f.mat_idx, shading_state_material);
-            mdl_edf_emission_evaluate(f.mat_idx, edf_evaluate_data, shading_state_material);
-
-            vec3 emission_intensity = mdl_edf_emission_intensity(f.mat_idx, shading_state_material);
-            bool thin_walled = mdl_thin_walled(f.mat_idx, shading_state_material);
-
-            /* BSDF (importance) sampling. */
-
-            /* Reassign normal - it can be changed by the _init() functions.
-             * https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411 */
-            shading_state_material.normal = normal;
-
+        /* 7. BSDF (importance) sampling. */
+        {
             Bsdf_sample_data bsdf_sample_data;
-            bsdf_sample_data.ior1 = (state.inside && !thin_walled) ? vec3(BSDF_USE_MATERIAL_IOR) : vec3(1.0);
-            bsdf_sample_data.ior2 = (state.inside && !thin_walled) ? vec3(1.0) : vec3(BSDF_USE_MATERIAL_IOR);
-            bsdf_sample_data.k1 = -state.ray_dir;
-            bsdf_sample_data.xi = pcg4d_next(state.rng_state);
-            mdl_bsdf_scattering_init(f.mat_idx, shading_state_material);
-            mdl_bsdf_scattering_sample(f.mat_idx, bsdf_sample_data, shading_state_material);
-
-            /* Handle results. */
-            state.radiance += state.throughput * edf_evaluate_data.edf * emission_intensity;
+            bsdf_sample_data.ior1 = vec3(ior1);
+            bsdf_sample_data.ior2 = vec3(ior2);
+            bsdf_sample_data.k1 = -sample_state.ray_dir;
+            bsdf_sample_data.xi = pcg4d_next(rng_state);
+            mdl_bsdf_scattering_init(mat_idx, shading_state);
+            mdl_bsdf_scattering_sample(mat_idx, bsdf_sample_data, shading_state);
 
             if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
             {
+                // TODO: don't break here, need test NEE vis & add contrib
                 break;
             }
 
-            state.throughput *= bsdf_sample_data.bsdf_over_pdf;
+            sample_state.throughput *= bsdf_sample_data.bsdf_over_pdf;
 
-            /* Prepare next ray. */
-            if ((bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0)
+            bool is_transmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;
+
+            if (is_transmission)
             {
-                state.inside = !state.inside;
+                sample_state.inside = !sample_state.inside;
             }
 
-            state.ray_dir = bsdf_sample_data.k2;
-            state.ray_origin = offset_ray_origin(hit_pos, geom_normal * (state.inside ? -1.0 : 1.0));
+            sample_state.ray_dir = bsdf_sample_data.k2;
+            sample_state.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (is_transmission ? -1.0 : 1.0));
         }
 
-        if (bounce >= PC.RR_BOUNCE_OFFSET)
-        {
-            if (russian_roulette(random_float, state.throughput))
-            {
-                break;
-            }
-        }
+        /* TODO 8. NEE shadow query */
 
         bounce++;
     }
@@ -294,7 +266,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
     return vec3(float(bounce), 0.0, 0.0);
 #endif
 
-    return clamp(state.radiance, vec3(0.0, 0.0, 0.0), vec3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE));
+    return clamp(sample_state.radiance, vec3(0.0, 0.0, 0.0), vec3(PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE, PC.MAX_SAMPLE_VALUE));
 }
 
 // Tracing rays in Morton order requires us to reorder the results for coalesced framebuffer memory accesses.
