@@ -52,6 +52,8 @@ namespace sg
                                   const mi::neuraylib::ICompiled_material* compiledMaterial,
                                   mi::neuraylib::ILink_unit* linkUnit);
 
+    std::string extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, int i);
+
   private:
     mi::base::Handle<MdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IMdl_backend> m_backend;

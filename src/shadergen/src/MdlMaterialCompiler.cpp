@@ -109,6 +109,7 @@ namespace sg
                                     mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
     mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
+    context->set_option("resolve_resources", false);
 
     mi::Sint32 modCreateResult = modCreateFunc(context.get());
 

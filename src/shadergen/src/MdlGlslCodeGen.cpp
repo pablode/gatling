@@ -21,6 +21,9 @@
 
 #include <sstream>
 #include <cassert>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace sg
 {
@@ -112,6 +115,7 @@ namespace sg
 
     mi::base::Handle<mi::neuraylib::IMdl_factory> factory(runtime.getFactory());
     m_context = mi::base::Handle<mi::neuraylib::IMdl_execution_context>(factory->create_execution_context());
+    m_context->set_option("resolve_resources", false);
 
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
     m_transaction = mi::base::Handle<mi::neuraylib::ITransaction>(runtime.getTransaction());
@@ -128,48 +132,22 @@ namespace sg
     {
       TextureResource textureResource;
       textureResource.binding = i - 1;
-
-      auto setTextureTo1x1Black = [&textureResource]() {
-        textureResource.is3dImage = false;
-        textureResource.width = 1;
-        textureResource.height = 1;
-        textureResource.depth = 1;
-        textureResource.data.resize(4, 0);
-      };
+      textureResource.is3dImage = false;
+      textureResource.width = 1;
+      textureResource.height = 1;
+      textureResource.depth = 1;
+      textureResource.data.resize(4, 0); // fall back to 1x1 black pixel
 
       switch (targetCode->get_texture_shape(i))
       {
       case mi::neuraylib::ITarget_code::Texture_shape_2d: {
-        const char* texDbName = targetCode->get_texture(i);
-        if (!texDbName)
+        std::string filePath = extractTargetCodeTextureFilePath(targetCode, i);
+        if (filePath.empty())
         {
-          m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "2d texture does not exist in DB");
-          setTextureTo1x1Black();
+          m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "2d texture has no URL");
           break;
         }
-
-        mi::base::Handle<const mi::neuraylib::ITexture> texture(m_transaction->access<mi::neuraylib::ITexture>(texDbName));
-        assert(texture);
-        mi::base::Handle<const mi::neuraylib::IImage> image(m_transaction->access<mi::neuraylib::IImage>(texture->get_image()));
-        assert(image);
-
-        uint32_t frameId = 0, uvTileId = 0, level = 0;
-        uint32_t width = image->resolution_x(frameId, uvTileId, level);
-        uint32_t height = image->resolution_y(frameId, uvTileId, level);
-
-        textureResource.is3dImage = false;
-        textureResource.width = width;
-        textureResource.height = height;
-        textureResource.depth = 1;
-
-        const char* filePath = image->get_filename(frameId, uvTileId);
-        if (filePath) {
-          textureResource.filePath = filePath;
-        }
-        else {
-          m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "2d texture has invalid path");
-          setTextureTo1x1Black();
-        }
+        textureResource.filePath = filePath;
         break;
       }
       case mi::neuraylib::ITarget_code::Texture_shape_bsdf_data: {
@@ -190,22 +168,17 @@ namespace sg
       }
       case mi::neuraylib::ITarget_code::Texture_shape_3d:
         m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "3d textures not supported");
-        setTextureTo1x1Black();
         break;
       case mi::neuraylib::ITarget_code::Texture_shape_cube:
         m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "Cube maps not supported");
-        setTextureTo1x1Black();
         break;
       case mi::neuraylib::ITarget_code::Texture_shape_ptex:
         m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "Ptex textures not supported");
-        setTextureTo1x1Black();
         break;
       case mi::neuraylib::ITarget_code::Texture_shape_invalid:
         m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "Unknown texture type");
-        setTextureTo1x1Black();
         break;
       default:
-        setTextureTo1x1Black();
         assert(false);
         break;
       }
@@ -296,5 +269,44 @@ namespace sg
     m_logger->flushContextMessages(m_context.get());
 
     return result == 0;
+  }
+
+  std::string MdlGlslCodeGen::extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, int i)
+  {
+    const char* url = targetCode->get_texture_url(i);
+    if (!url)
+    {
+      return "";
+    }
+
+    std::string path(url);
+
+    // If the MDL code is not generated but from a file, we need to convert relative to absolute file paths.
+    const char* ownerModule = targetCode->get_texture_owner_module(i);
+    if (ownerModule && strlen(ownerModule) > 0)
+    {
+      auto moduleDbName = std::string("mdl") + ownerModule;
+
+      mi::base::Handle<const mi::neuraylib::IModule> module(m_transaction->access<const mi::neuraylib::IModule>(moduleDbName.c_str()));
+
+      if (module)
+      {
+        fs::path parentPath = fs::path(module->get_filename()).parent_path();
+        path = (parentPath / path).string();
+      }
+    }
+
+#if _WIN32
+    // MDL paths start with '/c/', but we need 'c:/' on Windows.
+    bool shouldHaveDriveSpecifier = path.size() > 2 && path[0] == '/' && path[2] == '/';
+
+    if (shouldHaveDriveSpecifier)
+    {
+      path[0] = path[1];
+      path[1] = ':';
+    }
+#endif
+
+    return path;
   }
 }

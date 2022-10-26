@@ -86,9 +86,16 @@ namespace gi
       assert(binding < imageMappings.size());
       imageMappings[binding] = imageVector.size();
 
-      uint32_t payloadSize = payload.size();
-      if (payloadSize > 0)
+      const char* filePath = textureResource.filePath.c_str();
+      if (strcmp(filePath, "") == 0)
       {
+        uint32_t payloadSize = payload.size();
+        if (payloadSize == 0)
+        {
+          fprintf(stderr, "image %d has no payload\n", i);
+          continue;
+        }
+
         printf("image %d has binary payload of %.2fMiB\n", i, payloadSize * BYTES_TO_MIB);
 
         image_desc.width = textureResource.width;
@@ -104,8 +111,6 @@ namespace gi
         imageVector.push_back(image);
         continue;
       }
-
-      const char* filePath = textureResource.filePath.c_str();
 
       auto cacheResult = m_imageCache.find(filePath);
       if (cacheResult != m_imageCache.end())
