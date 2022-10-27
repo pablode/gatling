@@ -61,11 +61,11 @@ layout(push_constant) uniform PCBuffer {
 
 #include "mdl_interface.glsl"
 
-void setup_mdl_shading_state(in Hit_info hit, in vec3 ray_dir, out State state, out uint mat_idx)
+void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, in vec3 ray_dir, out State state, out uint mat_idx)
 {
-  vec3 bc = vec3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
+  vec3 bc = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
 
-  face f = faces[hit.face_idx];
+  face f = faces[hit_face_idx];
   fvertex v_0 = vertices[f.v_0];
   fvertex v_1 = vertices[f.v_1];
   fvertex v_2 = vertices[f.v_2];
@@ -168,14 +168,13 @@ vec3 evaluate_sample(inout uvec4 rng_state,
             break;
         }
 
-        Hit_info hit;
-        hit.face_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
-        hit.bc = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
+        uint hit_face_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
+        vec2 hit_bc = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
 
         /* 2. Set up shading state. */
         State shading_state; // Shading_state_material
         uint mat_idx;
-        setup_mdl_shading_state(hit, ray.dir, shading_state, mat_idx);
+        setup_mdl_shading_state(hit_face_idx, hit_bc, ray.dir, shading_state, mat_idx);
 
         // we keep a copy of the normal here since it can be changed within the state by *_init() functions:
         // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
@@ -190,7 +189,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
 #elif AOV_ID == AOV_ID_NORMAL
         return (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
 #elif AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
-        return vec3(1.0 - hit.bc.x - hit.bc.y, hit.bc.x, hit.bc.y);
+        return vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
 #elif AOV_ID == AOV_ID_DEBUG_TEXCOORDS
         return shading_state.text_coords[0];
 #endif

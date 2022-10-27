@@ -36,12 +36,6 @@ struct RayInfo
     float padding;
 };
 
-struct Hit_info
-{
-    uint face_idx;
-    vec2 bc;
-};
-
 // RNG producing on a four-element vector.
 // From: "Hash Functions for GPU Rendering" by Jarzynski and Olano.
 // Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/

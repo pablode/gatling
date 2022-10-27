@@ -33,9 +33,7 @@ namespace sg
   const char* THIN_WALLED_FUNC_NAME = "mdl_thin_walled";
   const char* MATERIAL_STATE_NAME = "State";
 
-  void _generateInitSwitch(std::stringstream& ss,
-                           const char* funcName,
-                           uint32_t caseCount)
+  void _generateInitSwitch(std::stringstream& ss, const char* funcName, uint32_t caseCount)
   {
     ss << "void " << funcName << "_init(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
@@ -49,8 +47,7 @@ namespace sg
     ss << "}\n";
   }
 
-  void _generateEdfIntensitySwitch(std::stringstream& ss,
-                                   uint32_t caseCount)
+  void _generateEdfIntensitySwitch(std::stringstream& ss, uint32_t caseCount)
   {
     ss << "vec3 " << EMISSION_INTENSITY_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
@@ -65,8 +62,7 @@ namespace sg
     ss << "}\n";
   }
 
-  void _generateThinWalledSwitch(std::stringstream& ss,
-                                 uint32_t caseCount)
+  void _generateThinWalledSwitch(std::stringstream& ss, uint32_t caseCount)
   {
     ss << "bool " << THIN_WALLED_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
@@ -81,11 +77,7 @@ namespace sg
     ss << "}\n";
   }
 
-  void _generateInOutSwitch(std::stringstream& ss,
-                             const char* funcName,
-                             const char* opName,
-                             const char* inoutTypeName,
-                             uint32_t caseCount)
+  void _generateInOutSwitch(std::stringstream& ss, const char* funcName, const char* opName, const char* inoutTypeName, uint32_t caseCount)
   {
     ss << "void " << funcName << "_" << opName << "(in uint idx, inout " << inoutTypeName << " sInOut, in " << MATERIAL_STATE_NAME << " sIn)\n";
     ss << "{\n";
