@@ -31,6 +31,7 @@ namespace sg
   const char* EMISSION_FUNC_NAME = "mdl_edf_emission";
   const char* EMISSION_INTENSITY_FUNC_NAME = "mdl_edf_emission_intensity";
   const char* THIN_WALLED_FUNC_NAME = "mdl_thin_walled";
+  const char* VOLUME_ABSORPTION_FUNC_NAME = "mdl_absorption_coefficient";
   const char* MATERIAL_STATE_NAME = "State";
 
   void _generateInitSwitch(std::stringstream& ss, const char* funcName, uint32_t caseCount)
@@ -56,6 +57,21 @@ namespace sg
     for (uint32_t i = 0; i < caseCount; i++)
     {
       ss << "\t\tcase " << i << ": return " << EMISSION_INTENSITY_FUNC_NAME << "_" << i << "(sIn);\n";
+    }
+    ss << "\t}\n";
+    ss << "\treturn vec3(0.0, 0.0, 0.0);\n";
+    ss << "}\n";
+  }
+
+  void _generateVolumeAbsorptionSwitch(std::stringstream& ss, uint32_t caseCount)
+  {
+    ss << "vec3 " << VOLUME_ABSORPTION_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
+    ss << "{\n";
+    ss << "\tswitch(idx)\n";
+    ss << "\t{\n";
+    for (uint32_t i = 0; i < caseCount; i++)
+    {
+      ss << "\t\tcase " << i << ": return " << VOLUME_ABSORPTION_FUNC_NAME << "_" << i << "(sIn);\n";
     }
     ss << "\t}\n";
     ss << "\treturn vec3(0.0, 0.0, 0.0);\n";
@@ -230,6 +246,7 @@ namespace sg
 
     _generateEdfIntensitySwitch(ss, materialCount);
     _generateThinWalledSwitch(ss, materialCount);
+    _generateVolumeAbsorptionSwitch(ss, materialCount);
 
     glslSrc = ss.str();
     return true;
@@ -244,12 +261,14 @@ namespace sg
     auto emissionFuncName = std::string(EMISSION_FUNC_NAME) + "_" + idxStr;
     auto emissionIntensityFuncName = std::string(EMISSION_INTENSITY_FUNC_NAME) + "_" + idxStr;
     auto thinWalledFuncName = std::string(THIN_WALLED_FUNC_NAME) + "_" + idxStr;
+    auto volumeAbsorptionFuncName = std::string(VOLUME_ABSORPTION_FUNC_NAME) + "_" + idxStr;
 
     std::vector<mi::neuraylib::Target_function_description> genFunctions;
     genFunctions.push_back(mi::neuraylib::Target_function_description("surface.scattering", scatteringFuncName.c_str()));
     genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.emission", emissionFuncName.c_str()));
     genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.intensity", emissionIntensityFuncName.c_str()));
     genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", thinWalledFuncName.c_str()));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", volumeAbsorptionFuncName.c_str()));
 
     mi::Sint32 result = linkUnit->add_material(
       compiledMaterial,

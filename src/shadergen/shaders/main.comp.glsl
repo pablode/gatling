@@ -170,6 +170,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
 
         uint hit_face_idx = rayQueryGetIntersectionPrimitiveIndexEXT(ray_query, true);
         vec2 hit_bc = rayQueryGetIntersectionBarycentricsEXT(ray_query, true);
+        float hit_t = rayQueryGetIntersectionTEXT(ray_query, true);
 
         /* 2. Set up shading state. */
         State shading_state; // Shading_state_material
@@ -194,7 +195,14 @@ vec3 evaluate_sample(inout uvec4 rng_state,
         return shading_state.text_coords[0];
 #endif
 
-        /* TODO: 3. apply volume attenuation */
+        /* 3. Apply volume attenuation */
+        if (sample_state.inside && !thin_walled)
+        {
+            vec3 abs_coeff = mdl_absorption_coefficient(mat_idx, shading_state);
+            sample_state.throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
+            sample_state.throughput.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0;
+            sample_state.throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
+        }
 
         /* 4. Add Emission */
         {
