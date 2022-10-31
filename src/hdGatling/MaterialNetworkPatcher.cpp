@@ -253,8 +253,6 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
 
 void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
 {
-  _PatchUsdTypes(network);
-
   _PatchUsdPreviewSurfaceGlossiness(network);
 
   if (!getenv(ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP))
@@ -263,6 +261,8 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
   }
 
   _PatchUsdUVTextureIsSrgbParam(network);
+
+  _PatchUsdTypes(network);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
