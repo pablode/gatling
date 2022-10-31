@@ -20,6 +20,7 @@
 #include "stager.h"
 #include "texsys.h"
 #include "turbo.h"
+#include "asset_reader.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -75,6 +76,7 @@ cgpu_physical_device_limits s_device_limits;
 cgpu_sampler s_tex_sampler = { CGPU_INVALID_HANDLE };
 std::unique_ptr<gi::Stager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
+std::unique_ptr<GiAssetReader> s_assetReader;
 std::unique_ptr<gi::TexSys> s_texSys;
 
 cgpu_buffer s_outputBuffer = { CGPU_INVALID_HANDLE };
@@ -124,7 +126,8 @@ int giInitialize(const gi_init_params* params)
     return GI_ERROR;
   }
 
-  s_texSys = std::make_unique<gi::TexSys>(s_device, *s_stager);
+  s_assetReader = std::make_unique<GiMmapAssetReader>();
+  s_texSys = std::make_unique<gi::TexSys>(s_device, *s_assetReader, *s_stager);
 
   return GI_OK;
 }

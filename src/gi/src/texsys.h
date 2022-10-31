@@ -23,6 +23,8 @@
 
 #include <cgpu.h>
 
+class GiAssetReader;
+
 namespace sg
 {
   struct TextureResource;
@@ -35,7 +37,7 @@ namespace gi
   class TexSys
   {
   public:
-    TexSys(cgpu_device device, Stager& stager);
+    TexSys(cgpu_device device, GiAssetReader& assetReader, Stager& stager);
 
     ~TexSys();
 
@@ -51,6 +53,7 @@ namespace gi
 
   private:
     cgpu_device m_device;
+    GiAssetReader& m_assetReader;
     Stager& m_stager;
     // FIXME: implement a proper CPU and GPU-aware cache with eviction strategy
     std::unordered_map<std::string, cgpu_image> m_imageCache;

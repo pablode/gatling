@@ -2,6 +2,8 @@ add_library(
   gi STATIC
   include/gi.h
   src/gi.cpp
+  src/asset_reader.h
+  src/asset_reader.cpp
   src/mmap.h
   src/mmap.cpp
   src/stager.h

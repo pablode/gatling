@@ -18,6 +18,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 #define GI_OK 0
 #define GI_ERROR 1
@@ -102,6 +103,17 @@ struct gi_init_params
 
 int giInitialize(const gi_init_params* params);
 void giTerminate();
+
+struct GiAsset;
+class GiAssetReader
+{
+public:
+  virtual GiAsset* open(const char* path) = 0;
+  virtual size_t size(const GiAsset* asset) const = 0;
+  virtual void* data(const GiAsset* asset) const = 0;
+  virtual void close(GiAsset* asset) = 0;
+  virtual ~GiAssetReader() = default;
+};
 
 gi_material* giCreateMaterialFromMtlx(const char* doc_str);
 gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
