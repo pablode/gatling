@@ -23,9 +23,6 @@
 
 namespace mx = MaterialX;
 
-const char* ENVVAR_DISABLE_PATCH_COLOR3_VECTOR3_MISMATCH = "GATLING_DOCPATCH_DISABLE_COLOR3_VECTOR3_MISMATCH";
-const char* ENVVAR_DISABLE_PATCH_USDUVTEXTURE_SOURCECOLORSPACE = "GATLING_DOCPATCH_DISABLE_USDUVTEXTURE_SOURCECOLORSPACE";
-
 const char* TYPE_COLOR3 = "color3";
 const char* TYPE_VECTOR3 = "vector3";
 
@@ -119,9 +116,6 @@ void _PatchColor3Vector3Mismatch(mx::DocumentPtr document, mx::InputPtr input, m
   {
     return;
   }
-
-  fprintf(stderr, "patching color3-vector3 type mismatch (set %s to disable)\n",
-    ENVVAR_DISABLE_PATCH_COLOR3_VECTOR3_MISMATCH);
 
   std::string nodeCategory = "convert";
   std::string nodeName = mx::EMPTY_STRING; // auto-assign
@@ -264,9 +258,6 @@ void _PatchUsdUVTextureSourceColorSpace(mx::DocumentPtr document)
     // Not spec-conform but should be more correct in most cases.
     bool isSrgbColorSpace = (colorSpaceString == "sRGB") || (colorSpaceString == "auto" && isSrgbInput);
 
-    fprintf(stderr, "setting color space attribute from UsdUVTexture:sourceColorSpace (set %s to disable)\n",
-      ENVVAR_DISABLE_PATCH_USDUVTEXTURE_SOURCECOLORSPACE);
-
     textureInput->setColorSpace(isSrgbColorSpace ? "srgb_texture" : "lin_rec709");
 
     // Prevent any other kind of processing.
@@ -283,16 +274,10 @@ namespace sg
   {
     _SanitizeFilePaths(document);
 
-    if (!getenv(ENVVAR_DISABLE_PATCH_USDUVTEXTURE_SOURCECOLORSPACE))
-    {
-      _PatchUsdUVTextureSourceColorSpace(document);
-    }
+    _PatchUsdUVTextureSourceColorSpace(document);
 
     _PatchGeompropNodes(document);
 
-    if (!getenv(ENVVAR_DISABLE_PATCH_COLOR3_VECTOR3_MISMATCH))
-    {
-      _PatchColor3Vector3Mismatches(document);
-    }
+    _PatchColor3Vector3Mismatches(document);
   }
 }
