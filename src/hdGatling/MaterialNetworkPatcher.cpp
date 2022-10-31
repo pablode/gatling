@@ -23,7 +23,6 @@
 
 #include <memory>
 
-const char* ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_GLOSSINESS = "HDGATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_GLOSSINESS";
 const char* ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP = "HDGATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_NORMALMAP";
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -102,9 +101,6 @@ void _PatchUsdPreviewSurfaceGlossiness(HdMaterialNetwork2& network)
     {
       return;
     }
-
-    TF_WARN("patching UsdPreviewSurface:glossiness input (set %s to disable)",
-      ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_GLOSSINESS);
 
     float glossiness = value.UncheckedGet<float>();
     float roughness = 1.0f - glossiness;
@@ -210,10 +206,7 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
 {
   _PatchUsdTypes(network);
 
-  if (!getenv(ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_GLOSSINESS))
-  {
-    _PatchUsdPreviewSurfaceGlossiness(network);
-  }
+  _PatchUsdPreviewSurfaceGlossiness(network);
 
   if (!getenv(ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP))
   {
