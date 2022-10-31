@@ -36,6 +36,8 @@ TF_DEFINE_PRIVATE_TOKENS(
   (normal)
   (bias)
   (scale)
+  (isSRGB)
+  (sourceColorSpace)
 );
 
 void _PatchUsdTypes(HdMaterialNetwork2& network)
@@ -161,6 +163,34 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
   }
 }
 
+// Observed UsdUVTexture nodes with an isSRGB="auto" param in the wild:
+// https://github.com/usd-wg/assets/blob/4c5355bc9bffa96e084961fb5004c829b1c82501/test_assets/AlphaBlendModeTest/AlphaBlendModeTest.usd#L59
+// I assume that this was part of an older specification version and the param should be renamed to "sourceColorSpace".
+void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
+{
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+    if (node.nodeTypeId != _tokens->ND_UsdUVTexture)
+    {
+      continue;
+    }
+
+    auto& parameters = node.parameters;
+
+    auto& isSrgbParam = parameters.find(_tokens->isSRGB);
+    if (isSrgbParam == parameters.end())
+    {
+      return;
+    }
+
+    auto value = isSrgbParam->second;
+
+    parameters.erase(isSrgbParam);
+    parameters[_tokens->sourceColorSpace] = value;
+  }
+}
+
 void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
 {
   _PatchUsdTypes(network);
@@ -174,6 +204,8 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
   {
     _PatchUsdPreviewSurfaceNormalMap(network);
   }
+
+  _PatchUsdUVTextureIsSrgbParam(network);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
