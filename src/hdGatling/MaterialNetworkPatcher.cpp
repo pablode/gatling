@@ -38,6 +38,11 @@ TF_DEFINE_PRIVATE_TOKENS(
   (scale)
   (isSRGB)
   (sourceColorSpace)
+  ((_auto, "auto"))
+  (yes)
+  (no)
+  (sRGB)
+  (raw)
 );
 
 void _PatchUsdTypes(HdMaterialNetwork2& network)
@@ -163,9 +168,9 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
   }
 }
 
-// Observed UsdUVTexture nodes with an isSRGB="auto" param in the wild:
+// Apparently the Unity USD exporter emits (or used to emit) UsdUVTexture nodes with an isSRGB parameter. Found in the wild:
 // https://github.com/usd-wg/assets/blob/4c5355bc9bffa96e084961fb5004c829b1c82501/test_assets/AlphaBlendModeTest/AlphaBlendModeTest.usd#L59
-// I assume that this was part of an older specification version and the param should be renamed to "sourceColorSpace".
+// Let's assume that this is part of an older specification version and rename it to "sourceColorSpace".
 void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
 {
   for (auto& pathNodePair : network.nodes)
@@ -185,9 +190,19 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
     }
 
     auto value = isSrgbParam->second;
+    TfToken newValue = _tokens->_auto;
+    // https://github.com/Unity-Technologies/usd-unity-sdk/blob/307303b25f5fd83e5275a2607b356e43799c38b4/package/com.unity.formats.usd/Dependencies/USD.NET.Unity/Shading/UsdPreviewSurface/TextureReaderSample.cs#L52-L57
+    if (value == _tokens->yes)
+    {
+      newValue = _tokens->sRGB;
+    }
+    else if (value == _tokens->no)
+    {
+      newValue = _tokens->raw;
+    }
 
     parameters.erase(isSrgbParam);
-    parameters[_tokens->sourceColorSpace] = value;
+    parameters[_tokens->sourceColorSpace] = newValue;
   }
 }
 
