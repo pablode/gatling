@@ -182,7 +182,7 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
     auto& isSrgbParam = parameters.find(_tokens->isSRGB);
     if (isSrgbParam == parameters.end())
     {
-      return;
+      continue;
     }
 
     auto value = isSrgbParam->second;
