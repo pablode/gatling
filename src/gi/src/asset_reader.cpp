@@ -51,3 +51,51 @@ void GiMmapAssetReader::close(GiAsset* asset)
   gi_file_close(iasset->file);
   delete iasset;
 }
+
+struct GiAggregateAsset
+{
+  GiAssetReader* reader;
+  GiAsset* asset;
+};
+
+void GiAggregateAssetReader::addAssetReader(GiAssetReader* reader)
+{
+  m_readers.push_back(reader);
+}
+
+GiAsset* GiAggregateAssetReader::open(const char* path)
+{
+  for (GiAssetReader* reader : m_readers)
+  {
+    GiAsset* asset = reader->open(path);
+    if (!asset)
+    {
+      continue;
+    }
+
+    auto iasset = new GiAggregateAsset;
+    iasset->reader = reader;
+    iasset->asset = asset;
+    return (GiAsset*) iasset;
+  }
+  return nullptr;
+}
+
+size_t GiAggregateAssetReader::size(const GiAsset* asset) const
+{
+  auto iasset = (GiAggregateAsset*) asset;
+  return iasset->reader->size(iasset->asset);
+}
+
+void* GiAggregateAssetReader::data(const GiAsset* asset) const
+{
+  auto iasset = (GiAggregateAsset*) asset;
+  return iasset->reader->data(iasset->asset);
+}
+
+void GiAggregateAssetReader::close(GiAsset* asset)
+{
+  auto iasset = (GiAggregateAsset*) asset;
+  iasset->reader->close(iasset->asset);
+  delete iasset;
+}

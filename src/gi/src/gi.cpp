@@ -76,7 +76,8 @@ cgpu_physical_device_limits s_device_limits;
 cgpu_sampler s_tex_sampler = { CGPU_INVALID_HANDLE };
 std::unique_ptr<gi::Stager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
-std::unique_ptr<GiAssetReader> s_assetReader;
+std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
+std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
 std::unique_ptr<gi::TexSys> s_texSys;
 
 cgpu_buffer s_outputBuffer = { CGPU_INVALID_HANDLE };
@@ -126,14 +127,19 @@ int giInitialize(const gi_init_params* params)
     return GI_ERROR;
   }
 
-  s_assetReader = std::make_unique<GiMmapAssetReader>();
-  s_texSys = std::make_unique<gi::TexSys>(s_device, *s_assetReader, *s_stager);
+  s_mmapAssetReader = std::make_unique<GiMmapAssetReader>();
+  s_aggregateAssetReader = std::make_unique<GiAggregateAssetReader>();
+  s_aggregateAssetReader->addAssetReader(s_mmapAssetReader.get());
+
+  s_texSys = std::make_unique<gi::TexSys>(s_device, *s_aggregateAssetReader, *s_stager);
 
   return GI_OK;
 }
 
 void giTerminate()
 {
+  s_aggregateAssetReader.reset();
+  s_mmapAssetReader.reset();
   cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
   s_outputStagingBuffer.handle = CGPU_INVALID_HANDLE;
   cgpu_destroy_buffer(s_device, s_outputBuffer);
@@ -154,6 +160,11 @@ void giTerminate()
   cgpu_destroy_sampler(s_device, s_tex_sampler);
   cgpu_destroy_device(s_device);
   cgpu_terminate();
+}
+
+void giRegisterAssetReader(GiAssetReader* reader)
+{
+  s_aggregateAssetReader->addAssetReader(reader);
 }
 
 gi_material* giCreateMaterialFromMtlx(const char* doc_str)

@@ -114,6 +114,7 @@ public:
   virtual void close(GiAsset* asset) = 0;
   virtual ~GiAssetReader() = default;
 };
+void giRegisterAssetReader(GiAssetReader* reader);
 
 gi_material* giCreateMaterialFromMtlx(const char* doc_str);
 gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
