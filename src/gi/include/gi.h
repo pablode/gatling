@@ -15,14 +15,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef GI_H
-#define GI_H
+#pragma once
 
 #include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define GI_OK 0
 #define GI_ERROR 1
@@ -67,34 +62,34 @@ struct gi_shader_cache;
 
 struct gi_geom_cache_params
 {
-  bool                       next_event_estimation;
-  uint32_t                   face_count;
-  struct gi_face*            faces;
-  uint32_t                   material_count;
-  const struct gi_material** materials;
-  uint32_t                   vertex_count;
-  struct gi_vertex*          vertices;
+  bool                next_event_estimation;
+  uint32_t            face_count;
+  gi_face*            faces;
+  uint32_t            material_count;
+  const gi_material** materials;
+  uint32_t            vertex_count;
+  gi_vertex*          vertices;
 };
 
 struct gi_shader_cache_params
 {
-  enum gi_aov_id        aov_id;
-  struct gi_geom_cache* geom_cache;
+  gi_aov_id      aov_id;
+  gi_geom_cache* geom_cache;
 };
 
 struct gi_render_params
 {
-  const struct gi_camera*       camera;
-  const struct gi_geom_cache*   geom_cache;
-  const struct gi_shader_cache* shader_cache;
-  uint32_t                      image_width;
-  uint32_t                      image_height;
-  uint32_t                      max_bounces;
-  uint32_t                      spp;
-  uint32_t                      rr_bounce_offset;
-  float                         rr_inv_min_term_prob;
-  float                         max_sample_value;
-  float                         bg_color[4];
+  const gi_camera*       camera;
+  const gi_geom_cache*   geom_cache;
+  const gi_shader_cache* shader_cache;
+  uint32_t               image_width;
+  uint32_t               image_height;
+  uint32_t               max_bounces;
+  uint32_t               spp;
+  uint32_t               rr_bounce_offset;
+  float                  rr_inv_min_term_prob;
+  float                  max_sample_value;
+  float                  bg_color[4];
 };
 
 struct gi_init_params
@@ -105,26 +100,20 @@ struct gi_init_params
   const char* mdl_lib_path;
 };
 
-int giInitialize(const struct gi_init_params* params);
+int giInitialize(const gi_init_params* params);
 void giTerminate();
 
-struct gi_material* giCreateMaterialFromMtlx(const char* doc_str);
-struct gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
-void giDestroyMaterial(struct gi_material* mat);
+gi_material* giCreateMaterialFromMtlx(const char* doc_str);
+gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
+void giDestroyMaterial(gi_material* mat);
 
-struct gi_geom_cache* giCreateGeomCache(const struct gi_geom_cache_params* params);
-void giDestroyGeomCache(struct gi_geom_cache* cache);
+gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params);
+void giDestroyGeomCache(gi_geom_cache* cache);
 
-struct gi_shader_cache* giCreateShaderCache(const struct gi_shader_cache_params* params);
-void giDestroyShaderCache(struct gi_shader_cache* cache);
+gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params);
+void giDestroyShaderCache(gi_shader_cache* cache);
 
 void giInvalidateFramebuffer();
 
-int giRender(const struct gi_render_params* params,
-             float* rgba_img);
+int giRender(const gi_render_params* params, float* rgba_img);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif
