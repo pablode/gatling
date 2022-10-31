@@ -43,6 +43,7 @@ public:
 
 private:
   std::unique_ptr<MaterialNetworkTranslator> m_translator;
+  std::unique_ptr<class UsdzAssetReader> m_usdzAssetReader;
   bool m_isSupported;
 };
 

@@ -20,11 +20,65 @@
 
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/base/plug/plugin.h>
-#include "pxr/base/plug/thisPlugin.h"
+#include <pxr/base/plug/thisPlugin.h>
+#include <pxr/usd/ar/asset.h>
+#include <pxr/usd/ar/resolver.h>
+#include <pxr/usd/ar/resolvedPath.h>
+#include <pxr/usd/ar/packageUtils.h>
 
 #include <gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+class UsdzAssetReader : public GiAssetReader
+{
+private:
+  struct UsdzAsset
+  {
+    size_t size;
+    std::shared_ptr<const char> buffer;
+  };
+
+public:
+  GiAsset* open(const char* path) override
+  {
+    auto resolvedPath = ArResolvedPath(path);
+    if (!ArIsPackageRelativePath(resolvedPath)) {
+      // Only read USDZ files with this reader, fall back
+      // to memory-mapping default for everything else.
+      return nullptr;
+    }
+
+    ArResolver& resolver = ArGetResolver();
+    auto asset = resolver.OpenAsset(resolvedPath);
+    if (!asset) {
+      return nullptr;
+    }
+
+    auto iasset = new UsdzAsset;
+    iasset->size = asset->GetSize();
+    iasset->buffer = asset->GetBuffer();
+    return (GiAsset*) iasset;
+  }
+
+  size_t size(const GiAsset* asset) const override
+  {
+    auto iasset = (UsdzAsset*) asset;
+    return iasset->size;
+  }
+
+  void* data(const GiAsset* asset) const override
+  {
+    auto iasset = (UsdzAsset*) asset;
+    return (void*) iasset->buffer.get();
+  }
+
+  void close(GiAsset* asset) override
+  {
+    auto iasset = (UsdzAsset*) asset;
+    delete iasset;
+  }
+};
 
 TF_REGISTRY_FUNCTION(TfType)
 {
@@ -48,9 +102,14 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
   params.mtlx_lib_path = mtlxLibPath.c_str();
   params.mdl_lib_path = mdlLibPath.c_str();
 
-  int initResult = giInitialize(&params);
+  m_isSupported = (giInitialize(&params) == GI_OK);
+  if (!m_isSupported)
+  {
+    return;
+  }
 
-  m_isSupported = (initResult == GI_OK);
+  m_usdzAssetReader = std::make_unique<UsdzAssetReader>();
+  giRegisterAssetReader(m_usdzAssetReader.get());
 }
 
 HdGatlingRendererPlugin::~HdGatlingRendererPlugin()
@@ -59,6 +118,8 @@ HdGatlingRendererPlugin::~HdGatlingRendererPlugin()
   {
     return;
   }
+
+  m_usdzAssetReader.reset();
   giTerminate();
 }
 
