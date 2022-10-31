@@ -42,6 +42,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (no)
   (sRGB)
   (raw)
+  (roughness)
 );
 
 void _PatchUsdTypes(HdMaterialNetwork2& network)
@@ -74,6 +75,65 @@ void _PatchUsdTypes(HdMaterialNetwork2& network)
   }
 }
 
+void _PatchUsdPreviewSurfaceGlossinessInput(HdMaterialNetwork2& network, std::map<TfToken, std::vector<HdMaterialConnection2>>& inputs)
+{
+  auto glossinessInput = inputs.find(_tokens->glossiness);
+  if (glossinessInput == inputs.end())
+  {
+    return;
+  }
+
+  auto connections = glossinessInput->second;
+  for (HdMaterialConnection2& connection : connections)
+  {
+    HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
+
+    if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+    {
+      continue;
+    }
+
+    auto& upstreamNodeParams = upstreamNode.parameters;
+    bool hasScale = upstreamNodeParams.find(_tokens->scale) != upstreamNodeParams.end();
+    bool hasBias = upstreamNodeParams.find(_tokens->bias) != upstreamNodeParams.end();
+
+    if (hasScale || hasBias)
+    {
+      continue;
+    }
+
+    // Map glossiness to roughness as follows:
+    // output = textureValue * scale + bias
+    upstreamNodeParams[_tokens->scale] = GfVec4f(-1.0f, -1.0f, -1.0f, -1.0f);
+    upstreamNodeParams[_tokens->bias] = GfVec4f(1.0f, 1.0f, 1.0f, 0.0f);
+  }
+
+  inputs[_tokens->roughness] = connections;
+  inputs.erase(glossinessInput);
+}
+
+bool _PatchUsdPreviewSurfaceGlossinessParam(std::map<TfToken, VtValue>& params)
+{
+  auto glossinessParam = params.find(_tokens->glossiness);
+  if (glossinessParam == params.end())
+  {
+    return false;
+  }
+
+  VtValue value = glossinessParam->second;
+  if (!value.IsHolding<float>())
+  {
+    return true;
+  }
+
+  float glossiness = value.UncheckedGet<float>();
+  float roughness = 1.0f - glossiness;
+
+  params[_tokens->roughness] = roughness;
+  params.erase(glossinessParam);
+  return true;
+}
+
 // Some of Sketchfab's auto-converted assets encode the roughness on the UsdPreviewSurface
 // node with a 'glossiness' input. See "Screen Space Reflection Demo: Follmann 2.OG" scene:
 // https://sketchfab.com/3d-models/screen-space-reflection-demo-follmann-2og-6164eed28c464c94be8f5268240dc864
@@ -85,28 +145,17 @@ void _PatchUsdPreviewSurfaceGlossiness(HdMaterialNetwork2& network)
 
     if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
     {
-      return;
+      continue;
     }
 
     auto& parameters = node.parameters;
-
-    auto glossinessParam = parameters.find(_tokens->glossiness);
-    if (glossinessParam == parameters.end())
+    if (_PatchUsdPreviewSurfaceGlossinessParam(parameters))
     {
-      return;
+      continue;
     }
 
-    VtValue value = glossinessParam->second;
-    if (!value.IsHolding<float>())
-    {
-      return;
-    }
-
-    float glossiness = value.UncheckedGet<float>();
-    float roughness = 1.0f - glossiness;
-
-    parameters[TfToken("roughness")] = roughness;
-    parameters.erase(glossinessParam);
+    auto& inputs = node.inputConnections;
+    _PatchUsdPreviewSurfaceGlossinessInput(network, inputs);
   }
 }
 
