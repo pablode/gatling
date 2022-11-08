@@ -19,7 +19,9 @@
 
 #include <MaterialXCore/Types.h>
 
+#include <unordered_set>
 #include <assert.h>
+#include <ctype.h>
 
 namespace mx = MaterialX;
 
@@ -268,16 +270,125 @@ void _PatchUsdUVTextureSourceColorSpace(mx::DocumentPtr document)
   }
 }
 
+// MDL spec 1.7.2 17th Jan 2022, section 5.6
+std::unordered_set<std::string_view> s_reservedMDLIdentifiers = {
+  "annotation", "auto", "bool", "bool2", "bool3", "bool4", "break", "bsdf",
+  "bsdf_measurement", "case", "cast", "color", "const", "continue", "default",
+  "do", "double", "double2", "double2x2", "double2x3", "double3", "double3x2",
+  "double3x3", "double3x4", "double4", "double4x3", "double4x4", "double4x2",
+  "double2x4", "edf", "else", "enum", "export", "false", "float", "float2",
+  "float2x2", "float2x3", "float3", "float3x2", "float3x3", "float3x4",
+  "float4", "float4x3", "float4x4", "float4x2", "float2x4", "for", "hair_bsdf",
+  "if", "import", "in", "int", "int2", "int3", "int4", "intensity_mode",
+  "intensity_power", "intensity_radiant_exitance", "let", "light_profile",
+  "material", "material_emission", "material_geometry", "material_surface",
+  "material_volume", "mdl", "module", "package", "return", "string", "struct",
+  "switch", "texture_2d", "texture_3d", "texture_cube", "texture_ptex", "true",
+  "typedef", "uniform", "using", "varying", "vdf", "while", "catch", "char",
+  "class", "const_cast", "delete", "dynamic_cast", "explicit", "extern",
+  "external", "foreach", "friend", "goto", "graph", "half", "half2", "half2x2",
+  "half2x3", "half3", "half3x2", "half3x3", "half3x4", "half4", "half4x3",
+  "half4x4", "half4x2", "half2x4", "inline", "inout", "lambda", "long",
+  "mutable", "namespace", "native", "new", "operator", "out", "phenomenon",
+  "private", "protected", "public", "reinterpret_cast", "sampler", "shader",
+  "short", "signed", "sizeof", "static", "static_cast", "technique", "template",
+  "this", "throw", "try", "typeid", "typename", "union", "unsigned", "virtual",
+  "void", "volatile", "wchar_t"
+};
+
+// MDL spec section 5.5 and 5.6: "An identifier is an alphabetic character followed
+// by a possibly empty sequence of alphabetic characters, decimal digits, and underscores,
+// that is neither a typename nor a reserved word."
+// https://raytracing-docs.nvidia.com/mdl/specification/MDL_spec_1.7.2_17Jan2022.pdf
+bool _MakeValidMDLIdentifier(std::string& str)
+{
+  assert(!str.empty());
+  bool strChanged = false;
+
+  // Replace all chars that are not 1) alphabetic or 2) decimal or 3) underscores with underscores
+  for (size_t i = 0; i < str.size(); i++)
+  {
+    char c = str[i];
+
+    if (isalnum(c) || c == '_')
+    {
+      continue;
+    }
+
+    str[i] = '_';
+    strChanged |= true;
+  }
+
+  bool invalidFirstChar = !isalpha(str[0]);
+  bool isReservedKeyword = s_reservedMDLIdentifiers.find(str) != s_reservedMDLIdentifiers.end();
+
+  bool usePrefix = invalidFirstChar || isReservedKeyword;
+  if (usePrefix)
+  {
+    str = std::string("GAT" + str);
+    strChanged |= true;
+  }
+
+  return strChanged;
+}
+
+void _PatchNodeNames(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node)
+    {
+      continue;
+    }
+
+    std::string newName = node->getName();
+
+    if (!_MakeValidMDLIdentifier(newName))
+    {
+      continue;
+    }
+
+    std::string oldName = node->getName();
+
+    // FIXME: this 'node renaming' algorithm works, but is not likely to cover all cases.
+    // Ideally, there should a MaterialX library function for this purpose.
+    for (mx::NodeGraphPtr nodeGraph : document->getNodeGraphs())
+    {
+      for (mx::OutputPtr output : nodeGraph->getOutputs())
+      {
+        if (output->getConnectedNode() == node)
+        {
+          output->setNodeName(newName);
+        }
+      }
+    }
+    for (mx::OutputPtr output : node->getOutputs())
+    {
+      if (output->getNodeName() == oldName)
+      {
+        output->setNodeName(newName);
+      }
+    }
+
+    node->setName(newName);
+  }
+}
+
 namespace sg
 {
   void MtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
   {
     _SanitizeFilePaths(document);
 
+    _PatchColor3Vector3Mismatches(document);
+
     _PatchUsdUVTextureSourceColorSpace(document);
 
     _PatchGeompropNodes(document);
 
-    _PatchColor3Vector3Mismatches(document);
+    _PatchNodeNames(document);
   }
 }
