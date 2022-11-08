@@ -244,7 +244,8 @@ static cgpu_physical_device_features cgpu_translate_physical_device_features(con
 }
 
 static cgpu_physical_device_limits cgpu_translate_physical_device_limits(const VkPhysicalDeviceLimits* vk_limits,
-                                                                         const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props)
+                                                                         const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props,
+                                                                         const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vk_as_props)
 {
   cgpu_physical_device_limits limits = {0};
   limits.maxImageDimension1D = vk_limits->maxImageDimension1D;
@@ -304,6 +305,7 @@ static cgpu_physical_device_limits cgpu_translate_physical_device_limits(const V
   limits.optimalBufferCopyRowPitchAlignment = vk_limits->optimalBufferCopyRowPitchAlignment;
   limits.nonCoherentAtomSize = vk_limits->nonCoherentAtomSize;
   limits.subgroupSize = vk_subgroup_props->subgroupSize;
+  limits.minAccelerationStructureScratchOffsetAlignment = vk_as_props->minAccelerationStructureScratchOffsetAlignment;
   return limits;
 }
 
@@ -635,9 +637,13 @@ bool cgpu_create_device(cgpu_device* p_device)
   vkGetPhysicalDeviceFeatures(idevice->physical_device, &features);
   idevice->features = cgpu_translate_physical_device_features(&features);
 
+  VkPhysicalDeviceAccelerationStructurePropertiesKHR as_properties = {0};
+  as_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
+  as_properties.pNext = NULL;
+
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_properties = {0};
   rt_pipeline_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-  rt_pipeline_properties.pNext = NULL;
+  rt_pipeline_properties.pNext = &as_properties;
 
   VkPhysicalDeviceSubgroupProperties subgroup_properties;
   subgroup_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
@@ -670,7 +676,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   }
 
   const VkPhysicalDeviceLimits* limits = &device_properties.properties.limits;
-  idevice->limits = cgpu_translate_physical_device_limits(limits, &subgroup_properties);
+  idevice->limits = cgpu_translate_physical_device_limits(limits, &subgroup_properties, &as_properties);
 
   uint32_t device_ext_count;
   vkEnumerateDeviceExtensionProperties(
@@ -1223,11 +1229,12 @@ bool cgpu_destroy_shader(cgpu_device device,
   return true;
 }
 
-bool cgpu_create_buffer(cgpu_device device,
-                        CgpuBufferUsageFlags usage,
-                        CgpuMemoryPropertyFlags memory_properties,
-                        uint64_t size,
-                        cgpu_buffer* p_buffer)
+static bool cgpu_create_buffer_aligned(cgpu_device device,
+                                       CgpuBufferUsageFlags usage,
+                                       CgpuMemoryPropertyFlags memory_properties,
+                                       uint64_t size,
+                                       uint64_t alignment,
+                                       cgpu_buffer* p_buffer)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
@@ -1277,14 +1284,30 @@ bool cgpu_create_buffer(cgpu_device device,
   VmaAllocationCreateInfo alloc_info = {0};
   alloc_info.requiredFlags = cgpu_translate_memory_properties(memory_properties);
 
-  VkResult result = vmaCreateBuffer(
-    idevice->allocator,
-    &buffer_info,
-    &alloc_info,
-    &ibuffer->buffer,
-    &ibuffer->allocation,
-    NULL
-  );
+  VkResult result;
+  if (alignment > 0)
+  {
+    result = vmaCreateBufferWithAlignment(
+      idevice->allocator,
+      &buffer_info,
+      &alloc_info,
+      alignment,
+      &ibuffer->buffer,
+      &ibuffer->allocation,
+      NULL
+    );
+  }
+  else
+  {
+    result = vmaCreateBuffer(
+      idevice->allocator,
+      &buffer_info,
+      &alloc_info,
+      &ibuffer->buffer,
+      &ibuffer->allocation,
+      NULL
+    );
+  }
 
   if (result != VK_SUCCESS)
   {
@@ -1295,6 +1318,17 @@ bool cgpu_create_buffer(cgpu_device device,
   ibuffer->size = size;
 
   return true;
+}
+
+bool cgpu_create_buffer(cgpu_device device,
+                        CgpuBufferUsageFlags usage,
+                        CgpuMemoryPropertyFlags memory_properties,
+                        uint64_t size,
+                        cgpu_buffer* p_buffer)
+{
+  uint64_t alignment = 0;
+
+  return cgpu_create_buffer_aligned(device, usage, memory_properties, size, alignment, p_buffer);
 }
 
 bool cgpu_destroy_buffer(cgpu_device device,
@@ -1956,9 +1990,9 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   VkAccelerationStructureBuildSizesInfoKHR as_build_sizes_info = {0};
   as_build_sizes_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
   as_build_sizes_info.pNext = NULL;
-  as_build_sizes_info.accelerationStructureSize; // output
-  as_build_sizes_info.updateScratchSize; // output
-  as_build_sizes_info.buildScratchSize; // output
+  as_build_sizes_info.accelerationStructureSize = 0; // output
+  as_build_sizes_info.updateScratchSize = 0; // output
+  as_build_sizes_info.buildScratchSize = 0; // output
 
   idevice->table.vkGetAccelerationStructureBuildSizesKHR(idevice->logical_device,
                                                          VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
@@ -1997,11 +2031,12 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
 
   // Set up device-local scratch buffer
   cgpu_buffer scratch_buffer;
-  if (!cgpu_create_buffer(device,
-                          CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
-                          CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                          as_build_sizes_info.buildScratchSize,
-                          &scratch_buffer))
+  if (!cgpu_create_buffer_aligned(device,
+                                  CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
+                                  CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                                  as_build_sizes_info.buildScratchSize,
+                                  idevice->limits.minAccelerationStructureScratchOffsetAlignment,
+                                  &scratch_buffer))
   {
     cgpu_destroy_buffer(device, *as_buffer);
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, NULL);

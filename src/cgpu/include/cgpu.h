@@ -406,6 +406,7 @@ typedef struct cgpu_physical_device_features {
   bool sparseResidencyAliased;
 } cgpu_physical_device_features;
 
+// FIXME: rename to _properties
 typedef struct cgpu_physical_device_limits {
   uint32_t maxImageDimension1D;
   uint32_t maxImageDimension2D;
@@ -460,6 +461,7 @@ typedef struct cgpu_physical_device_limits {
   uint64_t optimalBufferCopyRowPitchAlignment;
   uint64_t nonCoherentAtomSize;
   uint32_t subgroupSize;
+  uint64_t minAccelerationStructureScratchOffsetAlignment;
 } cgpu_physical_device_limits;
 
 typedef struct cgpu_vertex {
