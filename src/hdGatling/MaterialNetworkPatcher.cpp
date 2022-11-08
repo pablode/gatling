@@ -17,6 +17,7 @@
 
 #include "MaterialNetworkPatcher.h"
 
+#include <pxr/base/gf/vec3f.h>
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/material.h>
 #include <pxr/usd/sdf/assetPath.h>
@@ -43,6 +44,9 @@ TF_DEFINE_PRIVATE_TOKENS(
   (sRGB)
   (raw)
   (roughness)
+  (specular)
+  (specularColor)
+  (rgb)
 );
 
 void _PatchUsdTypes(HdMaterialNetwork2& network)
@@ -159,6 +163,60 @@ void _PatchUsdPreviewSurfaceGlossiness(HdMaterialNetwork2& network)
   }
 }
 
+// Blender's USD exporter (3.1+) emits a 'specular' input/param which should be 'specularColor'.
+// https://github.com/blender/blender/blob/e1b3d9112730bc3b569ffff732a1558752ded146/source/blender/io/usd/intern/usd_writer_material.cc#L234
+void _PatchUsdPreviewSurfaceSpecular(HdMaterialNetwork2& network)
+{
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+
+    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+    {
+      continue;
+    }
+
+    auto& params = node.parameters;
+
+    // Rename params and change type to Color3
+    auto specularParam = params.find(_tokens->specular);
+    if (specularParam != params.end())
+    {
+      if (specularParam->second.IsHolding<float>())
+      {
+        float specular = specularParam->second.UncheckedGet<float>();
+        params[_tokens->specularColor] = GfVec3f(specular);
+        params.erase(specularParam);
+      }
+      continue;
+    }
+
+    auto& inputs = node.inputConnections;
+
+    // Rename inputs and change connected UsdUVTexture output from single-channel to 'rgb'
+    auto specularInput = inputs.find(_tokens->specular);
+    if (specularInput != inputs.end())
+    {
+      auto connections = specularInput->second;
+
+      for (HdMaterialConnection2& connection : connections)
+      {
+        HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
+
+        if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+        {
+          continue;
+        }
+
+        connection.upstreamOutputName = _tokens->rgb;
+      }
+
+      inputs[_tokens->specularColor] = connections;
+      inputs.erase(specularInput);
+    }
+  }
+}
+
 // J CUBE's Maneki asset tries to read a normal map using a UsdUVTexture node,
 // however the bias and scale parameters which usually convert the [0, 1] image
 // values to [-1, 1] vectors are missing: https://j-cube.jp/solutions/multiverse/assets
@@ -254,6 +312,8 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
 void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
 {
   _PatchUsdPreviewSurfaceGlossiness(network);
+
+  _PatchUsdPreviewSurfaceSpecular(network);
 
   if (!getenv(ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP))
   {
