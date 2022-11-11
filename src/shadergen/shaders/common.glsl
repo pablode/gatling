@@ -78,6 +78,7 @@ void orthonormal_basis(in vec3 n, out vec3 b1, out vec3 b2)
     b2 = vec3(b, nsign + n.y * n.y * a, -n.y);
 }
 
+#ifdef DYNAMIC_OFFSETTING
 // From: "A Fast and Robust Method for Avoiding Self-Intersection"
 // Wächter and Binder, Ch. 6 in Ray Tracing Gems I.
 // Licensed under CC BY-NC-ND 4.0: https://creativecommons.org/licenses/by-nc-nd/4.0/
@@ -105,6 +106,13 @@ vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
         abs(p.z) < origin ? (p.z + float_scale * geom_normal.z) : p_i.z
     );
 }
+#else
+vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
+{
+    const float EPS = 0.00001;
+    return p + geom_normal * EPS;
+}
+#endif
 
 // Hand-crafted Morton code lookup table; index corresponds to thread-index in group.
 const uint16_t MORTON_2D_LUT_32x8[256] = {
