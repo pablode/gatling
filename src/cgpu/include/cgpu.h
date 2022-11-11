@@ -406,8 +406,7 @@ typedef struct cgpu_physical_device_features {
   bool sparseResidencyAliased;
 } cgpu_physical_device_features;
 
-// FIXME: rename to _properties
-typedef struct cgpu_physical_device_limits {
+typedef struct cgpu_physical_device_properties {
   uint32_t maxImageDimension1D;
   uint32_t maxImageDimension2D;
   uint32_t maxImageDimension3D;
@@ -462,7 +461,7 @@ typedef struct cgpu_physical_device_limits {
   uint64_t nonCoherentAtomSize;
   uint32_t subgroupSize;
   uint64_t minAccelerationStructureScratchOffsetAlignment;
-} cgpu_physical_device_limits;
+} cgpu_physical_device_properties;
 
 typedef struct cgpu_vertex {
   float x;
@@ -716,9 +715,9 @@ CGPU_API bool CGPU_CDECL cgpu_get_physical_device_features(
   cgpu_physical_device_features* p_features
 );
 
-CGPU_API bool CGPU_CDECL cgpu_get_physical_device_limits(
+CGPU_API bool CGPU_CDECL cgpu_get_physical_device_properties(
   cgpu_device device,
-  cgpu_physical_device_limits* p_limits
+  cgpu_physical_device_properties* p_limits
 );
 
 #ifdef __cplusplus

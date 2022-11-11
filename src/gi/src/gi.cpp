@@ -72,7 +72,7 @@ struct gi_material
 
 cgpu_device s_device = { CGPU_INVALID_HANDLE };
 cgpu_physical_device_features s_device_features;
-cgpu_physical_device_limits s_device_limits;
+cgpu_physical_device_properties s_device_properties;
 cgpu_sampler s_tex_sampler = { CGPU_INVALID_HANDLE };
 std::unique_ptr<gi::Stager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
@@ -97,7 +97,7 @@ int giInitialize(const gi_init_params* params)
   if (!cgpu_get_physical_device_features(s_device, &s_device_features))
     return GI_ERROR;
 
-  if (!cgpu_get_physical_device_limits(s_device, &s_device_limits))
+  if (!cgpu_get_physical_device_properties(s_device, &s_device_properties))
     return GI_ERROR;
 
   if (!cgpu_create_sampler(s_device,
@@ -240,7 +240,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
 
   uint64_t buf_size = 0;
-  const uint64_t offset_align = s_device_limits.minStorageBufferOffsetAlignment;
+  const uint64_t offset_align = s_device_properties.minStorageBufferOffsetAlignment;
 
   uint64_t face_buf_size = params->face_count * sizeof(gi_face);
   uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);

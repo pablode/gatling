@@ -52,15 +52,15 @@ typedef struct cgpu_iinstance {
 } cgpu_iinstance;
 
 typedef struct cgpu_idevice {
-  VkDevice                      logical_device;
-  VkPhysicalDevice              physical_device;
-  VkQueue                       compute_queue;
-  VkCommandPool                 command_pool;
-  VkQueryPool                   timestamp_pool;
-  struct VolkDeviceTable        table;
-  cgpu_physical_device_features features;
-  cgpu_physical_device_limits   limits;
-  VmaAllocator                  allocator;
+  VkDevice                        logical_device;
+  VkPhysicalDevice                physical_device;
+  VkQueue                         compute_queue;
+  VkCommandPool                   command_pool;
+  VkQueryPool                     timestamp_pool;
+  struct VolkDeviceTable          table;
+  cgpu_physical_device_features   features;
+  cgpu_physical_device_properties properties;
+  VmaAllocator                    allocator;
 } cgpu_idevice;
 
 typedef struct cgpu_ibuffer {
@@ -243,70 +243,70 @@ static cgpu_physical_device_features cgpu_translate_physical_device_features(con
   return features;
 }
 
-static cgpu_physical_device_limits cgpu_translate_physical_device_limits(const VkPhysicalDeviceLimits* vk_limits,
-                                                                         const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props,
-                                                                         const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vk_as_props)
+static cgpu_physical_device_properties cgpu_translate_physical_device_properties(const VkPhysicalDeviceLimits* vk_limits,
+                                                                                 const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props,
+                                                                                 const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vk_as_props)
 {
-  cgpu_physical_device_limits limits = {0};
-  limits.maxImageDimension1D = vk_limits->maxImageDimension1D;
-  limits.maxImageDimension2D = vk_limits->maxImageDimension2D;
-  limits.maxImageDimension3D = vk_limits->maxImageDimension3D;
-  limits.maxImageDimensionCube = vk_limits->maxImageDimensionCube;
-  limits.maxImageArrayLayers = vk_limits->maxImageArrayLayers;
-  limits.maxUniformBufferRange = vk_limits->maxUniformBufferRange;
-  limits.maxStorageBufferRange = vk_limits->maxStorageBufferRange;
-  limits.maxPushConstantsSize = vk_limits->maxPushConstantsSize;
-  limits.maxMemoryAllocationCount = vk_limits->maxMemoryAllocationCount;
-  limits.maxSamplerAllocationCount = vk_limits->maxSamplerAllocationCount;
-  limits.bufferImageGranularity = vk_limits->bufferImageGranularity;
-  limits.sparseAddressSpaceSize = vk_limits->sparseAddressSpaceSize;
-  limits.maxBoundDescriptorSets = vk_limits->maxBoundDescriptorSets;
-  limits.maxPerStageDescriptorSamplers = vk_limits->maxPerStageDescriptorSamplers;
-  limits.maxPerStageDescriptorUniformBuffers = vk_limits->maxPerStageDescriptorUniformBuffers;
-  limits.maxPerStageDescriptorStorageBuffers = vk_limits->maxPerStageDescriptorStorageBuffers;
-  limits.maxPerStageDescriptorSampledImages = vk_limits->maxPerStageDescriptorSampledImages;
-  limits.maxPerStageDescriptorStorageImages = vk_limits->maxPerStageDescriptorStorageImages;
-  limits.maxPerStageDescriptorInputAttachments = vk_limits->maxPerStageDescriptorInputAttachments;
-  limits.maxPerStageResources = vk_limits->maxPerStageResources;
-  limits.maxDescriptorSetSamplers = vk_limits->maxDescriptorSetSamplers;
-  limits.maxDescriptorSetUniformBuffers = vk_limits->maxDescriptorSetUniformBuffers;
-  limits.maxDescriptorSetUniformBuffersDynamic = vk_limits->maxDescriptorSetUniformBuffersDynamic;
-  limits.maxDescriptorSetStorageBuffers = vk_limits->maxDescriptorSetStorageBuffers;
-  limits.maxDescriptorSetStorageBuffersDynamic = vk_limits->maxDescriptorSetStorageBuffersDynamic;
-  limits.maxDescriptorSetSampledImages = vk_limits->maxDescriptorSetSampledImages;
-  limits.maxDescriptorSetStorageImages = vk_limits->maxDescriptorSetStorageImages;
-  limits.maxDescriptorSetInputAttachments = vk_limits->maxDescriptorSetInputAttachments;
-  limits.maxComputeSharedMemorySize = vk_limits->maxComputeSharedMemorySize;
-  limits.maxComputeWorkGroupCount[0] = vk_limits->maxComputeWorkGroupCount[0];
-  limits.maxComputeWorkGroupCount[1] = vk_limits->maxComputeWorkGroupCount[1];
-  limits.maxComputeWorkGroupCount[2] = vk_limits->maxComputeWorkGroupCount[2];
-  limits.maxComputeWorkGroupInvocations = vk_limits->maxComputeWorkGroupInvocations;
-  limits.maxComputeWorkGroupSize[0] = vk_limits->maxComputeWorkGroupSize[0];
-  limits.maxComputeWorkGroupSize[1] = vk_limits->maxComputeWorkGroupSize[1];
-  limits.maxComputeWorkGroupSize[2] = vk_limits->maxComputeWorkGroupSize[2];
-  limits.mipmapPrecisionBits = vk_limits->mipmapPrecisionBits;
-  limits.maxSamplerLodBias = vk_limits->maxSamplerLodBias;
-  limits.maxSamplerAnisotropy = vk_limits->maxSamplerAnisotropy;
-  limits.minMemoryMapAlignment = vk_limits->minMemoryMapAlignment;
-  limits.minUniformBufferOffsetAlignment = vk_limits->minUniformBufferOffsetAlignment;
-  limits.minStorageBufferOffsetAlignment = vk_limits->minStorageBufferOffsetAlignment;
-  limits.minTexelOffset = vk_limits->minTexelOffset;
-  limits.maxTexelOffset = vk_limits->maxTexelOffset;
-  limits.minTexelGatherOffset = vk_limits->minTexelGatherOffset;
-  limits.maxTexelGatherOffset = vk_limits->maxTexelGatherOffset;
-  limits.minInterpolationOffset = vk_limits->minInterpolationOffset;
-  limits.maxInterpolationOffset = vk_limits->maxInterpolationOffset;
-  limits.subPixelInterpolationOffsetBits = vk_limits->subPixelInterpolationOffsetBits;
-  limits.maxSampleMaskWords = vk_limits->maxSampleMaskWords;
-  limits.timestampComputeAndGraphics = vk_limits->timestampComputeAndGraphics;
-  limits.timestampPeriod = vk_limits->timestampPeriod;
-  limits.discreteQueuePriorities = vk_limits->discreteQueuePriorities;
-  limits.optimalBufferCopyOffsetAlignment = vk_limits->optimalBufferCopyOffsetAlignment;
-  limits.optimalBufferCopyRowPitchAlignment = vk_limits->optimalBufferCopyRowPitchAlignment;
-  limits.nonCoherentAtomSize = vk_limits->nonCoherentAtomSize;
-  limits.subgroupSize = vk_subgroup_props->subgroupSize;
-  limits.minAccelerationStructureScratchOffsetAlignment = vk_as_props->minAccelerationStructureScratchOffsetAlignment;
-  return limits;
+  cgpu_physical_device_properties properties = {0};
+  properties.maxImageDimension1D = vk_limits->maxImageDimension1D;
+  properties.maxImageDimension2D = vk_limits->maxImageDimension2D;
+  properties.maxImageDimension3D = vk_limits->maxImageDimension3D;
+  properties.maxImageDimensionCube = vk_limits->maxImageDimensionCube;
+  properties.maxImageArrayLayers = vk_limits->maxImageArrayLayers;
+  properties.maxUniformBufferRange = vk_limits->maxUniformBufferRange;
+  properties.maxStorageBufferRange = vk_limits->maxStorageBufferRange;
+  properties.maxPushConstantsSize = vk_limits->maxPushConstantsSize;
+  properties.maxMemoryAllocationCount = vk_limits->maxMemoryAllocationCount;
+  properties.maxSamplerAllocationCount = vk_limits->maxSamplerAllocationCount;
+  properties.bufferImageGranularity = vk_limits->bufferImageGranularity;
+  properties.sparseAddressSpaceSize = vk_limits->sparseAddressSpaceSize;
+  properties.maxBoundDescriptorSets = vk_limits->maxBoundDescriptorSets;
+  properties.maxPerStageDescriptorSamplers = vk_limits->maxPerStageDescriptorSamplers;
+  properties.maxPerStageDescriptorUniformBuffers = vk_limits->maxPerStageDescriptorUniformBuffers;
+  properties.maxPerStageDescriptorStorageBuffers = vk_limits->maxPerStageDescriptorStorageBuffers;
+  properties.maxPerStageDescriptorSampledImages = vk_limits->maxPerStageDescriptorSampledImages;
+  properties.maxPerStageDescriptorStorageImages = vk_limits->maxPerStageDescriptorStorageImages;
+  properties.maxPerStageDescriptorInputAttachments = vk_limits->maxPerStageDescriptorInputAttachments;
+  properties.maxPerStageResources = vk_limits->maxPerStageResources;
+  properties.maxDescriptorSetSamplers = vk_limits->maxDescriptorSetSamplers;
+  properties.maxDescriptorSetUniformBuffers = vk_limits->maxDescriptorSetUniformBuffers;
+  properties.maxDescriptorSetUniformBuffersDynamic = vk_limits->maxDescriptorSetUniformBuffersDynamic;
+  properties.maxDescriptorSetStorageBuffers = vk_limits->maxDescriptorSetStorageBuffers;
+  properties.maxDescriptorSetStorageBuffersDynamic = vk_limits->maxDescriptorSetStorageBuffersDynamic;
+  properties.maxDescriptorSetSampledImages = vk_limits->maxDescriptorSetSampledImages;
+  properties.maxDescriptorSetStorageImages = vk_limits->maxDescriptorSetStorageImages;
+  properties.maxDescriptorSetInputAttachments = vk_limits->maxDescriptorSetInputAttachments;
+  properties.maxComputeSharedMemorySize = vk_limits->maxComputeSharedMemorySize;
+  properties.maxComputeWorkGroupCount[0] = vk_limits->maxComputeWorkGroupCount[0];
+  properties.maxComputeWorkGroupCount[1] = vk_limits->maxComputeWorkGroupCount[1];
+  properties.maxComputeWorkGroupCount[2] = vk_limits->maxComputeWorkGroupCount[2];
+  properties.maxComputeWorkGroupInvocations = vk_limits->maxComputeWorkGroupInvocations;
+  properties.maxComputeWorkGroupSize[0] = vk_limits->maxComputeWorkGroupSize[0];
+  properties.maxComputeWorkGroupSize[1] = vk_limits->maxComputeWorkGroupSize[1];
+  properties.maxComputeWorkGroupSize[2] = vk_limits->maxComputeWorkGroupSize[2];
+  properties.mipmapPrecisionBits = vk_limits->mipmapPrecisionBits;
+  properties.maxSamplerLodBias = vk_limits->maxSamplerLodBias;
+  properties.maxSamplerAnisotropy = vk_limits->maxSamplerAnisotropy;
+  properties.minMemoryMapAlignment = vk_limits->minMemoryMapAlignment;
+  properties.minUniformBufferOffsetAlignment = vk_limits->minUniformBufferOffsetAlignment;
+  properties.minStorageBufferOffsetAlignment = vk_limits->minStorageBufferOffsetAlignment;
+  properties.minTexelOffset = vk_limits->minTexelOffset;
+  properties.maxTexelOffset = vk_limits->maxTexelOffset;
+  properties.minTexelGatherOffset = vk_limits->minTexelGatherOffset;
+  properties.maxTexelGatherOffset = vk_limits->maxTexelGatherOffset;
+  properties.minInterpolationOffset = vk_limits->minInterpolationOffset;
+  properties.maxInterpolationOffset = vk_limits->maxInterpolationOffset;
+  properties.subPixelInterpolationOffsetBits = vk_limits->subPixelInterpolationOffsetBits;
+  properties.maxSampleMaskWords = vk_limits->maxSampleMaskWords;
+  properties.timestampComputeAndGraphics = vk_limits->timestampComputeAndGraphics;
+  properties.timestampPeriod = vk_limits->timestampPeriod;
+  properties.discreteQueuePriorities = vk_limits->discreteQueuePriorities;
+  properties.optimalBufferCopyOffsetAlignment = vk_limits->optimalBufferCopyOffsetAlignment;
+  properties.optimalBufferCopyRowPitchAlignment = vk_limits->optimalBufferCopyRowPitchAlignment;
+  properties.nonCoherentAtomSize = vk_limits->nonCoherentAtomSize;
+  properties.subgroupSize = vk_subgroup_props->subgroupSize;
+  properties.minAccelerationStructureScratchOffsetAlignment = vk_as_props->minAccelerationStructureScratchOffsetAlignment;
+  return properties;
 }
 
 static VkFormat cgpu_translate_image_format(CgpuImageFormat image_format)
@@ -676,7 +676,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   }
 
   const VkPhysicalDeviceLimits* limits = &device_properties.properties.limits;
-  idevice->limits = cgpu_translate_physical_device_limits(limits, &subgroup_properties, &as_properties);
+  idevice->properties = cgpu_translate_physical_device_properties(limits, &subgroup_properties, &as_properties);
 
   uint32_t device_ext_count;
   vkEnumerateDeviceExtensionProperties(
@@ -2035,7 +2035,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
                                   CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
                                   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                                   as_build_sizes_info.buildScratchSize,
-                                  idevice->limits.minAccelerationStructureScratchOffsetAlignment,
+                                  idevice->properties.minAccelerationStructureScratchOffsetAlignment,
                                   &scratch_buffer))
   {
     cgpu_destroy_buffer(device, *as_buffer);
@@ -2645,7 +2645,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          if ((buffer_binding->offset % idevice->limits.minStorageBufferOffsetAlignment) != 0) {
+          if ((buffer_binding->offset % idevice->properties.minStorageBufferOffsetAlignment) != 0) {
             CGPU_RETURN_ERROR("buffer binding offset not aligned");
           }
 
@@ -3393,13 +3393,13 @@ bool cgpu_get_physical_device_features(cgpu_device device,
   return true;
 }
 
-bool cgpu_get_physical_device_limits(cgpu_device device,
-                                     cgpu_physical_device_limits* p_limits)
+bool cgpu_get_physical_device_properties(cgpu_device device,
+                                         cgpu_physical_device_properties* p_properties)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  memcpy(p_limits, &idevice->limits, sizeof(cgpu_physical_device_limits));
+  memcpy(p_properties, &idevice->properties, sizeof(cgpu_physical_device_properties));
   return true;
 }
