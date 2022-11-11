@@ -28,22 +28,22 @@
 
 #include <vma.h>
 
-#define MIN_VK_API_VERSION VK_API_VERSION_1_1
+#define CGPU_MIN_VK_API_VERSION VK_API_VERSION_1_1
 
 /* Array and pool allocation limits. */
 
-#define MAX_PHYSICAL_DEVICES 8
-#define MAX_DEVICE_EXTENSIONS 1024
-#define MAX_QUEUE_FAMILIES 64
-#define MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS 128
-#define MAX_DESCRIPTOR_BUFFER_INFOS 64
-#define MAX_DESCRIPTOR_IMAGE_INFOS 2048
-#define MAX_DESCRIPTOR_AS_INFOS 1
-#define MAX_WRITE_DESCRIPTOR_SETS 128
-#define MAX_BUFFER_MEMORY_BARRIERS 64
-#define MAX_IMAGE_MEMORY_BARRIERS 2048
-#define MAX_MEMORY_BARRIERS 128
-#define MAX_RAY_RECURSION_DEPTH 31
+#define CGPU_MAX_PHYSICAL_DEVICES 8
+#define CGPU_MAX_DEVICE_EXTENSIONS 1024
+#define CGPU_MAX_QUEUE_FAMILIES 64
+#define CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS 128
+#define CGPU_MAX_DESCRIPTOR_BUFFER_INFOS 64
+#define CGPU_MAX_DESCRIPTOR_IMAGE_INFOS 2048
+#define CGPU_MAX_DESCRIPTOR_AS_INFOS 1
+#define CGPU_MAX_WRITE_DESCRIPTOR_SETS 128
+#define CGPU_MAX_BUFFER_MEMORY_BARRIERS 64
+#define CGPU_MAX_IMAGE_MEMORY_BARRIERS 2048
+#define CGPU_MAX_MEMORY_BARRIERS 128
+#define CGPU_MAX_RAY_RECURSION_DEPTH 31
 
 /* Internal structures. */
 
@@ -87,7 +87,7 @@ typedef struct cgpu_ipipeline {
   VkDescriptorPool             descriptor_pool;
   VkDescriptorSet              descriptor_set;
   VkDescriptorSetLayout        descriptor_set_layout;
-  VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
+  VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
   uint32_t                     descriptor_set_layout_binding_count;
   cgpu_shader                  shader;
   VkPipelineBindPoint          bind_point;
@@ -505,7 +505,7 @@ bool cgpu_initialize(const char* p_app_name,
 {
   VkResult result = volkInitialize();
 
-  if (result != VK_SUCCESS || volkGetInstanceVersion() < MIN_VK_API_VERSION) {
+  if (result != VK_SUCCESS || volkGetInstanceVersion() < CGPU_MIN_VK_API_VERSION) {
     CGPU_RETURN_ERROR("failed to initialize volk");
   }
 
@@ -532,7 +532,7 @@ bool cgpu_initialize(const char* p_app_name,
   app_info.applicationVersion = VK_MAKE_VERSION(version_major, version_minor, version_patch);
   app_info.pEngineName = p_app_name;
   app_info.engineVersion = VK_MAKE_VERSION(version_major, version_minor, version_patch);
-  app_info.apiVersion = MIN_VK_API_VERSION;
+  app_info.apiVersion = CGPU_MIN_VK_API_VERSION;
 
   VkInstanceCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -611,7 +611,7 @@ bool cgpu_create_device(cgpu_device* p_device)
     NULL
   );
 
-  if (phys_device_count > MAX_PHYSICAL_DEVICES)
+  if (phys_device_count > CGPU_MAX_PHYSICAL_DEVICES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
@@ -623,7 +623,7 @@ bool cgpu_create_device(cgpu_device* p_device)
     CGPU_RETURN_ERROR("no physical device found");
   }
 
-  VkPhysicalDevice phys_devices[MAX_PHYSICAL_DEVICES];
+  VkPhysicalDevice phys_devices[CGPU_MAX_PHYSICAL_DEVICES];
 
   vkEnumeratePhysicalDevices(
     iinstance.instance,
@@ -655,7 +655,7 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   vkGetPhysicalDeviceProperties2(idevice->physical_device, &device_properties);
 
-  if (device_properties.properties.apiVersion < MIN_VK_API_VERSION)
+  if (device_properties.properties.apiVersion < CGPU_MIN_VK_API_VERSION)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     CGPU_RETURN_ERROR("unsupported vulkan version");
@@ -669,9 +669,9 @@ bool cgpu_create_device(cgpu_device* p_device)
     CGPU_RETURN_ERROR("subgroup features not supported");
   }
 
-  if (rt_pipeline_properties.maxRayRecursionDepth < MAX_RAY_RECURSION_DEPTH)
+  if (rt_pipeline_properties.maxRayRecursionDepth < CGPU_MAX_RAY_RECURSION_DEPTH)
   {
-    fprintf(stderr, "error in %s:%d: max ray recursion depth of %d not supported\n", __FILE__, __LINE__, MAX_RAY_RECURSION_DEPTH);
+    fprintf(stderr, "error in %s:%d: max ray recursion depth of %d not supported\n", __FILE__, __LINE__, CGPU_MAX_RAY_RECURSION_DEPTH);
     return false;
   }
 
@@ -686,13 +686,13 @@ bool cgpu_create_device(cgpu_device* p_device)
     NULL
   );
 
-  if (device_ext_count > MAX_DEVICE_EXTENSIONS)
+  if (device_ext_count > CGPU_MAX_DEVICE_EXTENSIONS)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
-  VkExtensionProperties device_extensions[MAX_DEVICE_EXTENSIONS];
+  VkExtensionProperties device_extensions[CGPU_MAX_DEVICE_EXTENSIONS];
 
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
@@ -771,13 +771,13 @@ bool cgpu_create_device(cgpu_device* p_device)
     NULL
   );
 
-  if (queue_family_count > MAX_QUEUE_FAMILIES)
+  if (queue_family_count > CGPU_MAX_QUEUE_FAMILIES)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
-  VkQueueFamilyProperties queue_families[MAX_QUEUE_FAMILIES];
+  VkQueueFamilyProperties queue_families[CGPU_MAX_QUEUE_FAMILIES];
 
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
@@ -1073,7 +1073,7 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   VmaAllocatorCreateInfo alloc_create_info = {0};
   alloc_create_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
-  alloc_create_info.vulkanApiVersion = MIN_VK_API_VERSION;
+  alloc_create_info.vulkanApiVersion = CGPU_MIN_VK_API_VERSION;
   alloc_create_info.physicalDevice = idevice->physical_device;
   alloc_create_info.device = idevice->logical_device;
   alloc_create_info.instance = iinstance.instance;
@@ -1667,7 +1667,7 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
 {
   const cgpu_shader_reflection* shader_reflection = &ishader->reflection;
 
-  if (shader_reflection->binding_count >= MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS)
+  if (shader_reflection->binding_count >= CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS)
   {
     CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
@@ -2461,7 +2461,7 @@ static bool cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkImageMemoryBarrier barriers[MAX_IMAGE_MEMORY_BARRIERS];
+  VkImageMemoryBarrier barriers[CGPU_MAX_IMAGE_MEMORY_BARRIERS];
   uint32_t barrier_count = 0;
 
   /* FIXME: this has quadratic complexity */
@@ -2521,7 +2521,7 @@ static bool cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
         access_mask = VK_ACCESS_SHADER_WRITE_BIT;
       }
 
-      if (barrier_count >= MAX_IMAGE_MEMORY_BARRIERS) {
+      if (barrier_count >= CGPU_MAX_IMAGE_MEMORY_BARRIERS) {
         CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
       }
 
@@ -2593,14 +2593,14 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
     return c_result;
   }
 
-  VkDescriptorBufferInfo buffer_infos[MAX_DESCRIPTOR_BUFFER_INFOS];
+  VkDescriptorBufferInfo buffer_infos[CGPU_MAX_DESCRIPTOR_BUFFER_INFOS];
   uint32_t buffer_info_count = 0;
-  VkDescriptorImageInfo image_infos[MAX_DESCRIPTOR_IMAGE_INFOS];
+  VkDescriptorImageInfo image_infos[CGPU_MAX_DESCRIPTOR_IMAGE_INFOS];
   uint32_t image_info_count = 0;
-  VkWriteDescriptorSetAccelerationStructureKHR as_infos[MAX_DESCRIPTOR_AS_INFOS];
+  VkWriteDescriptorSetAccelerationStructureKHR as_infos[CGPU_MAX_DESCRIPTOR_AS_INFOS];
   uint32_t as_info_count = 0;
 
-  VkWriteDescriptorSet write_descriptor_sets[MAX_WRITE_DESCRIPTOR_SETS];
+  VkWriteDescriptorSet write_descriptor_sets[CGPU_MAX_WRITE_DESCRIPTOR_SETS];
   uint32_t write_descriptor_set_count = 0;
 
   /* FIXME: this has a rather high complexity */
@@ -2608,7 +2608,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
   {
     const VkDescriptorSetLayoutBinding* layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
 
-    if (write_descriptor_set_count >= MAX_WRITE_DESCRIPTOR_SETS) {
+    if (write_descriptor_set_count >= CGPU_MAX_WRITE_DESCRIPTOR_SETS) {
       CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
     }
 
@@ -2649,7 +2649,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR("buffer binding offset not aligned");
           }
 
-          if (image_info_count >= MAX_DESCRIPTOR_BUFFER_INFOS) {
+          if (image_info_count >= CGPU_MAX_DESCRIPTOR_BUFFER_INFOS) {
             CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
           }
 
@@ -2685,7 +2685,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          if (image_info_count >= MAX_DESCRIPTOR_IMAGE_INFOS) {
+          if (image_info_count >= CGPU_MAX_DESCRIPTOR_IMAGE_INFOS) {
             CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
           }
 
@@ -2720,7 +2720,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          if (image_info_count >= MAX_DESCRIPTOR_IMAGE_INFOS) {
+          if (image_info_count >= CGPU_MAX_DESCRIPTOR_IMAGE_INFOS) {
             CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
           }
 
@@ -2755,7 +2755,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          if (as_info_count >= MAX_DESCRIPTOR_AS_INFOS) {
+          if (as_info_count >= CGPU_MAX_DESCRIPTOR_AS_INFOS) {
             CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
           }
 
@@ -3000,14 +3000,14 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  if (barrier_count >= MAX_MEMORY_BARRIERS ||
-      buffer_barrier_count >= MAX_BUFFER_MEMORY_BARRIERS ||
-      image_barrier_count >= MAX_IMAGE_MEMORY_BARRIERS)
+  if (barrier_count >= CGPU_MAX_MEMORY_BARRIERS ||
+      buffer_barrier_count >= CGPU_MAX_BUFFER_MEMORY_BARRIERS ||
+      image_barrier_count >= CGPU_MAX_IMAGE_MEMORY_BARRIERS)
   {
     CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
   }
 
-  VkMemoryBarrier vk_memory_barriers[MAX_MEMORY_BARRIERS];
+  VkMemoryBarrier vk_memory_barriers[CGPU_MAX_MEMORY_BARRIERS];
 
   for (uint32_t i = 0; i < barrier_count; ++i)
   {
@@ -3019,8 +3019,8 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
     b_vk->dstAccessMask = cgpu_translate_access_flags(b_cgpu->dst_access_flags);
   }
 
-  VkBufferMemoryBarrier vk_buffer_memory_barriers[MAX_BUFFER_MEMORY_BARRIERS];
-  VkImageMemoryBarrier vk_image_memory_barriers[MAX_IMAGE_MEMORY_BARRIERS];
+  VkBufferMemoryBarrier vk_buffer_memory_barriers[CGPU_MAX_BUFFER_MEMORY_BARRIERS];
+  VkImageMemoryBarrier vk_image_memory_barriers[CGPU_MAX_IMAGE_MEMORY_BARRIERS];
 
   for (uint32_t i = 0; i < buffer_barrier_count; ++i)
   {
