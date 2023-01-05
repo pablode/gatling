@@ -11,6 +11,24 @@ add_library(
   src/texsys.h
   src/texsys.cpp
   src/turbo.h
+  src/sg/ShaderGen.h
+  src/sg/ShaderGen.cpp
+  src/sg/GlslangShaderCompiler.h
+  src/sg/GlslangShaderCompiler.cpp
+  src/sg/MdlGlslCodeGen.h
+  src/sg/MdlGlslCodeGen.cpp
+  src/sg/MdlLogger.h
+  src/sg/MdlLogger.cpp
+  src/sg/MdlMaterialCompiler.h
+  src/sg/MdlMaterialCompiler.cpp
+  src/sg/MdlNeurayLoader.h
+  src/sg/MdlNeurayLoader.cpp
+  src/sg/MdlRuntime.h
+  src/sg/MdlRuntime.cpp
+  src/sg/MtlxDocumentPatcher.h
+  src/sg/MtlxDocumentPatcher.cpp
+  src/sg/MtlxMdlCodeGen.h
+  src/sg/MtlxMdlCodeGen.cpp
 )
 
 target_include_directories(
@@ -19,6 +37,7 @@ target_include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
   PRIVATE
     src
+    ${MDL_INCLUDE_DIR}
 )
 
 target_compile_definitions(
@@ -33,9 +52,13 @@ target_link_libraries(
   gi
   PRIVATE
     cgpu
-    shadergen
     gml
     imgio
+    MaterialXCore
+    MaterialXFormat
+    MaterialXGenMdl
+    glslang
+    SPIRV
 )
 
 # Required since library is linked into hdGatling DSO
@@ -44,3 +67,21 @@ set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(ENABLE_IPO)
   set_target_properties(gi PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 endif()
+
+install(
+  FILES ${MDL_SHARED_LIB}
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
+  COMPONENT hdGatling
+)
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
+  COMPONENT hdGatling
+)
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mdl"
+  COMPONENT hdGatling
+)

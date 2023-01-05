@@ -33,7 +33,7 @@
 
 #include <cgpu.h>
 #include <gml.h>
-#include <ShaderGen.h>
+#include <sg/ShaderGen.h>
 
 const uint32_t WORKGROUP_SIZE_X = 32;
 const uint32_t WORKGROUP_SIZE_Y = 8;
