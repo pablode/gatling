@@ -278,7 +278,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cache->face_count = params->face_count;
   cache->emissive_face_indices_buf_size = emissive_face_indices_buf_size;
   cache->emissive_face_indices_buf_offset = emissive_face_indices_buf_offset;
-  cache->emissive_face_count = emissive_face_indices.size();
+  cache->emissive_face_count = (uint32_t) emissive_face_indices.size();
   cache->vertex_buf_size = vertex_buf_size;
   cache->vertex_buf_offset = vertex_buf_offset;
 
@@ -313,9 +313,9 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     }
 
     if (!cgpu_create_acceleration_structure(s_device,
-                                            vertices.size(),
+                                            (uint32_t) vertices.size(),
                                             vertices.data(),
-                                            indices.size(),
+                                            (uint32_t) indices.size(),
                                             indices.data(),
                                             &cache->acceleration_structure))
     {
@@ -544,7 +544,7 @@ int giRender(const gi_render_params* params, float* rgba_img)
   }
   buffers.push_back({ 3, 0, geom_cache->buffer, geom_cache->vertex_buf_offset, geom_cache->vertex_buf_size });
 
-  uint32_t image_count = shader_cache->images_2d.size() + shader_cache->images_3d.size();
+  size_t image_count = shader_cache->images_2d.size() + shader_cache->images_3d.size();
 
   std::vector<cgpu_image_binding> images;
   images.reserve(image_count);
@@ -569,9 +569,9 @@ int giRender(const gi_render_params* params, float* rgba_img)
   cgpu_acceleration_structure_binding as = { 8, 0, geom_cache->acceleration_structure };
 
   cgpu_bindings bindings = {0};
-  bindings.buffer_count = buffers.size();
+  bindings.buffer_count = (uint32_t) buffers.size();
   bindings.p_buffers = buffers.data();
-  bindings.image_count = images.size();
+  bindings.image_count = (uint32_t) images.size();
   bindings.p_images = images.data();
   bindings.sampler_count = image_count ? 1 : 0;
   bindings.p_samplers = &sampler;
@@ -680,9 +680,9 @@ int giRender(const gi_render_params* params, float* rgba_img)
     }
     for (int i = 0; i < value_count && max_value > 0.0f; i += 4) {
       int val_index = std::min(int((rgba_img[i] / max_value) * 255.0), 255);
-      rgba_img[i + 0] = gi::TURBO_SRGB_FLOATS[val_index][0];
-      rgba_img[i + 1] = gi::TURBO_SRGB_FLOATS[val_index][1];
-      rgba_img[i + 2] = gi::TURBO_SRGB_FLOATS[val_index][2];
+      rgba_img[i + 0] = (float) gi::TURBO_SRGB_FLOATS[val_index][0];
+      rgba_img[i + 1] = (float) gi::TURBO_SRGB_FLOATS[val_index][1];
+      rgba_img[i + 2] = (float) gi::TURBO_SRGB_FLOATS[val_index][2];
       rgba_img[i + 3] = 255;
     }
   }

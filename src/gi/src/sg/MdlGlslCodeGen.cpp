@@ -132,7 +132,7 @@ namespace sg
 
   void MdlGlslCodeGen::extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, std::vector<TextureResource>& textureResources)
   {
-    int texCount = targetCode->get_body_texture_count();
+    size_t texCount = targetCode->get_body_texture_count();
     textureResources.reserve(texCount);
 
     // We start at 1 because index 0 is the invalid texture.
@@ -164,9 +164,9 @@ namespace sg
         assert(dataPtr);
 
         textureResource.is3dImage = true;
-        textureResource.width = width;
-        textureResource.height = height;
-        textureResource.depth = depth;
+        textureResource.width = (uint32_t) width;
+        textureResource.height = (uint32_t) height;
+        textureResource.depth = (uint32_t) depth;
 
         uint64_t size = width * height * depth * sizeof(mi::Float32);
         std::vector<uint8_t>& data = textureResource.data;
@@ -207,7 +207,7 @@ namespace sg
       return false;
     }
 
-    uint32_t materialCount = materials.size();
+    auto materialCount = uint32_t(materials.size());
     for (uint32_t i = 0; i < materialCount; i++)
     {
       const mi::neuraylib::ICompiled_material* material = materials.at(i);

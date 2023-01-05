@@ -24,6 +24,7 @@
 #include <ShaderGen.h>
 #include <imgio.h>
 #include <assert.h>
+#include <inttypes.h>
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
@@ -75,14 +76,14 @@ namespace gi
                             std::vector<cgpu_image>& images3d,
                             std::vector<uint16_t>& imageMappings)
   {
-    uint32_t texCount = textureResources.size();
+    size_t texCount = textureResources.size();
 
     if (texCount == 0)
     {
       return true;
     }
 
-    printf("staging %d images\n", texCount);
+    printf("staging %zu images\n", texCount);
 
     imageMappings.resize(texCount, 0);
     images2d.reserve(texCount);
@@ -107,12 +108,12 @@ namespace gi
 
       int binding = textureResource.binding;
       assert(binding < imageMappings.size());
-      imageMappings[binding] = imageVector.size();
+      imageMappings[binding] = (uint16_t) imageVector.size();
 
       const char* filePath = textureResource.filePath.c_str();
       if (strcmp(filePath, "") == 0)
       {
-        uint32_t payloadSize = payload.size();
+        uint64_t payloadSize = payload.size();
         if (payloadSize == 0)
         {
           fprintf(stderr, "image %d has no payload\n", i);
