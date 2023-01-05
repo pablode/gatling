@@ -25,7 +25,7 @@
 
 namespace fs = std::filesystem;
 
-namespace sg
+namespace gi::sg
 {
   const char* MODULE_PREFIX = "::gatling::";
   std::atomic_uint32_t s_idCounter(0);

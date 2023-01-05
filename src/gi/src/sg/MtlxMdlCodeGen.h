@@ -24,7 +24,7 @@
 #include <MaterialXFormat/File.h>
 #include <MaterialXGenShader/ShaderGenerator.h>
 
-namespace sg
+namespace gi::sg
 {
   class MtlxMdlCodeGen
   {

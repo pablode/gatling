@@ -20,7 +20,7 @@
 #include <vector>
 #include <string_view>
 
-namespace sg
+namespace gi::sg
 {
   class GlslangShaderCompiler
   {

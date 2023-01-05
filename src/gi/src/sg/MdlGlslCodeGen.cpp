@@ -25,7 +25,7 @@
 
 namespace fs = std::filesystem;
 
-namespace sg
+namespace gi::sg
 {
   const char* SCATTERING_FUNC_NAME = "mdl_bsdf_scattering";
   const char* EMISSION_FUNC_NAME = "mdl_edf_emission";

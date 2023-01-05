@@ -21,7 +21,7 @@
 
 #include <memory>
 
-namespace sg
+namespace gi::sg
 {
   class MtlxDocumentPatcher
   {

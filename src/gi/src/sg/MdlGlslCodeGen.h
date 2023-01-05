@@ -33,7 +33,7 @@
 #include "MdlRuntime.h"
 #include "MdlLogger.h"
 
-namespace sg
+namespace gi::sg
 {
   class MdlGlslCodeGen
   {

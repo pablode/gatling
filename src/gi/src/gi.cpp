@@ -35,6 +35,8 @@
 #include <gml.h>
 #include <sg/ShaderGen.h>
 
+using namespace gi;
+
 const uint32_t WORKGROUP_SIZE_X = 32;
 const uint32_t WORKGROUP_SIZE_Y = 8;
 const float    BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);

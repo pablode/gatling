@@ -20,7 +20,7 @@
 #include <mi/base/handle.h>
 #include <mi/neuraylib/ineuray.h>
 
-namespace sg
+namespace gi::sg
 {
   class MdlNeurayLoader
   {

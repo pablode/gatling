@@ -25,13 +25,13 @@
 
 class GiAssetReader;
 
-namespace sg
-{
-  struct TextureResource;
-}
-
 namespace gi
 {
+  namespace sg
+  {
+    struct TextureResource;
+  }
+
   class Stager;
 
   class TexSys

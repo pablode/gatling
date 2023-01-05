@@ -21,7 +21,7 @@
 #include "mmap.h"
 #include "gi.h"
 
-#include <ShaderGen.h>
+#include <sg/ShaderGen.h>
 #include <imgio.h>
 #include <assert.h>
 #include <inttypes.h>

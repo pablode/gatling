@@ -24,7 +24,7 @@
 #include <string>
 #include <memory>
 
-namespace sg
+namespace gi::sg
 {
   struct Material;
 

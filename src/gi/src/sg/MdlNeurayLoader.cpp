@@ -27,7 +27,7 @@
 
 #include <string>
 
-namespace sg
+namespace gi::sg
 {
   MdlNeurayLoader::MdlNeurayLoader()
     : m_dsoHandle(nullptr)

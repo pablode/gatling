@@ -377,7 +377,7 @@ void _PatchNodeNames(mx::DocumentPtr document)
   }
 }
 
-namespace sg
+namespace gi::sg
 {
   void MtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
   {

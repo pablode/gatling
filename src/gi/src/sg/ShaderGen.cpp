@@ -30,7 +30,7 @@
 #include <fstream>
 #include <cassert>
 
-namespace sg
+namespace gi::sg
 {
   struct Material
   {

@@ -19,7 +19,7 @@
 
 #include <mi/mdl_sdk.h>
 
-namespace sg
+namespace gi::sg
 {
   MdlRuntime::MdlRuntime()
   {

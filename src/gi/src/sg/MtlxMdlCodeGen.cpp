@@ -35,7 +35,7 @@
 
 namespace mx = MaterialX;
 
-namespace sg
+namespace gi::sg
 {
   MtlxMdlCodeGen::MtlxMdlCodeGen(const char* mtlxLibPath)
     : m_mtlxLibPath(mtlxLibPath)

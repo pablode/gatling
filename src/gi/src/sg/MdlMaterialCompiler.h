@@ -31,7 +31,7 @@
 
 #include "MdlRuntime.h"
 
-namespace sg
+namespace gi::sg
 {
   class MdlMaterialCompiler
   {

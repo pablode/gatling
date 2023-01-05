@@ -182,7 +182,7 @@ namespace detail
     }
   };
 
-  using ShaderStage = sg::GlslangShaderCompiler::ShaderStage;
+  using ShaderStage = gi::sg::GlslangShaderCompiler::ShaderStage;
 
   EShLanguage getGlslangShaderLanguage(ShaderStage stage)
   {
@@ -199,7 +199,7 @@ namespace detail
   }
 }
 
-namespace sg
+namespace gi::sg
 {
   static bool s_glslangInitialized = false;
 

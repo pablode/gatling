@@ -21,7 +21,7 @@
 
 #include <stdio.h>
 
-namespace sg
+namespace gi::sg
 {
   const char* _miMessageSeverityToCStr(mi::base::Message_severity severity)
   {
