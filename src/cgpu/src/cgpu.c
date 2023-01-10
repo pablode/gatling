@@ -1534,9 +1534,9 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
   return true;
 }
 
-bool cgpu_create_pipeline(cgpu_device device,
-                          cgpu_shader shader,
-                          cgpu_pipeline* p_pipeline)
+bool cgpu_create_compute_pipeline(cgpu_device device,
+                                  cgpu_shader shader,
+                                  cgpu_pipeline* p_pipeline)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {

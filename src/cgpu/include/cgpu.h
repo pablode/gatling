@@ -559,7 +559,7 @@ CGPU_API bool CGPU_CDECL cgpu_destroy_sampler(
   cgpu_sampler sampler
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_pipeline(
+CGPU_API bool CGPU_CDECL cgpu_create_compute_pipeline(
   cgpu_device device,
   cgpu_shader shader,
   cgpu_pipeline* p_pipeline
