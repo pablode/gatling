@@ -15,8 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef SHADERGEN_H
-#define SHADERGEN_H
+#pragma once
 
 #include <cstdint>
 #include <string_view>
@@ -92,5 +91,3 @@ namespace gi::sg
     std::string m_shaderPath;
   };
 }
-
-#endif
