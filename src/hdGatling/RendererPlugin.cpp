@@ -140,7 +140,11 @@ void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDeleg
   delete renderDelegate;
 }
 
+#if PXR_VERSION >= 2302
+bool HdGatlingRendererPlugin::IsSupported(bool gpuEnabled) const
+#else
 bool HdGatlingRendererPlugin::IsSupported() const
+#endif
 {
   return m_isSupported;
 }

@@ -39,7 +39,11 @@ public:
 
   void DeleteRenderDelegate(HdRenderDelegate* renderDelegate) override;
 
+#if PXR_VERSION >= 2302
+  bool IsSupported(bool gpuEnabled) const override;
+#else
   bool IsSupported() const override;
+#endif
 
 private:
   std::unique_ptr<MaterialNetworkTranslator> m_translator;
