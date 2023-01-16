@@ -72,6 +72,7 @@ set(ZLIB_COMPAT ON)
 set(ZLIB_ENABLE_TESTS OFF)
 add_subdirectory(zlib-ng)
 target_include_directories(zlib PUBLIC zlib-ng $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
+add_library(ZLIB::ZLIB ALIAS zlib) # Needed for OpenEXR
 
 #
 # libspng
