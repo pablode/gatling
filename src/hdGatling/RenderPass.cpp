@@ -37,16 +37,17 @@ std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* nam
   // Prefer UsdPreviewSurface over MDL diffuse or unlit because we want to give a good first
   // impression (many people will try Pixar's Kitchen scene first), regardless of whether the user
   // is aware of the use or purpose of the displayColor attribute (as opposed to a preview material).
-  static const char* USDPREVIEWSURFACE_MTLX_DOC =
-    "<?xml version=\"1.0\"?>"
-    "<materialx version=\"1.38\">"
-    "  <UsdPreviewSurface name=\"gatling_SR_%s\" type=\"surfaceshader\">"
-    "    <input name=\"diffuseColor\" type=\"color3\" value=\"%f, %f, %f\" />"
-    "  </UsdPreviewSurface>"
-    "  <surfacematerial name=\"gatling_MAT_%s\" type=\"material\">"
-    "    <input name=\"surfaceshader\" type=\"surfaceshader\" nodename=\"gatling_SR_%s\" />"
-    "  </surfacematerial>"
-    "</materialx>";
+  static const char* USDPREVIEWSURFACE_MTLX_DOC = R"(
+    <?xml version="1.0"?>
+    <materialx version="1.38">
+      <UsdPreviewSurface name="gatling_SR_%s" type="surfaceshader">
+        <input name="diffuseColor" type="color3" value="%f, %f, %f" />
+      </UsdPreviewSurface>
+      <surfacematerial name="gatling_MAT_%s" type="material">
+        <input name="surfaceshader" type="surfaceshader" nodename="gatling_SR_%s" />
+      </surfacematerial>
+    </materialx>
+  )";
 
   return TfStringPrintf(USDPREVIEWSURFACE_MTLX_DOC, name, color[0], color[1], color[2], name, name);
 }
