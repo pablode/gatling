@@ -200,12 +200,11 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
   {
     const HdRprim* rprim = renderIndex->GetRprim(rprimId);
 
-    if (!dynamic_cast<const HdMesh*>(rprim))
+    const HdGatlingMesh* mesh = dynamic_cast<const HdGatlingMesh*>(rprim);
+    if (!mesh)
     {
       continue;
     }
-
-    const HdGatlingMesh* mesh = dynamic_cast<const HdGatlingMesh*>(rprim);
 
     VtMatrix4dArray transforms;
     const SdfPath& instancerId = mesh->GetInstancerId();
