@@ -1,6 +1,3 @@
-[submodule "extern/MaterialX"]
-	path = extern/MaterialX
-	url = https://github.com/materialx/MaterialX
 [submodule "extern/volk"]
 	path = extern/volk
 	url = https://github.com/zeux/volk.git
@@ -34,3 +31,6 @@
 [submodule "extern/SPIRV-Reflect"]
 	path = extern/SPIRV-Reflect
 	url = https://github.com/pablode/SPIRV-Reflect
+[submodule "extern/MaterialX"]
+	path = extern/MaterialX
+	url = https://github.com/AcademySoftwareFoundation/MaterialX
