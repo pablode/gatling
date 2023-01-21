@@ -286,7 +286,7 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
 
     auto& parameters = node.parameters;
 
-    auto& isSrgbParam = parameters.find(_tokens->isSRGB);
+    auto isSrgbParam = parameters.find(_tokens->isSRGB);
     if (isSrgbParam == parameters.end())
     {
       continue;
