@@ -2641,6 +2641,8 @@ bool cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
 
 bool cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
                              cgpu_pipeline pipeline,
+                             CgpuShaderStageFlags stage_flags,
+                             uint32_t size,
                              const void* p_data)
 {
   cgpu_icommand_buffer* icommand_buffer;
@@ -2655,16 +2657,13 @@ bool cgpu_cmd_push_constants(cgpu_command_buffer command_buffer,
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  cgpu_ishader* ishader;
-  if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
+
   idevice->table.vkCmdPushConstants(
     icommand_buffer->command_buffer,
     ipipeline->layout,
-    ishader->stage_flags,
+    (VkShaderStageFlags) stage_flags,
     0,
-    ishader->reflection.push_constants_size,
+    size,
     p_data
   );
   return true;

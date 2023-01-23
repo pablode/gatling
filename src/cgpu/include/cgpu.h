@@ -630,6 +630,8 @@ CGPU_API bool CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
 CGPU_API bool CGPU_CDECL cgpu_cmd_push_constants(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline,
+  CgpuShaderStageFlags stage_flags,
+  uint32_t size,
   const void* p_data
 );
 
