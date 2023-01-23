@@ -232,32 +232,42 @@ namespace gi::sg
     return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::Miss, source, spv);
   }
 
-  bool ShaderGen::generateClosestHitIntermediates(const Material* material,
-                                                  ClosestHitShaderIntermediates& intermediates)
+  bool ShaderGen::generateMaterialGlslGenInfo(const Material* material, MaterialGlslGenInfo& genInfo)
   {
     const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
 
+    std::string mdlGeneratedGlsl;
     if (!m_mdlGlslCodeGen->translate(compiledMaterial,
-                                     intermediates.mdlGeneratedGlsl,
-                                     intermediates.textureResources))
+                                     mdlGeneratedGlsl,
+                                     genInfo.textureResources))
     {
       return false;
     }
+
+    // Remove MDL struct definitions because they're too bloated. We know more about the
+    // data from which the code is generated from and can reduce the memory footprint.
+    size_t mdlCodeOffset = mdlGeneratedGlsl.find("// user defined structs");
+    assert(mdlCodeOffset != std::string::npos);
+    mdlGeneratedGlsl = mdlGeneratedGlsl.substr(mdlCodeOffset, mdlGeneratedGlsl.size() - mdlCodeOffset);
+
+    GlslSourceStitcher stitcher;
+    if (!stitcher.appendSourceFile(m_shaderPath / "mdl_types.glsl"))
+    {
+      return false;
+    }
+    if (!stitcher.appendSourceFile(m_shaderPath / "mdl_interface.glsl"))
+    {
+      return false;
+    }
+    stitcher.appendString(mdlGeneratedGlsl);
+
+    genInfo.glslSource = stitcher.source();
 
     return true;
   }
 
   bool ShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)
   {
-    auto mdlGeneratedGlsl = std::string(params.mdlGeneratedGlsl);
-    {
-      // Remove MDL struct definitions because they're too bloated. We know more about the
-      // data from which the code is generated from and can reduce the memory footprint.
-      size_t mdlCodeOffset = mdlGeneratedGlsl.find("// user defined structs");
-      assert(mdlCodeOffset != std::string::npos);
-      mdlGeneratedGlsl = mdlGeneratedGlsl.substr(mdlCodeOffset, mdlGeneratedGlsl.size() - mdlCodeOffset);
-    }
-
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
@@ -272,7 +282,7 @@ namespace gi::sg
       return false;
     }
 
-    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", mdlGeneratedGlsl);
+    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", params.materialGlslSource);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::ClosestHit, source, spv);

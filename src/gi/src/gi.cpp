@@ -479,19 +479,19 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     }
 
     // 1. Generate GLSL from MDL
-    std::vector<sg::ShaderGen::ClosestHitShaderIntermediates> hitShaderIntermediates;
-    hitShaderIntermediates.resize(params->material_count);
+    std::vector<sg::ShaderGen::MaterialGlslGenInfo> hitShaderGenInfos;
+    hitShaderGenInfos.resize(params->material_count);
 
     std::atomic_bool threadWorkFailed = false;
 #pragma omp parallel for
-    for (int i = 0; i < hitShaderIntermediates.size(); i++)
+    for (int i = 0; i < hitShaderGenInfos.size(); i++)
     {
       const gi_material* mat = params->materials[i];
 
-      sg::ShaderGen::ClosestHitShaderIntermediates intermediates;
-      if (s_shaderGen->generateClosestHitIntermediates(mat->sg_mat, intermediates))
+      sg::ShaderGen::MaterialGlslGenInfo genInfo;
+      if (s_shaderGen->generateMaterialGlslGenInfo(mat->sg_mat, genInfo))
       {
-        hitShaderIntermediates[i] = intermediates;
+        hitShaderGenInfos[i] = genInfo;
       }
       else
       {
@@ -505,28 +505,28 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
     // 2. Sum up texture resources & calculate per-material index offsets.
     std::vector<uint32_t> textureIndexOffsets;
-    for (const auto& intermediates : hitShaderIntermediates)
+    for (const sg::ShaderGen::MaterialGlslGenInfo& genInfo : hitShaderGenInfos)
     {
       textureIndexOffsets.push_back(textureResources.size());
 
-      for (const auto& tr : intermediates.textureResources)
+      for (const sg::TextureResource& tr : genInfo.textureResources)
       {
         textureResources.push_back(tr);
       }
     }
 
     // 3. Generate final GLSL hit shaders, and compile them to SPIR-V.
-    hitShaders.resize(hitShaderIntermediates.size(), { CGPU_INVALID_HANDLE });
+    hitShaders.resize(hitShaderGenInfos.size(), { CGPU_INVALID_HANDLE });
     threadWorkFailed = false;
 #pragma omp parallel for
-    for (int i = 0; i < hitShaderIntermediates.size(); i++)
+    for (int i = 0; i < hitShaderGenInfos.size(); i++)
     {
-      const sg::ShaderGen::ClosestHitShaderIntermediates& intermediates = hitShaderIntermediates[i];
+      const sg::ShaderGen::MaterialGlslGenInfo& genInfo = hitShaderGenInfos[i];
 
       sg::ShaderGen::ClosestHitShaderParams hitParams;
       hitParams.aovId = params->aov_id;
       hitParams.baseFileName = "rt_main.chit";
-      hitParams.mdlGeneratedGlsl = intermediates.mdlGeneratedGlsl;
+      hitParams.materialGlslSource = genInfo.glslSource;
       hitParams.textureResources = &textureResources;
       hitParams.textureIndexOffset = textureIndexOffsets[i];
 

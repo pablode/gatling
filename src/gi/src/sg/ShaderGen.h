@@ -63,6 +63,14 @@ namespace gi::sg
     bool isMaterialEmissive(const struct Material* mat);
 
   public:
+    struct MaterialGlslGenInfo
+    {
+      std::string glslSource;
+      std::vector<TextureResource> textureResources;
+    };
+
+    bool generateMaterialGlslGenInfo(const Material* material, MaterialGlslGenInfo& genInfo);
+
     struct RaygenShaderParams
     {
       bool shaderClockExts;
@@ -72,24 +80,17 @@ namespace gi::sg
     {
       const std::vector<TextureResource>* textureResources;
     };
-    struct ClosestHitShaderIntermediates
-    {
-      std::string mdlGeneratedGlsl;
-      std::vector<TextureResource> textureResources;
-    };
     struct ClosestHitShaderParams
     {
       int32_t aovId;
       std::string_view baseFileName;
-      std::string_view mdlGeneratedGlsl;
+      std::string_view materialGlslSource;
       uint32_t textureIndexOffset;
       std::vector<TextureResource>* textureResources;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);
     bool generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv);
-
-    bool generateClosestHitIntermediates(const Material* material, ClosestHitShaderIntermediates& intermediates);
     bool generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv);
 
   private:

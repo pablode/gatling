@@ -3,10 +3,10 @@
 #extension GL_EXT_nonuniform_qualifier: enable
 #extension GL_EXT_samplerless_texture_functions: require
 
-#include "mdl_types.glsl"
 #include "rt_payload.glsl"
 #include "rt_descriptors.glsl"
-#include "mdl_interface.glsl"
+
+#pragma MDL_GENERATED_CODE
 
 layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
 hitAttributeEXT vec2 baryCoord;
@@ -50,8 +50,6 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, in vec3 ray_d
   state.animation_time = 0.0;
   state.text_coords[0] = vec3(uv, 0.0);
 }
-
-#pragma MDL_GENERATED_CODE
 
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
