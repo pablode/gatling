@@ -3140,6 +3140,31 @@ bool cgpu_cmd_copy_timestamps(cgpu_command_buffer command_buffer,
   return true;
 }
 
+bool cgpu_cmd_trace_rays(cgpu_command_buffer command_buffer, cgpu_pipeline rt_pipeline, uint32_t width, uint32_t height)
+{
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(icommand_buffer->device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  cgpu_ipipeline* ipipeline;
+  if (!cgpu_resolve_pipeline(rt_pipeline, &ipipeline)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  VkStridedDeviceAddressRegionKHR callableSBT = {0};
+  idevice->table.vkCmdTraceRaysKHR(icommand_buffer->command_buffer,
+                                   &ipipeline->sbtRgen,
+                                   &ipipeline->sbtMiss,
+                                   &ipipeline->sbtHit,
+                                   &callableSBT,
+                                   width, height, 1);
+  return true;
+}
+
 bool cgpu_end_command_buffer(cgpu_command_buffer command_buffer)
 {
   cgpu_icommand_buffer* icommand_buffer;

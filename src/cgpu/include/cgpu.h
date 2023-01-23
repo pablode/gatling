@@ -714,6 +714,13 @@ CGPU_API bool CGPU_CDECL cgpu_cmd_copy_timestamps(
   bool wait_until_available
 );
 
+CGPU_API bool CGPU_CDECL cgpu_cmd_trace_rays(
+  cgpu_command_buffer command_buffer,
+  cgpu_pipeline rt_pipeline,
+  uint32_t width,
+  uint32_t height
+);
+
 CGPU_API bool CGPU_CDECL cgpu_end_command_buffer(
   cgpu_command_buffer command_buffer
 );
