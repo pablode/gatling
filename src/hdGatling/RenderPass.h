@@ -45,7 +45,7 @@ protected:
                 const TfTokenVector& renderTags) override;
 
 private:
-  void _BakeMeshInstance(const HdGatlingMesh* mesh,
+  void _BakeMeshGeometry(const HdGatlingMesh* mesh,
                          GfMatrix4d transform,
                          uint32_t materialIndex,
                          std::vector<gi_face>& faces,
@@ -53,9 +53,8 @@ private:
 
   void _BakeMeshes(HdRenderIndex* renderIndex,
                    GfMatrix4d rootTransform,
-                   std::vector<gi_vertex>& vertices,
-                   std::vector<gi_face>& faces,
-                   std::vector<const gi_material*>& materials);
+                   std::vector<const gi_material*>& materials,
+                   std::vector<const gi_mesh*>& meshes);
 
   void _ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const;
 

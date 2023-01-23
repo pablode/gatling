@@ -34,79 +34,6 @@ namespace gi::sg
   const char* VOLUME_ABSORPTION_FUNC_NAME = "mdl_absorption_coefficient";
   const char* MATERIAL_STATE_NAME = "State";
 
-  void _generateInitSwitch(std::stringstream& ss, const char* funcName, uint32_t caseCount)
-  {
-    ss << "void " << funcName << "_init(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
-    ss << "{\n";
-    ss << "\tswitch(idx)\n";
-    ss << "\t{\n";
-    for (uint32_t i = 0; i < caseCount; i++)
-    {
-      ss << "\t\tcase " << i << ": " << funcName << "_" << i << "_init" << "(sIn); return;\n";
-    }
-    ss << "\t}\n";
-    ss << "}\n";
-  }
-
-  void _generateEdfIntensitySwitch(std::stringstream& ss, uint32_t caseCount)
-  {
-    ss << "vec3 " << EMISSION_INTENSITY_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
-    ss << "{\n";
-    ss << "\tswitch(idx)\n";
-    ss << "\t{\n";
-    for (uint32_t i = 0; i < caseCount; i++)
-    {
-      ss << "\t\tcase " << i << ": return " << EMISSION_INTENSITY_FUNC_NAME << "_" << i << "(sIn);\n";
-    }
-    ss << "\t}\n";
-    ss << "\treturn vec3(0.0, 0.0, 0.0);\n";
-    ss << "}\n";
-  }
-
-  void _generateVolumeAbsorptionSwitch(std::stringstream& ss, uint32_t caseCount)
-  {
-    ss << "vec3 " << VOLUME_ABSORPTION_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
-    ss << "{\n";
-    ss << "\tswitch(idx)\n";
-    ss << "\t{\n";
-    for (uint32_t i = 0; i < caseCount; i++)
-    {
-      ss << "\t\tcase " << i << ": return " << VOLUME_ABSORPTION_FUNC_NAME << "_" << i << "(sIn);\n";
-    }
-    ss << "\t}\n";
-    ss << "\treturn vec3(0.0, 0.0, 0.0);\n";
-    ss << "}\n";
-  }
-
-  void _generateThinWalledSwitch(std::stringstream& ss, uint32_t caseCount)
-  {
-    ss << "bool " << THIN_WALLED_FUNC_NAME << "(in uint idx, in " << MATERIAL_STATE_NAME << " sIn)\n";
-    ss << "{\n";
-    ss << "\tswitch(idx)\n";
-    ss << "\t{\n";
-    for (uint32_t i = 0; i < caseCount; i++)
-    {
-      ss << "\t\tcase " << i << ": return " << THIN_WALLED_FUNC_NAME << "_" << i << "(sIn);\n";
-    }
-    ss << "\t}\n";
-    ss << "\treturn false;\n";
-    ss << "}\n";
-  }
-
-  void _generateInOutSwitch(std::stringstream& ss, const char* funcName, const char* opName, const char* inoutTypeName, uint32_t caseCount)
-  {
-    ss << "void " << funcName << "_" << opName << "(in uint idx, inout " << inoutTypeName << " sInOut, in " << MATERIAL_STATE_NAME << " sIn)\n";
-    ss << "{\n";
-    ss << "\tswitch(idx)\n";
-    ss << "\t{\n";
-    for (uint32_t i = 0; i < caseCount; i++)
-    {
-      ss << "\t\tcase " << i << ": "  << funcName << "_" << i << "_" << opName << "(sInOut, sIn); return;\n";
-    }
-    ss << "\t}\n";
-    ss << "}\n";
-  }
-
   bool MdlGlslCodeGen::init(MdlRuntime& runtime)
   {
     mi::base::Handle<mi::neuraylib::IMdl_backend_api> backendApi(runtime.getBackendApi());
@@ -130,7 +57,8 @@ namespace gi::sg
     return true;
   }
 
-  void MdlGlslCodeGen::extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, std::vector<TextureResource>& textureResources)
+  void MdlGlslCodeGen::extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
+                                           std::vector<TextureResource>& textureResources)
   {
     size_t texCount = targetCode->get_body_texture_count();
     textureResources.reserve(texCount);
@@ -195,7 +123,7 @@ namespace gi::sg
     }
   }
 
-  bool MdlGlslCodeGen::translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
+  bool MdlGlslCodeGen::translate(const mi::neuraylib::ICompiled_material* material,
                                  std::string& glslSrc,
                                  std::vector<TextureResource>& textureResources)
   {
@@ -207,20 +135,9 @@ namespace gi::sg
       return false;
     }
 
-    auto materialCount = uint32_t(materials.size());
-    for (uint32_t i = 0; i < materialCount; i++)
+    if (!appendMaterialToLinkUnit(material, linkUnit.get()))
     {
-      const mi::neuraylib::ICompiled_material* material = materials.at(i);
-      if (!material)
-      {
-        assert(false);
-        continue;
-      }
-
-      if (!appendMaterialToLinkUnit(i, material, linkUnit.get()))
-      {
-        return false;
-      }
+      return false;
     }
 
     mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode(m_backend->translate_link_unit(linkUnit.get(), m_context.get()));
@@ -235,40 +152,20 @@ namespace gi::sg
 
     extractTextureInfos(targetCode, textureResources);
 
-    std::stringstream ss;
-    ss << targetCode->get_code();
+    glslSrc = targetCode->get_code();
 
-    _generateInOutSwitch(ss, SCATTERING_FUNC_NAME, "sample", "Bsdf_sample_data", materialCount);
-    _generateInitSwitch(ss, SCATTERING_FUNC_NAME, materialCount);
-
-    _generateInOutSwitch(ss, EMISSION_FUNC_NAME, "evaluate", "Edf_evaluate_data", materialCount);
-    _generateInitSwitch(ss, EMISSION_FUNC_NAME, materialCount);
-
-    _generateEdfIntensitySwitch(ss, materialCount);
-    _generateThinWalledSwitch(ss, materialCount);
-    _generateVolumeAbsorptionSwitch(ss, materialCount);
-
-    glslSrc = ss.str();
     return true;
   }
 
-  bool MdlGlslCodeGen::appendMaterialToLinkUnit(uint32_t idx,
-                                                const mi::neuraylib::ICompiled_material* compiledMaterial,
+  bool MdlGlslCodeGen::appendMaterialToLinkUnit(const mi::neuraylib::ICompiled_material* compiledMaterial,
                                                 mi::neuraylib::ILink_unit* linkUnit)
   {
-    std::string idxStr = std::to_string(idx);
-    auto scatteringFuncName = std::string(SCATTERING_FUNC_NAME) + "_" + idxStr;
-    auto emissionFuncName = std::string(EMISSION_FUNC_NAME) + "_" + idxStr;
-    auto emissionIntensityFuncName = std::string(EMISSION_INTENSITY_FUNC_NAME) + "_" + idxStr;
-    auto thinWalledFuncName = std::string(THIN_WALLED_FUNC_NAME) + "_" + idxStr;
-    auto volumeAbsorptionFuncName = std::string(VOLUME_ABSORPTION_FUNC_NAME) + "_" + idxStr;
-
     std::vector<mi::neuraylib::Target_function_description> genFunctions;
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.scattering", scatteringFuncName.c_str()));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.emission", emissionFuncName.c_str()));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.intensity", emissionIntensityFuncName.c_str()));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", thinWalledFuncName.c_str()));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", volumeAbsorptionFuncName.c_str()));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.scattering", SCATTERING_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.emission", EMISSION_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.intensity", EMISSION_INTENSITY_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", THIN_WALLED_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", VOLUME_ABSORPTION_FUNC_NAME));
 
     mi::Sint32 result = linkUnit->add_material(
       compiledMaterial,

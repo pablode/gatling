@@ -40,7 +40,7 @@ namespace gi::sg
   public:
     bool init(MdlRuntime& runtime);
 
-    bool translate(const std::vector<const mi::neuraylib::ICompiled_material*>& materials,
+    bool translate(const mi::neuraylib::ICompiled_material* material,
                    std::string& glslSrc,
                    std::vector<TextureResource>& textureResources);
 
@@ -48,8 +48,7 @@ namespace gi::sg
     void extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
                              std::vector<TextureResource>& textureResources);
 
-    bool appendMaterialToLinkUnit(uint32_t idx,
-                                  const mi::neuraylib::ICompiled_material* compiledMaterial,
+    bool appendMaterialToLinkUnit(const mi::neuraylib::ICompiled_material* compiledMaterial,
                                   mi::neuraylib::ILink_unit* linkUnit);
 
     std::string extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, int i);

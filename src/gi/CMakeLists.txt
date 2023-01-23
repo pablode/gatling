@@ -15,6 +15,8 @@ add_library(
   src/sg/ShaderGen.cpp
   src/sg/GlslangShaderCompiler.h
   src/sg/GlslangShaderCompiler.cpp
+  src/sg/GlslSourceStitcher.h
+  src/sg/GlslSourceStitcher.cpp
   src/sg/MdlGlslCodeGen.h
   src/sg/MdlGlslCodeGen.cpp
   src/sg/MdlLogger.h

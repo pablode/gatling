@@ -53,6 +53,7 @@ namespace gi::sg
   {
     std::string moduleName = _makeModuleName(identifier);
 
+    // FIXME: is this thread-safe?
     if (m_config->add_mdl_path(m_mdlLibPath.c_str()))
     {
       m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MaterialX MDL library files not found");

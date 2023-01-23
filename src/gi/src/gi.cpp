@@ -29,6 +29,8 @@
 #include <vector>
 #include <unordered_map>
 #include <algorithm>
+#include <fstream>
+#include <atomic>
 #include <assert.h>
 
 #include <cgpu.h>
@@ -37,39 +39,45 @@
 
 using namespace gi;
 
-const uint32_t WORKGROUP_SIZE_X = 32;
-const uint32_t WORKGROUP_SIZE_Y = 8;
-const float    BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
+const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
 struct gi_geom_cache
 {
-  cgpu_acceleration_structure acceleration_structure;
-  cgpu_buffer                 buffer;
-  uint64_t                    face_buf_offset;
-  uint64_t                    face_buf_size;
-  uint32_t                    face_count;
-  uint64_t                    emissive_face_indices_buf_offset;
-  uint64_t                    emissive_face_indices_buf_size;
-  uint32_t                    emissive_face_count;
-  uint64_t                    vertex_buf_offset;
-  uint64_t                    vertex_buf_size;
-  std::vector<sg::Material*>  materials;
+  std::vector<cgpu_blas> blases;
+  cgpu_buffer            buffer;
+  uint32_t               emissive_face_count;
+  uint64_t               emissive_face_indices_buf_offset;
+  uint64_t               emissive_face_indices_buf_size;
+  uint64_t               face_buf_offset;
+  uint64_t               face_buf_size;
+  uint32_t               face_count;
+  cgpu_tlas              tlas;
+  uint64_t               vertex_buf_offset;
+  uint64_t               vertex_buf_size;
 };
 
 struct gi_shader_cache
 {
-  uint32_t                aov_id;
-  cgpu_shader             shader;
-  cgpu_pipeline           pipeline;
-  bool                    nee_enabled;
-  std::vector<cgpu_image> images_2d;
-  std::vector<cgpu_image> images_3d;
-  cgpu_buffer             image_mappings;
+  uint32_t                        aov_id;
+  std::vector<cgpu_shader>        hitShaders;
+  std::vector<cgpu_image>         images_2d;
+  std::vector<cgpu_image>         images_3d;
+  std::vector<const gi_material*> materials;
+  cgpu_shader                     missShader;
+  cgpu_pipeline                   pipeline;
+  cgpu_shader                     rgenShader;
 };
 
 struct gi_material
 {
   sg::Material* sg_mat;
+};
+
+struct gi_mesh
+{
+  std::vector<gi_face> faces;
+  std::vector<gi_vertex> vertices;
+  const gi_material* material;
 };
 
 cgpu_device s_device = { CGPU_INVALID_HANDLE };
@@ -103,10 +111,10 @@ int giInitialize(const gi_init_params* params)
     return GI_ERROR;
 
   if (!cgpu_create_sampler(s_device,
-      CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-      CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-      CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-      &s_tex_sampler))
+                           CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+                           CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+                           CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+                           &s_tex_sampler))
   {
     return GI_ERROR;
   }
@@ -215,163 +223,223 @@ uint64_t giAlignBuffer(uint64_t alignment, uint64_t buffer_size, uint64_t* total
   return offset;
 }
 
-gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
+gi_mesh* giCreateMesh(const gi_mesh_desc* desc)
 {
-  printf("creating geom cache\n");
+  gi_mesh* mesh = new gi_mesh;
+  mesh->faces = std::vector<gi_face>(&desc->faces[0], &desc->faces[desc->face_count]);
+  mesh->vertices = std::vector<gi_vertex>(&desc->vertices[0], &desc->vertices[desc->vertex_count]);
+  mesh->material = desc->material;
+  return mesh;
+}
 
-  printf("faces: %d\n", params->face_count);
-  printf("vertices: %d\n", params->vertex_count);
-
-  // Build list of emissive faces.
-  std::vector<uint32_t> emissive_face_indices;
-  if (params->next_event_estimation)
+bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
+                                std::vector<cgpu_blas>& blases,
+                                std::vector<cgpu_blas_instance>& blas_instances,
+                                std::vector<gi_vertex>& allVertices,
+                                std::vector<gi_face>& allFaces,
+                                std::vector<uint32_t>& emissive_face_indices)
+{
+  for (uint32_t m = 0; m < params->mesh_count; m++)
   {
-    emissive_face_indices.reserve(1024);
-    for (uint32_t i = 0; i < params->face_count; i++)
+    const gi_mesh* mesh = params->meshes[m];
+
+    if (mesh->faces.empty())
     {
-      const gi_material* mat = params->materials[params->faces[i].mat_index];
-      if (s_shaderGen->isMaterialEmissive(mat->sg_mat))
+      continue;
+    }
+
+    uint32_t faceIndexOffset = allFaces.size();
+    uint32_t vertexIndexOffset = allVertices.size();
+
+    // Vertices
+    std::vector<cgpu_vertex> vertices;
+    vertices.resize(mesh->vertices.size());
+    allVertices.reserve(allVertices.size() + mesh->vertices.size());
+
+    for (uint32_t i = 0; i < vertices.size(); i++)
+    {
+      vertices[i].x = mesh->vertices[i].pos[0];
+      vertices[i].y = mesh->vertices[i].pos[1];
+      vertices[i].z = mesh->vertices[i].pos[2];
+
+      allVertices.push_back(mesh->vertices[i]);
+    }
+
+    // Indices
+    std::vector<uint32_t> indices;
+    indices.reserve(mesh->faces.size() * 3);
+    allFaces.reserve(allFaces.size() + mesh->faces.size());
+
+    for (uint32_t i = 0; i < mesh->faces.size(); i++)
+    {
+      const auto* face = &mesh->faces[i];
+      indices.push_back(face->v_i[0]);
+      indices.push_back(face->v_i[1]);
+      indices.push_back(face->v_i[2]);
+
+      gi_face new_face;
+      new_face.v_i[0] = vertexIndexOffset + face->v_i[0];
+      new_face.v_i[1] = vertexIndexOffset + face->v_i[1];
+      new_face.v_i[2] = vertexIndexOffset + face->v_i[2];
+      allFaces.push_back(new_face);
+    }
+
+    // BLAS
+    cgpu_blas blas;
+    if (!cgpu_create_blas(s_device, (uint32_t)vertices.size(), vertices.data(), (uint32_t)indices.size(), indices.data(), &blas))
+    {
+      goto fail_cleanup;
+    }
+
+    blases.push_back(blas);
+
+    // FIXME: find a better solution
+    uint32_t materialIndex = UINT32_MAX;
+    gi_shader_cache* shader_cache = params->shader_cache;
+    for (uint32_t i = 0; i < shader_cache->materials.size(); i++)
+    {
+      if (shader_cache->materials[i] == mesh->material)
       {
-        emissive_face_indices.push_back(i);
+        materialIndex = i;
+        break;
       }
     }
+    if (materialIndex == UINT32_MAX)
+    {
+      goto fail_cleanup;
+    }
+
+    // Instance
+    cgpu_blas_instance blas_instance = { 0 };
+    blas_instance.as = blas;
+    blas_instance.faceIndexOffset = faceIndexOffset;
+    blas_instance.hitShaderIndex = materialIndex;
+    float transform[3][4] = {
+      1.0f, 0.0f, 0.0f, 0.0f,
+      0.0f, 1.0f, 0.0f, 0.0f,
+      0.0f, 0.0f, 1.0f, 0.0f
+    };
+    memcpy(blas_instance.transform, transform, sizeof(float) * 12);
+
+    blas_instances.push_back(blas_instance);
+  }
+  return true;
+
+fail_cleanup:
+  assert(false);
+  for (cgpu_blas blas : blases)
+  {
+    cgpu_destroy_blas(s_device, blas);
+  }
+  return false;
+}
+
+gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
+{
+  gi_geom_cache* cache = nullptr;
+
+  printf("creating geom cache\n");
+  printf("mesh count: %d\n", params->mesh_count);
+
+  // Build HW ASes and vertex, index buffers.
+  cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
+  cgpu_tlas tlas = { CGPU_INVALID_HANDLE };
+  std::vector<cgpu_blas> blases;
+  std::vector<cgpu_blas_instance> blas_instances;
+  std::vector<gi_vertex> allVertices;
+  std::vector<gi_face> allFaces;
+  std::vector<uint32_t> emissive_face_indices; // FIXME: reintroduce
+
+  if (!_giBuildGeometryStructures(params, blases, blas_instances, allVertices, allFaces, emissive_face_indices))
+    goto cleanup;
+
+  if (!cgpu_create_tlas(s_device, blas_instances.size(), blas_instances.data(), &tlas))
+    goto cleanup;
+
+  // Upload vertex, index buffers to single GPU buffer.
+  uint64_t face_buf_size;
+  uint64_t emissive_face_indices_buf_size;
+  uint64_t vertex_buf_size;
+  uint64_t face_buf_offset;
+  uint64_t emissive_face_indices_buf_offset;
+  uint64_t vertex_buf_offset;
+  {
+    uint64_t buf_size = 0;
+    const uint64_t offset_align = s_device_properties.minStorageBufferOffsetAlignment;
+
+    face_buf_size = allFaces.size() * sizeof(gi_face);
+    emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
+    vertex_buf_size = allVertices.size() * sizeof(gi_vertex);
+
+    face_buf_offset = giAlignBuffer(offset_align, face_buf_size, &buf_size);
+    emissive_face_indices_buf_offset = giAlignBuffer(offset_align, emissive_face_indices_buf_size, &buf_size);
+    vertex_buf_offset = giAlignBuffer(offset_align, vertex_buf_size, &buf_size);
+
+    printf("total geom buffer size: %.2fMiB\n", buf_size * BYTES_TO_MIB);
+    printf("> %.2fMiB faces\n", face_buf_size * BYTES_TO_MIB);
+    printf("> %.2fMiB emissive face indices\n", emissive_face_indices_buf_size * BYTES_TO_MIB);
+    printf("> %.2fMiB vertices\n", vertex_buf_size * BYTES_TO_MIB);
+
+    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+    CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
+
+    if (!cgpu_create_buffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer))
+      goto cleanup;
+
+    if (!s_stager->stageToBuffer((uint8_t*)allFaces.data(), face_buf_size, buffer, face_buf_offset))
+      goto cleanup;
+    if (!s_stager->stageToBuffer((uint8_t*)emissive_face_indices.data(), emissive_face_indices_buf_size, buffer, emissive_face_indices_buf_offset))
+      goto cleanup;
+    if (!s_stager->stageToBuffer((uint8_t*)allVertices.data(), vertex_buf_size, buffer, vertex_buf_offset))
+      goto cleanup;
+
+    if (!s_stager->flush())
+      goto cleanup;
   }
 
-  // Upload to GPU buffer.
-  gi_geom_cache* cache = nullptr;
-  cgpu_buffer buffer = { CGPU_INVALID_HANDLE };
-
-  uint64_t buf_size = 0;
-  const uint64_t offset_align = s_device_properties.minStorageBufferOffsetAlignment;
-
-  uint64_t face_buf_size = params->face_count * sizeof(gi_face);
-  uint64_t emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
-  uint64_t vertex_buf_size = params->vertex_count * sizeof(gi_vertex);
-
-  uint64_t face_buf_offset = giAlignBuffer(offset_align, face_buf_size, &buf_size);
-  uint64_t emissive_face_indices_buf_offset = giAlignBuffer(offset_align, emissive_face_indices_buf_size, &buf_size);
-  uint64_t vertex_buf_offset = giAlignBuffer(offset_align, vertex_buf_size, &buf_size);
-
-  printf("total geom buffer size: %.2fMiB\n", buf_size * BYTES_TO_MIB);
-  printf("> %.2fMiB faces\n", face_buf_size * BYTES_TO_MIB);
-  printf("> %.2fMiB emissive face indices\n", emissive_face_indices_buf_size * BYTES_TO_MIB);
-  printf("> %.2fMiB vertices\n", vertex_buf_size * BYTES_TO_MIB);
-
-  CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-  CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
-
-  if (!cgpu_create_buffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer))
-    goto cleanup;
-
-  if (!s_stager->stageToBuffer((uint8_t*) params->faces, face_buf_size, buffer, face_buf_offset))
-    goto cleanup;
-  if (!s_stager->stageToBuffer((uint8_t*) emissive_face_indices.data(), emissive_face_indices_buf_size, buffer, emissive_face_indices_buf_offset))
-    goto cleanup;
-  if (!s_stager->stageToBuffer((uint8_t*) params->vertices, vertex_buf_size, buffer, vertex_buf_offset))
-    goto cleanup;
-
-  if (!s_stager->flush())
-    goto cleanup;
-
+  // Fill cache struct.
   cache = new gi_geom_cache;
+  cache->tlas = tlas;
+  cache->blases = blases;
   cache->buffer = buffer;
   cache->face_buf_size = face_buf_size;
   cache->face_buf_offset = face_buf_offset;
-  cache->face_count = params->face_count;
+  cache->face_count = allFaces.size();
   cache->emissive_face_indices_buf_size = emissive_face_indices_buf_size;
   cache->emissive_face_indices_buf_offset = emissive_face_indices_buf_offset;
   cache->emissive_face_count = (uint32_t) emissive_face_indices.size();
   cache->vertex_buf_size = vertex_buf_size;
   cache->vertex_buf_offset = vertex_buf_offset;
 
-  // Copy materials.
-  cache->materials.resize(params->material_count);
-  for (int i = 0; i < cache->materials.size(); i++)
-  {
-    cache->materials[i] = params->materials[i]->sg_mat;
-  }
-
-  // Build HW AS.
-  {
-    std::vector<cgpu_vertex> vertices;
-    vertices.resize(params->vertex_count);
-
-    for (uint32_t i = 0; i < params->vertex_count; i++)
-    {
-      vertices[i].x = params->vertices[i].pos[0];
-      vertices[i].y = params->vertices[i].pos[1];
-      vertices[i].z = params->vertices[i].pos[2];
-    }
-
-    std::vector<uint32_t> indices;
-    indices.reserve(params->face_count * 3);
-
-    for (uint32_t i = 0; i < params->face_count; i++)
-    {
-      const auto* face = &params->faces[i];
-      indices.push_back(face->v_i[0]);
-      indices.push_back(face->v_i[1]);
-      indices.push_back(face->v_i[2]);
-    }
-
-    if (!cgpu_create_acceleration_structure(s_device,
-                                            (uint32_t) vertices.size(),
-                                            vertices.data(),
-                                            (uint32_t) indices.size(),
-                                            indices.data(),
-                                            &cache->acceleration_structure))
-    {
-      assert(false);
-      goto cleanup;
-    }
-  }
-
 cleanup:
   if (!cache)
   {
-    cgpu_destroy_buffer(s_device, buffer);
+    assert(false);
+    if (buffer.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpu_destroy_buffer(s_device, buffer);
+    }
+    if (tlas.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpu_destroy_tlas(s_device, tlas);
+    }
+    for (cgpu_blas blas : blases)
+    {
+      cgpu_destroy_blas(s_device, blas);
+    }
   }
   return cache;
 }
 
 void giDestroyGeomCache(gi_geom_cache* cache)
 {
-  cgpu_destroy_acceleration_structure(s_device, cache->acceleration_structure);
+  for (cgpu_blas blas : cache->blases)
+  {
+    cgpu_destroy_blas(s_device, blas);
+  }
+  cgpu_destroy_tlas(s_device, cache->tlas);
   cgpu_destroy_buffer(s_device, cache->buffer);
   delete cache;
-}
-
-bool giStageImages(const std::vector<sg::TextureResource>& textureResources,
-                   std::vector<cgpu_image>& images_2d,
-                   std::vector<cgpu_image>& images_3d,
-                   cgpu_buffer& imageMappingBuffer)
-{
-  std::vector<uint16_t> imageMappings;
-  if (!s_texSys->loadTextures(textureResources,
-                              images_2d,
-                              images_3d,
-                              imageMappings))
-  {
-    return false;
-  }
-
-  assert(imageMappings.size() < UINT16_MAX);
-
-  uint64_t imageMappingsSize = imageMappings.size() * sizeof(uint16_t);
-  if (!cgpu_create_buffer(
-      s_device,
-      CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-      CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-      imageMappingsSize,
-      &imageMappingBuffer))
-  {
-    return false;
-  }
-
-  if (!s_stager->stageToBuffer((uint8_t*) imageMappings.data(), imageMappingsSize, imageMappingBuffer, 0))
-    return false;
-
-  return s_stager->flush();
 }
 
 gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
@@ -385,66 +453,191 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   }
 
   printf("creating shader cache\n");
+  printf("material count: %d\n", params->material_count);
 
-  const gi_geom_cache* geom_cache = params->geom_cache;
-  bool nee_enabled = geom_cache->emissive_face_count > 0;
-
-  sg::ShaderGen::MainShaderParams shaderParams;
-  shaderParams.aovId               = params->aov_id;
-  shaderParams.numThreadsX         = WORKGROUP_SIZE_X;
-  shaderParams.numThreadsY         = WORKGROUP_SIZE_Y;
-  shaderParams.materials           = geom_cache->materials;
-  shaderParams.nextEventEstimation = nee_enabled;
-  shaderParams.faceCount           = geom_cache->face_count;
-  shaderParams.emissiveFaceCount   = geom_cache->emissive_face_count;
-  shaderParams.shaderClockExts     = clockCyclesAov;
-
-  sg::ShaderGen::MainShaderResult mainShader;
-  if (!s_shaderGen->generateMainShader(&shaderParams, mainShader))
-  {
-    return nullptr;
-  }
-
-  cgpu_shader shader;
-  if (!cgpu_create_shader(s_device, mainShader.spv.size(), mainShader.spv.data(), CGPU_SHADER_STAGE_COMPUTE, &shader))
-  {
-    return nullptr;
-  }
-
-  cgpu_pipeline pipeline;
-  if (!cgpu_create_compute_pipeline(s_device, shader, &pipeline))
-  {
-    cgpu_destroy_shader(s_device, shader);
-    return nullptr;
-  }
-
+  gi_shader_cache* cache = nullptr;
+  cgpu_pipeline pipeline = { CGPU_INVALID_HANDLE };
+  cgpu_shader rgenShader = { CGPU_INVALID_HANDLE };
+  cgpu_shader missShader = { CGPU_INVALID_HANDLE };
+  std::vector<cgpu_shader> hitShaders;
   std::vector<cgpu_image> images_2d;
   std::vector<cgpu_image> images_3d;
-  cgpu_buffer imageMappingBuffer = { CGPU_INVALID_HANDLE };
+  std::vector<sg::TextureResource> textureResources;
 
-  const auto& textureResources = mainShader.textureResources;
-  if (textureResources.size() > 0)
+  // Create per-material closest-hit shaders.
+  //
+  // This is done in multiple phases: first, GLSL is generated from MDL, and
+  // texture information is extracted. The information is then used to generated
+  // the descriptor sets for the pipeline. Lastly, the GLSL is stiched, #defines
+  // are added, and the code is compiled to SPIR-V.
   {
-    if (!giStageImages(textureResources, images_2d, images_3d, imageMappingBuffer))
+    std::vector<sg::Material*> materials;
+    materials.resize(params->material_count);
+    for (int i = 0; i < params->material_count; i++)
     {
-      cgpu_destroy_buffer(s_device, imageMappingBuffer);
-      s_texSys->destroyUncachedImages(images_2d);
-      s_texSys->destroyUncachedImages(images_3d);
-      cgpu_destroy_shader(s_device, shader);
-      cgpu_destroy_pipeline(s_device, pipeline);
-      return nullptr;
+      materials[i] = params->materials[i]->sg_mat;
+    }
+
+    // 1. Generate GLSL from MDL
+    std::vector<sg::ShaderGen::ClosestHitShaderIntermediates> hitShaderIntermediates;
+    hitShaderIntermediates.resize(params->material_count);
+
+    std::atomic_bool threadWorkFailed = false;
+    for (int i = 0; i < hitShaderIntermediates.size(); i++)
+    {
+      const gi_material* mat = params->materials[i];
+
+      sg::ShaderGen::ClosestHitShaderIntermediates intermediates;
+      if (s_shaderGen->generateClosestHitIntermediates(mat->sg_mat, intermediates))
+      {
+        hitShaderIntermediates[i] = intermediates;
+      }
+      else
+      {
+        threadWorkFailed = true;
+      }
+    }
+    if (threadWorkFailed)
+    {
+      goto cleanup;
+    }
+
+    // 2. Sum up texture resources & calculate per-material index offsets.
+    std::vector<uint32_t> textureIndexOffsets;
+    for (const auto& intermediates : hitShaderIntermediates)
+    {
+      textureIndexOffsets.push_back(textureResources.size());
+
+      for (const auto& tr : intermediates.textureResources)
+      {
+        textureResources.push_back(tr);
+      }
+    }
+
+    // 3. Generate final GLSL hit shaders, and compile them to SPIR-V.
+    hitShaders.resize(hitShaderIntermediates.size(), { CGPU_INVALID_HANDLE });
+    threadWorkFailed = false;
+    for (int i = 0; i < hitShaderIntermediates.size(); i++)
+    {
+      const sg::ShaderGen::ClosestHitShaderIntermediates& intermediates = hitShaderIntermediates[i];
+
+      sg::ShaderGen::ClosestHitShaderParams hitParams;
+      hitParams.aovId = params->aov_id;
+      hitParams.baseFileName = "rt_main.chit";
+      hitParams.mdlGeneratedGlsl = intermediates.mdlGeneratedGlsl;
+      hitParams.textureResources = &textureResources;
+      hitParams.textureIndexOffset = textureIndexOffsets[i];
+
+      std::vector<uint8_t> spv;
+      if (s_shaderGen->generateClosestHitSpirv(hitParams, spv))
+      {
+        cgpu_shader closestHitShader;
+        if (cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+        {
+          hitShaders[i] = closestHitShader;
+        }
+        else
+        {
+          threadWorkFailed = true;
+        }
+      }
+      else
+      {
+        threadWorkFailed = true;
+      }
+    }
+    if (threadWorkFailed)
+    {
+      goto cleanup;
     }
   }
 
-  gi_shader_cache* cache = new gi_shader_cache;
+  // Create ray generation and miss shader.
+  {
+    std::vector<uint8_t> rgenSpirv;
+    sg::ShaderGen::RaygenShaderParams rgenParams;
+    rgenParams.shaderClockExts = clockCyclesAov;
+    rgenParams.textureResources = &textureResources;
+
+    std::vector<uint8_t> missSpirv;
+    sg::ShaderGen::MissShaderParams missParams;
+    missParams.textureResources = &textureResources;
+
+    if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, rgenSpirv) ||
+        !s_shaderGen->generateMissSpirv("rt_main.miss", missParams, missSpirv))
+    {
+      goto cleanup;
+    }
+
+    if (!cgpu_create_shader(s_device, rgenSpirv.size(), rgenSpirv.data(), CGPU_SHADER_STAGE_RAYGEN, &rgenShader))
+    {
+      goto cleanup;
+    }
+
+    if (!cgpu_create_shader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+    {
+      goto cleanup;
+    }
+  }
+
+  // Upload textures.
+  if (textureResources.size() > 0 && !s_texSys->loadTextures(textureResources, images_2d, images_3d))
+  {
+    goto cleanup;
+  }
+
+  // Create RT pipeline.
+  {
+    cgpu_rt_pipeline_desc pipeline_desc = {0};
+    pipeline_desc.rgen_shader = rgenShader;
+    pipeline_desc.miss_shader_count = 1;
+    pipeline_desc.miss_shaders = &missShader;
+    pipeline_desc.hit_shader_count = hitShaders.size();
+    pipeline_desc.hit_shaders = hitShaders.data();
+
+    if (!cgpu_create_rt_pipeline(s_device, &pipeline_desc, &pipeline))
+    {
+      goto cleanup;
+    }
+  }
+
+  cache = new gi_shader_cache;
   cache->aov_id = params->aov_id;
-  cache->shader = shader;
-  cache->pipeline = pipeline;
-  cache->nee_enabled = nee_enabled;
+  cache->hitShaders = std::move(hitShaders);
   cache->images_2d = std::move(images_2d);
   cache->images_3d = std::move(images_3d);
-  cache->image_mappings = imageMappingBuffer;
+  cache->materials.resize(params->material_count);
+  for (int i = 0; i < params->material_count; i++)
+  {
+    cache->materials[i] = params->materials[i];
+  }
+  cache->missShader = missShader;
+  cache->pipeline = pipeline;
+  cache->rgenShader = rgenShader;
 
+cleanup:
+  if (!cache)
+  {
+    assert(false);
+    s_texSys->destroyUncachedImages(images_2d);
+    s_texSys->destroyUncachedImages(images_3d);
+    if (rgenShader.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpu_destroy_shader(s_device, rgenShader);
+    }
+    if (missShader.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpu_destroy_shader(s_device, missShader);
+    }
+    for (cgpu_shader shader : hitShaders)
+    {
+      cgpu_destroy_shader(s_device, shader);
+    }
+    if (pipeline.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpu_destroy_pipeline(s_device, pipeline);
+    }
+  }
   return cache;
 }
 
@@ -452,8 +645,12 @@ void giDestroyShaderCache(gi_shader_cache* cache)
 {
   s_texSys->destroyUncachedImages(cache->images_2d);
   s_texSys->destroyUncachedImages(cache->images_3d);
-  cgpu_destroy_buffer(s_device, cache->image_mappings);
-  cgpu_destroy_shader(s_device, cache->shader);
+  cgpu_destroy_shader(s_device, cache->rgenShader);
+  cgpu_destroy_shader(s_device, cache->missShader);
+  for (cgpu_shader shader : cache->hitShaders)
+  {
+    cgpu_destroy_shader(s_device, shader);
+  }
   cgpu_destroy_pipeline(s_device, cache->pipeline);
   delete cache;
 }
@@ -534,13 +731,14 @@ int giRender(const gi_render_params* params, float* rgba_img)
     params->rr_inv_min_term_prob,                                                          // float
     *((float*)&s_sampleOffset)                                                             // uint
   };
+  uint32_t push_size = sizeof(push_data);
 
   std::vector<cgpu_buffer_binding> buffers;
   buffers.reserve(16);
 
   buffers.push_back({ 0, 0, s_outputBuffer, 0, output_buffer_size });
   buffers.push_back({ 1, 0, geom_cache->buffer, geom_cache->face_buf_offset, geom_cache->face_buf_size });
-  if (shader_cache->nee_enabled)
+  if (false/*FIXME: shader_cache->nee_enabled*/)
   {
     buffers.push_back({ 2, 0, geom_cache->buffer, geom_cache->emissive_face_indices_buf_offset, geom_cache->emissive_face_indices_buf_size });
   }
@@ -553,22 +751,17 @@ int giRender(const gi_render_params* params, float* rgba_img)
 
   cgpu_sampler_binding sampler = { 4, 0, s_tex_sampler };
 
-  if (image_count > 0)
-  {
-    buffers.push_back({ 5, 0, shader_cache->image_mappings, 0, CGPU_WHOLE_SIZE });
-  }
-
   for (uint32_t i = 0; i < shader_cache->images_2d.size(); i++)
   {
-    images.push_back({ 6, i, shader_cache->images_2d[i] });
+    images.push_back({ 5, i, shader_cache->images_2d[i] });
   }
 
   for (uint32_t i = 0; i < shader_cache->images_3d.size(); i++)
   {
-    images.push_back({ 7, i, shader_cache->images_3d[i] });
+    images.push_back({ 6, i, shader_cache->images_3d[i] });
   }
 
-  cgpu_acceleration_structure_binding as = { 8, 0, geom_cache->acceleration_structure };
+  cgpu_tlas_binding as = { 7, 0, geom_cache->tlas };
 
   cgpu_bindings bindings = {0};
   bindings.buffer_count = (uint32_t) buffers.size();
@@ -577,14 +770,17 @@ int giRender(const gi_render_params* params, float* rgba_img)
   bindings.p_images = images.data();
   bindings.sampler_count = image_count ? 1 : 0;
   bindings.p_samplers = &sampler;
-  bindings.as_count = 1;
-  bindings.p_ases = &as;
+  bindings.tlas_count = 1;
+  bindings.p_tlases = &as;
 
   // Set up command buffer.
   if (!cgpu_create_command_buffer(s_device, &command_buffer))
     goto cleanup;
 
   if (!cgpu_begin_command_buffer(command_buffer))
+    goto cleanup;
+
+  if (!cgpu_cmd_transition_shader_image_layouts(command_buffer, shader_cache->rgenShader, images.size(), images.data()))
     goto cleanup;
 
   if (!cgpu_cmd_update_bindings(command_buffer, shader_cache->pipeline, &bindings))
@@ -594,17 +790,11 @@ int giRender(const gi_render_params* params, float* rgba_img)
     goto cleanup;
 
   // Trace rays.
-  if (!cgpu_cmd_push_constants(command_buffer, shader_cache->pipeline, &push_data))
+  if (!cgpu_cmd_push_constants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT, push_size, &push_data))
     goto cleanup;
 
-  if (!cgpu_cmd_dispatch(
-      command_buffer,
-      (params->image_width + WORKGROUP_SIZE_X - 1) / WORKGROUP_SIZE_X,
-      (params->image_height + WORKGROUP_SIZE_Y - 1) / WORKGROUP_SIZE_Y,
-      1))
-  {
+  if (!cgpu_cmd_trace_rays(command_buffer, shader_cache->pipeline, params->image_width, params->image_height))
     goto cleanup;
-  }
 
   // Copy output buffer to staging buffer.
   cgpu_buffer_memory_barrier barrier;

@@ -22,6 +22,9 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace gi::sg
 {
@@ -49,12 +52,6 @@ namespace gi::sg
       std::string_view mdlLibPath;
     };
 
-    struct MainShaderResult
-    {
-      std::vector<uint8_t> spv;
-      std::vector<TextureResource> textureResources;
-    };
-
   public:
     bool init(const InitParams& params);
     ~ShaderGen();
@@ -66,21 +63,34 @@ namespace gi::sg
     bool isMaterialEmissive(const struct Material* mat);
 
   public:
-    struct MainShaderParams
+    struct RaygenShaderParams
     {
-      uint32_t aovId;
-      uint32_t numThreadsX;
-      uint32_t numThreadsY;
-      std::vector<Material*> materials;
-      bool trianglePostponing;
-      bool nextEventEstimation;
-      uint32_t emissiveFaceCount;
-      uint32_t faceCount;
       bool shaderClockExts;
+      const std::vector<TextureResource>* textureResources;
+    };
+    struct MissShaderParams
+    {
+      const std::vector<TextureResource>* textureResources;
+    };
+    struct ClosestHitShaderIntermediates
+    {
+      std::string mdlGeneratedGlsl;
+      std::vector<TextureResource> textureResources;
+    };
+    struct ClosestHitShaderParams
+    {
+      int32_t aovId;
+      std::string_view baseFileName;
+      std::string_view mdlGeneratedGlsl;
+      uint32_t textureIndexOffset;
+      std::vector<TextureResource>* textureResources;
     };
 
-    bool generateMainShader(const struct MainShaderParams* params,
-                            MainShaderResult& result);
+    bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);
+    bool generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv);
+
+    bool generateClosestHitIntermediates(const Material* material, ClosestHitShaderIntermediates& intermediates);
+    bool generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv);
 
   private:
     class MdlRuntime* m_mdlRuntime = nullptr;
@@ -88,6 +98,6 @@ namespace gi::sg
     class MdlGlslCodeGen* m_mdlGlslCodeGen = nullptr;
     class MtlxMdlCodeGen* m_mtlxMdlCodeGen = nullptr;
     class GlslangShaderCompiler* m_shaderCompiler = nullptr;
-    std::string m_shaderPath;
+    fs::path m_shaderPath;
   };
 }

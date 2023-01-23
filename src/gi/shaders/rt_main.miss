@@ -1,0 +1,13 @@
+#extension GL_GOOGLE_include_directive: require
+#extension GL_EXT_ray_tracing: require
+
+#include "rt_payload.glsl"
+#include "rt_descriptors.glsl"
+
+layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
+
+void main()
+{
+    rayPayload.radiance += rayPayload.throughput * PC.BACKGROUND_COLOR.rgb;
+    rayPayload.bounce = 0xFFFFFFFFu;
+}

@@ -53,29 +53,36 @@ struct gi_vertex
 struct gi_face
 {
   uint32_t v_i[3];
-  uint32_t mat_index;
 };
 
 struct gi_material;
+struct gi_mesh;
 
 struct gi_geom_cache;
 struct gi_shader_cache;
 
-struct gi_geom_cache_params
+struct gi_mesh_desc
 {
-  bool                next_event_estimation;
-  uint32_t            face_count;
-  gi_face*            faces;
-  uint32_t            material_count;
-  const gi_material** materials;
-  uint32_t            vertex_count;
-  gi_vertex*          vertices;
+  uint32_t           face_count;
+  gi_face*           faces;
+  const gi_material* material;
+  uint32_t           vertex_count;
+  gi_vertex*         vertices;
 };
 
 struct gi_shader_cache_params
 {
-  gi_aov_id      aov_id;
-  gi_geom_cache* geom_cache;
+  gi_aov_id           aov_id;
+  uint32_t            material_count;
+  const gi_material** materials;
+};
+
+struct gi_geom_cache_params
+{
+  // FIXME: use gi_mesh_instance with transform instead
+  uint32_t         mesh_count;
+  const gi_mesh**  meshes;
+  gi_shader_cache* shader_cache;
 };
 
 struct gi_render_params
@@ -119,6 +126,8 @@ void giRegisterAssetReader(GiAssetReader* reader);
 gi_material* giCreateMaterialFromMtlx(const char* doc_str);
 gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
 void giDestroyMaterial(gi_material* mat);
+
+gi_mesh* giCreateMesh(const gi_mesh_desc* desc);
 
 gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params);
 void giDestroyGeomCache(gi_geom_cache* cache);

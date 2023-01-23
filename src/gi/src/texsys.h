@@ -46,8 +46,7 @@ namespace gi
   public:
     bool loadTextures(const std::vector<sg::TextureResource>& textureResources,
                       std::vector<cgpu_image>& images2d,
-                      std::vector<cgpu_image>& images3d,
-                      std::vector<uint16_t>& imageMappings);
+                      std::vector<cgpu_image>& images3d);
 
     void destroyUncachedImages(const std::vector<cgpu_image>& images);
 

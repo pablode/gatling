@@ -48,7 +48,7 @@ vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = uint(tex_mappings[tex - 1]);
+    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
 
     int mipmap_level = 0;
     ivec3 res = textureSize(textures_3d[array_idx], mipmap_level);
@@ -93,7 +93,7 @@ vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = uint(tex_mappings[tex - 1]);
+    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
 
     int mipmap_level = 0;
     ivec3 res = textureSize(textures_3d[array_idx], mipmap_level);
@@ -140,7 +140,7 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = uint(tex_mappings[tex - 1]);
+    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
 
     int mipmap_level = 0;
     ivec2 res = textureSize(textures_2d[array_idx], mipmap_level);
@@ -184,7 +184,7 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = uint(tex_mappings[tex - 1]);
+    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
 
     int mipmap_level = 0;
     ivec2 res = textureSize(textures_2d[array_idx], mipmap_level);
@@ -229,7 +229,7 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
         return ivec2(0, 0);
     }
 
-    uint array_idx = uint(tex_mappings[tex - 1]);
+    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
 
     ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
 

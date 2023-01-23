@@ -119,7 +119,7 @@ gi_vertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfV
   return vertex;
 }
 
-void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
+void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
                                             GfMatrix4d transform,
                                             uint32_t materialIndex,
                                             std::vector<gi_face>& faces,
@@ -143,7 +143,6 @@ void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
     face.v_i[0] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 0) : vertexIndices[0]);
     face.v_i[1] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 1) : vertexIndices[1]);
     face.v_i[2] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 2) : vertexIndices[2]);
-    face.mat_index = materialIndex;
 
     // We always need three unique vertices per face.
     for (size_t j = 0; isAnyPrimvarNotIndexed && j < 3; j++)
@@ -182,13 +181,9 @@ void HdGatlingRenderPass::_BakeMeshInstance(const HdGatlingMesh* mesh,
 
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
-                                      std::vector<gi_vertex>& vertices,
-                                      std::vector<gi_face>& faces,
-                                      std::vector<const gi_material*>& materials)
+                                      std::vector<const gi_material*>& materials,
+                                      std::vector<const gi_mesh*>& meshes)
 {
-  vertices.clear();
-  faces.clear();
-
   _ClearColorMaterials();
 
   TfHashMap<std::string, uint32_t> materialMap;
@@ -273,9 +268,23 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
     for (size_t i = 0; i < transforms.size(); i++)
     {
+      std::vector<gi_face> faces;
+      std::vector<gi_vertex> vertices;
+
       GfMatrix4d transform = prototypeTransform * transforms[i] * rootTransform;
 
-      _BakeMeshInstance(mesh, transform, materialIndex, faces, vertices);
+      _BakeMeshGeometry(mesh, transform, materialIndex, faces, vertices);
+
+      gi_mesh_desc desc = {0};
+      desc.face_count = faces.size();
+      desc.faces = faces.data();
+      desc.material = materials[materialIndex];
+      desc.vertex_count = vertices.size();
+      desc.vertices = vertices.data();
+
+      gi_mesh* mesh = giCreateMesh(&desc);
+      assert(mesh);
+      meshes.push_back(mesh);
     }
   }
 }
@@ -420,10 +429,19 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastBackgroundColor = backgroundColor;
   m_lastAovId = aovId;
 
+  bool rebuildShaderCache = !m_shaderCache || aovChanged;
+#ifndef NDEBUG
+  // HACK: activating the NEE debug render setting requires shader recompilation.
+  rebuildShaderCache |= renderSettingsChanged;
+#endif
   bool rebuildGeomCache = !m_geomCache;
 
-  if (rebuildGeomCache)
+  if (rebuildShaderCache || rebuildGeomCache)
   {
+    if (m_shaderCache)
+    {
+      giDestroyShaderCache(m_shaderCache);
+    }
     if (m_geomCache)
     {
       giDestroyGeomCache(m_geomCache);
@@ -432,49 +450,30 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     const SdfPath& cameraId = camera->GetId();
     printf("rebuilding geom cache for camera %s\n", cameraId.GetText());
 
-    std::vector<gi_vertex> vertices;
-    std::vector<gi_face> faces;
-    std::vector<const gi_material*> materials;
-
     // Transform scene into camera space to increase floating point precision.
     GfMatrix4d viewMatrix = camera->GetTransform().GetInverse();
-
-    _BakeMeshes(renderIndex, viewMatrix, vertices, faces, materials);
-
-    gi_geom_cache_params geomParams;
-    geomParams.next_event_estimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
-    geomParams.face_count = faces.size();
-    geomParams.faces = faces.data();
-    geomParams.material_count = materials.size();
-    geomParams.materials = materials.data();
-    geomParams.vertex_count = vertices.size();
-    geomParams.vertices = vertices.data();
-
-    m_geomCache = giCreateGeomCache(&geomParams);
-    TF_VERIFY(m_geomCache, "Unable to create geom cache");
-
     m_rootMatrix = viewMatrix;
-  }
 
-  bool rebuildShaderCache = !m_shaderCache || aovChanged;
-#ifndef NDEBUG
-  // HACK: activating the NEE debug render setting requires shader recompilation.
-  rebuildShaderCache |= renderSettingsChanged;
-#endif
-
-  if (m_geomCache && rebuildShaderCache)
-  {
-    if (m_shaderCache)
-    {
-      giDestroyShaderCache(m_shaderCache);
-    }
+    // FIXME: destroy these resources
+    std::vector<const gi_mesh*> meshes;
+    std::vector<const gi_material*> materials;
+    _BakeMeshes(renderIndex, viewMatrix, materials, meshes);
 
     gi_shader_cache_params shaderParams;
     shaderParams.aov_id = aovId;
-    shaderParams.geom_cache = m_geomCache;
+    shaderParams.material_count = materials.size();
+    shaderParams.materials = materials.data();
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");
+
+    gi_geom_cache_params geomParams;
+    geomParams.mesh_count = meshes.size();
+    geomParams.meshes = meshes.data();
+    geomParams.shader_cache = m_shaderCache;
+
+    m_geomCache = giCreateGeomCache(&geomParams);
+    TF_VERIFY(m_geomCache, "Unable to create geom cache");
   }
 
   if (!m_geomCache || !m_shaderCache)

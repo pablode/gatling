@@ -1,0 +1,177 @@
+#extension GL_GOOGLE_include_directive: require
+#extension GL_EXT_ray_tracing: require
+#extension GL_EXT_nonuniform_qualifier: enable
+#extension GL_EXT_samplerless_texture_functions: require
+
+#include "mdl_types.glsl"
+#include "rt_payload.glsl"
+#include "rt_descriptors.glsl"
+#include "mdl_interface.glsl"
+
+layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
+hitAttributeEXT vec2 baryCoord;
+
+void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, in vec3 ray_dir, out State state)
+{
+  vec3 bc = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+
+  face f = faces[hit_face_idx];
+  fvertex v_0 = vertices[f.v_0];
+  fvertex v_1 = vertices[f.v_1];
+  fvertex v_2 = vertices[f.v_2];
+
+  vec3 p_0 = v_0.field1.xyz;
+  vec3 p_1 = v_1.field1.xyz;
+  vec3 p_2 = v_2.field1.xyz;
+  vec3 pos = bc.x * p_0 + bc.y * p_1 + bc.z * p_2;
+  vec3 geom_normal = normalize(cross(p_1 - p_0, p_2 - p_0));
+
+  vec3 n_0 = v_0.field2.xyz;
+  vec3 n_1 = v_1.field2.xyz;
+  vec3 n_2 = v_2.field2.xyz;
+  vec3 normal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
+
+  vec3 tangent, bitangent;
+  orthonormal_basis(normal, tangent, bitangent);
+
+  vec2 uv_0 = vec2(v_0.field1.w, v_0.field2.w);
+  vec2 uv_1 = vec2(v_1.field1.w, v_1.field2.w);
+  vec2 uv_2 = vec2(v_2.field1.w, v_2.field2.w);
+  vec2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
+
+  if (dot(normal, ray_dir) > 0.0) { normal *= -1.0f; }
+  if (dot(geom_normal, ray_dir) > 0.0) { geom_normal *= -1.0f; }
+
+  state.normal = normal;
+  state.geom_normal = geom_normal;
+  state.position = pos;
+  state.tangent_u[0] = tangent;
+  state.tangent_v[0] = bitangent;
+  state.animation_time = 0.0;
+  state.text_coords[0] = vec3(uv, 0.0);
+}
+
+#pragma MDL_GENERATED_CODE
+
+bool russian_roulette(in float random_float, inout vec3 throughput)
+{
+    float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
+    float p = min(max_throughput, PC.RR_INV_MIN_TERM_PROB);
+
+    if (random_float > p)
+    {
+        return true;
+    }
+
+    throughput /= p;
+
+    return false;
+}
+
+void main()
+{
+    /* 1. Get hit info. */
+    vec2 hit_bc = baryCoord;
+    uint hit_face_idx = gl_InstanceCustomIndexEXT + gl_PrimitiveID;
+    float hit_t = gl_HitTEXT;
+
+    /* 2. Set up shading state. */
+    State shading_state; // Shading_state_material
+    setup_mdl_shading_state(hit_face_idx, hit_bc, rayPayload.ray_dir, shading_state);
+
+    // we keep a copy of the normal here since it can be changed within the state by *_init() functions:
+    // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
+    const vec3 normal = shading_state.normal;
+
+    const bool thin_walled = mdl_thin_walled(shading_state);
+    const float ior1 = (rayPayload.inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
+    const float ior2 = (rayPayload.inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
+
+#if AOV_ID == AOV_ID_DEBUG_NEE
+    return vec3(0.0, 0.0, 0.0);
+#elif AOV_ID == AOV_ID_NORMAL
+    return (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
+#elif AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
+    return vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+#elif AOV_ID == AOV_ID_DEBUG_TEXCOORDS
+    return shading_state.text_coords[0];
+#endif
+
+    /* 3. Apply volume attenuation */
+    if (rayPayload.inside && !thin_walled)
+    {
+        vec3 abs_coeff = mdl_absorption_coefficient(shading_state);
+        rayPayload.throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
+        rayPayload.throughput.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0;
+        rayPayload.throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
+    }
+
+    /* 4. Add Emission */
+    {
+        Edf_evaluate_data edf_evaluate_data;
+        edf_evaluate_data.k1 = -rayPayload.ray_dir;
+        mdl_edf_emission_init(shading_state);
+        mdl_edf_emission_evaluate(edf_evaluate_data, shading_state);
+
+        vec3 emission_intensity = mdl_edf_emission_intensity(shading_state);
+
+        rayPayload.radiance += rayPayload.throughput * edf_evaluate_data.edf * emission_intensity;
+    }
+
+    // reassign normal, see declaration of variable.
+    shading_state.normal = normal;
+
+    /* TODO 5. NEE light sampling */
+
+    /* 6. Russian Roulette */
+    vec4 rand4 = pcg4d_next(rayPayload.rng_state);
+
+    // TODO: don't break here, need test NEE vis & add contrib - but don't do BSDF sampling
+    if (rayPayload.bounce == PC.MAX_BOUNCES - 1)
+    {
+        rayPayload.bounce = 0xFFFFFFFFu;
+        return;
+    }
+    else if (rayPayload.bounce > PC.RR_BOUNCE_OFFSET)
+    {
+        if (russian_roulette(rand4.x, rayPayload.throughput))
+        {
+            rayPayload.bounce = 0xFFFFFFFFu;
+            return;
+        }
+    }
+
+    /* 7. BSDF (importance) sampling. */
+    {
+        Bsdf_sample_data bsdf_sample_data;
+        bsdf_sample_data.ior1 = vec3(ior1);
+        bsdf_sample_data.ior2 = vec3(ior2);
+        bsdf_sample_data.k1 = -rayPayload.ray_dir;
+        bsdf_sample_data.xi = pcg4d_next(rayPayload.rng_state);
+        mdl_bsdf_scattering_init(shading_state);
+        mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
+
+        if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
+        {
+            // TODO: don't break here, need test NEE vis & add contrib
+            rayPayload.bounce = 0xFFFFFFFFu;
+            return;
+        }
+
+        rayPayload.throughput *= bsdf_sample_data.bsdf_over_pdf;
+
+        bool is_transmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;
+
+        if (is_transmission)
+        {
+            rayPayload.inside = !rayPayload.inside;
+        }
+
+        rayPayload.ray_dir = bsdf_sample_data.k2;
+        rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (is_transmission ? -1.0 : 1.0));
+    }
+
+    /* TODO 8. NEE shadow query */
+
+    rayPayload.bounce++;
+}

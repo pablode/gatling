@@ -73,8 +73,7 @@ namespace gi
 
   bool TexSys::loadTextures(const std::vector<sg::TextureResource>& textureResources,
                             std::vector<cgpu_image>& images2d,
-                            std::vector<cgpu_image>& images3d,
-                            std::vector<uint16_t>& imageMappings)
+                            std::vector<cgpu_image>& images3d)
   {
     size_t texCount = textureResources.size();
 
@@ -85,7 +84,6 @@ namespace gi
 
     printf("staging %zu images\n", texCount);
 
-    imageMappings.resize(texCount, 0);
     images2d.reserve(texCount);
     images3d.reserve(texCount);
 
@@ -107,8 +105,6 @@ namespace gi
       auto& imageVector = image_desc.is3d ? images3d : images2d;
 
       int binding = textureResource.binding;
-      assert(binding < imageMappings.size());
-      imageMappings[binding] = (uint16_t) imageVector.size();
 
       const char* filePath = textureResource.filePath.c_str();
       if (strcmp(filePath, "") == 0)

@@ -22,6 +22,7 @@
 #include "MdlMaterialCompiler.h"
 #include "MdlGlslCodeGen.h"
 #include "GlslangShaderCompiler.h"
+#include "GlslSourceStitcher.h"
 
 #include <string>
 #include <sstream>
@@ -41,7 +42,7 @@ namespace gi::sg
 
   bool ShaderGen::init(const InitParams& params)
   {
-    m_shaderPath = std::string(params.shaderPath);
+    m_shaderPath = fs::path(params.shaderPath);
 
     m_mdlRuntime = new sg::MdlRuntime();
     if (!m_mdlRuntime->init(params.resourcePath.data()))
@@ -166,110 +167,114 @@ namespace gi::sg
     return mat->isEmissive;
   }
 
-  bool _sgReadTextFromFile(const std::string& filePath, std::string& text)
+  void _sgGenerateCommonDefines(GlslSourceStitcher& stitcher, const std::vector<TextureResource>* textureResources)
   {
-    std::ifstream file(filePath, std::ios_base::in | std::ios_base::binary);
-    if (!file.is_open())
-    {
-      return false;
-    }
-    file.seekg(0, std::ios_base::end);
-    text.resize(file.tellg(), ' ');
-    file.seekg(0, std::ios_base::beg);
-    file.read(&text[0], text.size());
-    return file.good();
-  }
-
-  bool ShaderGen::generateMainShader(const MainShaderParams* params,
-                                     MainShaderResult& result)
-  {
-    std::string fileName = "main.comp.glsl";
-    std::string filePath = m_shaderPath + "/" + fileName;
-
-    std::vector<const mi::neuraylib::ICompiled_material*> compiledMaterials;
-    for (uint32_t i = 0; i < params->materials.size(); i++)
-    {
-      compiledMaterials.push_back(params->materials[i]->compiledMaterial.get());
-    }
-
-    std::string genMdl;
-    if (!m_mdlGlslCodeGen->translate(compiledMaterials, genMdl, result.textureResources))
-    {
-      return false;
-    }
-
-    std::string fileSrc;
-    if (!_sgReadTextFromFile(filePath, fileSrc))
-    {
-      return false;
-    }
-
-    std::stringstream ss;
-    ss << std::showpoint;
-    ss << std::setprecision(std::numeric_limits<float>::digits10);
-
-    ss << "#version 460 core\n";
-
-    // FIXME: unfortunately we can't enable #extension requirements using the GLSL preprocessor..
-    if (params->shaderClockExts)
-    {
-      ss << "#extension GL_EXT_shader_explicit_arithmetic_types_int64: require\n";
-      ss << "#extension GL_ARB_shader_clock: require\n";
-    }
-
-    // Remove MDL struct definitions because they're too bloated. We know more about the
-    // data from which the code is generated from and can reduce the memory footprint.
-    size_t mdlCodeOffset = genMdl.find("// user defined structs");
-    assert(mdlCodeOffset != std::string::npos);
-    genMdl = genMdl.substr(mdlCodeOffset, genMdl.size() - mdlCodeOffset);
-
-    std::string mdlLocMarker = "#pragma MDL_GENERATED_CODE";
-    size_t mdlInjectionLoc = fileSrc.find(mdlLocMarker);
-    assert(mdlInjectionLoc != std::string::npos);
-    fileSrc.replace(mdlInjectionLoc, mdlLocMarker.size(), genMdl);
+#if defined(NDEBUG) || defined(__APPLE__)
+    stitcher.appendDefine("NDEBUG");
+#endif
 
     int textureCount2d = 0;
     int textureCount3d = 0;
-    for (auto& texResource : result.textureResources)
+    for (const auto& texResource : *textureResources)
     {
       (texResource.is3dImage ? textureCount3d : textureCount2d)++;
     }
     if (textureCount2d > 0)
     {
-      ss << "#define HAS_TEXTURES_2D\n";
-      ss << "#define TEXTURE_COUNT_2D " << textureCount2d << "\n";
+      stitcher.appendDefine("HAS_TEXTURES_2D");
+      stitcher.appendDefine("TEXTURE_COUNT_2D", textureCount2d);
     }
     if (textureCount3d > 0)
     {
-      ss << "#define HAS_TEXTURES_3D\n";
-      ss << "#define TEXTURE_COUNT_3D " << textureCount3d << "\n";
+      stitcher.appendDefine("HAS_TEXTURES_3D");
+      stitcher.appendDefine("TEXTURE_COUNT_3D", textureCount3d);
     }
+  }
 
-#if defined(NDEBUG) || defined(__APPLE__)
-    ss << "#define NDEBUG\n";
-#endif
+  bool ShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)
+  {
+    GlslSourceStitcher stitcher;
+    stitcher.appendVersion();
 
-#define APPEND_CONSTANT(name, cvar) \
-    ss << "#define " << name << " " << params->cvar << "\n";
-#define APPEND_DEFINE(name, cvar) \
-    if (params->cvar) ss << "#define " << name << "\n";
+    _sgGenerateCommonDefines(stitcher, params.textureResources);
 
-    APPEND_CONSTANT("AOV_ID", aovId)
-    APPEND_CONSTANT("NUM_THREADS_X", numThreadsX)
-    APPEND_CONSTANT("NUM_THREADS_Y", numThreadsY)
-    APPEND_CONSTANT("FACE_COUNT", faceCount)
-    APPEND_CONSTANT("EMISSIVE_FACE_COUNT", emissiveFaceCount)
-    APPEND_DEFINE("TRIANGLE_POSTPONING", trianglePostponing)
-    APPEND_DEFINE("NEXT_EVENT_ESTIMATION", nextEventEstimation)
-
-    ss << fileSrc;
-
-    std::string glslStr = ss.str();
-    if (getenv("GATLING_DUMP_GLSL"))
+    // FIXME: 'enable' instead?
+    if (params.shaderClockExts)
     {
-      printf("GLSL source: %s\n", glslStr.c_str());
+      stitcher.appendRequiredExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
+      stitcher.appendRequiredExtension("GL_ARB_shader_clock");
     }
 
-    return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::Compute, glslStr, filePath, result.spv);
+    fs::path filePath = m_shaderPath / fileName;
+    if (!stitcher.appendSourceFile(filePath))
+    {
+      return false;
+    }
+
+    std::string source = stitcher.source();
+    return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::RayGen, source, spv);
+  }
+
+  bool ShaderGen::generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv)
+  {
+    GlslSourceStitcher stitcher;
+    stitcher.appendVersion();
+
+    _sgGenerateCommonDefines(stitcher, params.textureResources);
+
+    fs::path filePath = m_shaderPath / fileName;
+    if (!stitcher.appendSourceFile(filePath))
+    {
+      return false;
+    }
+
+    std::string source = stitcher.source();
+    return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::Miss, source, spv);
+  }
+
+  bool ShaderGen::generateClosestHitIntermediates(const Material* material,
+                                                  ClosestHitShaderIntermediates& intermediates)
+  {
+    const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
+
+    if (!m_mdlGlslCodeGen->translate(compiledMaterial,
+                                     intermediates.mdlGeneratedGlsl,
+                                     intermediates.textureResources))
+    {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool ShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)
+  {
+    auto mdlGeneratedGlsl = std::string(params.mdlGeneratedGlsl);
+    {
+      // Remove MDL struct definitions because they're too bloated. We know more about the
+      // data from which the code is generated from and can reduce the memory footprint.
+      size_t mdlCodeOffset = mdlGeneratedGlsl.find("// user defined structs");
+      assert(mdlCodeOffset != std::string::npos);
+      mdlGeneratedGlsl = mdlGeneratedGlsl.substr(mdlCodeOffset, mdlGeneratedGlsl.size() - mdlCodeOffset);
+    }
+
+    GlslSourceStitcher stitcher;
+    stitcher.appendVersion();
+
+    _sgGenerateCommonDefines(stitcher, params.textureResources);
+
+    stitcher.appendDefine("AOV_ID", params.aovId);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", params.textureIndexOffset);
+
+    fs::path filePath = m_shaderPath / params.baseFileName;
+    if (!stitcher.appendSourceFile(filePath))
+    {
+      return false;
+    }
+
+    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", mdlGeneratedGlsl);
+
+    std::string source = stitcher.source();
+    return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::ClosestHit, source, spv);
   }
 }
