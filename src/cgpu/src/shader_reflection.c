@@ -41,35 +41,33 @@ bool cgpu_perform_shader_reflection(uint64_t size,
   {
     goto fail;
   }
-  assert(binding_count > 0);
 
-  bindings = malloc(binding_count * sizeof(SpvReflectDescriptorBinding*));
-  if (spvReflectEnumerateDescriptorBindings(&shader_module, &binding_count, bindings) != SPV_REFLECT_RESULT_SUCCESS)
+  if (binding_count > 0)
   {
-    goto fail;
-  }
+    p_reflection->binding_count = 0;
+    p_reflection->bindings = (cgpu_shader_reflection_binding*)malloc(sizeof(cgpu_shader_reflection_binding) * binding_count);
 
-  p_reflection->binding_count = 0;
-  p_reflection->bindings = (cgpu_shader_reflection_binding*) malloc(sizeof(cgpu_shader_reflection_binding) * binding_count);
-
-  for (uint32_t i = 0; i < binding_count; i++)
-  {
-    const SpvReflectDescriptorBinding* src_binding = bindings[i];
-    if (!src_binding->accessed)
+    bindings = malloc(binding_count * sizeof(SpvReflectDescriptorBinding*));
+    if (spvReflectEnumerateDescriptorBindings(&shader_module, &binding_count, bindings) != SPV_REFLECT_RESULT_SUCCESS)
     {
-      continue;
+      goto fail;
     }
 
-    cgpu_shader_reflection_binding* dst_binding = &p_reflection->bindings[p_reflection->binding_count++];
+    for (uint32_t i = 0; i < binding_count; i++)
+    {
+      const SpvReflectDescriptorBinding* src_binding = bindings[i];
+      cgpu_shader_reflection_binding* dst_binding = &p_reflection->bindings[p_reflection->binding_count++];
 
-    /* Unfortunately SPIRV-Reflect lacks this functionality:
-     * https://github.com/KhronosGroup/SPIRV-Reflect/issues/99 */
-    const SpvReflectTypeDescription* type_description = src_binding->type_description;
-    dst_binding->write_access = ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
-    dst_binding->read_access = true;
-    dst_binding->binding = src_binding->binding;
-    dst_binding->count = src_binding->count;
-    dst_binding->descriptor_type = (int) src_binding->descriptor_type;
+      /* Unfortunately SPIRV-Reflect lacks this functionality:
+       * https://github.com/KhronosGroup/SPIRV-Reflect/issues/99 */
+      const SpvReflectTypeDescription* type_description = src_binding->type_description;
+      // FIXME: we need to reflect all pipeline stages and logical or ( | )-chain them
+      dst_binding->write_access = src_binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+      dst_binding->read_access = src_binding->accessed;
+      dst_binding->binding = src_binding->binding;
+      dst_binding->count = src_binding->count;
+      dst_binding->descriptor_type = (int)src_binding->descriptor_type;
+    }
   }
 
   if (shader_module.push_constant_block_count == 0)
