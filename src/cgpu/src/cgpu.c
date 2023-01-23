@@ -43,7 +43,6 @@
 #define CGPU_MAX_BUFFER_MEMORY_BARRIERS 64
 #define CGPU_MAX_IMAGE_MEMORY_BARRIERS 2048
 #define CGPU_MAX_MEMORY_BARRIERS 128
-#define CGPU_MAX_RAY_RECURSION_DEPTH 31
 #define CGPU_MAX_RT_PIPELINE_STAGE_COUNT 1024
 
 /* Internal structures. */
@@ -266,7 +265,6 @@ static cgpu_physical_device_properties cgpu_translate_physical_device_properties
   properties.subgroupSize = vk_subgroup_props->subgroupSize;
   properties.minAccelerationStructureScratchOffsetAlignment = vk_as_props->minAccelerationStructureScratchOffsetAlignment;
   properties.shaderGroupHandleSize = vk_rt_pipeline_props->shaderGroupHandleSize;
-  properties.maxRayRecursionDepth = vk_rt_pipeline_props->maxRayRecursionDepth;
   properties.maxShaderGroupStride = vk_rt_pipeline_props->maxShaderGroupStride;
   properties.shaderGroupBaseAlignment = vk_rt_pipeline_props->shaderGroupBaseAlignment;
   properties.shaderGroupHandleCaptureReplaySize = vk_rt_pipeline_props->shaderGroupHandleCaptureReplaySize;
@@ -461,12 +459,6 @@ bool cgpu_create_device(cgpu_device* p_device)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     CGPU_RETURN_ERROR("subgroup features not supported");
-  }
-
-  if (rt_pipeline_properties.maxRayRecursionDepth < CGPU_MAX_RAY_RECURSION_DEPTH)
-  {
-    fprintf(stderr, "error in %s:%d: max ray recursion depth of %d not supported\n", __FILE__, __LINE__, CGPU_MAX_RAY_RECURSION_DEPTH);
-    return false;
   }
 
   const VkPhysicalDeviceLimits* limits = &device_properties.properties.limits;
@@ -1845,7 +1837,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   rt_pipeline_create_info.pStages = stages;
   rt_pipeline_create_info.groupCount = groupCount;
   rt_pipeline_create_info.pGroups = groups;
-  rt_pipeline_create_info.maxPipelineRayRecursionDepth = CGPU_MAX_RAY_RECURSION_DEPTH;
+  rt_pipeline_create_info.maxPipelineRayRecursionDepth = 1;
   rt_pipeline_create_info.pLibraryInfo = NULL;
   rt_pipeline_create_info.pLibraryInterface = NULL;
   rt_pipeline_create_info.pDynamicState = NULL;

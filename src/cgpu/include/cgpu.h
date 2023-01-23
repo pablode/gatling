@@ -465,7 +465,6 @@ typedef struct cgpu_physical_device_properties {
   uint32_t subgroupSize;
   uint64_t minAccelerationStructureScratchOffsetAlignment;
   uint32_t shaderGroupHandleSize;
-  uint32_t maxRayRecursionDepth;
   uint32_t maxShaderGroupStride;
   uint32_t shaderGroupBaseAlignment;
   uint32_t shaderGroupHandleCaptureReplaySize;
