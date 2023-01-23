@@ -483,6 +483,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     hitShaderIntermediates.resize(params->material_count);
 
     std::atomic_bool threadWorkFailed = false;
+#pragma omp parallel for
     for (int i = 0; i < hitShaderIntermediates.size(); i++)
     {
       const gi_material* mat = params->materials[i];
@@ -517,6 +518,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     // 3. Generate final GLSL hit shaders, and compile them to SPIR-V.
     hitShaders.resize(hitShaderIntermediates.size(), { CGPU_INVALID_HANDLE });
     threadWorkFailed = false;
+#pragma omp parallel for
     for (int i = 0; i < hitShaderIntermediates.size(); i++)
     {
       const sg::ShaderGen::ClosestHitShaderIntermediates& intermediates = hitShaderIntermediates[i];
