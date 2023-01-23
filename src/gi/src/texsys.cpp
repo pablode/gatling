@@ -17,7 +17,7 @@
 
 #include "texsys.h"
 
-#include "stager.h"
+#include "Stager.h"
 #include "mmap.h"
 #include "gi.h"
 

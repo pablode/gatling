@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "stager.h"
+#include "Stager.h"
 
 #include <assert.h>
 #include <algorithm>
