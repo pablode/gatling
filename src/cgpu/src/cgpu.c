@@ -480,8 +480,7 @@ bool cgpu_create_device(cgpu_device* p_device)
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
     VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
-    VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, // required by VK_KHR_ray_query (temporary)
-    VK_KHR_RAY_QUERY_EXTENSION_NAME,
+    VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
     VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME // required by VK_KHR_spirv_1_4
   };
@@ -615,14 +614,9 @@ bool cgpu_create_device(cgpu_device* p_device)
   acceleration_structure_features.accelerationStructureHostCommands = VK_FALSE;
   acceleration_structure_features.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
 
-  VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features = {0};
-  ray_query_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
-  ray_query_features.pNext = &acceleration_structure_features;
-  ray_query_features.rayQuery = VK_TRUE;
-
   VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features = {0};
   ray_tracing_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-  ray_tracing_pipeline_features.pNext = &ray_query_features;
+  ray_tracing_pipeline_features.pNext = &acceleration_structure_features;
   ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
   ray_tracing_pipeline_features.rayTracingPipelineShaderGroupHandleCaptureReplay = VK_FALSE;
   ray_tracing_pipeline_features.rayTracingPipelineShaderGroupHandleCaptureReplayMixed = VK_FALSE;
