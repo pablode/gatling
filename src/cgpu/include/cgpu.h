@@ -598,6 +598,13 @@ CGPU_API bool CGPU_CDECL cgpu_cmd_bind_pipeline(
   cgpu_pipeline pipeline
 );
 
+CGPU_API bool CGPU_CDECL cgpu_cmd_transition_shader_image_layouts(
+  cgpu_command_buffer command_buffer,
+  cgpu_shader shader,
+  uint32_t image_count,
+  const cgpu_image_binding* p_images
+);
+
 CGPU_API bool CGPU_CDECL cgpu_cmd_update_bindings(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline,

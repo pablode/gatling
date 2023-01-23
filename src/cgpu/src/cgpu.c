@@ -2163,13 +2163,17 @@ bool cgpu_cmd_bind_pipeline(cgpu_command_buffer command_buffer,
   return true;
 }
 
-static bool cgpu_transition_image_layouts_for_shader(cgpu_ipipeline* ipipeline,
-                                                     cgpu_icommand_buffer* icommand_buffer,
-                                                     uint32_t image_count,
-                                                     const cgpu_image_binding* p_images)
+bool cgpu_cmd_transition_shader_image_layouts(cgpu_command_buffer command_buffer,
+                                              cgpu_shader shader,
+                                              uint32_t image_count,
+                                              const cgpu_image_binding* p_images)
 {
   cgpu_ishader* ishader;
-  if (!cgpu_resolve_shader(ipipeline->shader, &ishader)) {
+  if (!cgpu_resolve_shader(shader, &ishader)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  cgpu_icommand_buffer* icommand_buffer;
+  if (!cgpu_resolve_command_buffer(command_buffer, &icommand_buffer)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   cgpu_idevice* idevice;
@@ -2297,16 +2301,6 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
-
-  bool c_result = cgpu_transition_image_layouts_for_shader(
-    ipipeline,
-    icommand_buffer,
-    bindings->image_count,
-    bindings->p_images
-  );
-  if (c_result != true) {
-    return c_result;
   }
 
   VkDescriptorBufferInfo buffer_infos[CGPU_MAX_DESCRIPTOR_BUFFER_INFOS];
