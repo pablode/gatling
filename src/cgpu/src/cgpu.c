@@ -108,16 +108,19 @@ typedef struct cgpu_icommand_buffer {
   cgpu_device     device;
 } cgpu_icommand_buffer;
 
-typedef struct cgpu_iacceleration_structure {
-  VkAccelerationStructureKHR blas;
-  VkAccelerationStructureKHR tlas;
-  uint64_t blas_address;
-  cgpu_buffer blas_buffer;
-  cgpu_buffer tlas_buffer;
-  cgpu_buffer index_buffer; // blas
-  cgpu_buffer vertex_buffer; // blas
-  cgpu_buffer instances_buffer; // tlas
-} cgpu_iacceleration_structure;
+typedef struct cgpu_iblas {
+  VkAccelerationStructureKHR as;
+  uint64_t address;
+  cgpu_buffer buffer;
+  cgpu_buffer indices;
+  cgpu_buffer vertices;
+} cgpu_iblas;
+
+typedef struct cgpu_itlas {
+  VkAccelerationStructureKHR as;
+  cgpu_buffer buffer;
+  cgpu_buffer instances;
+} cgpu_itlas;
 
 typedef struct cgpu_isampler {
   VkSampler sampler;
@@ -134,7 +137,8 @@ static resource_store ipipeline_store;
 static resource_store ifence_store;
 static resource_store icommand_buffer_store;
 static resource_store isampler_store;
-static resource_store iacceleration_structure_store;
+static resource_store iblas_store;
+static resource_store itlas_store;
 
 /* Helper functions. */
 
@@ -158,15 +162,16 @@ static resource_store iacceleration_structure_store;
     return resource_store_get(&RESOURCE_STORE, handle.handle, (void**) idata);            \
   }
 
-CGPU_RESOLVE_HANDLE(                device,                 cgpu_device,                 cgpu_idevice,                 idevice_store)
-CGPU_RESOLVE_HANDLE(                buffer,                 cgpu_buffer,                 cgpu_ibuffer,                 ibuffer_store)
-CGPU_RESOLVE_HANDLE(                 image,                  cgpu_image,                  cgpu_iimage,                  iimage_store)
-CGPU_RESOLVE_HANDLE(                shader,                 cgpu_shader,                 cgpu_ishader,                 ishader_store)
-CGPU_RESOLVE_HANDLE(              pipeline,               cgpu_pipeline,               cgpu_ipipeline,               ipipeline_store)
-CGPU_RESOLVE_HANDLE(                 fence,                  cgpu_fence,                  cgpu_ifence,                  ifence_store)
-CGPU_RESOLVE_HANDLE(        command_buffer,         cgpu_command_buffer,         cgpu_icommand_buffer,         icommand_buffer_store)
-CGPU_RESOLVE_HANDLE(               sampler,                cgpu_sampler,                cgpu_isampler,                isampler_store)
-CGPU_RESOLVE_HANDLE(acceleration_structure, cgpu_acceleration_structure, cgpu_iacceleration_structure, iacceleration_structure_store)
+CGPU_RESOLVE_HANDLE(        device,         cgpu_device,         cgpu_idevice,         idevice_store)
+CGPU_RESOLVE_HANDLE(        buffer,         cgpu_buffer,         cgpu_ibuffer,         ibuffer_store)
+CGPU_RESOLVE_HANDLE(         image,          cgpu_image,          cgpu_iimage,          iimage_store)
+CGPU_RESOLVE_HANDLE(        shader,         cgpu_shader,         cgpu_ishader,         ishader_store)
+CGPU_RESOLVE_HANDLE(      pipeline,       cgpu_pipeline,       cgpu_ipipeline,       ipipeline_store)
+CGPU_RESOLVE_HANDLE(         fence,          cgpu_fence,          cgpu_ifence,          ifence_store)
+CGPU_RESOLVE_HANDLE(command_buffer, cgpu_command_buffer, cgpu_icommand_buffer, icommand_buffer_store)
+CGPU_RESOLVE_HANDLE(       sampler,        cgpu_sampler,        cgpu_isampler,        isampler_store)
+CGPU_RESOLVE_HANDLE(          blas,           cgpu_blas,           cgpu_iblas,           iblas_store)
+CGPU_RESOLVE_HANDLE(          tlas,           cgpu_tlas,           cgpu_itlas,           itlas_store)
 
 static cgpu_physical_device_features cgpu_translate_physical_device_features(const VkPhysicalDeviceFeatures* vk_features)
 {
@@ -333,7 +338,8 @@ bool cgpu_initialize(const char* p_app_name,
   resource_store_create(&ifence_store, sizeof(cgpu_ifence), 8);
   resource_store_create(&icommand_buffer_store, sizeof(cgpu_icommand_buffer), 16);
   resource_store_create(&isampler_store, sizeof(cgpu_isampler), 8);
-  resource_store_create(&iacceleration_structure_store, sizeof(cgpu_iacceleration_structure), 8);
+  resource_store_create(&iblas_store, sizeof(cgpu_iblas), 1024);
+  resource_store_create(&itlas_store, sizeof(cgpu_itlas), 1);
 
   return true;
 }
@@ -348,7 +354,8 @@ void cgpu_terminate(void)
   resource_store_destroy(&ifence_store);
   resource_store_destroy(&icommand_buffer_store);
   resource_store_destroy(&isampler_store);
-  resource_store_destroy(&iacceleration_structure_store);
+  resource_store_destroy(&iblas_store);
+  resource_store_destroy(&itlas_store);
 
   vkDestroyInstance(iinstance.instance, NULL);
 }
@@ -1661,24 +1668,13 @@ bool cgpu_destroy_pipeline(cgpu_device device,
   return true;
 }
 
-static uint64_t cgpu_get_acceleration_structure_buffer_address(cgpu_idevice* idevice, cgpu_ibuffer* ibuffer)
-{
-  VkBufferDeviceAddressInfoKHR address_info = {0};
-  address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-  address_info.pNext = NULL;
-  address_info.buffer = ibuffer->buffer;
-  return idevice->table.vkGetBufferDeviceAddressKHR(idevice->logical_device, &address_info);
-}
-
 static bool cgpu_create_top_or_bottom_as(cgpu_device device,
                                          VkAccelerationStructureTypeKHR as_type,
                                          VkAccelerationStructureGeometryKHR* as_geom,
                                          uint32_t primitive_count,
-                                         cgpu_iacceleration_structure* iacceleration_structure)
+                                         cgpu_buffer* as_buffer,
+                                         VkAccelerationStructureKHR* as)
 {
-  bool is_bottom_level = as_type == VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-  assert(is_bottom_level || as_type == VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR);
-
   cgpu_idevice* idevice;
   cgpu_resolve_device(device, &idevice);
 
@@ -1711,7 +1707,6 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
                                                          &as_build_sizes_info);
 
   // Create AS buffer & AS object
-  cgpu_buffer* as_buffer = is_bottom_level ? &iacceleration_structure->blas_buffer : &iacceleration_structure->tlas_buffer;
   if (!cgpu_create_buffer(device,
                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE,
                           CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
@@ -1733,8 +1728,8 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   as_create_info.type = as_type;
   as_create_info.deviceAddress = 0; // used for capture-replay feature
 
-  VkAccelerationStructureKHR* as = is_bottom_level ? &iacceleration_structure->blas : &iacceleration_structure->tlas;
-  if (idevice->table.vkCreateAccelerationStructureKHR(idevice->logical_device, &as_create_info, NULL, as) != VK_SUCCESS) {
+  if (idevice->table.vkCreateAccelerationStructureKHR(idevice->logical_device, &as_create_info, NULL, as) != VK_SUCCESS)
+  {
     cgpu_destroy_buffer(device, *as_buffer);
     CGPU_RETURN_ERROR("failed to create Vulkan AS object");
   }
@@ -1756,9 +1751,9 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   cgpu_ibuffer* iscratch_buffer;
   cgpu_resolve_buffer(scratch_buffer, &iscratch_buffer);
 
-  as_build_geom_info.dstAccelerationStructure = is_bottom_level ? iacceleration_structure->blas : iacceleration_structure->tlas;
+  as_build_geom_info.dstAccelerationStructure = *as;
   as_build_geom_info.scratchData.hostAddress = 0;
-  as_build_geom_info.scratchData.deviceAddress = cgpu_get_acceleration_structure_buffer_address(idevice, iscratch_buffer);
+  as_build_geom_info.scratchData.deviceAddress = cgpu_get_buffer_device_address(idevice, iscratch_buffer);
 
   VkAccelerationStructureBuildRangeInfoKHR as_build_range_info;
   as_build_range_info.primitiveCount = primitive_count;
@@ -1795,16 +1790,6 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   cgpu_submit_command_buffer(device, command_buffer, fence);
   cgpu_wait_for_fence(device, fence);
 
-  if (is_bottom_level)
-  {
-    VkAccelerationStructureDeviceAddressInfoKHR as_address_info = { 0 };
-    as_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-    as_address_info.pNext = NULL;
-    as_address_info.accelerationStructure = *as;
-
-    iacceleration_structure->blas_address = idevice->table.vkGetAccelerationStructureDeviceAddressKHR(idevice->logical_device, &as_address_info);
-  }
-
   // Dispose resources
   cgpu_destroy_fence(device, fence);
   cgpu_destroy_command_buffer(device, command_buffer);
@@ -1813,18 +1798,29 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   return true;
 }
 
-static bool cgpu_create_blas(cgpu_device device,
-                             uint32_t vertex_count,
-                             const cgpu_vertex* vertices,
-                             uint32_t index_count,
-                             const uint32_t* indices,
-                             cgpu_iacceleration_structure* iacceleration_structure)
+
+bool cgpu_create_blas(cgpu_device device,
+                      uint32_t vertex_count,
+                      const cgpu_vertex* vertices,
+                      uint32_t index_count,
+                      const uint32_t* indices,
+                      cgpu_blas* p_blas)
 {
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  p_blas->handle = resource_store_create_handle(&iblas_store);
+
+  cgpu_iblas* iblas;
+  if (!cgpu_resolve_blas(*p_blas, &iblas)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
   if ((index_count % 3) != 0) {
     CGPU_RETURN_ERROR("BLAS indices do not represent triangles");
   }
-  cgpu_idevice* idevice;
-  cgpu_resolve_device(device, &idevice);
 
   // Create index buffer & copy data into it
   uint64_t index_buffer_size = index_count * sizeof(uint32_t);
@@ -1832,24 +1828,24 @@ static bool cgpu_create_blas(cgpu_device device,
                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                           CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
                           index_buffer_size,
-                          &iacceleration_structure->index_buffer))
+                          &iblas->indices))
   {
     CGPU_RETURN_ERROR("failed to create BLAS index buffer");
   }
 
   cgpu_ibuffer* iindex_buffer;
-  cgpu_resolve_buffer(iacceleration_structure->index_buffer, &iindex_buffer);
+  cgpu_resolve_buffer(iblas->indices, &iindex_buffer);
 
   {
     bool result;
     void* mapped_mem;
-    result = cgpu_map_buffer(device, iacceleration_structure->index_buffer, &mapped_mem);
+    result = cgpu_map_buffer(device, iblas->indices, &mapped_mem);
     if (!result) {
-      cgpu_destroy_buffer(device, iacceleration_structure->index_buffer);
+      cgpu_destroy_buffer(device, iblas->indices);
       CGPU_RETURN_ERROR("failed to map BLAS index buffer memory");
     }
     memcpy(mapped_mem, indices, index_buffer_size);
-    result = cgpu_unmap_buffer(device, iacceleration_structure->index_buffer);
+    result = cgpu_unmap_buffer(device, iblas->indices);
     assert(result);
   }
 
@@ -1859,25 +1855,25 @@ static bool cgpu_create_blas(cgpu_device device,
                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                           CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
                           vertex_buffer_size,
-                          &iacceleration_structure->vertex_buffer))
+                          &iblas->vertices))
   {
-    cgpu_destroy_buffer(device, iacceleration_structure->index_buffer);
+    cgpu_destroy_buffer(device, iblas->indices);
     CGPU_RETURN_ERROR("failed to create BLAS vertex buffer");
   }
 
   cgpu_ibuffer* ivertex_buffer;
-  cgpu_resolve_buffer(iacceleration_structure->vertex_buffer, &ivertex_buffer);
+  cgpu_resolve_buffer(iblas->vertices, &ivertex_buffer);
 
   {
     void* mapped_mem;
-    bool result = cgpu_map_buffer(device, iacceleration_structure->vertex_buffer, &mapped_mem);
+    bool result = cgpu_map_buffer(device, iblas->vertices, &mapped_mem);
     if (!result) {
-      cgpu_destroy_buffer(device, iacceleration_structure->index_buffer);
-      cgpu_destroy_buffer(device, iacceleration_structure->vertex_buffer);
+      cgpu_destroy_buffer(device, iblas->vertices);
+      cgpu_destroy_buffer(device, iblas->indices);
       CGPU_RETURN_ERROR("failed to map BLAS vertex buffer memory");
     }
     memcpy(mapped_mem, vertices, vertex_buffer_size);
-    result = cgpu_unmap_buffer(device, iacceleration_structure->vertex_buffer);
+    result = cgpu_unmap_buffer(device, iblas->vertices);
     assert(result);
   }
 
@@ -1887,12 +1883,12 @@ static bool cgpu_create_blas(cgpu_device device,
   as_triangle_data.pNext = NULL;
   as_triangle_data.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
   as_triangle_data.vertexData.hostAddress = NULL;
-  as_triangle_data.vertexData.deviceAddress = cgpu_get_acceleration_structure_buffer_address(idevice, ivertex_buffer);
+  as_triangle_data.vertexData.deviceAddress = cgpu_get_buffer_device_address(idevice, ivertex_buffer);
   as_triangle_data.vertexStride = sizeof(cgpu_vertex);
   as_triangle_data.maxVertex = vertex_count;
   as_triangle_data.indexType = VK_INDEX_TYPE_UINT32;
   as_triangle_data.indexData.hostAddress = NULL;
-  as_triangle_data.indexData.deviceAddress = cgpu_get_acceleration_structure_buffer_address(idevice, iindex_buffer);
+  as_triangle_data.indexData.deviceAddress = cgpu_get_buffer_device_address(idevice, iindex_buffer);
   as_triangle_data.transformData.hostAddress = NULL;
   as_triangle_data.transformData.deviceAddress = 0; // optional
 
@@ -1907,56 +1903,76 @@ static bool cgpu_create_blas(cgpu_device device,
   as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 
   uint32_t triangle_count = index_count / 3;
-  if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &as_geom, triangle_count, iacceleration_structure)) {
-    cgpu_destroy_buffer(device, iacceleration_structure->index_buffer);
-    cgpu_destroy_buffer(device, iacceleration_structure->vertex_buffer);
+  if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &as_geom, triangle_count, &iblas->buffer, &iblas->as))
+  {
+    cgpu_destroy_buffer(device, iblas->indices);
+    cgpu_destroy_buffer(device, iblas->vertices);
     CGPU_RETURN_ERROR("failed to build BLAS");
   }
+
+  VkAccelerationStructureDeviceAddressInfoKHR as_address_info = {0};
+  as_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+  as_address_info.pNext = NULL;
+  as_address_info.accelerationStructure = iblas->as;
+  iblas->address = idevice->table.vkGetAccelerationStructureDeviceAddressKHR(idevice->logical_device, &as_address_info);
 
   return true;
 }
 
-static bool cgpu_create_tlas(cgpu_device device, cgpu_iacceleration_structure* iacceleration_structure)
+bool cgpu_create_tlas(cgpu_device device,
+                      uint32_t instance_count,
+                      const struct cgpu_blas_instance* instances,
+                      cgpu_tlas* p_tlas)
 {
   cgpu_idevice* idevice;
-  cgpu_resolve_device(device, &idevice);
+  if (!cgpu_resolve_device(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
 
-  // Create instance buffer & copy matrix into it
-  VkTransformMatrixKHR transform_matrix = {
-    1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f
-  };
+  p_tlas->handle = resource_store_create_handle(&itlas_store);
 
-  VkAccelerationStructureInstanceKHR as_instance = {0};
-  as_instance.transform = transform_matrix;
-  as_instance.instanceCustomIndex = 0;
-  as_instance.mask = 0xFF;
-  as_instance.instanceShaderBindingTableRecordOffset = 0;
-  as_instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-  as_instance.accelerationStructureReference = iacceleration_structure->blas_address;
+  cgpu_itlas* itlas;
+  if (!cgpu_resolve_tlas(*p_tlas, &itlas)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
 
+  // Create instance buffer & copy into it
   if (!cgpu_create_buffer(device,
                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                           CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                          sizeof(VkAccelerationStructureInstanceKHR),
-                          &iacceleration_structure->instances_buffer))
+                          instance_count * sizeof(VkAccelerationStructureInstanceKHR),
+                          &itlas->instances))
   {
     CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
   }
 
   cgpu_ibuffer* iinstances_buffer;
-  cgpu_resolve_buffer(iacceleration_structure->instances_buffer, &iinstances_buffer);
-
+  cgpu_resolve_buffer(itlas->instances, &iinstances_buffer);
   {
-    void* mapped_mem;
-    bool result = cgpu_map_buffer(device, iacceleration_structure->instances_buffer, &mapped_mem);
+    uint8_t* mapped_mem;
+    bool result = cgpu_map_buffer(device, itlas->instances, (void**) &mapped_mem);
     if (!result) {
-      cgpu_destroy_buffer(device, iacceleration_structure->instances_buffer);
+      cgpu_destroy_buffer(device, itlas->instances);
       CGPU_RETURN_ERROR("failed to map TLAS instances buffer memory");
     }
-    memcpy(mapped_mem, &as_instance, sizeof(VkAccelerationStructureInstanceKHR));
-    result = cgpu_unmap_buffer(device, iacceleration_structure->instances_buffer);
+
+    for (uint32_t i = 0; i < instance_count; i++)
+    {
+      cgpu_iblas* iblas;
+      if (!cgpu_resolve_blas(instances[i].as, &iblas)) {
+        CGPU_RETURN_ERROR_INVALID_HANDLE;
+      }
+
+      VkAccelerationStructureInstanceKHR* as_instance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];
+      memcpy(&as_instance->transform, &instances[i].transform, sizeof(VkTransformMatrixKHR));
+      as_instance->instanceCustomIndex = instances[i].faceIndexOffset;
+      as_instance->mask = 0xFF;
+      as_instance->instanceShaderBindingTableRecordOffset = instances[i].hitShaderIndex;
+      as_instance->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+      as_instance->accelerationStructureReference = iblas->address;
+    }
+
+    result = cgpu_unmap_buffer(device, itlas->instances);
     assert(result);
   }
 
@@ -1965,73 +1981,58 @@ static bool cgpu_create_tlas(cgpu_device device, cgpu_iacceleration_structure* i
   as_geom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
   as_geom.pNext = NULL;
   as_geom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-	as_geom.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-	as_geom.geometry.instances.pNext = NULL;
-	as_geom.geometry.instances.arrayOfPointers = VK_FALSE;
-	as_geom.geometry.instances.data.hostAddress = NULL;
-	as_geom.geometry.instances.data.deviceAddress = cgpu_get_acceleration_structure_buffer_address(idevice, iinstances_buffer);
+  as_geom.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+  as_geom.geometry.instances.pNext = NULL;
+  as_geom.geometry.instances.arrayOfPointers = VK_FALSE;
+  as_geom.geometry.instances.data.hostAddress = NULL;
+  as_geom.geometry.instances.data.deviceAddress = cgpu_get_buffer_device_address(idevice, iinstances_buffer);
   as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 
-  uint32_t primitive_count = 1;
-  if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &as_geom, primitive_count, iacceleration_structure)) {
-    cgpu_destroy_buffer(device, iacceleration_structure->instances_buffer);
+  if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &as_geom, instance_count, &itlas->buffer, &itlas->as))
+  {
+    cgpu_destroy_buffer(device, itlas->instances);
     CGPU_RETURN_ERROR("failed to build TLAS");
   }
 
   return true;
 }
 
-bool cgpu_create_acceleration_structure(cgpu_device device,
-                                        uint32_t vertex_count,
-                                        const cgpu_vertex* vertices,
-                                        uint32_t index_count,
-                                        const uint32_t* indices,
-                                        cgpu_acceleration_structure* p_acceleration_structure)
-{
-  p_acceleration_structure->handle = resource_store_create_handle(&iacceleration_structure_store);
-
-  cgpu_iacceleration_structure* iacceleration_structure;
-  if (!cgpu_resolve_acceleration_structure(*p_acceleration_structure, &iacceleration_structure))
-  {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
-
-  if (!cgpu_create_blas(device, vertex_count, vertices, index_count, indices, iacceleration_structure))
-  {
-    resource_store_free_handle(&iacceleration_structure_store, p_acceleration_structure->handle);
-    CGPU_RETURN_ERROR("failed to build AS");
-  }
-
-  if (!cgpu_create_tlas(device, iacceleration_structure))
-  {
-    resource_store_free_handle(&iacceleration_structure_store, p_acceleration_structure->handle);
-    CGPU_RETURN_ERROR("failed to build AS");
-  }
-
-  return true;
-}
-
-bool cgpu_destroy_acceleration_structure(cgpu_device device, cgpu_acceleration_structure acceleration_structure)
+bool cgpu_destroy_blas(cgpu_device device, cgpu_blas blas)
 {
   cgpu_idevice* idevice;
   if (!cgpu_resolve_device(device, &idevice)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  cgpu_iacceleration_structure* iacceleration_structure;
-  if (!cgpu_resolve_acceleration_structure(acceleration_structure, &iacceleration_structure)) {
+  cgpu_iblas* iblas;
+  if (!cgpu_resolve_blas(blas, &iblas)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, iacceleration_structure->blas, NULL);
-  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, iacceleration_structure->tlas, NULL);
+  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, iblas->as, NULL);
+  cgpu_destroy_buffer(device, iblas->buffer);
+  cgpu_destroy_buffer(device, iblas->indices);
+  cgpu_destroy_buffer(device, iblas->vertices);
 
-  cgpu_destroy_buffer(device, iacceleration_structure->instances_buffer);
-  cgpu_destroy_buffer(device, iacceleration_structure->vertex_buffer);
-  cgpu_destroy_buffer(device, iacceleration_structure->index_buffer);
-  cgpu_destroy_buffer(device, iacceleration_structure->tlas_buffer);
-  cgpu_destroy_buffer(device, iacceleration_structure->blas_buffer);
+  resource_store_free_handle(&iblas_store, blas.handle);
+  return true;
+}
 
-  resource_store_free_handle(&iacceleration_structure_store, acceleration_structure.handle);
+bool cgpu_destroy_tlas(cgpu_device device, cgpu_tlas tlas)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  cgpu_itlas* itlas;
+  if (!cgpu_resolve_tlas(tlas, &itlas)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, itlas->as, NULL);
+  cgpu_destroy_buffer(device, itlas->instances);
+  cgpu_destroy_buffer(device, itlas->buffer);
+
+  resource_store_free_handle(&itlas_store, tlas.handle);
   return true;
 }
 
@@ -2444,18 +2445,18 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
       }
       else if (layout_binding->descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
       {
-        for (uint32_t k = 0; k < bindings->as_count; ++k)
+        for (uint32_t k = 0; k < bindings->tlas_count; ++k)
         {
-          const cgpu_acceleration_structure_binding* as_binding = &bindings->p_ases[k];
+          const cgpu_tlas_binding* as_binding = &bindings->p_tlases[k];
 
           if (as_binding->binding != layout_binding->binding || as_binding->index != j)
           {
             continue;
           }
 
-          cgpu_iacceleration_structure* iacceleration_structure;
-          cgpu_acceleration_structure acceleration_structure = as_binding->as;
-          if (!cgpu_resolve_acceleration_structure(acceleration_structure, &iacceleration_structure)) {
+          cgpu_itlas* itlas;
+          cgpu_tlas tlas = as_binding->as;
+          if (!cgpu_resolve_tlas(tlas, &itlas)) {
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
@@ -2467,7 +2468,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
           as_info->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
           as_info->pNext = NULL;
           as_info->accelerationStructureCount = 1;
-          as_info->pAccelerationStructures = &iacceleration_structure->tlas;
+          as_info->pAccelerationStructures = &itlas->as;
 
           if (j == 0)
           {

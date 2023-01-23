@@ -308,16 +308,17 @@ typedef enum CgpuShaderStageFlagBits {
   CGPU_SHADER_STAGE_MISS        = 0x00000800
 } CgpuShaderStageFlagBits;
 
-typedef struct cgpu_instance               { uint64_t handle; } cgpu_instance;
-typedef struct cgpu_device                 { uint64_t handle; } cgpu_device;
-typedef struct cgpu_buffer                 { uint64_t handle; } cgpu_buffer;
-typedef struct cgpu_image                  { uint64_t handle; } cgpu_image;
-typedef struct cgpu_shader                 { uint64_t handle; } cgpu_shader;
-typedef struct cgpu_pipeline               { uint64_t handle; } cgpu_pipeline;
-typedef struct cgpu_fence                  { uint64_t handle; } cgpu_fence;
-typedef struct cgpu_command_buffer         { uint64_t handle; } cgpu_command_buffer;
-typedef struct cgpu_sampler                { uint64_t handle; } cgpu_sampler;
-typedef struct cgpu_acceleration_structure { uint64_t handle; } cgpu_acceleration_structure;
+typedef struct cgpu_instance       { uint64_t handle; } cgpu_instance;
+typedef struct cgpu_device         { uint64_t handle; } cgpu_device;
+typedef struct cgpu_buffer         { uint64_t handle; } cgpu_buffer;
+typedef struct cgpu_image          { uint64_t handle; } cgpu_image;
+typedef struct cgpu_shader         { uint64_t handle; } cgpu_shader;
+typedef struct cgpu_pipeline       { uint64_t handle; } cgpu_pipeline;
+typedef struct cgpu_fence          { uint64_t handle; } cgpu_fence;
+typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
+typedef struct cgpu_sampler        { uint64_t handle; } cgpu_sampler;
+typedef struct cgpu_blas           { uint64_t handle; } cgpu_blas;
+typedef struct cgpu_tlas           { uint64_t handle; } cgpu_tlas;
 
 typedef struct cgpu_image_description {
   bool is3d;
@@ -348,11 +349,11 @@ typedef struct cgpu_sampler_binding {
   cgpu_sampler sampler;
 } cgpu_sampler_binding;
 
-typedef struct cgpu_acceleration_structure_binding {
+typedef struct cgpu_tlas_binding {
   uint32_t binding;
   uint32_t index;
-  cgpu_acceleration_structure as;
-} cgpu_acceleration_structure_binding;
+  cgpu_tlas as;
+} cgpu_tlas_binding;
 
 typedef struct cgpu_bindings {
   uint32_t buffer_count;
@@ -361,8 +362,8 @@ typedef struct cgpu_bindings {
   const cgpu_image_binding* p_images;
   uint32_t sampler_count;
   const cgpu_sampler_binding* p_samplers;
-  uint32_t as_count;
-  const cgpu_acceleration_structure_binding* p_ases;
+  uint32_t tlas_count;
+  const cgpu_tlas_binding* p_tlases;
 } cgpu_bindings;
 
 typedef struct cgpu_memory_barrier {
@@ -470,6 +471,13 @@ typedef struct cgpu_vertex {
   float z;
 } cgpu_vertex;
 
+typedef struct cgpu_blas_instance {
+  cgpu_blas as;
+  uint32_t faceIndexOffset;
+  uint32_t hitShaderIndex;
+  float transform[3][4];
+} cgpu_blas_instance;
+
 CGPU_API bool CGPU_CDECL cgpu_initialize(
   const char* p_app_name,
   uint32_t version_major,
@@ -570,18 +578,30 @@ CGPU_API bool CGPU_CDECL cgpu_destroy_pipeline(
   cgpu_pipeline pipeline
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_acceleration_structure(
+CGPU_API bool CGPU_CDECL cgpu_create_blas(
   cgpu_device device,
   uint32_t vertex_count,
   const cgpu_vertex* vertices,
   uint32_t index_count,
   const uint32_t* indices,
-  cgpu_acceleration_structure* p_acceleration_structure
+  cgpu_blas* p_blas
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_acceleration_structure(
+CGPU_API bool CGPU_CDECL cgpu_create_tlas(
   cgpu_device device,
-  cgpu_acceleration_structure acceleration_structure
+  uint32_t instance_count,
+  const struct cgpu_blas_instance* instances,
+  cgpu_tlas* p_tlas
+);
+
+CGPU_API bool CGPU_CDECL cgpu_destroy_blas(
+  cgpu_device device,
+  cgpu_blas blas
+);
+
+CGPU_API bool CGPU_CDECL cgpu_destroy_tlas(
+  cgpu_device device,
+  cgpu_tlas tlas
 );
 
 CGPU_API bool CGPU_CDECL cgpu_create_command_buffer(
