@@ -19,6 +19,9 @@
 
 #include <vector>
 #include <string_view>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace gi::sg
 {
@@ -27,19 +30,21 @@ namespace gi::sg
   public:
     enum class ShaderStage
     {
+      AnyHit,
+      ClosestHit,
       Compute,
+      Miss,
       RayGen
     };
 
   public:
-    GlslangShaderCompiler(const std::string& shaderPath);
+    GlslangShaderCompiler(const fs::path& shaderPath);
 
     ~GlslangShaderCompiler();
 
   public:
     bool compileGlslToSpv(ShaderStage stage,
                           std::string_view source,
-                          std::string_view filePath,
                           std::vector<uint8_t>& spv);
 
     static bool init();

@@ -135,10 +135,10 @@ namespace detail
   class FileIncluder : public glslang::TShader::Includer
   {
   private:
-    std::string m_rootPath;
+    fs::path m_rootPath;
 
   public:
-    FileIncluder(std::string_view rootPath)
+    FileIncluder(const fs::path& rootPath)
       : m_rootPath(rootPath)
     {
     }
@@ -155,12 +155,13 @@ namespace detail
                                 const char* includerName,
                                 size_t inclusionDepth) override
     {
-      std::string fileName = m_rootPath + "/" + headerName;
+      fs::path filePath = m_rootPath / headerName;
 
-      std::ifstream fileStream(fileName.c_str(), std::ios_base::binary | std::ios_base::ate);
+      std::ifstream fileStream(filePath.c_str(), std::ios_base::binary | std::ios_base::ate);
       if (!fileStream.is_open())
       {
-        fprintf(stderr, "Failed to find shader include '%s'\n", fileName.c_str());
+        std::string pathStr = filePath.string();
+        fprintf(stderr, "Failed to find shader include '%s'\n", pathStr.c_str());
         return nullptr;
       }
 
@@ -188,10 +189,11 @@ namespace detail
   {
     switch (stage)
     {
-    case ShaderStage::Compute:
-      return EShLangCompute;
-    case ShaderStage::RayGen:
-      return EShLangRayGen;
+    case ShaderStage::AnyHit:     return EShLangAnyHit;
+    case ShaderStage::ClosestHit: return EShLangClosestHit;
+    case ShaderStage::Compute:    return EShLangCompute;
+    case ShaderStage::Miss:       return EShLangMiss;
+    case ShaderStage::RayGen:     return EShLangRayGen;
     default:
       assert(false);
       return EShLangCount;
@@ -221,7 +223,7 @@ namespace gi::sg
     glslang::FinalizeProcess();
   }
 
-  GlslangShaderCompiler::GlslangShaderCompiler(const std::string& shaderPath)
+  GlslangShaderCompiler::GlslangShaderCompiler(const fs::path& shaderPath)
     : m_fileIncluder(new detail::FileIncluder(shaderPath))
   {
   }
@@ -233,7 +235,6 @@ namespace gi::sg
 
   bool GlslangShaderCompiler::compileGlslToSpv(ShaderStage stage,
                                                std::string_view source,
-                                               std::string_view filePath,
                                                std::vector<uint8_t>& spv)
   {
     EShLanguage language = detail::getGlslangShaderLanguage(stage);
@@ -292,6 +293,7 @@ namespace gi::sg
     spvOptions.generateDebugInfo = true;
     spvOptions.validate = true;
 #endif
+
     glslang::TIntermediate* intermediate = program.getIntermediate(language);
     glslang::GlslangToSpv(*intermediate, *reinterpret_cast<std::vector<unsigned int>*>(&spv), &spvOptions);
     return true;
