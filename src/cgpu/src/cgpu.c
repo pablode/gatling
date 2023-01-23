@@ -153,10 +153,10 @@ static resource_store itlas_store;
   } while (false)
 
 #define CGPU_RETURN_ERROR_INVALID_HANDLE                              \
-  CGPU_RETURN_ERROR("invalid resource handle");
+  CGPU_RETURN_ERROR("invalid resource handle")
 
 #define CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED                     \
-  CGPU_RETURN_ERROR("hardcoded limit reached");
+  CGPU_RETURN_ERROR("hardcoded limit reached")
 
 #define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)   \
   CGPU_INLINE static bool cgpu_resolve_##RESOURCE_NAME(                                   \
@@ -2845,6 +2845,7 @@ bool cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
 
     idevice->table.vkCmdPipelineBarrier(
       icommand_buffer->command_buffer,
+      // FIXME: batch this barrier and use correct pipeline flag bits
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
       0,
@@ -3041,6 +3042,7 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
 
   idevice->table.vkCmdPipelineBarrier(
     icommand_buffer->command_buffer,
+    // FIXME: use correct pipeline flag bits
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
     0,
@@ -3092,6 +3094,7 @@ bool cgpu_cmd_write_timestamp(cgpu_command_buffer command_buffer,
 
   idevice->table.vkCmdWriteTimestamp(
     icommand_buffer->command_buffer,
+    // FIXME: use correct pipeline flag bits
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
     idevice->timestamp_pool,
     timestamp_index
