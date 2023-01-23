@@ -44,6 +44,7 @@
 #define CGPU_MAX_IMAGE_MEMORY_BARRIERS 2048
 #define CGPU_MAX_MEMORY_BARRIERS 128
 #define CGPU_MAX_RAY_RECURSION_DEPTH 31
+#define CGPU_MAX_RT_PIPELINE_STAGE_COUNT 1024
 
 /* Internal structures. */
 
@@ -82,15 +83,18 @@ typedef struct cgpu_iimage {
 } cgpu_iimage;
 
 typedef struct cgpu_ipipeline {
-  VkPipeline                   pipeline;
-  VkPipelineLayout             layout;
-  VkDescriptorPool             descriptor_pool;
-  VkDescriptorSet              descriptor_set;
-  VkDescriptorSetLayout        descriptor_set_layout;
-  VkDescriptorSetLayoutBinding descriptor_set_layout_bindings[CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
-  uint32_t                     descriptor_set_layout_binding_count;
-  cgpu_shader                  shader;
-  VkPipelineBindPoint          bind_point;
+  VkPipeline                      pipeline;
+  VkPipelineLayout                layout;
+  VkDescriptorPool                descriptor_pool;
+  VkDescriptorSet                 descriptor_set;
+  VkDescriptorSetLayout           descriptor_set_layout;
+  VkDescriptorSetLayoutBinding    descriptor_set_layout_bindings[CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
+  uint32_t                        descriptor_set_layout_binding_count;
+  VkPipelineBindPoint             bind_point;
+  VkStridedDeviceAddressRegionKHR sbtRgen;
+  VkStridedDeviceAddressRegionKHR sbtMiss;
+  VkStridedDeviceAddressRegionKHR sbtHit;
+  cgpu_buffer                     sbt;
 } cgpu_ipipeline;
 
 typedef struct cgpu_ishader {
@@ -199,7 +203,8 @@ static cgpu_physical_device_features cgpu_translate_physical_device_features(con
 
 static cgpu_physical_device_properties cgpu_translate_physical_device_properties(const VkPhysicalDeviceLimits* vk_limits,
                                                                                  const VkPhysicalDeviceSubgroupProperties* vk_subgroup_props,
-                                                                                 const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vk_as_props)
+                                                                                 const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vk_as_props,
+                                                                                 const VkPhysicalDeviceRayTracingPipelinePropertiesKHR* vk_rt_pipeline_props)
 {
   cgpu_physical_device_properties properties = {0};
   properties.maxImageDimension1D = vk_limits->maxImageDimension1D;
@@ -260,6 +265,14 @@ static cgpu_physical_device_properties cgpu_translate_physical_device_properties
   properties.nonCoherentAtomSize = vk_limits->nonCoherentAtomSize;
   properties.subgroupSize = vk_subgroup_props->subgroupSize;
   properties.minAccelerationStructureScratchOffsetAlignment = vk_as_props->minAccelerationStructureScratchOffsetAlignment;
+  properties.shaderGroupHandleSize = vk_rt_pipeline_props->shaderGroupHandleSize;
+  properties.maxRayRecursionDepth = vk_rt_pipeline_props->maxRayRecursionDepth;
+  properties.maxShaderGroupStride = vk_rt_pipeline_props->maxShaderGroupStride;
+  properties.shaderGroupBaseAlignment = vk_rt_pipeline_props->shaderGroupBaseAlignment;
+  properties.shaderGroupHandleCaptureReplaySize = vk_rt_pipeline_props->shaderGroupHandleCaptureReplaySize;
+  properties.maxRayDispatchInvocationCount = vk_rt_pipeline_props->maxRayDispatchInvocationCount;
+  properties.shaderGroupHandleAlignment = vk_rt_pipeline_props->shaderGroupHandleAlignment;
+  properties.maxRayHitAttributeSize = vk_rt_pipeline_props->maxRayHitAttributeSize;
   return properties;
 }
 
@@ -457,7 +470,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   }
 
   const VkPhysicalDeviceLimits* limits = &device_properties.properties.limits;
-  idevice->properties = cgpu_translate_physical_device_properties(limits, &subgroup_properties, &as_properties);
+  idevice->properties = cgpu_translate_physical_device_properties(limits, &subgroup_properties, &as_properties, &rt_pipeline_properties);
 
   uint32_t device_ext_count;
   vkEnumerateDeviceExtensionProperties(
@@ -1358,10 +1371,10 @@ bool cgpu_destroy_sampler(cgpu_device device,
   return true;
 }
 
-static bool cgpu_create_pipeline_layout(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, cgpu_ishader* ishader)
+static bool cgpu_create_pipeline_layout(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, cgpu_ishader* ishader, VkShaderStageFlags stageFlags)
 {
   VkPushConstantRange push_const_range;
-  push_const_range.stageFlags = ishader->stage_flags;
+  push_const_range.stageFlags = stageFlags;
   push_const_range.offset = 0;
   push_const_range.size = ishader->reflection.push_constants_size;
 
@@ -1380,7 +1393,7 @@ static bool cgpu_create_pipeline_layout(cgpu_idevice* idevice, cgpu_ipipeline* i
                                                &ipipeline->layout) == VK_SUCCESS;
 }
 
-static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, cgpu_ishader* ishader)
+static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, cgpu_ishader* ishader, VkShaderStageFlags stageFlags)
 {
   const cgpu_shader_reflection* shader_reflection = &ishader->reflection;
 
@@ -1399,7 +1412,7 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
     descriptor_set_layout_binding->binding = binding->binding;
     descriptor_set_layout_binding->descriptorType = binding->descriptor_type;
     descriptor_set_layout_binding->descriptorCount = binding->count;
-    descriptor_set_layout_binding->stageFlags = ishader->stage_flags;
+    descriptor_set_layout_binding->stageFlags = stageFlags;
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
   }
 
@@ -1555,13 +1568,13 @@ bool cgpu_create_compute_pipeline(cgpu_device device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  if (!cgpu_create_pipeline_descriptors(idevice, ipipeline, ishader))
+  if (!cgpu_create_pipeline_descriptors(idevice, ipipeline, ishader, VK_SHADER_STAGE_COMPUTE_BIT))
   {
     resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
     CGPU_RETURN_ERROR("failed to create descriptor set layout");
   }
 
-  if (!cgpu_create_pipeline_layout(idevice, ipipeline, ishader))
+  if (!cgpu_create_pipeline_layout(idevice, ipipeline, ishader, VK_SHADER_STAGE_COMPUTE_BIT))
   {
     resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
     idevice->table.vkDestroyDescriptorSetLayout(
@@ -1581,7 +1594,7 @@ bool cgpu_create_compute_pipeline(cgpu_device device,
   pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_shader_stage_create_info.pNext = NULL;
   pipeline_shader_stage_create_info.flags = 0;
-  pipeline_shader_stage_create_info.stage = ishader->stage_flags;
+  pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   pipeline_shader_stage_create_info.module = ishader->module;
   pipeline_shader_stage_create_info.pName = "main";
   pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
@@ -1624,10 +1637,254 @@ bool cgpu_create_compute_pipeline(cgpu_device device,
     CGPU_RETURN_ERROR("failed to create compute pipeline");
   }
 
-  ipipeline->shader = shader;
   ipipeline->bind_point = VK_PIPELINE_BIND_POINT_COMPUTE;
 
   return true;
+}
+
+static VkDeviceAddress cgpu_get_buffer_device_address(cgpu_idevice* idevice, cgpu_ibuffer* ibuffer)
+{
+  VkBufferDeviceAddressInfoKHR address_info = {0};
+  address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+  address_info.pNext = NULL;
+  address_info.buffer = ibuffer->buffer;
+  return idevice->table.vkGetBufferDeviceAddressKHR(idevice->logical_device, &address_info);
+}
+
+static uint32_t cgpu_align_size(uint32_t size, uint32_t alignment)
+{
+    return (size + (alignment - 1)) & ~(alignment - 1);
+}
+
+static bool cgpu_create_rt_pipeline_sbt(cgpu_device device, cgpu_ipipeline* ipipeline, uint32_t groupCount, uint32_t miss_shader_count, uint32_t hit_shader_count)
+{
+  cgpu_idevice* idevice;
+  cgpu_resolve_device(device, &idevice);
+
+  uint32_t handleSize = idevice->properties.shaderGroupHandleSize;
+  uint32_t alignedHandleSize = cgpu_align_size(handleSize, idevice->properties.shaderGroupHandleAlignment);
+
+  ipipeline->sbtRgen.stride = cgpu_align_size(alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+  ipipeline->sbtRgen.size = ipipeline->sbtRgen.stride; // Special raygen condition: size must be equal to stride
+  ipipeline->sbtMiss.stride = alignedHandleSize;
+  ipipeline->sbtMiss.size = cgpu_align_size(miss_shader_count * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+  ipipeline->sbtHit.stride = alignedHandleSize;
+  ipipeline->sbtHit.size = cgpu_align_size(hit_shader_count * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+
+  uint32_t firstGroup = 0;
+  uint32_t dataSize = handleSize * groupCount;
+  assert(handleSize <= 64); // conservatively estimate handle size
+  uint8_t handleData[64 * CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
+  if (idevice->table.vkGetRayTracingShaderGroupHandlesKHR(idevice->logical_device, ipipeline->pipeline, firstGroup, groupCount, dataSize, handleData) != VK_SUCCESS)
+  {
+    CGPU_RETURN_ERROR("failed to create sbt handles");
+  }
+
+  VkDeviceSize sbtSize = ipipeline->sbtRgen.size + ipipeline->sbtMiss.size + ipipeline->sbtHit.size;
+  CgpuBufferUsageFlags bufferUsageFlags = CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR;
+  CgpuMemoryPropertyFlags bufferMemPropFlags = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
+
+  if (!cgpu_create_buffer(device, bufferUsageFlags, bufferMemPropFlags, sbtSize, &ipipeline->sbt))
+  {
+    CGPU_RETURN_ERROR("failed to create sbt buffer");
+  }
+
+  cgpu_ibuffer* isbt_buffer;
+  cgpu_resolve_buffer(ipipeline->sbt, &isbt_buffer);
+
+  VkDeviceAddress sbtDeviceAddress = cgpu_get_buffer_device_address(idevice, isbt_buffer);
+  ipipeline->sbtRgen.deviceAddress = sbtDeviceAddress;
+  ipipeline->sbtMiss.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size;
+  ipipeline->sbtHit.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size + ipipeline->sbtMiss.size;
+
+  uint8_t* sbt_mem;
+  cgpu_map_buffer(device, ipipeline->sbt, (void**)&sbt_mem);
+
+  uint32_t handle_count = 0;
+  uint8_t* sbt_mem_rgen = &sbt_mem[0];
+  uint8_t* sbt_mem_miss = &sbt_mem[ipipeline->sbtRgen.size];
+  uint8_t* sbt_mem_hit = &sbt_mem[ipipeline->sbtRgen.size + ipipeline->sbtMiss.size];
+
+  // Rgen
+  sbt_mem = sbt_mem_rgen;
+  memcpy(sbt_mem, &handleData[handleSize * (handle_count++)], handleSize);
+  // Miss
+  sbt_mem = sbt_mem_miss;
+  for (uint32_t i = 0; i < miss_shader_count; i++)
+  {
+    memcpy(sbt_mem, &handleData[handleSize * (handle_count++)], handleSize);
+    sbt_mem += ipipeline->sbtMiss.stride;
+  }
+  // Hit
+  sbt_mem = sbt_mem_hit;
+  for (uint32_t i = 0; i < hit_shader_count; i++)
+  {
+    memcpy(sbt_mem, &handleData[handleSize * (handle_count++)], handleSize);
+    sbt_mem += ipipeline->sbtHit.stride;
+  }
+
+  cgpu_unmap_buffer(device, ipipeline->sbt);
+  return true;
+}
+
+bool cgpu_create_rt_pipeline(cgpu_device device,
+                             const cgpu_rt_pipeline_desc* desc,
+                             cgpu_pipeline* p_pipeline)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  p_pipeline->handle = resource_store_create_handle(&ipipeline_store);
+
+  cgpu_ipipeline* ipipeline;
+  if (!cgpu_resolve_pipeline(*p_pipeline, &ipipeline)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  // Zero-init for cleanup routine.
+  memset(ipipeline, 0, sizeof(cgpu_ipipeline));
+
+  // In a ray tracing pipeline, all shaders are expected to have the same descriptor set layouts. Here, we
+  // construct the descriptor set layouts and the pipeline layout from only the ray generation shader.
+  cgpu_ishader* irgen_shader;
+  if (!cgpu_resolve_shader(desc->rgen_shader, &irgen_shader)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  // Set up pipeline stages and groups.
+  VkShaderStageFlags pipelineStageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
+  VkPipelineShaderStageCreateInfo stages[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
+  for (uint32_t i = 0; i < CGPU_MAX_RT_PIPELINE_STAGE_COUNT; i++)
+  {
+    VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {0};
+    pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    pipeline_shader_stage_create_info.pNext = NULL;
+    pipeline_shader_stage_create_info.flags = 0;
+    pipeline_shader_stage_create_info.pName = "main";
+    pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
+    stages[i] = pipeline_shader_stage_create_info;
+  }
+
+  stages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+  stages[0].module = irgen_shader->module;
+  if (desc->miss_shader_count > 0)
+  {
+    pipelineStageFlags |= VK_SHADER_STAGE_MISS_BIT_KHR;
+  }
+  for (uint32_t i = 0; i < desc->miss_shader_count; i++)
+  {
+    cgpu_ishader* imiss_shader;
+    if (!cgpu_resolve_shader(desc->miss_shaders[i], &imiss_shader)) {
+      CGPU_RETURN_ERROR_INVALID_HANDLE;
+    }
+    assert(imiss_shader->module);
+
+    uint32_t stageIndex = 1/*rgen*/ + i;
+    stages[stageIndex].module = imiss_shader->module;
+    stages[stageIndex].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+  }
+  for (uint32_t i = 0; i < desc->hit_shader_count; i++)
+  {
+    cgpu_ishader* ihit_shader;
+    if (!cgpu_resolve_shader(desc->hit_shaders[i], &ihit_shader)) {
+      CGPU_RETURN_ERROR_INVALID_HANDLE;
+    }
+    assert(ihit_shader->module);
+
+    uint32_t stageIndex = 1/*rgen*/ + desc->miss_shader_count + i;
+    stages[stageIndex].module = ihit_shader->module;
+    stages[stageIndex].stage = ihit_shader->stage_flags;
+    pipelineStageFlags |= ihit_shader->stage_flags;
+  }
+
+  VkRayTracingShaderGroupCreateInfoKHR groups[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
+  for (uint32_t i = 0; i < CGPU_MAX_RT_PIPELINE_STAGE_COUNT; i++)
+  {
+    VkRayTracingShaderGroupCreateInfoKHR rt_shader_group_create_info = {0};
+    rt_shader_group_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    rt_shader_group_create_info.pNext = NULL;
+    rt_shader_group_create_info.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    rt_shader_group_create_info.generalShader = i;
+    rt_shader_group_create_info.closestHitShader = VK_SHADER_UNUSED_KHR;
+    rt_shader_group_create_info.anyHitShader = VK_SHADER_UNUSED_KHR;
+    rt_shader_group_create_info.intersectionShader = VK_SHADER_UNUSED_KHR;
+    rt_shader_group_create_info.pShaderGroupCaptureReplayHandle = NULL;
+    groups[i] = rt_shader_group_create_info;
+  }
+
+  for (uint32_t i = 0; i < desc->hit_shader_count; i++)
+  {
+    uint32_t groupIndex = 1/*rgen*/ + desc->miss_shader_count + i;
+    uint32_t stageIndex = groupIndex;
+    groups[groupIndex].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+    groups[groupIndex].generalShader = VK_SHADER_UNUSED_KHR;
+    groups[groupIndex].closestHitShader = stageIndex;
+  }
+
+  // Create descriptor and pipeline layout.
+  if (!cgpu_create_pipeline_descriptors(idevice, ipipeline, irgen_shader, pipelineStageFlags))
+  {
+    goto cleanup_fail;
+  }
+  if (!cgpu_create_pipeline_layout(idevice, ipipeline, irgen_shader, pipelineStageFlags))
+  {
+    goto cleanup_fail;
+  }
+
+  // Create pipeline.
+  uint32_t stageCount = 1/*rgen*/ + desc->miss_shader_count + desc->hit_shader_count;
+  uint32_t groupCount = stageCount;
+
+  VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {0};
+  rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+  rt_pipeline_create_info.pNext = NULL;
+  rt_pipeline_create_info.flags = 0;
+  rt_pipeline_create_info.stageCount = stageCount;
+  rt_pipeline_create_info.pStages = stages;
+  rt_pipeline_create_info.groupCount = groupCount;
+  rt_pipeline_create_info.pGroups = groups;
+  rt_pipeline_create_info.maxPipelineRayRecursionDepth = CGPU_MAX_RAY_RECURSION_DEPTH;
+  rt_pipeline_create_info.pLibraryInfo = NULL;
+  rt_pipeline_create_info.pLibraryInterface = NULL;
+  rt_pipeline_create_info.pDynamicState = NULL;
+  rt_pipeline_create_info.layout = ipipeline->layout;
+  rt_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
+  rt_pipeline_create_info.basePipelineIndex = 0;
+
+  VkResult result = idevice->table.vkCreateRayTracingPipelinesKHR(
+    idevice->logical_device,
+    VK_NULL_HANDLE,
+    VK_NULL_HANDLE,
+    1,
+    &rt_pipeline_create_info,
+    NULL,
+    &ipipeline->pipeline
+  );
+
+  if (result != VK_SUCCESS)
+  {
+    goto cleanup_fail;
+  }
+
+  ipipeline->bind_point = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+
+  // Create the SBT.
+  if (!cgpu_create_rt_pipeline_sbt(device, ipipeline, groupCount, desc->miss_shader_count, desc->hit_shader_count))
+  {
+    goto cleanup_fail;
+  }
+
+  return true;
+
+cleanup_fail:
+  idevice->table.vkDestroyPipelineLayout(idevice->logical_device, ipipeline->layout, NULL);
+  idevice->table.vkDestroyDescriptorSetLayout(idevice->logical_device, ipipeline->descriptor_set_layout, NULL);
+  idevice->table.vkDestroyDescriptorPool(idevice->logical_device, ipipeline->descriptor_pool, NULL);
+  resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
+
+  CGPU_RETURN_ERROR("failed to create rt pipeline");
 }
 
 bool cgpu_destroy_pipeline(cgpu_device device,
@@ -1640,6 +1897,11 @@ bool cgpu_destroy_pipeline(cgpu_device device,
   cgpu_ipipeline* ipipeline;
   if (!cgpu_resolve_pipeline(pipeline, &ipipeline)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  if (ipipeline->bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR)
+  {
+    cgpu_destroy_buffer(device, ipipeline->sbt);
   }
 
   idevice->table.vkDestroyDescriptorPool(

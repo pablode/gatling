@@ -85,8 +85,9 @@ typedef enum CgpuBufferUsageFlagBits {
   CGPU_BUFFER_USAGE_FLAG_UNIFORM_BUFFER                     = 0x00000010,
   CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER                     = 0x00000020,
   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS              = 0x00020000,
+  CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT = 0x00080000,
   CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE     = 0x00100000,
-  CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT = 0x00080000
+  CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR       = 0x00000400
 } CgpuBufferUsageFlagBits;
 
 typedef uint32_t CgpuMemoryPropertyFlags;
@@ -463,6 +464,14 @@ typedef struct cgpu_physical_device_properties {
   uint64_t nonCoherentAtomSize;
   uint32_t subgroupSize;
   uint64_t minAccelerationStructureScratchOffsetAlignment;
+  uint32_t shaderGroupHandleSize;
+  uint32_t maxRayRecursionDepth;
+  uint32_t maxShaderGroupStride;
+  uint32_t shaderGroupBaseAlignment;
+  uint32_t shaderGroupHandleCaptureReplaySize;
+  uint32_t maxRayDispatchInvocationCount;
+  uint32_t shaderGroupHandleAlignment;
+  uint32_t maxRayHitAttributeSize;
 } cgpu_physical_device_properties;
 
 typedef struct cgpu_vertex {
@@ -570,6 +579,20 @@ CGPU_API bool CGPU_CDECL cgpu_destroy_sampler(
 CGPU_API bool CGPU_CDECL cgpu_create_compute_pipeline(
   cgpu_device device,
   cgpu_shader shader,
+  cgpu_pipeline* p_pipeline
+);
+
+typedef struct cgpu_rt_pipeline_desc {
+  cgpu_shader rgen_shader;
+  uint32_t miss_shader_count;
+  cgpu_shader* miss_shaders;
+  uint32_t hit_shader_count;
+  const cgpu_shader* hit_shaders;
+} cgpu_rt_pipeline_desc;
+
+CGPU_API bool CGPU_CDECL cgpu_create_rt_pipeline(
+  cgpu_device device,
+  const struct cgpu_rt_pipeline_desc* desc,
   cgpu_pipeline* p_pipeline
 );
 
