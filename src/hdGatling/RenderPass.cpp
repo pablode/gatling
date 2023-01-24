@@ -22,6 +22,7 @@
 #include "Instancer.h"
 #include "Material.h"
 #include "Tokens.h"
+#include "MaterialNetworkTranslator.h"
 
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>
@@ -54,9 +55,11 @@ std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* nam
 
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
                                          const HdRprimCollection& collection,
-                                         const HdRenderSettingsMap& settings)
+                                         const HdRenderSettingsMap& settings,
+                                         const MaterialNetworkTranslator& materialNetworkTranslator)
   : HdRenderPass(index, collection)
   , m_settings(settings)
+  , m_materialNetworkTranslator(materialNetworkTranslator)
   , m_isConverged(false)
   , m_lastSceneStateVersion(UINT32_MAX)
   , m_lastRenderSettingsVersion(UINT32_MAX)
@@ -70,13 +73,13 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   TF_AXIOM(m_defaultMaterial);
 }
 
-void HdGatlingRenderPass::_ClearColorMaterials()
+void HdGatlingRenderPass::_ClearMaterials()
 {
-  for (gi_material* mat : m_colorMaterials)
+  for (gi_material* mat : m_materials)
   {
     giDestroyMaterial(mat);
   }
-  m_colorMaterials.clear();
+  m_materials.clear();
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
@@ -91,7 +94,7 @@ HdGatlingRenderPass::~HdGatlingRenderPass()
   }
 
   giDestroyMaterial(m_defaultMaterial);
-  _ClearColorMaterials();
+  _ClearMaterials();
 }
 
 bool HdGatlingRenderPass::IsConverged() const
@@ -185,7 +188,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       std::vector<const gi_mesh*>& meshes,
                                       std::vector<gi_mesh_instance>& instances)
 {
-  _ClearColorMaterials();
+  _ClearMaterials();
 
   TfHashMap<std::string, uint32_t> materialMap;
   materialMap[""] = 0;
@@ -223,7 +226,6 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     std::string materialIdStr = materialId.GetAsString();
 
     uint32_t materialIndex = 0;
-
     if (!materialId.IsEmpty() && materialMap.find(materialIdStr) != materialMap.end())
     {
       materialIndex = materialMap[materialIdStr];
@@ -232,7 +234,18 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     {
       HdSprim* sprim = renderIndex->GetSprim(HdPrimTypeTokens->material, materialId);
       HdGatlingMaterial* material = dynamic_cast<HdGatlingMaterial*>(sprim);
-      const gi_material* giMat = material ? material->GetGiMaterial() : nullptr;
+
+      gi_material* giMat = nullptr;
+      if (material)
+      {
+        const HdMaterialNetwork2* network = material->GetNetwork();
+
+        if (network)
+        {
+          giMat = m_materialNetworkTranslator.ParseNetwork(sprim->GetId(), *network);
+          m_materials.push_back(giMat);
+        }
+      }
 
       if (!giMat && mesh->HasColor())
       {
@@ -251,7 +264,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
           gi_material* giColorMat = giCreateMaterialFromMtlx(colorMatSrc.c_str());
           if (giColorMat)
           {
-            m_colorMaterials.push_back(giColorMat);
+            m_materials.push_back(giColorMat);
             giMat = giColorMat;
           }
         }

@@ -199,7 +199,7 @@ MaterialNetworkTranslator::MaterialNetworkTranslator(const std::string& mtlxLibP
 }
 
 gi_material* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,
-                                                     HdMaterialNetwork2& network) const
+                                                     const HdMaterialNetwork2& network) const
 {
   gi_material* result = TryParseMdlNetwork(network);
 
@@ -238,7 +238,7 @@ gi_material* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwo
   return giCreateMaterialFromMdlFile(fileUri.c_str(), subIdentifier.c_str());
 }
 
-gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, HdMaterialNetwork2& network) const
+gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   HdMaterialNetwork2 mtlxNetwork;
   if (!_ConvertUsdNodesToMaterialXNodes(network, mtlxNetwork))
@@ -261,7 +261,7 @@ gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, H
 }
 
 mx::DocumentPtr MaterialNetworkTranslator::CreateMaterialXDocumentFromNetwork(const SdfPath& id,
-                                                                              HdMaterialNetwork2& network) const
+                                                                              const HdMaterialNetwork2& network) const
 {
   HdMaterialNode2 terminalNode;
   SdfPath terminalPath;

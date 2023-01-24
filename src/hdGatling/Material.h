@@ -22,15 +22,12 @@
 
 #include <gi.h>
 
-#include "MaterialNetworkTranslator.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingMaterial final : public HdMaterial
 {
 public:
-  HdGatlingMaterial(const SdfPath& id,
-                    const MaterialNetworkTranslator& translator);
+  HdGatlingMaterial(const SdfPath& id);
 
   ~HdGatlingMaterial() override;
 
@@ -42,11 +39,10 @@ public:
             HdDirtyBits* dirtyBits) override;
 
 public:
-  const gi_material* GetGiMaterial() const;
+  const HdMaterialNetwork2* GetNetwork() const;
 
 private:
-  const MaterialNetworkTranslator& m_translator;
-  gi_material* m_giMaterial = nullptr;
+  std::unique_ptr<HdMaterialNetwork2> m_network;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

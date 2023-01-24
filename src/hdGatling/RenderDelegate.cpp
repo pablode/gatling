@@ -88,7 +88,7 @@ void HdGatlingRenderDelegate::SetRenderSetting(TfToken const& key, VtValue const
 HdRenderPassSharedPtr HdGatlingRenderDelegate::CreateRenderPass(HdRenderIndex* index,
                                                                 const HdRprimCollection& collection)
 {
-  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap));
+  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, m_translator));
 }
 
 HdResourceRegistrySharedPtr HdGatlingRenderDelegate::GetResourceRegistry() const
@@ -171,7 +171,7 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId,
   }
   else if (typeId == HdPrimTypeTokens->material)
   {
-    return new HdGatlingMaterial(sprimId, m_translator);
+    return new HdGatlingMaterial(sprimId);
   }
 
   return nullptr;

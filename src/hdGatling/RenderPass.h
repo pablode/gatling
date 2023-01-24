@@ -22,6 +22,7 @@
 #include <pxr/imaging/hd/renderDelegate.h>
 
 #include <gi.h>
+#include "MaterialNetworkTranslator.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -33,7 +34,8 @@ class HdGatlingRenderPass final : public HdRenderPass
 public:
   HdGatlingRenderPass(HdRenderIndex* index,
                       const HdRprimCollection& collection,
-                      const HdRenderSettingsMap& settings);
+                      const HdRenderSettingsMap& settings,
+                      const MaterialNetworkTranslator& materialNetworkTranslator);
 
   ~HdGatlingRenderPass() override;
 
@@ -59,12 +61,13 @@ private:
 
   void _ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const;
 
-  void _ClearColorMaterials();
+  void _ClearMaterials();
 
 private:
   const HdRenderSettingsMap& m_settings;
+  const MaterialNetworkTranslator& m_materialNetworkTranslator;
   gi_material* m_defaultMaterial;
-  std::vector<gi_material*> m_colorMaterials;
+  std::vector<gi_material*> m_materials;
   bool m_isConverged;
   uint32_t m_lastSceneStateVersion;
   uint32_t m_lastRenderSettingsVersion;
