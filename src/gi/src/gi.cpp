@@ -239,87 +239,107 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
                                 std::vector<gi_face>& allFaces,
                                 std::vector<uint32_t>& emissive_face_indices)
 {
-  for (uint32_t m = 0; m < params->mesh_count; m++)
+  struct ProtoBlasInstance
   {
-    const gi_mesh* mesh = params->meshes[m];
-
-    if (mesh->faces.empty())
-    {
-      continue;
-    }
-
-    uint32_t faceIndexOffset = allFaces.size();
-    uint32_t vertexIndexOffset = allVertices.size();
-
-    // Vertices
-    std::vector<cgpu_vertex> vertices;
-    vertices.resize(mesh->vertices.size());
-    allVertices.reserve(allVertices.size() + mesh->vertices.size());
-
-    for (uint32_t i = 0; i < vertices.size(); i++)
-    {
-      vertices[i].x = mesh->vertices[i].pos[0];
-      vertices[i].y = mesh->vertices[i].pos[1];
-      vertices[i].z = mesh->vertices[i].pos[2];
-
-      allVertices.push_back(mesh->vertices[i]);
-    }
-
-    // Indices
-    std::vector<uint32_t> indices;
-    indices.reserve(mesh->faces.size() * 3);
-    allFaces.reserve(allFaces.size() + mesh->faces.size());
-
-    for (uint32_t i = 0; i < mesh->faces.size(); i++)
-    {
-      const auto* face = &mesh->faces[i];
-      indices.push_back(face->v_i[0]);
-      indices.push_back(face->v_i[1]);
-      indices.push_back(face->v_i[2]);
-
-      gi_face new_face;
-      new_face.v_i[0] = vertexIndexOffset + face->v_i[0];
-      new_face.v_i[1] = vertexIndexOffset + face->v_i[1];
-      new_face.v_i[2] = vertexIndexOffset + face->v_i[2];
-      allFaces.push_back(new_face);
-    }
-
-    // BLAS
     cgpu_blas blas;
-    if (!cgpu_create_blas(s_device, (uint32_t)vertices.size(), vertices.data(), (uint32_t)indices.size(), indices.data(), &blas))
-    {
-      goto fail_cleanup;
-    }
+    uint32_t faceIndexOffset;
+    uint32_t materialIndex;
+  };
+  std::unordered_map<const gi_mesh*, ProtoBlasInstance> protoBlasInstances;
 
-    blases.push_back(blas);
+  for (uint32_t m = 0; m < params->mesh_instance_count; m++)
+  {
+    const gi_mesh_instance* instance = &params->mesh_instances[m];
 
-    // FIXME: find a better solution
-    uint32_t materialIndex = UINT32_MAX;
-    gi_shader_cache* shader_cache = params->shader_cache;
-    for (uint32_t i = 0; i < shader_cache->materials.size(); i++)
+    if (protoBlasInstances.count(instance->mesh) == 0)
     {
-      if (shader_cache->materials[i] == mesh->material)
+      const gi_mesh* mesh = instance->mesh;
+
+      if (mesh->faces.empty())
       {
-        materialIndex = i;
-        break;
+        continue;
       }
-    }
-    if (materialIndex == UINT32_MAX)
-    {
-      goto fail_cleanup;
-    }
 
-    // Instance
-    cgpu_blas_instance blas_instance = { 0 };
-    blas_instance.as = blas;
-    blas_instance.faceIndexOffset = faceIndexOffset;
-    blas_instance.hitShaderIndex = materialIndex;
-    float transform[3][4] = {
-      1.0f, 0.0f, 0.0f, 0.0f,
-      0.0f, 1.0f, 0.0f, 0.0f,
-      0.0f, 0.0f, 1.0f, 0.0f
-    };
-    memcpy(blas_instance.transform, transform, sizeof(float) * 12);
+      uint32_t faceIndexOffset = allFaces.size();
+      uint32_t vertexIndexOffset = allVertices.size();
+
+      // Vertices
+      std::vector<cgpu_vertex> vertices;
+      vertices.resize(mesh->vertices.size());
+      allVertices.reserve(allVertices.size() + mesh->vertices.size());
+
+      for (uint32_t i = 0; i < vertices.size(); i++)
+      {
+        vertices[i].x = mesh->vertices[i].pos[0];
+        vertices[i].y = mesh->vertices[i].pos[1];
+        vertices[i].z = mesh->vertices[i].pos[2];
+
+        allVertices.push_back(mesh->vertices[i]);
+      }
+
+      // Indices
+      std::vector<uint32_t> indices;
+      indices.reserve(mesh->faces.size() * 3);
+      allFaces.reserve(allFaces.size() + mesh->faces.size());
+
+      for (uint32_t i = 0; i < mesh->faces.size(); i++)
+      {
+        const auto* face = &mesh->faces[i];
+        indices.push_back(face->v_i[0]);
+        indices.push_back(face->v_i[1]);
+        indices.push_back(face->v_i[2]);
+
+        gi_face new_face;
+        new_face.v_i[0] = vertexIndexOffset + face->v_i[0];
+        new_face.v_i[1] = vertexIndexOffset + face->v_i[1];
+        new_face.v_i[2] = vertexIndexOffset + face->v_i[2];
+        allFaces.push_back(new_face);
+      }
+
+      // BLAS
+      cgpu_blas blas;
+      if (!cgpu_create_blas(s_device, (uint32_t)vertices.size(), vertices.data(), (uint32_t)indices.size(), indices.data(), &blas))
+      {
+        goto fail_cleanup;
+      }
+
+      blases.push_back(blas);
+
+      // FIXME: find a better solution
+      uint32_t materialIndex = UINT32_MAX;
+      gi_shader_cache* shader_cache = params->shader_cache;
+      for (uint32_t i = 0; i < shader_cache->materials.size(); i++)
+      {
+        if (shader_cache->materials[i] == mesh->material)
+        {
+          materialIndex = i;
+          break;
+        }
+      }
+      if (materialIndex == UINT32_MAX)
+      {
+        goto fail_cleanup;
+      }
+
+      ProtoBlasInstance proto;
+      proto.blas = blas;
+      proto.faceIndexOffset = faceIndexOffset;
+      proto.materialIndex = materialIndex;
+      protoBlasInstances[instance->mesh] = proto;
+    }
+  }
+
+  // Instances
+  for (uint32_t m = 0; m < params->mesh_instance_count; m++)
+  {
+    const gi_mesh_instance* instance = &params->mesh_instances[m];
+    const ProtoBlasInstance& proto = protoBlasInstances[instance->mesh];
+
+    cgpu_blas_instance blas_instance = {0};
+    blas_instance.as = proto.blas;
+    blas_instance.faceIndexOffset = proto.faceIndexOffset;
+    blas_instance.hitShaderIndex = proto.materialIndex;
+    memcpy(blas_instance.transform, instance->transform, sizeof(float) * 12);
 
     blas_instances.push_back(blas_instance);
   }
@@ -339,7 +359,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   gi_geom_cache* cache = nullptr;
 
   printf("creating geom cache\n");
-  printf("mesh count: %d\n", params->mesh_count);
+  printf("instance count: %d\n", params->mesh_instance_count);
 
   // Build HW ASes and vertex, index buffers.
   cgpu_buffer buffer = { CGPU_INVALID_HANDLE };

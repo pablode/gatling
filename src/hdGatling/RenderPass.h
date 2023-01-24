@@ -54,7 +54,8 @@ private:
   void _BakeMeshes(HdRenderIndex* renderIndex,
                    GfMatrix4d rootTransform,
                    std::vector<const gi_material*>& materials,
-                   std::vector<const gi_mesh*>& meshes);
+                   std::vector<const gi_mesh*>& meshes,
+                   std::vector<gi_mesh_instance>& instances);
 
   void _ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const;
 

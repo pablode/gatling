@@ -182,7 +182,8 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
                                       std::vector<const gi_material*>& materials,
-                                      std::vector<const gi_mesh*>& meshes)
+                                      std::vector<const gi_mesh*>& meshes,
+                                      std::vector<gi_mesh_instance>& instances)
 {
   _ClearColorMaterials();
 
@@ -275,16 +276,28 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
       _BakeMeshGeometry(mesh, transform, materialIndex, faces, vertices);
 
+      // FIXME: multiple transformed instances per single mesh
       gi_mesh_desc desc = {0};
       desc.face_count = faces.size();
       desc.faces = faces.data();
       desc.material = materials[materialIndex];
       desc.vertex_count = vertices.size();
       desc.vertices = vertices.data();
+      gi_mesh* giMesh = giCreateMesh(&desc);
 
-      gi_mesh* mesh = giCreateMesh(&desc);
-      assert(mesh);
-      meshes.push_back(mesh);
+      assert(giMesh);
+      meshes.push_back(giMesh);
+
+      float identityTransform[3][4] = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f
+      };
+
+      gi_mesh_instance instance;
+      instance.mesh = giMesh;
+      memcpy(instance.transform, identityTransform, 12 * sizeof(float));
+      instances.push_back(instance);
     }
   }
 }
@@ -455,9 +468,10 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     m_rootMatrix = viewMatrix;
 
     // FIXME: destroy these resources
-    std::vector<const gi_mesh*> meshes;
     std::vector<const gi_material*> materials;
-    _BakeMeshes(renderIndex, viewMatrix, materials, meshes);
+    std::vector<const gi_mesh*> meshes;
+    std::vector<gi_mesh_instance> instances;
+    _BakeMeshes(renderIndex, viewMatrix, materials, meshes, instances);
 
     gi_shader_cache_params shaderParams;
     shaderParams.aov_id = aovId;
@@ -468,8 +482,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");
 
     gi_geom_cache_params geomParams;
-    geomParams.mesh_count = meshes.size();
-    geomParams.meshes = meshes.data();
+    geomParams.mesh_instance_count = instances.size();
+    geomParams.mesh_instances = instances.data();
     geomParams.shader_cache = m_shaderCache;
 
     m_geomCache = giCreateGeomCache(&geomParams);

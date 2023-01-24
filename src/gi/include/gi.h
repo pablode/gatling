@@ -70,6 +70,12 @@ struct gi_mesh_desc
   gi_vertex*         vertices;
 };
 
+struct gi_mesh_instance
+{
+  const gi_mesh* mesh;
+  float transform[3][4];
+};
+
 struct gi_shader_cache_params
 {
   gi_aov_id           aov_id;
@@ -79,9 +85,8 @@ struct gi_shader_cache_params
 
 struct gi_geom_cache_params
 {
-  // FIXME: use gi_mesh_instance with transform instead
-  uint32_t         mesh_count;
-  const gi_mesh**  meshes;
+  uint32_t                mesh_instance_count;
+  const gi_mesh_instance* mesh_instances;
   gi_shader_cache* shader_cache;
 };
 
