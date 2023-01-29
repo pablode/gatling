@@ -578,6 +578,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   {
     std::vector<uint8_t> rgenSpirv;
     sg::ShaderGen::RaygenShaderParams rgenParams;
+    rgenParams.aovId = params->aov_id;
     rgenParams.shaderClockExts = clockCyclesAov;
     rgenParams.textureResources = &textureResources;
 

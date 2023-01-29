@@ -73,6 +73,7 @@ namespace gi::sg
 
     struct RaygenShaderParams
     {
+      int32_t aovId;
       bool shaderClockExts;
       const std::vector<TextureResource>* textureResources;
     };

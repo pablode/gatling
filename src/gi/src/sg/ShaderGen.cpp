@@ -205,6 +205,8 @@ namespace gi::sg
       stitcher.appendRequiredExtension("GL_ARB_shader_clock");
     }
 
+    stitcher.appendDefine("AOV_ID", params.aovId);
+
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))
     {
