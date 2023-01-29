@@ -24,9 +24,9 @@ void handle_store_create(handle_store* store)
   store->max_index = 0;
   store->free_index_count = 0;
   store->free_index_capacity = 8;
-  store->free_indices= malloc(store->free_index_capacity * sizeof(uint32_t));
+  store->free_indices= (uint32_t*) malloc(store->free_index_capacity * sizeof(uint32_t));
   store->version_capacity = 8;
-  store->versions = malloc(store->version_capacity * sizeof(uint32_t));
+  store->versions = (uint32_t*) malloc(store->version_capacity * sizeof(uint32_t));
 }
 
 void handle_store_destroy(handle_store* store)
@@ -50,15 +50,21 @@ uint32_t handle_store_next_power_of_two(uint32_t v)
 
 uint64_t handle_store_create_handle(handle_store* store)
 {
-  assert(store->max_index < ~0u);
+  assert(store->max_index < (~0u));
 
-  uint32_t version;
   uint32_t index;
+  uint32_t version;
 
-  if (store->free_index_count == 0)
+  if (store->free_index_count > 0)
   {
-    version = 1;
+    index = store->free_indices[store->free_index_count - 1];
+    store->free_index_count--;
+    version = store->versions[index];
+  }
+  else
+  {
     index = store->max_index++;
+    version = 1;
 
     if (index >= store->version_capacity)
     {
@@ -66,13 +72,7 @@ uint64_t handle_store_create_handle(handle_store* store)
       store->versions = realloc(store->versions, sizeof(uint32_t) * store->version_capacity);
     }
 
-    store->versions[index] = 1;
-  }
-  else
-  {
-    index = store->free_indices[store->free_index_count - 1];
-    store->free_index_count--;
-    version = store->versions[index];
+    store->versions[index] = version;
   }
 
   uint64_t handle = ((uint64_t) index) | (((uint64_t) version) << 32ul);
@@ -85,7 +85,7 @@ bool handle_store_is_handle_valid(const handle_store* store,
 {
   uint32_t version = (uint32_t) (handle >> 32ul);
   uint32_t index = (uint32_t) (handle);
-  if (index >= store->max_index)
+  if (index > store->max_index)
   {
     return false;
   }
@@ -103,16 +103,12 @@ void handle_store_free_handle(handle_store* store,
                               uint64_t handle)
 {
   uint32_t index = handle_store_get_index(handle);
-  uint32_t version = store->versions[index];
-  version++;
-
-  store->versions[index] = version;
+  store->versions[index]++;
   store->free_index_count++;
 
-  if (store->free_index_count >= store->free_index_capacity)
+  if (store->free_index_count > store->free_index_capacity)
   {
-    const uint32_t next_multiple_of_two = ((store->free_index_count + 1) / 2) * 2;
-    store->free_index_capacity = next_multiple_of_two;
+    store->free_index_capacity = handle_store_next_power_of_two(store->free_index_count);
     store->free_indices = realloc(store->free_indices, sizeof(uint32_t) * store->free_index_capacity);
   }
 

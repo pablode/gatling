@@ -28,10 +28,9 @@ void resource_store_create(resource_store* store,
   assert(initial_capacity != 0);
   handle_store_create(&store->handle_store);
 
-  uint32_t ptr_size = sizeof(void*);
-  store->item_byte_size = (item_byte_size + ptr_size - 1) / ptr_size * ptr_size;
+  store->item_byte_size = item_byte_size;
   store->object_count = initial_capacity;
-  store->objects = malloc(store->item_byte_size * store->object_count);
+  store->objects = (uint8_t*) malloc(store->item_byte_size * store->object_count);
 }
 
 void resource_store_destroy(resource_store* store)
@@ -60,15 +59,14 @@ bool resource_store_get(resource_store* store, uint64_t handle, void** object)
   uint32_t index = handle_store_get_index(handle);
 
   assert(store->object_count > 0);
+  assert(index <= store->object_count);
 
-  if (index >= store->object_count)
+  if (index == store->object_count)
   {
     store->object_count *= 2;
-    store->objects = realloc(store->objects, store->object_count * store->item_byte_size);
+    store->objects = (uint8_t*) realloc(store->objects, store->object_count * store->item_byte_size);
   }
 
-  uint32_t object_index = store->item_byte_size * index;
-  uint8_t* objects_ptr = (uint8_t*) store->objects;
-  *object = (void*) (objects_ptr + object_index);
+  *object = (void*) &store->objects[store->item_byte_size * index];
   return true;
 }

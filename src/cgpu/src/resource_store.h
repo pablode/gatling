@@ -24,7 +24,7 @@
 
 typedef struct resource_store {
   handle_store handle_store;
-  void*        objects;
+  uint8_t*     objects;
   uint32_t     object_count;
   uint32_t     item_byte_size;
 } resource_store;
