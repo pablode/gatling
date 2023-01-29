@@ -85,11 +85,9 @@ void main()
         vec3 ray_origin = PC.CAMERA_POSITION;
         vec3 ray_dir = P - ray_origin;
 
-        /* Beware: a single direction component must not be zero.
-         * This is because we often take the inverse of the direction. */
-        if (ray_dir.x == 0.0) ray_dir.x = FLOAT_MIN;
-        if (ray_dir.y == 0.0) ray_dir.y = FLOAT_MIN;
-        if (ray_dir.z == 0.0) ray_dir.z = FLOAT_MIN;
+        /* Beware: a single direction component must not be zero,
+         * because we often take the inverse of the direction. */
+        ray_dir += vec3(equal(ray_dir, vec3(0.0))) * FLOAT_MIN;
 
         ray_dir = normalize(ray_dir);
 
@@ -99,7 +97,7 @@ void main()
     }
 
 #if AOV_ID == AOV_ID_DEBUG_CLOCK_CYCLES
-    float cycles_elapsed_norm = float(clockARB() - start_cycle_count) / 4294967295.0;
+    float cycles_elapsed_norm = float(clockARB() - start_cycle_count) / float(UINT32_MAX);
     pixel_color = vec3(cycles_elapsed_norm, 0.0, 0.0);
 #endif
 
