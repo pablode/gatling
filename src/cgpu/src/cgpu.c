@@ -344,7 +344,7 @@ bool cgpu_initialize(const char* p_app_name,
   resource_store_create(&idevice_store, sizeof(cgpu_idevice), 1);
   resource_store_create(&ibuffer_store, sizeof(cgpu_ibuffer), 16);
   resource_store_create(&iimage_store, sizeof(cgpu_iimage), 64);
-  resource_store_create(&ishader_store, sizeof(cgpu_ishader), 16);
+  resource_store_create(&ishader_store, sizeof(cgpu_ishader), 64);
   resource_store_create(&ipipeline_store, sizeof(cgpu_ipipeline), 8);
   resource_store_create(&ifence_store, sizeof(cgpu_ifence), 8);
   resource_store_create(&icommand_buffer_store, sizeof(cgpu_icommand_buffer), 16);
