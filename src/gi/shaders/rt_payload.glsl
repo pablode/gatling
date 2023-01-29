@@ -2,11 +2,11 @@ struct RayPayload
 {
     uvec4 rng_state;
     vec3 ray_origin;
-    uint bounce;
     vec3 ray_dir;
-    bool inside;
     vec3 throughput;
-    float pad0;
     vec3 radiance;
-    float pad1;
+    // Bitfield values:
+    // 1xxxxxxxxxxxxxxx bool inside
+    // x111111111111111 uint bounce
+    uint bitfield;
 };

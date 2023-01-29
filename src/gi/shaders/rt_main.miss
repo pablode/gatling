@@ -9,5 +9,5 @@ layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
 void main()
 {
     rayPayload.radiance += rayPayload.throughput * PC.BACKGROUND_COLOR.rgb;
-    rayPayload.bounce = 0xFFFFFFFFu;
+    rayPayload.bitfield = 0xFFFFFFFFu;
 }

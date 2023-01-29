@@ -81,9 +81,10 @@ void main()
     // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
     const vec3 normal = shading_state.normal;
 
+    bool inside = bool(rayPayload.bitfield & 0x80000000u);
     const bool thin_walled = mdl_thin_walled(shading_state);
-    const float ior1 = (rayPayload.inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
-    const float ior2 = (rayPayload.inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
+    const float ior1 = (inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
+    const float ior2 = (inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
 #if AOV_ID == AOV_ID_DEBUG_NEE
     return vec3(0.0, 0.0, 0.0);
@@ -96,7 +97,7 @@ void main()
 #endif
 
     /* 3. Apply volume attenuation */
-    if (rayPayload.inside && !thin_walled)
+    if (inside && !thin_walled)
     {
         vec3 abs_coeff = mdl_absorption_coefficient(shading_state);
         rayPayload.throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
@@ -124,17 +125,18 @@ void main()
     /* 6. Russian Roulette */
     vec4 rand4 = pcg4d_next(rayPayload.rng_state);
 
+    uint bounce = rayPayload.bitfield & 0x7FFFFFFFu;
     // TODO: don't break here, need test NEE vis & add contrib - but don't do BSDF sampling
-    if (rayPayload.bounce == PC.MAX_BOUNCES - 1)
+    if (bounce == PC.MAX_BOUNCES - 1)
     {
-        rayPayload.bounce = 0xFFFFFFFFu;
+        rayPayload.bitfield = 0xFFFFFFFFu;
         return;
     }
-    else if (rayPayload.bounce > PC.RR_BOUNCE_OFFSET)
+    else if (bounce > PC.RR_BOUNCE_OFFSET)
     {
         if (russian_roulette(rand4.x, rayPayload.throughput))
         {
-            rayPayload.bounce = 0xFFFFFFFFu;
+            rayPayload.bitfield = 0xFFFFFFFFu;
             return;
         }
     }
@@ -152,7 +154,7 @@ void main()
         if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
         {
             // TODO: don't break here, need test NEE vis & add contrib
-            rayPayload.bounce = 0xFFFFFFFFu;
+            rayPayload.bitfield = 0xFFFFFFFFu;
             return;
         }
 
@@ -162,7 +164,7 @@ void main()
 
         if (is_transmission)
         {
-            rayPayload.inside = !rayPayload.inside;
+            inside = !inside;
         }
 
         rayPayload.ray_dir = bsdf_sample_data.k2;
@@ -171,5 +173,5 @@ void main()
 
     /* TODO 8. NEE shadow query */
 
-    rayPayload.bounce++;
+    rayPayload.bitfield = (uint(inside) << 31) | (bounce + 1);
 }

@@ -15,10 +15,9 @@ vec3 evaluate_sample(inout uvec4 rng_state,
     rayPayload.ray_dir    = ray_dir;
     rayPayload.throughput = vec3(1.0, 1.0, 1.0);
     rayPayload.radiance   = vec3(0.0, 0.0, 0.0);
-    rayPayload.bounce     = 0;
-    rayPayload.inside     = false;
+    rayPayload.bitfield   = 0;
 
-    while (rayPayload.bounce <= PC.MAX_BOUNCES)
+    while ((rayPayload.bitfield & 0x7FFFFFFFu) <= PC.MAX_BOUNCES)
     {
         uint rayFlags = gl_RayFlagsOpaqueEXT;
 
@@ -38,7 +37,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
     }
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
-    return vec3(float(rayPayload.bounce), 0.0, 0.0);
+    return vec3(float(rayPayload.bitfield & 0x7FFFFFFFu), 0.0, 0.0);
 #endif
 
     rng_state = rayPayload.rng_state; // FIXME: find cleaner solution
