@@ -1832,7 +1832,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {0};
   rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
   rt_pipeline_create_info.pNext = NULL;
-  rt_pipeline_create_info.flags = 0;
+  rt_pipeline_create_info.flags = VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
   rt_pipeline_create_info.stageCount = stageCount;
   rt_pipeline_create_info.pStages = stages;
   rt_pipeline_create_info.groupCount = groupCount;

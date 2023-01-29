@@ -1,5 +1,6 @@
 #extension GL_GOOGLE_include_directive: require
 #extension GL_EXT_ray_tracing: require
+#extension GL_EXT_control_flow_attributes: require
 
 #include "rt_payload.glsl"
 #include "rt_descriptors.glsl"
@@ -17,6 +18,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
     rayPayload.radiance   = vec3(0.0, 0.0, 0.0);
     rayPayload.bitfield   = 0;
 
+    [[loop]]
     while ((rayPayload.bitfield & 0x7FFFFFFFu) <= PC.MAX_BOUNCES)
     {
         uint rayFlags = gl_RayFlagsOpaqueEXT;
@@ -52,54 +54,48 @@ void main()
 #endif
 
     uvec2 pixel_pos = gl_LaunchIDEXT.xy;
+    uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
+
+    vec3 camera_right = cross(PC.CAMERA_FORWARD, PC.CAMERA_UP);
+    float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
+
+    float H = 1.0;
+    float W = H * aspect_ratio;
+    float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
+
+    float WX = W / float(PC.IMAGE_WIDTH);
+    float HY = H / float(PC.IMAGE_HEIGHT);
+
+    vec3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
+    vec3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
+
+    float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
 
     vec3 pixel_color = vec3(0.0, 0.0, 0.0);
-
-    if (pixel_pos.x < PC.IMAGE_WIDTH && pixel_pos.y < PC.IMAGE_HEIGHT)
+    for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
     {
-        uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
+        uvec4 rng_state = pcg4d_init(pixel_pos.xy, PC.SAMPLE_OFFSET + s);
+        vec4 r = pcg4d_next(rng_state);
 
-        vec3 camera_right = cross(PC.CAMERA_FORWARD, PC.CAMERA_UP);
+        vec3 P =
+            L +
+            (float(pixel_pos.x) + r.x) * camera_right * WX +
+            (float(pixel_pos.y) + r.y) * PC.CAMERA_UP * HY;
 
-        float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
+        vec3 ray_origin = PC.CAMERA_POSITION;
+        vec3 ray_dir = P - ray_origin;
 
-        float H = 1.0;
-        float W = H * aspect_ratio;
-        float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
+        /* Beware: a single direction component must not be zero.
+         * This is because we often take the inverse of the direction. */
+        if (ray_dir.x == 0.0) ray_dir.x = FLOAT_MIN;
+        if (ray_dir.y == 0.0) ray_dir.y = FLOAT_MIN;
+        if (ray_dir.z == 0.0) ray_dir.z = FLOAT_MIN;
 
-        float WX = W / float(PC.IMAGE_WIDTH);
-        float HY = H / float(PC.IMAGE_HEIGHT);
+        ray_dir = normalize(ray_dir);
 
-        vec3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
-        vec3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
-
-        float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
-
-        for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
-        {
-            uvec4 rng_state = pcg4d_init(pixel_pos.xy, PC.SAMPLE_OFFSET + s);
-            vec4 r = pcg4d_next(rng_state);
-
-            vec3 P =
-                L +
-                (float(pixel_pos.x) + r.x) * camera_right * WX +
-                (float(pixel_pos.y) + r.y) * PC.CAMERA_UP * HY;
-
-            vec3 ray_origin = PC.CAMERA_POSITION;
-            vec3 ray_dir = P - ray_origin;
-
-            /* Beware: a single direction component must not be zero.
-             * This is because we often take the inverse of the direction. */
-            if (ray_dir.x == 0.0) ray_dir.x = FLOAT_MIN;
-            if (ray_dir.y == 0.0) ray_dir.y = FLOAT_MIN;
-            if (ray_dir.z == 0.0) ray_dir.z = FLOAT_MIN;
-
-            ray_dir = normalize(ray_dir);
-
-            /* Path trace sample and accumulate color. */
-            vec3 sample_color = evaluate_sample(rng_state, ray_origin, ray_dir);
-            pixel_color += sample_color * inv_sample_count;
-        }
+        /* Path trace sample and accumulate color. */
+        vec3 sample_color = evaluate_sample(rng_state, ray_origin, ray_dir);
+        pixel_color += sample_color * inv_sample_count;
     }
 
 #if AOV_ID == AOV_ID_DEBUG_CLOCK_CYCLES
@@ -107,20 +103,15 @@ void main()
     pixel_color = vec3(cycles_elapsed_norm, 0.0, 0.0);
 #endif
 
-    if (pixel_pos.x < PC.IMAGE_WIDTH && pixel_pos.y < PC.IMAGE_HEIGHT)
+    if (PC.SAMPLE_OFFSET > 0)
     {
-        uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
+      float inv_total_sample_count = 1.0 / float(PC.SAMPLE_OFFSET + PC.SAMPLE_COUNT);
 
-        if (PC.SAMPLE_OFFSET > 0)
-        {
-          float inv_total_sample_count = 1.0 / float(PC.SAMPLE_OFFSET + PC.SAMPLE_COUNT);
+      float weight_old = float(PC.SAMPLE_OFFSET) * inv_total_sample_count;
+      float weight_new = float(PC.SAMPLE_COUNT) * inv_total_sample_count;
 
-          float weight_old = float(PC.SAMPLE_OFFSET) * inv_total_sample_count;
-          float weight_new = float(PC.SAMPLE_COUNT) * inv_total_sample_count;
-
-          pixel_color = weight_old * pixels[pixel_index].rgb + weight_new * pixel_color;
-        }
-
-        pixels[pixel_index] = vec4(pixel_color, 0.0);
+      pixel_color = weight_old * pixels[pixel_index].rgb + weight_new * pixel_color;
     }
+
+    pixels[pixel_index] = vec4(pixel_color, 0.0);
 }
