@@ -509,14 +509,13 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       const gi_material* mat = params->materials[i];
 
       sg::ShaderGen::MaterialGlslGenInfo genInfo;
-      if (s_shaderGen->generateMaterialGlslGenInfo(mat->sg_mat, genInfo))
-      {
-        hitShaderGenInfos[i] = genInfo;
-      }
-      else
+      if (!s_shaderGen->generateMaterialGlslGenInfo(mat->sg_mat, genInfo))
       {
         threadWorkFailed = true;
+        continue;
       }
+
+      hitShaderGenInfos[i] = genInfo;
     }
     if (threadWorkFailed)
     {
@@ -535,9 +534,9 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       }
     }
 
-    // 3. Generate final GLSL hit shaders, and compile them to SPIR-V.
-    hitShaders.resize(hitShaderGenInfos.size(), { CGPU_INVALID_HANDLE });
+    // 3. Generate final hit shader GLSL source.
     threadWorkFailed = false;
+    std::vector<std::vector<uint8_t>> hitShaderSpvs(hitShaderGenInfos.size());
 #pragma omp parallel for
     for (int i = 0; i < hitShaderGenInfos.size(); i++)
     {
@@ -551,26 +550,33 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       hitParams.textureIndexOffset = textureIndexOffsets[i];
 
       std::vector<uint8_t> spv;
-      if (s_shaderGen->generateClosestHitSpirv(hitParams, spv))
-      {
-        cgpu_shader closestHitShader;
-        if (cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
-        {
-          hitShaders[i] = closestHitShader;
-        }
-        else
-        {
-          threadWorkFailed = true;
-        }
-      }
-      else
+      if (!s_shaderGen->generateClosestHitSpirv(hitParams, spv))
       {
         threadWorkFailed = true;
+        continue;
       }
+
+      hitShaderSpvs[i] = std::move(spv);
     }
     if (threadWorkFailed)
     {
       goto cleanup;
+    }
+
+    // 4. Compile the shaders to SPIV-V. (FIXME: multithread - beware of shared cgpu resource stores)
+    hitShaders.resize(hitShaderGenInfos.size(), { CGPU_INVALID_HANDLE });
+
+    for (int i = 0; i < hitShaderSpvs.size(); i++)
+    {
+      const std::vector<uint8_t>& spv = hitShaderSpvs[i];
+
+      cgpu_shader closestHitShader;
+      if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+      {
+        goto cleanup;
+      }
+
+      hitShaders[i] = closestHitShader;
     }
   }
 
