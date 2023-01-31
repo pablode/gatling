@@ -93,7 +93,7 @@ typedef struct cgpu_ipipeline {
   VkStridedDeviceAddressRegionKHR sbtRgen;
   VkStridedDeviceAddressRegionKHR sbtMiss;
   VkStridedDeviceAddressRegionKHR sbtHit;
-  cgpu_buffer                     sbt;
+  cgpu_ibuffer                    sbt;
 } cgpu_ipipeline;
 
 typedef struct cgpu_ishader {
@@ -114,15 +114,15 @@ typedef struct cgpu_icommand_buffer {
 typedef struct cgpu_iblas {
   VkAccelerationStructureKHR as;
   uint64_t address;
-  cgpu_buffer buffer;
-  cgpu_buffer indices;
-  cgpu_buffer vertices;
+  cgpu_ibuffer buffer;
+  cgpu_ibuffer indices;
+  cgpu_ibuffer vertices;
 } cgpu_iblas;
 
 typedef struct cgpu_itlas {
   VkAccelerationStructureKHR as;
-  cgpu_buffer buffer;
-  cgpu_buffer instances;
+  cgpu_ibuffer buffer;
+  cgpu_ibuffer instances;
 } cgpu_itlas;
 
 typedef struct cgpu_isampler {
@@ -344,7 +344,7 @@ bool cgpu_initialize(const char* p_app_name,
   resource_store_create(&idevice_store, sizeof(cgpu_idevice), 1);
   resource_store_create(&ibuffer_store, sizeof(cgpu_ibuffer), 16);
   resource_store_create(&iimage_store, sizeof(cgpu_iimage), 64);
-  resource_store_create(&ishader_store, sizeof(cgpu_ishader), 64);
+  resource_store_create(&ishader_store, sizeof(cgpu_ishader), 16);
   resource_store_create(&ipipeline_store, sizeof(cgpu_ipipeline), 8);
   resource_store_create(&ifence_store, sizeof(cgpu_ifence), 8);
   resource_store_create(&icommand_buffer_store, sizeof(cgpu_icommand_buffer), 16);
@@ -990,25 +990,13 @@ bool cgpu_destroy_shader(cgpu_device device,
   return true;
 }
 
-static bool cgpu_create_buffer_aligned(cgpu_device device,
-                                       CgpuBufferUsageFlags usage,
-                                       CgpuMemoryPropertyFlags memory_properties,
-                                       uint64_t size,
-                                       uint64_t alignment,
-                                       cgpu_buffer* p_buffer)
+static bool cgpu_create_ibuffer_aligned(cgpu_idevice* idevice,
+                                        CgpuBufferUsageFlags usage,
+                                        CgpuMemoryPropertyFlags memory_properties,
+                                        uint64_t size,
+                                        uint64_t alignment,
+                                        cgpu_ibuffer* ibuffer)
 {
-  cgpu_idevice* idevice;
-  if (!cgpu_resolve_device(device, &idevice)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
-
-  p_buffer->handle = resource_store_create_handle(&ibuffer_store);
-
-  cgpu_ibuffer* ibuffer;
-  if (!cgpu_resolve_buffer(*p_buffer, &ibuffer)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
-
   VkBufferCreateInfo buffer_info;
   buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   buffer_info.pNext = NULL;
@@ -1049,11 +1037,38 @@ static bool cgpu_create_buffer_aligned(cgpu_device device,
 
   if (result != VK_SUCCESS)
   {
-    resource_store_free_handle(&ibuffer_store, p_buffer->handle);
     CGPU_RETURN_ERROR("failed to create buffer");
   }
 
   ibuffer->size = size;
+
+  return true;
+}
+
+static bool cgpu_create_buffer_aligned(cgpu_device device,
+                                       CgpuBufferUsageFlags usage,
+                                       CgpuMemoryPropertyFlags memory_properties,
+                                       uint64_t size,
+                                       uint64_t alignment,
+                                       cgpu_buffer* p_buffer)
+{
+  cgpu_idevice* idevice;
+  if (!cgpu_resolve_device(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  p_buffer->handle = resource_store_create_handle(&ibuffer_store);
+
+  cgpu_ibuffer* ibuffer;
+  if (!cgpu_resolve_buffer(*p_buffer, &ibuffer)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  if (!cgpu_create_ibuffer_aligned(idevice, usage, memory_properties, size, alignment, ibuffer))
+  {
+    resource_store_free_handle(&ibuffer_store, p_buffer->handle);
+    CGPU_RETURN_ERROR("failed to create buffer");
+  }
 
   return true;
 }
@@ -1069,6 +1084,12 @@ bool cgpu_create_buffer(cgpu_device device,
   return cgpu_create_buffer_aligned(device, usage, memory_properties, size, alignment, p_buffer);
 }
 
+static void cgpu_destroy_ibuffer(cgpu_idevice* idevice,
+                                 cgpu_ibuffer* ibuffer)
+{
+  vmaDestroyBuffer(idevice->allocator, ibuffer->buffer, ibuffer->allocation);
+}
+
 bool cgpu_destroy_buffer(cgpu_device device,
                          cgpu_buffer buffer)
 {
@@ -1081,7 +1102,7 @@ bool cgpu_destroy_buffer(cgpu_device device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  vmaDestroyBuffer(idevice->allocator, ibuffer->buffer, ibuffer->allocation);
+  cgpu_destroy_ibuffer(idevice, ibuffer);
 
   resource_store_free_handle(&ibuffer_store, buffer.handle);
 
@@ -1648,11 +1669,8 @@ static uint32_t cgpu_align_size(uint32_t size, uint32_t alignment)
     return (size + (alignment - 1)) & ~(alignment - 1);
 }
 
-static bool cgpu_create_rt_pipeline_sbt(cgpu_device device, cgpu_ipipeline* ipipeline, uint32_t groupCount, uint32_t miss_shader_count, uint32_t hit_shader_count)
+static bool cgpu_create_rt_pipeline_sbt(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, uint32_t groupCount, uint32_t miss_shader_count, uint32_t hit_shader_count)
 {
-  cgpu_idevice* idevice;
-  cgpu_resolve_device(device, &idevice);
-
   uint32_t handleSize = idevice->properties.shaderGroupHandleSize;
   uint32_t alignedHandleSize = cgpu_align_size(handleSize, idevice->properties.shaderGroupHandleAlignment);
 
@@ -1676,21 +1694,20 @@ static bool cgpu_create_rt_pipeline_sbt(cgpu_device device, cgpu_ipipeline* ipip
   CgpuBufferUsageFlags bufferUsageFlags = CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR;
   CgpuMemoryPropertyFlags bufferMemPropFlags = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
 
-  if (!cgpu_create_buffer(device, bufferUsageFlags, bufferMemPropFlags, sbtSize, &ipipeline->sbt))
+  if (!cgpu_create_ibuffer_aligned(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize, 0, &ipipeline->sbt))
   {
     CGPU_RETURN_ERROR("failed to create sbt buffer");
   }
 
-  cgpu_ibuffer* isbt_buffer;
-  cgpu_resolve_buffer(ipipeline->sbt, &isbt_buffer);
-
-  VkDeviceAddress sbtDeviceAddress = cgpu_get_buffer_device_address(idevice, isbt_buffer);
+  VkDeviceAddress sbtDeviceAddress = cgpu_get_buffer_device_address(idevice, &ipipeline->sbt);
   ipipeline->sbtRgen.deviceAddress = sbtDeviceAddress;
   ipipeline->sbtMiss.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size;
   ipipeline->sbtHit.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size + ipipeline->sbtMiss.size;
 
   uint8_t* sbt_mem;
-  cgpu_map_buffer(device, ipipeline->sbt, (void**)&sbt_mem);
+  if (vmaMapMemory(idevice->allocator, ipipeline->sbt.allocation, (void**)&sbt_mem) != VK_SUCCESS) {
+    CGPU_RETURN_ERROR("failed to map buffer memory");
+  }
 
   uint32_t handle_count = 0;
   uint8_t* sbt_mem_rgen = &sbt_mem[0];
@@ -1715,7 +1732,7 @@ static bool cgpu_create_rt_pipeline_sbt(cgpu_device device, cgpu_ipipeline* ipip
     sbt_mem += ipipeline->sbtHit.stride;
   }
 
-  cgpu_unmap_buffer(device, ipipeline->sbt);
+  vmaUnmapMemory(idevice->allocator, ipipeline->sbt.allocation);
   return true;
 }
 
@@ -1784,6 +1801,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
       CGPU_RETURN_ERROR_INVALID_HANDLE;
     }
     assert(ihit_shader->module);
+    assert(ihit_shader->stage_flags);
 
     uint32_t stageIndex = 1/*rgen*/ + desc->miss_shader_count + i;
     stages[stageIndex].module = ihit_shader->module;
@@ -1863,7 +1881,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   ipipeline->bind_point = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
   // Create the SBT.
-  if (!cgpu_create_rt_pipeline_sbt(device, ipipeline, groupCount, desc->miss_shader_count, desc->hit_shader_count))
+  if (!cgpu_create_rt_pipeline_sbt(idevice, ipipeline, groupCount, desc->miss_shader_count, desc->hit_shader_count))
   {
     goto cleanup_fail;
   }
@@ -1893,7 +1911,7 @@ bool cgpu_destroy_pipeline(cgpu_device device,
 
   if (ipipeline->bind_point == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR)
   {
-    cgpu_destroy_buffer(device, ipipeline->sbt);
+    cgpu_destroy_ibuffer(idevice, &ipipeline->sbt);
   }
 
   idevice->table.vkDestroyDescriptorPool(
@@ -1926,7 +1944,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
                                          VkAccelerationStructureTypeKHR as_type,
                                          VkAccelerationStructureGeometryKHR* as_geom,
                                          uint32_t primitive_count,
-                                         cgpu_buffer* as_buffer,
+                                         cgpu_ibuffer* ias_buffer,
                                          VkAccelerationStructureKHR* as)
 {
   cgpu_idevice* idevice;
@@ -1961,16 +1979,14 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
                                                          &as_build_sizes_info);
 
   // Create AS buffer & AS object
-  if (!cgpu_create_buffer(device,
-                          CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE,
-                          CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                          as_build_sizes_info.accelerationStructureSize,
-                          as_buffer))
+  if (!cgpu_create_ibuffer_aligned(idevice,
+                                   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE,
+                                   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                                   as_build_sizes_info.accelerationStructureSize, 0,
+                                   ias_buffer))
   {
     CGPU_RETURN_ERROR("failed to create AS buffer");
   }
-  cgpu_ibuffer* ias_buffer;
-  cgpu_resolve_buffer(*as_buffer, &ias_buffer);
 
   VkAccelerationStructureCreateInfoKHR as_create_info = {0};
   as_create_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
@@ -1984,30 +2000,27 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
 
   if (idevice->table.vkCreateAccelerationStructureKHR(idevice->logical_device, &as_create_info, NULL, as) != VK_SUCCESS)
   {
-    cgpu_destroy_buffer(device, *as_buffer);
+    cgpu_destroy_ibuffer(idevice, ias_buffer);
     CGPU_RETURN_ERROR("failed to create Vulkan AS object");
   }
 
   // Set up device-local scratch buffer
-  cgpu_buffer scratch_buffer;
-  if (!cgpu_create_buffer_aligned(device,
-                                  CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
-                                  CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                                  as_build_sizes_info.buildScratchSize,
-                                  idevice->properties.minAccelerationStructureScratchOffsetAlignment,
-                                  &scratch_buffer))
+  cgpu_ibuffer iscratch_buffer;
+  if (!cgpu_create_ibuffer_aligned(idevice,
+                                   CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
+                                   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                                   as_build_sizes_info.buildScratchSize,
+                                   idevice->properties.minAccelerationStructureScratchOffsetAlignment,
+                                   &iscratch_buffer))
   {
-    cgpu_destroy_buffer(device, *as_buffer);
+    cgpu_destroy_ibuffer(idevice, ias_buffer);
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, NULL);
     CGPU_RETURN_ERROR("failed to create AS scratch buffer");
   }
 
-  cgpu_ibuffer* iscratch_buffer;
-  cgpu_resolve_buffer(scratch_buffer, &iscratch_buffer);
-
   as_build_geom_info.dstAccelerationStructure = *as;
   as_build_geom_info.scratchData.hostAddress = 0;
-  as_build_geom_info.scratchData.deviceAddress = cgpu_get_buffer_device_address(idevice, iscratch_buffer);
+  as_build_geom_info.scratchData.deviceAddress = cgpu_get_buffer_device_address(idevice, &iscratch_buffer);
 
   VkAccelerationStructureBuildRangeInfoKHR as_build_range_info;
   as_build_range_info.primitiveCount = primitive_count;
@@ -2019,8 +2032,8 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
 
   cgpu_command_buffer command_buffer;
   if (!cgpu_create_command_buffer(device, &command_buffer)) {
-    cgpu_destroy_buffer(device, scratch_buffer);
-    cgpu_destroy_buffer(device, *as_buffer);
+    cgpu_destroy_ibuffer(idevice, ias_buffer);
+    cgpu_destroy_ibuffer(idevice, &iscratch_buffer);
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, NULL);
     CGPU_RETURN_ERROR("failed to create AS build command buffer");
   }
@@ -2035,8 +2048,8 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
 
   cgpu_fence fence;
   if (!cgpu_create_fence(device, &fence)) {
-    cgpu_destroy_buffer(device, scratch_buffer);
-    cgpu_destroy_buffer(device, *as_buffer);
+    cgpu_destroy_ibuffer(idevice, ias_buffer);
+    cgpu_destroy_ibuffer(idevice, &iscratch_buffer);
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, NULL);
     CGPU_RETURN_ERROR("failed to create AS build fence");
   }
@@ -2047,7 +2060,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   // Dispose resources
   cgpu_destroy_fence(device, fence);
   cgpu_destroy_command_buffer(device, command_buffer);
-  cgpu_destroy_buffer(device, scratch_buffer);
+  cgpu_destroy_ibuffer(idevice, &iscratch_buffer);
 
   return true;
 }
@@ -2078,57 +2091,47 @@ bool cgpu_create_blas(cgpu_device device,
 
   // Create index buffer & copy data into it
   uint64_t index_buffer_size = index_count * sizeof(uint32_t);
-  if (!cgpu_create_buffer(device,
-                          CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                          CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                          index_buffer_size,
-                          &iblas->indices))
+  if (!cgpu_create_ibuffer_aligned(idevice,
+                                   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                                   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+                                   index_buffer_size, 0,
+                                   &iblas->indices))
   {
     CGPU_RETURN_ERROR("failed to create BLAS index buffer");
   }
 
-  cgpu_ibuffer* iindex_buffer;
-  cgpu_resolve_buffer(iblas->indices, &iindex_buffer);
-
   {
-    bool result;
     void* mapped_mem;
-    result = cgpu_map_buffer(device, iblas->indices, &mapped_mem);
-    if (!result) {
-      cgpu_destroy_buffer(device, iblas->indices);
-      CGPU_RETURN_ERROR("failed to map BLAS index buffer memory");
+    if (vmaMapMemory(idevice->allocator, iblas->indices.allocation, (void**) &mapped_mem) != VK_SUCCESS) {
+      cgpu_destroy_ibuffer(idevice, &iblas->indices);
+      CGPU_RETURN_ERROR("failed to map buffer memory");
     }
     memcpy(mapped_mem, indices, index_buffer_size);
-    result = cgpu_unmap_buffer(device, iblas->indices);
-    assert(result);
+    vmaUnmapMemory(idevice->allocator, iblas->indices.allocation);
   }
 
   // Create vertex buffer & copy data into it
   uint64_t vertex_buffer_size = vertex_count * sizeof(cgpu_vertex);
-  if (!cgpu_create_buffer(device,
-                          CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                          CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                          vertex_buffer_size,
-                          &iblas->vertices))
+  if (!cgpu_create_ibuffer_aligned(idevice,
+                                   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                                   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+                                   vertex_buffer_size, 0,
+                                   &iblas->vertices))
   {
-    cgpu_destroy_buffer(device, iblas->indices);
+    cgpu_destroy_ibuffer(idevice, &iblas->indices);
     CGPU_RETURN_ERROR("failed to create BLAS vertex buffer");
   }
 
-  cgpu_ibuffer* ivertex_buffer;
-  cgpu_resolve_buffer(iblas->vertices, &ivertex_buffer);
-
   {
     void* mapped_mem;
-    bool result = cgpu_map_buffer(device, iblas->vertices, &mapped_mem);
-    if (!result) {
-      cgpu_destroy_buffer(device, iblas->vertices);
-      cgpu_destroy_buffer(device, iblas->indices);
-      CGPU_RETURN_ERROR("failed to map BLAS vertex buffer memory");
+    if (vmaMapMemory(idevice->allocator, iblas->vertices.allocation, (void**)&mapped_mem) != VK_SUCCESS)
+    {
+      cgpu_destroy_ibuffer(idevice, &iblas->indices);
+      cgpu_destroy_ibuffer(idevice, &iblas->vertices);
+      CGPU_RETURN_ERROR("failed to map buffer memory");
     }
     memcpy(mapped_mem, vertices, vertex_buffer_size);
-    result = cgpu_unmap_buffer(device, iblas->vertices);
-    assert(result);
+    vmaUnmapMemory(idevice->allocator, iblas->vertices.allocation);
   }
 
   // Create BLAS
@@ -2137,12 +2140,12 @@ bool cgpu_create_blas(cgpu_device device,
   as_triangle_data.pNext = NULL;
   as_triangle_data.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
   as_triangle_data.vertexData.hostAddress = NULL;
-  as_triangle_data.vertexData.deviceAddress = cgpu_get_buffer_device_address(idevice, ivertex_buffer);
+  as_triangle_data.vertexData.deviceAddress = cgpu_get_buffer_device_address(idevice, &iblas->vertices);
   as_triangle_data.vertexStride = sizeof(cgpu_vertex);
   as_triangle_data.maxVertex = vertex_count;
   as_triangle_data.indexType = VK_INDEX_TYPE_UINT32;
   as_triangle_data.indexData.hostAddress = NULL;
-  as_triangle_data.indexData.deviceAddress = cgpu_get_buffer_device_address(idevice, iindex_buffer);
+  as_triangle_data.indexData.deviceAddress = cgpu_get_buffer_device_address(idevice, &iblas->indices);
   as_triangle_data.transformData.hostAddress = NULL;
   as_triangle_data.transformData.deviceAddress = 0; // optional
 
@@ -2159,8 +2162,8 @@ bool cgpu_create_blas(cgpu_device device,
   uint32_t triangle_count = index_count / 3;
   if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &as_geom, triangle_count, &iblas->buffer, &iblas->as))
   {
-    cgpu_destroy_buffer(device, iblas->indices);
-    cgpu_destroy_buffer(device, iblas->vertices);
+    cgpu_destroy_ibuffer(idevice, &iblas->indices);
+    cgpu_destroy_ibuffer(idevice, &iblas->vertices);
     CGPU_RETURN_ERROR("failed to build BLAS");
   }
 
@@ -2191,29 +2194,28 @@ bool cgpu_create_tlas(cgpu_device device,
   }
 
   // Create instance buffer & copy into it
-  if (!cgpu_create_buffer(device,
-                          CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                          CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                          instance_count * sizeof(VkAccelerationStructureInstanceKHR),
-                          &itlas->instances))
+  if (!cgpu_create_ibuffer_aligned(idevice,
+                                   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                                   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+                                   instance_count * sizeof(VkAccelerationStructureInstanceKHR), 0,
+                                   &itlas->instances))
   {
     CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
   }
 
-  cgpu_ibuffer* iinstances_buffer;
-  cgpu_resolve_buffer(itlas->instances, &iinstances_buffer);
   {
     uint8_t* mapped_mem;
-    bool result = cgpu_map_buffer(device, itlas->instances, (void**) &mapped_mem);
-    if (!result) {
-      cgpu_destroy_buffer(device, itlas->instances);
-      CGPU_RETURN_ERROR("failed to map TLAS instances buffer memory");
+    if (vmaMapMemory(idevice->allocator, itlas->instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
+    {
+      cgpu_destroy_ibuffer(idevice, &itlas->instances);
+      CGPU_RETURN_ERROR("failed to map buffer memory");
     }
 
     for (uint32_t i = 0; i < instance_count; i++)
     {
       cgpu_iblas* iblas;
       if (!cgpu_resolve_blas(instances[i].as, &iblas)) {
+        cgpu_destroy_ibuffer(idevice, &itlas->instances);
         CGPU_RETURN_ERROR_INVALID_HANDLE;
       }
 
@@ -2226,8 +2228,7 @@ bool cgpu_create_tlas(cgpu_device device,
       as_instance->accelerationStructureReference = iblas->address;
     }
 
-    result = cgpu_unmap_buffer(device, itlas->instances);
-    assert(result);
+    vmaUnmapMemory(idevice->allocator, itlas->instances.allocation);
   }
 
   // Create TLAS
@@ -2239,12 +2240,12 @@ bool cgpu_create_tlas(cgpu_device device,
   as_geom.geometry.instances.pNext = NULL;
   as_geom.geometry.instances.arrayOfPointers = VK_FALSE;
   as_geom.geometry.instances.data.hostAddress = NULL;
-  as_geom.geometry.instances.data.deviceAddress = cgpu_get_buffer_device_address(idevice, iinstances_buffer);
+  as_geom.geometry.instances.data.deviceAddress = cgpu_get_buffer_device_address(idevice, &itlas->instances);
   as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
 
   if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &as_geom, instance_count, &itlas->buffer, &itlas->as))
   {
-    cgpu_destroy_buffer(device, itlas->instances);
+    cgpu_destroy_ibuffer(idevice, &itlas->instances);
     CGPU_RETURN_ERROR("failed to build TLAS");
   }
 
@@ -2263,9 +2264,9 @@ bool cgpu_destroy_blas(cgpu_device device, cgpu_blas blas)
   }
 
   idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, iblas->as, NULL);
-  cgpu_destroy_buffer(device, iblas->buffer);
-  cgpu_destroy_buffer(device, iblas->indices);
-  cgpu_destroy_buffer(device, iblas->vertices);
+  cgpu_destroy_ibuffer(idevice, &iblas->buffer);
+  cgpu_destroy_ibuffer(idevice, &iblas->indices);
+  cgpu_destroy_ibuffer(idevice, &iblas->vertices);
 
   resource_store_free_handle(&iblas_store, blas.handle);
   return true;
@@ -2283,8 +2284,8 @@ bool cgpu_destroy_tlas(cgpu_device device, cgpu_tlas tlas)
   }
 
   idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, itlas->as, NULL);
-  cgpu_destroy_buffer(device, itlas->instances);
-  cgpu_destroy_buffer(device, itlas->buffer);
+  cgpu_destroy_ibuffer(idevice, &itlas->instances);
+  cgpu_destroy_ibuffer(idevice, &itlas->buffer);
 
   resource_store_free_handle(&itlas_store, tlas.handle);
   return true;
