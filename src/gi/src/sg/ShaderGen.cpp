@@ -38,6 +38,7 @@ namespace gi::sg
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
     bool isEmissive;
     bool isOpaque;
+    std::string resourcePathPrefix;
   };
 
   bool ShaderGen::init(const InitParams& params)
@@ -119,12 +120,13 @@ namespace gi::sg
     return compiledMaterial->get_cutout_opacity(&opacity) && opacity >= 1.0f;
   }
 
-  Material* _sgMakeMaterial(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  Material* _sgMakeMaterial(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial, std::string resourcePathPrefix = "")
   {
     Material* m = new Material();
     m->compiledMaterial = compiledMaterial;
     m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
     m->isOpaque = _sgIsMaterialOpaque(compiledMaterial);
+    m->resourcePathPrefix = resourcePathPrefix;
     return m;
   }
 
@@ -154,7 +156,9 @@ namespace gi::sg
       return nullptr;
     }
 
-    return _sgMakeMaterial(compiledMaterial);
+    std::string resourcePathPrefix = fs::path(filePath).parent_path().string();
+
+    return _sgMakeMaterial(compiledMaterial, resourcePathPrefix);
   }
 
   void ShaderGen::destroyMaterial(Material* mat)
@@ -244,6 +248,15 @@ namespace gi::sg
                                      genInfo.textureResources))
     {
       return false;
+    }
+
+    // Append resource path prefix for file-backed MDL modules.
+    if (!material->resourcePathPrefix.empty())
+    {
+      for (sg::TextureResource& texRes : genInfo.textureResources)
+      {
+        texRes.filePath = material->resourcePathPrefix + texRes.filePath;
+      }
     }
 
     // Remove MDL struct definitions because they're too bloated. We know more about the
