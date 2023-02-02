@@ -90,10 +90,17 @@ namespace gi::sg
       uint32_t textureIndexOffset;
       std::vector<TextureResource>* textureResources;
     };
+    struct AnyHitShaderParams
+    {
+      std::string_view baseFileName;
+      std::string_view opacityEvalGlsl;
+      const std::vector<TextureResource>* textureResources;
+    };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);
     bool generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv);
     bool generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv);
+    bool generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv);
 
   private:
     class MdlRuntime* m_mdlRuntime = nullptr;

@@ -64,6 +64,7 @@ struct gi_shader_cache
   std::vector<cgpu_image>         images_3d;
   std::vector<const gi_material*> materials;
   cgpu_shader                     missShader;
+  cgpu_shader                     anyHitShader;
   cgpu_pipeline                   pipeline;
   cgpu_shader                     rgenShader;
 };
@@ -482,6 +483,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   cgpu_pipeline pipeline = { CGPU_INVALID_HANDLE };
   cgpu_shader rgenShader = { CGPU_INVALID_HANDLE };
   cgpu_shader missShader = { CGPU_INVALID_HANDLE };
+  cgpu_shader anyHitShader = { CGPU_INVALID_HANDLE };
   std::vector<cgpu_shader> hitShaders;
   std::vector<cgpu_image> images_2d;
   std::vector<cgpu_image> images_3d;
@@ -537,7 +539,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       }
     }
 
-    // 3. Generate final hit shader GLSL source.
+    // 3. Generate final hit shader GLSL sources.
     threadWorkFailed = false;
     std::vector<std::vector<uint8_t>> hitShaderSpvs(hitShaderGenInfos.size());
 #pragma omp parallel for
@@ -564,6 +566,24 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     if (threadWorkFailed)
     {
       goto cleanup;
+    }
+
+    {
+      sg::ShaderGen::AnyHitShaderParams hitParams;
+      hitParams.baseFileName = "rt_main.ahit";
+      hitParams.opacityEvalGlsl = ""; // TODO
+      hitParams.textureResources = &textureResources;
+
+      std::vector<uint8_t> spv;
+      if (!s_shaderGen->generateAnyHitSpirv(hitParams, spv))
+      {
+        goto cleanup;
+      }
+
+      if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+      {
+        goto cleanup;
+      }
     }
 
     // 4. Compile the shaders to SPIV-V. (FIXME: multithread - beware of shared cgpu resource stores)
@@ -644,6 +664,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     cache->materials[i] = params->materials[i];
   }
   cache->missShader = missShader;
+  cache->anyHitShader = anyHitShader;
   cache->pipeline = pipeline;
   cache->rgenShader = rgenShader;
 
@@ -660,6 +681,10 @@ cleanup:
     if (missShader.handle != CGPU_INVALID_HANDLE)
     {
       cgpu_destroy_shader(s_device, missShader);
+    }
+    if (anyHitShader.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpu_destroy_shader(s_device, anyHitShader);
     }
     for (cgpu_shader shader : hitShaders)
     {
@@ -679,6 +704,7 @@ void giDestroyShaderCache(gi_shader_cache* cache)
   s_texSys->destroyUncachedImages(cache->images_3d);
   cgpu_destroy_shader(s_device, cache->rgenShader);
   cgpu_destroy_shader(s_device, cache->missShader);
+  cgpu_destroy_shader(s_device, cache->anyHitShader);
   for (cgpu_shader shader : cache->hitShaders)
   {
     cgpu_destroy_shader(s_device, shader);

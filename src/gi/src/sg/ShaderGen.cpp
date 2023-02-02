@@ -307,4 +307,23 @@ namespace gi::sg
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::ClosestHit, source, spv);
   }
+
+  bool ShaderGen::generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv)
+  {
+    GlslSourceStitcher stitcher;
+    stitcher.appendVersion();
+
+    _sgGenerateCommonDefines(stitcher, params.textureResources);
+
+    stitcher.appendString(params.opacityEvalGlsl);
+
+    fs::path filePath = m_shaderPath / params.baseFileName;
+    if (!stitcher.appendSourceFile(filePath))
+    {
+      return false;
+    }
+
+    std::string source = stitcher.source();
+    return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::AnyHit, source, spv);
+  }
 }
