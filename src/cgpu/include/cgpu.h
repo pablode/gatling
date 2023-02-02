@@ -606,6 +606,7 @@ CGPU_API bool CGPU_CDECL cgpu_create_blas(
   const cgpu_vertex* vertices,
   uint32_t index_count,
   const uint32_t* indices,
+  bool isOpaque,
   cgpu_blas* p_blas
 );
 

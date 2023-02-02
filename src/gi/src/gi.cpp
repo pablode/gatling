@@ -297,8 +297,11 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
       }
 
       // BLAS
+      bool isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sg_mat);
+
       cgpu_blas blas;
-      if (!cgpu_create_blas(s_device, (uint32_t)vertices.size(), vertices.data(), (uint32_t)indices.size(), indices.data(), &blas))
+      if (!cgpu_create_blas(s_device, (uint32_t)vertices.size(), vertices.data(),
+                            (uint32_t)indices.size(), indices.data(), isOpaque, &blas))
       {
         goto fail_cleanup;
       }

@@ -166,9 +166,14 @@ namespace gi::sg
     delete mat;
   }
 
-  bool ShaderGen::isMaterialEmissive(const struct Material* mat)
+  bool ShaderGen::isMaterialEmissive(const Material* mat)
   {
     return mat->isEmissive;
+  }
+
+  bool ShaderGen::isMaterialOpaque(const Material* mat)
+  {
+    return mat->isOpaque;
   }
 
   void _sgGenerateCommonDefines(GlslSourceStitcher& stitcher, const std::vector<TextureResource>* textureResources)

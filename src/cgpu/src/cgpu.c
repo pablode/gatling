@@ -117,6 +117,7 @@ typedef struct cgpu_iblas {
   cgpu_ibuffer buffer;
   cgpu_ibuffer indices;
   cgpu_ibuffer vertices;
+  bool isOpaque;
 } cgpu_iblas;
 
 typedef struct cgpu_itlas {
@@ -2071,6 +2072,7 @@ bool cgpu_create_blas(cgpu_device device,
                       const cgpu_vertex* vertices,
                       uint32_t index_count,
                       const uint32_t* indices,
+                      bool isOpaque,
                       cgpu_blas* p_blas)
 {
   cgpu_idevice* idevice;
@@ -2157,7 +2159,7 @@ bool cgpu_create_blas(cgpu_device device,
   as_geom.pNext = NULL;
   as_geom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
   as_geom.geometry = as_geom_data;
-  as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+  as_geom.flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
 
   uint32_t triangle_count = index_count / 3;
   if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &as_geom, triangle_count, &iblas->buffer, &iblas->as))
@@ -2172,6 +2174,8 @@ bool cgpu_create_blas(cgpu_device device,
   as_address_info.pNext = NULL;
   as_address_info.accelerationStructure = iblas->as;
   iblas->address = idevice->table.vkGetAccelerationStructureDeviceAddressKHR(idevice->logical_device, &as_address_info);
+
+  iblas->isOpaque = isOpaque;
 
   return true;
 }
@@ -2203,6 +2207,7 @@ bool cgpu_create_tlas(cgpu_device device,
     CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
   }
 
+  bool areAllBlasOpaque = true;
   {
     uint8_t* mapped_mem;
     if (vmaMapMemory(idevice->allocator, itlas->instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
@@ -2226,6 +2231,8 @@ bool cgpu_create_tlas(cgpu_device device,
       as_instance->instanceShaderBindingTableRecordOffset = instances[i].hitShaderIndex;
       as_instance->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
       as_instance->accelerationStructureReference = iblas->address;
+
+      areAllBlasOpaque &= iblas->isOpaque;
     }
 
     vmaUnmapMemory(idevice->allocator, itlas->instances.allocation);
@@ -2241,7 +2248,7 @@ bool cgpu_create_tlas(cgpu_device device,
   as_geom.geometry.instances.arrayOfPointers = VK_FALSE;
   as_geom.geometry.instances.data.hostAddress = NULL;
   as_geom.geometry.instances.data.deviceAddress = cgpu_get_buffer_device_address(idevice, &itlas->instances);
-  as_geom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+  as_geom.flags = areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0;
 
   if (!cgpu_create_top_or_bottom_as(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &as_geom, instance_count, &itlas->buffer, &itlas->as))
   {
