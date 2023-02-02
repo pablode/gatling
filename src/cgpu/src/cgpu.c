@@ -1827,11 +1827,28 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
 
   for (uint32_t i = 0; i < desc->hit_shader_count; i++)
   {
+    cgpu_ishader* ihit_shader;
+    if (!cgpu_resolve_shader(desc->hit_shaders[i], &ihit_shader)) {
+      CGPU_RETURN_ERROR_INVALID_HANDLE;
+    }
+
     uint32_t groupIndex = 1/*rgen*/ + desc->miss_shader_count + i;
     uint32_t stageIndex = groupIndex;
     groups[groupIndex].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
     groups[groupIndex].generalShader = VK_SHADER_UNUSED_KHR;
-    groups[groupIndex].closestHitShader = stageIndex;
+    if (ihit_shader->stage_flags == VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
+    {
+      groups[groupIndex].closestHitShader = stageIndex;
+    }
+    else if (ihit_shader->stage_flags == VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
+    {
+      // FIXME: batch if possible (single opaque hit shader)
+      groups[groupIndex].anyHitShader = stageIndex;
+    }
+    else
+    {
+      CGPU_RETURN_ERROR("invalid hit shader type");
+    }
   }
 
   // Create descriptor and pipeline layout.
