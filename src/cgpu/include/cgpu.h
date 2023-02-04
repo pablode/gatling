@@ -482,9 +482,14 @@ typedef struct cgpu_vertex {
 typedef struct cgpu_blas_instance {
   cgpu_blas as;
   uint32_t faceIndexOffset;
-  uint32_t hitShaderIndex;
+  uint32_t hitGroupIndex;
   float transform[3][4];
 } cgpu_blas_instance;
+
+typedef struct cgpu_rt_hit_group {
+  cgpu_shader closestHitShader; // required
+  cgpu_shader anyHitShader;     // optional
+} cgpu_rt_hit_group;
 
 CGPU_API bool CGPU_CDECL cgpu_initialize(
   const char* p_app_name,
@@ -585,8 +590,8 @@ typedef struct cgpu_rt_pipeline_desc {
   cgpu_shader rgen_shader;
   uint32_t miss_shader_count;
   cgpu_shader* miss_shaders;
-  uint32_t hit_shader_count;
-  const cgpu_shader* hit_shaders;
+  uint32_t hit_group_count;
+  const cgpu_rt_hit_group* hit_groups;
 } cgpu_rt_pipeline_desc;
 
 CGPU_API bool CGPU_CDECL cgpu_create_rt_pipeline(

@@ -1670,7 +1670,7 @@ static uint32_t cgpu_align_size(uint32_t size, uint32_t alignment)
     return (size + (alignment - 1)) & ~(alignment - 1);
 }
 
-static bool cgpu_create_rt_pipeline_sbt(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, uint32_t groupCount, uint32_t miss_shader_count, uint32_t hit_shader_count)
+static bool cgpu_create_rt_pipeline_sbt(cgpu_idevice* idevice, cgpu_ipipeline* ipipeline, uint32_t groupCount, uint32_t miss_shader_count, uint32_t hit_group_count)
 {
   uint32_t handleSize = idevice->properties.shaderGroupHandleSize;
   uint32_t alignedHandleSize = cgpu_align_size(handleSize, idevice->properties.shaderGroupHandleAlignment);
@@ -1680,7 +1680,7 @@ static bool cgpu_create_rt_pipeline_sbt(cgpu_idevice* idevice, cgpu_ipipeline* i
   ipipeline->sbtMiss.stride = alignedHandleSize;
   ipipeline->sbtMiss.size = cgpu_align_size(miss_shader_count * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
   ipipeline->sbtHit.stride = alignedHandleSize;
-  ipipeline->sbtHit.size = cgpu_align_size(hit_shader_count * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+  ipipeline->sbtHit.size = cgpu_align_size(hit_group_count * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
 
   uint32_t firstGroup = 0;
   uint32_t dataSize = handleSize * groupCount;
@@ -1727,7 +1727,7 @@ static bool cgpu_create_rt_pipeline_sbt(cgpu_idevice* idevice, cgpu_ipipeline* i
   }
   // Hit
   sbt_mem = sbt_mem_hit;
-  for (uint32_t i = 0; i < hit_shader_count; i++)
+  for (uint32_t i = 0; i < hit_group_count; i++)
   {
     memcpy(sbt_mem, &handleData[handleSize * (handle_count++)], handleSize);
     sbt_mem += ipipeline->sbtHit.stride;
@@ -1795,19 +1795,44 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     stages[stageIndex].module = imiss_shader->module;
     stages[stageIndex].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
   }
-  for (uint32_t i = 0; i < desc->hit_shader_count; i++)
-  {
-    cgpu_ishader* ihit_shader;
-    if (!cgpu_resolve_shader(desc->hit_shaders[i], &ihit_shader)) {
-      CGPU_RETURN_ERROR_INVALID_HANDLE;
-    }
-    assert(ihit_shader->module);
-    assert(ihit_shader->stage_flags);
 
-    uint32_t stageIndex = 1/*rgen*/ + desc->miss_shader_count + i;
-    stages[stageIndex].module = ihit_shader->module;
-    stages[stageIndex].stage = ihit_shader->stage_flags;
-    pipelineStageFlags |= ihit_shader->stage_flags;
+  uint32_t hitStageAndGroupOffset = 1/*rgen*/ + desc->miss_shader_count;
+  uint32_t hitShaderStageIndex = hitStageAndGroupOffset;
+  for (uint32_t i = 0; i < desc->hit_group_count; i++)
+  {
+    const cgpu_rt_hit_group* hit_group = &desc->hit_groups[i];
+
+    // Closest hit (required)
+    {
+      cgpu_ishader* iclosestHitShader;
+      if (!cgpu_resolve_shader(hit_group->closestHitShader, &iclosestHitShader)) {
+        CGPU_RETURN_ERROR_INVALID_HANDLE;
+      }
+      assert(iclosestHitShader->stage_flags == VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
+
+      uint32_t stageIndex = (hitShaderStageIndex++);
+      stages[stageIndex].module = iclosestHitShader->module;
+      stages[stageIndex].stage = iclosestHitShader->stage_flags;
+    }
+
+    // Any hit (optional)
+    if (hit_group->anyHitShader.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpu_ishader* ianyHitShader;
+      if (!cgpu_resolve_shader(hit_group->anyHitShader, &ianyHitShader)) {
+        CGPU_RETURN_ERROR_INVALID_HANDLE;
+      }
+      assert(ianyHitShader->stage_flags == VK_SHADER_STAGE_ANY_HIT_BIT_KHR);
+
+      uint32_t stageIndex = (hitShaderStageIndex++);
+      stages[stageIndex].module = ianyHitShader->module;
+      stages[stageIndex].stage = ianyHitShader->stage_flags;
+      pipelineStageFlags |= ianyHitShader->stage_flags;
+    }
+  }
+  if (desc->hit_group_count > 0)
+  {
+    pipelineStageFlags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
   }
 
   VkRayTracingShaderGroupCreateInfoKHR groups[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
@@ -1825,29 +1850,19 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     groups[i] = rt_shader_group_create_info;
   }
 
-  for (uint32_t i = 0; i < desc->hit_shader_count; i++)
+  hitShaderStageIndex = hitStageAndGroupOffset;
+  for (uint32_t i = 0; i < desc->hit_group_count; i++)
   {
-    cgpu_ishader* ihit_shader;
-    if (!cgpu_resolve_shader(desc->hit_shaders[i], &ihit_shader)) {
-      CGPU_RETURN_ERROR_INVALID_HANDLE;
-    }
+    const cgpu_rt_hit_group* hit_group = &desc->hit_groups[i];
 
-    uint32_t groupIndex = 1/*rgen*/ + desc->miss_shader_count + i;
-    uint32_t stageIndex = groupIndex;
+    uint32_t groupIndex = hitStageAndGroupOffset + i;
     groups[groupIndex].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
     groups[groupIndex].generalShader = VK_SHADER_UNUSED_KHR;
-    if (ihit_shader->stage_flags == VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
+    groups[groupIndex].closestHitShader = (hitShaderStageIndex++);
+
+    if (hit_group->anyHitShader.handle != CGPU_INVALID_HANDLE)
     {
-      groups[groupIndex].closestHitShader = stageIndex;
-    }
-    else if (ihit_shader->stage_flags == VK_SHADER_STAGE_ANY_HIT_BIT_KHR)
-    {
-      // FIXME: batch if possible (single opaque hit shader)
-      groups[groupIndex].anyHitShader = stageIndex;
-    }
-    else
-    {
-      CGPU_RETURN_ERROR("invalid hit shader type");
+      groups[groupIndex].anyHitShader = (hitShaderStageIndex++);
     }
   }
 
@@ -1862,8 +1877,8 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   }
 
   // Create pipeline.
-  uint32_t stageCount = 1/*rgen*/ + desc->miss_shader_count + desc->hit_shader_count;
-  uint32_t groupCount = stageCount;
+  uint32_t stageCount = hitShaderStageIndex;
+  uint32_t groupCount = hitStageAndGroupOffset + desc->hit_group_count;
 
   VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {0};
   rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
@@ -1899,7 +1914,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   ipipeline->bind_point = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
   // Create the SBT.
-  if (!cgpu_create_rt_pipeline_sbt(idevice, ipipeline, groupCount, desc->miss_shader_count, desc->hit_shader_count))
+  if (!cgpu_create_rt_pipeline_sbt(idevice, ipipeline, groupCount, desc->miss_shader_count, desc->hit_group_count))
   {
     goto cleanup_fail;
   }
@@ -2245,7 +2260,7 @@ bool cgpu_create_tlas(cgpu_device device,
       memcpy(&as_instance->transform, &instances[i].transform, sizeof(VkTransformMatrixKHR));
       as_instance->instanceCustomIndex = instances[i].faceIndexOffset;
       as_instance->mask = 0xFF;
-      as_instance->instanceShaderBindingTableRecordOffset = instances[i].hitShaderIndex;
+      as_instance->instanceShaderBindingTableRecordOffset = instances[i].hitGroupIndex;
       as_instance->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
       as_instance->accelerationStructureReference = iblas->address;
 
