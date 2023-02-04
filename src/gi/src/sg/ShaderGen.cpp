@@ -247,13 +247,13 @@ namespace gi::sg
   {
     const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
 
-    std::string mdlGeneratedGlsl;
-    if (!m_mdlGlslCodeGen->translate(compiledMaterial,
-                                     mdlGeneratedGlsl,
-                                     genInfo.textureResources))
+    MdlGlslCodeGenResult glslResult;
+    if (!m_mdlGlslCodeGen->genMaterialShadingCode(compiledMaterial, glslResult))
     {
       return false;
     }
+
+    genInfo.textureResources = glslResult.textureResources;
 
     // Append resource path prefix for file-backed MDL modules.
     if (!material->resourcePathPrefix.empty())
@@ -263,6 +263,8 @@ namespace gi::sg
         texRes.filePath = material->resourcePathPrefix + texRes.filePath;
       }
     }
+
+    std::string mdlGeneratedGlsl = glslResult.shadingGlsl;
 
     // Remove MDL struct definitions because they're too bloated. We know more about the
     // data from which the code is generated from and can reduce the memory footprint.

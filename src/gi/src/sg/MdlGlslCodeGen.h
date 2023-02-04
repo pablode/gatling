@@ -35,21 +35,28 @@
 
 namespace gi::sg
 {
+  struct MdlGlslCodeGenResult
+  {
+    std::string shadingGlsl;
+    std::vector<TextureResource> textureResources;
+  };
+
   class MdlGlslCodeGen
   {
   public:
     bool init(MdlRuntime& runtime);
 
-    bool translate(const mi::neuraylib::ICompiled_material* material,
-                   std::string& glslSrc,
-                   std::vector<TextureResource>& textureResources);
+    bool genMaterialShadingCode(const mi::neuraylib::ICompiled_material* material,
+                                MdlGlslCodeGenResult& result);
 
   private:
-    void extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
+    bool generateGlslWithDfs(const mi::neuraylib::ICompiled_material* compiledMaterial,
+                             std::vector<mi::neuraylib::Target_function_description>& genFunctions,
+                             std::string& glslSrc,
                              std::vector<TextureResource>& textureResources);
 
-    bool appendMaterialToLinkUnit(const mi::neuraylib::ICompiled_material* compiledMaterial,
-                                  mi::neuraylib::ILink_unit* linkUnit);
+    void extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
+                             std::vector<TextureResource>& textureResources);
 
     std::string extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, int i);
 

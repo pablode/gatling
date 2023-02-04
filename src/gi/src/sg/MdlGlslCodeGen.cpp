@@ -123,9 +123,23 @@ namespace gi::sg
     }
   }
 
-  bool MdlGlslCodeGen::translate(const mi::neuraylib::ICompiled_material* material,
-                                 std::string& glslSrc,
-                                 std::vector<TextureResource>& textureResources)
+  bool MdlGlslCodeGen::genMaterialShadingCode(const mi::neuraylib::ICompiled_material* material,
+                                              MdlGlslCodeGenResult& result)
+  {
+    std::vector<mi::neuraylib::Target_function_description> genFunctions;
+    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.scattering", SCATTERING_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.emission", EMISSION_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.intensity", EMISSION_INTENSITY_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", THIN_WALLED_FUNC_NAME));
+    genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", VOLUME_ABSORPTION_FUNC_NAME));
+
+    return generateGlslWithDfs(material, genFunctions, result.shadingGlsl, result.textureResources);
+  }
+
+  bool MdlGlslCodeGen::generateGlslWithDfs(const mi::neuraylib::ICompiled_material* compiledMaterial,
+                                           std::vector<mi::neuraylib::Target_function_description>& genFunctions,
+                                           std::string& glslSrc,
+                                           std::vector<TextureResource>& textureResources)
   {
     mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), m_context.get()));
     m_logger->flushContextMessages(m_context.get());
@@ -135,7 +149,15 @@ namespace gi::sg
       return false;
     }
 
-    if (!appendMaterialToLinkUnit(material, linkUnit.get()))
+    mi::Sint32 linkResult = linkUnit->add_material(
+      compiledMaterial,
+      genFunctions.data(),
+      genFunctions.size(),
+      m_context.get()
+    );
+    m_logger->flushContextMessages(m_context.get());
+
+    if (linkResult)
     {
       return false;
     }
@@ -151,32 +173,9 @@ namespace gi::sg
     assert(targetCode->get_ro_data_segment_count() == 0);
 
     extractTextureInfos(targetCode, textureResources);
-
     glslSrc = targetCode->get_code();
 
     return true;
-  }
-
-  bool MdlGlslCodeGen::appendMaterialToLinkUnit(const mi::neuraylib::ICompiled_material* compiledMaterial,
-                                                mi::neuraylib::ILink_unit* linkUnit)
-  {
-    std::vector<mi::neuraylib::Target_function_description> genFunctions;
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.scattering", SCATTERING_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.emission", EMISSION_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.intensity", EMISSION_INTENSITY_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", THIN_WALLED_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", VOLUME_ABSORPTION_FUNC_NAME));
-
-    mi::Sint32 result = linkUnit->add_material(
-      compiledMaterial,
-      genFunctions.data(),
-      genFunctions.size(),
-      m_context.get()
-    );
-
-    m_logger->flushContextMessages(m_context.get());
-
-    return result == 0;
   }
 
   std::string MdlGlslCodeGen::extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, int i)
