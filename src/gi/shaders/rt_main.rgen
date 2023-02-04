@@ -21,11 +21,9 @@ vec3 evaluate_sample(inout uvec4 rng_state,
     [[loop]]
     while ((rayPayload.bitfield & 0x7FFFFFFFu) <= PC.MAX_BOUNCES)
     {
-        uint rayFlags = gl_RayFlagsOpaqueEXT;
-
         traceRayEXT(
             sceneAS,               // top-level acceleration structure
-            rayFlags,              // rayFlags
+            0,                     // rayFlags
             0xFF,                  // cullMask
             0,                     // sbtRecordOffset
             0,                     // sbtRecordStride

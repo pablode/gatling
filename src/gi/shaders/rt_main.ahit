@@ -6,16 +6,25 @@
 #include "rt_payload.glsl"
 #include "rt_descriptors.glsl"
 
+#pragma MDL_GENERATED_CODE
+
+#include "rt_shading_state.glsl"
+
 layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
 hitAttributeEXT vec2 baryCoord;
 
 void main()
 {
-  // FIXME: MDL-generated opacity cutout mask check
-#if 0
-  ignoreIntersectionEXT;
-#else
-  // Always invoke the closest-hit shader.
-  terminateRayEXT;
-#endif
+  State shading_state;
+  vec2 hit_bc = baryCoord;
+  uint hit_face_idx = gl_InstanceCustomIndexEXT + gl_PrimitiveID;
+  setup_mdl_shading_state(hit_face_idx, hit_bc, rayPayload.ray_dir, shading_state);
+
+  float opacity = mdl_cutout_opacity(shading_state);
+
+  vec4 r = pcg4d_next(rayPayload.rng_state);
+  if (r.x > opacity)
+  {
+	ignoreIntersectionEXT;
+  }
 }

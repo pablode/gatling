@@ -66,8 +66,10 @@ namespace gi::sg
   public:
     struct MaterialGlslGenInfo
     {
-      std::string glslSource;
-      std::vector<TextureResource> textureResources;
+      std::string shadingGlsl;
+      std::string opacityGlsl;
+      std::vector<TextureResource> shadingTextureResources;
+      std::vector<TextureResource> opacityTextureResources;
     };
 
     bool generateMaterialGlslGenInfo(const Material* material, MaterialGlslGenInfo& genInfo);
@@ -86,7 +88,7 @@ namespace gi::sg
     {
       int32_t aovId;
       std::string_view baseFileName;
-      std::string_view materialGlslSource;
+      std::string_view shadingGlsl;
       uint32_t textureIndexOffset;
       std::vector<TextureResource>* textureResources;
     };
@@ -94,6 +96,7 @@ namespace gi::sg
     {
       std::string_view baseFileName;
       std::string_view opacityEvalGlsl;
+      uint32_t textureIndexOffset;
       const std::vector<TextureResource>* textureResources;
     };
 

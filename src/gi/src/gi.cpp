@@ -64,7 +64,6 @@ struct gi_shader_cache
   std::vector<cgpu_image>         images_3d;
   std::vector<const gi_material*> materials;
   cgpu_shader                     missShader;
-  cgpu_shader                     anyHitShader;
   cgpu_pipeline                   pipeline;
   cgpu_shader                     rgenShader;
 };
@@ -342,7 +341,7 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
     cgpu_blas_instance blas_instance = {0};
     blas_instance.as = proto.blas;
     blas_instance.faceIndexOffset = proto.faceIndexOffset;
-    blas_instance.hitShaderIndex = proto.materialIndex;
+    blas_instance.hitGroupIndex = proto.materialIndex;
     memcpy(blas_instance.transform, instance->transform, sizeof(float) * 12);
 
     blas_instances.push_back(blas_instance);
@@ -483,10 +482,10 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   cgpu_pipeline pipeline = { CGPU_INVALID_HANDLE };
   cgpu_shader rgenShader = { CGPU_INVALID_HANDLE };
   cgpu_shader missShader = { CGPU_INVALID_HANDLE };
-  cgpu_shader anyHitShader = { CGPU_INVALID_HANDLE };
   std::vector<cgpu_shader> hitShaders;
   std::vector<cgpu_image> images_2d;
   std::vector<cgpu_image> images_3d;
+  std::vector<cgpu_rt_hit_group> hitGroups;
   std::vector<sg::TextureResource> textureResources;
 
   // Create per-material closest-hit shaders.
@@ -532,8 +531,13 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     for (const sg::ShaderGen::MaterialGlslGenInfo& genInfo : hitShaderGenInfos)
     {
       textureIndexOffsets.push_back(textureResources.size());
+      for (const sg::TextureResource& tr : genInfo.shadingTextureResources)
+      {
+        textureResources.push_back(tr);
+      }
 
-      for (const sg::TextureResource& tr : genInfo.textureResources)
+      textureIndexOffsets.push_back(textureResources.size());
+      for (const sg::TextureResource& tr : genInfo.opacityTextureResources)
       {
         textureResources.push_back(tr);
       }
@@ -541,65 +545,91 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
     // 3. Generate final hit shader GLSL sources.
     threadWorkFailed = false;
-    std::vector<std::vector<uint8_t>> hitShaderSpvs(hitShaderGenInfos.size());
+    std::vector<std::vector<uint8_t>> closestHitShaderSpvs(hitShaderGenInfos.size());
+    std::vector<std::vector<uint8_t>> anyHitShaderSpvs(hitShaderGenInfos.size());
 #pragma omp parallel for
     for (int i = 0; i < hitShaderGenInfos.size(); i++)
     {
       const sg::ShaderGen::MaterialGlslGenInfo& genInfo = hitShaderGenInfos[i];
 
-      sg::ShaderGen::ClosestHitShaderParams hitParams;
-      hitParams.aovId = params->aov_id;
-      hitParams.baseFileName = "rt_main.chit";
-      hitParams.materialGlslSource = genInfo.glslSource;
-      hitParams.textureResources = &textureResources;
-      hitParams.textureIndexOffset = textureIndexOffsets[i];
-
-      std::vector<uint8_t> spv;
-      if (!s_shaderGen->generateClosestHitSpirv(hitParams, spv))
+      // Closest hit
       {
-        threadWorkFailed = true;
-        continue;
+        sg::ShaderGen::ClosestHitShaderParams hitParams;
+        hitParams.aovId = params->aov_id;
+        hitParams.baseFileName = "rt_main.chit";
+        hitParams.shadingGlsl = genInfo.shadingGlsl;
+        hitParams.textureResources = &textureResources;
+        hitParams.textureIndexOffset = textureIndexOffsets[i * 2 + 0];
+
+        std::vector<uint8_t> spv;
+        if (!s_shaderGen->generateClosestHitSpirv(hitParams, spv))
+        {
+          threadWorkFailed = true;
+          continue;
+        }
+
+        closestHitShaderSpvs[i] = std::move(spv);
       }
 
-      hitShaderSpvs[i] = std::move(spv);
+      // Any hit
+      {
+        sg::ShaderGen::AnyHitShaderParams hitParams;
+        hitParams.baseFileName = "rt_main.ahit";
+        hitParams.opacityEvalGlsl = genInfo.opacityGlsl;
+        hitParams.textureIndexOffset = textureIndexOffsets[i * 2 + 1];
+        hitParams.textureResources = &textureResources;
+
+        std::vector<uint8_t> spv;
+        if (!s_shaderGen->generateAnyHitSpirv(hitParams, spv))
+        {
+          threadWorkFailed = true;
+          continue;
+        }
+
+        anyHitShaderSpvs[i] = std::move(spv);
+      }
     }
     if (threadWorkFailed)
     {
       goto cleanup;
     }
 
-    {
-      sg::ShaderGen::AnyHitShaderParams hitParams;
-      hitParams.baseFileName = "rt_main.ahit";
-      hitParams.opacityEvalGlsl = ""; // TODO
-      hitParams.textureResources = &textureResources;
-
-      std::vector<uint8_t> spv;
-      if (!s_shaderGen->generateAnyHitSpirv(hitParams, spv))
-      {
-        goto cleanup;
-      }
-
-      if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
-      {
-        goto cleanup;
-      }
-    }
-
     // 4. Compile the shaders to SPIV-V. (FIXME: multithread - beware of shared cgpu resource stores)
-    hitShaders.resize(hitShaderGenInfos.size(), { CGPU_INVALID_HANDLE });
+    hitShaders.reserve(hitShaderGenInfos.size() * 2);
 
-    for (int i = 0; i < hitShaderSpvs.size(); i++)
+    for (int i = 0; i < hitShaderGenInfos.size(); i++)
     {
-      const std::vector<uint8_t>& spv = hitShaderSpvs[i];
-
       cgpu_shader closestHitShader;
-      if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+      cgpu_shader anyHitShader; // FIXME: provide fallback/make optional
+
+      // Closest Hit
       {
-        goto cleanup;
+        const std::vector<uint8_t>& spv = closestHitShaderSpvs[i];
+
+        if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+        {
+          goto cleanup;
+        }
+
+        hitShaders.push_back(closestHitShader);
       }
 
-      hitShaders[i] = closestHitShader;
+      // Any Hit
+      {
+        const std::vector<uint8_t>& spv = anyHitShaderSpvs[i];
+
+        if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+        {
+          goto cleanup;
+        }
+
+        hitShaders.push_back(anyHitShader);
+      }
+
+      cgpu_rt_hit_group hitGroup;
+      hitGroup.closestHitShader = closestHitShader;
+      hitGroup.anyHitShader = anyHitShader;
+      hitGroups.push_back(hitGroup);
     }
   }
 
@@ -644,8 +674,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     pipeline_desc.rgen_shader = rgenShader;
     pipeline_desc.miss_shader_count = 1;
     pipeline_desc.miss_shaders = &missShader;
-    pipeline_desc.hit_shader_count = hitShaders.size();
-    pipeline_desc.hit_shaders = hitShaders.data();
+    pipeline_desc.hit_group_count = hitGroups.size();
+    pipeline_desc.hit_groups = hitGroups.data();
 
     if (!cgpu_create_rt_pipeline(s_device, &pipeline_desc, &pipeline))
     {
@@ -664,7 +694,6 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     cache->materials[i] = params->materials[i];
   }
   cache->missShader = missShader;
-  cache->anyHitShader = anyHitShader;
   cache->pipeline = pipeline;
   cache->rgenShader = rgenShader;
 
@@ -681,10 +710,6 @@ cleanup:
     if (missShader.handle != CGPU_INVALID_HANDLE)
     {
       cgpu_destroy_shader(s_device, missShader);
-    }
-    if (anyHitShader.handle != CGPU_INVALID_HANDLE)
-    {
-      cgpu_destroy_shader(s_device, anyHitShader);
     }
     for (cgpu_shader shader : hitShaders)
     {
@@ -704,7 +729,6 @@ void giDestroyShaderCache(gi_shader_cache* cache)
   s_texSys->destroyUncachedImages(cache->images_3d);
   cgpu_destroy_shader(s_device, cache->rgenShader);
   cgpu_destroy_shader(s_device, cache->missShader);
-  cgpu_destroy_shader(s_device, cache->anyHitShader);
   for (cgpu_shader shader : cache->hitShaders)
   {
     cgpu_destroy_shader(s_device, shader);
@@ -848,7 +872,7 @@ int giRender(const gi_render_params* params, float* rgba_img)
     goto cleanup;
 
   // Trace rays.
-  if (!cgpu_cmd_push_constants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT, push_size, &push_data))
+  if (!cgpu_cmd_push_constants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, push_size, &push_data))
     goto cleanup;
 
   if (!cgpu_cmd_trace_rays(command_buffer, shader_cache->pipeline, params->image_width, params->image_height))

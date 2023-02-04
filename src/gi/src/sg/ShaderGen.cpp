@@ -247,43 +247,62 @@ namespace gi::sg
   {
     const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
 
-    MdlGlslCodeGenResult glslResult;
-    if (!m_mdlGlslCodeGen->genMaterialShadingCode(compiledMaterial, glslResult))
+    MdlGlslCodeGenResult shadingResult;
+    MdlGlslCodeGenResult opacityResult;
+    if (!m_mdlGlslCodeGen->genMaterialShadingCode(compiledMaterial, shadingResult) ||
+        !m_mdlGlslCodeGen->genMaterialOpacityCode(compiledMaterial, opacityResult))
     {
       return false;
     }
 
-    genInfo.textureResources = glslResult.textureResources;
+    genInfo.shadingTextureResources = shadingResult.textureResources;
+    genInfo.opacityTextureResources = opacityResult.textureResources;
 
     // Append resource path prefix for file-backed MDL modules.
     if (!material->resourcePathPrefix.empty())
     {
-      for (sg::TextureResource& texRes : genInfo.textureResources)
+      for (sg::TextureResource& texRes : genInfo.shadingTextureResources)
+      {
+        texRes.filePath = material->resourcePathPrefix + texRes.filePath;
+      }
+      for (sg::TextureResource& texRes : genInfo.opacityTextureResources)
       {
         texRes.filePath = material->resourcePathPrefix + texRes.filePath;
       }
     }
 
-    std::string mdlGeneratedGlsl = glslResult.glslSource;
+    auto genMdlGlslScaffolding = [&](std::string inputSource, std::string& outputSource)
+    {
+      // Remove MDL struct definitions because they're too bloated. We know more about the
+      // data from which the code is generated from and can reduce the memory footprint.
+      size_t mdlCodeOffset = inputSource.find("// user defined structs");
+      assert(mdlCodeOffset != std::string::npos);
+      inputSource = inputSource.substr(mdlCodeOffset, inputSource.size() - mdlCodeOffset);
 
-    // Remove MDL struct definitions because they're too bloated. We know more about the
-    // data from which the code is generated from and can reduce the memory footprint.
-    size_t mdlCodeOffset = mdlGeneratedGlsl.find("// user defined structs");
-    assert(mdlCodeOffset != std::string::npos);
-    mdlGeneratedGlsl = mdlGeneratedGlsl.substr(mdlCodeOffset, mdlGeneratedGlsl.size() - mdlCodeOffset);
+      GlslSourceStitcher stitcher;
+      if (!stitcher.appendSourceFile(m_shaderPath / "mdl_types.glsl"))
+      {
+        return false;
+      }
+      if (!stitcher.appendSourceFile(m_shaderPath / "mdl_interface.glsl"))
+      {
+        return false;
+      }
+      stitcher.appendString(inputSource);
 
-    GlslSourceStitcher stitcher;
-    if (!stitcher.appendSourceFile(m_shaderPath / "mdl_types.glsl"))
+      outputSource = stitcher.source();
+
+      return true;
+    };
+
+    if (!genMdlGlslScaffolding(shadingResult.glslSource, genInfo.shadingGlsl))
     {
       return false;
     }
-    if (!stitcher.appendSourceFile(m_shaderPath / "mdl_interface.glsl"))
+    if (!genMdlGlslScaffolding(opacityResult.glslSource, genInfo.opacityGlsl))
     {
       return false;
     }
-    stitcher.appendString(mdlGeneratedGlsl);
-
-    genInfo.glslSource = stitcher.source();
 
     return true;
   }
@@ -304,7 +323,7 @@ namespace gi::sg
       return false;
     }
 
-    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", params.materialGlslSource);
+    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", params.shadingGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::ClosestHit, source, spv);
@@ -317,13 +336,15 @@ namespace gi::sg
 
     _sgGenerateCommonDefines(stitcher, params.textureResources);
 
-    stitcher.appendString(params.opacityEvalGlsl);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", params.textureIndexOffset);
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
     {
       return false;
     }
+
+    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", params.opacityEvalGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::AnyHit, source, spv);
