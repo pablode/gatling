@@ -32,6 +32,7 @@ namespace gi::sg
   const char* EMISSION_INTENSITY_FUNC_NAME = "mdl_edf_emission_intensity";
   const char* THIN_WALLED_FUNC_NAME = "mdl_thin_walled";
   const char* VOLUME_ABSORPTION_FUNC_NAME = "mdl_absorption_coefficient";
+  const char* CUTOUT_OPACITY_FUNC_NAME = "mdl_cutout_opacity";
   const char* MATERIAL_STATE_NAME = "State";
 
   bool MdlGlslCodeGen::init(MdlRuntime& runtime)
@@ -67,7 +68,16 @@ namespace gi::sg
     genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", THIN_WALLED_FUNC_NAME));
     genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", VOLUME_ABSORPTION_FUNC_NAME));
 
-    return generateGlslWithDfs(material, genFunctions, result.shadingGlsl, result.textureResources);
+    return generateGlslWithDfs(material, genFunctions, result.glslSource, result.textureResources);
+  }
+
+  bool MdlGlslCodeGen::genMaterialOpacityCode(const mi::neuraylib::ICompiled_material* material,
+                                              MdlGlslCodeGenResult& result)
+  {
+    std::vector<mi::neuraylib::Target_function_description> genFunctions;
+    genFunctions.push_back(mi::neuraylib::Target_function_description("geometry.cutout_opacity", CUTOUT_OPACITY_FUNC_NAME));
+
+    return generateGlslWithDfs(material, genFunctions, result.glslSource, result.textureResources);
   }
 
   bool MdlGlslCodeGen::generateGlslWithDfs(const mi::neuraylib::ICompiled_material* compiledMaterial,

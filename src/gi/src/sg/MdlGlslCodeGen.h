@@ -37,7 +37,7 @@ namespace gi::sg
 {
   struct MdlGlslCodeGenResult
   {
-    std::string shadingGlsl;
+    std::string glslSource;
     std::vector<TextureResource> textureResources;
   };
 
@@ -47,6 +47,9 @@ namespace gi::sg
     bool init(MdlRuntime& runtime);
 
     bool genMaterialShadingCode(const mi::neuraylib::ICompiled_material* material,
+                                MdlGlslCodeGenResult& result);
+
+    bool genMaterialOpacityCode(const mi::neuraylib::ICompiled_material* material,
                                 MdlGlslCodeGenResult& result);
 
   private:

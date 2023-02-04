@@ -264,7 +264,7 @@ namespace gi::sg
       }
     }
 
-    std::string mdlGeneratedGlsl = glslResult.shadingGlsl;
+    std::string mdlGeneratedGlsl = glslResult.glslSource;
 
     // Remove MDL struct definitions because they're too bloated. We know more about the
     // data from which the code is generated from and can reduce the memory footprint.
