@@ -115,9 +115,7 @@ namespace gi::sg
 
   bool _sgIsMaterialOpaque(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
   {
-    float opacity = -1.0f;
-
-    return compiledMaterial->get_cutout_opacity(&opacity) && opacity >= 1.0f;
+    return compiledMaterial->get_opacity() == mi::neuraylib::OPACITY_OPAQUE;
   }
 
   Material* _sgMakeMaterial(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial, std::string resourcePathPrefix = "")
