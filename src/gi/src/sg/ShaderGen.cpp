@@ -243,68 +243,69 @@ namespace gi::sg
     return m_shaderCompiler->compileGlslToSpv(GlslangShaderCompiler::ShaderStage::Miss, source, spv);
   }
 
-  bool ShaderGen::generateMaterialGlslGenInfo(const Material* material, MaterialGlslGenInfo& genInfo)
+  bool _genInfoFromCodeGenResult(const MdlGlslCodeGenResult& codeGenResult,
+                                 const std::string& resourcePathPrefix,
+                                 fs::path shaderPath,
+                                 ShaderGen::MaterialGlslGenInfo& genInfo)
+  {
+    // Append resource path prefix for file-backed MDL modules.
+    genInfo.textureResources = codeGenResult.textureResources;
+
+    if (!resourcePathPrefix.empty())
+    {
+      for (sg::TextureResource& texRes : genInfo.textureResources)
+      {
+        texRes.filePath = resourcePathPrefix + texRes.filePath;
+      }
+    }
+
+    // Remove MDL struct definitions because they're too bloated. We know more about the
+    // data from which the code is generated from and can reduce the memory footprint.
+    std::string glslSource = codeGenResult.glslSource;
+    size_t mdlCodeOffset = glslSource.find("// user defined structs");
+    assert(mdlCodeOffset != std::string::npos);
+    glslSource = glslSource.substr(mdlCodeOffset, glslSource.size() - mdlCodeOffset);
+
+    GlslSourceStitcher stitcher;
+    if (!stitcher.appendSourceFile(shaderPath / "mdl_types.glsl"))
+    {
+      return false;
+    }
+    if (!stitcher.appendSourceFile(shaderPath / "mdl_interface.glsl"))
+    {
+      return false;
+    }
+    stitcher.appendString(glslSource);
+
+    genInfo.glslSource = stitcher.source();
+
+    return true;
+  }
+
+  bool ShaderGen::generateMaterialShadingGenInfo(const Material* material, MaterialGlslGenInfo& genInfo)
   {
     const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
 
-    MdlGlslCodeGenResult shadingResult;
-    MdlGlslCodeGenResult opacityResult;
-    if (!m_mdlGlslCodeGen->genMaterialShadingCode(compiledMaterial, shadingResult) ||
-        !m_mdlGlslCodeGen->genMaterialOpacityCode(compiledMaterial, opacityResult))
+    MdlGlslCodeGenResult codeGenResult;
+    if (!m_mdlGlslCodeGen->genMaterialShadingCode(compiledMaterial, codeGenResult))
     {
       return false;
     }
 
-    genInfo.shadingTextureResources = shadingResult.textureResources;
-    genInfo.opacityTextureResources = opacityResult.textureResources;
+    return _genInfoFromCodeGenResult(codeGenResult, material->resourcePathPrefix, m_shaderPath, genInfo);
+  }
 
-    // Append resource path prefix for file-backed MDL modules.
-    if (!material->resourcePathPrefix.empty())
-    {
-      for (sg::TextureResource& texRes : genInfo.shadingTextureResources)
-      {
-        texRes.filePath = material->resourcePathPrefix + texRes.filePath;
-      }
-      for (sg::TextureResource& texRes : genInfo.opacityTextureResources)
-      {
-        texRes.filePath = material->resourcePathPrefix + texRes.filePath;
-      }
-    }
+  bool ShaderGen::generateMaterialOpacityGenInfo(const Material* material, MaterialGlslGenInfo& genInfo)
+  {
+    const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
 
-    auto genMdlGlslScaffolding = [&](std::string inputSource, std::string& outputSource)
-    {
-      // Remove MDL struct definitions because they're too bloated. We know more about the
-      // data from which the code is generated from and can reduce the memory footprint.
-      size_t mdlCodeOffset = inputSource.find("// user defined structs");
-      assert(mdlCodeOffset != std::string::npos);
-      inputSource = inputSource.substr(mdlCodeOffset, inputSource.size() - mdlCodeOffset);
-
-      GlslSourceStitcher stitcher;
-      if (!stitcher.appendSourceFile(m_shaderPath / "mdl_types.glsl"))
-      {
-        return false;
-      }
-      if (!stitcher.appendSourceFile(m_shaderPath / "mdl_interface.glsl"))
-      {
-        return false;
-      }
-      stitcher.appendString(inputSource);
-
-      outputSource = stitcher.source();
-
-      return true;
-    };
-
-    if (!genMdlGlslScaffolding(shadingResult.glslSource, genInfo.shadingGlsl))
-    {
-      return false;
-    }
-    if (!genMdlGlslScaffolding(opacityResult.glslSource, genInfo.opacityGlsl))
+    MdlGlslCodeGenResult codeGenResult;
+    if (!m_mdlGlslCodeGen->genMaterialOpacityCode(compiledMaterial, codeGenResult))
     {
       return false;
     }
 
-    return true;
+    return _genInfoFromCodeGenResult(codeGenResult, material->resourcePathPrefix, m_shaderPath, genInfo);
   }
 
   bool ShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)

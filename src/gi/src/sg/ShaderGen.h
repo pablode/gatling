@@ -66,13 +66,12 @@ namespace gi::sg
   public:
     struct MaterialGlslGenInfo
     {
-      std::string shadingGlsl;
-      std::string opacityGlsl;
-      std::vector<TextureResource> shadingTextureResources;
-      std::vector<TextureResource> opacityTextureResources;
+      std::string glslSource;
+      std::vector<TextureResource> textureResources;
     };
 
-    bool generateMaterialGlslGenInfo(const Material* material, MaterialGlslGenInfo& genInfo);
+    bool generateMaterialShadingGenInfo(const Material* material, MaterialGlslGenInfo& genInfo);
+    bool generateMaterialOpacityGenInfo(const Material* material, MaterialGlslGenInfo& genInfo);
 
     struct RaygenShaderParams
     {

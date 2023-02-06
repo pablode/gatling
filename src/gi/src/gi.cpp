@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <fstream>
 #include <atomic>
+#include <optional>
 #include <assert.h>
 
 #include <cgpu.h>
@@ -503,23 +504,55 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     }
 
     // 1. Generate GLSL from MDL
-    std::vector<sg::ShaderGen::MaterialGlslGenInfo> hitShaderGenInfos;
-    hitShaderGenInfos.resize(params->material_count);
+    struct HitShaderCompInfo
+    {
+      sg::ShaderGen::MaterialGlslGenInfo genInfo;
+      uint32_t texOffset = 0;
+      std::vector<uint8_t> spv;
+    };
+    struct HitGroupCompInfo
+    {
+      HitShaderCompInfo closestHitInfo;
+      std::optional<HitShaderCompInfo> anyHitInfo;
+    };
+
+    std::vector<HitGroupCompInfo> hitGroupCompInfos;
+    hitGroupCompInfos.resize(params->material_count);
 
     std::atomic_bool threadWorkFailed = false;
 #pragma omp parallel for
-    for (int i = 0; i < hitShaderGenInfos.size(); i++)
+    for (int i = 0; i < hitGroupCompInfos.size(); i++)
     {
       const gi_material* mat = params->materials[i];
 
-      sg::ShaderGen::MaterialGlslGenInfo genInfo;
-      if (!s_shaderGen->generateMaterialGlslGenInfo(mat->sg_mat, genInfo))
+      HitGroupCompInfo groupInfo;
       {
-        threadWorkFailed = true;
-        continue;
+        sg::ShaderGen::MaterialGlslGenInfo genInfo;
+        if (!s_shaderGen->generateMaterialShadingGenInfo(mat->sg_mat, genInfo))
+        {
+          threadWorkFailed = true;
+          continue;
+        }
+
+        HitShaderCompInfo hitInfo;
+        hitInfo.genInfo = genInfo;
+        groupInfo.closestHitInfo = hitInfo;
+      }
+      if (!s_shaderGen->isMaterialOpaque(mat->sg_mat))
+      {
+        sg::ShaderGen::MaterialGlslGenInfo genInfo;
+        if (!s_shaderGen->generateMaterialOpacityGenInfo(mat->sg_mat, genInfo))
+        {
+          threadWorkFailed = true;
+          continue;
+        }
+
+        HitShaderCompInfo hitInfo;
+        hitInfo.genInfo = genInfo;
+        groupInfo.anyHitInfo = hitInfo;
       }
 
-      hitShaderGenInfos[i] = genInfo;
+      hitGroupCompInfos[i] = groupInfo;
     }
     if (threadWorkFailed)
     {
@@ -527,66 +560,65 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     }
 
     // 2. Sum up texture resources & calculate per-material index offsets.
-    std::vector<uint32_t> textureIndexOffsets;
-    for (const sg::ShaderGen::MaterialGlslGenInfo& genInfo : hitShaderGenInfos)
+    for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
     {
-      textureIndexOffsets.push_back(textureResources.size());
-      for (const sg::TextureResource& tr : genInfo.shadingTextureResources)
+      HitShaderCompInfo& closestHitShaderCompInfo = groupInfo.closestHitInfo;
+      closestHitShaderCompInfo.texOffset = textureResources.size();
+
+      for (const sg::TextureResource& tr : closestHitShaderCompInfo.genInfo.textureResources)
       {
         textureResources.push_back(tr);
       }
 
-      textureIndexOffsets.push_back(textureResources.size());
-      for (const sg::TextureResource& tr : genInfo.opacityTextureResources)
+      if (groupInfo.anyHitInfo)
       {
-        textureResources.push_back(tr);
+        HitShaderCompInfo& anyHitShaderCompInfo = *groupInfo.anyHitInfo;
+        anyHitShaderCompInfo.texOffset = textureResources.size();
+
+        for (const sg::TextureResource& tr : anyHitShaderCompInfo.genInfo.textureResources)
+        {
+          textureResources.push_back(tr);
+        }
       }
     }
 
     // 3. Generate final hit shader GLSL sources.
     threadWorkFailed = false;
-    std::vector<std::vector<uint8_t>> closestHitShaderSpvs(hitShaderGenInfos.size());
-    std::vector<std::vector<uint8_t>> anyHitShaderSpvs(hitShaderGenInfos.size());
 #pragma omp parallel for
-    for (int i = 0; i < hitShaderGenInfos.size(); i++)
+    for (int i = 0; i < hitGroupCompInfos.size(); i++)
     {
-      const sg::ShaderGen::MaterialGlslGenInfo& genInfo = hitShaderGenInfos[i];
+      HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
       // Closest hit
       {
         sg::ShaderGen::ClosestHitShaderParams hitParams;
         hitParams.aovId = params->aov_id;
         hitParams.baseFileName = "rt_main.chit";
-        hitParams.shadingGlsl = genInfo.shadingGlsl;
+        hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
+        hitParams.textureIndexOffset = compInfo.closestHitInfo.texOffset;
         hitParams.textureResources = &textureResources;
-        hitParams.textureIndexOffset = textureIndexOffsets[i * 2 + 0];
 
-        std::vector<uint8_t> spv;
-        if (!s_shaderGen->generateClosestHitSpirv(hitParams, spv))
+        if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
         {
           threadWorkFailed = true;
           continue;
         }
-
-        closestHitShaderSpvs[i] = std::move(spv);
       }
 
       // Any hit
+      if (compInfo.anyHitInfo)
       {
         sg::ShaderGen::AnyHitShaderParams hitParams;
         hitParams.baseFileName = "rt_main.ahit";
-        hitParams.opacityEvalGlsl = genInfo.opacityGlsl;
-        hitParams.textureIndexOffset = textureIndexOffsets[i * 2 + 1];
+        hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
+        hitParams.textureIndexOffset = compInfo.anyHitInfo->texOffset;
         hitParams.textureResources = &textureResources;
 
-        std::vector<uint8_t> spv;
-        if (!s_shaderGen->generateAnyHitSpirv(hitParams, spv))
+        if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
         {
           threadWorkFailed = true;
           continue;
         }
-
-        anyHitShaderSpvs[i] = std::move(spv);
       }
     }
     if (threadWorkFailed)
@@ -595,16 +627,15 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     }
 
     // 4. Compile the shaders to SPIV-V. (FIXME: multithread - beware of shared cgpu resource stores)
-    hitShaders.reserve(hitShaderGenInfos.size() * 2);
-
-    for (int i = 0; i < hitShaderGenInfos.size(); i++)
+    hitShaders.reserve(hitGroupCompInfos.size());
+    for (int i = 0; i < hitGroupCompInfos.size(); i++)
     {
-      cgpu_shader closestHitShader;
-      cgpu_shader anyHitShader; // FIXME: provide fallback/make optional
+      const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
       // Closest Hit
+      cgpu_shader closestHitShader;
       {
-        const std::vector<uint8_t>& spv = closestHitShaderSpvs[i];
+        const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
 
         if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
         {
@@ -615,8 +646,10 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       }
 
       // Any Hit
+      cgpu_shader anyHitShader{ CGPU_INVALID_HANDLE };
+      if (compInfo.anyHitInfo)
       {
-        const std::vector<uint8_t>& spv = anyHitShaderSpvs[i];
+        const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
 
         if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
         {
