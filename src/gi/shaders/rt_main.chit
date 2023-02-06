@@ -48,7 +48,15 @@ void main()
     const float ior1 = (inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
     const float ior2 = (inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
-#if AOV_ID == AOV_ID_NORMAL
+#if AOV_ID == AOV_ID_DEBUG_OPACITY
+#ifdef IS_OPAQUE
+    rayPayload.radiance = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap
+    rayPayload.bitfield = 0xFFFFFFFFu;
+#else
+    // Payload fields have been set in any-hit shader.
+#endif
+    return;
+#elif AOV_ID == AOV_ID_NORMAL
     rayPayload.radiance = (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
     rayPayload.bitfield = 0xFFFFFFFFu;
     return;

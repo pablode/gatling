@@ -317,6 +317,10 @@ namespace gi::sg
 
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET", params.textureIndexOffset);
+    if (params.isOpaque)
+    {
+      stitcher.appendDefine("IS_OPAQUE", params.aovId);
+    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
@@ -337,6 +341,7 @@ namespace gi::sg
 
     _sgGenerateCommonDefines(stitcher, params.textureResources);
 
+    stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET", params.textureIndexOffset);
 
     fs::path filePath = m_shaderPath / params.baseFileName;

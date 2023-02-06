@@ -87,12 +87,14 @@ namespace gi::sg
     {
       int32_t aovId;
       std::string_view baseFileName;
+      bool isOpaque;
       std::string_view shadingGlsl;
       uint32_t textureIndexOffset;
       std::vector<TextureResource>* textureResources;
     };
     struct AnyHitShaderParams
     {
+      int32_t aovId;
       std::string_view baseFileName;
       std::string_view opacityEvalGlsl;
       uint32_t textureIndexOffset;

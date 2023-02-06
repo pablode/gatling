@@ -594,6 +594,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
         sg::ShaderGen::ClosestHitShaderParams hitParams;
         hitParams.aovId = params->aov_id;
         hitParams.baseFileName = "rt_main.chit";
+        hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sg_mat);
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
         hitParams.textureIndexOffset = compInfo.closestHitInfo.texOffset;
         hitParams.textureResources = &textureResources;
@@ -609,6 +610,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       if (compInfo.anyHitInfo)
       {
         sg::ShaderGen::AnyHitShaderParams hitParams;
+        hitParams.aovId = params->aov_id;
         hitParams.baseFileName = "rt_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
         hitParams.textureIndexOffset = compInfo.anyHitInfo->texOffset;
