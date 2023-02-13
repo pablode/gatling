@@ -16,7 +16,7 @@ It is exposed as a Hydra render delegate and comes with a standalone that accept
 
 gatling implements complex BSDFs like Autodesk's Standard Surface and the glTF shading model via MaterialX's MDL code generation backend.  The MDL SDK is then used to generate evaluation and importance sampling functions, which are emitted as GLSL code. This code is compiled to SPIR-V and executed via [Vulkan](https://www.vulkan.org/).
 
-\* hardware ray tracing is required. MacOS will be supported [in the future](https://github.com/KhronosGroup/MoltenVK/issues/427).
+\* Hardware ray tracing is required. MacOS will be supported [in the future](https://github.com/KhronosGroup/MoltenVK/issues/427).
 
 ### Build
 
@@ -77,7 +77,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 ### Outlook
 
-Work in progress: HWRT, texture support, NEE/MIS.
+Next up: improved opacity handling, backface DFs, AS compaction, NEE/MIS.
 
 ### License
 
