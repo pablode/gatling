@@ -86,9 +86,12 @@ void main()
         mdl_edf_emission_init(shading_state);
         mdl_edf_emission_evaluate(edf_evaluate_data, shading_state);
 
-        vec3 emission_intensity = mdl_edf_emission_intensity(shading_state);
+        if (edf_evaluate_data.pdf > 0.0)
+        {
+            vec3 emission_intensity = mdl_edf_emission_intensity(shading_state);
 
-        rayPayload.radiance += rayPayload.throughput * edf_evaluate_data.edf * emission_intensity;
+            rayPayload.radiance += rayPayload.throughput * edf_evaluate_data.edf * emission_intensity;
+        }
     }
 
     // reassign normal, see declaration of variable.
