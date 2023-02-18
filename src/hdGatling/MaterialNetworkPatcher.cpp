@@ -268,6 +268,28 @@ void _PatchUsdPreviewSurfaceNormalInputConnection(HdMaterialNetwork2& network, H
   upstreamNodeParams[_tokens->bias] = GfVec4f(-1.0f, -1.0f, -1.0f, 0.0f);
 }
 
+// Some Sketchfab assets have a normal parameter of the value (1, 1, 1). For example:
+// https://sketchfab.com/3d-models/light-transport-equation-orb-385f55f5d1d34bbc80f91cd86193b78f
+// https://sketchfab.com/3d-models/medieval-fantasy-book-06d5a80a04fc4c5ab552759e9a97d91as
+void _PatchUsdPreviewSurfaceNormalParamValue(VtValue& value)
+{
+  if (!value.IsHolding<GfVec3f>())
+  {
+    return;
+  }
+
+  GfVec3f rawVec = value.UncheckedGet<GfVec3f>();
+  if (rawVec[0] != 1.0f || rawVec[1] != 1.0f || rawVec[2] != 1.0f)
+  {
+    return;
+  }
+
+  TF_WARN("patching UsdPreviewSurface:normal param value from (1,1,1) to default (0,0,1) (set %s to disable)",
+    ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP);
+
+  value = GfVec3f(0, 0, 1);
+}
+
 void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
 {
   for (auto& pathNodePair : network.nodes)
@@ -276,6 +298,18 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
     if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
     {
       continue;
+    }
+
+    auto& parameters = node.parameters;
+
+    auto normalParamIt = parameters.find(_tokens->normal);
+    if (normalParamIt != parameters.end())
+    {
+      _PatchUsdPreviewSurfaceNormalParamValue(normalParamIt->second);
+
+      // We can't continue here because both parameter and input could be set at the same time. Example:
+      // https://github.com/usd-wg/assets/blob/25542a54739d36051a4d88a97d3c4e4975238d90/test_assets/AlphaBlendModeTest/AlphaBlendModeTest.usdz
+      //continue;
     }
 
     auto& inputs = node.inputConnections;
