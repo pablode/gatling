@@ -32,7 +32,7 @@ namespace gi::sg
     explicit MtlxMdlCodeGen(const char* mtlxLibPath);
 
   public:
-    bool translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier);
+    bool translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
 
   private:
     const MaterialX::FileSearchPath m_mtlxLibPath;

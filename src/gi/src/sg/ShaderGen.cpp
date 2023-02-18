@@ -118,21 +118,12 @@ namespace gi::sg
     return compiledMaterial->get_opacity() == mi::neuraylib::OPACITY_OPAQUE;
   }
 
-  Material* _sgMakeMaterial(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial, std::string resourcePathPrefix = "")
-  {
-    Material* m = new Material();
-    m->compiledMaterial = compiledMaterial;
-    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
-    m->isOpaque = _sgIsMaterialOpaque(compiledMaterial);
-    m->resourcePathPrefix = resourcePathPrefix;
-    return m;
-  }
-
   Material* ShaderGen::createMaterialFromMtlx(std::string_view docStr)
   {
     std::string mdlSrc;
     std::string subIdentifier;
-    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier))
+    bool isOpaque;
+    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier, isOpaque))
     {
       return nullptr;
     }
@@ -143,7 +134,11 @@ namespace gi::sg
       return nullptr;
     }
 
-    return _sgMakeMaterial(compiledMaterial);
+    Material* m = new Material();
+    m->compiledMaterial = compiledMaterial;
+    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
+    m->isOpaque = isOpaque;
+    return m;
   }
 
   Material* ShaderGen::createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
@@ -156,7 +151,12 @@ namespace gi::sg
 
     std::string resourcePathPrefix = fs::path(filePath).parent_path().string();
 
-    return _sgMakeMaterial(compiledMaterial, resourcePathPrefix);
+    Material* m = new Material();
+    m->compiledMaterial = compiledMaterial;
+    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
+    m->isOpaque = _sgIsMaterialOpaque(compiledMaterial);
+    m->resourcePathPrefix = resourcePathPrefix;
+    return m;
   }
 
   void ShaderGen::destroyMaterial(Material* mat)

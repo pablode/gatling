@@ -101,7 +101,7 @@ namespace gi::sg
     return nullptr;
   }
 
-  bool MtlxMdlCodeGen::translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier)
+  bool MtlxMdlCodeGen::translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -128,6 +128,8 @@ namespace gi::sg
       }
 
       subIdentifier = element->getName();
+      // FIXME: this function has too many false positives; use custom logic
+      isOpaque = !mx::isTransparentSurface(element);
       shader = m_shaderGen->generate(subIdentifier, element, context);
     }
     catch (const std::exception& ex)
