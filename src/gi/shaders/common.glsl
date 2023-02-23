@@ -109,7 +109,7 @@ vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
 #else
 vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
 {
-    const float EPS = 0.00001;
+    const float EPS = 0.0001;
     return p + geom_normal * EPS;
 }
 #endif
