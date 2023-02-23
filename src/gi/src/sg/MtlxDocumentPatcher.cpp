@@ -259,6 +259,37 @@ void _PatchUsdUVTextureSourceColorSpaces(mx::DocumentPtr document)
   }
 }
 
+// Currently, the HdMtlxCreateMtlxDocumentFromHdNetwork helper function commonly used by Hydra render
+// delegates that support MaterialX does not copy color spaces: https://github.com/PixarAnimationStudios/USD/issues/1523
+// We work around this issue by setting an <image> node's colorspace attribute to sRGB if the node type
+// is color3. If it isn't (but rather float/vec2/vec3/vec4), we mark it as linear.
+//
+// FIXME: remove this patching step once the issue is resolved
+void _PatchImageSrgbColorSpaces(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node || node->hasColorSpace()) // don't overwrite color space, f.i. from above sourceColorSpace patching
+    {
+      continue;
+    }
+
+    const mx::string& category = node->getCategory();
+
+    if (category != "image" && category != "tiledimage")
+    {
+      continue;
+    }
+
+    const mx::string& valueType = node->getType();
+
+    node->setColorSpace(valueType == TYPE_COLOR3 ? "srgb_texture" : "lin_rec709");
+  }
+}
+
 // MDL spec 1.7.2 17th Jan 2022, section 5.6
 std::unordered_set<std::string_view> s_reservedMDLIdentifiers = {
   "annotation", "auto", "bool", "bool2", "bool3", "bool4", "break", "bsdf",
@@ -377,6 +408,8 @@ namespace gi::sg
     _PatchUsdUVTextureSourceColorSpaces(document);
 
     _PatchGeomprops(document);
+
+    _PatchImageSrgbColorSpaces(document);
 
     _PatchNodeNames(document);
   }
