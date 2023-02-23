@@ -78,7 +78,7 @@ void orthonormal_basis(in vec3 n, out vec3 b1, out vec3 b2)
     b2 = vec3(b, nsign + n.y * n.y * a, -n.y);
 }
 
-#ifdef DYNAMIC_OFFSETTING
+#if 1
 // From: "A Fast and Robust Method for Avoiding Self-Intersection"
 // Wächter and Binder, Ch. 6 in Ray Tracing Gems I.
 // Licensed under CC BY-NC-ND 4.0: https://creativecommons.org/licenses/by-nc-nd/4.0/
