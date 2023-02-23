@@ -109,6 +109,7 @@ namespace gi::sg
 
     mx::GenOptions& contextOptions = context.getOptions();
     contextOptions.targetDistanceUnit = "meter";
+    contextOptions.targetColorSpaceOverride = "lin_rec709";
 
     mx::ShaderPtr shader = nullptr;
     try
