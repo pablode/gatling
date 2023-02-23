@@ -278,38 +278,35 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       }
     }
 
-    const GfMatrix4d& prototypeTransform = mesh->GetPrototypeTransform();
+    std::vector<gi_face> faces;
+    std::vector<gi_vertex> vertices;
+    _BakeMeshGeometry(mesh, GfMatrix4d(1.0), materialIndex, faces, vertices);
 
+    gi_mesh_desc desc = {0};
+    desc.face_count = faces.size();
+    desc.faces = faces.data();
+    desc.material = materials[materialIndex];
+    desc.vertex_count = vertices.size();
+    desc.vertices = vertices.data();
+
+    gi_mesh* giMesh = giCreateMesh(&desc);
+    assert(giMesh);
+    meshes.push_back(giMesh);
+
+    const GfMatrix4d& prototypeTransform = mesh->GetPrototypeTransform();
     for (size_t i = 0; i < transforms.size(); i++)
     {
-      std::vector<gi_face> faces;
-      std::vector<gi_vertex> vertices;
+      GfMatrix4d T = prototypeTransform * transforms[i];
 
-      GfMatrix4d transform = prototypeTransform * transforms[i] * rootTransform;
-
-      _BakeMeshGeometry(mesh, transform, materialIndex, faces, vertices);
-
-      // FIXME: multiple transformed instances per single mesh
-      gi_mesh_desc desc = {0};
-      desc.face_count = faces.size();
-      desc.faces = faces.data();
-      desc.material = materials[materialIndex];
-      desc.vertex_count = vertices.size();
-      desc.vertices = vertices.data();
-      gi_mesh* giMesh = giCreateMesh(&desc);
-
-      assert(giMesh);
-      meshes.push_back(giMesh);
-
-      float identityTransform[3][4] = {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f
+      float instanceTransform[3][4] = {
+        (float) T[0][0], (float) T[1][0], (float) T[2][0], (float) T[3][0],
+        (float) T[0][1], (float) T[1][1], (float) T[2][1], (float) T[3][1],
+        (float) T[0][2], (float) T[1][2], (float) T[2][2], (float) T[3][2]
       };
 
       gi_mesh_instance instance;
       instance.mesh = giMesh;
-      memcpy(instance.transform, identityTransform, 12 * sizeof(float));
+      memcpy(instance.transform, instanceTransform, sizeof(instanceTransform));
       instances.push_back(instance);
     }
   }
@@ -319,9 +316,6 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_c
 {
   // We transform the scene into camera space at the beginning, so for
   // subsequent camera transforms, we need to 'substract' the initial transform.
-  //
-  // FIXME: don't apply rotation to improve numerical precision
-  // https://pharr.org/matt/blog/2018/03/02/rendering-in-camera-space
   GfMatrix4d absInvViewMatrix = camera.GetTransform();
   GfMatrix4d relViewMatrix = absInvViewMatrix * m_rootMatrix;
 
@@ -478,14 +472,16 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     printf("rebuilding geom cache for camera %s\n", cameraId.GetText());
 
     // Transform scene into camera space to increase floating point precision.
-    GfMatrix4d viewMatrix = camera->GetTransform().GetInverse();
-    m_rootMatrix = viewMatrix;
+    // FIXME: reintroduce and don't apply rotation
+    // https://pharr.org/matt/blog/2018/03/02/rendering-in-camera-space
+    //GfMatrix4d viewMatrix = camera->GetTransform().GetInverse();
+    m_rootMatrix = GfMatrix4d(1.0);// viewMatrix;
 
     // FIXME: destroy these resources
     std::vector<const gi_material*> materials;
     std::vector<const gi_mesh*> meshes;
     std::vector<gi_mesh_instance> instances;
-    _BakeMeshes(renderIndex, viewMatrix, materials, meshes, instances);
+    _BakeMeshes(renderIndex, m_rootMatrix, materials, meshes, instances);
 
     gi_shader_cache_params shaderParams;
     shaderParams.aov_id = aovId;
