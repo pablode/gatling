@@ -163,7 +163,7 @@ void _PatchColor3Vector3Mismatches(mx::DocumentPtr document)
 // MDL state, which we can fill by anticipating certain geomprops/primvars
 // on the Hydra side (e.g. the 'st' primvar). This way, we can still get
 // proper texture coordinates in MOST cases, but not all.
-void _PatchGeompropNodes(mx::DocumentPtr document)
+void _PatchGeomprops(mx::DocumentPtr document)
 {
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
   {
@@ -175,22 +175,15 @@ void _PatchGeompropNodes(mx::DocumentPtr document)
       continue;
     }
 
-    mx::NodeDefPtr nodeDef = node->getNodeDef(mx::EMPTY_STRING, true);
-    if (!nodeDef)
-    {
-      continue;
-    }
+    const mx::string& category = node->getCategory();
 
-    std::string nodeDefName = nodeDef->getName();
-    if (strstr(nodeDefName.c_str(), "ND_geompropvalue") ||
-        strstr(nodeDefName.c_str(), "ND_UsdPrimvarReader"))
+    if (category == "geompropvalue" || category == "UsdPrimvarReader")
     {
       document->removeNode(node->getName());
       continue;
     }
 
-    if (strstr(nodeDefName.c_str(), "ND_image") == nullptr &&
-        strstr(nodeDefName.c_str(), "ND_tiledimage") == nullptr)
+    if (category != "image" && category != "tiledimage")
     {
       continue;
     }
@@ -211,7 +204,7 @@ void _PatchGeompropNodes(mx::DocumentPtr document)
 // are supposed to be handled by node _attributes_ instead of inputs. Attributes can not be set
 // dynamically. To work around the incompatibility of both approaches, this function replaces
 // said input with the corresponding 'colorspace' attribute.
-void _PatchUsdUVTextureSourceColorSpace(mx::DocumentPtr document)
+void _PatchUsdUVTextureSourceColorSpaces(mx::DocumentPtr document)
 {
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
   {
@@ -224,27 +217,20 @@ void _PatchUsdUVTextureSourceColorSpace(mx::DocumentPtr document)
     }
 
     mx::ElementPtr upstreamElem = textureInput->getParent();
-    if (!upstreamElem)
+    mx::NodePtr downstreamNode = textureInput->getConnectedNode();
+    if (!upstreamElem || !downstreamNode || downstreamNode->hasColorSpace())
     {
       continue;
     }
 
     mx::NodePtr upstreamNode = upstreamElem->asA<mx::Node>();
-    mx::NodePtr downstreamNode = textureInput->getConnectedNode();
-    if (!upstreamNode || !downstreamNode || downstreamNode->hasColorSpace())
+    if (!upstreamNode)
     {
       continue;
     }
 
-    mx::NodeDefPtr upstreamNodeDef = upstreamNode->getNodeDef(mx::EMPTY_STRING, true);
-    mx::NodeDefPtr downstreamNodeDef = downstreamNode->getNodeDef(mx::EMPTY_STRING, true);
-    if (!upstreamNodeDef || !downstreamNodeDef)
-    {
-      continue;
-    }
-
-    std::string downstreamNodeDefName = downstreamNodeDef->getName();
-    if (!strstr(downstreamNodeDefName.c_str(), "ND_UsdUVTexture")) // strstr because of versioning suffix
+    const mx::string& downstreamCategory = downstreamNode->getCategory();
+    if (downstreamCategory != "UsdUVTexture")
     {
       continue;
     }
@@ -254,11 +240,14 @@ void _PatchUsdUVTextureSourceColorSpace(mx::DocumentPtr document)
 
     std::string colorSpaceString = colorSpaceInput ? colorSpaceInput->getValueString() : "auto";
 
-    bool isSrgbInput = (upstreamNodeDef->getName() == "ND_UsdPreviewSurface_surfaceshader" &&
-      (textureInputName == "diffuseColor" || textureInputName == "emissiveColor" || textureInputName == "specularColor"));
+    const mx::string& upstreamCategory = upstreamNode->getCategory();
+    bool isUpstreamUsdPreviewSurface = (upstreamCategory == "UsdPreviewSurface");
+
+    bool isUsdPreviewSurfaceSrgbInput = isUpstreamUsdPreviewSurface &&
+      (textureInputName == "diffuseColor" || textureInputName == "emissiveColor" || textureInputName == "specularColor");
 
     // Not spec-conform but should be more correct in most cases.
-    bool isSrgbColorSpace = (colorSpaceString == "sRGB") || (colorSpaceString == "auto" && isSrgbInput);
+    bool isSrgbColorSpace = (colorSpaceString == "sRGB") || (colorSpaceString == "auto" && isUsdPreviewSurfaceSrgbInput);
 
     textureInput->setColorSpace(isSrgbColorSpace ? "srgb_texture" : "lin_rec709");
 
@@ -385,9 +374,9 @@ namespace gi::sg
 
     _PatchColor3Vector3Mismatches(document);
 
-    _PatchUsdUVTextureSourceColorSpace(document);
+    _PatchUsdUVTextureSourceColorSpaces(document);
 
-    _PatchGeompropNodes(document);
+    _PatchGeomprops(document);
 
     _PatchNodeNames(document);
   }
