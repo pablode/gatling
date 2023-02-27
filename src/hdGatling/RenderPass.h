@@ -71,6 +71,7 @@ private:
   bool m_isConverged;
   uint32_t m_lastSceneStateVersion;
   uint32_t m_lastRenderSettingsVersion;
+  uint32_t m_lastVisChangeCount;
   GfVec4f m_lastBackgroundColor;
   gi_aov_id m_lastAovId;
   gi_geom_cache* m_geomCache;

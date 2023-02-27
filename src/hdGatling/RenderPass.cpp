@@ -63,6 +63,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_isConverged(false)
   , m_lastSceneStateVersion(UINT32_MAX)
   , m_lastRenderSettingsVersion(UINT32_MAX)
+  , m_lastVisChangeCount(UINT32_MAX)
   , m_lastBackgroundColor(GfVec4f(0.0f, 0.0f, 0.0f, 0.0f))
   , m_geomCache(nullptr)
   , m_shaderCache(nullptr)
@@ -201,6 +202,11 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
     const HdGatlingMesh* mesh = dynamic_cast<const HdGatlingMesh*>(rprim);
     if (!mesh)
+    {
+      continue;
+    }
+
+    if (!mesh->IsVisible())
     {
       continue;
     }
@@ -432,21 +438,24 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   }
 
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
+  uint32_t visibilityChangeCount = changeTracker.GetVisibilityChangeCount();
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
   gi_aov_id aovId = _GetAovId(aovBinding->aovName);
 
   bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
   bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
+  bool visibilityChanged = (m_lastVisChangeCount != visibilityChangeCount);
   bool backgroundColorChanged = (backgroundColor != m_lastBackgroundColor);
   bool aovChanged = (aovId != m_lastAovId);
 
-  if (sceneChanged || renderSettingsChanged || backgroundColorChanged || aovChanged)
+  if (sceneChanged || renderSettingsChanged || visibilityChanged || backgroundColorChanged || aovChanged)
   {
     giInvalidateFramebuffer();
   }
 
   m_lastSceneStateVersion = sceneStateVersion;
   m_lastRenderSettingsVersion = renderSettingsStateVersion;
+  m_lastVisChangeCount = visibilityChangeCount;
   m_lastBackgroundColor = backgroundColor;
   m_lastAovId = aovId;
 
@@ -455,7 +464,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   // HACK: activating the NEE debug render setting requires shader recompilation.
   rebuildShaderCache |= renderSettingsChanged;
 #endif
-  bool rebuildGeomCache = !m_geomCache;
+  bool rebuildGeomCache = !m_geomCache || visibilityChanged;
 
   if (rebuildShaderCache || rebuildGeomCache)
   {

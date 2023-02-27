@@ -55,12 +55,13 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   TF_UNUSED(renderParam);
   TF_UNUSED(reprToken);
 
+  HdDirtyBits dirtyBitsCopy = *dirtyBits;
+
   HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
 
   if ((*dirtyBits & HdChangeTracker::DirtyInstancer) |
       (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
   {
-    HdDirtyBits dirtyBitsCopy = *dirtyBits;
 
     _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
 
@@ -76,6 +77,11 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
 
     SetMaterialId(materialId);
+  }
+
+  if (*dirtyBits & HdChangeTracker::DirtyVisibility)
+  {
+    _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform)
@@ -368,7 +374,8 @@ HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const
          HdChangeTracker::DirtyInstancer |
          HdChangeTracker::DirtyInstanceIndex |
          HdChangeTracker::DirtyTransform |
-         HdChangeTracker::DirtyMaterialId;
+         HdChangeTracker::DirtyMaterialId |
+         HdChangeTracker::DirtyVisibility;
 }
 
 HdDirtyBits HdGatlingMesh::_PropagateDirtyBits(HdDirtyBits bits) const
