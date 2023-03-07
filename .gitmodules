@@ -37,3 +37,6 @@
 [submodule "extern/Vulkan-Headers"]
 	path = extern/Vulkan-Headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+[submodule "extern/stb"]
+	path = extern/stb
+	url = https://github.com/nothings/stb

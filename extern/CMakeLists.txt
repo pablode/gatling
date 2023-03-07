@@ -108,6 +108,13 @@ set(OPENEXR_INSTALL_EXAMPLES OFF)
 add_subdirectory(OpenEXR)
 
 #
+# stb
+#
+add_library(stb INTERFACE)
+set_target_properties(stb PROPERTIES LINKER_LANGUAGE C)
+target_include_directories(stb INTERFACE stb)
+
+#
 # SPIRV-Reflect
 #
 set(SPIRV_REFLECT_EXECUTABLE OFF)
