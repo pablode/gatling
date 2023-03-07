@@ -174,27 +174,21 @@ namespace gi::sg
     return mat->isOpaque;
   }
 
-  void _sgGenerateCommonDefines(GlslSourceStitcher& stitcher, const std::vector<TextureResource>* textureResources)
+  void _sgGenerateCommonDefines(GlslSourceStitcher& stitcher, uint32_t texCount2d, uint32_t texCount3d)
   {
 #if defined(NDEBUG) || defined(__APPLE__)
     stitcher.appendDefine("NDEBUG");
 #endif
 
-    int textureCount2d = 0;
-    int textureCount3d = 0;
-    for (const auto& texResource : *textureResources)
-    {
-      (texResource.is3dImage ? textureCount3d : textureCount2d)++;
-    }
-    if (textureCount2d > 0)
+    if (texCount2d > 0)
     {
       stitcher.appendDefine("HAS_TEXTURES_2D");
-      stitcher.appendDefine("TEXTURE_COUNT_2D", textureCount2d);
+      stitcher.appendDefine("TEXTURE_COUNT_2D", texCount2d);
     }
-    if (textureCount3d > 0)
+    if (texCount3d > 0)
     {
       stitcher.appendDefine("HAS_TEXTURES_3D");
-      stitcher.appendDefine("TEXTURE_COUNT_3D", textureCount3d);
+      stitcher.appendDefine("TEXTURE_COUNT_3D", texCount3d);
     }
   }
 
@@ -203,7 +197,7 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.textureResources);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
     // FIXME: 'enable' instead?
     if (params.shaderClockExts)
@@ -229,7 +223,7 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.textureResources);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))
@@ -311,10 +305,11 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.textureResources);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", params.textureIndexOffset);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", params.textureIndexOffset2d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", params.textureIndexOffset3d);
     if (params.isOpaque)
     {
       stitcher.appendDefine("IS_OPAQUE", params.aovId);
@@ -337,10 +332,11 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.textureResources);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", params.textureIndexOffset);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", params.textureIndexOffset2d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", params.textureIndexOffset3d);
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))

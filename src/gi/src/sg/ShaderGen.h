@@ -77,11 +77,13 @@ namespace gi::sg
     {
       int32_t aovId;
       bool shaderClockExts;
-      const std::vector<TextureResource>* textureResources;
+      uint32_t texCount2d;
+      uint32_t texCount3d;
     };
     struct MissShaderParams
     {
-      const std::vector<TextureResource>* textureResources;
+      uint32_t texCount2d;
+      uint32_t texCount3d;
     };
     struct ClosestHitShaderParams
     {
@@ -89,16 +91,20 @@ namespace gi::sg
       std::string_view baseFileName;
       bool isOpaque;
       std::string_view shadingGlsl;
-      uint32_t textureIndexOffset;
-      std::vector<TextureResource>* textureResources;
+      uint32_t textureIndexOffset2d;
+      uint32_t textureIndexOffset3d;
+      uint32_t texCount2d;
+      uint32_t texCount3d;
     };
     struct AnyHitShaderParams
     {
       int32_t aovId;
       std::string_view baseFileName;
       std::string_view opacityEvalGlsl;
-      uint32_t textureIndexOffset;
-      const std::vector<TextureResource>* textureResources;
+      uint32_t textureIndexOffset2d;
+      uint32_t textureIndexOffset3d;
+      uint32_t texCount2d;
+      uint32_t texCount3d;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);

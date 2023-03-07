@@ -488,6 +488,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   std::vector<cgpu_image> images_3d;
   std::vector<cgpu_rt_hit_group> hitGroups;
   std::vector<sg::TextureResource> textureResources;
+  uint32_t texCount2d = 0;
+  uint32_t texCount3d = 0;
 
   // Create per-material closest-hit shaders.
   //
@@ -507,7 +509,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     struct HitShaderCompInfo
     {
       sg::ShaderGen::MaterialGlslGenInfo genInfo;
-      uint32_t texOffset = 0;
+      uint32_t texOffset2d = 0;
+      uint32_t texOffset3d = 0;
       std::vector<uint8_t> spv;
     };
     struct HitGroupCompInfo
@@ -563,20 +566,24 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
     {
       HitShaderCompInfo& closestHitShaderCompInfo = groupInfo.closestHitInfo;
-      closestHitShaderCompInfo.texOffset = textureResources.size();
+      closestHitShaderCompInfo.texOffset2d = texCount2d;
+      closestHitShaderCompInfo.texOffset3d = texCount3d;
 
       for (const sg::TextureResource& tr : closestHitShaderCompInfo.genInfo.textureResources)
       {
+        (tr.is3dImage ? texCount3d : texCount2d)++;
         textureResources.push_back(tr);
       }
 
       if (groupInfo.anyHitInfo)
       {
         HitShaderCompInfo& anyHitShaderCompInfo = *groupInfo.anyHitInfo;
-        anyHitShaderCompInfo.texOffset = textureResources.size();
+        anyHitShaderCompInfo.texOffset2d = texCount2d;
+        anyHitShaderCompInfo.texOffset3d = texCount3d;
 
         for (const sg::TextureResource& tr : anyHitShaderCompInfo.genInfo.textureResources)
         {
+          (tr.is3dImage ? texCount3d : texCount2d)++;
           textureResources.push_back(tr);
         }
       }
@@ -596,8 +603,10 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
         hitParams.baseFileName = "rt_main.chit";
         hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sg_mat);
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
-        hitParams.textureIndexOffset = compInfo.closestHitInfo.texOffset;
-        hitParams.textureResources = &textureResources;
+        hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
+        hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;
+        hitParams.texCount2d = texCount2d;
+        hitParams.texCount3d = texCount3d;
 
         if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
         {
@@ -613,8 +622,10 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
         hitParams.aovId = params->aov_id;
         hitParams.baseFileName = "rt_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
-        hitParams.textureIndexOffset = compInfo.anyHitInfo->texOffset;
-        hitParams.textureResources = &textureResources;
+        hitParams.textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d;
+        hitParams.textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d;
+        hitParams.texCount2d = texCount2d;
+        hitParams.texCount3d = texCount3d;
 
         if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
         {
@@ -674,11 +685,13 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     sg::ShaderGen::RaygenShaderParams rgenParams;
     rgenParams.aovId = params->aov_id;
     rgenParams.shaderClockExts = clockCyclesAov;
-    rgenParams.textureResources = &textureResources;
+    rgenParams.texCount2d = texCount2d;
+    rgenParams.texCount3d = texCount3d;
 
     std::vector<uint8_t> missSpirv;
     sg::ShaderGen::MissShaderParams missParams;
-    missParams.textureResources = &textureResources;
+    missParams.texCount2d = texCount2d;
+    missParams.texCount3d = texCount3d;
 
     if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, rgenSpirv) ||
         !s_shaderGen->generateMissSpirv("rt_main.miss", missParams, missSpirv))
@@ -702,6 +715,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   {
     goto cleanup;
   }
+  assert(images_2d.size() == texCount2d);
+  assert(images_3d.size() == texCount3d);
 
   // Create RT pipeline.
   {
