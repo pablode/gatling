@@ -1,7 +1,7 @@
 /*
  * This file is part of gatling.
  *
- * Copyright (C) 2019-2022 Pablo Delgado Kr√§mer
+ * Copyright (C) 2023 Pablo Delgado Kr‰mer
  *
  * gatling is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,38 +17,13 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "imgio.h"
+#ifndef IMGIO_HDR_H
+#define IMGIO_HDR_H
 
-#include "png.h"
-#include "jpeg.h"
-#include "exr.h"
-#include "hdr.h"
+#include <stddef.h>
 
-#include <stdlib.h>
+struct imgio_img;
 
-int imgio_load_img(const void* data, size_t size, imgio_img* img)
-{
-  int r = imgio_png_decode(size, data, img);
+int imgio_hdr_decode(size_t size, const void* data, imgio_img* img);
 
-  if (r == IMGIO_ERR_UNSUPPORTED_ENCODING)
-  {
-    r = imgio_jpeg_decode(size, data, img);
-  }
-
-  if (r == IMGIO_ERR_UNSUPPORTED_ENCODING)
-  {
-    r = imgio_exr_decode(size, data, img);
-  }
-
-  if (r == IMGIO_ERR_UNSUPPORTED_ENCODING)
-  {
-    r = imgio_hdr_decode(size, data, img);
-  }
-
-  return r;
-}
-
-void imgio_free_img(imgio_img* img)
-{
-  free(img->data);
-}
+#endif

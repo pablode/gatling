@@ -6,6 +6,8 @@ add_library(
   src/imgio.cpp
   src/exr.h
   src/exr.cpp
+  src/hdr.h
+  src/hdr.cpp
   src/jpeg.h
   src/jpeg.cpp
   src/png.h
@@ -33,4 +35,5 @@ target_link_libraries(
     spng
     turbojpeg-static
     OpenEXR::OpenEXR
+    stb
 )
