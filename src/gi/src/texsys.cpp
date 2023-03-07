@@ -179,6 +179,8 @@ namespace gi
       imageVector.push_back(image);
     }
 
+    m_stager.flush();
+
     return true;
   }
 
