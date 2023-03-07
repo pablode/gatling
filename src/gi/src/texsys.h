@@ -47,9 +47,14 @@ namespace gi
     void destroy();
 
   public:
-    bool loadTextures(const std::vector<sg::TextureResource>& textureResources,
-                      std::vector<CgpuImage>& images2d,
-                      std::vector<CgpuImage>& images3d);
+    bool loadTextureFromFilePath(const char* filePath,
+                                 CgpuImage& image,
+                                 bool is3dImage = false,
+                                 bool flush = true);
+
+    bool loadTextureResources(const std::vector<sg::TextureResource>& textureResources,
+                              std::vector<CgpuImage>& images2d,
+                              std::vector<CgpuImage>& images3d);
 
     void destroyUncachedImages(const std::vector<CgpuImage>& images);
 

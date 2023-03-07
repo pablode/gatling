@@ -825,7 +825,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   }
 
   // Upload textures.
-  if (textureResources.size() > 0 && !s_texSys->loadTextures(textureResources, images_2d, images_3d))
+  if (textureResources.size() > 0 && !s_texSys->loadTextureResources(textureResources, images_2d, images_3d))
   {
     goto cleanup;
   }

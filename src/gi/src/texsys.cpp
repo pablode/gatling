@@ -17,7 +17,7 @@
 
 #include "texsys.h"
 
-#include "stager.h"
+#include "Stager.h"
 #include "mmap.h"
 #include "gi.h"
 
@@ -73,9 +73,48 @@ namespace gi
     m_imageCache.clear();
   }
 
-  bool TexSys::loadTextures(const std::vector<sg::TextureResource>& textureResources,
-                            std::vector<CgpuImage>& images2d,
-                            std::vector<CgpuImage>& images3d)
+  bool TexSys::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flush)
+  {
+    imgio_img image_data;
+    if (!detail::readImage(filePath, m_assetReader, &image_data))
+    {
+      return false;
+    }
+
+    printf("image read from path %s of size %.2fMiB\n",
+      filePath, image_data.size * BYTES_TO_MIB);
+
+    CgpuImageDesc image_desc;
+    image_desc.is3d = is3dImage;
+    image_desc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+    image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
+    image_desc.width = image_data.width;
+    image_desc.height = image_data.height;
+    image_desc.depth = 1;
+
+    bool creationSuccessful = cgpuCreateImage(m_device, &image_desc, &image) &&
+                              m_stager.stageToImage(image_data.data, image_data.size, image);
+
+    imgio_free_img(&image_data);
+
+    if (!creationSuccessful)
+    {
+      return false;
+    }
+
+    m_imageCache[filePath] = image;
+
+    if (flush)
+    {
+      m_stager.flush();
+    }
+
+    return true;
+  }
+
+  bool TexSys::loadTextureResources(const std::vector<sg::TextureResource>& textureResources,
+                                    std::vector<CgpuImage>& images2d,
+                                    std::vector<CgpuImage>& images3d)
   {
     size_t texCount = textureResources.size();
 
@@ -142,26 +181,8 @@ namespace gi
         continue;
       }
 
-      imgio_img image_data;
-      if (detail::readImage(filePath, m_assetReader, &image_data))
+      if (loadTextureFromFilePath(filePath, image, textureResource.is3dImage, false))
       {
-        printf("image %d read from path %s of size %.2fMiB\n",
-          i, filePath, image_data.size * BYTES_TO_MIB);
-
-        image_desc.width = image_data.width;
-        image_desc.height = image_data.height;
-        image_desc.depth = 1;
-
-        if (!cgpuCreateImage(m_device, &image_desc, &image))
-          return false;
-
-        result = m_stager.stageToImage(image_data.data, image_data.size, image);
-        if (!result) return false;
-
-        imgio_free_img(&image_data);
-
-        m_imageCache[filePath] = image;
-
         imageVector.push_back(image);
         continue;
       }
