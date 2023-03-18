@@ -487,7 +487,7 @@ typedef struct cgpu_blas_instance {
 } cgpu_blas_instance;
 
 typedef struct cgpu_rt_hit_group {
-  cgpu_shader closestHitShader; // required
+  cgpu_shader closestHitShader; // optional
   cgpu_shader anyHitShader;     // optional
 } cgpu_rt_hit_group;
 

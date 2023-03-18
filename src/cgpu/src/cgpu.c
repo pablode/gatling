@@ -1772,6 +1772,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     pipeline_shader_stage_create_info.pNext = NULL;
     pipeline_shader_stage_create_info.flags = 0;
+    pipeline_shader_stage_create_info.stage = 0;
     pipeline_shader_stage_create_info.pName = "main";
     pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
     stages[i] = pipeline_shader_stage_create_info;
@@ -1802,7 +1803,8 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   {
     const cgpu_rt_hit_group* hit_group = &desc->hit_groups[i];
 
-    // Closest hit (required)
+    // Closest hit (optional)
+    if (hit_group->closestHitShader.handle != CGPU_INVALID_HANDLE)
     {
       cgpu_ishader* iclosestHitShader;
       if (!cgpu_resolve_shader(hit_group->closestHitShader, &iclosestHitShader)) {
@@ -1813,6 +1815,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
       uint32_t stageIndex = (hitShaderStageIndex++);
       stages[stageIndex].module = iclosestHitShader->module;
       stages[stageIndex].stage = iclosestHitShader->stage_flags;
+      pipelineStageFlags |= iclosestHitShader->stage_flags;
     }
 
     // Any hit (optional)
@@ -1830,10 +1833,6 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
       pipelineStageFlags |= ianyHitShader->stage_flags;
     }
   }
-  if (desc->hit_group_count > 0)
-  {
-    pipelineStageFlags |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-  }
 
   VkRayTracingShaderGroupCreateInfoKHR groups[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
   for (uint32_t i = 0; i < CGPU_MAX_RT_PIPELINE_STAGE_COUNT; i++)
@@ -1850,6 +1849,9 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     groups[i] = rt_shader_group_create_info;
   }
 
+  bool anyNullClosestHitShader = false;
+  bool anyNullAnyHitShader = false;
+
   hitShaderStageIndex = hitStageAndGroupOffset;
   for (uint32_t i = 0; i < desc->hit_group_count; i++)
   {
@@ -1858,11 +1860,23 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     uint32_t groupIndex = hitStageAndGroupOffset + i;
     groups[groupIndex].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
     groups[groupIndex].generalShader = VK_SHADER_UNUSED_KHR;
-    groups[groupIndex].closestHitShader = (hitShaderStageIndex++);
+
+    if (hit_group->closestHitShader.handle != CGPU_INVALID_HANDLE)
+    {
+      groups[groupIndex].closestHitShader = (hitShaderStageIndex++);
+    }
+    else
+    {
+      anyNullClosestHitShader |= true;
+    }
 
     if (hit_group->anyHitShader.handle != CGPU_INVALID_HANDLE)
     {
       groups[groupIndex].anyHitShader = (hitShaderStageIndex++);
+    }
+    else
+    {
+      anyNullAnyHitShader |= true;
     }
   }
 
@@ -1880,10 +1894,20 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   uint32_t stageCount = hitShaderStageIndex;
   uint32_t groupCount = hitStageAndGroupOffset + desc->hit_group_count;
 
+  VkPipelineCreateFlags flags = 0;
+  if (!anyNullClosestHitShader)
+  {
+    flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
+  }
+  if (!anyNullAnyHitShader)
+  {
+    flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
+  }
+
   VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {0};
   rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
   rt_pipeline_create_info.pNext = NULL;
-  rt_pipeline_create_info.flags = VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
+  rt_pipeline_create_info.flags = flags;
   rt_pipeline_create_info.stageCount = stageCount;
   rt_pipeline_create_info.pStages = stages;
   rt_pipeline_create_info.groupCount = groupCount;
