@@ -64,7 +64,7 @@ struct gi_shader_cache
   std::vector<cgpu_image>         images_2d;
   std::vector<cgpu_image>         images_3d;
   std::vector<const gi_material*> materials;
-  cgpu_shader                     missShader;
+  std::vector<cgpu_shader>        missShaders;
   cgpu_pipeline                   pipeline;
   cgpu_shader                     rgenShader;
 };
@@ -342,7 +342,7 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
     cgpu_blas_instance blas_instance = {0};
     blas_instance.as = proto.blas;
     blas_instance.faceIndexOffset = proto.faceIndexOffset;
-    blas_instance.hitGroupIndex = proto.materialIndex;
+    blas_instance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: regular & shadow
     memcpy(blas_instance.transform, instance->transform, sizeof(float) * 12);
 
     blas_instances.push_back(blas_instance);
@@ -482,7 +482,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   gi_shader_cache* cache = nullptr;
   cgpu_pipeline pipeline = { CGPU_INVALID_HANDLE };
   cgpu_shader rgenShader = { CGPU_INVALID_HANDLE };
-  cgpu_shader missShader = { CGPU_INVALID_HANDLE };
+  std::vector<cgpu_shader> missShaders;
   std::vector<cgpu_shader> hitShaders;
   std::vector<cgpu_image> images_2d;
   std::vector<cgpu_image> images_3d;
@@ -512,6 +512,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
       uint32_t texOffset2d = 0;
       uint32_t texOffset3d = 0;
       std::vector<uint8_t> spv;
+      std::vector<uint8_t> shadowSpv;
     };
     struct HitGroupCompInfo
     {
@@ -627,7 +628,15 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
         hitParams.texCount2d = texCount2d;
         hitParams.texCount3d = texCount3d;
 
+        hitParams.shadowTest = false;
         if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
+        {
+          threadWorkFailed = true;
+          continue;
+        }
+
+        hitParams.shadowTest = true;
+        if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->shadowSpv))
         {
           threadWorkFailed = true;
           continue;
@@ -641,45 +650,70 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 
     // 4. Compile the shaders to SPIV-V. (FIXME: multithread - beware of shared cgpu resource stores)
     hitShaders.reserve(hitGroupCompInfos.size());
+    hitGroups.reserve(hitGroupCompInfos.size() * 2);
+
     for (int i = 0; i < hitGroupCompInfos.size(); i++)
     {
       const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
-      // Closest Hit
-      cgpu_shader closestHitShader;
+      // regular hit group
       {
-        const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
-
-        if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+        cgpu_shader closestHitShader;
         {
-          goto cleanup;
+          const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
+
+          if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+          {
+            goto cleanup;
+          }
+
+          hitShaders.push_back(closestHitShader);
         }
 
-        hitShaders.push_back(closestHitShader);
-      }
-
-      // Any Hit
-      cgpu_shader anyHitShader{ CGPU_INVALID_HANDLE };
-      if (compInfo.anyHitInfo)
-      {
-        const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
-
-        if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+        cgpu_shader anyHitShader{ CGPU_INVALID_HANDLE };
+        if (compInfo.anyHitInfo)
         {
-          goto cleanup;
+          const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
+
+          if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+          {
+            goto cleanup;
+          }
+
+          hitShaders.push_back(anyHitShader);
         }
 
-        hitShaders.push_back(anyHitShader);
+        cgpu_rt_hit_group hitGroup;
+        hitGroup.closestHitShader = closestHitShader;
+        hitGroup.anyHitShader = anyHitShader;
+        hitGroups.push_back(hitGroup);
       }
 
-      cgpu_rt_hit_group hitGroup;
-      hitGroup.closestHitShader = closestHitShader;
-      hitGroup.anyHitShader = anyHitShader;
-      hitGroups.push_back(hitGroup);
+      // shadow hit group
+      {
+        cgpu_shader anyHitShader{ CGPU_INVALID_HANDLE };
+
+        if (compInfo.anyHitInfo)
+        {
+          const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
+
+          if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+          {
+            goto cleanup;
+          }
+
+          hitShaders.push_back(anyHitShader);
+        }
+
+        cgpu_rt_hit_group hitGroup;
+        hitGroup.closestHitShader = { CGPU_INVALID_HANDLE };
+        hitGroup.anyHitShader = anyHitShader;
+        hitGroups.push_back(hitGroup);
+      }
     }
   }
 
-  // Create ray generation and miss shader.
+  // Create ray generation shader.
   {
     std::vector<uint8_t> rgenSpirv;
     sg::ShaderGen::RaygenShaderParams rgenParams;
@@ -688,13 +722,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     rgenParams.texCount2d = texCount2d;
     rgenParams.texCount3d = texCount3d;
 
-    std::vector<uint8_t> missSpirv;
-    sg::ShaderGen::MissShaderParams missParams;
-    missParams.texCount2d = texCount2d;
-    missParams.texCount3d = texCount3d;
-
-    if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, rgenSpirv) ||
-        !s_shaderGen->generateMissSpirv("rt_main.miss", missParams, missSpirv))
+    if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, rgenSpirv))
     {
       goto cleanup;
     }
@@ -703,10 +731,46 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     {
       goto cleanup;
     }
+  }
 
-    if (!cgpu_create_shader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+  // Create miss shaders.
+  {
+    sg::ShaderGen::MissShaderParams missParams;
+    missParams.texCount2d = texCount2d;
+    missParams.texCount3d = texCount3d;
+
+    // regular miss shader
     {
-      goto cleanup;
+      std::vector<uint8_t> missSpirv;
+      if (!s_shaderGen->generateMissSpirv("rt_main.miss", missParams, missSpirv))
+      {
+        goto cleanup;
+      }
+
+      cgpu_shader missShader;
+      if (!cgpu_create_shader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+      {
+        goto cleanup;
+      }
+
+      missShaders.push_back(missShader);
+    }
+
+    // shadow test miss shader
+    {
+      std::vector<uint8_t> missSpirv;
+      if (!s_shaderGen->generateMissSpirv("rt_shadow.miss", missParams, missSpirv))
+      {
+        goto cleanup;
+      }
+
+      cgpu_shader missShader;
+      if (!cgpu_create_shader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+      {
+        goto cleanup;
+      }
+
+      missShaders.push_back(missShader);
     }
   }
 
@@ -722,8 +786,8 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   {
     cgpu_rt_pipeline_desc pipeline_desc = {0};
     pipeline_desc.rgen_shader = rgenShader;
-    pipeline_desc.miss_shader_count = 1;
-    pipeline_desc.miss_shaders = &missShader;
+    pipeline_desc.miss_shader_count = missShaders.size();
+    pipeline_desc.miss_shaders = missShaders.data();
     pipeline_desc.hit_group_count = hitGroups.size();
     pipeline_desc.hit_groups = hitGroups.data();
 
@@ -743,7 +807,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   {
     cache->materials[i] = params->materials[i];
   }
-  cache->missShader = missShader;
+  cache->missShaders = missShaders;
   cache->pipeline = pipeline;
   cache->rgenShader = rgenShader;
 
@@ -757,9 +821,9 @@ cleanup:
     {
       cgpu_destroy_shader(s_device, rgenShader);
     }
-    if (missShader.handle != CGPU_INVALID_HANDLE)
+    for (cgpu_shader shader : missShaders)
     {
-      cgpu_destroy_shader(s_device, missShader);
+      cgpu_destroy_shader(s_device, shader);
     }
     for (cgpu_shader shader : hitShaders)
     {
@@ -778,7 +842,10 @@ void giDestroyShaderCache(gi_shader_cache* cache)
   s_texSys->destroyUncachedImages(cache->images_2d);
   s_texSys->destroyUncachedImages(cache->images_3d);
   cgpu_destroy_shader(s_device, cache->rgenShader);
-  cgpu_destroy_shader(s_device, cache->missShader);
+  for (cgpu_shader shader : cache->missShaders)
+  {
+    cgpu_destroy_shader(s_device, shader);
+  }
   for (cgpu_shader shader : cache->hitShaders)
   {
     cgpu_destroy_shader(s_device, shader);

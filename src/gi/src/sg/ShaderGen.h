@@ -101,6 +101,7 @@ namespace gi::sg
       int32_t aovId;
       std::string_view baseFileName;
       std::string_view opacityEvalGlsl;
+      bool shadowTest;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
       uint32_t texCount2d;

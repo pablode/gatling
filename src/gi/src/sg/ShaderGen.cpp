@@ -337,6 +337,10 @@ namespace gi::sg
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", params.textureIndexOffset2d);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", params.textureIndexOffset3d);
+    if (params.shadowTest)
+    {
+      stitcher.appendDefine("SHADOW_TEST");
+    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))

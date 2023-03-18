@@ -10,3 +10,9 @@ struct RayPayload
     // x111111111111111 uint bounce
     uint bitfield;
 };
+
+struct ShadowRayPayload
+{
+    uvec4 rng_state;
+    bool shadowed;
+};

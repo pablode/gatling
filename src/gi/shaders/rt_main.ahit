@@ -11,7 +11,12 @@
 
 #include "rt_shading_state.glsl"
 
+#ifndef SHADOW_TEST
 layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
+#else
+layout(location = 1) rayPayloadInEXT ShadowRayPayload rayPayload;
+#endif
+
 hitAttributeEXT vec2 baryCoord;
 
 void main()
@@ -19,7 +24,7 @@ void main()
   State shading_state;
   vec2 hit_bc = baryCoord;
   uint hit_face_idx = gl_InstanceCustomIndexEXT + gl_PrimitiveID;
-  setup_mdl_shading_state(hit_face_idx, hit_bc, rayPayload.ray_dir, shading_state);
+  setup_mdl_shading_state(hit_face_idx, hit_bc, gl_WorldRayDirectionEXT, shading_state);
 
   float opacity = mdl_cutout_opacity(shading_state);
 

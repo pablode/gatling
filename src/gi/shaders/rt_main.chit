@@ -11,6 +11,8 @@
 #include "rt_shading_state.glsl"
 
 layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
+layout(location = 1) rayPayloadEXT ShadowRayPayload shadowRayPayload;
+
 hitAttributeEXT vec2 baryCoord;
 
 bool russian_roulette(in float random_float, inout vec3 throughput)
@@ -149,6 +151,36 @@ void main()
     }
 
     /* TODO 8. NEE shadow query */
+    {
+#if AOV_ID == AOV_ID_DEBUG_NEE
+        shadowRayPayload.rng_state = rayPayload.rng_state;
+        shadowRayPayload.shadowed = true; // Gets set to false by miss shader
+
+        vec3 shadowRayOrigin = rayPayload.ray_origin; // temporary
+        vec3 shadowRayDir = shading_state.geom_normal; // temporary
+
+        uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+        traceRayEXT(
+            sceneAS,         // top-level acceleration structure
+            rayFlags,        // rayFlags
+            0xFF,            // cullMask
+            1,               // sbtRecordOffset (shadow test: use second hit group)
+            2,               // sbtRecordStride
+            1,               // missIndex (differs because of shadow test)
+            shadowRayOrigin, // ray origin
+            0.0,             // ray min range
+            shadowRayDir,    // ray direction
+            FLOAT_MAX,       // ray max range
+            1                // payload (location = 1, differs because of shadow test)
+        );
+
+        rayPayload.rng_state = shadowRayPayload.rng_state;
+
+        rayPayload.radiance = shadowRayPayload.shadowed ? vec3(1,0,0) : vec3(0,1,0);
+        rayPayload.bitfield = 0xFFFFFFFFu;
+        return;
+#endif
+    }
 
     rayPayload.bitfield = (uint(inside) << 31) | (bounce + 1);
 }

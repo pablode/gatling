@@ -26,7 +26,7 @@ vec3 evaluate_sample(inout uvec4 rng_state,
             0,                     // rayFlags
             0xFF,                  // cullMask
             0,                     // sbtRecordOffset
-            0,                     // sbtRecordStride
+            2,                     // sbtRecordStride
             0,                     // missIndex
             rayPayload.ray_origin, // ray origin
             0.0,                   // ray min range
