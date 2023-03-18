@@ -156,7 +156,7 @@ int main(int argc, const char* argv[])
   renderBuffer->Allocate(GfVec3i(settings.imageWidth, settings.imageHeight, 1), HdFormatFloat32Vec4, false);
 
   HdRenderPassAovBindingVector aovBindings(1);
-  aovBindings[0].aovName = HdAovTokens->color;
+  aovBindings[0].aovName = TfToken(settings.aov);
   aovBindings[0].renderBuffer = renderBuffer;
 
   CameraUtilFraming framing;

@@ -27,6 +27,7 @@ class HdRenderDelegate;
 
 struct AppSettings
 {
+  std::string aov;
   std::string sceneFilePath;
   std::string outputFilePath;
   int imageWidth;

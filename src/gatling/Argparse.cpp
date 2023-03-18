@@ -21,6 +21,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+constexpr static const char* DEFAULT_AOV = "color";
 constexpr static int DEFAULT_IMAGE_WIDTH = 800;
 constexpr static int DEFAULT_IMAGE_HEIGHT = 800;
 constexpr static const char* DEFAULT_CAMERA_PATH = "";
@@ -28,6 +29,7 @@ constexpr static bool DEFAULT_GAMMA_CORRECTION = true;
 
 TF_DEFINE_PRIVATE_TOKENS(
   _AppSettingsTokens,
+  ((aov, "aov"))                           \
   ((image_width, "image-width"))           \
   ((image_height, "image-height"))         \
   ((camera_path, "camera-path"))           \
@@ -138,6 +140,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
 {
   // Add non-delegate specific options to temporary settings list.
   HdRenderSettingDescriptorList renderSettingDescs = renderDelegate.GetRenderSettingDescriptors();
+  renderSettingDescs.push_back(HdRenderSettingDescriptor{"AOV", _AppSettingsTokens->aov, VtValue(DEFAULT_AOV)});
   renderSettingDescs.push_back(HdRenderSettingDescriptor{"Output image width", _AppSettingsTokens->image_width, VtValue(DEFAULT_IMAGE_WIDTH)});
   renderSettingDescs.push_back(HdRenderSettingDescriptor{"Output image height", _AppSettingsTokens->image_height, VtValue(DEFAULT_IMAGE_HEIGHT)});
   renderSettingDescs.push_back(HdRenderSettingDescriptor{"Camera path", _AppSettingsTokens->camera_path, VtValue(DEFAULT_CAMERA_PATH)});
@@ -161,6 +164,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
 
   settings.sceneFilePath = std::string(argv[1]);
   settings.outputFilePath = std::string(argv[2]);
+  settings.aov = DEFAULT_AOV;
   settings.imageWidth = DEFAULT_IMAGE_WIDTH;
   settings.imageHeight = DEFAULT_IMAGE_HEIGHT;
   settings.cameraPath = DEFAULT_CAMERA_PATH;
@@ -186,6 +190,15 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
       PrintCorrectUsage(renderSettingDescs);
       settings.help = true;
       return true;
+    }
+    else if (arg == _AppSettingsTokens->aov)
+    {
+      if (i + 1 >= argc)
+      {
+        PrintCorrectUsage(renderSettingDescs);
+        return false;
+      }
+      settings.aov = std::string(argv[++i]);
     }
     else if (arg == _AppSettingsTokens->image_width)
     {
