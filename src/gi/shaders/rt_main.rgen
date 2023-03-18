@@ -115,5 +115,5 @@ void main()
       pixel_color = weight_old * pixels[pixel_index].rgb + weight_new * pixel_color;
     }
 
-    pixels[pixel_index] = vec4(pixel_color, 0.0);
+    pixels[pixel_index] = vec4(pixel_color, 1.0);
 }
