@@ -4,6 +4,8 @@ add_library(
   Camera.h
   Instancer.cpp
   Instancer.h
+  Light.cpp
+  Light.h
   Material.cpp
   Material.h
   MaterialNetworkPatcher.cpp

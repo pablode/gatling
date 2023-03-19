@@ -23,6 +23,7 @@
 #include "RenderBuffer.h"
 #include "Material.h"
 #include "Tokens.h"
+#include "Light.h"
 
 #include <pxr/imaging/hd/resourceRegistry.h>
 #include <pxr/base/gf/vec4f.h>
@@ -59,10 +60,13 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
 
     _settingsMap[key] = value;
   }
+
+  m_giScene = giCreateScene();
 }
 
 HdGatlingRenderDelegate::~HdGatlingRenderDelegate()
 {
+  giDestroyScene(m_giScene);
 }
 
 HdRenderSettingDescriptorList HdGatlingRenderDelegate::GetRenderSettingDescriptors() const
@@ -154,7 +158,8 @@ void HdGatlingRenderDelegate::DestroyRprim(HdRprim* rprim)
 const TfTokenVector SUPPORTED_SPRIM_TYPES =
 {
   HdPrimTypeTokens->camera,
-  HdPrimTypeTokens->material
+  HdPrimTypeTokens->material,
+  HdPrimTypeTokens->sphereLight
 };
 
 const TfTokenVector& HdGatlingRenderDelegate::GetSupportedSprimTypes() const
@@ -172,6 +177,10 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId,
   else if (typeId == HdPrimTypeTokens->material)
   {
     return new HdGatlingMaterial(sprimId);
+  }
+  else if (typeId == HdPrimTypeTokens->sphereLight)
+  {
+    return new HdGatlingSphereLight(m_giScene, sprimId);
   }
 
   return nullptr;

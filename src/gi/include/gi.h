@@ -145,3 +145,11 @@ void giInvalidateFramebuffer();
 
 int giRender(const gi_render_params* params, float* rgba_img);
 
+struct gi_scene;
+gi_scene* giCreateScene();
+void giDestroyScene(gi_scene* scene);
+
+struct gi_sphere_light;
+gi_sphere_light* giCreateSphereLight(gi_scene* scene);
+void giDestroySphereLight(gi_scene* scene, gi_sphere_light* light);
+void giSphereLightSetTransform(gi_sphere_light* light, float* transform3x4);

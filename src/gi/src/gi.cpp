@@ -32,6 +32,8 @@
 #include <fstream>
 #include <atomic>
 #include <optional>
+#include <unordered_set>
+#include <mutex>
 #include <assert.h>
 
 #include <cgpu.h>
@@ -79,6 +81,17 @@ struct gi_mesh
   std::vector<gi_face> faces;
   std::vector<gi_vertex> vertices;
   const gi_material* material;
+};
+
+struct gi_sphere_light
+{
+  float transform[3][4];
+};
+
+struct gi_scene
+{
+  std::unordered_set<gi_sphere_light*> lights;
+  std::mutex lightsMutex;
 };
 
 cgpu_device s_device = { CGPU_INVALID_HANDLE };
@@ -1087,4 +1100,46 @@ cleanup:
   cgpu_destroy_command_buffer(s_device, command_buffer);
 
   return result;
+}
+
+gi_scene* giCreateScene()
+{
+  return new gi_scene;
+}
+
+void giDestroyScene(gi_scene* scene)
+{
+  delete scene;
+}
+
+gi_sphere_light* giCreateSphereLight(gi_scene* scene)
+{
+  auto light = new gi_sphere_light;
+
+  float identityTransform[3][4] = {
+    1.0f, 0.0f, 0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f
+  };
+  memcpy(light->transform, identityTransform, sizeof(identityTransform));
+
+  {
+    std::lock_guard lock(scene->lightsMutex);
+    scene->lights.insert(light);
+  }
+
+  return light;
+}
+void giDestroySphereLight(gi_scene* scene, gi_sphere_light* light)
+{
+  {
+    std::lock_guard lock(scene->lightsMutex);
+    scene->lights.erase(light);
+  }
+
+  delete light;
+}
+void giSphereLightSetTransform(gi_sphere_light* light, float* transform3x4)
+{
+  memcpy(&light->transform, transform3x4, sizeof(light->transform));
 }

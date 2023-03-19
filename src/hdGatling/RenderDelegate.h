@@ -21,6 +21,8 @@
 
 #include "MaterialNetworkTranslator.h"
 
+struct gi_scene;
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingRenderDelegate final : public HdRenderDelegate
@@ -93,6 +95,7 @@ private:
   HdResourceRegistrySharedPtr m_resourceRegistry;
   HdRenderSettingDescriptorList m_settingDescriptors;
   HdRenderSettingDescriptorList m_debugSettingDescriptors;
+  gi_scene* m_giScene = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
