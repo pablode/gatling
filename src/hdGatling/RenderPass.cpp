@@ -289,10 +289,10 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     _BakeMeshGeometry(mesh, GfMatrix4d(1.0), materialIndex, faces, vertices);
 
     GiMeshDesc desc = {0};
-    desc.face_count = faces.size();
+    desc.faceCount = faces.size();
     desc.faces = faces.data();
     desc.material = materials[materialIndex];
-    desc.vertex_count = vertices.size();
+    desc.vertexCount = vertices.size();
     desc.vertices = vertices.data();
 
     GiMesh* giMesh = giCreateMesh(&desc);
@@ -493,17 +493,17 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     _BakeMeshes(renderIndex, m_rootMatrix, materials, meshes, instances);
 
     GiShaderCacheParams shaderParams;
-    shaderParams.aov_id = aovId;
-    shaderParams.material_count = materials.size();
+    shaderParams.aovId = aovId;
+    shaderParams.materialCount = materials.size();
     shaderParams.materials = materials.data();
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");
 
     GiGeomCacheParams geomParams;
-    geomParams.mesh_instance_count = instances.size();
-    geomParams.mesh_instances = instances.data();
-    geomParams.shader_cache = m_shaderCache;
+    geomParams.meshInstanceCount = instances.size();
+    geomParams.meshInstances = instances.data();
+    geomParams.shaderCache = m_shaderCache;
 
     m_geomCache = giCreateGeomCache(&geomParams);
     TF_VERIFY(m_geomCache, "Unable to create geom cache");
@@ -519,21 +519,21 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   GiRenderParams renderParams;
   renderParams.camera = &giCamera;
-  renderParams.geom_cache = m_geomCache;
-  renderParams.shader_cache = m_shaderCache;
-  renderParams.image_width = renderBuffer->GetWidth();
-  renderParams.image_height = renderBuffer->GetHeight();
-  renderParams.max_bounces = m_settings.find(HdGatlingSettingsTokens->max_bounces)->second.Get<int>();
+  renderParams.geomCache = m_geomCache;
+  renderParams.shaderCache = m_shaderCache;
+  renderParams.imageWidth = renderBuffer->GetWidth();
+  renderParams.imageHeight = renderBuffer->GetHeight();
+  renderParams.maxBounces = m_settings.find(HdGatlingSettingsTokens->max_bounces)->second.Get<int>();
   renderParams.spp = m_settings.find(HdGatlingSettingsTokens->spp)->second.Get<int>();
-  renderParams.rr_bounce_offset = m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second.Get<int>();
+  renderParams.rrBounceOffset = m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second.Get<int>();
   // Workaround for bug https://github.com/PixarAnimationStudios/USD/issues/913
   VtValue rr_inv_min_term_prob = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
   VtValue max_sample_value = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
-  renderParams.rr_inv_min_term_prob = float(rr_inv_min_term_prob.Cast<double>().Get<double>());
-  renderParams.max_sample_value = float(max_sample_value.Cast<double>().Get<double>());
+  renderParams.rrInvMinTermProb = float(rr_inv_min_term_prob.Cast<double>().Get<double>());
+  renderParams.maxSampleValue = float(max_sample_value.Cast<double>().Get<double>());
   for (uint32_t i = 0; i < 4; i++)
   {
-    renderParams.bg_color[i] = backgroundColor[i];
+    renderParams.bgColor[i] = backgroundColor[i];
   }
 
   float* img_data = (float*) renderBuffer->Map();

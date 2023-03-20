@@ -98,10 +98,10 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
   m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxLibPath);
 
   GiInitParams params;
-  params.resource_path = resourcePath.c_str();
-  params.shader_path = shaderPath.c_str();
-  params.mtlx_lib_path = mtlxLibPath.c_str();
-  params.mdl_lib_path = mdlLibPath.c_str();
+  params.resourcePath = resourcePath.c_str();
+  params.shaderPath = shaderPath.c_str();
+  params.mtlxLibPath = mtlxLibPath.c_str();
+  params.mdlLibPath = mdlLibPath.c_str();
 
   m_isSupported = (giInitialize(&params) == GI_OK);
   if (!m_isSupported)

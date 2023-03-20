@@ -69,10 +69,10 @@ struct GiFace
 
 struct GiMeshDesc
 {
-  uint32_t          face_count;
+  uint32_t          faceCount;
   GiFace*           faces;
   const GiMaterial* material;
-  uint32_t          vertex_count;
+  uint32_t          vertexCount;
   GiVertex*         vertices;
 };
 
@@ -84,39 +84,39 @@ struct GiMeshInstance
 
 struct GiShaderCacheParams
 {
-  GiAovId            aov_id;
-  uint32_t           material_count;
+  GiAovId            aovId;
+  uint32_t           materialCount;
   const GiMaterial** materials;
 };
 
 struct GiGeomCacheParams
 {
-  uint32_t              mesh_instance_count;
-  const GiMeshInstance* mesh_instances;
-  GiShaderCache*        shader_cache;
+  uint32_t              meshInstanceCount;
+  const GiMeshInstance* meshInstances;
+  GiShaderCache*        shaderCache;
 };
 
 struct GiRenderParams
 {
   const GiCameraDesc*  camera;
-  const GiGeomCache*   geom_cache;
-  const GiShaderCache* shader_cache;
-  uint32_t             image_width;
-  uint32_t             image_height;
-  uint32_t             max_bounces;
+  const GiGeomCache*   geomCache;
+  const GiShaderCache* shaderCache;
+  uint32_t             imageWidth;
+  uint32_t             imageHeight;
+  uint32_t             maxBounces;
   uint32_t             spp;
-  uint32_t             rr_bounce_offset;
-  float                rr_inv_min_term_prob;
-  float                max_sample_value;
-  float                bg_color[4];
+  uint32_t             rrBounceOffset;
+  float                rrInvMinTermProb;
+  float                maxSampleValue;
+  float                bgColor[4];
 };
 
 struct GiInitParams
 {
-  const char* resource_path;
-  const char* shader_path;
-  const char* mtlx_lib_path;
-  const char* mdl_lib_path;
+  const char* resourcePath;
+  const char* shaderPath;
+  const char* mtlxLibPath;
+  const char* mdlLibPath;
 };
 
 GiStatus giInitialize(const GiInitParams* params);
@@ -134,8 +134,8 @@ public:
 };
 void giRegisterAssetReader(GiAssetReader* reader);
 
-GiMaterial* giCreateMaterialFromMtlx(const char* doc_str);
-GiMaterial* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
+GiMaterial* giCreateMaterialFromMtlx(const char* docStr);
+GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier);
 void giDestroyMaterial(GiMaterial* mat);
 
 GiMesh* giCreateMesh(const GiMeshDesc* desc);
@@ -148,7 +148,7 @@ void giDestroyShaderCache(GiShaderCache* cache);
 
 void giInvalidateFramebuffer();
 
-int giRender(const GiRenderParams* params, float* rgba_img);
+int giRender(const GiRenderParams* params, float* rgbaImg);
 
 GiScene* giCreateScene();
 void giDestroyScene(GiScene* scene);
