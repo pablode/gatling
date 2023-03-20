@@ -198,10 +198,10 @@ MaterialNetworkTranslator::MaterialNetworkTranslator(const std::string& mtlxLibP
   mx::loadLibraries(libFolders, folderSearchPath, m_nodeLib);
 }
 
-gi_material* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,
+GiMaterial* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,
                                                      const HdMaterialNetwork2& network) const
 {
-  gi_material* result = TryParseMdlNetwork(network);
+  GiMaterial* result = TryParseMdlNetwork(network);
 
   if (!result)
   {
@@ -211,7 +211,7 @@ gi_material* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,
   return result;
 }
 
-gi_material* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwork2& network) const
 {
   if (network.nodes.size() != 1)
   {
@@ -238,7 +238,7 @@ gi_material* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwo
   return giCreateMaterialFromMdlFile(fileUri.c_str(), subIdentifier.c_str());
 }
 
-gi_material* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   HdMaterialNetwork2 mtlxNetwork;
   if (!_ConvertUsdNodesToMaterialXNodes(network, mtlxNetwork))

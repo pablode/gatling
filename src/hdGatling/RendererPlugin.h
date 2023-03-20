@@ -21,8 +21,6 @@
 
 #include <memory>
 
-#include "MaterialNetworkTranslator.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingRendererPlugin final : public HdRendererPlugin
@@ -46,7 +44,7 @@ public:
 #endif
 
 private:
-  std::unique_ptr<MaterialNetworkTranslator> m_translator;
+  std::unique_ptr<class MaterialNetworkTranslator> m_translator;
   std::unique_ptr<class UsdzAssetReader> m_usdzAssetReader;
   bool m_isSupported;
 };

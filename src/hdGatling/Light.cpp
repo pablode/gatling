@@ -24,7 +24,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdGatlingSphereLight::HdGatlingSphereLight(gi_scene* scene, const SdfPath& id)
+HdGatlingSphereLight::HdGatlingSphereLight(GiScene* scene, const SdfPath& id)
   : HdLight(id)
   , m_giScene(scene)
 {
@@ -51,7 +51,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
       (float) T[0][1], (float) T[1][1], (float) T[2][1], (float) T[3][1],
       (float) T[0][2], (float) T[1][2], (float) T[2][2], (float) T[3][2]
     };
-    giSphereLightSetTransform(m_giSphereLight, (float*) transform3x4);
+    giSetSphereLightTransform(m_giSphereLight, (float*) transform3x4);
   }
 
   // TODO: intensity, radius (with treatAsPoint)

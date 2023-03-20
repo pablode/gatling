@@ -20,8 +20,6 @@
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/sceneDelegate.h>
 
-#include <gi.h>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingMaterial final : public HdMaterial

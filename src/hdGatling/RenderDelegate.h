@@ -21,7 +21,7 @@
 
 #include "MaterialNetworkTranslator.h"
 
-struct gi_scene;
+struct GiScene;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -95,7 +95,7 @@ private:
   HdResourceRegistrySharedPtr m_resourceRegistry;
   HdRenderSettingDescriptorList m_settingDescriptors;
   HdRenderSettingDescriptorList m_debugSettingDescriptors;
-  gi_scene* m_giScene = nullptr;
+  GiScene* m_giScene = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

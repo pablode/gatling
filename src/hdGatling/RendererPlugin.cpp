@@ -17,6 +17,7 @@
 
 #include "RendererPlugin.h"
 #include "RenderDelegate.h"
+#include "MaterialNetworkTranslator.h"
 
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/base/plug/plugin.h>
@@ -96,7 +97,7 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 
   m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxLibPath);
 
-  gi_init_params params;
+  GiInitParams params;
   params.resource_path = resourcePath.c_str();
   params.shader_path = shaderPath.c_str();
   params.mtlx_lib_path = mtlxLibPath.c_str();

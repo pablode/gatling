@@ -44,7 +44,7 @@ using namespace gi;
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
-struct gi_geom_cache
+struct GiGeomCache
 {
   std::vector<cgpu_blas> blases;
   cgpu_buffer            buffer;
@@ -59,38 +59,38 @@ struct gi_geom_cache
   uint64_t               vertex_buf_size;
 };
 
-struct gi_shader_cache
+struct GiShaderCache
 {
-  uint32_t                        aov_id;
-  std::vector<cgpu_shader>        hitShaders;
-  std::vector<cgpu_image>         images_2d;
-  std::vector<cgpu_image>         images_3d;
-  std::vector<const gi_material*> materials;
-  std::vector<cgpu_shader>        missShaders;
-  cgpu_pipeline                   pipeline;
-  cgpu_shader                     rgenShader;
+  uint32_t                       aov_id;
+  std::vector<cgpu_shader>       hitShaders;
+  std::vector<cgpu_image>        images_2d;
+  std::vector<cgpu_image>        images_3d;
+  std::vector<const GiMaterial*> materials;
+  std::vector<cgpu_shader>       missShaders;
+  cgpu_pipeline                  pipeline;
+  cgpu_shader                    rgenShader;
 };
 
-struct gi_material
+struct GiMaterial
 {
   sg::Material* sg_mat;
 };
 
-struct gi_mesh
+struct GiMesh
 {
-  std::vector<gi_face> faces;
-  std::vector<gi_vertex> vertices;
-  const gi_material* material;
+  std::vector<GiFace> faces;
+  std::vector<GiVertex> vertices;
+  const GiMaterial* material;
 };
 
-struct gi_sphere_light
+struct GiSphereLight
 {
   float transform[3][4];
 };
 
-struct gi_scene
+struct GiScene
 {
-  std::unordered_set<gi_sphere_light*> lights;
+  std::unordered_set<GiSphereLight*> lights;
   std::mutex lightsMutex;
 };
 
@@ -110,7 +110,7 @@ uint32_t s_outputBufferWidth = 0;
 uint32_t s_outputBufferHeight = 0;
 uint32_t s_sampleOffset = 0;
 
-int giInitialize(const gi_init_params* params)
+GiStatus giInitialize(const GiInitParams* params)
 {
   if (!cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH))
     return GI_ERROR;
@@ -191,7 +191,7 @@ void giRegisterAssetReader(GiAssetReader* reader)
   s_aggregateAssetReader->addAssetReader(reader);
 }
 
-gi_material* giCreateMaterialFromMtlx(const char* doc_str)
+GiMaterial* giCreateMaterialFromMtlx(const char* doc_str)
 {
   sg::Material* sg_mat = s_shaderGen->createMaterialFromMtlx(doc_str);
   if (!sg_mat)
@@ -199,12 +199,12 @@ gi_material* giCreateMaterialFromMtlx(const char* doc_str)
     return nullptr;
   }
 
-  gi_material* mat = new gi_material;
+  GiMaterial* mat = new GiMaterial;
   mat->sg_mat = sg_mat;
   return mat;
 }
 
-gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier)
+GiMaterial* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier)
 {
   sg::Material* sg_mat = s_shaderGen->createMaterialFromMdlFile(file_path, sub_identifier);
   if (!sg_mat)
@@ -212,12 +212,12 @@ gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_
     return nullptr;
   }
 
-  gi_material* mat = new gi_material;
+  GiMaterial* mat = new GiMaterial;
   mat->sg_mat = sg_mat;
   return mat;
 }
 
-void giDestroyMaterial(gi_material* mat)
+void giDestroyMaterial(GiMaterial* mat)
 {
   s_shaderGen->destroyMaterial(mat->sg_mat);
   delete mat;
@@ -237,20 +237,20 @@ uint64_t giAlignBuffer(uint64_t alignment, uint64_t buffer_size, uint64_t* total
   return offset;
 }
 
-gi_mesh* giCreateMesh(const gi_mesh_desc* desc)
+GiMesh* giCreateMesh(const GiMeshDesc* desc)
 {
-  gi_mesh* mesh = new gi_mesh;
-  mesh->faces = std::vector<gi_face>(&desc->faces[0], &desc->faces[desc->face_count]);
-  mesh->vertices = std::vector<gi_vertex>(&desc->vertices[0], &desc->vertices[desc->vertex_count]);
+  GiMesh* mesh = new GiMesh;
+  mesh->faces = std::vector<GiFace>(&desc->faces[0], &desc->faces[desc->face_count]);
+  mesh->vertices = std::vector<GiVertex>(&desc->vertices[0], &desc->vertices[desc->vertex_count]);
   mesh->material = desc->material;
   return mesh;
 }
 
-bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
+bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
                                 std::vector<cgpu_blas>& blases,
                                 std::vector<cgpu_blas_instance>& blas_instances,
-                                std::vector<gi_vertex>& allVertices,
-                                std::vector<gi_face>& allFaces,
+                                std::vector<GiVertex>& allVertices,
+                                std::vector<GiFace>& allFaces,
                                 std::vector<uint32_t>& emissive_face_indices)
 {
   struct ProtoBlasInstance
@@ -259,15 +259,15 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
     uint32_t faceIndexOffset;
     uint32_t materialIndex;
   };
-  std::unordered_map<const gi_mesh*, ProtoBlasInstance> protoBlasInstances;
+  std::unordered_map<const GiMesh*, ProtoBlasInstance> protoBlasInstances;
 
   for (uint32_t m = 0; m < params->mesh_instance_count; m++)
   {
-    const gi_mesh_instance* instance = &params->mesh_instances[m];
+    const GiMeshInstance* instance = &params->mesh_instances[m];
 
     if (protoBlasInstances.count(instance->mesh) == 0)
     {
-      const gi_mesh* mesh = instance->mesh;
+      const GiMesh* mesh = instance->mesh;
 
       if (mesh->faces.empty())
       {
@@ -303,7 +303,7 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
         indices.push_back(face->v_i[1]);
         indices.push_back(face->v_i[2]);
 
-        gi_face new_face;
+        GiFace new_face;
         new_face.v_i[0] = vertexIndexOffset + face->v_i[0];
         new_face.v_i[1] = vertexIndexOffset + face->v_i[1];
         new_face.v_i[2] = vertexIndexOffset + face->v_i[2];
@@ -324,7 +324,7 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
 
       // FIXME: find a better solution
       uint32_t materialIndex = UINT32_MAX;
-      gi_shader_cache* shader_cache = params->shader_cache;
+      GiShaderCache* shader_cache = params->shader_cache;
       for (uint32_t i = 0; i < shader_cache->materials.size(); i++)
       {
         if (shader_cache->materials[i] == mesh->material)
@@ -349,7 +349,7 @@ bool _giBuildGeometryStructures(const gi_geom_cache_params* params,
   // Instances
   for (uint32_t m = 0; m < params->mesh_instance_count; m++)
   {
-    const gi_mesh_instance* instance = &params->mesh_instances[m];
+    const GiMeshInstance* instance = &params->mesh_instances[m];
     const ProtoBlasInstance& proto = protoBlasInstances[instance->mesh];
 
     cgpu_blas_instance blas_instance = {0};
@@ -371,9 +371,9 @@ fail_cleanup:
   return false;
 }
 
-gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
+GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 {
-  gi_geom_cache* cache = nullptr;
+  GiGeomCache* cache = nullptr;
 
   printf("creating geom cache\n");
   printf("instance count: %d\n", params->mesh_instance_count);
@@ -383,8 +383,8 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   cgpu_tlas tlas = { CGPU_INVALID_HANDLE };
   std::vector<cgpu_blas> blases;
   std::vector<cgpu_blas_instance> blas_instances;
-  std::vector<gi_vertex> allVertices;
-  std::vector<gi_face> allFaces;
+  std::vector<GiVertex> allVertices;
+  std::vector<GiFace> allFaces;
   std::vector<uint32_t> emissive_face_indices; // FIXME: reintroduce
 
   if (!_giBuildGeometryStructures(params, blases, blas_instances, allVertices, allFaces, emissive_face_indices))
@@ -404,9 +404,9 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
     uint64_t buf_size = 0;
     const uint64_t offset_align = s_device_properties.minStorageBufferOffsetAlignment;
 
-    face_buf_size = allFaces.size() * sizeof(gi_face);
+    face_buf_size = allFaces.size() * sizeof(GiFace);
     emissive_face_indices_buf_size = emissive_face_indices.size() * sizeof(uint32_t);
-    vertex_buf_size = allVertices.size() * sizeof(gi_vertex);
+    vertex_buf_size = allVertices.size() * sizeof(GiVertex);
 
     face_buf_offset = giAlignBuffer(offset_align, face_buf_size, &buf_size);
     emissive_face_indices_buf_offset = giAlignBuffer(offset_align, emissive_face_indices_buf_size, &buf_size);
@@ -435,7 +435,7 @@ gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params)
   }
 
   // Fill cache struct.
-  cache = new gi_geom_cache;
+  cache = new GiGeomCache;
   cache->tlas = tlas;
   cache->blases = blases;
   cache->buffer = buffer;
@@ -468,7 +468,7 @@ cleanup:
   return cache;
 }
 
-void giDestroyGeomCache(gi_geom_cache* cache)
+void giDestroyGeomCache(GiGeomCache* cache)
 {
   for (cgpu_blas blas : cache->blases)
   {
@@ -479,7 +479,7 @@ void giDestroyGeomCache(gi_geom_cache* cache)
   delete cache;
 }
 
-gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
+GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 {
   bool clockCyclesAov = params->aov_id == GI_AOV_ID_DEBUG_CLOCK_CYCLES;
 
@@ -492,7 +492,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
   printf("creating shader cache\n");
   printf("material count: %d\n", params->material_count);
 
-  gi_shader_cache* cache = nullptr;
+  GiShaderCache* cache = nullptr;
   cgpu_pipeline pipeline = { CGPU_INVALID_HANDLE };
   cgpu_shader rgenShader = { CGPU_INVALID_HANDLE };
   std::vector<cgpu_shader> missShaders;
@@ -540,7 +540,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
 #pragma omp parallel for
     for (int i = 0; i < hitGroupCompInfos.size(); i++)
     {
-      const gi_material* mat = params->materials[i];
+      const GiMaterial* mat = params->materials[i];
 
       HitGroupCompInfo groupInfo;
       {
@@ -810,7 +810,7 @@ gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params)
     }
   }
 
-  cache = new gi_shader_cache;
+  cache = new GiShaderCache;
   cache->aov_id = params->aov_id;
   cache->hitShaders = std::move(hitShaders);
   cache->images_2d = std::move(images_2d);
@@ -850,7 +850,7 @@ cleanup:
   return cache;
 }
 
-void giDestroyShaderCache(gi_shader_cache* cache)
+void giDestroyShaderCache(GiShaderCache* cache)
 {
   s_texSys->destroyUncachedImages(cache->images_2d);
   s_texSys->destroyUncachedImages(cache->images_3d);
@@ -872,10 +872,10 @@ void giInvalidateFramebuffer()
   s_sampleOffset = 0;
 }
 
-int giRender(const gi_render_params* params, float* rgba_img)
+int giRender(const GiRenderParams* params, float* rgba_img)
 {
-  const gi_geom_cache* geom_cache = params->geom_cache;
-  const gi_shader_cache* shader_cache = params->shader_cache;
+  const GiGeomCache* geom_cache = params->geom_cache;
+  const GiShaderCache* shader_cache = params->shader_cache;
 
   // Init state for goto error handling.
   int result = GI_ERROR;
@@ -1102,19 +1102,19 @@ cleanup:
   return result;
 }
 
-gi_scene* giCreateScene()
+GiScene* giCreateScene()
 {
-  return new gi_scene;
+  return new GiScene;
 }
 
-void giDestroyScene(gi_scene* scene)
+void giDestroyScene(GiScene* scene)
 {
   delete scene;
 }
 
-gi_sphere_light* giCreateSphereLight(gi_scene* scene)
+GiSphereLight* giCreateSphereLight(GiScene* scene)
 {
-  auto light = new gi_sphere_light;
+  auto light = new GiSphereLight;
 
   float identityTransform[3][4] = {
     1.0f, 0.0f, 0.0f, 0.0f,
@@ -1130,7 +1130,8 @@ gi_sphere_light* giCreateSphereLight(gi_scene* scene)
 
   return light;
 }
-void giDestroySphereLight(gi_scene* scene, gi_sphere_light* light)
+
+void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
 {
   {
     std::lock_guard lock(scene->lightsMutex);
@@ -1139,7 +1140,8 @@ void giDestroySphereLight(gi_scene* scene, gi_sphere_light* light)
 
   delete light;
 }
-void giSphereLightSetTransform(gi_sphere_light* light, float* transform3x4)
+
+void giSetSphereLightTransform(GiSphereLight* light, float* transform3x4)
 {
   memcpy(&light->transform, transform3x4, sizeof(light->transform));
 }

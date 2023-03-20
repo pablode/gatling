@@ -76,7 +76,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
 
 void HdGatlingRenderPass::_ClearMaterials()
 {
-  for (gi_material* mat : m_materials)
+  for (GiMaterial* mat : m_materials)
   {
     giDestroyMaterial(mat);
   }
@@ -103,14 +103,14 @@ bool HdGatlingRenderPass::IsConverged() const
   return m_isConverged;
 }
 
-gi_vertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal, const GfVec2f& texCoords)
+GiVertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal, const GfVec2f& texCoords)
 {
   GfVec3f newPoint = transform.Transform(point);
 
   GfVec3f newNormal = normalMatrix.TransformDir(normal);
   newNormal.Normalize();
 
-  gi_vertex vertex;
+  GiVertex vertex;
   vertex.pos[0] = newPoint[0];
   vertex.pos[1] = newPoint[1];
   vertex.pos[2] = newPoint[2];
@@ -126,8 +126,8 @@ gi_vertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfV
 void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
                                             GfMatrix4d transform,
                                             uint32_t materialIndex,
-                                            std::vector<gi_face>& faces,
-                                            std::vector<gi_vertex>& vertices) const
+                                            std::vector<GiFace>& faces,
+                                            std::vector<GiVertex>& vertices) const
 {
   GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
 
@@ -143,7 +143,7 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
   {
     const GfVec3i& vertexIndices = meshFaces[i];
 
-    gi_face face;
+    GiFace face;
     face.v_i[0] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 0) : vertexIndices[0]);
     face.v_i[1] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 1) : vertexIndices[1]);
     face.v_i[2] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 2) : vertexIndices[2]);
@@ -157,7 +157,7 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
       bool hasTexCoords = meshTexCoords.array.size() > 0;
       GfVec2f texCoords = hasTexCoords ? meshTexCoords.array[meshTexCoords.indexed ? vertexIndices[j] : (i * 3 + j)] : GfVec2f();
 
-      gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
+      GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
       vertices.push_back(vertex);
     }
 
@@ -178,16 +178,16 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
     bool hasTexCoords = meshTexCoords.array.size() > 0;
     GfVec2f texCoords = hasTexCoords ? meshTexCoords.array[j] : GfVec2f();
 
-    gi_vertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
+    GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
     vertices.push_back(vertex);
   }
 }
 
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
-                                      std::vector<const gi_material*>& materials,
-                                      std::vector<const gi_mesh*>& meshes,
-                                      std::vector<gi_mesh_instance>& instances)
+                                      std::vector<const GiMaterial*>& materials,
+                                      std::vector<const GiMesh*>& meshes,
+                                      std::vector<GiMeshInstance>& instances)
 {
   _ClearMaterials();
 
@@ -241,7 +241,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       HdSprim* sprim = renderIndex->GetSprim(HdPrimTypeTokens->material, materialId);
       HdGatlingMaterial* material = dynamic_cast<HdGatlingMaterial*>(sprim);
 
-      gi_material* giMat = nullptr;
+      GiMaterial* giMat = nullptr;
       if (material)
       {
         const HdMaterialNetwork2* network = material->GetNetwork();
@@ -267,7 +267,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
         else
         {
           std::string colorMatSrc = _MakeMaterialXColorMaterialSrc(color, materialIdStr.c_str());
-          gi_material* giColorMat = giCreateMaterialFromMtlx(colorMatSrc.c_str());
+          GiMaterial* giColorMat = giCreateMaterialFromMtlx(colorMatSrc.c_str());
           if (giColorMat)
           {
             m_materials.push_back(giColorMat);
@@ -284,18 +284,18 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       }
     }
 
-    std::vector<gi_face> faces;
-    std::vector<gi_vertex> vertices;
+    std::vector<GiFace> faces;
+    std::vector<GiVertex> vertices;
     _BakeMeshGeometry(mesh, GfMatrix4d(1.0), materialIndex, faces, vertices);
 
-    gi_mesh_desc desc = {0};
+    GiMeshDesc desc = {0};
     desc.face_count = faces.size();
     desc.faces = faces.data();
     desc.material = materials[materialIndex];
     desc.vertex_count = vertices.size();
     desc.vertices = vertices.data();
 
-    gi_mesh* giMesh = giCreateMesh(&desc);
+    GiMesh* giMesh = giCreateMesh(&desc);
     assert(giMesh);
     meshes.push_back(giMesh);
 
@@ -310,7 +310,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
         (float) T[0][2], (float) T[1][2], (float) T[2][2], (float) T[3][2]
       };
 
-      gi_mesh_instance instance;
+      GiMeshInstance instance;
       instance.mesh = giMesh;
       memcpy(instance.transform, instanceTransform, sizeof(instanceTransform));
       instances.push_back(instance);
@@ -318,7 +318,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
   }
 }
 
-void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const
+void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, GiCameraDesc& giCamera) const
 {
   // We transform the scene into camera space at the beginning, so for
   // subsequent camera transforms, we need to 'substract' the initial transform.
@@ -344,7 +344,7 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, gi_c
   giCamera.vfov = camera.GetVFov();
 }
 
-const std::unordered_map<TfToken, gi_aov_id, TfToken::HashFunctor> s_aovIdMappings {
+const std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> s_aovIdMappings {
   { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
   { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
 #ifndef NDEBUG
@@ -376,9 +376,9 @@ const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVect
   return nullptr;
 }
 
-gi_aov_id _GetAovId(const TfToken& aovName)
+GiAovId _GetAovId(const TfToken& aovName)
 {
-  gi_aov_id id = GI_AOV_ID_COLOR;
+  GiAovId id = GI_AOV_ID_COLOR;
 
   auto iter = s_aovIdMappings.find(aovName);
 
@@ -440,7 +440,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
   uint32_t visibilityChangeCount = changeTracker.GetVisibilityChangeCount();
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
-  gi_aov_id aovId = _GetAovId(aovBinding->aovName);
+  GiAovId aovId = _GetAovId(aovBinding->aovName);
 
   bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
   bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
@@ -487,12 +487,12 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     m_rootMatrix = GfMatrix4d(1.0);// viewMatrix;
 
     // FIXME: destroy these resources
-    std::vector<const gi_material*> materials;
-    std::vector<const gi_mesh*> meshes;
-    std::vector<gi_mesh_instance> instances;
+    std::vector<const GiMaterial*> materials;
+    std::vector<const GiMesh*> meshes;
+    std::vector<GiMeshInstance> instances;
     _BakeMeshes(renderIndex, m_rootMatrix, materials, meshes, instances);
 
-    gi_shader_cache_params shaderParams;
+    GiShaderCacheParams shaderParams;
     shaderParams.aov_id = aovId;
     shaderParams.material_count = materials.size();
     shaderParams.materials = materials.data();
@@ -500,7 +500,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");
 
-    gi_geom_cache_params geomParams;
+    GiGeomCacheParams geomParams;
     geomParams.mesh_instance_count = instances.size();
     geomParams.mesh_instances = instances.data();
     geomParams.shader_cache = m_shaderCache;
@@ -514,10 +514,10 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
-  gi_camera giCamera;
+  GiCameraDesc giCamera;
   _ConstructGiCamera(*camera, giCamera);
 
-  gi_render_params renderParams;
+  GiRenderParams renderParams;
   renderParams.camera = &giCamera;
   renderParams.geom_cache = m_geomCache;
   renderParams.shader_cache = m_shaderCache;

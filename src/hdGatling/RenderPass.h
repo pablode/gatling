@@ -22,12 +22,12 @@
 #include <pxr/imaging/hd/renderDelegate.h>
 
 #include <gi.h>
-#include "MaterialNetworkTranslator.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingCamera;
 class HdGatlingMesh;
+class MaterialNetworkTranslator;
 
 class HdGatlingRenderPass final : public HdRenderPass
 {
@@ -50,32 +50,32 @@ private:
   void _BakeMeshGeometry(const HdGatlingMesh* mesh,
                          GfMatrix4d transform,
                          uint32_t materialIndex,
-                         std::vector<gi_face>& faces,
-                         std::vector<gi_vertex>& vertices) const;
+                         std::vector<GiFace>& faces,
+                         std::vector<GiVertex>& vertices) const;
 
   void _BakeMeshes(HdRenderIndex* renderIndex,
                    GfMatrix4d rootTransform,
-                   std::vector<const gi_material*>& materials,
-                   std::vector<const gi_mesh*>& meshes,
-                   std::vector<gi_mesh_instance>& instances);
+                   std::vector<const GiMaterial*>& materials,
+                   std::vector<const GiMesh*>& meshes,
+                   std::vector<GiMeshInstance>& instances);
 
-  void _ConstructGiCamera(const HdGatlingCamera& camera, gi_camera& giCamera) const;
+  void _ConstructGiCamera(const HdGatlingCamera& camera, GiCameraDesc& giCamera) const;
 
   void _ClearMaterials();
 
 private:
   const HdRenderSettingsMap& m_settings;
   const MaterialNetworkTranslator& m_materialNetworkTranslator;
-  gi_material* m_defaultMaterial;
-  std::vector<gi_material*> m_materials;
+  GiMaterial* m_defaultMaterial;
+  std::vector<GiMaterial*> m_materials;
   bool m_isConverged;
   uint32_t m_lastSceneStateVersion;
   uint32_t m_lastRenderSettingsVersion;
   uint32_t m_lastVisChangeCount;
   GfVec4f m_lastBackgroundColor;
-  gi_aov_id m_lastAovId;
-  gi_geom_cache* m_geomCache;
-  gi_shader_cache* m_shaderCache;
+  GiAovId m_lastAovId;
+  GiGeomCache* m_geomCache;
+  GiShaderCache* m_shaderCache;
   GfMatrix4d m_rootMatrix;
 };
 

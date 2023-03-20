@@ -19,15 +19,15 @@
 
 #include <pxr/imaging/hd/light.h>
 
-struct gi_scene;
-struct gi_sphere_light;
+struct GiScene;
+struct GiSphereLight;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingSphereLight final : public HdLight
 {
 public:
-  HdGatlingSphereLight(gi_scene* scene, const SdfPath& id);
+  HdGatlingSphereLight(GiScene* scene, const SdfPath& id);
 
   ~HdGatlingSphereLight();
 
@@ -39,8 +39,8 @@ public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
-  gi_scene* m_giScene;
-  gi_sphere_light* m_giSphereLight;
+  GiScene* m_giScene;
+  GiSphereLight* m_giSphereLight;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

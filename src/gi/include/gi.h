@@ -20,10 +20,13 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define GI_OK 0
-#define GI_ERROR 1
+enum GiStatus
+{
+  GI_OK = 0,
+  GI_ERROR
+};
 
-enum gi_aov_id
+enum GiAovId
 {
   GI_AOV_ID_COLOR              = 0,
   GI_AOV_ID_NORMAL             = 1,
@@ -35,7 +38,15 @@ enum gi_aov_id
   GI_AOV_ID_DEBUG_OPACITY      = 7
 };
 
-struct gi_camera
+struct GiGeomCache;
+struct GiMaterial;
+struct GiMesh;
+struct GiMeshInstance;
+struct GiShaderCache;
+struct GiScene;
+struct GiSphereLight;
+
+struct GiCameraDesc
 {
   float position[3];
   float forward[3];
@@ -43,7 +54,7 @@ struct gi_camera
   float vfov;
 };
 
-struct gi_vertex
+struct GiVertex
 {
   float pos[3];
   float u;
@@ -51,62 +62,56 @@ struct gi_vertex
   float v;
 };
 
-struct gi_face
+struct GiFace
 {
   uint32_t v_i[3];
 };
 
-struct gi_material;
-struct gi_mesh;
-
-struct gi_geom_cache;
-struct gi_shader_cache;
-
-struct gi_mesh_desc
+struct GiMeshDesc
 {
-  uint32_t           face_count;
-  gi_face*           faces;
-  const gi_material* material;
-  uint32_t           vertex_count;
-  gi_vertex*         vertices;
+  uint32_t          face_count;
+  GiFace*           faces;
+  const GiMaterial* material;
+  uint32_t          vertex_count;
+  GiVertex*         vertices;
 };
 
-struct gi_mesh_instance
+struct GiMeshInstance
 {
-  const gi_mesh* mesh;
+  const GiMesh* mesh;
   float transform[3][4];
 };
 
-struct gi_shader_cache_params
+struct GiShaderCacheParams
 {
-  gi_aov_id           aov_id;
-  uint32_t            material_count;
-  const gi_material** materials;
+  GiAovId            aov_id;
+  uint32_t           material_count;
+  const GiMaterial** materials;
 };
 
-struct gi_geom_cache_params
+struct GiGeomCacheParams
 {
-  uint32_t                mesh_instance_count;
-  const gi_mesh_instance* mesh_instances;
-  gi_shader_cache* shader_cache;
+  uint32_t              mesh_instance_count;
+  const GiMeshInstance* mesh_instances;
+  GiShaderCache*        shader_cache;
 };
 
-struct gi_render_params
+struct GiRenderParams
 {
-  const gi_camera*       camera;
-  const gi_geom_cache*   geom_cache;
-  const gi_shader_cache* shader_cache;
-  uint32_t               image_width;
-  uint32_t               image_height;
-  uint32_t               max_bounces;
-  uint32_t               spp;
-  uint32_t               rr_bounce_offset;
-  float                  rr_inv_min_term_prob;
-  float                  max_sample_value;
-  float                  bg_color[4];
+  const GiCameraDesc*  camera;
+  const GiGeomCache*   geom_cache;
+  const GiShaderCache* shader_cache;
+  uint32_t             image_width;
+  uint32_t             image_height;
+  uint32_t             max_bounces;
+  uint32_t             spp;
+  uint32_t             rr_bounce_offset;
+  float                rr_inv_min_term_prob;
+  float                max_sample_value;
+  float                bg_color[4];
 };
 
-struct gi_init_params
+struct GiInitParams
 {
   const char* resource_path;
   const char* shader_path;
@@ -114,7 +119,7 @@ struct gi_init_params
   const char* mdl_lib_path;
 };
 
-int giInitialize(const gi_init_params* params);
+GiStatus giInitialize(const GiInitParams* params);
 void giTerminate();
 
 struct GiAsset;
@@ -129,27 +134,25 @@ public:
 };
 void giRegisterAssetReader(GiAssetReader* reader);
 
-gi_material* giCreateMaterialFromMtlx(const char* doc_str);
-gi_material* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
-void giDestroyMaterial(gi_material* mat);
+GiMaterial* giCreateMaterialFromMtlx(const char* doc_str);
+GiMaterial* giCreateMaterialFromMdlFile(const char* file_path, const char* sub_identifier);
+void giDestroyMaterial(GiMaterial* mat);
 
-gi_mesh* giCreateMesh(const gi_mesh_desc* desc);
+GiMesh* giCreateMesh(const GiMeshDesc* desc);
 
-gi_geom_cache* giCreateGeomCache(const gi_geom_cache_params* params);
-void giDestroyGeomCache(gi_geom_cache* cache);
+GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params);
+void giDestroyGeomCache(GiGeomCache* cache);
 
-gi_shader_cache* giCreateShaderCache(const gi_shader_cache_params* params);
-void giDestroyShaderCache(gi_shader_cache* cache);
+GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params);
+void giDestroyShaderCache(GiShaderCache* cache);
 
 void giInvalidateFramebuffer();
 
-int giRender(const gi_render_params* params, float* rgba_img);
+int giRender(const GiRenderParams* params, float* rgba_img);
 
-struct gi_scene;
-gi_scene* giCreateScene();
-void giDestroyScene(gi_scene* scene);
+GiScene* giCreateScene();
+void giDestroyScene(GiScene* scene);
 
-struct gi_sphere_light;
-gi_sphere_light* giCreateSphereLight(gi_scene* scene);
-void giDestroySphereLight(gi_scene* scene, gi_sphere_light* light);
-void giSphereLightSetTransform(gi_sphere_light* light, float* transform3x4);
+GiSphereLight* giCreateSphereLight(GiScene* scene);
+void giDestroySphereLight(GiScene* scene, GiSphereLight* light);
+void giSetSphereLightTransform(GiSphereLight* light, float* transform3x4);
