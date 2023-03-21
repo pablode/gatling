@@ -70,7 +70,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
 {
   std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(GfVec3f(1.0f, 0.0f, 1.0f), "invalid");
 
-  m_defaultMaterial = giCreateMaterialFromMtlx(defaultMatSrc.c_str());
+  m_defaultMaterial = giCreateMaterialFromMtlxStr(defaultMatSrc.c_str());
   TF_AXIOM(m_defaultMaterial);
 }
 
@@ -267,7 +267,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
         else
         {
           std::string colorMatSrc = _MakeMaterialXColorMaterialSrc(color, materialIdStr.c_str());
-          GiMaterial* giColorMat = giCreateMaterialFromMtlx(colorMatSrc.c_str());
+          GiMaterial* giColorMat = giCreateMaterialFromMtlxStr(colorMatSrc.c_str());
           if (giColorMat)
           {
             m_materials.push_back(giColorMat);

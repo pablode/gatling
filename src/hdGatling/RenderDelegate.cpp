@@ -107,8 +107,7 @@ void HdGatlingRenderDelegate::CommitResources(HdChangeTracker* tracker)
   // We delay BVH building and GPU uploads to the next render call.
 }
 
-HdInstancer* HdGatlingRenderDelegate::CreateInstancer(HdSceneDelegate* delegate,
-                                                      const SdfPath& id)
+HdInstancer* HdGatlingRenderDelegate::CreateInstancer(HdSceneDelegate* delegate, const SdfPath& id)
 {
   return new HdGatlingInstancer(delegate, id);
 }
@@ -139,8 +138,7 @@ const TfTokenVector& HdGatlingRenderDelegate::GetSupportedRprimTypes() const
   return SUPPORTED_RPRIM_TYPES;
 }
 
-HdRprim* HdGatlingRenderDelegate::CreateRprim(const TfToken& typeId,
-                                              const SdfPath& rprimId)
+HdRprim* HdGatlingRenderDelegate::CreateRprim(const TfToken& typeId, const SdfPath& rprimId)
 {
   if (typeId == HdPrimTypeTokens->mesh)
   {
@@ -167,8 +165,7 @@ const TfTokenVector& HdGatlingRenderDelegate::GetSupportedSprimTypes() const
   return SUPPORTED_SPRIM_TYPES;
 }
 
-HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId,
-                                              const SdfPath& sprimId)
+HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPath& sprimId)
 {
   if (typeId == HdPrimTypeTokens->camera)
   {
@@ -208,8 +205,7 @@ const TfTokenVector& HdGatlingRenderDelegate::GetSupportedBprimTypes() const
   return SUPPORTED_BPRIM_TYPES;
 }
 
-HdBprim* HdGatlingRenderDelegate::CreateBprim(const TfToken& typeId,
-                                              const SdfPath& bprimId)
+HdBprim* HdGatlingRenderDelegate::CreateBprim(const TfToken& typeId, const SdfPath& bprimId)
 {
   if (typeId == HdPrimTypeTokens->renderBuffer)
   {

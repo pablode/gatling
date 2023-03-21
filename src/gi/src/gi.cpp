@@ -53,27 +53,27 @@ struct GiGpuBufferView
 struct GiGeomCache
 {
   std::vector<cgpu_blas> blases;
-  cgpu_buffer            buffer;
-  GiGpuBufferView        faceBufferView;
-  cgpu_tlas              tlas;
-  GiGpuBufferView        vertexBufferView;
+  cgpu_buffer            buffer = { CGPU_INVALID_HANDLE };
+  GiGpuBufferView        faceBufferView = {};
+  cgpu_tlas              tlas = { CGPU_INVALID_HANDLE };
+  GiGpuBufferView        vertexBufferView = {};
 };
 
 struct GiShaderCache
 {
-  uint32_t                       aovId;
+  uint32_t                       aovId = UINT32_MAX;
   std::vector<cgpu_shader>       hitShaders;
-  std::vector<cgpu_image>        images_2d;
-  std::vector<cgpu_image>        images_3d;
+  std::vector<cgpu_image>        images2d;
+  std::vector<cgpu_image>        images3d;
   std::vector<const GiMaterial*> materials;
   std::vector<cgpu_shader>       missShaders;
-  cgpu_pipeline                  pipeline;
-  cgpu_shader                    rgenShader;
+  cgpu_pipeline                  pipeline = { CGPU_INVALID_HANDLE };
+  cgpu_shader                    rgenShader = { CGPU_INVALID_HANDLE };
 };
 
 struct GiMaterial
 {
-  sg::Material* sg_mat;
+  sg::Material* sgMat;
 };
 
 struct GiMesh
@@ -91,7 +91,7 @@ struct GiSphereLight
 struct GiScene
 {
   std::unordered_set<GiSphereLight*> lights;
-  std::mutex lightsMutex;
+  std::mutex mutex;
 };
 
 cgpu_device s_device = { CGPU_INVALID_HANDLE };
@@ -190,35 +190,35 @@ void giRegisterAssetReader(GiAssetReader* reader)
   s_aggregateAssetReader->addAssetReader(reader);
 }
 
-GiMaterial* giCreateMaterialFromMtlx(const char* docStr)
+GiMaterial* giCreateMaterialFromMtlxStr(const char* docStr)
 {
-  sg::Material* sg_mat = s_shaderGen->createMaterialFromMtlx(docStr);
-  if (!sg_mat)
+  sg::Material* sgMat = s_shaderGen->createMaterialFromMtlxStr(docStr);
+  if (!sgMat)
   {
     return nullptr;
   }
 
   GiMaterial* mat = new GiMaterial;
-  mat->sg_mat = sg_mat;
+  mat->sgMat = sgMat;
   return mat;
 }
 
 GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier)
 {
-  sg::Material* sg_mat = s_shaderGen->createMaterialFromMdlFile(filePath, subIdentifier);
-  if (!sg_mat)
+  sg::Material* sgMat = s_shaderGen->createMaterialFromMdlFile(filePath, subIdentifier);
+  if (!sgMat)
   {
     return nullptr;
   }
 
   GiMaterial* mat = new GiMaterial;
-  mat->sg_mat = sg_mat;
+  mat->sgMat = sgMat;
   return mat;
 }
 
 void giDestroyMaterial(GiMaterial* mat)
 {
-  s_shaderGen->destroyMaterial(mat->sg_mat);
+  s_shaderGen->destroyMaterial(mat->sgMat);
   delete mat;
 }
 
@@ -309,7 +309,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       }
 
       // BLAS
-      bool isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sg_mat);
+      bool isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sgMat);
 
       cgpu_blas blas;
       if (!cgpu_create_blas(s_device, (uint32_t)vertices.size(), vertices.data(),
@@ -497,7 +497,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     materials.resize(params->materialCount);
     for (int i = 0; i < params->materialCount; i++)
     {
-      materials[i] = params->materials[i]->sg_mat;
+      materials[i] = params->materials[i]->sgMat;
     }
 
     // 1. Generate GLSL from MDL
@@ -527,7 +527,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       HitGroupCompInfo groupInfo;
       {
         sg::ShaderGen::MaterialGlslGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialShadingGenInfo(mat->sg_mat, genInfo))
+        if (!s_shaderGen->generateMaterialShadingGenInfo(mat->sgMat, genInfo))
         {
           threadWorkFailed = true;
           continue;
@@ -537,10 +537,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitInfo.genInfo = genInfo;
         groupInfo.closestHitInfo = hitInfo;
       }
-      if (!s_shaderGen->isMaterialOpaque(mat->sg_mat))
+      if (!s_shaderGen->isMaterialOpaque(mat->sgMat))
       {
         sg::ShaderGen::MaterialGlslGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialOpacityGenInfo(mat->sg_mat, genInfo))
+        if (!s_shaderGen->generateMaterialOpacityGenInfo(mat->sgMat, genInfo))
         {
           threadWorkFailed = true;
           continue;
@@ -597,7 +597,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         sg::ShaderGen::ClosestHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.chit";
-        hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sg_mat);
+        hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sgMat);
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
         hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;
@@ -795,8 +795,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   cache = new GiShaderCache;
   cache->aovId = params->aovId;
   cache->hitShaders = std::move(hitShaders);
-  cache->images_2d = std::move(images_2d);
-  cache->images_3d = std::move(images_3d);
+  cache->images2d = std::move(images_2d);
+  cache->images3d = std::move(images_3d);
   cache->materials.resize(params->materialCount);
   for (int i = 0; i < params->materialCount; i++)
   {
@@ -834,8 +834,8 @@ cleanup:
 
 void giDestroyShaderCache(GiShaderCache* cache)
 {
-  s_texSys->destroyUncachedImages(cache->images_2d);
-  s_texSys->destroyUncachedImages(cache->images_3d);
+  s_texSys->destroyUncachedImages(cache->images2d);
+  s_texSys->destroyUncachedImages(cache->images3d);
   cgpu_destroy_shader(s_device, cache->rgenShader);
   for (cgpu_shader shader : cache->missShaders)
   {
@@ -939,21 +939,21 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   //}
   buffers.push_back({ 3, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
-  size_t image_count = shader_cache->images_2d.size() + shader_cache->images_3d.size();
+  size_t image_count = shader_cache->images2d.size() + shader_cache->images3d.size();
 
   std::vector<cgpu_image_binding> images;
   images.reserve(image_count);
 
   cgpu_sampler_binding sampler = { 4, 0, s_texSampler };
 
-  for (uint32_t i = 0; i < shader_cache->images_2d.size(); i++)
+  for (uint32_t i = 0; i < shader_cache->images2d.size(); i++)
   {
-    images.push_back({ 5, i, shader_cache->images_2d[i] });
+    images.push_back({ 5, i, shader_cache->images2d[i] });
   }
 
-  for (uint32_t i = 0; i < shader_cache->images_3d.size(); i++)
+  for (uint32_t i = 0; i < shader_cache->images3d.size(); i++)
   {
-    images.push_back({ 6, i, shader_cache->images_3d[i] });
+    images.push_back({ 6, i, shader_cache->images3d[i] });
   }
 
   cgpu_tlas_binding as = { 7, 0, geom_cache->tlas };
@@ -999,22 +999,20 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   barrier.offset = 0;
   barrier.size = CGPU_WHOLE_SIZE;
 
-  if (!cgpu_cmd_pipeline_barrier(
-      command_buffer,
-      0, nullptr,
-      1, &barrier,
-      0, nullptr))
+  if (!cgpu_cmd_pipeline_barrier(command_buffer,
+                                 0, nullptr,
+                                 1, &barrier,
+                                 0, nullptr))
   {
     goto cleanup;
   }
 
-  if (!cgpu_cmd_copy_buffer(
-      command_buffer,
-      s_outputBuffer,
-      0,
-      s_outputStagingBuffer,
-      0,
-      output_buffer_size))
+  if (!cgpu_cmd_copy_buffer(command_buffer,
+                            s_outputBuffer,
+                            0,
+                            s_outputStagingBuffer,
+                            0,
+                            output_buffer_size))
   {
     goto cleanup;
   }
@@ -1029,10 +1027,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   if (!cgpu_reset_fence(s_device, fence))
     goto cleanup;
 
-  if (!cgpu_submit_command_buffer(
-      s_device,
-      command_buffer,
-      fence))
+  if (!cgpu_submit_command_buffer(s_device, command_buffer, fence))
   {
     goto cleanup;
   }
@@ -1097,30 +1092,27 @@ void giDestroyScene(GiScene* scene)
 
 GiSphereLight* giCreateSphereLight(GiScene* scene)
 {
-  auto light = new GiSphereLight;
-
-  float identityTransform[3][4] = {
+  const float identityTransform[3][4] = {
     1.0f, 0.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
     0.0f, 0.0f, 1.0f, 0.0f
   };
-  memcpy(light->transform, identityTransform, sizeof(identityTransform));
 
+  auto light = new GiSphereLight;
+  memcpy(light->transform, identityTransform, sizeof(identityTransform));
   {
-    std::lock_guard lock(scene->lightsMutex);
+    std::lock_guard guard(scene->mutex);
     scene->lights.insert(light);
   }
-
   return light;
 }
 
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
 {
   {
-    std::lock_guard lock(scene->lightsMutex);
+    std::lock_guard guard(scene->mutex);
     scene->lights.erase(light);
   }
-
   delete light;
 }
 

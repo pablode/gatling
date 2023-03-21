@@ -118,7 +118,7 @@ namespace gi::sg
     return compiledMaterial->get_opacity() == mi::neuraylib::OPACITY_OPAQUE;
   }
 
-  Material* ShaderGen::createMaterialFromMtlx(std::string_view docStr)
+  Material* ShaderGen::createMaterialFromMtlxStr(std::string_view docStr)
   {
     std::string mdlSrc;
     std::string subIdentifier;

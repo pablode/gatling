@@ -57,7 +57,7 @@ namespace gi::sg
     ~ShaderGen();
 
   public:
-    Material* createMaterialFromMtlx(std::string_view docStr);
+    Material* createMaterialFromMtlxStr(std::string_view docStr);
     Material* createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
     void destroyMaterial(Material* mat);
     bool isMaterialEmissive(const Material* mat);

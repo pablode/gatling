@@ -257,7 +257,7 @@ GiMaterial* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, co
 
   mx::string docStr = mx::writeToXmlString(doc);
 
-  return giCreateMaterialFromMtlx(docStr.c_str());
+  return giCreateMaterialFromMtlxStr(docStr.c_str());
 }
 
 mx::DocumentPtr MaterialNetworkTranslator::CreateMaterialXDocumentFromNetwork(const SdfPath& id,

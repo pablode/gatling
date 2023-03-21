@@ -38,6 +38,7 @@ enum GiAovId
   GI_AOV_ID_DEBUG_OPACITY      = 7
 };
 
+struct GiAsset;
 struct GiGeomCache;
 struct GiMaterial;
 struct GiMesh;
@@ -119,10 +120,6 @@ struct GiInitParams
   const char* mdlLibPath;
 };
 
-GiStatus giInitialize(const GiInitParams* params);
-void giTerminate();
-
-struct GiAsset;
 class GiAssetReader
 {
 public:
@@ -132,9 +129,13 @@ public:
   virtual void close(GiAsset* asset) = 0;
   virtual ~GiAssetReader() = default;
 };
+
+GiStatus giInitialize(const GiInitParams* params);
+void giTerminate();
+
 void giRegisterAssetReader(GiAssetReader* reader);
 
-GiMaterial* giCreateMaterialFromMtlx(const char* docStr);
+GiMaterial* giCreateMaterialFromMtlxStr(const char* docStr);
 GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier);
 void giDestroyMaterial(GiMaterial* mat);
 
