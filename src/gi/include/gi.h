@@ -65,6 +65,8 @@ struct GiVertex
   float u;
   float norm[3];
   float v;
+  float tangent[3];
+  float bitangentSign;
 };
 
 struct GiFace

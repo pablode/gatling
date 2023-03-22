@@ -29,6 +29,8 @@ struct fvertex
     vec4 field1;
     /* norm.{x, y, z}, tex.v */
     vec4 field2;
+    /* tangent.{x, y, z}, bitangent sign */
+    vec4 tangent;
 };
 
 struct face

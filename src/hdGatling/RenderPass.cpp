@@ -108,12 +108,16 @@ bool HdGatlingRenderPass::IsConverged() const
   return m_isConverged;
 }
 
-GiVertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal, const GfVec2f& texCoords)
+GiVertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal,
+                       const GfVec2f& texCoords, const GfVec3f& tangent, float bitangentSign)
 {
   GfVec3f newPoint = transform.Transform(point);
 
   GfVec3f newNormal = normalMatrix.TransformDir(normal);
   newNormal.Normalize();
+
+  GfVec3f newTangent = transform.Transform(tangent);
+  newTangent.Normalize();
 
   GiVertex vertex;
   vertex.pos[0] = newPoint[0];
@@ -124,6 +128,10 @@ GiVertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVe
   vertex.norm[2] = newNormal[2];
   vertex.u = texCoords[0];
   vertex.v = 1.0f - texCoords[1];
+  vertex.tangent[0] = newTangent[0];
+  vertex.tangent[1] = newTangent[1];
+  vertex.tangent[2] = newTangent[2];
+  vertex.bitangentSign = bitangentSign;
 
   return vertex;
 }
@@ -135,6 +143,10 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
                                             std::vector<GiVertex>& vertices) const
 {
   GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
+
+  // TODO
+  GfVec3f tangent(0.0f, 0.0f, 0.0f);
+  float bitangentSign = 1.0f;
 
   const VtVec3iArray& meshFaces = mesh->GetFaces();
   const VtVec3fArray& meshPoints = mesh->GetPoints();
@@ -162,7 +174,7 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
       bool hasTexCoords = meshTexCoords.array.size() > 0;
       GfVec2f texCoords = hasTexCoords ? meshTexCoords.array[meshTexCoords.indexed ? vertexIndices[j] : (i * 3 + j)] : GfVec2f();
 
-      GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
+      GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords, tangent, bitangentSign);
       vertices.push_back(vertex);
     }
 
@@ -183,7 +195,7 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
     bool hasTexCoords = meshTexCoords.array.size() > 0;
     GfVec2f texCoords = hasTexCoords ? meshTexCoords.array[j] : GfVec2f();
 
-    GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords);
+    GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords, tangent, bitangentSign);
     vertices.push_back(vertex);
   }
 }
