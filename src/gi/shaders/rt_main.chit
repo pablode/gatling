@@ -102,7 +102,11 @@ void main()
     /* TODO 5. NEE light sampling */
 
     /* 6. Russian Roulette */
-    vec4 rand4 = pcg4d_next(rayPayload.rng_state);
+#ifdef RAND_4D
+    float k1 = rng4d_next(rayPayload.rng_state).x;
+#else
+    float k1 = rng_next(rayPayload.rng_state);
+#endif
 
     uint bounce = rayPayload.bitfield & 0x7FFFFFFFu;
     // TODO: don't break here, need test NEE vis & add contrib - but don't do BSDF sampling
@@ -113,7 +117,7 @@ void main()
     }
     else if (bounce > PC.RR_BOUNCE_OFFSET)
     {
-        if (russian_roulette(rand4.x, rayPayload.throughput))
+        if (russian_roulette(k1, rayPayload.throughput))
         {
             rayPayload.bitfield = 0xFFFFFFFFu;
             return;
@@ -126,7 +130,14 @@ void main()
         bsdf_sample_data.ior1 = vec3(ior1);
         bsdf_sample_data.ior2 = vec3(ior2);
         bsdf_sample_data.k1 = -rayPayload.ray_dir;
-        bsdf_sample_data.xi = pcg4d_next(rayPayload.rng_state);
+#ifdef RAND_4D
+        bsdf_sample_data.xi = rng4d_next(rayPayload.rng_state);
+#else
+        bsdf_sample_data.xi[0] = rng_next(rayPayload.rng_state);
+        bsdf_sample_data.xi[1] = rng_next(rayPayload.rng_state);
+        bsdf_sample_data.xi[2] = rng_next(rayPayload.rng_state);
+        bsdf_sample_data.xi[3] = rng_next(rayPayload.rng_state);
+#endif
         mdl_bsdf_scattering_init(shading_state);
         mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
 

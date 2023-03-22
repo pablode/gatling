@@ -34,9 +34,13 @@ void main()
   return;
 #endif
 
-  vec4 r = pcg4d_next(rayPayload.rng_state);
-  if (r.x > opacity)
+#ifdef RAND_4D
+  float k = rng4d_next(rayPayload.rng_state).x;
+#else
+  float k = rng_next(rayPayload.rng_state);
+#endif
+  if (k > opacity)
   {
-	ignoreIntersectionEXT;
+    ignoreIntersectionEXT;
   }
 }

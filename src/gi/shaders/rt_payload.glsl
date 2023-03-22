@@ -1,6 +1,12 @@
+#include "common.glsl"
+
 struct RayPayload
 {
+#ifdef RAND_4D
     uvec4 rng_state;
+#else
+    uint rng_state;
+#endif
     vec3 ray_origin;
     vec3 ray_dir;
     vec3 throughput;
@@ -13,6 +19,10 @@ struct RayPayload
 
 struct ShadowRayPayload
 {
+#ifdef RAND_4D
     uvec4 rng_state;
+#else
+    uint rng_state;
+#endif
     bool shadowed;
 };

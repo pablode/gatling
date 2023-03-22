@@ -7,9 +7,13 @@
 
 layout(location = 0) rayPayloadEXT RayPayload rayPayload;
 
-vec3 evaluate_sample(inout uvec4 rng_state,
-                     in vec3 ray_origin,
-                     in vec3 ray_dir)
+vec3 evaluate_sample(in vec3 ray_origin,
+                     in vec3 ray_dir,
+#ifdef RAND_4D
+                     inout uvec4 rng_state)
+#else
+                     inout uint rng_state)
+#endif
 {
     rayPayload.rng_state  = rng_state;
     rayPayload.ray_origin = ray_origin;
@@ -78,13 +82,22 @@ void main()
     vec3 pixel_color = vec3(0.0, 0.0, 0.0);
     for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
     {
-        uvec4 rng_state = pcg4d_init(pixel_pos.xy, PC.SAMPLE_OFFSET + s);
-        vec4 r = pcg4d_next(rng_state);
+        uint sampleIndex = PC.SAMPLE_OFFSET + s;
+#ifdef RAND_4D
+        uvec4 rng_state = rng4d_init(pixel_pos.xy, sampleIndex);
+        vec4 k = rng4d_next(rng_state);
+        float k1 = k.x;
+        float k2 = k.y;
+#else
+        uint rng_state = rng_init(pixel_index, sampleIndex);
+        float k1 = rng_next(rng_state);
+        float k2 = rng_next(rng_state);
+#endif
 
         vec3 P =
             L +
-            (float(pixel_pos.x) + r.x) * camera_right * WX +
-            (float(pixel_pos.y) + r.y) * PC.CAMERA_UP * HY;
+            (float(pixel_pos.x) + k1) * camera_right * WX +
+            (float(pixel_pos.y) + k2) * PC.CAMERA_UP * HY;
 
         vec3 ray_origin = PC.CAMERA_POSITION;
         vec3 ray_dir = P - ray_origin;
@@ -96,7 +109,7 @@ void main()
         ray_dir = normalize(ray_dir);
 
         /* Path trace sample and accumulate color. */
-        vec3 sample_color = evaluate_sample(rng_state, ray_origin, ray_dir);
+        vec3 sample_color = evaluate_sample(ray_origin, ray_dir, rng_state);
         pixel_color += sample_color * inv_sample_count;
     }
 

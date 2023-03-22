@@ -1,3 +1,6 @@
+#ifndef H_COMMON
+#define H_COMMON
+
 const uint UINT32_MAX = 0xFFFFFFFFu;
 const float FLOAT_MAX = 3.402823466e38;
 const float FLOAT_MIN = 1.175494351e-38;
@@ -35,10 +38,26 @@ struct face
     uint v_2;
 };
 
+vec4 uvec4AsVec4(uvec4 v)
+{
+    v >>= 9;
+    v |= 0x3f800000;
+    return vec4(uintBitsToFloat(v)) - vec4(1.0);
+}
+
+float uintAsFloat(uint v)
+{
+    return uintBitsToFloat(0x3f800000 | (v >> 9)) - 1.0;
+}
+
+// Enable for higher quality random numbers at the cost of performance
+#define RAND_4D
+
+#ifdef RAND_4D
 // RNG producing on a four-element vector.
 // From: "Hash Functions for GPU Rendering" by Jarzynski and Olano.
 // Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/
-uvec4 pcg4d(uvec4 v)
+uvec4 hash_pcg4d(uvec4 v)
 {
     v = v * 1664525u + 1013904223u;
     v.x += v.y * v.w; v.y += v.z * v.x; v.z += v.x * v.y; v.w += v.y * v.z;
@@ -47,23 +66,40 @@ uvec4 pcg4d(uvec4 v)
     return v;
 }
 
-uvec4 pcg4d_init(uvec2 pixel_coords, uint frame_num)
+vec4 rng4d_next(inout uvec4 rng_state)
+{
+    rng_state.w++;
+    return uvec4AsVec4(hash_pcg4d(rng_state));
+}
+
+uvec4 rng4d_init(uvec2 pixel_coords, uint frame_num)
 {
     return uvec4(pixel_coords.xy, frame_num, 0);
 }
-
-vec4 uvec4AsVec4(uvec4 v)
+#else
+// Hash prospector parametrization found by GH user TheIronBorn:
+// https://github.com/skeeto/hash-prospector#discovered-hash-functions
+uint hash_theironborn(uint x)
 {
-    v >>= 9;
-    v |= 0x3f800000;
-    return vec4(uintBitsToFloat(v)) - vec4(1.0, 1.0, 1.0, 1.0);
+    x ^= x >> 16u;
+    x *= 0x21f0aaadu;
+    x ^= x >> 15u;
+    x *= 0xd35a2d97u;
+    x ^= x >> 15u;
+    return x;
 }
 
-vec4 pcg4d_next(inout uvec4 rng_state)
+float rng_next(inout uint rng_state)
 {
-    rng_state.w++;
-    return uvec4AsVec4(pcg4d(rng_state));
+    rng_state = hash_theironborn(rng_state);
+    return uintAsFloat(rng_state);
 }
+
+uint rng_init(uint pixel_index, uint frame_num)
+{
+    return pixel_index ^ hash_theironborn(frame_num);
+}
+#endif
 
 // Duff et al. 2017. Building an Orthonormal Basis, Revisited. JCGT.
 // Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/
@@ -215,3 +251,5 @@ const uint MORTON_2D_LUT_32x8_REV[256] = {
     (170), (171), (174), (175), (186), (187), (190), (191),
     (234), (235), (238), (239), (250), (251), (254), (255)
 };
+
+#endif
