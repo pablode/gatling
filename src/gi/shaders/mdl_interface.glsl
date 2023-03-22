@@ -250,3 +250,8 @@ int tex_height_2d(int tex, ivec2 uv_tile, float frame)
 {
     return tex_resolution_2d(tex, uv_tile, frame).y;
 }
+
+vec3 mdl_adapt_normal(State state, vec3 normal)
+{
+    return normal;
+}

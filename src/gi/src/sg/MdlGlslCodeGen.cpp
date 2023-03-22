@@ -46,6 +46,7 @@ namespace gi::sg
     }
 
     m_backend->set_option("enable_exceptions", "off");
+    m_backend->set_option("use_renderer_adapt_normal", "on");
 
     m_logger = mi::base::Handle<MdlLogger>(runtime.getLogger());
 
