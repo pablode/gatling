@@ -34,8 +34,18 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     }
 
     // Tangent and bitangent
-    vec3 tangent, bitangent;
-    orthonormal_basis(normal, tangent, bitangent);
+    vec4 t_0 = v_0.tangent;
+    vec4 t_1 = v_1.tangent;
+    vec4 t_2 = v_2.tangent;
+
+    vec3 localTangent = normalize(bc.x * t_0.xyz + bc.y * t_1.xyz + bc.z * t_2.xyz);
+    vec3 tangent = normalize(vec3(gl_ObjectToWorldEXT * vec4(localTangent, 0.0)));
+    // Re-orthonomalize to improve shading of surfaces with shared vertices. See:
+    // https://learnopengl.com/Advanced-Lighting/Normal-Mapping (bottom)
+    tangent = normalize(tangent - dot(tangent, normal) * normal);
+
+    float bitangentSign = bc.x * t_0.w + bc.y * t_1.w + bc.z * t_2.w;
+    vec3 bitangent = cross(normal, tangent) * bitangentSign;
 
     // UV coordinates
     vec2 uv_0 = vec2(v_0.field1.w, v_0.field2.w);
