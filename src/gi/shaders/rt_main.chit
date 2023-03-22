@@ -2,6 +2,9 @@
 #extension GL_EXT_ray_tracing: require
 #extension GL_EXT_nonuniform_qualifier: enable
 #extension GL_EXT_samplerless_texture_functions: require
+#extension GL_EXT_shader_16bit_storage: require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
+#extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 
 #include "rt_payload.glsl"
 #include "rt_descriptors.glsl"
@@ -39,36 +42,41 @@ void main()
 
     /* 2. Set up shading state. */
     State shading_state; // Shading_state_material
-    setup_mdl_shading_state(hit_face_idx, hit_bc, rayPayload.ray_dir, shading_state);
+    setup_mdl_shading_state(hit_face_idx, hit_bc, shading_state);
 
     // we keep a copy of the normal here since it can be changed within the state by *_init() functions:
     // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
     const vec3 normal = shading_state.normal;
 
-    bool inside = bool(rayPayload.bitfield & 0x80000000u);
+    vec3 throughput = vec3(rayPayload.throughput);
+    vec3 radiance = vec3(rayPayload.radiance);
+
+    uint bounce = (rayPayload.bitfield & 0x7FFFu);
+    bool inside = bool(rayPayload.bitfield & 0x8000u);
+
     const bool thin_walled = mdl_thin_walled(shading_state);
     const float ior1 = (inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
     const float ior2 = (inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
 #if AOV_ID == AOV_ID_DEBUG_OPACITY
 #ifdef IS_OPAQUE
-    rayPayload.radiance = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.radiance = f16vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap
+    rayPayload.bitfield = uint16_t(0xFFFFu);
 #else
     // Payload fields have been set in any-hit shader.
 #endif
     return;
 #elif AOV_ID == AOV_ID_NORMAL
-    rayPayload.radiance = (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.radiance = f16vec3((normal + vec3(1.0, 1.0, 1.0)) * 0.5);
+    rayPayload.bitfield = uint16_t(0xFFFFu);
     return;
 #elif AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
-    rayPayload.radiance = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.radiance = f16vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+    rayPayload.bitfield = uint16_t(0xFFFFu);
     return;
 #elif AOV_ID == AOV_ID_DEBUG_TEXCOORDS
-    rayPayload.radiance = shading_state.text_coords[0];
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.radiance = f16vec3(shading_state.text_coords[0]);
+    rayPayload.bitfield = uint16_t(0xFFFFu);
     return;
 #endif
 
@@ -76,15 +84,15 @@ void main()
     if (inside && !thin_walled)
     {
         vec3 abs_coeff = mdl_absorption_coefficient(shading_state);
-        rayPayload.throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
-        rayPayload.throughput.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0;
-        rayPayload.throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
+        throughput.x *= float16_t(abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0);
+        throughput.y *= float16_t(abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0);
+        throughput.z *= float16_t(abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0);
     }
 
     /* 4. Add Emission */
     {
         Edf_evaluate_data edf_evaluate_data;
-        edf_evaluate_data.k1 = -rayPayload.ray_dir;
+        edf_evaluate_data.k1 = -gl_WorldRayDirectionEXT;
         mdl_edf_emission_init(shading_state);
         mdl_edf_emission_evaluate(edf_evaluate_data, shading_state);
 
@@ -92,7 +100,7 @@ void main()
         {
             vec3 emission_intensity = mdl_edf_emission_intensity(shading_state);
 
-            rayPayload.radiance += rayPayload.throughput * edf_evaluate_data.edf * emission_intensity;
+            radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }
     }
 
@@ -108,28 +116,23 @@ void main()
     float k1 = rng_next(rayPayload.rng_state);
 #endif
 
-    uint bounce = rayPayload.bitfield & 0x7FFFFFFFu;
-    // TODO: don't break here, need test NEE vis & add contrib - but don't do BSDF sampling
+    bool terminateRay = false;
     if (bounce == PC.MAX_BOUNCES - 1)
     {
-        rayPayload.bitfield = 0xFFFFFFFFu;
-        return;
+        terminateRay = true;
     }
     else if (bounce > PC.RR_BOUNCE_OFFSET)
     {
-        if (russian_roulette(k1, rayPayload.throughput))
-        {
-            rayPayload.bitfield = 0xFFFFFFFFu;
-            return;
-        }
+        terminateRay = russian_roulette(k1, throughput);
     }
 
     /* 7. BSDF (importance) sampling. */
+    if (!terminateRay)
     {
         Bsdf_sample_data bsdf_sample_data;
         bsdf_sample_data.ior1 = vec3(ior1);
         bsdf_sample_data.ior2 = vec3(ior2);
-        bsdf_sample_data.k1 = -rayPayload.ray_dir;
+        bsdf_sample_data.k1 = -gl_WorldRayDirectionEXT;
 #ifdef RAND_4D
         bsdf_sample_data.xi = rng4d_next(rayPayload.rng_state);
 #else
@@ -141,27 +144,21 @@ void main()
         mdl_bsdf_scattering_init(shading_state);
         mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
 
-        if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
-        {
-            // TODO: don't break here, need test NEE vis & add contrib
-            rayPayload.bitfield = 0xFFFFFFFFu;
-            return;
-        }
-
-        rayPayload.throughput *= bsdf_sample_data.bsdf_over_pdf;
+        terminateRay = (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB);
+        throughput *= bsdf_sample_data.bsdf_over_pdf;
 
         bool is_transmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;
-
         if (is_transmission)
         {
             inside = !inside;
         }
 
-        rayPayload.ray_dir = bsdf_sample_data.k2;
+        rayPayload.ray_dir = encode_octahedral(bsdf_sample_data.k2);
         rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (is_transmission ? -1.0 : 1.0));
     }
 
     /* TODO 8. NEE shadow query */
+    // TODO: skip vs tMax==0.0
     {
 #if AOV_ID == AOV_ID_DEBUG_NEE
         shadowRayPayload.rng_state = rayPayload.rng_state;
@@ -169,8 +166,9 @@ void main()
 
         vec3 shadowRayOrigin = rayPayload.ray_origin; // temporary
         vec3 shadowRayDir = shading_state.geom_normal; // temporary
-
         uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+        float tMax = float(!terminateRay) * FLOAT_MAX;
+
         traceRayEXT(
             sceneAS,         // top-level acceleration structure
             rayFlags,        // rayFlags
@@ -181,17 +179,19 @@ void main()
             shadowRayOrigin, // ray origin
             0.0,             // ray min range
             shadowRayDir,    // ray direction
-            FLOAT_MAX,       // ray max range
+            tMax,            // ray max range
             1                // payload (location = 1, differs because of shadow test)
         );
 
         rayPayload.rng_state = shadowRayPayload.rng_state;
 
-        rayPayload.radiance = shadowRayPayload.shadowed ? vec3(1,0,0) : vec3(0,1,0);
-        rayPayload.bitfield = 0xFFFFFFFFu;
-        return;
+        radiance = f16vec3(shadowRayPayload.shadowed ? vec3(1,0,0) : vec3(0,1,0));
+        terminateRay = true;
 #endif
     }
 
-    rayPayload.bitfield = (uint(inside) << 31) | (bounce + 1);
+    uint bitfield = (uint(inside) << 15) | (bounce + 1);
+    rayPayload.bitfield = uint16_t(terminateRay ? 0xFFFFu : bitfield);
+    rayPayload.throughput = f16vec3(throughput);
+    rayPayload.radiance = f16vec3(radiance);
 }

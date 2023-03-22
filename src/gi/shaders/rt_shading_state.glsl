@@ -1,4 +1,4 @@
-void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, in vec3 ray_dir, out State state)
+void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State state)
 {
     vec3 bc = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
 
@@ -27,11 +27,11 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, in vec3 ray_d
     vec3 normal = normalize(vec3(localNormal * gl_WorldToObjectEXT));
 
     // Flip normals to side of the incident ray
-    if (dot(geomNormal, ray_dir) > 0.0)
+    if (dot(geomNormal, gl_WorldRayDirectionEXT) > 0.0)
     {
         geomNormal *= -1.0;
     }
-    if (dot(normal, ray_dir) > 0.0)
+    if (dot(normal, gl_WorldRayDirectionEXT) > 0.0)
     {
         normal *= -1.0;
     }
