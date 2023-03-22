@@ -40,6 +40,8 @@
 #include <gml.h>
 #include <sg/ShaderGen.h>
 
+#include <MaterialXCore/Document.h>
+
 using namespace gi;
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
@@ -190,9 +192,28 @@ void giRegisterAssetReader(GiAssetReader* reader)
   s_aggregateAssetReader->addAssetReader(reader);
 }
 
-GiMaterial* giCreateMaterialFromMtlxStr(const char* docStr)
+GiMaterial* giCreateMaterialFromMtlxStr(const char* str)
 {
-  sg::Material* sgMat = s_shaderGen->createMaterialFromMtlxStr(docStr);
+  sg::Material* sgMat = s_shaderGen->createMaterialFromMtlxStr(str);
+  if (!sgMat)
+  {
+    return nullptr;
+  }
+
+  GiMaterial* mat = new GiMaterial;
+  mat->sgMat = sgMat;
+  return mat;
+}
+
+GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::Document*/> doc)
+{
+  MaterialX::DocumentPtr resolvedDoc = reinterpret_pointer_cast<MaterialX::Document>(doc);
+  if (!doc)
+  {
+    return nullptr;
+  }
+
+  sg::Material* sgMat = s_shaderGen->createMaterialFromMtlxDoc(resolvedDoc);
   if (!sgMat)
   {
     return nullptr;

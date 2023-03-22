@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <memory>
 
 enum GiStatus
 {
@@ -135,7 +136,8 @@ void giTerminate();
 
 void giRegisterAssetReader(GiAssetReader* reader);
 
-GiMaterial* giCreateMaterialFromMtlxStr(const char* docStr);
+GiMaterial* giCreateMaterialFromMtlxStr(const char* str);
+GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::Document*/> doc);
 GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier);
 void giDestroyMaterial(GiMaterial* mat);
 

@@ -141,6 +141,30 @@ namespace gi::sg
     return m;
   }
 
+  Material* ShaderGen::createMaterialFromMtlxDoc(const MaterialX::DocumentPtr doc)
+  {
+    // FIXME: deduplicate code
+    std::string mdlSrc;
+    std::string subIdentifier;
+    bool isOpaque;
+    if (!m_mtlxMdlCodeGen->translate(doc, mdlSrc, subIdentifier, isOpaque))
+    {
+      return nullptr;
+    }
+
+    mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
+    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
+    {
+      return nullptr;
+    }
+
+    Material* m = new Material();
+    m->compiledMaterial = compiledMaterial;
+    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
+    m->isOpaque = isOpaque;
+    return m;
+  }
+
   Material* ShaderGen::createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;

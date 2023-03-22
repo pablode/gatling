@@ -101,7 +101,24 @@ namespace gi::sg
     return nullptr;
   }
 
-  bool MtlxMdlCodeGen::translate(std::string_view mtlxSrc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
+  bool MtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
+  {
+    try
+    {
+      mx::DocumentPtr doc = mx::createDocument();
+      doc->importLibrary(m_stdLib);
+      mx::readFromXmlString(doc, mtlxStr.data());
+
+      return translate(doc, mdlSrc, subIdentifier, isOpaque);
+    }
+    catch (const std::exception& ex)
+    {
+      fprintf(stderr, "Exception creating MaterialX document: %s\n", ex.what());
+      return false;
+    }
+  }
+
+  bool MtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -114,14 +131,10 @@ namespace gi::sg
     mx::ShaderPtr shader = nullptr;
     try
     {
-      mx::DocumentPtr doc = mx::createDocument();
-      doc->importLibrary(m_stdLib);
-      mx::readFromXmlString(doc, mtlxSrc.data());
-
       MtlxDocumentPatcher patcher;
-      patcher.patch(doc);
+      patcher.patch(mtlxDoc);
 
-      mx::TypedElementPtr element = _FindSurfaceShaderElement(doc);
+      mx::TypedElementPtr element = _FindSurfaceShaderElement(mtlxDoc);
       if (!element)
       {
         fprintf(stderr, "Generation failed: surface shader not found\n");
