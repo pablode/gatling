@@ -495,7 +495,8 @@ bool cgpu_create_device(cgpu_device* p_device)
     VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
     VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
-    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME // required by VK_KHR_spirv_1_4
+    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME, // required by VK_KHR_spirv_1_4
+    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME
   };
   uint32_t required_extension_count = sizeof(required_extensions) / sizeof(required_extensions[0]);
 
@@ -667,17 +668,23 @@ bool cgpu_create_device(cgpu_device* p_device)
   descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_FALSE;
   descriptor_indexing_features.runtimeDescriptorArray = VK_FALSE;
 
-  VkPhysicalDevice16BitStorageFeatures device_16bit_storage_featurs = {0};
-  device_16bit_storage_featurs.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
-  device_16bit_storage_featurs.pNext = &descriptor_indexing_features;
-  device_16bit_storage_featurs.storageBuffer16BitAccess = VK_TRUE;
-  device_16bit_storage_featurs.uniformAndStorageBuffer16BitAccess = VK_FALSE;
-  device_16bit_storage_featurs.storagePushConstant16 = VK_FALSE;
-  device_16bit_storage_featurs.storageInputOutput16 = VK_FALSE;
+  VkPhysicalDeviceShaderFloat16Int8Features shader_float16_int8_features = {0};
+  shader_float16_int8_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+  shader_float16_int8_features.pNext = &descriptor_indexing_features;
+  shader_float16_int8_features.shaderFloat16 = VK_TRUE;
+  shader_float16_int8_features.shaderInt8 = VK_FALSE;
+
+  VkPhysicalDevice16BitStorageFeatures device_16bit_storage_features = {0};
+  device_16bit_storage_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
+  device_16bit_storage_features.pNext = &shader_float16_int8_features;
+  device_16bit_storage_features.storageBuffer16BitAccess = VK_TRUE;
+  device_16bit_storage_features.uniformAndStorageBuffer16BitAccess = VK_TRUE;
+  device_16bit_storage_features.storagePushConstant16 = VK_FALSE;
+  device_16bit_storage_features.storageInputOutput16 = VK_FALSE;
 
   VkPhysicalDeviceFeatures2 device_features2;
   device_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  device_features2.pNext = &device_16bit_storage_featurs;
+  device_features2.pNext = &device_16bit_storage_features;
   device_features2.features.robustBufferAccess = VK_FALSE;
   device_features2.features.fullDrawIndexUint32 = VK_FALSE;
   device_features2.features.imageCubeArray = VK_FALSE;
