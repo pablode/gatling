@@ -29,17 +29,8 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     // Flip normals to side of the incident ray
     if (dot(geomNormal, gl_WorldRayDirectionEXT) > 0.0)
     {
-        geomNormal *= -1.0;
-    }
-    if (dot(normal, gl_WorldRayDirectionEXT) > 0.0)
-    {
-        normal *= -1.0;
-    }
-
-    // Ensure that geometry and shading normal have same sidedness
-    if (dot(geomNormal, normal) < 0.0)
-    {
         geomNormal = -geomNormal;
+        normal = -normal;
     }
 
     // Tangent and bitangent

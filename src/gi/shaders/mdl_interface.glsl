@@ -251,7 +251,35 @@ int tex_height_2d(int tex, ivec2 uv_tile, float frame)
     return tex_resolution_2d(tex, uv_tile, frame).y;
 }
 
+// Adapt normal to fix the 'shadow terminator problem'. The problem is well-described here:
+// Hanika, Hacking the Shadow Terminator. https://jo.dreggn.org/home/2021_terminator.pdf (Figure 4-3)
+//
+// We employ Iray's approach of bending the normal as described in:
+// Keller et al. The Iray Light Transport Simulation and Rendering System.
+// https://arxiv.org/pdf/1705.01263.pdf, Section A.3
 vec3 mdl_adapt_normal(State state, vec3 normal)
 {
-    return normal;
+#if 0
+    // Disable normal mapping for debug purposes
+    return state.normal;
+#endif
+
+    // Calculate the perfect reflection vector
+    vec3 r = reflect(gl_WorldRayDirectionEXT, normal);
+
+    // Return if shading normal does not fall under geometric surface (angle between r and normal within 90 degrees)
+    float a = dot(r, state.geom_normal);
+    if (a >= 0.0)
+    {
+        return normal;
+    }
+
+    // Otherwise, bend normal (see above paper, A.3)
+    float b = max(0.0001, dot(normal, state.geom_normal));
+
+    vec3 tangent = normalize(r - (a / b) * normal);
+
+    vec3 new_normal = normalize(-gl_WorldRayDirectionEXT + tangent);
+
+    return new_normal;
 }
