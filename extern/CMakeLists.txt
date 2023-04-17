@@ -6,6 +6,11 @@ set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 #
+# Vulkan-Headers
+#
+add_subdirectory(Vulkan-Headers)
+
+#
 # volk
 #
 add_subdirectory(volk)

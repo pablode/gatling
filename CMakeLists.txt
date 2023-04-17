@@ -24,7 +24,6 @@ endforeach()
 
 option(GATLING_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
 
-find_package(Vulkan REQUIRED)
 if(${GATLING_BUILD_HDGATLING})
   find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
   find_package(MaterialX REQUIRED HINTS ${USD_ROOT})
