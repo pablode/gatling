@@ -34,3 +34,6 @@
 [submodule "extern/MaterialX"]
 	path = extern/MaterialX
 	url = https://github.com/AcademySoftwareFoundation/MaterialX
+[submodule "extern/Vulkan-Headers"]
+	path = extern/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
