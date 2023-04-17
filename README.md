@@ -22,8 +22,8 @@ gatling implements complex BSDFs like Autodesk's Standard Surface and the glTF s
 
 You need to
 
-- download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK 2022.0</a> binaries
-- build <a href="https://github.com/PixarAnimationStudios/USD/releases/tag/v22.08">USD 22.08</a> with MaterialX support
+- download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK</a> (2022.0+) binaries
+- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v23.05">USD</a> (22.08+) with MaterialX support
 - have NASM 2.13+ or YASM 1.2.0+ in your PATH
 
 > Note: EXR export requires building USD with OpenImageIO support.
