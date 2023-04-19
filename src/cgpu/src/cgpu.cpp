@@ -24,26 +24,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+
 #include <volk.h>
 
 #include <vma.h>
 
+// TODO: should be in 'gtl/gb' subfolder
+#include <SmallVector.h>
+
+using namespace gtl;
+
 #define CGPU_MIN_VK_API_VERSION VK_API_VERSION_1_1
-
-/* Array and pool allocation limits. */
-
-#define CGPU_MAX_PHYSICAL_DEVICES 8
-#define CGPU_MAX_DEVICE_EXTENSIONS 1024
-#define CGPU_MAX_QUEUE_FAMILIES 64
-#define CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS 128
-#define CGPU_MAX_DESCRIPTOR_BUFFER_INFOS 64
-#define CGPU_MAX_DESCRIPTOR_IMAGE_INFOS 2048
-#define CGPU_MAX_DESCRIPTOR_AS_INFOS 1
-#define CGPU_MAX_WRITE_DESCRIPTOR_SETS 128
-#define CGPU_MAX_BUFFER_MEMORY_BARRIERS 64
-#define CGPU_MAX_IMAGE_MEMORY_BARRIERS 2048
-#define CGPU_MAX_MEMORY_BARRIERS 128
-#define CGPU_MAX_RT_PIPELINE_STAGE_COUNT 1024
 
 /* Internal structures. */
 
@@ -87,18 +78,17 @@ struct cgpu_iimage
 
 struct cgpu_ipipeline
 {
-  VkPipeline                      pipeline;
-  VkPipelineLayout                layout;
-  VkDescriptorPool                descriptor_pool;
-  VkDescriptorSet                 descriptor_set;
-  VkDescriptorSetLayout           descriptor_set_layout;
-  VkDescriptorSetLayoutBinding    descriptor_set_layout_bindings[CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS];
-  uint32_t                        descriptor_set_layout_binding_count;
-  VkPipelineBindPoint             bind_point;
-  VkStridedDeviceAddressRegionKHR sbtRgen;
-  VkStridedDeviceAddressRegionKHR sbtMiss;
-  VkStridedDeviceAddressRegionKHR sbtHit;
-  cgpu_ibuffer                    sbt;
+  VkPipeline                                       pipeline;
+  VkPipelineLayout                                 layout;
+  VkDescriptorPool                                 descriptor_pool;
+  VkDescriptorSet                                  descriptor_set;
+  VkDescriptorSetLayout                            descriptor_set_layout;
+  GbSmallVector<VkDescriptorSetLayoutBinding, 128> descriptor_set_layout_bindings;
+  VkPipelineBindPoint                              bind_point;
+  VkStridedDeviceAddressRegionKHR                  sbtRgen;
+  VkStridedDeviceAddressRegionKHR                  sbtMiss;
+  VkStridedDeviceAddressRegionKHR                  sbtHit;
+  cgpu_ibuffer                                     sbt;
 };
 
 struct cgpu_ishader
@@ -427,24 +417,19 @@ bool cgpu_create_device(cgpu_device* p_device)
     NULL
   );
 
-  if (phys_device_count > CGPU_MAX_PHYSICAL_DEVICES)
-  {
-    resource_store_free_handle(&idevice_store, p_device->handle);
-    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-  }
-
   if (phys_device_count == 0)
   {
     resource_store_free_handle(&idevice_store, p_device->handle);
     CGPU_RETURN_ERROR("no physical device found");
   }
 
-  VkPhysicalDevice phys_devices[CGPU_MAX_PHYSICAL_DEVICES];
+  GbSmallVector<VkPhysicalDevice, 8> phys_devices;
+  phys_devices.resize(phys_device_count);
 
   vkEnumeratePhysicalDevices(
     iinstance.instance,
     &phys_device_count,
-    phys_devices
+    phys_devices.data()
   );
 
   idevice->physical_device = phys_devices[0];
@@ -496,19 +481,14 @@ bool cgpu_create_device(cgpu_device* p_device)
     NULL
   );
 
-  if (device_ext_count > CGPU_MAX_DEVICE_EXTENSIONS)
-  {
-    resource_store_free_handle(&idevice_store, p_device->handle);
-    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-  }
-
-  VkExtensionProperties device_extensions[CGPU_MAX_DEVICE_EXTENSIONS];
+  GbSmallVector<VkExtensionProperties, 1024> device_extensions;
+  device_extensions.resize(device_ext_count);
 
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
     NULL,
     &device_ext_count,
-    device_extensions
+    device_extensions.data()
   );
 
   const char* required_extensions[] = {
@@ -523,14 +503,12 @@ bool cgpu_create_device(cgpu_device* p_device)
   };
   uint32_t required_extension_count = sizeof(required_extensions) / sizeof(required_extensions[0]);
 
-  uint32_t enabled_device_extension_count = 0;
-  const char* enabled_device_extensions[32];
-
+  GbSmallVector<const char*, 32> enabled_device_extensions;
   for (uint32_t i = 0; i < required_extension_count; i++)
   {
     const char* extension = required_extensions[i];
 
-    if (!cgpu_find_device_extension(extension, device_ext_count, device_extensions))
+    if (!cgpu_find_device_extension(extension, device_ext_count, device_extensions.data()))
     {
       resource_store_free_handle(&idevice_store, p_device->handle);
 
@@ -538,40 +516,36 @@ bool cgpu_create_device(cgpu_device* p_device)
       return false;
     }
 
-    enabled_device_extensions[enabled_device_extension_count] = extension;
-    enabled_device_extension_count++;
+    enabled_device_extensions.push_back(extension);
   }
 
   const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
-  if (cgpu_find_device_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, device_ext_count, device_extensions))
+  if (cgpu_find_device_extension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, device_ext_count, device_extensions.data()))
   {
-    enabled_device_extensions[enabled_device_extension_count] = VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
-    enabled_device_extension_count++;
+    enabled_device_extensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
   }
 
 #ifndef NDEBUG
-  if (cgpu_find_device_extension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, device_ext_count, device_extensions) && features.shaderInt64)
+  if (cgpu_find_device_extension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, device_ext_count, device_extensions.data()) && features.shaderInt64)
   {
     idevice->features.shaderClock = true;
-    enabled_device_extensions[enabled_device_extension_count] = VK_KHR_SHADER_CLOCK_EXTENSION_NAME;
-    enabled_device_extension_count++;
+    enabled_device_extensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
   }
 
 #ifndef __APPLE__
-  if (cgpu_find_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions))
+  if (cgpu_find_device_extension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions.data()))
   {
     idevice->features.debugPrintf = true;
-    enabled_device_extensions[enabled_device_extension_count] = VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME;
-    enabled_device_extension_count++;
+    enabled_device_extensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
   }
 #endif
 #endif
-  if (cgpu_find_device_extension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, device_ext_count, device_extensions) &&
-      cgpu_find_device_extension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, device_ext_count, device_extensions))
+  if (cgpu_find_device_extension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, device_ext_count, device_extensions.data()) &&
+      cgpu_find_device_extension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, device_ext_count, device_extensions.data()))
   {
     idevice->features.pageableDeviceLocalMemory = true;
-    enabled_device_extensions[enabled_device_extension_count++] = VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME;
-    enabled_device_extensions[enabled_device_extension_count++] = VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME;
+    enabled_device_extensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
+    enabled_device_extensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
   }
 
   uint32_t queue_family_count = 0;
@@ -581,18 +555,13 @@ bool cgpu_create_device(cgpu_device* p_device)
     NULL
   );
 
-  if (queue_family_count > CGPU_MAX_QUEUE_FAMILIES)
-  {
-    resource_store_free_handle(&idevice_store, p_device->handle);
-    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-  }
-
-  VkQueueFamilyProperties queue_families[CGPU_MAX_QUEUE_FAMILIES];
+  GbSmallVector<VkQueueFamilyProperties, 32> queue_families;
+  queue_families.resize(queue_family_count);
 
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
     &queue_family_count,
-    queue_families
+    queue_families.data()
   );
 
   int32_t queue_family_index = -1;
@@ -774,8 +743,8 @@ bool cgpu_create_device(cgpu_device* p_device)
    * nowadays, there is no difference to instance validation layers. */
   device_create_info.enabledLayerCount = 0;
   device_create_info.ppEnabledLayerNames = NULL;
-  device_create_info.enabledExtensionCount = enabled_device_extension_count;
-  device_create_info.ppEnabledExtensionNames = enabled_device_extensions;
+  device_create_info.enabledExtensionCount = enabled_device_extensions.size();
+  device_create_info.ppEnabledExtensionNames = enabled_device_extensions.data();
   device_create_info.pEnabledFeatures = NULL;
 
   VkResult result = vkCreateDevice(
@@ -1441,31 +1410,26 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
 {
   const cgpu_shader_reflection* shader_reflection = &ishader->reflection;
 
-  if (shader_reflection->binding_count >= CGPU_MAX_DESCRIPTOR_SET_LAYOUT_BINDINGS)
-  {
-    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-  }
-
-  ipipeline->descriptor_set_layout_binding_count = shader_reflection->binding_count;
-
   for (uint32_t i = 0; i < shader_reflection->binding_count; i++)
   {
-    const cgpu_shader_reflection_binding* binding = &shader_reflection->bindings[i];
+    const cgpu_shader_reflection_binding* binding_reflection = &shader_reflection->bindings[i];
 
-    VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
-    descriptor_set_layout_binding->binding = binding->binding;
-    descriptor_set_layout_binding->descriptorType = (VkDescriptorType) binding->descriptor_type;
-    descriptor_set_layout_binding->descriptorCount = binding->count;
-    descriptor_set_layout_binding->stageFlags = stageFlags;
-    descriptor_set_layout_binding->pImmutableSamplers = NULL;
+    VkDescriptorSetLayoutBinding layout_binding;
+    layout_binding.binding = binding_reflection->binding;
+    layout_binding.descriptorType = (VkDescriptorType) binding_reflection->descriptor_type;
+    layout_binding.descriptorCount = binding_reflection->count;
+    layout_binding.stageFlags = stageFlags;
+    layout_binding.pImmutableSamplers = NULL;
+
+    ipipeline->descriptor_set_layout_bindings.push_back(layout_binding);
   }
 
   VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
   descriptor_set_layout_create_info.pNext = NULL;
   descriptor_set_layout_create_info.flags = 0;
-  descriptor_set_layout_create_info.bindingCount = shader_reflection->binding_count;
-  descriptor_set_layout_create_info.pBindings = ipipeline->descriptor_set_layout_bindings;
+  descriptor_set_layout_create_info.bindingCount = ipipeline->descriptor_set_layout_bindings.size();
+  descriptor_set_layout_create_info.pBindings = ipipeline->descriptor_set_layout_bindings.data();
 
   VkResult result = idevice->table.vkCreateDescriptorSetLayout(
     idevice->logical_device,
@@ -1714,9 +1678,9 @@ static bool cgpu_create_rt_pipeline_sbt(cgpu_idevice* idevice, cgpu_ipipeline* i
 
   uint32_t firstGroup = 0;
   uint32_t dataSize = handleSize * groupCount;
-  assert(handleSize <= 64); // conservatively estimate handle size
-  uint8_t handleData[64 * CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
-  if (idevice->table.vkGetRayTracingShaderGroupHandlesKHR(idevice->logical_device, ipipeline->pipeline, firstGroup, groupCount, dataSize, handleData) != VK_SUCCESS)
+
+  GbSmallVector<uint8_t, 64> handleData(dataSize);
+  if (idevice->table.vkGetRayTracingShaderGroupHandlesKHR(idevice->logical_device, ipipeline->pipeline, firstGroup, groupCount, handleData.size(), handleData.data()) != VK_SUCCESS)
   {
     CGPU_RETURN_ERROR("failed to create sbt handles");
   }
@@ -1792,24 +1756,26 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  // Set up pipeline stages and groups.
+  // Set up stages
+  GbSmallVector<VkPipelineShaderStageCreateInfo, 128> stages;
   VkShaderStageFlags pipelineStageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
-  VkPipelineShaderStageCreateInfo stages[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
-  for (uint32_t i = 0; i < CGPU_MAX_RT_PIPELINE_STAGE_COUNT; i++)
-  {
+  auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
     VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {};
     pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     pipeline_shader_stage_create_info.pNext = NULL;
     pipeline_shader_stage_create_info.flags = 0;
-    pipeline_shader_stage_create_info.stage = (VkShaderStageFlagBits) 0;
+    pipeline_shader_stage_create_info.stage = stage;
+    pipeline_shader_stage_create_info.module = module;
     pipeline_shader_stage_create_info.pName = "main";
     pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
-    stages[i] = pipeline_shader_stage_create_info;
-  }
+    stages.push_back(pipeline_shader_stage_create_info);
+  };
 
-  stages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-  stages[0].module = irgen_shader->module;
+  // Ray gen
+  pushStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR, irgen_shader->module);
+
+  // Miss
   if (desc->miss_shader_count > 0)
   {
     pipelineStageFlags |= VK_SHADER_STAGE_MISS_BIT_KHR;
@@ -1822,13 +1788,10 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     }
     assert(imiss_shader->module);
 
-    uint32_t stageIndex = 1/*rgen*/ + i;
-    stages[stageIndex].module = imiss_shader->module;
-    stages[stageIndex].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+    pushStage(VK_SHADER_STAGE_MISS_BIT_KHR, imiss_shader->module);
   }
 
-  uint32_t hitStageAndGroupOffset = 1/*rgen*/ + desc->miss_shader_count;
-  uint32_t hitShaderStageIndex = hitStageAndGroupOffset;
+  // Hit
   for (uint32_t i = 0; i < desc->hit_group_count; i++)
   {
     const cgpu_rt_hit_group* hit_group = &desc->hit_groups[i];
@@ -1842,9 +1805,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
       }
       assert(iclosestHitShader->stage_flags == VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
 
-      uint32_t stageIndex = (hitShaderStageIndex++);
-      stages[stageIndex].module = iclosestHitShader->module;
-      stages[stageIndex].stage = iclosestHitShader->stage_flags;
+      pushStage(iclosestHitShader->stage_flags, iclosestHitShader->module);
       pipelineStageFlags |= iclosestHitShader->stage_flags;
     }
 
@@ -1857,32 +1818,34 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
       }
       assert(ianyHitShader->stage_flags == VK_SHADER_STAGE_ANY_HIT_BIT_KHR);
 
-      uint32_t stageIndex = (hitShaderStageIndex++);
-      stages[stageIndex].module = ianyHitShader->module;
-      stages[stageIndex].stage = ianyHitShader->stage_flags;
+      pushStage(ianyHitShader->stage_flags, ianyHitShader->module);
       pipelineStageFlags |= ianyHitShader->stage_flags;
     }
   }
 
-  VkRayTracingShaderGroupCreateInfoKHR groups[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
-  for (uint32_t i = 0; i < CGPU_MAX_RT_PIPELINE_STAGE_COUNT; i++)
+  // Set up groups
+  GbSmallVector<VkRayTracingShaderGroupCreateInfoKHR, 128> groups;
+  groups.resize(1/*rgen*/ + desc->miss_shader_count + desc->hit_group_count);
+
+  for (uint32_t i = 0; i < groups.size(); i++)
   {
-    VkRayTracingShaderGroupCreateInfoKHR rt_shader_group_create_info = {};
-    rt_shader_group_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-    rt_shader_group_create_info.pNext = NULL;
-    rt_shader_group_create_info.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-    rt_shader_group_create_info.generalShader = i;
-    rt_shader_group_create_info.closestHitShader = VK_SHADER_UNUSED_KHR;
-    rt_shader_group_create_info.anyHitShader = VK_SHADER_UNUSED_KHR;
-    rt_shader_group_create_info.intersectionShader = VK_SHADER_UNUSED_KHR;
-    rt_shader_group_create_info.pShaderGroupCaptureReplayHandle = NULL;
-    groups[i] = rt_shader_group_create_info;
+    VkRayTracingShaderGroupCreateInfoKHR createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    createInfo.pNext = NULL;
+    createInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    createInfo.generalShader = i;
+    createInfo.closestHitShader = VK_SHADER_UNUSED_KHR;
+    createInfo.anyHitShader = VK_SHADER_UNUSED_KHR;
+    createInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
+    createInfo.pShaderGroupCaptureReplayHandle = NULL;
+    groups[i] = createInfo;
   }
 
   bool anyNullClosestHitShader = false;
   bool anyNullAnyHitShader = false;
 
-  hitShaderStageIndex = hitStageAndGroupOffset;
+  uint32_t hitStageAndGroupOffset = 1/*rgen*/ + desc->miss_shader_count;
+  uint32_t hitShaderStageIndex = hitStageAndGroupOffset;
   for (uint32_t i = 0; i < desc->hit_group_count; i++)
   {
     const cgpu_rt_hit_group* hit_group = &desc->hit_groups[i];
@@ -1922,7 +1885,6 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
 
   // Create pipeline.
   {
-    uint32_t stageCount = hitShaderStageIndex;
     uint32_t groupCount = hitStageAndGroupOffset + desc->hit_group_count;
 
     VkPipelineCreateFlags flags = 0;
@@ -1939,10 +1901,10 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
     rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
     rt_pipeline_create_info.pNext = NULL;
     rt_pipeline_create_info.flags = flags;
-    rt_pipeline_create_info.stageCount = stageCount;
-    rt_pipeline_create_info.pStages = stages;
-    rt_pipeline_create_info.groupCount = groupCount;
-    rt_pipeline_create_info.pGroups = groups;
+    rt_pipeline_create_info.stageCount = stages.size();
+    rt_pipeline_create_info.pStages = stages.data();
+    rt_pipeline_create_info.groupCount = groups.size();
+    rt_pipeline_create_info.pGroups = groups.data();
     rt_pipeline_create_info.maxPipelineRayRecursionDepth = 1;
     rt_pipeline_create_info.pLibraryInfo = NULL;
     rt_pipeline_create_info.pLibraryInterface = NULL;
@@ -2522,8 +2484,7 @@ bool cgpu_cmd_transition_shader_image_layouts(cgpu_command_buffer command_buffer
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkImageMemoryBarrier barriers[CGPU_MAX_IMAGE_MEMORY_BARRIERS];
-  uint32_t barrier_count = 0;
+  GbSmallVector<VkImageMemoryBarrier, 64> barriers;
 
   /* FIXME: this has quadratic complexity */
   const cgpu_shader_reflection* reflection = &ishader->reflection;
@@ -2582,32 +2543,29 @@ bool cgpu_cmd_transition_shader_image_layouts(cgpu_command_buffer command_buffer
         access_mask = VK_ACCESS_SHADER_WRITE_BIT;
       }
 
-      if (barrier_count >= CGPU_MAX_IMAGE_MEMORY_BARRIERS) {
-        CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-      }
-
-      VkImageMemoryBarrier* barrier = &barriers[barrier_count++];
-      barrier->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      barrier->pNext = NULL;
-      barrier->srcAccessMask = iimage->access_mask;
-      barrier->dstAccessMask = access_mask;
-      barrier->oldLayout = old_layout;
-      barrier->newLayout = new_layout;
-      barrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier->image = iimage->image;
-      barrier->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      barrier->subresourceRange.baseMipLevel = 0;
-      barrier->subresourceRange.levelCount = 1;
-      barrier->subresourceRange.baseArrayLayer = 0;
-      barrier->subresourceRange.layerCount = 1;
+      VkImageMemoryBarrier barrier = {};
+      barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      barrier.pNext = NULL;
+      barrier.srcAccessMask = iimage->access_mask;
+      barrier.dstAccessMask = access_mask;
+      barrier.oldLayout = old_layout;
+      barrier.newLayout = new_layout;
+      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.image = iimage->image;
+      barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+      barrier.subresourceRange.baseMipLevel = 0;
+      barrier.subresourceRange.levelCount = 1;
+      barrier.subresourceRange.baseArrayLayer = 0;
+      barrier.subresourceRange.layerCount = 1;
+      barriers.push_back(barrier);
 
       iimage->access_mask = access_mask;
       iimage->layout = new_layout;
     }
   }
 
-  if (barrier_count > 0)
+  if (barriers.size() > 0)
   {
     idevice->table.vkCmdPipelineBarrier(
       icommand_buffer->command_buffer,
@@ -2618,8 +2576,8 @@ bool cgpu_cmd_transition_shader_image_layouts(cgpu_command_buffer command_buffer
       NULL,
       0,
       NULL,
-      barrier_count,
-      barriers
+      barriers.size(),
+      barriers.data()
     );
   }
 
@@ -2644,36 +2602,32 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkDescriptorBufferInfo buffer_infos[CGPU_MAX_DESCRIPTOR_BUFFER_INFOS];
-  uint32_t buffer_info_count = 0;
-  VkDescriptorImageInfo image_infos[CGPU_MAX_DESCRIPTOR_IMAGE_INFOS];
-  uint32_t image_info_count = 0;
-  VkWriteDescriptorSetAccelerationStructureKHR as_infos[CGPU_MAX_DESCRIPTOR_AS_INFOS];
-  uint32_t as_info_count = 0;
+  GbSmallVector<VkDescriptorBufferInfo, 64> buffer_infos;
+  GbSmallVector<VkDescriptorImageInfo, 128> image_infos;
+  GbSmallVector<VkWriteDescriptorSetAccelerationStructureKHR, 1> as_infos;
 
-  VkWriteDescriptorSet write_descriptor_sets[CGPU_MAX_WRITE_DESCRIPTOR_SETS];
-  uint32_t write_descriptor_set_count = 0;
+  buffer_infos.reserve(bindings->buffer_count);
+  image_infos.reserve(bindings->image_count + bindings->sampler_count);
+  as_infos.reserve(bindings->tlas_count);
+
+  GbSmallVector<VkWriteDescriptorSet, 128> write_descriptor_sets;
 
   /* FIXME: this has a rather high complexity */
-  for (uint32_t i = 0; i < ipipeline->descriptor_set_layout_binding_count; i++)
+  for (uint32_t i = 0; i < ipipeline->descriptor_set_layout_bindings.size(); i++)
   {
     const VkDescriptorSetLayoutBinding* layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
 
-    if (write_descriptor_set_count >= CGPU_MAX_WRITE_DESCRIPTOR_SETS) {
-      CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-    }
-
-    VkWriteDescriptorSet* write_descriptor_set = &write_descriptor_sets[write_descriptor_set_count++];
-    write_descriptor_set->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write_descriptor_set->pNext = NULL;
-    write_descriptor_set->dstSet = ipipeline->descriptor_set;
-    write_descriptor_set->dstBinding = layout_binding->binding;
-    write_descriptor_set->dstArrayElement = 0;
-    write_descriptor_set->descriptorCount = layout_binding->descriptorCount;
-    write_descriptor_set->descriptorType = layout_binding->descriptorType;
-    write_descriptor_set->pTexelBufferView = NULL;
-    write_descriptor_set->pBufferInfo = NULL;
-    write_descriptor_set->pImageInfo = NULL;
+    VkWriteDescriptorSet write_descriptor_set = {};
+    write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write_descriptor_set.pNext = NULL;
+    write_descriptor_set.dstSet = ipipeline->descriptor_set;
+    write_descriptor_set.dstBinding = layout_binding->binding;
+    write_descriptor_set.dstArrayElement = 0;
+    write_descriptor_set.descriptorCount = layout_binding->descriptorCount;
+    write_descriptor_set.descriptorType = layout_binding->descriptorType;
+    write_descriptor_set.pTexelBufferView = NULL;
+    write_descriptor_set.pBufferInfo = NULL;
+    write_descriptor_set.pImageInfo = NULL;
 
     for (uint32_t j = 0; j < layout_binding->descriptorCount; j++)
     {
@@ -2700,18 +2654,15 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR("buffer binding offset not aligned");
           }
 
-          if (image_info_count >= CGPU_MAX_DESCRIPTOR_BUFFER_INFOS) {
-            CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-          }
-
-          VkDescriptorBufferInfo* buffer_info = &buffer_infos[buffer_info_count++];
-          buffer_info->buffer = ibuffer->buffer;
-          buffer_info->offset = buffer_binding->offset;
-          buffer_info->range = (buffer_binding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - buffer_binding->offset) : buffer_binding->size;
+          VkDescriptorBufferInfo buffer_info = {};
+          buffer_info.buffer = ibuffer->buffer;
+          buffer_info.offset = buffer_binding->offset;
+          buffer_info.range = (buffer_binding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - buffer_binding->offset) : buffer_binding->size;
+          buffer_infos.push_back(buffer_info);
 
           if (j == 0)
           {
-            write_descriptor_set->pBufferInfo = buffer_info;
+            write_descriptor_set.pBufferInfo = &buffer_infos.back();
           }
 
           slotHandled = true;
@@ -2736,18 +2687,15 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          if (image_info_count >= CGPU_MAX_DESCRIPTOR_IMAGE_INFOS) {
-            CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-          }
-
-          VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
-          image_info->sampler = VK_NULL_HANDLE;
-          image_info->imageView = iimage->image_view;
-          image_info->imageLayout = iimage->layout;
+          VkDescriptorImageInfo image_info = {};
+          image_info.sampler = VK_NULL_HANDLE;
+          image_info.imageView = iimage->image_view;
+          image_info.imageLayout = iimage->layout;
+          image_infos.push_back(image_info);
 
           if (j == 0)
           {
-            write_descriptor_set->pImageInfo = image_info;
+            write_descriptor_set.pImageInfo = &image_infos.back();
           }
 
           slotHandled = true;
@@ -2771,18 +2719,15 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          if (image_info_count >= CGPU_MAX_DESCRIPTOR_IMAGE_INFOS) {
-            CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-          }
-
-          VkDescriptorImageInfo* image_info = &image_infos[image_info_count++];
-          image_info->sampler = isampler->sampler;
-          image_info->imageView = VK_NULL_HANDLE;
-          image_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+          VkDescriptorImageInfo image_info = {};
+          image_info.sampler = isampler->sampler;
+          image_info.imageView = VK_NULL_HANDLE;
+          image_info.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+          image_infos.push_back(image_info);
 
           if (j == 0)
           {
-            write_descriptor_set->pImageInfo = image_info;
+            write_descriptor_set.pImageInfo = &image_infos.back();
           }
 
           slotHandled = true;
@@ -2806,19 +2751,16 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          if (as_info_count >= CGPU_MAX_DESCRIPTOR_AS_INFOS) {
-            CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-          }
-
-          VkWriteDescriptorSetAccelerationStructureKHR* as_info = &as_infos[as_info_count++];
-          as_info->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-          as_info->pNext = NULL;
-          as_info->accelerationStructureCount = 1;
-          as_info->pAccelerationStructures = &itlas->as;
+          VkWriteDescriptorSetAccelerationStructureKHR as_info = {};
+          as_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+          as_info.pNext = NULL;
+          as_info.accelerationStructureCount = 1;
+          as_info.pAccelerationStructures = &itlas->as;
+          as_infos.push_back(as_info);
 
           if (j == 0)
           {
-            write_descriptor_set->pNext = as_info;
+            write_descriptor_set.pNext = &as_infos.back();
           }
 
           slotHandled = true;
@@ -2831,12 +2773,14 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
         CGPU_RETURN_ERROR("resource binding mismatch");
       }
     }
+
+    write_descriptor_sets.push_back(write_descriptor_set);
   }
 
   idevice->table.vkUpdateDescriptorSets(
     idevice->logical_device,
-    write_descriptor_set_count,
-    write_descriptor_sets,
+    write_descriptor_sets.size(),
+    write_descriptor_sets.data(),
     0,
     NULL
   );
@@ -3051,27 +2995,22 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  if (barrier_count >= CGPU_MAX_MEMORY_BARRIERS ||
-      buffer_barrier_count >= CGPU_MAX_BUFFER_MEMORY_BARRIERS ||
-      image_barrier_count >= CGPU_MAX_IMAGE_MEMORY_BARRIERS)
-  {
-    CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED;
-  }
-
-  VkMemoryBarrier vk_memory_barriers[CGPU_MAX_MEMORY_BARRIERS];
+  GbSmallVector<VkMemoryBarrier, 128> vk_memory_barriers;
 
   for (uint32_t i = 0; i < barrier_count; ++i)
   {
     const cgpu_memory_barrier* b_cgpu = &p_barriers[i];
-    VkMemoryBarrier* b_vk = &vk_memory_barriers[i];
-    b_vk->sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    b_vk->pNext = NULL;
-    b_vk->srcAccessMask = (VkAccessFlags) b_cgpu->src_access_flags;
-    b_vk->dstAccessMask = (VkAccessFlags) b_cgpu->dst_access_flags;
+
+    VkMemoryBarrier b_vk = {};
+    b_vk.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    b_vk.pNext = NULL;
+    b_vk.srcAccessMask = (VkAccessFlags) b_cgpu->src_access_flags;
+    b_vk.dstAccessMask = (VkAccessFlags) b_cgpu->dst_access_flags;
+    vk_memory_barriers.push_back(b_vk);
   }
 
-  VkBufferMemoryBarrier vk_buffer_memory_barriers[CGPU_MAX_BUFFER_MEMORY_BARRIERS];
-  VkImageMemoryBarrier vk_image_memory_barriers[CGPU_MAX_IMAGE_MEMORY_BARRIERS];
+  GbSmallVector<VkBufferMemoryBarrier, 32> vk_buffer_memory_barriers;
+  GbSmallVector<VkImageMemoryBarrier, 128> vk_image_memory_barriers;
 
   for (uint32_t i = 0; i < buffer_barrier_count; ++i)
   {
@@ -3082,16 +3021,17 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
       CGPU_RETURN_ERROR_INVALID_HANDLE;
     }
 
-    VkBufferMemoryBarrier* b_vk = &vk_buffer_memory_barriers[i];
-    b_vk->sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    b_vk->pNext = NULL;
-    b_vk->srcAccessMask = (VkAccessFlags) b_cgpu->src_access_flags;
-    b_vk->dstAccessMask = (VkAccessFlags) b_cgpu->dst_access_flags;
-    b_vk->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    b_vk->buffer = ibuffer->buffer;
-    b_vk->offset = b_cgpu->offset;
-    b_vk->size = (b_cgpu->size == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : b_cgpu->size;
+    VkBufferMemoryBarrier b_vk = {};
+    b_vk.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    b_vk.pNext = NULL;
+    b_vk.srcAccessMask = (VkAccessFlags) b_cgpu->src_access_flags;
+    b_vk.dstAccessMask = (VkAccessFlags) b_cgpu->dst_access_flags;
+    b_vk.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b_vk.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b_vk.buffer = ibuffer->buffer;
+    b_vk.offset = b_cgpu->offset;
+    b_vk.size = (b_cgpu->size == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : b_cgpu->size;
+    vk_buffer_memory_barriers.push_back(b_vk);
   }
 
   for (uint32_t i = 0; i < image_barrier_count; ++i)
@@ -3105,21 +3045,22 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
 
     VkAccessFlags access_mask = (VkAccessFlags) b_cgpu->access_mask;
 
-    VkImageMemoryBarrier* b_vk = &vk_image_memory_barriers[i];
-    b_vk->sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    b_vk->pNext = NULL;
-    b_vk->srcAccessMask = iimage->access_mask;
-    b_vk->dstAccessMask = access_mask;
-    b_vk->oldLayout = iimage->layout;
-    b_vk->newLayout = iimage->layout;
-    b_vk->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    b_vk->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    b_vk->image = iimage->image;
-    b_vk->subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    b_vk->subresourceRange.baseMipLevel = 0;
-    b_vk->subresourceRange.levelCount = 1;
-    b_vk->subresourceRange.baseArrayLayer = 0;
-    b_vk->subresourceRange.layerCount = 1;
+    VkImageMemoryBarrier b_vk = {};
+    b_vk.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    b_vk.pNext = NULL;
+    b_vk.srcAccessMask = iimage->access_mask;
+    b_vk.dstAccessMask = access_mask;
+    b_vk.oldLayout = iimage->layout;
+    b_vk.newLayout = iimage->layout;
+    b_vk.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b_vk.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b_vk.image = iimage->image;
+    b_vk.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    b_vk.subresourceRange.baseMipLevel = 0;
+    b_vk.subresourceRange.levelCount = 1;
+    b_vk.subresourceRange.baseArrayLayer = 0;
+    b_vk.subresourceRange.layerCount = 1;
+    vk_image_memory_barriers.push_back(b_vk);
 
     iimage->access_mask = access_mask;
   }
@@ -3130,12 +3071,12 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
     0,
-    barrier_count,
-    vk_memory_barriers,
-    buffer_barrier_count,
-    vk_buffer_memory_barriers,
-    image_barrier_count,
-    vk_image_memory_barriers
+    vk_memory_barriers.size(),
+    vk_memory_barriers.data(),
+    vk_buffer_memory_barriers.size(),
+    vk_buffer_memory_barriers.data(),
+    vk_image_memory_barriers.size(),
+    vk_image_memory_barriers.data()
   );
 
   return true;

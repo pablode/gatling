@@ -21,6 +21,7 @@ target_include_directories(
 target_link_libraries(
   cgpu
   PRIVATE
+    gb
     volk
     vma-c
     spirv-reflect-static
