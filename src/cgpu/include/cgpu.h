@@ -1,72 +1,21 @@
-/*
- * Copyright (C) 2019-2022 Pablo Delgado Krämer
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
+//
+// Copyright (C) 2023 Pablo Delgado Krämer
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
 
-#ifndef CGPU_H
-#define CGPU_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if defined(CGPU_EXPORT_SYMBOLS) && defined(CGPU_IMPORT_SYMBOLS)
-  #error "Symbols can not be exported and imported at the same time."
-#endif
-
-#if defined(BUILD_SHARED_LIBS)
-  #if defined(_WIN32) && (defined(_MSC_VER) || defined(__MING32__))
-    #if defined(CGPU_EXPORT_SYMBOLS)
-      #define CGPU_API __declspec(dllexport)
-    #elif defined(CGPU_IMPORT_SYMBOLS)
-      #define CGPU_API __declspec(dllimport)
-    #endif
-  #elif defined(_WIN32) && defined(__GNUC__)
-    #if defined(CGPU_EXPORT_SYMBOLS)
-      #define CGPU_API __attribute__((dllexport))
-    #elif defined(CGPU_IMPORT_SYMBOLS)
-      #define CGPU_API __attribute__((dllimport))
-    #endif
-  #elif defined(__GNUC__)
-    #define CGPU_API __attribute__((__visibility__("default")))
-  #endif
-#endif
-
-#ifndef CGPU_API
-  #define CGPU_API
-#endif
-
-#if defined(NDEBUG)
-  #if defined(__GNUC__)
-    #define CGPU_INLINE inline __attribute__((__always_inline__))
-  #elif defined(_MSC_VER)
-    #define CGPU_INLINE __forceinline
-  #else
-    #define CGPU_INLINE inline
-  #endif
-#else
-  #define CGPU_INLINE
-#endif
-
-#if defined(_MSC_VER)
-  #define CGPU_CDECL __cdecl
-#elif defined(__GNUC__) && defined(__i386__) && !defined(__x86_64__)
-  #define CGPU_CDECL __attribute__((__cdecl__))
-#else
-  #define CGPU_CDECL
-#endif
+#pragma once
 
 #include <stdint.h>
 #include <stddef.h>
@@ -79,7 +28,8 @@ extern "C" {
 
 typedef uint32_t CgpuBufferUsageFlags;
 
-typedef enum CgpuBufferUsageFlagBits {
+enum CgpuBufferUsageFlagBits
+{
   CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC                       = 0x00000001,
   CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST                       = 0x00000002,
   CGPU_BUFFER_USAGE_FLAG_UNIFORM_BUFFER                     = 0x00000010,
@@ -88,27 +38,30 @@ typedef enum CgpuBufferUsageFlagBits {
   CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT = 0x00080000,
   CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE     = 0x00100000,
   CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR       = 0x00000400
-} CgpuBufferUsageFlagBits;
+};
 
 typedef uint32_t CgpuMemoryPropertyFlags;
 
-typedef enum CgpuMemoryPropertyFlagBits {
+enum CgpuMemoryPropertyFlagBits
+{
   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL  = 0x00000001,
   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE  = 0x00000002,
   CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT = 0x00000004,
   CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED   = 0x00000008
-} CgpuMemoryPropertyFlagBits;
+};
 
 typedef uint32_t CgpuImageUsageFlags;
 
-typedef enum CgpuImageUsageFlagBits {
+enum CgpuImageUsageFlagBits
+{
   CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC = 0x00000001,
   CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST = 0x00000002,
   CGPU_IMAGE_USAGE_FLAG_SAMPLED      = 0x00000004,
   CGPU_IMAGE_USAGE_FLAG_STORAGE      = 0x00000008
-} CgpuImageUsageFlagBits;
+};
 
-typedef enum CgpuImageFormat {
+enum CgpuImageFormat
+{
   CGPU_IMAGE_FORMAT_UNDEFINED = 0,
   CGPU_IMAGE_FORMAT_R4G4_UNORM_PACK8 = 1,
   CGPU_IMAGE_FORMAT_R4G4B4A4_UNORM_PACK16 = 2,
@@ -276,11 +229,12 @@ typedef enum CgpuImageFormat {
   CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_422_UNORM = 1000156031,
   CGPU_IMAGE_FORMAT_G16_B16R16_2PLANE_422_UNORM = 1000156032,
   CGPU_IMAGE_FORMAT_G16_B16_R16_3PLANE_444_UNORM = 1000156033
-} CgpuImageFormat;
+};
 
 typedef uint32_t CgpuMemoryAccessFlags;
 
-typedef enum CgpuMemoryAccessFlagBits {
+enum CgpuMemoryAccessFlagBits
+{
   CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ   = 0x00000008,
   CGPU_MEMORY_ACCESS_FLAG_SHADER_READ    = 0x00000020,
   CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE   = 0x00000040,
@@ -290,73 +244,81 @@ typedef enum CgpuMemoryAccessFlagBits {
   CGPU_MEMORY_ACCESS_FLAG_HOST_WRITE     = 0x00004000,
   CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ    = 0x00008000,
   CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE   = 0x00010000
-} CgpuMemoryAccessFlagBits;
+};
 
-typedef enum CgpuSamplerAddressMode {
+enum CgpuSamplerAddressMode
+{
   CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE = 0,
   CGPU_SAMPLER_ADDRESS_MODE_REPEAT = 1,
   CGPU_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT = 2,
   CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK = 3
-} CgpuSamplerAddressMode;
+};
 
 typedef uint32_t CgpuShaderStageFlags;
 
-typedef enum CgpuShaderStageFlagBits {
+enum CgpuShaderStageFlagBits
+{
   CGPU_SHADER_STAGE_COMPUTE     = 0x00000020,
   CGPU_SHADER_STAGE_RAYGEN      = 0x00000100,
   CGPU_SHADER_STAGE_ANY_HIT     = 0x00000200,
   CGPU_SHADER_STAGE_CLOSEST_HIT = 0x00000400,
   CGPU_SHADER_STAGE_MISS        = 0x00000800
-} CgpuShaderStageFlagBits;
+};
 
-typedef struct cgpu_instance       { uint64_t handle; } cgpu_instance;
-typedef struct cgpu_device         { uint64_t handle; } cgpu_device;
-typedef struct cgpu_buffer         { uint64_t handle; } cgpu_buffer;
-typedef struct cgpu_image          { uint64_t handle; } cgpu_image;
-typedef struct cgpu_shader         { uint64_t handle; } cgpu_shader;
-typedef struct cgpu_pipeline       { uint64_t handle; } cgpu_pipeline;
-typedef struct cgpu_fence          { uint64_t handle; } cgpu_fence;
-typedef struct cgpu_command_buffer { uint64_t handle; } cgpu_command_buffer;
-typedef struct cgpu_sampler        { uint64_t handle; } cgpu_sampler;
-typedef struct cgpu_blas           { uint64_t handle; } cgpu_blas;
-typedef struct cgpu_tlas           { uint64_t handle; } cgpu_tlas;
+struct cgpu_instance       { uint64_t handle; };
+struct cgpu_device         { uint64_t handle; };
+struct cgpu_buffer         { uint64_t handle; };
+struct cgpu_image          { uint64_t handle; };
+struct cgpu_shader         { uint64_t handle; };
+struct cgpu_pipeline       { uint64_t handle; };
+struct cgpu_fence          { uint64_t handle; };
+struct cgpu_command_buffer { uint64_t handle; };
+struct cgpu_sampler        { uint64_t handle; };
+struct cgpu_blas           { uint64_t handle; };
+struct cgpu_tlas           { uint64_t handle; };
 
-typedef struct cgpu_image_description {
+struct cgpu_image_description
+{
   bool is3d;
   uint32_t width;
   uint32_t height;
   uint32_t depth;
   CgpuImageFormat format;
   CgpuImageUsageFlags usage;
-} cgpu_image_description;
+};
 
-typedef struct cgpu_buffer_binding {
+struct cgpu_buffer_binding
+{
   uint32_t binding;
   uint32_t index;
   cgpu_buffer buffer;
   uint64_t offset;
   uint64_t size;
-} cgpu_buffer_binding;
+};
 
-typedef struct cgpu_image_binding {
+struct cgpu_image_binding
+{
   uint32_t binding;
   uint32_t index;
   cgpu_image image;
-} cgpu_image_binding;
+};
 
-typedef struct cgpu_sampler_binding {
+struct cgpu_sampler_binding
+{
   uint32_t binding;
   uint32_t index;
   cgpu_sampler sampler;
-} cgpu_sampler_binding;
+};
 
-typedef struct cgpu_tlas_binding {
+struct cgpu_tlas_binding
+{
   uint32_t binding;
   uint32_t index;
   cgpu_tlas as;
-} cgpu_tlas_binding;
+};
 
-typedef struct cgpu_bindings {
+struct cgpu_bindings
+{
   uint32_t buffer_count;
   const cgpu_buffer_binding* p_buffers;
   uint32_t image_count;
@@ -365,27 +327,31 @@ typedef struct cgpu_bindings {
   const cgpu_sampler_binding* p_samplers;
   uint32_t tlas_count;
   const cgpu_tlas_binding* p_tlases;
-} cgpu_bindings;
+};
 
-typedef struct cgpu_memory_barrier {
+struct cgpu_memory_barrier
+{
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
-} cgpu_memory_barrier;
+};
 
-typedef struct cgpu_buffer_memory_barrier {
+struct cgpu_buffer_memory_barrier
+{
   cgpu_buffer buffer;
   CgpuMemoryAccessFlags src_access_flags;
   CgpuMemoryAccessFlags dst_access_flags;
   uint64_t offset;
   uint64_t size;
-} cgpu_buffer_memory_barrier;
+};
 
-typedef struct cgpu_image_memory_barrier {
+struct cgpu_image_memory_barrier
+{
   cgpu_image image;
   CgpuMemoryAccessFlags access_mask;
-} cgpu_image_memory_barrier;
+};
 
-typedef struct cgpu_physical_device_features {
+struct cgpu_physical_device_features
+{
   bool pageableDeviceLocalMemory;
   bool debugPrintf;
   bool textureCompressionBC;
@@ -407,9 +373,10 @@ typedef struct cgpu_physical_device_features {
   bool sparseResidencyImage2D;
   bool sparseResidencyImage3D;
   bool sparseResidencyAliased;
-} cgpu_physical_device_features;
+};
 
-typedef struct cgpu_physical_device_properties {
+struct cgpu_physical_device_properties
+{
   uint32_t maxImageDimension1D;
   uint32_t maxImageDimension2D;
   uint32_t maxImageDimension3D;
@@ -471,44 +438,47 @@ typedef struct cgpu_physical_device_properties {
   uint32_t maxRayDispatchInvocationCount;
   uint32_t shaderGroupHandleAlignment;
   uint32_t maxRayHitAttributeSize;
-} cgpu_physical_device_properties;
+};
 
-typedef struct cgpu_vertex {
+struct cgpu_vertex
+{
   float x;
   float y;
   float z;
-} cgpu_vertex;
+};
 
-typedef struct cgpu_blas_instance {
+struct cgpu_blas_instance
+{
   cgpu_blas as;
   uint32_t faceIndexOffset;
   uint32_t hitGroupIndex;
   float transform[3][4];
-} cgpu_blas_instance;
+};
 
-typedef struct cgpu_rt_hit_group {
+struct cgpu_rt_hit_group
+{
   cgpu_shader closestHitShader; // optional
   cgpu_shader anyHitShader;     // optional
-} cgpu_rt_hit_group;
+};
 
-CGPU_API bool CGPU_CDECL cgpu_initialize(
+bool cgpu_initialize(
   const char* p_app_name,
   uint32_t version_major,
   uint32_t version_minor,
   uint32_t version_patch
 );
 
-CGPU_API void CGPU_CDECL cgpu_terminate(void);
+void cgpu_terminate();
 
-CGPU_API bool CGPU_CDECL cgpu_create_device(
+bool cgpu_create_device(
   cgpu_device* p_device
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_device(
+bool cgpu_destroy_device(
   cgpu_device device
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_shader(
+bool cgpu_create_shader(
   cgpu_device device,
   uint64_t size,
   const uint8_t* p_source,
@@ -516,12 +486,12 @@ CGPU_API bool CGPU_CDECL cgpu_create_shader(
   cgpu_shader* p_shader
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_shader(
+bool cgpu_destroy_shader(
   cgpu_device device,
   cgpu_shader shader
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_buffer(
+bool cgpu_create_buffer(
   cgpu_device device,
   CgpuBufferUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
@@ -529,45 +499,45 @@ CGPU_API bool CGPU_CDECL cgpu_create_buffer(
   cgpu_buffer* p_buffer
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_buffer(
+bool cgpu_destroy_buffer(
   cgpu_device device,
   cgpu_buffer buffer
 );
 
-CGPU_API bool CGPU_CDECL cgpu_map_buffer(
+bool cgpu_map_buffer(
   cgpu_device device,
   cgpu_buffer buffer,
   void** pp_mapped_mem
 );
 
-CGPU_API bool CGPU_CDECL cgpu_unmap_buffer(
+bool cgpu_unmap_buffer(
   cgpu_device device,
   cgpu_buffer buffer
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_image(
+bool cgpu_create_image(
   cgpu_device device,
   const cgpu_image_description* image_desc,
   cgpu_image* p_image
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_image(
+bool cgpu_destroy_image(
   cgpu_device device,
   cgpu_image image
 );
 
-CGPU_API bool CGPU_CDECL cgpu_map_image(
+bool cgpu_map_image(
   cgpu_device device,
   cgpu_image image,
   void** pp_mapped_mem
 );
 
-CGPU_API bool CGPU_CDECL cgpu_unmap_image(
+bool cgpu_unmap_image(
   cgpu_device device,
   cgpu_image image
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_sampler(
+bool cgpu_create_sampler(
   cgpu_device device,
   CgpuSamplerAddressMode address_mode_u,
   CgpuSamplerAddressMode address_mode_v,
@@ -575,37 +545,38 @@ CGPU_API bool CGPU_CDECL cgpu_create_sampler(
   cgpu_sampler* p_sampler
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_sampler(
+bool cgpu_destroy_sampler(
   cgpu_device device,
   cgpu_sampler sampler
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_compute_pipeline(
+bool cgpu_create_compute_pipeline(
   cgpu_device device,
   cgpu_shader shader,
   cgpu_pipeline* p_pipeline
 );
 
-typedef struct cgpu_rt_pipeline_desc {
+struct cgpu_rt_pipeline_desc
+{
   cgpu_shader rgen_shader;
   uint32_t miss_shader_count;
   cgpu_shader* miss_shaders;
   uint32_t hit_group_count;
   const cgpu_rt_hit_group* hit_groups;
-} cgpu_rt_pipeline_desc;
+};
 
-CGPU_API bool CGPU_CDECL cgpu_create_rt_pipeline(
+bool cgpu_create_rt_pipeline(
   cgpu_device device,
-  const struct cgpu_rt_pipeline_desc* desc,
+  const cgpu_rt_pipeline_desc* desc,
   cgpu_pipeline* p_pipeline
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_pipeline(
+bool cgpu_destroy_pipeline(
   cgpu_device device,
   cgpu_pipeline pipeline
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_blas(
+bool cgpu_create_blas(
   cgpu_device device,
   uint32_t vertex_count,
   const cgpu_vertex* vertices,
@@ -615,51 +586,51 @@ CGPU_API bool CGPU_CDECL cgpu_create_blas(
   cgpu_blas* p_blas
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_tlas(
+bool cgpu_create_tlas(
   cgpu_device device,
   uint32_t instance_count,
-  const struct cgpu_blas_instance* instances,
+  const cgpu_blas_instance* instances,
   cgpu_tlas* p_tlas
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_blas(
+bool cgpu_destroy_blas(
   cgpu_device device,
   cgpu_blas blas
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_tlas(
+bool cgpu_destroy_tlas(
   cgpu_device device,
   cgpu_tlas tlas
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_command_buffer(
+bool cgpu_create_command_buffer(
   cgpu_device device,
   cgpu_command_buffer* p_command_buffer
 );
 
-CGPU_API bool CGPU_CDECL cgpu_begin_command_buffer(
+bool cgpu_begin_command_buffer(
   cgpu_command_buffer command_buffer
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_bind_pipeline(
+bool cgpu_cmd_bind_pipeline(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_transition_shader_image_layouts(
+bool cgpu_cmd_transition_shader_image_layouts(
   cgpu_command_buffer command_buffer,
   cgpu_shader shader,
   uint32_t image_count,
   const cgpu_image_binding* p_images
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_update_bindings(
+bool cgpu_cmd_update_bindings(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline,
   const cgpu_bindings* bindings
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_copy_buffer(
+bool cgpu_cmd_copy_buffer(
   cgpu_command_buffer command_buffer,
   cgpu_buffer source,
   uint64_t source_offset,
@@ -668,14 +639,14 @@ CGPU_API bool CGPU_CDECL cgpu_cmd_copy_buffer(
   uint64_t size
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_copy_buffer_to_image(
+bool cgpu_cmd_copy_buffer_to_image(
   cgpu_command_buffer command_buffer,
   cgpu_buffer buffer,
   uint64_t buffer_offset,
   cgpu_image image
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_push_constants(
+bool cgpu_cmd_push_constants(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline pipeline,
   CgpuShaderStageFlags stage_flags,
@@ -683,14 +654,14 @@ CGPU_API bool CGPU_CDECL cgpu_cmd_push_constants(
   const void* p_data
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_dispatch(
+bool cgpu_cmd_dispatch(
   cgpu_command_buffer command_buffer,
   uint32_t dim_x,
   uint32_t dim_y,
   uint32_t dim_z
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_pipeline_barrier(
+bool cgpu_cmd_pipeline_barrier(
   cgpu_command_buffer command_buffer,
   uint32_t barrier_count,
   const cgpu_memory_barrier* p_barriers,
@@ -700,18 +671,18 @@ CGPU_API bool CGPU_CDECL cgpu_cmd_pipeline_barrier(
   const cgpu_image_memory_barrier* p_image_barriers
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_reset_timestamps(
+bool cgpu_cmd_reset_timestamps(
   cgpu_command_buffer command_buffer,
   uint32_t offset,
   uint32_t count
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_write_timestamp(
+bool cgpu_cmd_write_timestamp(
   cgpu_command_buffer command_buffer,
   uint32_t timestamp_index
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_copy_timestamps(
+bool cgpu_cmd_copy_timestamps(
   cgpu_command_buffer command_buffer,
   cgpu_buffer buffer,
   uint32_t offset,
@@ -719,74 +690,68 @@ CGPU_API bool CGPU_CDECL cgpu_cmd_copy_timestamps(
   bool wait_until_available
 );
 
-CGPU_API bool CGPU_CDECL cgpu_cmd_trace_rays(
+bool cgpu_cmd_trace_rays(
   cgpu_command_buffer command_buffer,
   cgpu_pipeline rt_pipeline,
   uint32_t width,
   uint32_t height
 );
 
-CGPU_API bool CGPU_CDECL cgpu_end_command_buffer(
+bool cgpu_end_command_buffer(
   cgpu_command_buffer command_buffer
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_command_buffer(
+bool cgpu_destroy_command_buffer(
   cgpu_device device,
   cgpu_command_buffer command_buffer
 );
 
-CGPU_API bool CGPU_CDECL cgpu_create_fence(
+bool cgpu_create_fence(
   cgpu_device device,
   cgpu_fence* p_fence
 );
 
-CGPU_API bool CGPU_CDECL cgpu_reset_fence(
+bool cgpu_reset_fence(
   cgpu_device device,
   cgpu_fence fence
 );
 
-CGPU_API bool CGPU_CDECL cgpu_wait_for_fence(
+bool cgpu_wait_for_fence(
   cgpu_device device,
   cgpu_fence fence
 );
 
-CGPU_API bool CGPU_CDECL cgpu_destroy_fence(
+bool cgpu_destroy_fence(
   cgpu_device device,
   cgpu_fence fence
 );
 
-CGPU_API bool CGPU_CDECL cgpu_submit_command_buffer(
+bool cgpu_submit_command_buffer(
   cgpu_device device,
   cgpu_command_buffer command_buffer,
   cgpu_fence fence
 );
 
-CGPU_API bool CGPU_CDECL cgpu_flush_mapped_memory(
+bool cgpu_flush_mapped_memory(
   cgpu_device device,
   cgpu_buffer buffer,
   uint64_t offset,
   uint64_t size
 );
 
-CGPU_API bool CGPU_CDECL cgpu_invalidate_mapped_memory(
+bool cgpu_invalidate_mapped_memory(
   cgpu_device device,
   cgpu_buffer buffer,
   uint64_t offset,
   uint64_t size
 );
 
-CGPU_API bool CGPU_CDECL cgpu_get_physical_device_features(
+bool cgpu_get_physical_device_features(
   cgpu_device device,
   cgpu_physical_device_features* p_features
 );
 
-CGPU_API bool CGPU_CDECL cgpu_get_physical_device_properties(
+bool cgpu_get_physical_device_properties(
   cgpu_device device,
   cgpu_physical_device_properties* p_limits
 );
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif

@@ -1,19 +1,19 @@
-/*
- * Copyright (C) 2019-2022 Pablo Delgado Krämer
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
+//
+// Copyright (C) 2023 Pablo Delgado Krämer
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
 
 #include "cgpu.h"
 #include "resource_store.h"
@@ -47,29 +47,33 @@
 
 /* Internal structures. */
 
-typedef struct cgpu_iinstance {
+struct cgpu_iinstance
+{
   VkInstance instance;
-} cgpu_iinstance;
+};
 
-typedef struct cgpu_idevice {
+struct cgpu_idevice
+{
   VkDevice                        logical_device;
   VkPhysicalDevice                physical_device;
   VkQueue                         compute_queue;
   VkCommandPool                   command_pool;
   VkQueryPool                     timestamp_pool;
-  struct VolkDeviceTable          table;
+  VolkDeviceTable                 table;
   cgpu_physical_device_features   features;
   cgpu_physical_device_properties properties;
   VmaAllocator                    allocator;
-} cgpu_idevice;
+};
 
-typedef struct cgpu_ibuffer {
+struct cgpu_ibuffer
+{
   VkBuffer       buffer;
   uint64_t       size;
   VmaAllocation  allocation;
-} cgpu_ibuffer;
+};
 
-typedef struct cgpu_iimage {
+struct cgpu_iimage
+{
   VkImage       image;
   VkImageView   image_view;
   VmaAllocation allocation;
@@ -79,9 +83,10 @@ typedef struct cgpu_iimage {
   uint32_t      depth;
   VkImageLayout layout;
   VkAccessFlags access_mask;
-} cgpu_iimage;
+};
 
-typedef struct cgpu_ipipeline {
+struct cgpu_ipipeline
+{
   VkPipeline                      pipeline;
   VkPipelineLayout                layout;
   VkDescriptorPool                descriptor_pool;
@@ -94,41 +99,47 @@ typedef struct cgpu_ipipeline {
   VkStridedDeviceAddressRegionKHR sbtMiss;
   VkStridedDeviceAddressRegionKHR sbtHit;
   cgpu_ibuffer                    sbt;
-} cgpu_ipipeline;
+};
 
-typedef struct cgpu_ishader {
+struct cgpu_ishader
+{
   VkShaderModule module;
   cgpu_shader_reflection reflection;
   VkShaderStageFlagBits stage_flags;
-} cgpu_ishader;
+};
 
-typedef struct cgpu_ifence {
+struct cgpu_ifence
+{
   VkFence fence;
-} cgpu_ifence;
+};
 
-typedef struct cgpu_icommand_buffer {
+struct cgpu_icommand_buffer
+{
   VkCommandBuffer command_buffer;
   cgpu_device     device;
-} cgpu_icommand_buffer;
+};
 
-typedef struct cgpu_iblas {
+struct cgpu_iblas
+{
   VkAccelerationStructureKHR as;
   uint64_t address;
   cgpu_ibuffer buffer;
   cgpu_ibuffer indices;
   cgpu_ibuffer vertices;
   bool isOpaque;
-} cgpu_iblas;
+};
 
-typedef struct cgpu_itlas {
+struct cgpu_itlas
+{
   VkAccelerationStructureKHR as;
   cgpu_ibuffer buffer;
   cgpu_ibuffer instances;
-} cgpu_itlas;
+};
 
-typedef struct cgpu_isampler {
+struct cgpu_isampler
+{
   VkSampler sampler;
-} cgpu_isampler;
+};
 
 /* Handle and structure storage. */
 
@@ -144,7 +155,19 @@ static resource_store isampler_store;
 static resource_store iblas_store;
 static resource_store itlas_store;
 
-/* Helper functions. */
+/* Helper defines. */
+
+#if defined(NDEBUG)
+  #if defined(__GNUC__)
+    #define CGPU_INLINE inline __attribute__((__always_inline__))
+  #elif defined(_MSC_VER)
+    #define CGPU_INLINE __forceinline
+  #else
+    #define CGPU_INLINE inline
+  #endif
+#else
+  #define CGPU_INLINE
+#endif
 
 #define CGPU_RETURN_ERROR(msg)                                        \
   do {                                                                \
@@ -356,7 +379,7 @@ bool cgpu_initialize(const char* p_app_name,
   return true;
 }
 
-void cgpu_terminate(void)
+void cgpu_terminate()
 {
   resource_store_destroy(&idevice_store);
   resource_store_destroy(&ibuffer_store);
@@ -2243,7 +2266,7 @@ bool cgpu_create_blas(cgpu_device device,
 
 bool cgpu_create_tlas(cgpu_device device,
                       uint32_t instance_count,
-                      const struct cgpu_blas_instance* instances,
+                      const cgpu_blas_instance* instances,
                       cgpu_tlas* p_tlas)
 {
   cgpu_idevice* idevice;
