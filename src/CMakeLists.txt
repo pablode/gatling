@@ -1,3 +1,4 @@
+add_subdirectory(gb)
 add_subdirectory(vma-c)
 add_subdirectory(cgpu)
 add_subdirectory(gml)
