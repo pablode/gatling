@@ -26,7 +26,7 @@ bool cgpu_perform_shader_reflection(uint64_t size,
                                     const uint32_t* p_spv,
                                     cgpu_shader_reflection* p_reflection)
 {
-  SpvReflectShaderModule shader_module = {0};
+  SpvReflectShaderModule shader_module = {};
   SpvReflectModuleFlags flags = SPV_REFLECT_MODULE_FLAG_NO_COPY;
   if (spvReflectCreateShaderModule2(flags, size, p_spv, &shader_module) != SPV_REFLECT_RESULT_SUCCESS)
   {
@@ -47,7 +47,7 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     p_reflection->binding_count = 0;
     p_reflection->bindings = (cgpu_shader_reflection_binding*)malloc(sizeof(cgpu_shader_reflection_binding) * binding_count);
 
-    bindings = malloc(binding_count * sizeof(SpvReflectDescriptorBinding*));
+    bindings = (SpvReflectDescriptorBinding**) malloc(binding_count * sizeof(SpvReflectDescriptorBinding*));
     if (spvReflectEnumerateDescriptorBindings(&shader_module, &binding_count, bindings) != SPV_REFLECT_RESULT_SUCCESS)
     {
       goto fail;

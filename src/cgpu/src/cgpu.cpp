@@ -179,7 +179,7 @@ CGPU_RESOLVE_HANDLE(          tlas,           cgpu_tlas,           cgpu_itlas,  
 
 static cgpu_physical_device_features cgpu_translate_physical_device_features(const VkPhysicalDeviceFeatures* vk_features)
 {
-  cgpu_physical_device_features features = {0};
+  cgpu_physical_device_features features = {};
   features.textureCompressionBC = vk_features->textureCompressionBC;
   features.pipelineStatisticsQuery = vk_features->pipelineStatisticsQuery;
   features.shaderImageGatherExtended = vk_features->shaderImageGatherExtended;
@@ -206,7 +206,7 @@ static cgpu_physical_device_properties cgpu_translate_physical_device_properties
                                                                                  const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vk_as_props,
                                                                                  const VkPhysicalDeviceRayTracingPipelinePropertiesKHR* vk_rt_pipeline_props)
 {
-  cgpu_physical_device_properties properties = {0};
+  cgpu_physical_device_properties properties = {};
   properties.maxImageDimension1D = vk_limits->maxImageDimension1D;
   properties.maxImageDimension2D = vk_limits->maxImageDimension2D;
   properties.maxImageDimension3D = vk_limits->maxImageDimension3D;
@@ -430,11 +430,11 @@ bool cgpu_create_device(cgpu_device* p_device)
   vkGetPhysicalDeviceFeatures(idevice->physical_device, &features);
   idevice->features = cgpu_translate_physical_device_features(&features);
 
-  VkPhysicalDeviceAccelerationStructurePropertiesKHR as_properties = {0};
+  VkPhysicalDeviceAccelerationStructurePropertiesKHR as_properties = {};
   as_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
   as_properties.pNext = NULL;
 
-  VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_properties = {0};
+  VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_properties = {};
   rt_pipeline_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
   rt_pipeline_properties.pNext = &as_properties;
 
@@ -598,7 +598,7 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   void* pNext = NULL;
 
-  VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageable_memory_features = {0};
+  VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageable_memory_features = {};
   pageable_memory_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
   pageable_memory_features.pNext = NULL;
   pageable_memory_features.pageableDeviceLocalMemory = VK_TRUE;
@@ -608,7 +608,7 @@ bool cgpu_create_device(cgpu_device* p_device)
     pNext = &pageable_memory_features;
   }
 
-  VkPhysicalDeviceShaderClockFeaturesKHR shader_clock_features = {0};
+  VkPhysicalDeviceShaderClockFeaturesKHR shader_clock_features = {};
   shader_clock_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
   shader_clock_features.pNext = pNext;
   shader_clock_features.shaderSubgroupClock = VK_TRUE;
@@ -619,7 +619,7 @@ bool cgpu_create_device(cgpu_device* p_device)
     pNext = &shader_clock_features;
   }
 
-  VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features = {0};
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features = {};
   acceleration_structure_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
   acceleration_structure_features.pNext = pNext;
   acceleration_structure_features.accelerationStructure = VK_TRUE;
@@ -628,7 +628,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   acceleration_structure_features.accelerationStructureHostCommands = VK_FALSE;
   acceleration_structure_features.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
 
-  VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features = {0};
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_pipeline_features = {};
   ray_tracing_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
   ray_tracing_pipeline_features.pNext = &acceleration_structure_features;
   ray_tracing_pipeline_features.rayTracingPipeline = VK_TRUE;
@@ -637,14 +637,14 @@ bool cgpu_create_device(cgpu_device* p_device)
   ray_tracing_pipeline_features.rayTracingPipelineTraceRaysIndirect = VK_FALSE;
   ray_tracing_pipeline_features.rayTraversalPrimitiveCulling = VK_FALSE;
 
-  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_features = {0};
+  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_features = {};
   buffer_device_address_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
   buffer_device_address_features.pNext = &ray_tracing_pipeline_features;
   buffer_device_address_features.bufferDeviceAddress = VK_TRUE;
   buffer_device_address_features.bufferDeviceAddressCaptureReplay = VK_FALSE;
   buffer_device_address_features.bufferDeviceAddressMultiDevice = VK_FALSE;
 
-  VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features = {0};
+  VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features = {};
   descriptor_indexing_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
   descriptor_indexing_features.pNext = &buffer_device_address_features;
   descriptor_indexing_features.shaderInputAttachmentArrayDynamicIndexing = VK_FALSE;
@@ -668,13 +668,13 @@ bool cgpu_create_device(cgpu_device* p_device)
   descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_FALSE;
   descriptor_indexing_features.runtimeDescriptorArray = VK_FALSE;
 
-  VkPhysicalDeviceShaderFloat16Int8Features shader_float16_int8_features = {0};
+  VkPhysicalDeviceShaderFloat16Int8Features shader_float16_int8_features = {};
   shader_float16_int8_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
   shader_float16_int8_features.pNext = &descriptor_indexing_features;
   shader_float16_int8_features.shaderFloat16 = VK_TRUE;
   shader_float16_int8_features.shaderInt8 = VK_FALSE;
 
-  VkPhysicalDevice16BitStorageFeatures device_16bit_storage_features = {0};
+  VkPhysicalDevice16BitStorageFeatures device_16bit_storage_features = {};
   device_16bit_storage_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
   device_16bit_storage_features.pNext = &shader_float16_int8_features;
   device_16bit_storage_features.storageBuffer16BitAccess = VK_TRUE;
@@ -835,7 +835,7 @@ bool cgpu_create_device(cgpu_device* p_device)
     CGPU_RETURN_ERROR("failed to create query pool");
   }
 
-  VmaVulkanFunctions vulkan_functions = {0};
+  VmaVulkanFunctions vulkan_functions = {};
   vulkan_functions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
   vulkan_functions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
   vulkan_functions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2;
@@ -859,7 +859,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   vulkan_functions.vkBindBufferMemory2KHR = idevice->table.vkBindBufferMemory2;
   vulkan_functions.vkBindImageMemory2KHR = idevice->table.vkBindImageMemory2;
 
-  VmaAllocatorCreateInfo alloc_create_info = {0};
+  VmaAllocatorCreateInfo alloc_create_info = {};
   alloc_create_info.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   alloc_create_info.vulkanApiVersion = CGPU_MIN_VK_API_VERSION;
   alloc_create_info.physicalDevice = idevice->physical_device;
@@ -968,7 +968,7 @@ bool cgpu_create_shader(cgpu_device device,
     CGPU_RETURN_ERROR("failed to reflect shader");
   }
 
-  ishader->stage_flags = (VkShaderStageFlags) stage_flags;
+  ishader->stage_flags = (VkShaderStageFlagBits) stage_flags;
 
   return true;
 }
@@ -1015,7 +1015,7 @@ static bool cgpu_create_ibuffer_aligned(cgpu_idevice* idevice,
   buffer_info.queueFamilyIndexCount = 0;
   buffer_info.pQueueFamilyIndices = NULL;
 
-  VmaAllocationCreateInfo alloc_info = {0};
+  VmaAllocationCreateInfo alloc_info = {};
   alloc_info.requiredFlags = (VkMemoryPropertyFlags) memory_properties;
 
   VkResult result;
@@ -1192,7 +1192,7 @@ bool cgpu_create_image(cgpu_device device,
   image_info.pQueueFamilyIndices = NULL;
   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  VmaAllocationCreateInfo alloc_info = {0};
+  VmaAllocationCreateInfo alloc_info = {};
   alloc_info.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
   VkResult result = vmaCreateImage(
@@ -1431,7 +1431,7 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
 
     VkDescriptorSetLayoutBinding* descriptor_set_layout_binding = &ipipeline->descriptor_set_layout_bindings[i];
     descriptor_set_layout_binding->binding = binding->binding;
-    descriptor_set_layout_binding->descriptorType = binding->descriptor_type;
+    descriptor_set_layout_binding->descriptorType = (VkDescriptorType) binding->descriptor_type;
     descriptor_set_layout_binding->descriptorCount = binding->count;
     descriptor_set_layout_binding->stageFlags = stageFlags;
     descriptor_set_layout_binding->pImmutableSamplers = NULL;
@@ -1665,7 +1665,7 @@ bool cgpu_create_compute_pipeline(cgpu_device device,
 
 static VkDeviceAddress cgpu_get_buffer_device_address(cgpu_idevice* idevice, cgpu_ibuffer* ibuffer)
 {
-  VkBufferDeviceAddressInfoKHR address_info = {0};
+  VkBufferDeviceAddressInfoKHR address_info = {};
   address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
   address_info.pNext = NULL;
   address_info.buffer = ibuffer->buffer;
@@ -1775,11 +1775,11 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   VkPipelineShaderStageCreateInfo stages[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
   for (uint32_t i = 0; i < CGPU_MAX_RT_PIPELINE_STAGE_COUNT; i++)
   {
-    VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {0};
+    VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {};
     pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     pipeline_shader_stage_create_info.pNext = NULL;
     pipeline_shader_stage_create_info.flags = 0;
-    pipeline_shader_stage_create_info.stage = 0;
+    pipeline_shader_stage_create_info.stage = (VkShaderStageFlagBits) 0;
     pipeline_shader_stage_create_info.pName = "main";
     pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
     stages[i] = pipeline_shader_stage_create_info;
@@ -1844,7 +1844,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   VkRayTracingShaderGroupCreateInfoKHR groups[CGPU_MAX_RT_PIPELINE_STAGE_COUNT];
   for (uint32_t i = 0; i < CGPU_MAX_RT_PIPELINE_STAGE_COUNT; i++)
   {
-    VkRayTracingShaderGroupCreateInfoKHR rt_shader_group_create_info = {0};
+    VkRayTracingShaderGroupCreateInfoKHR rt_shader_group_create_info = {};
     rt_shader_group_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
     rt_shader_group_create_info.pNext = NULL;
     rt_shader_group_create_info.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
@@ -1898,59 +1898,57 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   }
 
   // Create pipeline.
-  uint32_t stageCount = hitShaderStageIndex;
-  uint32_t groupCount = hitStageAndGroupOffset + desc->hit_group_count;
-
-  VkPipelineCreateFlags flags = 0;
-  if (!anyNullClosestHitShader)
   {
-    flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
+    uint32_t stageCount = hitShaderStageIndex;
+    uint32_t groupCount = hitStageAndGroupOffset + desc->hit_group_count;
+
+    VkPipelineCreateFlags flags = 0;
+    if (!anyNullClosestHitShader)
+    {
+      flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
+    }
+    if (!anyNullAnyHitShader)
+    {
+      flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
+    }
+
+    VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {};
+    rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+    rt_pipeline_create_info.pNext = NULL;
+    rt_pipeline_create_info.flags = flags;
+    rt_pipeline_create_info.stageCount = stageCount;
+    rt_pipeline_create_info.pStages = stages;
+    rt_pipeline_create_info.groupCount = groupCount;
+    rt_pipeline_create_info.pGroups = groups;
+    rt_pipeline_create_info.maxPipelineRayRecursionDepth = 1;
+    rt_pipeline_create_info.pLibraryInfo = NULL;
+    rt_pipeline_create_info.pLibraryInterface = NULL;
+    rt_pipeline_create_info.pDynamicState = NULL;
+    rt_pipeline_create_info.layout = ipipeline->layout;
+    rt_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
+    rt_pipeline_create_info.basePipelineIndex = 0;
+
+    if (idevice->table.vkCreateRayTracingPipelinesKHR(idevice->logical_device,
+                                                      VK_NULL_HANDLE,
+                                                      VK_NULL_HANDLE,
+                                                      1,
+                                                      &rt_pipeline_create_info,
+                                                      NULL,
+                                                      &ipipeline->pipeline) != VK_SUCCESS)
+    {
+      goto cleanup_fail;
+    }
+
+    ipipeline->bind_point = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+
+    // Create the SBT.
+    if (!cgpu_create_rt_pipeline_sbt(idevice, ipipeline, groupCount, desc->miss_shader_count, desc->hit_group_count))
+    {
+      goto cleanup_fail;
+    }
+
+    return true;
   }
-  if (!anyNullAnyHitShader)
-  {
-    flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
-  }
-
-  VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {0};
-  rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-  rt_pipeline_create_info.pNext = NULL;
-  rt_pipeline_create_info.flags = flags;
-  rt_pipeline_create_info.stageCount = stageCount;
-  rt_pipeline_create_info.pStages = stages;
-  rt_pipeline_create_info.groupCount = groupCount;
-  rt_pipeline_create_info.pGroups = groups;
-  rt_pipeline_create_info.maxPipelineRayRecursionDepth = 1;
-  rt_pipeline_create_info.pLibraryInfo = NULL;
-  rt_pipeline_create_info.pLibraryInterface = NULL;
-  rt_pipeline_create_info.pDynamicState = NULL;
-  rt_pipeline_create_info.layout = ipipeline->layout;
-  rt_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
-  rt_pipeline_create_info.basePipelineIndex = 0;
-
-  VkResult result = idevice->table.vkCreateRayTracingPipelinesKHR(
-    idevice->logical_device,
-    VK_NULL_HANDLE,
-    VK_NULL_HANDLE,
-    1,
-    &rt_pipeline_create_info,
-    NULL,
-    &ipipeline->pipeline
-  );
-
-  if (result != VK_SUCCESS)
-  {
-    goto cleanup_fail;
-  }
-
-  ipipeline->bind_point = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
-
-  // Create the SBT.
-  if (!cgpu_create_rt_pipeline_sbt(idevice, ipipeline, groupCount, desc->miss_shader_count, desc->hit_group_count))
-  {
-    goto cleanup_fail;
-  }
-
-  return true;
 
 cleanup_fail:
   idevice->table.vkDestroyPipelineLayout(idevice->logical_device, ipipeline->layout, NULL);
@@ -2015,7 +2013,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   cgpu_resolve_device(device, &idevice);
 
   // Get AS size
-  VkAccelerationStructureBuildGeometryInfoKHR as_build_geom_info = {0};
+  VkAccelerationStructureBuildGeometryInfoKHR as_build_geom_info = {};
   as_build_geom_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
   as_build_geom_info.pNext = NULL;
   as_build_geom_info.type = as_type;
@@ -2029,7 +2027,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   as_build_geom_info.scratchData.hostAddress = NULL;
   as_build_geom_info.scratchData.deviceAddress = 0; // set in second round
 
-  VkAccelerationStructureBuildSizesInfoKHR as_build_sizes_info = {0};
+  VkAccelerationStructureBuildSizesInfoKHR as_build_sizes_info = {};
   as_build_sizes_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
   as_build_sizes_info.pNext = NULL;
   as_build_sizes_info.accelerationStructureSize = 0; // output
@@ -2052,7 +2050,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
     CGPU_RETURN_ERROR("failed to create AS buffer");
   }
 
-  VkAccelerationStructureCreateInfoKHR as_create_info = {0};
+  VkAccelerationStructureCreateInfoKHR as_create_info = {};
   as_create_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
   as_create_info.pNext = NULL;
   as_create_info.createFlags = 0;
@@ -2200,7 +2198,7 @@ bool cgpu_create_blas(cgpu_device device,
   }
 
   // Create BLAS
-  VkAccelerationStructureGeometryTrianglesDataKHR as_triangle_data = {0};
+  VkAccelerationStructureGeometryTrianglesDataKHR as_triangle_data = {};
   as_triangle_data.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
   as_triangle_data.pNext = NULL;
   as_triangle_data.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
@@ -2214,10 +2212,10 @@ bool cgpu_create_blas(cgpu_device device,
   as_triangle_data.transformData.hostAddress = NULL;
   as_triangle_data.transformData.deviceAddress = 0; // optional
 
-  VkAccelerationStructureGeometryDataKHR as_geom_data = {0};
+  VkAccelerationStructureGeometryDataKHR as_geom_data = {};
   as_geom_data.triangles = as_triangle_data;
 
-  VkAccelerationStructureGeometryKHR as_geom = {0};
+  VkAccelerationStructureGeometryKHR as_geom = {};
   as_geom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
   as_geom.pNext = NULL;
   as_geom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
@@ -2232,7 +2230,7 @@ bool cgpu_create_blas(cgpu_device device,
     CGPU_RETURN_ERROR("failed to build BLAS");
   }
 
-  VkAccelerationStructureDeviceAddressInfoKHR as_address_info = {0};
+  VkAccelerationStructureDeviceAddressInfoKHR as_address_info = {};
   as_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
   as_address_info.pNext = NULL;
   as_address_info.accelerationStructure = iblas->as;
@@ -2302,7 +2300,7 @@ bool cgpu_create_tlas(cgpu_device device,
   }
 
   // Create TLAS
-  VkAccelerationStructureGeometryKHR as_geom = {0};
+  VkAccelerationStructureGeometryKHR as_geom = {};
   as_geom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
   as_geom.pNext = NULL;
   as_geom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
@@ -3221,7 +3219,7 @@ bool cgpu_cmd_trace_rays(cgpu_command_buffer command_buffer, cgpu_pipeline rt_pi
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkStridedDeviceAddressRegionKHR callableSBT = {0};
+  VkStridedDeviceAddressRegionKHR callableSBT = {};
   idevice->table.vkCmdTraceRaysKHR(icommand_buffer->command_buffer,
                                    &ipipeline->sbtRgen,
                                    &ipipeline->sbtMiss,

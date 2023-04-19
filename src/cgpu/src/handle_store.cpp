@@ -69,7 +69,7 @@ uint64_t handle_store_create_handle(handle_store* store)
     if (index >= store->version_capacity)
     {
       store->version_capacity = handle_store_next_power_of_two(index + 1);
-      store->versions = realloc(store->versions, sizeof(uint32_t) * store->version_capacity);
+      store->versions = (uint32_t*) realloc(store->versions, sizeof(uint32_t) * store->version_capacity);
     }
 
     store->versions[index] = version;
@@ -109,7 +109,7 @@ void handle_store_free_handle(handle_store* store,
   if (store->free_index_count > store->free_index_capacity)
   {
     store->free_index_capacity = handle_store_next_power_of_two(store->free_index_count);
-    store->free_indices = realloc(store->free_indices, sizeof(uint32_t) * store->free_index_capacity);
+    store->free_indices = (uint32_t*) realloc(store->free_indices, sizeof(uint32_t) * store->free_index_capacity);
   }
 
   store->free_indices[store->free_index_count - 1] = index;

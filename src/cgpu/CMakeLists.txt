@@ -1,12 +1,12 @@
 add_library(
   cgpu STATIC
   include/cgpu.h
-  src/cgpu.c
-  src/handle_store.c
+  src/cgpu.cpp
+  src/handle_store.cpp
   src/handle_store.h
-  src/resource_store.c
+  src/resource_store.cpp
   src/resource_store.h
-  src/shader_reflection.c
+  src/shader_reflection.cpp
   src/shader_reflection.h
 )
 
@@ -29,10 +29,6 @@ target_link_libraries(
 set_target_properties(
   cgpu
   PROPERTIES
-    LINKER_LANGUAGE C
-    C_STANDARD 11
-    C_STANDARD_REQUIRED ON
-    C_EXTENSIONS OFF
     # Required since library is linked into hdGatling DSO
     POSITION_INDEPENDENT_CODE ON
 )
