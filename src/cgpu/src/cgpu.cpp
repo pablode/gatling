@@ -323,15 +323,15 @@ bool cgpu_initialize(const char* p_app_name,
   uint32_t validation_layer_count = 1;
   uint32_t instance_extension_count = 1;
 #else
-  const char** validation_layers = NULL;
+  const char** validation_layers = nullptr;
   uint32_t validation_layer_count = 0;
-  const char** instance_extensions = NULL;
+  const char** instance_extensions = nullptr;
   uint32_t instance_extension_count = 0;
 #endif
 
   VkApplicationInfo app_info;
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  app_info.pNext = NULL;
+  app_info.pNext = nullptr;
   app_info.pApplicationName = p_app_name;
   app_info.applicationVersion = VK_MAKE_VERSION(version_major, version_minor, version_patch);
   app_info.pEngineName = p_app_name;
@@ -340,7 +340,7 @@ bool cgpu_initialize(const char* p_app_name,
 
   VkInstanceCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  create_info.pNext = NULL;
+  create_info.pNext = nullptr;
   create_info.flags = 0;
   create_info.pApplicationInfo = &app_info;
   create_info.enabledLayerCount = validation_layer_count;
@@ -348,7 +348,7 @@ bool cgpu_initialize(const char* p_app_name,
   create_info.enabledExtensionCount = instance_extension_count;
   create_info.ppEnabledExtensionNames = instance_extensions;
 
-  result = vkCreateInstance(&create_info, NULL, &iinstance.instance);
+  result = vkCreateInstance(&create_info, nullptr, &iinstance.instance);
   if (result != VK_SUCCESS) {
     CGPU_RETURN_ERROR("failed to create vulkan instance");
   }
@@ -382,7 +382,7 @@ void cgpu_terminate()
   resource_store_destroy(&iblas_store);
   resource_store_destroy(&itlas_store);
 
-  vkDestroyInstance(iinstance.instance, NULL);
+  vkDestroyInstance(iinstance.instance, nullptr);
 }
 
 static bool cgpu_find_device_extension(const char* extension_name,
@@ -414,7 +414,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   vkEnumeratePhysicalDevices(
     iinstance.instance,
     &phys_device_count,
-    NULL
+    nullptr
   );
 
   if (phys_device_count == 0)
@@ -440,7 +440,7 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   VkPhysicalDeviceAccelerationStructurePropertiesKHR as_properties = {};
   as_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
-  as_properties.pNext = NULL;
+  as_properties.pNext = nullptr;
 
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt_pipeline_properties = {};
   rt_pipeline_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
@@ -476,9 +476,9 @@ bool cgpu_create_device(cgpu_device* p_device)
   uint32_t device_ext_count;
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
-    NULL,
+    nullptr,
     &device_ext_count,
-    NULL
+    nullptr
   );
 
   GbSmallVector<VkExtensionProperties, 1024> device_extensions;
@@ -486,7 +486,7 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   vkEnumerateDeviceExtensionProperties(
     idevice->physical_device,
-    NULL,
+    nullptr,
     &device_ext_count,
     device_extensions.data()
   );
@@ -552,7 +552,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physical_device,
     &queue_family_count,
-    NULL
+    nullptr
   );
 
   GbSmallVector<VkQueueFamilyProperties, 32> queue_families;
@@ -581,18 +581,18 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   VkDeviceQueueCreateInfo queue_create_info;
   queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  queue_create_info.pNext = NULL;
+  queue_create_info.pNext = nullptr;
   queue_create_info.flags = 0;
   queue_create_info.queueFamilyIndex = queue_family_index;
   queue_create_info.queueCount = 1;
   const float queue_priority = 1.0f;
   queue_create_info.pQueuePriorities = &queue_priority;
 
-  void* pNext = NULL;
+  void* pNext = nullptr;
 
   VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageable_memory_features = {};
   pageable_memory_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
-  pageable_memory_features.pNext = NULL;
+  pageable_memory_features.pNext = nullptr;
   pageable_memory_features.pageableDeviceLocalMemory = VK_TRUE;
 
   if (idevice->features.pageableDeviceLocalMemory)
@@ -742,15 +742,15 @@ bool cgpu_create_device(cgpu_device* p_device)
   /* These two fields are ignored by up-to-date implementations since
    * nowadays, there is no difference to instance validation layers. */
   device_create_info.enabledLayerCount = 0;
-  device_create_info.ppEnabledLayerNames = NULL;
+  device_create_info.ppEnabledLayerNames = nullptr;
   device_create_info.enabledExtensionCount = enabled_device_extensions.size();
   device_create_info.ppEnabledExtensionNames = enabled_device_extensions.data();
-  device_create_info.pEnabledFeatures = NULL;
+  device_create_info.pEnabledFeatures = nullptr;
 
   VkResult result = vkCreateDevice(
     idevice->physical_device,
     &device_create_info,
-    NULL,
+    nullptr,
     &idevice->logical_device
   );
   if (result != VK_SUCCESS) {
@@ -772,14 +772,14 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   VkCommandPoolCreateInfo pool_info;
   pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  pool_info.pNext = NULL;
+  pool_info.pNext = nullptr;
   pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   pool_info.queueFamilyIndex = queue_family_index;
 
   result = idevice->table.vkCreateCommandPool(
     idevice->logical_device,
     &pool_info,
-    NULL,
+    nullptr,
     &idevice->command_pool
   );
 
@@ -789,7 +789,7 @@ bool cgpu_create_device(cgpu_device* p_device)
 
     idevice->table.vkDestroyDevice(
       idevice->logical_device,
-      NULL
+      nullptr
     );
 
     CGPU_RETURN_ERROR("failed to create command pool");
@@ -797,7 +797,7 @@ bool cgpu_create_device(cgpu_device* p_device)
 
   VkQueryPoolCreateInfo timestamp_pool_info;
   timestamp_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-  timestamp_pool_info.pNext = NULL;
+  timestamp_pool_info.pNext = nullptr;
   timestamp_pool_info.flags = 0;
   timestamp_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
   timestamp_pool_info.queryCount = CGPU_MAX_TIMESTAMP_QUERIES;
@@ -806,7 +806,7 @@ bool cgpu_create_device(cgpu_device* p_device)
   result = idevice->table.vkCreateQueryPool(
     idevice->logical_device,
     &timestamp_pool_info,
-    NULL,
+    nullptr,
     &idevice->timestamp_pool
   );
 
@@ -817,11 +817,11 @@ bool cgpu_create_device(cgpu_device* p_device)
     idevice->table.vkDestroyCommandPool(
       idevice->logical_device,
       idevice->command_pool,
-      NULL
+      nullptr
     );
     idevice->table.vkDestroyDevice(
       idevice->logical_device,
-      NULL
+      nullptr
     );
 
     CGPU_RETURN_ERROR("failed to create query pool");
@@ -868,16 +868,16 @@ bool cgpu_create_device(cgpu_device* p_device)
     idevice->table.vkDestroyQueryPool(
       idevice->logical_device,
       idevice->timestamp_pool,
-      NULL
+      nullptr
     );
     idevice->table.vkDestroyCommandPool(
       idevice->logical_device,
       idevice->command_pool,
-      NULL
+      nullptr
     );
     idevice->table.vkDestroyDevice(
       idevice->logical_device,
-      NULL
+      nullptr
     );
     CGPU_RETURN_ERROR("failed to create vma allocator");
   }
@@ -897,16 +897,16 @@ bool cgpu_destroy_device(cgpu_device device)
   idevice->table.vkDestroyQueryPool(
     idevice->logical_device,
     idevice->timestamp_pool,
-    NULL
+    nullptr
   );
   idevice->table.vkDestroyCommandPool(
     idevice->logical_device,
     idevice->command_pool,
-    NULL
+    nullptr
   );
   idevice->table.vkDestroyDevice(
     idevice->logical_device,
-    NULL
+    nullptr
   );
 
   resource_store_free_handle(&idevice_store, device.handle);
@@ -933,7 +933,7 @@ bool cgpu_create_shader(cgpu_device device,
 
   VkShaderModuleCreateInfo shader_module_create_info;
   shader_module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  shader_module_create_info.pNext = NULL;
+  shader_module_create_info.pNext = nullptr;
   shader_module_create_info.flags = 0;
   shader_module_create_info.codeSize = size;
   shader_module_create_info.pCode = (uint32_t*) p_source;
@@ -941,7 +941,7 @@ bool cgpu_create_shader(cgpu_device device,
   VkResult result = idevice->table.vkCreateShaderModule(
     idevice->logical_device,
     &shader_module_create_info,
-    NULL,
+    nullptr,
     &ishader->module
   );
   if (result != VK_SUCCESS) {
@@ -954,7 +954,7 @@ bool cgpu_create_shader(cgpu_device device,
     idevice->table.vkDestroyShaderModule(
       idevice->logical_device,
       ishader->module,
-      NULL
+      nullptr
     );
     resource_store_free_handle(&ishader_store, p_shader->handle);
     CGPU_RETURN_ERROR("failed to reflect shader");
@@ -982,7 +982,7 @@ bool cgpu_destroy_shader(cgpu_device device,
   idevice->table.vkDestroyShaderModule(
     idevice->logical_device,
     ishader->module,
-    NULL
+    nullptr
   );
 
   resource_store_free_handle(&ishader_store, shader.handle);
@@ -999,13 +999,13 @@ static bool cgpu_create_ibuffer_aligned(cgpu_idevice* idevice,
 {
   VkBufferCreateInfo buffer_info;
   buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  buffer_info.pNext = NULL;
+  buffer_info.pNext = nullptr;
   buffer_info.flags = 0;
   buffer_info.size = size;
   buffer_info.usage = (VkBufferUsageFlags) usage;
   buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   buffer_info.queueFamilyIndexCount = 0;
-  buffer_info.pQueueFamilyIndices = NULL;
+  buffer_info.pQueueFamilyIndices = nullptr;
 
   VmaAllocationCreateInfo alloc_info = {};
   alloc_info.requiredFlags = (VkMemoryPropertyFlags) memory_properties;
@@ -1020,7 +1020,7 @@ static bool cgpu_create_ibuffer_aligned(cgpu_idevice* idevice,
       alignment,
       &ibuffer->buffer,
       &ibuffer->allocation,
-      NULL
+      nullptr
     );
   }
   else
@@ -1031,7 +1031,7 @@ static bool cgpu_create_ibuffer_aligned(cgpu_idevice* idevice,
       &alloc_info,
       &ibuffer->buffer,
       &ibuffer->allocation,
-      NULL
+      nullptr
     );
   }
 
@@ -1167,7 +1167,7 @@ bool cgpu_create_image(cgpu_device device,
 
   VkImageCreateInfo image_info;
   image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  image_info.pNext = NULL;
+  image_info.pNext = nullptr;
   image_info.flags = 0;
   image_info.imageType = image_desc->is3d ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
   image_info.format = (VkFormat) image_desc->format;
@@ -1181,7 +1181,7 @@ bool cgpu_create_image(cgpu_device device,
   image_info.usage = (VkImageUsageFlags) image_desc->usage;
   image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   image_info.queueFamilyIndexCount = 0;
-  image_info.pQueueFamilyIndices = NULL;
+  image_info.pQueueFamilyIndices = nullptr;
   image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VmaAllocationCreateInfo alloc_info = {};
@@ -1193,7 +1193,7 @@ bool cgpu_create_image(cgpu_device device,
     &alloc_info,
     &iimage->image,
     &iimage->allocation,
-    NULL
+    nullptr
   );
 
   if (result != VK_SUCCESS) {
@@ -1212,7 +1212,7 @@ bool cgpu_create_image(cgpu_device device,
 
   VkImageViewCreateInfo image_view_info;
   image_view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  image_view_info.pNext = NULL;
+  image_view_info.pNext = nullptr;
   image_view_info.flags = 0;
   image_view_info.image = iimage->image;
   image_view_info.viewType = image_desc->is3d ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
@@ -1230,7 +1230,7 @@ bool cgpu_create_image(cgpu_device device,
   result = idevice->table.vkCreateImageView(
     idevice->logical_device,
     &image_view_info,
-    NULL,
+    nullptr,
     &iimage->image_view
   );
   if (result != VK_SUCCESS)
@@ -1264,7 +1264,7 @@ bool cgpu_destroy_image(cgpu_device device,
   idevice->table.vkDestroyImageView(
     idevice->logical_device,
     iimage->image_view,
-    NULL
+    nullptr
   );
 
   vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
@@ -1332,7 +1332,7 @@ bool cgpu_create_sampler(cgpu_device device,
 
   VkSamplerCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  create_info.pNext = NULL;
+  create_info.pNext = nullptr;
   create_info.flags = 0;
   create_info.magFilter = VK_FILTER_LINEAR;
   create_info.minFilter = VK_FILTER_LINEAR;
@@ -1353,7 +1353,7 @@ bool cgpu_create_sampler(cgpu_device device,
   VkResult result = idevice->table.vkCreateSampler(
     idevice->logical_device,
     &create_info,
-    NULL,
+    nullptr,
     &isampler->sampler
   );
 
@@ -1377,7 +1377,7 @@ bool cgpu_destroy_sampler(cgpu_device device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  idevice->table.vkDestroySampler(idevice->logical_device, isampler->sampler, NULL);
+  idevice->table.vkDestroySampler(idevice->logical_device, isampler->sampler, nullptr);
 
   resource_store_free_handle(&isampler_store, sampler.handle);
 
@@ -1393,7 +1393,7 @@ static bool cgpu_create_pipeline_layout(cgpu_idevice* idevice, cgpu_ipipeline* i
 
   VkPipelineLayoutCreateInfo pipeline_layout_create_info;
   pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipeline_layout_create_info.pNext = NULL;
+  pipeline_layout_create_info.pNext = nullptr;
   pipeline_layout_create_info.flags = 0;
   pipeline_layout_create_info.setLayoutCount = 1;
   pipeline_layout_create_info.pSetLayouts = &ipipeline->descriptor_set_layout;
@@ -1402,7 +1402,7 @@ static bool cgpu_create_pipeline_layout(cgpu_idevice* idevice, cgpu_ipipeline* i
 
   return idevice->table.vkCreatePipelineLayout(idevice->logical_device,
                                                &pipeline_layout_create_info,
-                                               NULL,
+                                               nullptr,
                                                &ipipeline->layout) == VK_SUCCESS;
 }
 
@@ -1419,14 +1419,14 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
     layout_binding.descriptorType = (VkDescriptorType) binding_reflection->descriptor_type;
     layout_binding.descriptorCount = binding_reflection->count;
     layout_binding.stageFlags = stageFlags;
-    layout_binding.pImmutableSamplers = NULL;
+    layout_binding.pImmutableSamplers = nullptr;
 
     ipipeline->descriptor_set_layout_bindings.push_back(layout_binding);
   }
 
   VkDescriptorSetLayoutCreateInfo descriptor_set_layout_create_info;
   descriptor_set_layout_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  descriptor_set_layout_create_info.pNext = NULL;
+  descriptor_set_layout_create_info.pNext = nullptr;
   descriptor_set_layout_create_info.flags = 0;
   descriptor_set_layout_create_info.bindingCount = ipipeline->descriptor_set_layout_bindings.size();
   descriptor_set_layout_create_info.pBindings = ipipeline->descriptor_set_layout_bindings.data();
@@ -1434,7 +1434,7 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
   VkResult result = idevice->table.vkCreateDescriptorSetLayout(
     idevice->logical_device,
     &descriptor_set_layout_create_info,
-    NULL,
+    nullptr,
     &ipipeline->descriptor_set_layout
   );
 
@@ -1463,7 +1463,7 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
       idevice->table.vkDestroyDescriptorSetLayout(
         idevice->logical_device,
         ipipeline->descriptor_set_layout,
-        NULL
+        nullptr
       );
       CGPU_RETURN_ERROR("invalid descriptor type");
     }
@@ -1506,7 +1506,7 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
 
   VkDescriptorPoolCreateInfo descriptor_pool_create_info;
   descriptor_pool_create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  descriptor_pool_create_info.pNext = NULL;
+  descriptor_pool_create_info.pNext = nullptr;
   descriptor_pool_create_info.flags = 0;
   descriptor_pool_create_info.maxSets = 1;
   descriptor_pool_create_info.poolSizeCount = pool_size_count;
@@ -1515,21 +1515,21 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
   result = idevice->table.vkCreateDescriptorPool(
     idevice->logical_device,
     &descriptor_pool_create_info,
-    NULL,
+    nullptr,
     &ipipeline->descriptor_pool
   );
   if (result != VK_SUCCESS) {
     idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
-      NULL
+      nullptr
     );
     CGPU_RETURN_ERROR("failed to create descriptor pool");
   }
 
   VkDescriptorSetAllocateInfo descriptor_set_allocate_info;
   descriptor_set_allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  descriptor_set_allocate_info.pNext = NULL;
+  descriptor_set_allocate_info.pNext = nullptr;
   descriptor_set_allocate_info.descriptorPool = ipipeline->descriptor_pool;
   descriptor_set_allocate_info.descriptorSetCount = 1;
   descriptor_set_allocate_info.pSetLayouts = &ipipeline->descriptor_set_layout;
@@ -1543,12 +1543,12 @@ static bool cgpu_create_pipeline_descriptors(cgpu_idevice* idevice, cgpu_ipipeli
     idevice->table.vkDestroyDescriptorPool(
       idevice->logical_device,
       ipipeline->descriptor_pool,
-      NULL
+      nullptr
     );
     idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
-      NULL
+      nullptr
     );
     CGPU_RETURN_ERROR("failed to allocate descriptor set");
   }
@@ -1588,28 +1588,28 @@ bool cgpu_create_compute_pipeline(cgpu_device device,
     idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
-      NULL
+      nullptr
     );
     idevice->table.vkDestroyDescriptorPool(
       idevice->logical_device,
       ipipeline->descriptor_pool,
-      NULL
+      nullptr
     );
     CGPU_RETURN_ERROR("failed to create pipeline layout");
   }
 
   VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info;
   pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  pipeline_shader_stage_create_info.pNext = NULL;
+  pipeline_shader_stage_create_info.pNext = nullptr;
   pipeline_shader_stage_create_info.flags = 0;
   pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   pipeline_shader_stage_create_info.module = ishader->module;
   pipeline_shader_stage_create_info.pName = "main";
-  pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
+  pipeline_shader_stage_create_info.pSpecializationInfo = nullptr;
 
   VkComputePipelineCreateInfo pipeline_create_info;
   pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-  pipeline_create_info.pNext = NULL;
+  pipeline_create_info.pNext = nullptr;
   pipeline_create_info.flags = 0;
   pipeline_create_info.stage = pipeline_shader_stage_create_info;
   pipeline_create_info.layout = ipipeline->layout;
@@ -1621,7 +1621,7 @@ bool cgpu_create_compute_pipeline(cgpu_device device,
     VK_NULL_HANDLE,
     1,
     &pipeline_create_info,
-    NULL,
+    nullptr,
     &ipipeline->pipeline
   );
 
@@ -1630,17 +1630,17 @@ bool cgpu_create_compute_pipeline(cgpu_device device,
     idevice->table.vkDestroyPipelineLayout(
       idevice->logical_device,
       ipipeline->layout,
-      NULL
+      nullptr
     );
     idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
-      NULL
+      nullptr
     );
     idevice->table.vkDestroyDescriptorPool(
       idevice->logical_device,
       ipipeline->descriptor_pool,
-      NULL
+      nullptr
     );
     CGPU_RETURN_ERROR("failed to create compute pipeline");
   }
@@ -1654,7 +1654,7 @@ static VkDeviceAddress cgpu_get_buffer_device_address(cgpu_idevice* idevice, cgp
 {
   VkBufferDeviceAddressInfoKHR address_info = {};
   address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-  address_info.pNext = NULL;
+  address_info.pNext = nullptr;
   address_info.buffer = ibuffer->buffer;
   return idevice->table.vkGetBufferDeviceAddressKHR(idevice->logical_device, &address_info);
 }
@@ -1763,12 +1763,12 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
     VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {};
     pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    pipeline_shader_stage_create_info.pNext = NULL;
+    pipeline_shader_stage_create_info.pNext = nullptr;
     pipeline_shader_stage_create_info.flags = 0;
     pipeline_shader_stage_create_info.stage = stage;
     pipeline_shader_stage_create_info.module = module;
     pipeline_shader_stage_create_info.pName = "main";
-    pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
+    pipeline_shader_stage_create_info.pSpecializationInfo = nullptr;
     stages.push_back(pipeline_shader_stage_create_info);
   };
 
@@ -1831,13 +1831,13 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   {
     VkRayTracingShaderGroupCreateInfoKHR createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-    createInfo.pNext = NULL;
+    createInfo.pNext = nullptr;
     createInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
     createInfo.generalShader = i;
     createInfo.closestHitShader = VK_SHADER_UNUSED_KHR;
     createInfo.anyHitShader = VK_SHADER_UNUSED_KHR;
     createInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
-    createInfo.pShaderGroupCaptureReplayHandle = NULL;
+    createInfo.pShaderGroupCaptureReplayHandle = nullptr;
     groups[i] = createInfo;
   }
 
@@ -1899,16 +1899,16 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
 
     VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {};
     rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-    rt_pipeline_create_info.pNext = NULL;
+    rt_pipeline_create_info.pNext = nullptr;
     rt_pipeline_create_info.flags = flags;
     rt_pipeline_create_info.stageCount = stages.size();
     rt_pipeline_create_info.pStages = stages.data();
     rt_pipeline_create_info.groupCount = groups.size();
     rt_pipeline_create_info.pGroups = groups.data();
     rt_pipeline_create_info.maxPipelineRayRecursionDepth = 1;
-    rt_pipeline_create_info.pLibraryInfo = NULL;
-    rt_pipeline_create_info.pLibraryInterface = NULL;
-    rt_pipeline_create_info.pDynamicState = NULL;
+    rt_pipeline_create_info.pLibraryInfo = nullptr;
+    rt_pipeline_create_info.pLibraryInterface = nullptr;
+    rt_pipeline_create_info.pDynamicState = nullptr;
     rt_pipeline_create_info.layout = ipipeline->layout;
     rt_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
     rt_pipeline_create_info.basePipelineIndex = 0;
@@ -1918,7 +1918,7 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
                                                       VK_NULL_HANDLE,
                                                       1,
                                                       &rt_pipeline_create_info,
-                                                      NULL,
+                                                      nullptr,
                                                       &ipipeline->pipeline) != VK_SUCCESS)
     {
       goto cleanup_fail;
@@ -1936,9 +1936,9 @@ bool cgpu_create_rt_pipeline(cgpu_device device,
   }
 
 cleanup_fail:
-  idevice->table.vkDestroyPipelineLayout(idevice->logical_device, ipipeline->layout, NULL);
-  idevice->table.vkDestroyDescriptorSetLayout(idevice->logical_device, ipipeline->descriptor_set_layout, NULL);
-  idevice->table.vkDestroyDescriptorPool(idevice->logical_device, ipipeline->descriptor_pool, NULL);
+  idevice->table.vkDestroyPipelineLayout(idevice->logical_device, ipipeline->layout, nullptr);
+  idevice->table.vkDestroyDescriptorSetLayout(idevice->logical_device, ipipeline->descriptor_set_layout, nullptr);
+  idevice->table.vkDestroyDescriptorPool(idevice->logical_device, ipipeline->descriptor_pool, nullptr);
   resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
 
   CGPU_RETURN_ERROR("failed to create rt pipeline");
@@ -1964,22 +1964,22 @@ bool cgpu_destroy_pipeline(cgpu_device device,
   idevice->table.vkDestroyDescriptorPool(
     idevice->logical_device,
     ipipeline->descriptor_pool,
-    NULL
+    nullptr
   );
   idevice->table.vkDestroyPipeline(
     idevice->logical_device,
     ipipeline->pipeline,
-    NULL
+    nullptr
   );
   idevice->table.vkDestroyPipelineLayout(
     idevice->logical_device,
     ipipeline->layout,
-    NULL
+    nullptr
   );
   idevice->table.vkDestroyDescriptorSetLayout(
     idevice->logical_device,
     ipipeline->descriptor_set_layout,
-    NULL
+    nullptr
   );
 
   resource_store_free_handle(&ipipeline_store, pipeline.handle);
@@ -2000,7 +2000,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   // Get AS size
   VkAccelerationStructureBuildGeometryInfoKHR as_build_geom_info = {};
   as_build_geom_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-  as_build_geom_info.pNext = NULL;
+  as_build_geom_info.pNext = nullptr;
   as_build_geom_info.type = as_type;
   as_build_geom_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
   as_build_geom_info.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
@@ -2008,13 +2008,13 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   as_build_geom_info.dstAccelerationStructure = VK_NULL_HANDLE; // set in second round
   as_build_geom_info.geometryCount = 1;
   as_build_geom_info.pGeometries = as_geom;
-  as_build_geom_info.ppGeometries = NULL;
-  as_build_geom_info.scratchData.hostAddress = NULL;
+  as_build_geom_info.ppGeometries = nullptr;
+  as_build_geom_info.scratchData.hostAddress = nullptr;
   as_build_geom_info.scratchData.deviceAddress = 0; // set in second round
 
   VkAccelerationStructureBuildSizesInfoKHR as_build_sizes_info = {};
   as_build_sizes_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-  as_build_sizes_info.pNext = NULL;
+  as_build_sizes_info.pNext = nullptr;
   as_build_sizes_info.accelerationStructureSize = 0; // output
   as_build_sizes_info.updateScratchSize = 0; // output
   as_build_sizes_info.buildScratchSize = 0; // output
@@ -2037,7 +2037,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
 
   VkAccelerationStructureCreateInfoKHR as_create_info = {};
   as_create_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-  as_create_info.pNext = NULL;
+  as_create_info.pNext = nullptr;
   as_create_info.createFlags = 0;
   as_create_info.buffer = ias_buffer->buffer;
   as_create_info.offset = 0;
@@ -2045,7 +2045,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   as_create_info.type = as_type;
   as_create_info.deviceAddress = 0; // used for capture-replay feature
 
-  if (idevice->table.vkCreateAccelerationStructureKHR(idevice->logical_device, &as_create_info, NULL, as) != VK_SUCCESS)
+  if (idevice->table.vkCreateAccelerationStructureKHR(idevice->logical_device, &as_create_info, nullptr, as) != VK_SUCCESS)
   {
     cgpu_destroy_ibuffer(idevice, ias_buffer);
     CGPU_RETURN_ERROR("failed to create Vulkan AS object");
@@ -2061,7 +2061,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
                                    &iscratch_buffer))
   {
     cgpu_destroy_ibuffer(idevice, ias_buffer);
-    idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, NULL);
+    idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, nullptr);
     CGPU_RETURN_ERROR("failed to create AS scratch buffer");
   }
 
@@ -2081,7 +2081,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   if (!cgpu_create_command_buffer(device, &command_buffer)) {
     cgpu_destroy_ibuffer(idevice, ias_buffer);
     cgpu_destroy_ibuffer(idevice, &iscratch_buffer);
-    idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, NULL);
+    idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, nullptr);
     CGPU_RETURN_ERROR("failed to create AS build command buffer");
   }
 
@@ -2097,7 +2097,7 @@ static bool cgpu_create_top_or_bottom_as(cgpu_device device,
   if (!cgpu_create_fence(device, &fence)) {
     cgpu_destroy_ibuffer(idevice, ias_buffer);
     cgpu_destroy_ibuffer(idevice, &iscratch_buffer);
-    idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, NULL);
+    idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, *as, nullptr);
     CGPU_RETURN_ERROR("failed to create AS build fence");
   }
   cgpu_reset_fence(device, fence);
@@ -2185,16 +2185,16 @@ bool cgpu_create_blas(cgpu_device device,
   // Create BLAS
   VkAccelerationStructureGeometryTrianglesDataKHR as_triangle_data = {};
   as_triangle_data.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-  as_triangle_data.pNext = NULL;
+  as_triangle_data.pNext = nullptr;
   as_triangle_data.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-  as_triangle_data.vertexData.hostAddress = NULL;
+  as_triangle_data.vertexData.hostAddress = nullptr;
   as_triangle_data.vertexData.deviceAddress = cgpu_get_buffer_device_address(idevice, &iblas->vertices);
   as_triangle_data.vertexStride = sizeof(cgpu_vertex);
   as_triangle_data.maxVertex = vertex_count;
   as_triangle_data.indexType = VK_INDEX_TYPE_UINT32;
-  as_triangle_data.indexData.hostAddress = NULL;
+  as_triangle_data.indexData.hostAddress = nullptr;
   as_triangle_data.indexData.deviceAddress = cgpu_get_buffer_device_address(idevice, &iblas->indices);
-  as_triangle_data.transformData.hostAddress = NULL;
+  as_triangle_data.transformData.hostAddress = nullptr;
   as_triangle_data.transformData.deviceAddress = 0; // optional
 
   VkAccelerationStructureGeometryDataKHR as_geom_data = {};
@@ -2202,7 +2202,7 @@ bool cgpu_create_blas(cgpu_device device,
 
   VkAccelerationStructureGeometryKHR as_geom = {};
   as_geom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  as_geom.pNext = NULL;
+  as_geom.pNext = nullptr;
   as_geom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
   as_geom.geometry = as_geom_data;
   as_geom.flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
@@ -2217,7 +2217,7 @@ bool cgpu_create_blas(cgpu_device device,
 
   VkAccelerationStructureDeviceAddressInfoKHR as_address_info = {};
   as_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-  as_address_info.pNext = NULL;
+  as_address_info.pNext = nullptr;
   as_address_info.accelerationStructure = iblas->as;
   iblas->address = idevice->table.vkGetAccelerationStructureDeviceAddressKHR(idevice->logical_device, &as_address_info);
 
@@ -2287,12 +2287,12 @@ bool cgpu_create_tlas(cgpu_device device,
   // Create TLAS
   VkAccelerationStructureGeometryKHR as_geom = {};
   as_geom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  as_geom.pNext = NULL;
+  as_geom.pNext = nullptr;
   as_geom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
   as_geom.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-  as_geom.geometry.instances.pNext = NULL;
+  as_geom.geometry.instances.pNext = nullptr;
   as_geom.geometry.instances.arrayOfPointers = VK_FALSE;
-  as_geom.geometry.instances.data.hostAddress = NULL;
+  as_geom.geometry.instances.data.hostAddress = nullptr;
   as_geom.geometry.instances.data.deviceAddress = cgpu_get_buffer_device_address(idevice, &itlas->instances);
   as_geom.flags = areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0;
 
@@ -2316,7 +2316,7 @@ bool cgpu_destroy_blas(cgpu_device device, cgpu_blas blas)
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, iblas->as, NULL);
+  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, iblas->as, nullptr);
   cgpu_destroy_ibuffer(idevice, &iblas->buffer);
   cgpu_destroy_ibuffer(idevice, &iblas->indices);
   cgpu_destroy_ibuffer(idevice, &iblas->vertices);
@@ -2336,7 +2336,7 @@ bool cgpu_destroy_tlas(cgpu_device device, cgpu_tlas tlas)
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, itlas->as, NULL);
+  idevice->table.vkDestroyAccelerationStructureKHR(idevice->logical_device, itlas->as, nullptr);
   cgpu_destroy_ibuffer(idevice, &itlas->instances);
   cgpu_destroy_ibuffer(idevice, &itlas->buffer);
 
@@ -2362,7 +2362,7 @@ bool cgpu_create_command_buffer(cgpu_device device,
 
   VkCommandBufferAllocateInfo cmdbuf_alloc_info;
   cmdbuf_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmdbuf_alloc_info.pNext = NULL;
+  cmdbuf_alloc_info.pNext = nullptr;
   cmdbuf_alloc_info.commandPool = idevice->command_pool;
   cmdbuf_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   cmdbuf_alloc_info.commandBufferCount = 1;
@@ -2416,9 +2416,9 @@ bool cgpu_begin_command_buffer(cgpu_command_buffer command_buffer)
 
   VkCommandBufferBeginInfo command_buffer_begin_info;
   command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  command_buffer_begin_info.pNext = NULL;
+  command_buffer_begin_info.pNext = nullptr;
   command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-  command_buffer_begin_info.pInheritanceInfo = NULL;
+  command_buffer_begin_info.pInheritanceInfo = nullptr;
 
   VkResult result = idevice->table.vkBeginCommandBuffer(
     icommand_buffer->command_buffer,
@@ -2510,7 +2510,7 @@ bool cgpu_cmd_transition_shader_image_layouts(cgpu_command_buffer command_buffer
     for (uint32_t j = 0; j < binding->count; j++)
     {
       /* Image layout needs transitioning. */
-      const cgpu_image_binding* image_binding = NULL;
+      const cgpu_image_binding* image_binding = nullptr;
       for (uint32_t k = 0; k < image_count; k++)
       {
         if (p_images[k].binding == binding->binding && p_images[k].index == j)
@@ -2545,7 +2545,7 @@ bool cgpu_cmd_transition_shader_image_layouts(cgpu_command_buffer command_buffer
 
       VkImageMemoryBarrier barrier = {};
       barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      barrier.pNext = NULL;
+      barrier.pNext = nullptr;
       barrier.srcAccessMask = iimage->access_mask;
       barrier.dstAccessMask = access_mask;
       barrier.oldLayout = old_layout;
@@ -2573,9 +2573,9 @@ bool cgpu_cmd_transition_shader_image_layouts(cgpu_command_buffer command_buffer
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
       0,
       0,
-      NULL,
+      nullptr,
       0,
-      NULL,
+      nullptr,
       barriers.size(),
       barriers.data()
     );
@@ -2619,15 +2619,15 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
 
     VkWriteDescriptorSet write_descriptor_set = {};
     write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write_descriptor_set.pNext = NULL;
+    write_descriptor_set.pNext = nullptr;
     write_descriptor_set.dstSet = ipipeline->descriptor_set;
     write_descriptor_set.dstBinding = layout_binding->binding;
     write_descriptor_set.dstArrayElement = 0;
     write_descriptor_set.descriptorCount = layout_binding->descriptorCount;
     write_descriptor_set.descriptorType = layout_binding->descriptorType;
-    write_descriptor_set.pTexelBufferView = NULL;
-    write_descriptor_set.pBufferInfo = NULL;
-    write_descriptor_set.pImageInfo = NULL;
+    write_descriptor_set.pTexelBufferView = nullptr;
+    write_descriptor_set.pBufferInfo = nullptr;
+    write_descriptor_set.pImageInfo = nullptr;
 
     for (uint32_t j = 0; j < layout_binding->descriptorCount; j++)
     {
@@ -2753,7 +2753,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
 
           VkWriteDescriptorSetAccelerationStructureKHR as_info = {};
           as_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-          as_info.pNext = NULL;
+          as_info.pNext = nullptr;
           as_info.accelerationStructureCount = 1;
           as_info.pAccelerationStructures = &itlas->as;
           as_infos.push_back(as_info);
@@ -2782,7 +2782,7 @@ bool cgpu_cmd_update_bindings(cgpu_command_buffer command_buffer,
     write_descriptor_sets.size(),
     write_descriptor_sets.data(),
     0,
-    NULL
+    nullptr
   );
 
   return true;
@@ -2857,7 +2857,7 @@ bool cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
 
     VkImageMemoryBarrier barrier;
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.pNext = NULL;
+    barrier.pNext = nullptr;
     barrier.srcAccessMask = iimage->access_mask;
     barrier.dstAccessMask = access_mask;
     barrier.oldLayout = iimage->layout;
@@ -2878,9 +2878,9 @@ bool cgpu_cmd_copy_buffer_to_image(cgpu_command_buffer command_buffer,
       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
       0,
       0,
-      NULL,
+      nullptr,
       0,
-      NULL,
+      nullptr,
       1,
       &barrier
     );
@@ -3003,7 +3003,7 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
 
     VkMemoryBarrier b_vk = {};
     b_vk.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    b_vk.pNext = NULL;
+    b_vk.pNext = nullptr;
     b_vk.srcAccessMask = (VkAccessFlags) b_cgpu->src_access_flags;
     b_vk.dstAccessMask = (VkAccessFlags) b_cgpu->dst_access_flags;
     vk_memory_barriers.push_back(b_vk);
@@ -3023,7 +3023,7 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
 
     VkBufferMemoryBarrier b_vk = {};
     b_vk.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    b_vk.pNext = NULL;
+    b_vk.pNext = nullptr;
     b_vk.srcAccessMask = (VkAccessFlags) b_cgpu->src_access_flags;
     b_vk.dstAccessMask = (VkAccessFlags) b_cgpu->dst_access_flags;
     b_vk.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -3047,7 +3047,7 @@ bool cgpu_cmd_pipeline_barrier(cgpu_command_buffer command_buffer,
 
     VkImageMemoryBarrier b_vk = {};
     b_vk.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    b_vk.pNext = NULL;
+    b_vk.pNext = nullptr;
     b_vk.srcAccessMask = iimage->access_mask;
     b_vk.dstAccessMask = access_mask;
     b_vk.oldLayout = iimage->layout;
@@ -3224,13 +3224,13 @@ bool cgpu_create_fence(cgpu_device device,
 
   VkFenceCreateInfo fence_create_info;
   fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  fence_create_info.pNext = NULL;
+  fence_create_info.pNext = nullptr;
   fence_create_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
   VkResult result = idevice->table.vkCreateFence(
     idevice->logical_device,
     &fence_create_info,
-    NULL,
+    nullptr,
     &ifence->fence
   );
 
@@ -3255,7 +3255,7 @@ bool cgpu_destroy_fence(cgpu_device device,
   idevice->table.vkDestroyFence(
     idevice->logical_device,
     ifence->fence,
-    NULL
+    nullptr
   );
   resource_store_free_handle(&ifence_store, fence.handle);
   return true;
@@ -3325,14 +3325,14 @@ bool cgpu_submit_command_buffer(cgpu_device device,
 
   VkSubmitInfo submit_info;
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.pNext = NULL;
+  submit_info.pNext = nullptr;
   submit_info.waitSemaphoreCount = 0;
-  submit_info.pWaitSemaphores = NULL;
-  submit_info.pWaitDstStageMask = NULL;
+  submit_info.pWaitSemaphores = nullptr;
+  submit_info.pWaitDstStageMask = nullptr;
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &icommand_buffer->command_buffer;
   submit_info.signalSemaphoreCount = 0;
-  submit_info.pSignalSemaphores = NULL;
+  submit_info.pSignalSemaphores = nullptr;
 
   VkResult result = idevice->table.vkQueueSubmit(
     idevice->compute_queue,
