@@ -1,19 +1,19 @@
-/*
- * Copyright (C) 2019-2022 Pablo Delgado Krämer
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
+//
+// Copyright (C) 2023 Pablo Delgado Krämer
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
 
 #include "shader_reflection.h"
 
@@ -22,9 +22,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-bool cgpu_perform_shader_reflection(uint64_t size,
-                                    const uint32_t* p_spv,
-                                    cgpu_shader_reflection* p_reflection)
+bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, cgpu_shader_reflection* p_reflection)
 {
   SpvReflectShaderModule shader_module = {};
   SpvReflectModuleFlags flags = SPV_REFLECT_MODULE_FLAG_NO_COPY;
@@ -33,11 +31,11 @@ bool cgpu_perform_shader_reflection(uint64_t size,
     return false;
   }
 
-  SpvReflectDescriptorBinding** bindings = NULL;
+  SpvReflectDescriptorBinding** bindings = nullptr;
   bool result = false;
 
   uint32_t binding_count;
-  if (spvReflectEnumerateDescriptorBindings(&shader_module, &binding_count, NULL) != SPV_REFLECT_RESULT_SUCCESS)
+  if (spvReflectEnumerateDescriptorBindings(&shader_module, &binding_count, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
   {
     goto fail;
   }
@@ -58,8 +56,8 @@ bool cgpu_perform_shader_reflection(uint64_t size,
       const SpvReflectDescriptorBinding* src_binding = bindings[i];
       cgpu_shader_reflection_binding* dst_binding = &p_reflection->bindings[p_reflection->binding_count++];
 
-      /* Unfortunately SPIRV-Reflect lacks this functionality:
-       * https://github.com/KhronosGroup/SPIRV-Reflect/issues/99 */
+      // Unfortunately SPIRV-Reflect lacks this functionality:
+      // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
       const SpvReflectTypeDescription* type_description = src_binding->type_description;
       // FIXME: we need to reflect all pipeline stages and logical or ( | )-chain them
       dst_binding->write_access = src_binding->accessed && ~(type_description->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
