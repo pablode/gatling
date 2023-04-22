@@ -50,7 +50,7 @@ namespace detail
 
 namespace gi
 {
-  TexSys::TexSys(cgpu_device device, GiAssetReader& assetReader, Stager& stager)
+  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader, Stager& stager)
     : m_device(device)
     , m_assetReader(assetReader)
     , m_stager(stager)
@@ -72,8 +72,8 @@ namespace gi
   }
 
   bool TexSys::loadTextures(const std::vector<sg::TextureResource>& textureResources,
-                            std::vector<cgpu_image>& images2d,
-                            std::vector<cgpu_image>& images3d)
+                            std::vector<CgpuImage>& images2d,
+                            std::vector<CgpuImage>& images3d)
   {
     size_t texCount = textureResources.size();
 
@@ -92,12 +92,12 @@ namespace gi
     for (int i = 0; i < texCount; i++)
     {
       fflush(stdout);
-      cgpu_image image = { CGPU_INVALID_HANDLE };
+      CgpuImage image = { CGPU_INVALID_HANDLE };
 
       auto& textureResource = textureResources[i];
       auto& payload = textureResource.data;
 
-      cgpu_image_description image_desc;
+      CgpuImageDesc image_desc;
       image_desc.is3d = textureResource.is3dImage;
       image_desc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
       image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
@@ -184,15 +184,15 @@ namespace gi
     return true;
   }
 
-  void TexSys::destroyUncachedImages(const std::vector<cgpu_image>& images)
+  void TexSys::destroyUncachedImages(const std::vector<CgpuImage>& images)
   {
-    for (cgpu_image image : images)
+    for (CgpuImage image : images)
     {
       bool isCached = false;
 
       for (const auto& pathImagePair : m_imageCache)
       {
-        cgpu_image cachedImage = pathImagePair.second;
+        CgpuImage cachedImage = pathImagePair.second;
 
         if (cachedImage.handle == image.handle)
         {

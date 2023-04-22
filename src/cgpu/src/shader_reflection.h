@@ -19,7 +19,7 @@
 
 #include "cgpu.h"
 
-struct cgpu_shader_reflection_binding
+struct CgpuShaderReflectionBinding
 {
   uint32_t binding;
   int descriptor_type;
@@ -28,13 +28,13 @@ struct cgpu_shader_reflection_binding
   uint32_t count;
 };
 
-struct cgpu_shader_reflection
+struct CgpuShaderReflection
 {
   uint32_t push_constants_size;
   uint32_t binding_count;
-  cgpu_shader_reflection_binding* bindings;
+  CgpuShaderReflectionBinding* bindings;
 };
 
-bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, cgpu_shader_reflection* p_reflection);
+bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, CgpuShaderReflection* p_reflection);
 
-void cgpu_destroy_shader_reflection(cgpu_shader_reflection* p_reflection);
+void cgpu_destroy_shader_reflection(CgpuShaderReflection* p_reflection);

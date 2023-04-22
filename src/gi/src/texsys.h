@@ -37,7 +37,7 @@ namespace gi
   class TexSys
   {
   public:
-    TexSys(cgpu_device device, GiAssetReader& assetReader, Stager& stager);
+    TexSys(CgpuDevice device, GiAssetReader& assetReader, Stager& stager);
 
     ~TexSys();
 
@@ -45,16 +45,16 @@ namespace gi
 
   public:
     bool loadTextures(const std::vector<sg::TextureResource>& textureResources,
-                      std::vector<cgpu_image>& images2d,
-                      std::vector<cgpu_image>& images3d);
+                      std::vector<CgpuImage>& images2d,
+                      std::vector<CgpuImage>& images3d);
 
-    void destroyUncachedImages(const std::vector<cgpu_image>& images);
+    void destroyUncachedImages(const std::vector<CgpuImage>& images);
 
   private:
-    cgpu_device m_device;
+    CgpuDevice m_device;
     GiAssetReader& m_assetReader;
     Stager& m_stager;
     // FIXME: implement a proper CPU and GPU-aware cache with eviction strategy
-    std::unordered_map<std::string, cgpu_image> m_imageCache;
+    std::unordered_map<std::string, CgpuImage> m_imageCache;
   };
 }

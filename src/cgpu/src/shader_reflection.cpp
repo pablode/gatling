@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, cgpu_shader_reflection* p_reflection)
+bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, CgpuShaderReflection* p_reflection)
 {
   SpvReflectShaderModule shader_module = {};
   SpvReflectModuleFlags flags = SPV_REFLECT_MODULE_FLAG_NO_COPY;
@@ -43,7 +43,7 @@ bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, cgpu_s
   if (binding_count > 0)
   {
     p_reflection->binding_count = 0;
-    p_reflection->bindings = (cgpu_shader_reflection_binding*)malloc(sizeof(cgpu_shader_reflection_binding) * binding_count);
+    p_reflection->bindings = (CgpuShaderReflectionBinding*)malloc(sizeof(CgpuShaderReflectionBinding) * binding_count);
 
     bindings = (SpvReflectDescriptorBinding**) malloc(binding_count * sizeof(SpvReflectDescriptorBinding*));
     if (spvReflectEnumerateDescriptorBindings(&shader_module, &binding_count, bindings) != SPV_REFLECT_RESULT_SUCCESS)
@@ -54,7 +54,7 @@ bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, cgpu_s
     for (uint32_t i = 0; i < binding_count; i++)
     {
       const SpvReflectDescriptorBinding* src_binding = bindings[i];
-      cgpu_shader_reflection_binding* dst_binding = &p_reflection->bindings[p_reflection->binding_count++];
+      CgpuShaderReflectionBinding* dst_binding = &p_reflection->bindings[p_reflection->binding_count++];
 
       // Unfortunately SPIRV-Reflect lacks this functionality:
       // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
@@ -88,7 +88,7 @@ fail:
   return result;
 }
 
-void cgpu_destroy_shader_reflection(cgpu_shader_reflection* p_reflection)
+void cgpu_destroy_shader_reflection(CgpuShaderReflection* p_reflection)
 {
   free(p_reflection->bindings);
 }

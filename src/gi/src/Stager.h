@@ -27,7 +27,7 @@ namespace gi
   class Stager
   {
   public:
-    Stager(cgpu_device device);
+    Stager(CgpuDevice device);
     ~Stager();
 
     bool allocate();
@@ -36,9 +36,9 @@ namespace gi
   public:
     bool flush();
 
-    bool stageToBuffer(const uint8_t* src, uint64_t size, cgpu_buffer dst, uint64_t dstOffset);
+    bool stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstOffset);
 
-    bool stageToImage(const uint8_t* src, uint64_t size, cgpu_image dst);
+    bool stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst);
 
   private:
     using CopyFunc = std::function<bool(uint64_t srcOffset, uint64_t dstOffset, uint64_t size)>;
@@ -46,11 +46,11 @@ namespace gi
     bool stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc);
 
   private:
-    cgpu_device m_device;
+    CgpuDevice m_device;
 
-    cgpu_buffer m_stagingBuffer = { CGPU_INVALID_HANDLE };
-    cgpu_command_buffer m_commandBuffer = { CGPU_INVALID_HANDLE };
-    cgpu_fence m_fence = { CGPU_INVALID_HANDLE };
+    CgpuBuffer m_stagingBuffer = { CGPU_INVALID_HANDLE };
+    CgpuCommandBuffer m_commandBuffer = { CGPU_INVALID_HANDLE };
+    CgpuFence m_fence = { CGPU_INVALID_HANDLE };
 
     uint64_t m_stagedBytes = 0;
     uint8_t* m_mappedMem = nullptr;

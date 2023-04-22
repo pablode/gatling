@@ -24,7 +24,7 @@ const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
 
 namespace gi
 {
-  Stager::Stager(cgpu_device device)
+  Stager::Stager(CgpuDevice device)
     : m_device(device)
   {
   }
@@ -121,7 +121,7 @@ fail:
     return true;
   }
 
-  bool Stager::stageToBuffer(const uint8_t* src, uint64_t size, cgpu_buffer dst, uint64_t dstBaseOffset)
+  bool Stager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
   {
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
       return cgpu_cmd_copy_buffer(
@@ -137,7 +137,7 @@ fail:
     return stage(src, size, copyFunc);
   }
 
-  bool Stager::stageToImage(const uint8_t* src, uint64_t size, cgpu_image dst)
+  bool Stager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst)
   {
     if (size > BUFFER_SIZE)
     {
