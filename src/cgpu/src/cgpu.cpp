@@ -30,7 +30,7 @@
 #include <vma.h>
 
 // TODO: should be in 'gtl/gb' subfolder
-#include <SmallVector.h>
+#include <smallVector.h>
 
 using namespace gtl;
 

@@ -1,7 +1,7 @@
 add_library(
   gb STATIC
-  include/SmallVector.h
-  src/SmallVector.cpp
+  include/smallVector.h
+  src/smallVector.cpp
 )
 
 target_include_directories(
