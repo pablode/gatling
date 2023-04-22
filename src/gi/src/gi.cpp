@@ -111,6 +111,48 @@ uint32_t s_outputBufferWidth = 0;
 uint32_t s_outputBufferHeight = 0;
 uint32_t s_sampleOffset = 0;
 
+bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
+{
+  s_outputBufferWidth = width;
+  s_outputBufferHeight = height;
+
+  if (s_outputBuffer.handle != CGPU_INVALID_HANDLE)
+  {
+    cgpu_destroy_buffer(s_device, s_outputBuffer);
+    s_outputBuffer.handle = CGPU_INVALID_HANDLE;
+  }
+  if (s_outputStagingBuffer.handle != CGPU_INVALID_HANDLE)
+  {
+    cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
+    s_outputStagingBuffer.handle = CGPU_INVALID_HANDLE;
+  }
+
+  if (width == 0 || height == 0)
+  {
+    return true;
+  }
+
+  if (!cgpu_create_buffer(s_device,
+                          CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                          CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                          bufferSize,
+                          &s_outputBuffer))
+  {
+    return false;
+  }
+
+  if (!cgpu_create_buffer(s_device,
+                          CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                          CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                          bufferSize,
+                          &s_outputStagingBuffer))
+  {
+    return false;
+  }
+
+  return true;
+}
+
 GiStatus giInitialize(const GiInitParams* params)
 {
   if (!cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH))
@@ -165,12 +207,7 @@ void giTerminate()
 {
   s_aggregateAssetReader.reset();
   s_mmapAssetReader.reset();
-  cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
-  s_outputStagingBuffer.handle = CGPU_INVALID_HANDLE;
-  cgpu_destroy_buffer(s_device, s_outputBuffer);
-  s_outputBuffer.handle = CGPU_INVALID_HANDLE;
-  s_outputBufferWidth = 0;
-  s_outputBufferHeight = 0;
+  _giResizeOutputBuffer(0, 0, 0);
   if (s_texSys)
   {
     s_texSys->destroy();
@@ -887,9 +924,10 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   CgpuFence fence = { CGPU_INVALID_HANDLE };
 
   // Set up output buffer.
-  int color_component_count = 4;
-  int pixel_count = params->imageWidth * params->imageHeight;
-  uint64_t output_buffer_size = pixel_count * color_component_count * sizeof(float);
+  int compCount = 4;
+  int pixelStride = compCount * sizeof(float);
+  int pixelCount = params->imageWidth * params->imageHeight;
+  uint64_t outputBufferSize = pixelCount * pixelStride;
 
   bool reallocOutputBuffer = s_outputBufferWidth != params->imageWidth ||
                              s_outputBufferHeight != params->imageHeight;
@@ -897,33 +935,9 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   if (reallocOutputBuffer)
   {
     printf("recreating output buffer with size %dx%d (%.2fMiB)\n", params->imageWidth,
-      params->imageHeight, output_buffer_size * BYTES_TO_MIB);
+      params->imageHeight, outputBufferSize * BYTES_TO_MIB);
 
-    if (s_outputBuffer.handle != CGPU_INVALID_HANDLE)
-      cgpu_destroy_buffer(s_device, s_outputBuffer);
-    if (s_outputStagingBuffer.handle != CGPU_INVALID_HANDLE)
-      cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
-
-    if (!cgpu_create_buffer(s_device,
-                            CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                            CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                            output_buffer_size,
-                            &s_outputBuffer))
-    {
-      return GI_ERROR;
-    }
-
-    if (!cgpu_create_buffer(s_device,
-                            CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                            output_buffer_size,
-                            &s_outputStagingBuffer))
-    {
-      return GI_ERROR;
-    }
-
-    s_outputBufferWidth = params->imageWidth;
-    s_outputBufferHeight = params->imageHeight;
+    _giResizeOutputBuffer(params->imageWidth, params->imageHeight, outputBufferSize);
   }
 
   // Set up GPU data.
@@ -951,7 +965,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   std::vector<CgpuBufferBinding> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ 0, 0, s_outputBuffer, 0, output_buffer_size });
+  buffers.push_back({ 0, 0, s_outputBuffer, 0, outputBufferSize });
   buffers.push_back({ 1, 0, geom_cache->buffer, geom_cache->faceBufferView.offset, geom_cache->faceBufferView.size });
   // TODO: set sphere light buffer
   //if (shader_cache->nee_enabled)
@@ -1033,7 +1047,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
                             0,
                             s_outputStagingBuffer,
                             0,
-                            output_buffer_size))
+                            outputBufferSize))
   {
     goto cleanup;
   }
@@ -1066,7 +1080,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
   }
 
-  memcpy(rgbaImg, mapped_staging_mem, output_buffer_size);
+  memcpy(rgbaImg, mapped_staging_mem, outputBufferSize);
 
   if (!cgpu_unmap_buffer(s_device, s_outputStagingBuffer))
     goto cleanup;
@@ -1075,13 +1089,13 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   if (shader_cache->aovId == GI_AOV_ID_DEBUG_BOUNCES ||
       shader_cache->aovId == GI_AOV_ID_DEBUG_CLOCK_CYCLES)
   {
-    int value_count = pixel_count * color_component_count;
+    int valueCount = pixelCount * compCount;
 
     float max_value = 0.0f;
-    for (int i = 0; i < value_count; i += 4) {
+    for (int i = 0; i < valueCount; i += 4) {
       max_value = std::max(max_value, rgbaImg[i]);
     }
-    for (int i = 0; i < value_count && max_value > 0.0f; i += 4) {
+    for (int i = 0; i < valueCount && max_value > 0.0f; i += 4) {
       int val_index = std::min(int((rgbaImg[i] / max_value) * 255.0), 255);
       rgbaImg[i + 0] = (float) gi::TURBO_SRGB_FLOATS[val_index][0];
       rgbaImg[i + 1] = (float) gi::TURBO_SRGB_FLOATS[val_index][1];
