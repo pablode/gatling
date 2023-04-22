@@ -320,16 +320,16 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
   for (uint32_t m = 0; m < params->meshInstanceCount; m++)
   {
     const GiMeshInstance* instance = &params->meshInstances[m];
+    const GiMesh* mesh = instance->mesh;
 
-    if (protoBlasInstances.count(instance->mesh) == 0)
+    if (mesh->faces.empty())
     {
-      const GiMesh* mesh = instance->mesh;
+      continue;
+    }
 
-      if (mesh->faces.empty())
-      {
-        continue;
-      }
-
+    // Build mesh BLAS if it doesn't exist yet.
+    if (protoBlasInstances.count(mesh) == 0)
+    {
       uint32_t faceIndexOffset = allFaces.size();
       uint32_t vertexIndexOffset = allVertices.size();
 
@@ -398,24 +398,21 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       proto.blas = blas;
       proto.faceIndexOffset = faceIndexOffset;
       proto.materialIndex = materialIndex;
-      protoBlasInstances[instance->mesh] = proto;
+      protoBlasInstances[mesh] = proto;
     }
+
+    // Create mesh instance for TLAS.
+    const ProtoBlasInstance& proto = protoBlasInstances[mesh];
+
+    CgpuBlasInstance blasInstance = { CGPU_INVALID_HANDLE };
+    blasInstance.as = proto.blas;
+    blasInstance.faceIndexOffset = proto.faceIndexOffset;
+    blasInstance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: regular & shadow
+    memcpy(blasInstance.transform, instance->transform, sizeof(float) * 12);
+
+    blasInstances.push_back(blasInstance);
   }
 
-  // Instances
-  for (uint32_t m = 0; m < params->meshInstanceCount; m++)
-  {
-    const GiMeshInstance* instance = &params->meshInstances[m];
-    const ProtoBlasInstance& proto = protoBlasInstances[instance->mesh];
-
-    CgpuBlasInstance blas_instance = {0};
-    blas_instance.as = proto.blas;
-    blas_instance.faceIndexOffset = proto.faceIndexOffset;
-    blas_instance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: regular & shadow
-    memcpy(blas_instance.transform, instance->transform, sizeof(float) * 12);
-
-    blasInstances.push_back(blas_instance);
-  }
   return true;
 
 fail_cleanup:
