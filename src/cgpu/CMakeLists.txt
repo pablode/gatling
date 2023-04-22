@@ -2,10 +2,8 @@ add_library(
   cgpu STATIC
   include/cgpu.h
   src/cgpu.cpp
-  src/handle_store.cpp
-  src/handle_store.h
-  src/resource_store.cpp
-  src/resource_store.h
+  src/dataStoreCpu.cpp
+  src/dataStoreCpu.h
   src/shader_reflection.cpp
   src/shader_reflection.h
 )

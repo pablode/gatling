@@ -17,24 +17,26 @@
 
 #pragma once
 
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
-#include "handle_store.h"
+#include <SmallVector.h>
 
-struct resource_store
+namespace gtl
 {
-  handle_store handle_store;
-  uint8_t*     objects;
-  uint32_t     object_count;
-  uint32_t     item_byte_size;
-};
+  class GbHandleStore
+  {
+  public:
+    uint64_t allocateHandle();
 
-void resource_store_create(resource_store* store, uint32_t item_byte_size, uint32_t initial_capacity);
+    bool isHandleValid(uint64_t handle) const;
 
-void resource_store_destroy(resource_store* store);
+    void freeHandle(uint64_t handle);
 
-uint64_t resource_store_create_handle(resource_store* store);
-
-void resource_store_free_handle(resource_store* store, uint64_t handle);
-
-bool resource_store_get(resource_store* store, uint64_t handle, void** object);
+  private:
+    uint32_t m_maxIndex = 0;
+    GbSmallVector<uint32_t, 1024> m_versions;
+    GbSmallVector<uint32_t, 64> m_freeList;
+  };
+}

@@ -16,7 +16,7 @@
 //
 
 #include "cgpu.h"
-#include "resource_store.h"
+#include "dataStoreCpu.h"
 #include "shader_reflection.h"
 
 #include <stdint.h>
@@ -29,6 +29,8 @@
 
 #include <vma.h>
 
+#include <memory>
+
 // TODO: should be in 'gtl/gb' subfolder
 #include <smallVector.h>
 
@@ -37,11 +39,6 @@ using namespace gtl;
 #define CGPU_MIN_VK_API_VERSION VK_API_VERSION_1_1
 
 /* Internal structures. */
-
-struct CgpuIInstance
-{
-  VkInstance instance;
-};
 
 struct CgpuIDevice
 {
@@ -131,19 +128,22 @@ struct CgpuISampler
   VkSampler sampler;
 };
 
-/* Handle and structure storage. */
+struct CgpuIInstance
+{
+  VkInstance instance;
+  CgpuDataStoreCpu<CgpuIDevice, 32> idevice_store;
+  CgpuDataStoreCpu<CgpuIBuffer, 16> ibuffer_store;
+  CgpuDataStoreCpu<CgpuIImage, 128> iimage_store;
+  CgpuDataStoreCpu<CgpuIShader, 32> ishader_store;
+  CgpuDataStoreCpu<CgpuIPipeline, 8> ipipeline_store;
+  CgpuDataStoreCpu<CgpuIFence, 8> ifence_store;
+  CgpuDataStoreCpu<CgpuICommandBuffer, 16> icommand_buffer_store;
+  CgpuDataStoreCpu<CgpuISampler, 8> isampler_store;
+  CgpuDataStoreCpu<CgpuIBlas, 1024> iblas_store;
+  CgpuDataStoreCpu<CgpuITlas, 1> itlas_store;
+};
 
-static CgpuIInstance iinstance;
-static resource_store idevice_store;
-static resource_store ibuffer_store;
-static resource_store iimage_store;
-static resource_store ishader_store;
-static resource_store ipipeline_store;
-static resource_store ifence_store;
-static resource_store icommand_buffer_store;
-static resource_store isampler_store;
-static resource_store iblas_store;
-static resource_store itlas_store;
+static std::unique_ptr<CgpuIInstance> iinstance = nullptr;
 
 /* Helper defines. */
 
@@ -176,7 +176,7 @@ static resource_store itlas_store;
     HANDLE_TYPE handle,                                                                   \
     IRESOURCE_TYPE** idata)                                                               \
   {                                                                                       \
-    return resource_store_get(&RESOURCE_STORE, handle.handle, (void**) idata);            \
+    return iinstance->RESOURCE_STORE.get(handle.handle, idata);                           \
   }
 
 CGPU_RESOLVE_HANDLE(        device,        CgpuDevice,        CgpuIDevice,         idevice_store)
@@ -307,9 +307,9 @@ bool cgpu_initialize(const char* p_app_name,
                      uint32_t version_minor,
                      uint32_t version_patch)
 {
-  VkResult result = volkInitialize();
-
-  if (result != VK_SUCCESS || volkGetInstanceVersion() < CGPU_MIN_VK_API_VERSION) {
+  if (volkInitialize() != VK_SUCCESS ||
+      volkGetInstanceVersion() < CGPU_MIN_VK_API_VERSION)
+  {
     CGPU_RETURN_ERROR("failed to initialize volk");
   }
 
@@ -348,41 +348,23 @@ bool cgpu_initialize(const char* p_app_name,
   create_info.enabledExtensionCount = instance_extension_count;
   create_info.ppEnabledExtensionNames = instance_extensions;
 
-  result = vkCreateInstance(&create_info, nullptr, &iinstance.instance);
-  if (result != VK_SUCCESS) {
+  VkInstance instance;
+  if (vkCreateInstance(&create_info, nullptr, &instance) != VK_SUCCESS)
+  {
     CGPU_RETURN_ERROR("failed to create vulkan instance");
   }
 
-  volkLoadInstanceOnly(iinstance.instance);
+  volkLoadInstanceOnly(instance);
 
-  resource_store_create(&idevice_store, sizeof(CgpuIDevice), 1);
-  resource_store_create(&ibuffer_store, sizeof(CgpuIBuffer), 16);
-  resource_store_create(&iimage_store, sizeof(CgpuIImage), 64);
-  resource_store_create(&ishader_store, sizeof(CgpuIShader), 16);
-  resource_store_create(&ipipeline_store, sizeof(CgpuIPipeline), 8);
-  resource_store_create(&ifence_store, sizeof(CgpuIFence), 8);
-  resource_store_create(&icommand_buffer_store, sizeof(CgpuICommandBuffer), 16);
-  resource_store_create(&isampler_store, sizeof(CgpuISampler), 8);
-  resource_store_create(&iblas_store, sizeof(CgpuIBlas), 1024);
-  resource_store_create(&itlas_store, sizeof(CgpuITlas), 1);
-
+  iinstance = std::make_unique<CgpuIInstance>();
+  iinstance->instance = instance;
   return true;
 }
 
 void cgpu_terminate()
 {
-  resource_store_destroy(&idevice_store);
-  resource_store_destroy(&ibuffer_store);
-  resource_store_destroy(&iimage_store);
-  resource_store_destroy(&ishader_store);
-  resource_store_destroy(&ipipeline_store);
-  resource_store_destroy(&ifence_store);
-  resource_store_destroy(&icommand_buffer_store);
-  resource_store_destroy(&isampler_store);
-  resource_store_destroy(&iblas_store);
-  resource_store_destroy(&itlas_store);
-
-  vkDestroyInstance(iinstance.instance, nullptr);
+  vkDestroyInstance(iinstance->instance, nullptr);
+  iinstance.reset();
 }
 
 static bool cgpu_find_device_extension(const char* extension_name,
@@ -403,7 +385,7 @@ static bool cgpu_find_device_extension(const char* extension_name,
 
 bool cgpu_create_device(CgpuDevice* p_device)
 {
-  p_device->handle = resource_store_create_handle(&idevice_store);
+  p_device->handle = iinstance->idevice_store.allocate();
 
   CgpuIDevice* idevice;
   if (!cgpu_resolve_device(*p_device, &idevice)) {
@@ -412,14 +394,14 @@ bool cgpu_create_device(CgpuDevice* p_device)
 
   uint32_t phys_device_count;
   vkEnumeratePhysicalDevices(
-    iinstance.instance,
+    iinstance->instance,
     &phys_device_count,
     nullptr
   );
 
   if (phys_device_count == 0)
   {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
     CGPU_RETURN_ERROR("no physical device found");
   }
 
@@ -427,7 +409,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
   phys_devices.resize(phys_device_count);
 
   vkEnumeratePhysicalDevices(
-    iinstance.instance,
+    iinstance->instance,
     &phys_device_count,
     phys_devices.data()
   );
@@ -458,7 +440,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
 
   if (device_properties.properties.apiVersion < CGPU_MIN_VK_API_VERSION)
   {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
     CGPU_RETURN_ERROR("unsupported vulkan version");
   }
 
@@ -466,7 +448,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
       (subgroup_properties.supportedOperations & VK_SUBGROUP_FEATURE_BASIC_BIT) != VK_SUBGROUP_FEATURE_BASIC_BIT ||
       (subgroup_properties.supportedOperations & VK_SUBGROUP_FEATURE_BALLOT_BIT) != VK_SUBGROUP_FEATURE_BALLOT_BIT)
   {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
     CGPU_RETURN_ERROR("subgroup features not supported");
   }
 
@@ -510,7 +492,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
 
     if (!cgpu_find_device_extension(extension, device_ext_count, device_extensions.data()))
     {
-      resource_store_free_handle(&idevice_store, p_device->handle);
+      iinstance->idevice_store.free(p_device->handle);
 
       fprintf(stderr, "error in %s:%d: extension %s not supported\n", __FILE__, __LINE__, extension);
       return false;
@@ -575,7 +557,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
     }
   }
   if (queue_family_index == -1) {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
     CGPU_RETURN_ERROR("no suitable queue family");
   }
 
@@ -754,7 +736,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
     &idevice->logical_device
   );
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
     CGPU_RETURN_ERROR("failed to create device");
   }
 
@@ -785,7 +767,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
 
   if (result != VK_SUCCESS)
   {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
 
     idevice->table.vkDestroyDevice(
       idevice->logical_device,
@@ -812,7 +794,7 @@ bool cgpu_create_device(CgpuDevice* p_device)
 
   if (result != VK_SUCCESS)
   {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
 
     idevice->table.vkDestroyCommandPool(
       idevice->logical_device,
@@ -856,14 +838,14 @@ bool cgpu_create_device(CgpuDevice* p_device)
   alloc_create_info.vulkanApiVersion = CGPU_MIN_VK_API_VERSION;
   alloc_create_info.physicalDevice = idevice->physical_device;
   alloc_create_info.device = idevice->logical_device;
-  alloc_create_info.instance = iinstance.instance;
+  alloc_create_info.instance = iinstance->instance;
   alloc_create_info.pVulkanFunctions = &vulkan_functions;
 
   result = vmaCreateAllocator(&alloc_create_info, &idevice->allocator);
 
   if (result != VK_SUCCESS)
   {
-    resource_store_free_handle(&idevice_store, p_device->handle);
+    iinstance->idevice_store.free(p_device->handle);
 
     idevice->table.vkDestroyQueryPool(
       idevice->logical_device,
@@ -909,7 +891,7 @@ bool cgpu_destroy_device(CgpuDevice device)
     nullptr
   );
 
-  resource_store_free_handle(&idevice_store, device.handle);
+  iinstance->idevice_store.free(device.handle);
   return true;
 }
 
@@ -924,7 +906,7 @@ bool cgpu_create_shader(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_shader->handle = resource_store_create_handle(&ishader_store);
+  p_shader->handle = iinstance->ishader_store.allocate();
 
   CgpuIShader* ishader;
   if (!cgpu_resolve_shader(*p_shader, &ishader)) {
@@ -945,7 +927,7 @@ bool cgpu_create_shader(CgpuDevice device,
     &ishader->module
   );
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ishader_store, p_shader->handle);
+    iinstance->ishader_store.free(p_shader->handle);
     CGPU_RETURN_ERROR("failed to create shader module");
   }
 
@@ -956,7 +938,7 @@ bool cgpu_create_shader(CgpuDevice device,
       ishader->module,
       nullptr
     );
-    resource_store_free_handle(&ishader_store, p_shader->handle);
+    iinstance->ishader_store.free(p_shader->handle);
     CGPU_RETURN_ERROR("failed to reflect shader");
   }
 
@@ -985,7 +967,7 @@ bool cgpu_destroy_shader(CgpuDevice device,
     nullptr
   );
 
-  resource_store_free_handle(&ishader_store, shader.handle);
+  iinstance->ishader_store.free(shader.handle);
 
   return true;
 }
@@ -1057,7 +1039,7 @@ static bool cgpu_create_buffer_aligned(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_buffer->handle = resource_store_create_handle(&ibuffer_store);
+  p_buffer->handle = iinstance->ibuffer_store.allocate();
 
   CgpuIBuffer* ibuffer;
   if (!cgpu_resolve_buffer(*p_buffer, &ibuffer)) {
@@ -1066,7 +1048,7 @@ static bool cgpu_create_buffer_aligned(CgpuDevice device,
 
   if (!cgpu_create_ibuffer_aligned(idevice, usage, memory_properties, size, alignment, ibuffer))
   {
-    resource_store_free_handle(&ibuffer_store, p_buffer->handle);
+    iinstance->ibuffer_store.free(p_buffer->handle);
     CGPU_RETURN_ERROR("failed to create buffer");
   }
 
@@ -1104,7 +1086,7 @@ bool cgpu_destroy_buffer(CgpuDevice device,
 
   cgpu_destroy_ibuffer(idevice, ibuffer);
 
-  resource_store_free_handle(&ibuffer_store, buffer.handle);
+  iinstance->ibuffer_store.free(buffer.handle);
 
   return true;
 }
@@ -1151,7 +1133,7 @@ bool cgpu_create_image(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_image->handle = resource_store_create_handle(&iimage_store);
+  p_image->handle = iinstance->iimage_store.allocate();
 
   CgpuIImage* iimage;
   if (!cgpu_resolve_image(*p_image, &iimage)) {
@@ -1197,7 +1179,7 @@ bool cgpu_create_image(CgpuDevice device,
   );
 
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&iimage_store, p_image->handle);
+    iinstance->iimage_store.free(p_image->handle);
     CGPU_RETURN_ERROR("failed to create image");
   }
 
@@ -1235,7 +1217,7 @@ bool cgpu_create_image(CgpuDevice device,
   );
   if (result != VK_SUCCESS)
   {
-    resource_store_free_handle(&iimage_store, p_image->handle);
+    iinstance->iimage_store.free(p_image->handle);
     vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
     CGPU_RETURN_ERROR("failed to create image view");
   }
@@ -1269,7 +1251,7 @@ bool cgpu_destroy_image(CgpuDevice device,
 
   vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
 
-  resource_store_free_handle(&iimage_store, image.handle);
+  iinstance->iimage_store.free(image.handle);
 
   return true;
 }
@@ -1318,7 +1300,7 @@ bool cgpu_create_sampler(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_sampler->handle = resource_store_create_handle(&isampler_store);
+  p_sampler->handle = iinstance->isampler_store.allocate();
 
   CgpuISampler* isampler;
   if (!cgpu_resolve_sampler(*p_sampler, &isampler)) {
@@ -1358,7 +1340,7 @@ bool cgpu_create_sampler(CgpuDevice device,
   );
 
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&isampler_store, p_sampler->handle);
+    iinstance->isampler_store.free(p_sampler->handle);
     CGPU_RETURN_ERROR("failed to create sampler");
   }
 
@@ -1379,7 +1361,7 @@ bool cgpu_destroy_sampler(CgpuDevice device,
 
   idevice->table.vkDestroySampler(idevice->logical_device, isampler->sampler, nullptr);
 
-  resource_store_free_handle(&isampler_store, sampler.handle);
+  iinstance->isampler_store.free(sampler.handle);
 
   return true;
 }
@@ -1569,7 +1551,7 @@ bool cgpu_create_compute_pipeline(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_pipeline->handle = resource_store_create_handle(&ipipeline_store);
+  p_pipeline->handle = iinstance->ipipeline_store.allocate();
 
   CgpuIPipeline* ipipeline;
   if (!cgpu_resolve_pipeline(*p_pipeline, &ipipeline)) {
@@ -1578,13 +1560,13 @@ bool cgpu_create_compute_pipeline(CgpuDevice device,
 
   if (!cgpu_create_pipeline_descriptors(idevice, ipipeline, ishader, VK_SHADER_STAGE_COMPUTE_BIT))
   {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
+    iinstance->ipipeline_store.free(p_pipeline->handle);
     CGPU_RETURN_ERROR("failed to create descriptor set layout");
   }
 
   if (!cgpu_create_pipeline_layout(idevice, ipipeline, ishader, VK_SHADER_STAGE_COMPUTE_BIT))
   {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
+    iinstance->ipipeline_store.free(p_pipeline->handle);
     idevice->table.vkDestroyDescriptorSetLayout(
       idevice->logical_device,
       ipipeline->descriptor_set_layout,
@@ -1626,7 +1608,7 @@ bool cgpu_create_compute_pipeline(CgpuDevice device,
   );
 
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
+    iinstance->ipipeline_store.free(p_pipeline->handle);
     idevice->table.vkDestroyPipelineLayout(
       idevice->logical_device,
       ipipeline->layout,
@@ -1740,7 +1722,7 @@ bool cgpu_create_rt_pipeline(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_pipeline->handle = resource_store_create_handle(&ipipeline_store);
+  p_pipeline->handle = iinstance->ipipeline_store.allocate();
 
   CgpuIPipeline* ipipeline;
   if (!cgpu_resolve_pipeline(*p_pipeline, &ipipeline)) {
@@ -1939,7 +1921,7 @@ cleanup_fail:
   idevice->table.vkDestroyPipelineLayout(idevice->logical_device, ipipeline->layout, nullptr);
   idevice->table.vkDestroyDescriptorSetLayout(idevice->logical_device, ipipeline->descriptor_set_layout, nullptr);
   idevice->table.vkDestroyDescriptorPool(idevice->logical_device, ipipeline->descriptor_pool, nullptr);
-  resource_store_free_handle(&ipipeline_store, p_pipeline->handle);
+  iinstance->ipipeline_store.free(p_pipeline->handle);
 
   CGPU_RETURN_ERROR("failed to create rt pipeline");
 }
@@ -1982,7 +1964,7 @@ bool cgpu_destroy_pipeline(CgpuDevice device,
     nullptr
   );
 
-  resource_store_free_handle(&ipipeline_store, pipeline.handle);
+  iinstance->ipipeline_store.free(pipeline.handle);
 
   return true;
 }
@@ -2126,7 +2108,7 @@ bool cgpu_create_blas(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_blas->handle = resource_store_create_handle(&iblas_store);
+  p_blas->handle = iinstance->iblas_store.allocate();
 
   CgpuIBlas* iblas;
   if (!cgpu_resolve_blas(*p_blas, &iblas)) {
@@ -2236,7 +2218,7 @@ bool cgpu_create_tlas(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_tlas->handle = resource_store_create_handle(&itlas_store);
+  p_tlas->handle = iinstance->itlas_store.allocate();
 
   CgpuITlas* itlas;
   if (!cgpu_resolve_tlas(*p_tlas, &itlas)) {
@@ -2321,7 +2303,7 @@ bool cgpu_destroy_blas(CgpuDevice device, CgpuBlas blas)
   cgpu_destroy_ibuffer(idevice, &iblas->indices);
   cgpu_destroy_ibuffer(idevice, &iblas->vertices);
 
-  resource_store_free_handle(&iblas_store, blas.handle);
+  iinstance->iblas_store.free(blas.handle);
   return true;
 }
 
@@ -2340,7 +2322,7 @@ bool cgpu_destroy_tlas(CgpuDevice device, CgpuTlas tlas)
   cgpu_destroy_ibuffer(idevice, &itlas->instances);
   cgpu_destroy_ibuffer(idevice, &itlas->buffer);
 
-  resource_store_free_handle(&itlas_store, tlas.handle);
+  iinstance->itlas_store.free(tlas.handle);
   return true;
 }
 
@@ -2352,7 +2334,7 @@ bool cgpu_create_command_buffer(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_command_buffer->handle = resource_store_create_handle(&icommand_buffer_store);
+  p_command_buffer->handle = iinstance->icommand_buffer_store.allocate();
 
   CgpuICommandBuffer* icommand_buffer;
   if (!cgpu_resolve_command_buffer(*p_command_buffer, &icommand_buffer)) {
@@ -2373,7 +2355,7 @@ bool cgpu_create_command_buffer(CgpuDevice device,
     &icommand_buffer->command_buffer
   );
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&icommand_buffer_store, p_command_buffer->handle);
+    iinstance->icommand_buffer_store.free(p_command_buffer->handle);
     CGPU_RETURN_ERROR("failed to allocate command buffer");
   }
 
@@ -2399,7 +2381,7 @@ bool cgpu_destroy_command_buffer(CgpuDevice device,
     &icommand_buffer->command_buffer
   );
 
-  resource_store_free_handle(&icommand_buffer_store, command_buffer.handle);
+  iinstance->icommand_buffer_store.free(command_buffer.handle);
   return true;
 }
 
@@ -3215,7 +3197,7 @@ bool cgpu_create_fence(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  p_fence->handle = resource_store_create_handle(&ifence_store);
+  p_fence->handle = iinstance->ifence_store.allocate();
 
   CgpuIFence* ifence;
   if (!cgpu_resolve_fence(*p_fence, &ifence)) {
@@ -3235,7 +3217,7 @@ bool cgpu_create_fence(CgpuDevice device,
   );
 
   if (result != VK_SUCCESS) {
-    resource_store_free_handle(&ifence_store, p_fence->handle);
+    iinstance->ifence_store.free(p_fence->handle);
     CGPU_RETURN_ERROR("failed to create fence");
   }
   return true;
@@ -3257,7 +3239,7 @@ bool cgpu_destroy_fence(CgpuDevice device,
     ifence->fence,
     nullptr
   );
-  resource_store_free_handle(&ifence_store, fence.handle);
+  iinstance->ifence_store.free(fence.handle);
   return true;
 }
 
