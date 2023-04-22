@@ -4,6 +4,8 @@ add_library(
   src/gi.cpp
   src/asset_reader.h
   src/asset_reader.cpp
+  src/dataStoreGpu.h
+  src/dataStoreGpu.cpp
   src/mmap.h
   src/mmap.cpp
   src/stager.h
@@ -53,6 +55,7 @@ target_compile_definitions(
 target_link_libraries(
   gi
   PRIVATE
+    gb
     cgpu
     gml
     imgio
