@@ -21,7 +21,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <SmallVector.h>
+#include <smallVector.h>
 
 namespace gtl
 {
