@@ -16,7 +16,7 @@
 //
 
 #include "cgpu.h"
-#include "dataStoreCpu.h"
+#include "linearDataStoreCpu.h"
 #include "shaderReflection.h"
 
 #include <stdint.h>
@@ -131,16 +131,16 @@ struct CgpuISampler
 struct CgpuIInstance
 {
   VkInstance instance;
-  CgpuDataStoreCpu<CgpuIDevice, 32> idevice_store;
-  CgpuDataStoreCpu<CgpuIBuffer, 16> ibuffer_store;
-  CgpuDataStoreCpu<CgpuIImage, 128> iimage_store;
-  CgpuDataStoreCpu<CgpuIShader, 32> ishader_store;
-  CgpuDataStoreCpu<CgpuIPipeline, 8> ipipeline_store;
-  CgpuDataStoreCpu<CgpuIFence, 8> ifence_store;
-  CgpuDataStoreCpu<CgpuICommandBuffer, 16> icommand_buffer_store;
-  CgpuDataStoreCpu<CgpuISampler, 8> isampler_store;
-  CgpuDataStoreCpu<CgpuIBlas, 1024> iblas_store;
-  CgpuDataStoreCpu<CgpuITlas, 1> itlas_store;
+  CgpuLinearDataStoreCpu<CgpuIDevice, 32> idevice_store;
+  CgpuLinearDataStoreCpu<CgpuIBuffer, 16> ibuffer_store;
+  CgpuLinearDataStoreCpu<CgpuIImage, 128> iimage_store;
+  CgpuLinearDataStoreCpu<CgpuIShader, 32> ishader_store;
+  CgpuLinearDataStoreCpu<CgpuIPipeline, 8> ipipeline_store;
+  CgpuLinearDataStoreCpu<CgpuIFence, 8> ifence_store;
+  CgpuLinearDataStoreCpu<CgpuICommandBuffer, 16> icommand_buffer_store;
+  CgpuLinearDataStoreCpu<CgpuISampler, 8> isampler_store;
+  CgpuLinearDataStoreCpu<CgpuIBlas, 1024> iblas_store;
+  CgpuLinearDataStoreCpu<CgpuITlas, 1> itlas_store;
 };
 
 static std::unique_ptr<CgpuIInstance> iinstance = nullptr;
