@@ -19,22 +19,21 @@
 
 #include "cgpu.h"
 
+#include <smallVector.h>
+
 struct CgpuShaderReflectionBinding
 {
   uint32_t binding;
-  int descriptor_type;
-  bool write_access;
-  bool read_access;
   uint32_t count;
+  int descriptorType;
+  bool readAccess;
+  bool writeAccess;
 };
 
 struct CgpuShaderReflection
 {
-  uint32_t push_constants_size;
-  uint32_t binding_count;
-  CgpuShaderReflectionBinding* bindings;
+  uint32_t pushConstantsSize;
+  gtl::GbSmallVector<CgpuShaderReflectionBinding, 32> bindings;
 };
 
-bool cgpu_perform_shader_reflection(uint64_t size, const uint32_t* p_spv, CgpuShaderReflection* p_reflection);
-
-void cgpu_destroy_shader_reflection(CgpuShaderReflection* p_reflection);
+bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);

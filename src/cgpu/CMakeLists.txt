@@ -4,8 +4,8 @@ add_library(
   src/cgpu.cpp
   src/dataStoreCpu.cpp
   src/dataStoreCpu.h
-  src/shader_reflection.cpp
-  src/shader_reflection.h
+  src/shaderReflection.cpp
+  src/shaderReflection.h
 )
 
 target_include_directories(

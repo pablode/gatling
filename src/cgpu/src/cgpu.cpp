@@ -17,7 +17,7 @@
 
 #include "cgpu.h"
 #include "dataStoreCpu.h"
-#include "shader_reflection.h"
+#include "shaderReflection.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -931,7 +931,7 @@ bool cgpu_create_shader(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to create shader module");
   }
 
-  if (!cgpu_perform_shader_reflection(size, (uint32_t*) p_source, &ishader->reflection))
+  if (!cgpuReflectShader((uint32_t*) p_source, size, &ishader->reflection))
   {
     idevice->table.vkDestroyShaderModule(
       idevice->logical_device,
@@ -958,8 +958,6 @@ bool cgpu_destroy_shader(CgpuDevice device,
   if (!cgpu_resolve_shader(shader, &ishader)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-
-  cgpu_destroy_shader_reflection(&ishader->reflection);
 
   idevice->table.vkDestroyShaderModule(
     idevice->logical_device,
@@ -1371,7 +1369,7 @@ static bool cgpu_create_pipeline_layout(CgpuIDevice* idevice, CgpuIPipeline* ipi
   VkPushConstantRange push_const_range;
   push_const_range.stageFlags = stageFlags;
   push_const_range.offset = 0;
-  push_const_range.size = ishader->reflection.push_constants_size;
+  push_const_range.size = ishader->reflection.pushConstantsSize;
 
   VkPipelineLayoutCreateInfo pipeline_layout_create_info;
   pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1392,13 +1390,13 @@ static bool cgpu_create_pipeline_descriptors(CgpuIDevice* idevice, CgpuIPipeline
 {
   const CgpuShaderReflection* shader_reflection = &ishader->reflection;
 
-  for (uint32_t i = 0; i < shader_reflection->binding_count; i++)
+  for (uint32_t i = 0; i < shader_reflection->bindings.size(); i++)
   {
     const CgpuShaderReflectionBinding* binding_reflection = &shader_reflection->bindings[i];
 
     VkDescriptorSetLayoutBinding layout_binding;
     layout_binding.binding = binding_reflection->binding;
-    layout_binding.descriptorType = (VkDescriptorType) binding_reflection->descriptor_type;
+    layout_binding.descriptorType = (VkDescriptorType) binding_reflection->descriptorType;
     layout_binding.descriptorCount = binding_reflection->count;
     layout_binding.stageFlags = stageFlags;
     layout_binding.pImmutableSamplers = nullptr;
@@ -1430,11 +1428,11 @@ static bool cgpu_create_pipeline_descriptors(CgpuIDevice* idevice, CgpuIPipeline
   uint32_t sampler_count = 0;
   uint32_t as_count = 0;
 
-  for (uint32_t i = 0; i < shader_reflection->binding_count; i++)
+  for (uint32_t i = 0; i < shader_reflection->bindings.size(); i++)
   {
     const CgpuShaderReflectionBinding* binding = &shader_reflection->bindings[i];
 
-    switch (binding->descriptor_type)
+    switch (binding->descriptorType)
     {
     case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: buffer_count += binding->count; break;
     case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storage_image_count += binding->count; break;
@@ -2470,16 +2468,16 @@ bool cgpu_cmd_transition_shader_image_layouts(CgpuCommandBuffer command_buffer,
 
   /* FIXME: this has quadratic complexity */
   const CgpuShaderReflection* reflection = &ishader->reflection;
-  for (uint32_t i = 0; i < reflection->binding_count; i++)
+  for (uint32_t i = 0; i < reflection->bindings.size(); i++)
   {
     const CgpuShaderReflectionBinding* binding = &reflection->bindings[i];
 
     VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    if (binding->descriptor_type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+    if (binding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
     {
       new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
-    else if (binding->descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+    else if (binding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     {
       new_layout = VK_IMAGE_LAYOUT_GENERAL;
     }
@@ -2518,10 +2516,10 @@ bool cgpu_cmd_transition_shader_image_layouts(CgpuCommandBuffer command_buffer,
       }
 
       VkAccessFlags access_mask = 0;
-      if (binding->read_access) {
+      if (binding->readAccess) {
         access_mask = VK_ACCESS_SHADER_READ_BIT;
       }
-      if (binding->write_access) {
+      if (binding->writeAccess) {
         access_mask = VK_ACCESS_SHADER_WRITE_BIT;
       }
 
