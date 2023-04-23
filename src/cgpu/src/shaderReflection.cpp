@@ -74,8 +74,8 @@ bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection*
   {
     assert(shaderModule.push_constant_block_count == 1);
 
-    const SpvReflectBlockVariable* pc_block = &shaderModule.push_constant_blocks[0];
-    reflection->pushConstantsSize = pc_block->size;
+    const SpvReflectBlockVariable* pcBlock = &shaderModule.push_constant_blocks[0];
+    reflection->pushConstantsSize = pcBlock->size;
   }
 
   result = true;

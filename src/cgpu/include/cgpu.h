@@ -319,27 +319,27 @@ struct CgpuTlasBinding
 
 struct CgpuBindings
 {
-  uint32_t buffer_count;
-  const CgpuBufferBinding* p_buffers;
-  uint32_t image_count;
-  const CgpuImageBinding* p_images;
-  uint32_t sampler_count;
-  const CgpuSamplerBinding* p_samplers;
-  uint32_t tlas_count;
-  const CgpuTlasBinding* p_tlases;
+  uint32_t bufferCount;
+  const CgpuBufferBinding* buffers;
+  uint32_t imageCount;
+  const CgpuImageBinding* images;
+  uint32_t samplerCount;
+  const CgpuSamplerBinding* samplers;
+  uint32_t tlasCount;
+  const CgpuTlasBinding* tlases;
 };
 
 struct CgpuMemoryBarrier
 {
-  CgpuMemoryAccessFlags src_access_flags;
-  CgpuMemoryAccessFlags dst_access_flags;
+  CgpuMemoryAccessFlags srcAccessFlags;
+  CgpuMemoryAccessFlags dstAccessFlags;
 };
 
 struct CgpuBufferMemoryBarrier
 {
   CgpuBuffer buffer;
-  CgpuMemoryAccessFlags src_access_flags;
-  CgpuMemoryAccessFlags dst_access_flags;
+  CgpuMemoryAccessFlags srcAccessFlags;
+  CgpuMemoryAccessFlags dstAccessFlags;
   uint64_t offset;
   uint64_t size;
 };
@@ -347,7 +347,7 @@ struct CgpuBufferMemoryBarrier
 struct CgpuImageMemoryBarrier
 {
   CgpuImage image;
-  CgpuMemoryAccessFlags access_mask;
+  CgpuMemoryAccessFlags accessMask;
 };
 
 struct CgpuPhysicalDeviceFeatures
@@ -463,16 +463,16 @@ struct CgpuRtHitGroup
 };
 
 bool cgpuInitialize(
-  const char* p_app_name,
-  uint32_t version_major,
-  uint32_t version_minor,
-  uint32_t version_patch
+  const char* appName,
+  uint32_t versionMajor,
+  uint32_t versionMinor,
+  uint32_t versionPatch
 );
 
 void cgpuTerminate();
 
 bool cgpuCreateDevice(
-  CgpuDevice* p_device
+  CgpuDevice* device
 );
 
 bool cgpuDestroyDevice(
@@ -482,9 +482,9 @@ bool cgpuDestroyDevice(
 bool cgpuCreateShader(
   CgpuDevice device,
   uint64_t size,
-  const uint8_t* p_source,
-  CgpuShaderStageFlags stage_flags,
-  CgpuShader* p_shader
+  const uint8_t* source,
+  CgpuShaderStageFlags stageFlags,
+  CgpuShader* shader
 );
 
 bool cgpuDestroyShader(
@@ -495,9 +495,9 @@ bool cgpuDestroyShader(
 bool cgpuCreateBuffer(
   CgpuDevice device,
   CgpuBufferUsageFlags usage,
-  CgpuMemoryPropertyFlags memory_properties,
+  CgpuMemoryPropertyFlags memoryProperties,
   uint64_t size,
-  CgpuBuffer* p_buffer
+  CgpuBuffer* buffer
 );
 
 bool cgpuDestroyBuffer(
@@ -508,7 +508,7 @@ bool cgpuDestroyBuffer(
 bool cgpuMapBuffer(
   CgpuDevice device,
   CgpuBuffer buffer,
-  void** pp_mapped_mem
+  void** mappedMem
 );
 
 bool cgpuUnmapBuffer(
@@ -518,8 +518,8 @@ bool cgpuUnmapBuffer(
 
 bool cgpuCreateImage(
   CgpuDevice device,
-  const CgpuImageDesc* image_desc,
-  CgpuImage* p_image
+  const CgpuImageDesc* imageDesc,
+  CgpuImage* image
 );
 
 bool cgpuDestroyImage(
@@ -530,7 +530,7 @@ bool cgpuDestroyImage(
 bool cgpuMapImage(
   CgpuDevice device,
   CgpuImage image,
-  void** pp_mapped_mem
+  void** mappedMem
 );
 
 bool cgpuUnmapImage(
@@ -540,10 +540,10 @@ bool cgpuUnmapImage(
 
 bool cgpuCreateSampler(
   CgpuDevice device,
-  CgpuSamplerAddressMode address_mode_u,
-  CgpuSamplerAddressMode address_mode_v,
-  CgpuSamplerAddressMode address_mode_w,
-  CgpuSampler* p_sampler
+  CgpuSamplerAddressMode addressModeU,
+  CgpuSamplerAddressMode addressModeV,
+  CgpuSamplerAddressMode addressModeW,
+  CgpuSampler* sampler
 );
 
 bool cgpuDestroySampler(
@@ -554,22 +554,22 @@ bool cgpuDestroySampler(
 bool cgpuCreateComputePipeline(
   CgpuDevice device,
   CgpuShader shader,
-  CgpuPipeline* p_pipeline
+  CgpuPipeline* pipeline
 );
 
 struct CgpuRtPipelineDesc
 {
-  CgpuShader rgen_shader;
-  uint32_t miss_shader_count;
-  CgpuShader* miss_shaders;
-  uint32_t hit_group_count;
-  const CgpuRtHitGroup* hit_groups;
+  CgpuShader rgenShader;
+  uint32_t missShaderCount;
+  CgpuShader* missShaders;
+  uint32_t hitGroupCount;
+  const CgpuRtHitGroup* hitGroups;
 };
 
 bool cgpuCreateRtPipeline(
   CgpuDevice device,
   const CgpuRtPipelineDesc* desc,
-  CgpuPipeline* p_pipeline
+  CgpuPipeline* pipeline
 );
 
 bool cgpuDestroyPipeline(
@@ -579,19 +579,19 @@ bool cgpuDestroyPipeline(
 
 bool cgpuCreateBlas(
   CgpuDevice device,
-  uint32_t vertex_count,
+  uint32_t vertexCount,
   const CgpuVertex* vertices,
-  uint32_t index_count,
+  uint32_t indexCount,
   const uint32_t* indices,
   bool isOpaque,
-  CgpuBlas* p_blas
+  CgpuBlas* blas
 );
 
 bool cgpuCreateTlas(
   CgpuDevice device,
-  uint32_t instance_count,
+  uint32_t instanceCount,
   const CgpuBlasInstance* instances,
-  CgpuTlas* p_tlas
+  CgpuTlas* tlas
 );
 
 bool cgpuDestroyBlas(
@@ -606,23 +606,23 @@ bool cgpuDestroyTlas(
 
 bool cgpuCreateCommandBuffer(
   CgpuDevice device,
-  CgpuCommandBuffer* p_command_buffer
+  CgpuCommandBuffer* commandBuffer
 );
 
 bool cgpuBeginCommandBuffer(
-  CgpuCommandBuffer command_buffer
+  CgpuCommandBuffer commandBuffer
 );
 
 bool cgpuCmdBindPipeline(
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   CgpuPipeline pipeline
 );
 
 bool cgpuCmdTransitionShaderImageLayouts(
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   CgpuShader shader,
-  uint32_t image_count,
-  const CgpuImageBinding* p_images
+  uint32_t imageCount,
+  const CgpuImageBinding* images
 );
 
 bool cgpuCmdUpdateBindings(
@@ -632,84 +632,84 @@ bool cgpuCmdUpdateBindings(
 );
 
 bool cgpuCmdCopyBuffer(
-  CgpuCommandBuffer command_buffer,
-  CgpuBuffer source,
-  uint64_t source_offset,
-  CgpuBuffer destination,
-  uint64_t destination_offset,
+  CgpuCommandBuffer commandBuffer,
+  CgpuBuffer srcBuffer,
+  uint64_t srcOffset,
+  CgpuBuffer dstBuffer,
+  uint64_t dstOffset,
   uint64_t size
 );
 
 bool cgpuCmdCopyBufferToImage(
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   CgpuBuffer buffer,
-  uint64_t buffer_offset,
+  uint64_t bufferOffset,
   CgpuImage image
 );
 
 bool cgpuCmdPushConstants(
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   CgpuPipeline pipeline,
-  CgpuShaderStageFlags stage_flags,
+  CgpuShaderStageFlags stageFlags,
   uint32_t size,
-  const void* p_data
+  const void* data
 );
 
 bool cgpuCmdDispatch(
-  CgpuCommandBuffer command_buffer,
-  uint32_t dim_x,
-  uint32_t dim_y,
-  uint32_t dim_z
+  CgpuCommandBuffer commandBuffer,
+  uint32_t dimX,
+  uint32_t dimY,
+  uint32_t dimZ
 );
 
 bool cgpuCmdPipelineBarrier(
-  CgpuCommandBuffer command_buffer,
-  uint32_t barrier_count,
-  const CgpuMemoryBarrier* p_barriers,
-  uint32_t buffer_barrier_count,
-  const CgpuBufferMemoryBarrier* p_buffer_barriers,
-  uint32_t image_barrier_count,
-  const CgpuImageMemoryBarrier* p_image_barriers
+  CgpuCommandBuffer commandBuffer,
+  uint32_t barrierCount,
+  const CgpuMemoryBarrier* barriers,
+  uint32_t bufferBarrierCount,
+  const CgpuBufferMemoryBarrier* bufferBarriers,
+  uint32_t imageBarrierCount,
+  const CgpuImageMemoryBarrier* imageBarriers
 );
 
 bool cgpuCmdResetTimestamps(
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   uint32_t offset,
   uint32_t count
 );
 
 bool cgpuCmdWriteTimestamp(
-  CgpuCommandBuffer command_buffer,
-  uint32_t timestamp_index
+  CgpuCommandBuffer commandBuffer,
+  uint32_t timestampIndex
 );
 
 bool cgpuCmdCopyTimestamps(
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   CgpuBuffer buffer,
   uint32_t offset,
   uint32_t count,
-  bool wait_until_available
+  bool waitUntilAvailable
 );
 
 bool cgpuCmdTraceRays(
-  CgpuCommandBuffer command_buffer,
-  CgpuPipeline rt_pipeline,
+  CgpuCommandBuffer commandBuffer,
+  CgpuPipeline rtPipeline,
   uint32_t width,
   uint32_t height
 );
 
 bool cgpuEndCommandBuffer(
-  CgpuCommandBuffer command_buffer
+  CgpuCommandBuffer commandBuffer
 );
 
 bool cgpuDestroyCommandBuffer(
   CgpuDevice device,
-  CgpuCommandBuffer command_buffer
+  CgpuCommandBuffer commandBuffer
 );
 
 bool cgpuCreateFence(
   CgpuDevice device,
-  CgpuFence* p_fence
+  CgpuFence* fence
 );
 
 bool cgpuResetFence(
@@ -729,7 +729,7 @@ bool cgpuDestroyFence(
 
 bool cgpuSubmitCommandBuffer(
   CgpuDevice device,
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   CgpuFence fence
 );
 
@@ -749,10 +749,10 @@ bool cgpuInvalidateMappedMemory(
 
 bool cgpuGetPhysicalDeviceFeatures(
   CgpuDevice device,
-  CgpuPhysicalDeviceFeatures* p_features
+  CgpuPhysicalDeviceFeatures* features
 );
 
 bool cgpuGetPhysicalDeviceProperties(
   CgpuDevice device,
-  CgpuPhysicalDeviceProperties* p_limits
+  CgpuPhysicalDeviceProperties* limits
 );
