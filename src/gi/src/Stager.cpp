@@ -41,35 +41,34 @@ namespace gi
     m_fence = { CGPU_INVALID_HANDLE };
 
     // Try to use ReBAR if available.
-    bool bufferCreated = cgpu_create_buffer(m_device,
-      CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-      CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE,
-      BUFFER_SIZE,
-      &m_stagingBuffer
-    );
+    bool bufferCreated = cgpuCreateBuffer(m_device,
+                                          CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                                          CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE,
+                                          BUFFER_SIZE,
+                                          &m_stagingBuffer);
 
     if (!bufferCreated)
     {
-      if (!cgpu_create_buffer(m_device,
-          CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-          CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-          BUFFER_SIZE,
-          &m_stagingBuffer))
+      if (!cgpuCreateBuffer(m_device,
+                            CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                            BUFFER_SIZE,
+                            &m_stagingBuffer))
       {
         goto fail;
       }
     }
 
-    if (!cgpu_create_command_buffer(m_device, &m_commandBuffer))
+    if (!cgpuCreateCommandBuffer(m_device, &m_commandBuffer))
       goto fail;
 
-    if (!cgpu_create_fence(m_device, &m_fence))
+    if (!cgpuCreateFence(m_device, &m_fence))
       goto fail;
 
-    if (!cgpu_map_buffer(m_device, m_stagingBuffer, (void**) &m_mappedMem))
+    if (!cgpuMapBuffer(m_device, m_stagingBuffer, (void**) &m_mappedMem))
       goto fail;
 
-    if (!cgpu_begin_command_buffer(m_commandBuffer))
+    if (!cgpuBeginCommandBuffer(m_commandBuffer))
       goto fail;
 
     return true;
@@ -82,14 +81,14 @@ fail:
   void Stager::free()
   {
     assert(m_stagedBytes == 0);
-    cgpu_end_command_buffer(m_commandBuffer);
+    cgpuEndCommandBuffer(m_commandBuffer);
     if (m_mappedMem)
     {
-      cgpu_unmap_buffer(m_device, m_stagingBuffer);
+      cgpuUnmapBuffer(m_device, m_stagingBuffer);
     }
-    cgpu_destroy_fence(m_device, m_fence);
-    cgpu_destroy_command_buffer(m_device, m_commandBuffer);
-    cgpu_destroy_buffer(m_device, m_stagingBuffer);
+    cgpuDestroyFence(m_device, m_fence);
+    cgpuDestroyCommandBuffer(m_device, m_commandBuffer);
+    cgpuDestroyBuffer(m_device, m_stagingBuffer);
   }
 
   bool Stager::flush()
@@ -99,22 +98,22 @@ fail:
       return true;
     }
 
-    if (!cgpu_flush_mapped_memory(m_device, m_stagingBuffer, 0, m_stagedBytes))
+    if (!cgpuFlushMappedMemory(m_device, m_stagingBuffer, 0, m_stagedBytes))
       return false;
 
-    if (!cgpu_reset_fence(m_device, m_fence))
+    if (!cgpuResetFence(m_device, m_fence))
       return false;
 
-    if (!cgpu_end_command_buffer(m_commandBuffer))
+    if (!cgpuEndCommandBuffer(m_commandBuffer))
       return false;
 
-    if (!cgpu_submit_command_buffer(m_device, m_commandBuffer, m_fence))
+    if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffer, m_fence))
       return false;
 
-    if (!cgpu_wait_for_fence(m_device, m_fence))
+    if (!cgpuWaitForFence(m_device, m_fence))
       return false;
 
-    if (!cgpu_begin_command_buffer(m_commandBuffer))
+    if (!cgpuBeginCommandBuffer(m_commandBuffer))
       return false;
 
     m_stagedBytes = 0;
@@ -124,7 +123,7 @@ fail:
   bool Stager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
   {
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
-      return cgpu_cmd_copy_buffer(
+      return cgpuCmdCopyBuffer(
         m_commandBuffer,
         m_stagingBuffer,
         srcOffset,
@@ -156,7 +155,7 @@ fail:
     }
 
     auto copyFunc = [this, dst](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
-      return cgpu_cmd_copy_buffer_to_image(
+      return cgpuCmdCopyBufferToImage(
         m_commandBuffer,
         m_stagingBuffer,
         srcOffset,

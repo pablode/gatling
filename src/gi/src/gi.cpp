@@ -118,12 +118,12 @@ bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
 
   if (s_outputBuffer.handle != CGPU_INVALID_HANDLE)
   {
-    cgpu_destroy_buffer(s_device, s_outputBuffer);
+    cgpuDestroyBuffer(s_device, s_outputBuffer);
     s_outputBuffer.handle = CGPU_INVALID_HANDLE;
   }
   if (s_outputStagingBuffer.handle != CGPU_INVALID_HANDLE)
   {
-    cgpu_destroy_buffer(s_device, s_outputStagingBuffer);
+    cgpuDestroyBuffer(s_device, s_outputStagingBuffer);
     s_outputStagingBuffer.handle = CGPU_INVALID_HANDLE;
   }
 
@@ -132,20 +132,20 @@ bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
     return true;
   }
 
-  if (!cgpu_create_buffer(s_device,
-                          CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                          CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                          bufferSize,
-                          &s_outputBuffer))
+  if (!cgpuCreateBuffer(s_device,
+                        CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                        CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                        bufferSize,
+                        &s_outputBuffer))
   {
     return false;
   }
 
-  if (!cgpu_create_buffer(s_device,
-                          CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                          CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                          bufferSize,
-                          &s_outputStagingBuffer))
+  if (!cgpuCreateBuffer(s_device,
+                        CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                        CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                        bufferSize,
+                        &s_outputStagingBuffer))
   {
     return false;
   }
@@ -155,19 +155,19 @@ bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
 
 GiStatus giInitialize(const GiInitParams* params)
 {
-  if (!cgpu_initialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH))
+  if (!cgpuInitialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH))
     return GI_ERROR;
 
-  if (!cgpu_create_device(&s_device))
+  if (!cgpuCreateDevice(&s_device))
     return GI_ERROR;
 
-  if (!cgpu_get_physical_device_features(s_device, &s_deviceFeatures))
+  if (!cgpuGetPhysicalDeviceFeatures(s_device, &s_deviceFeatures))
     return GI_ERROR;
 
-  if (!cgpu_get_physical_device_properties(s_device, &s_deviceProperties))
+  if (!cgpuGetPhysicalDeviceProperties(s_device, &s_deviceProperties))
     return GI_ERROR;
 
-  if (!cgpu_create_sampler(s_device,
+  if (!cgpuCreateSampler(s_device,
                            CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
                            CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
                            CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -219,9 +219,9 @@ void giTerminate()
     s_stager->free();
     s_stager.reset();
   }
-  cgpu_destroy_sampler(s_device, s_texSampler);
-  cgpu_destroy_device(s_device);
-  cgpu_terminate();
+  cgpuDestroySampler(s_device, s_texSampler);
+  cgpuDestroyDevice(s_device);
+  cgpuTerminate();
 }
 
 void giRegisterAssetReader(GiAssetReader* reader)
@@ -370,8 +370,8 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       bool isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sgMat);
 
       CgpuBlas blas;
-      if (!cgpu_create_blas(s_device, (uint32_t)vertices.size(), vertices.data(),
-                            (uint32_t)indices.size(), indices.data(), isOpaque, &blas))
+      if (!cgpuCreateBlas(s_device, (uint32_t)vertices.size(), vertices.data(),
+                          (uint32_t)indices.size(), indices.data(), isOpaque, &blas))
       {
         goto fail_cleanup;
       }
@@ -419,7 +419,7 @@ fail_cleanup:
   assert(false);
   for (CgpuBlas blas : blases)
   {
-    cgpu_destroy_blas(s_device, blas);
+    cgpuDestroyBlas(s_device, blas);
   }
   return false;
 }
@@ -442,7 +442,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   if (!_giBuildGeometryStructures(params, blases, blas_instances, allVertices, allFaces))
     goto cleanup;
 
-  if (!cgpu_create_tlas(s_device, blas_instances.size(), blas_instances.data(), &tlas))
+  if (!cgpuCreateTlas(s_device, blas_instances.size(), blas_instances.data(), &tlas))
     goto cleanup;
 
   // Upload vertex & index buffers to single GPU buffer.
@@ -465,7 +465,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
     CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
     CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
 
-    if (!cgpu_create_buffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer))
+    if (!cgpuCreateBuffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer))
       goto cleanup;
 
     if (!s_stager->stageToBuffer((uint8_t*)allFaces.data(), faceBufferView.size, buffer, faceBufferView.offset))
@@ -491,15 +491,15 @@ cleanup:
     assert(false);
     if (buffer.handle != CGPU_INVALID_HANDLE)
     {
-      cgpu_destroy_buffer(s_device, buffer);
+      cgpuDestroyBuffer(s_device, buffer);
     }
     if (tlas.handle != CGPU_INVALID_HANDLE)
     {
-      cgpu_destroy_tlas(s_device, tlas);
+      cgpuDestroyTlas(s_device, tlas);
     }
     for (CgpuBlas blas : blases)
     {
-      cgpu_destroy_blas(s_device, blas);
+      cgpuDestroyBlas(s_device, blas);
     }
   }
   return cache;
@@ -509,10 +509,10 @@ void giDestroyGeomCache(GiGeomCache* cache)
 {
   for (CgpuBlas blas : cache->blases)
   {
-    cgpu_destroy_blas(s_device, blas);
+    cgpuDestroyBlas(s_device, blas);
   }
-  cgpu_destroy_tlas(s_device, cache->tlas);
-  cgpu_destroy_buffer(s_device, cache->buffer);
+  cgpuDestroyTlas(s_device, cache->tlas);
+  cgpuDestroyBuffer(s_device, cache->buffer);
   delete cache;
 }
 
@@ -712,7 +712,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
 
-          if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
           {
             goto cleanup;
           }
@@ -725,7 +725,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
 
-          if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
           {
             goto cleanup;
           }
@@ -747,7 +747,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
 
-          if (!cgpu_create_shader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
           {
             goto cleanup;
           }
@@ -777,7 +777,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       goto cleanup;
     }
 
-    if (!cgpu_create_shader(s_device, rgenSpirv.size(), rgenSpirv.data(), CGPU_SHADER_STAGE_RAYGEN, &rgenShader))
+    if (!cgpuCreateShader(s_device, rgenSpirv.size(), rgenSpirv.data(), CGPU_SHADER_STAGE_RAYGEN, &rgenShader))
     {
       goto cleanup;
     }
@@ -798,7 +798,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       }
 
       CgpuShader missShader;
-      if (!cgpu_create_shader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
       {
         goto cleanup;
       }
@@ -815,7 +815,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       }
 
       CgpuShader missShader;
-      if (!cgpu_create_shader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
       {
         goto cleanup;
       }
@@ -834,14 +834,14 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   // Create RT pipeline.
   {
-    cgpu_rt_pipeline_desc pipeline_desc = {0};
+    CgpuRtPipelineDesc pipeline_desc = {0};
     pipeline_desc.rgen_shader = rgenShader;
     pipeline_desc.miss_shader_count = missShaders.size();
     pipeline_desc.miss_shaders = missShaders.data();
     pipeline_desc.hit_group_count = hitGroups.size();
     pipeline_desc.hit_groups = hitGroups.data();
 
-    if (!cgpu_create_rt_pipeline(s_device, &pipeline_desc, &pipeline))
+    if (!cgpuCreateRtPipeline(s_device, &pipeline_desc, &pipeline))
     {
       goto cleanup;
     }
@@ -869,19 +869,19 @@ cleanup:
     s_texSys->destroyUncachedImages(images_3d);
     if (rgenShader.handle != CGPU_INVALID_HANDLE)
     {
-      cgpu_destroy_shader(s_device, rgenShader);
+      cgpuDestroyShader(s_device, rgenShader);
     }
     for (CgpuShader shader : missShaders)
     {
-      cgpu_destroy_shader(s_device, shader);
+      cgpuDestroyShader(s_device, shader);
     }
     for (CgpuShader shader : hitShaders)
     {
-      cgpu_destroy_shader(s_device, shader);
+      cgpuDestroyShader(s_device, shader);
     }
     if (pipeline.handle != CGPU_INVALID_HANDLE)
     {
-      cgpu_destroy_pipeline(s_device, pipeline);
+      cgpuDestroyPipeline(s_device, pipeline);
     }
   }
   return cache;
@@ -891,16 +891,16 @@ void giDestroyShaderCache(GiShaderCache* cache)
 {
   s_texSys->destroyUncachedImages(cache->images2d);
   s_texSys->destroyUncachedImages(cache->images3d);
-  cgpu_destroy_shader(s_device, cache->rgenShader);
+  cgpuDestroyShader(s_device, cache->rgenShader);
   for (CgpuShader shader : cache->missShaders)
   {
-    cgpu_destroy_shader(s_device, shader);
+    cgpuDestroyShader(s_device, shader);
   }
   for (CgpuShader shader : cache->hitShaders)
   {
-    cgpu_destroy_shader(s_device, shader);
+    cgpuDestroyShader(s_device, shader);
   }
-  cgpu_destroy_pipeline(s_device, cache->pipeline);
+  cgpuDestroyPipeline(s_device, cache->pipeline);
   delete cache;
 }
 
@@ -1001,26 +1001,27 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   bindings.p_tlases = &as;
 
   // Set up command buffer.
-  if (!cgpu_create_command_buffer(s_device, &command_buffer))
+  if (!cgpuCreateCommandBuffer(s_device, &command_buffer))
     goto cleanup;
 
-  if (!cgpu_begin_command_buffer(command_buffer))
+  if (!cgpuBeginCommandBuffer(command_buffer))
     goto cleanup;
 
-  if (!cgpu_cmd_transition_shader_image_layouts(command_buffer, shader_cache->rgenShader, images.size(), images.data()))
+  if (!cgpuCmdTransitionShaderImageLayouts(command_buffer, shader_cache->rgenShader, images.size(), images.data()))
     goto cleanup;
 
-  if (!cgpu_cmd_update_bindings(command_buffer, shader_cache->pipeline, &bindings))
+  if (!cgpuCmdUpdateBindings(command_buffer, shader_cache->pipeline, &bindings))
     goto cleanup;
 
-  if (!cgpu_cmd_bind_pipeline(command_buffer, shader_cache->pipeline))
+  if (!cgpuCmdBindPipeline(command_buffer, shader_cache->pipeline))
     goto cleanup;
 
   // Trace rays.
-  if (!cgpu_cmd_push_constants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, push_size, &push_data))
+  CgpuShaderStageFlags pcStageFlags = CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT;
+  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, pcStageFlags, push_size, &push_data))
     goto cleanup;
 
-  if (!cgpu_cmd_trace_rays(command_buffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
+  if (!cgpuCmdTraceRays(command_buffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
     goto cleanup;
 
   // Copy output buffer to staging buffer.
@@ -1031,55 +1032,39 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   barrier.offset = 0;
   barrier.size = CGPU_WHOLE_SIZE;
 
-  if (!cgpu_cmd_pipeline_barrier(command_buffer,
-                                 0, nullptr,
-                                 1, &barrier,
-                                 0, nullptr))
-  {
+  if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
     goto cleanup;
-  }
 
-  if (!cgpu_cmd_copy_buffer(command_buffer,
-                            s_outputBuffer,
-                            0,
-                            s_outputStagingBuffer,
-                            0,
-                            outputBufferSize))
-  {
+  if (!cgpuCmdCopyBuffer(command_buffer, s_outputBuffer, 0, s_outputStagingBuffer, 0, outputBufferSize))
     goto cleanup;
-  }
 
   // Submit command buffer.
-  if (!cgpu_end_command_buffer(command_buffer))
+  if (!cgpuEndCommandBuffer(command_buffer))
     goto cleanup;
 
-  if (!cgpu_create_fence(s_device, &fence))
+  if (!cgpuCreateFence(s_device, &fence))
     goto cleanup;
 
-  if (!cgpu_reset_fence(s_device, fence))
+  if (!cgpuResetFence(s_device, fence))
     goto cleanup;
 
-  if (!cgpu_submit_command_buffer(s_device, command_buffer, fence))
-  {
+  if (!cgpuSubmitCommandBuffer(s_device, command_buffer, fence))
     goto cleanup;
-  }
 
   // Now is a good time to flush buffered messages (on Windows).
   fflush(stdout);
 
-  if (!cgpu_wait_for_fence(s_device, fence))
+  if (!cgpuWaitForFence(s_device, fence))
     goto cleanup;
 
   // Read data from GPU to image.
   uint8_t* mapped_staging_mem;
-  if (!cgpu_map_buffer(s_device, s_outputStagingBuffer, (void**) &mapped_staging_mem))
-  {
+  if (!cgpuMapBuffer(s_device, s_outputStagingBuffer, (void**) &mapped_staging_mem))
     goto cleanup;
-  }
 
   memcpy(rgbaImg, mapped_staging_mem, outputBufferSize);
 
-  if (!cgpu_unmap_buffer(s_device, s_outputStagingBuffer))
+  if (!cgpuUnmapBuffer(s_device, s_outputStagingBuffer))
     goto cleanup;
 
   // Visualize red channel as heatmap for debug AOVs.
@@ -1106,8 +1091,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   result = GI_OK;
 
 cleanup:
-  cgpu_destroy_fence(s_device, fence);
-  cgpu_destroy_command_buffer(s_device, command_buffer);
+  cgpuDestroyFence(s_device, fence);
+  cgpuDestroyCommandBuffer(s_device, command_buffer);
 
   return result;
 }

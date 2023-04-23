@@ -462,24 +462,24 @@ struct CgpuRtHitGroup
   CgpuShader anyHitShader;     // optional
 };
 
-bool cgpu_initialize(
+bool cgpuInitialize(
   const char* p_app_name,
   uint32_t version_major,
   uint32_t version_minor,
   uint32_t version_patch
 );
 
-void cgpu_terminate();
+void cgpuTerminate();
 
-bool cgpu_create_device(
+bool cgpuCreateDevice(
   CgpuDevice* p_device
 );
 
-bool cgpu_destroy_device(
+bool cgpuDestroyDevice(
   CgpuDevice device
 );
 
-bool cgpu_create_shader(
+bool cgpuCreateShader(
   CgpuDevice device,
   uint64_t size,
   const uint8_t* p_source,
@@ -487,12 +487,12 @@ bool cgpu_create_shader(
   CgpuShader* p_shader
 );
 
-bool cgpu_destroy_shader(
+bool cgpuDestroyShader(
   CgpuDevice device,
   CgpuShader shader
 );
 
-bool cgpu_create_buffer(
+bool cgpuCreateBuffer(
   CgpuDevice device,
   CgpuBufferUsageFlags usage,
   CgpuMemoryPropertyFlags memory_properties,
@@ -500,45 +500,45 @@ bool cgpu_create_buffer(
   CgpuBuffer* p_buffer
 );
 
-bool cgpu_destroy_buffer(
+bool cgpuDestroyBuffer(
   CgpuDevice device,
   CgpuBuffer buffer
 );
 
-bool cgpu_map_buffer(
+bool cgpuMapBuffer(
   CgpuDevice device,
   CgpuBuffer buffer,
   void** pp_mapped_mem
 );
 
-bool cgpu_unmap_buffer(
+bool cgpuUnmapBuffer(
   CgpuDevice device,
   CgpuBuffer buffer
 );
 
-bool cgpu_create_image(
+bool cgpuCreateImage(
   CgpuDevice device,
   const CgpuImageDesc* image_desc,
   CgpuImage* p_image
 );
 
-bool cgpu_destroy_image(
+bool cgpuDestroyImage(
   CgpuDevice device,
   CgpuImage image
 );
 
-bool cgpu_map_image(
+bool cgpuMapImage(
   CgpuDevice device,
   CgpuImage image,
   void** pp_mapped_mem
 );
 
-bool cgpu_unmap_image(
+bool cgpuUnmapImage(
   CgpuDevice device,
   CgpuImage image
 );
 
-bool cgpu_create_sampler(
+bool cgpuCreateSampler(
   CgpuDevice device,
   CgpuSamplerAddressMode address_mode_u,
   CgpuSamplerAddressMode address_mode_v,
@@ -546,18 +546,18 @@ bool cgpu_create_sampler(
   CgpuSampler* p_sampler
 );
 
-bool cgpu_destroy_sampler(
+bool cgpuDestroySampler(
   CgpuDevice device,
   CgpuSampler sampler
 );
 
-bool cgpu_create_compute_pipeline(
+bool cgpuCreateComputePipeline(
   CgpuDevice device,
   CgpuShader shader,
   CgpuPipeline* p_pipeline
 );
 
-struct cgpu_rt_pipeline_desc
+struct CgpuRtPipelineDesc
 {
   CgpuShader rgen_shader;
   uint32_t miss_shader_count;
@@ -566,18 +566,18 @@ struct cgpu_rt_pipeline_desc
   const CgpuRtHitGroup* hit_groups;
 };
 
-bool cgpu_create_rt_pipeline(
+bool cgpuCreateRtPipeline(
   CgpuDevice device,
-  const cgpu_rt_pipeline_desc* desc,
+  const CgpuRtPipelineDesc* desc,
   CgpuPipeline* p_pipeline
 );
 
-bool cgpu_destroy_pipeline(
+bool cgpuDestroyPipeline(
   CgpuDevice device,
   CgpuPipeline pipeline
 );
 
-bool cgpu_create_blas(
+bool cgpuCreateBlas(
   CgpuDevice device,
   uint32_t vertex_count,
   const CgpuVertex* vertices,
@@ -587,51 +587,51 @@ bool cgpu_create_blas(
   CgpuBlas* p_blas
 );
 
-bool cgpu_create_tlas(
+bool cgpuCreateTlas(
   CgpuDevice device,
   uint32_t instance_count,
   const CgpuBlasInstance* instances,
   CgpuTlas* p_tlas
 );
 
-bool cgpu_destroy_blas(
+bool cgpuDestroyBlas(
   CgpuDevice device,
   CgpuBlas blas
 );
 
-bool cgpu_destroy_tlas(
+bool cgpuDestroyTlas(
   CgpuDevice device,
   CgpuTlas tlas
 );
 
-bool cgpu_create_command_buffer(
+bool cgpuCreateCommandBuffer(
   CgpuDevice device,
   CgpuCommandBuffer* p_command_buffer
 );
 
-bool cgpu_begin_command_buffer(
+bool cgpuBeginCommandBuffer(
   CgpuCommandBuffer command_buffer
 );
 
-bool cgpu_cmd_bind_pipeline(
+bool cgpuCmdBindPipeline(
   CgpuCommandBuffer command_buffer,
   CgpuPipeline pipeline
 );
 
-bool cgpu_cmd_transition_shader_image_layouts(
+bool cgpuCmdTransitionShaderImageLayouts(
   CgpuCommandBuffer command_buffer,
   CgpuShader shader,
   uint32_t image_count,
   const CgpuImageBinding* p_images
 );
 
-bool cgpu_cmd_update_bindings(
+bool cgpuCmdUpdateBindings(
   CgpuCommandBuffer command_buffer,
   CgpuPipeline pipeline,
   const CgpuBindings* bindings
 );
 
-bool cgpu_cmd_copy_buffer(
+bool cgpuCmdCopyBuffer(
   CgpuCommandBuffer command_buffer,
   CgpuBuffer source,
   uint64_t source_offset,
@@ -640,14 +640,14 @@ bool cgpu_cmd_copy_buffer(
   uint64_t size
 );
 
-bool cgpu_cmd_copy_buffer_to_image(
+bool cgpuCmdCopyBufferToImage(
   CgpuCommandBuffer command_buffer,
   CgpuBuffer buffer,
   uint64_t buffer_offset,
   CgpuImage image
 );
 
-bool cgpu_cmd_push_constants(
+bool cgpuCmdPushConstants(
   CgpuCommandBuffer command_buffer,
   CgpuPipeline pipeline,
   CgpuShaderStageFlags stage_flags,
@@ -655,14 +655,14 @@ bool cgpu_cmd_push_constants(
   const void* p_data
 );
 
-bool cgpu_cmd_dispatch(
+bool cgpuCmdDispatch(
   CgpuCommandBuffer command_buffer,
   uint32_t dim_x,
   uint32_t dim_y,
   uint32_t dim_z
 );
 
-bool cgpu_cmd_pipeline_barrier(
+bool cgpuCmdPipelineBarrier(
   CgpuCommandBuffer command_buffer,
   uint32_t barrier_count,
   const CgpuMemoryBarrier* p_barriers,
@@ -672,18 +672,18 @@ bool cgpu_cmd_pipeline_barrier(
   const CgpuImageMemoryBarrier* p_image_barriers
 );
 
-bool cgpu_cmd_reset_timestamps(
+bool cgpuCmdResetTimestamps(
   CgpuCommandBuffer command_buffer,
   uint32_t offset,
   uint32_t count
 );
 
-bool cgpu_cmd_write_timestamp(
+bool cgpuCmdWriteTimestamp(
   CgpuCommandBuffer command_buffer,
   uint32_t timestamp_index
 );
 
-bool cgpu_cmd_copy_timestamps(
+bool cgpuCmdCopyTimestamps(
   CgpuCommandBuffer command_buffer,
   CgpuBuffer buffer,
   uint32_t offset,
@@ -691,68 +691,68 @@ bool cgpu_cmd_copy_timestamps(
   bool wait_until_available
 );
 
-bool cgpu_cmd_trace_rays(
+bool cgpuCmdTraceRays(
   CgpuCommandBuffer command_buffer,
   CgpuPipeline rt_pipeline,
   uint32_t width,
   uint32_t height
 );
 
-bool cgpu_end_command_buffer(
+bool cgpuEndCommandBuffer(
   CgpuCommandBuffer command_buffer
 );
 
-bool cgpu_destroy_command_buffer(
+bool cgpuDestroyCommandBuffer(
   CgpuDevice device,
   CgpuCommandBuffer command_buffer
 );
 
-bool cgpu_create_fence(
+bool cgpuCreateFence(
   CgpuDevice device,
   CgpuFence* p_fence
 );
 
-bool cgpu_reset_fence(
+bool cgpuResetFence(
   CgpuDevice device,
   CgpuFence fence
 );
 
-bool cgpu_wait_for_fence(
+bool cgpuWaitForFence(
   CgpuDevice device,
   CgpuFence fence
 );
 
-bool cgpu_destroy_fence(
+bool cgpuDestroyFence(
   CgpuDevice device,
   CgpuFence fence
 );
 
-bool cgpu_submit_command_buffer(
+bool cgpuSubmitCommandBuffer(
   CgpuDevice device,
   CgpuCommandBuffer command_buffer,
   CgpuFence fence
 );
 
-bool cgpu_flush_mapped_memory(
+bool cgpuFlushMappedMemory(
   CgpuDevice device,
   CgpuBuffer buffer,
   uint64_t offset,
   uint64_t size
 );
 
-bool cgpu_invalidate_mapped_memory(
+bool cgpuInvalidateMappedMemory(
   CgpuDevice device,
   CgpuBuffer buffer,
   uint64_t offset,
   uint64_t size
 );
 
-bool cgpu_get_physical_device_features(
+bool cgpuGetPhysicalDeviceFeatures(
   CgpuDevice device,
   CgpuPhysicalDeviceFeatures* p_features
 );
 
-bool cgpu_get_physical_device_properties(
+bool cgpuGetPhysicalDeviceProperties(
   CgpuDevice device,
   CgpuPhysicalDeviceProperties* p_limits
 );

@@ -66,7 +66,7 @@ namespace gi
   {
     for (const auto& pathImagePair : m_imageCache)
     {
-      cgpu_destroy_image(m_device, pathImagePair.second);
+      cgpuDestroyImage(m_device, pathImagePair.second);
     }
     m_imageCache.clear();
   }
@@ -122,7 +122,7 @@ namespace gi
         image_desc.height = textureResource.height;
         image_desc.depth = textureResource.depth;
 
-        if (!cgpu_create_image(m_device, &image_desc, &image))
+        if (!cgpuCreateImage(m_device, &image_desc, &image))
           return false;
 
         result = m_stager.stageToImage(payload.data(), payloadSize, image);
@@ -150,7 +150,7 @@ namespace gi
         image_desc.height = image_data.height;
         image_desc.depth = 1;
 
-        if (!cgpu_create_image(m_device, &image_desc, &image))
+        if (!cgpuCreateImage(m_device, &image_desc, &image))
           return false;
 
         result = m_stager.stageToImage(image_data.data, image_data.size, image);
@@ -169,7 +169,7 @@ namespace gi
       image_desc.height = 1;
       image_desc.depth = 1;
 
-      if (!cgpu_create_image(m_device, &image_desc, &image))
+      if (!cgpuCreateImage(m_device, &image_desc, &image))
         return false;
 
       uint8_t black[4] = { 0, 0, 0, 0 };
@@ -203,7 +203,7 @@ namespace gi
 
       if (!isCached)
       {
-        cgpu_destroy_image(m_device, image);
+        cgpuDestroyImage(m_device, image);
       }
     }
   }

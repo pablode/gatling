@@ -45,11 +45,11 @@ namespace gtl
   GiDataStoreGpu::~GiDataStoreGpu()
   {
     if (m_mappedMem)
-      cgpu_unmap_buffer(m_device, m_buffer);
+      cgpuUnmapBuffer(m_device, m_buffer);
 
     // TODO: add to deletion queue instead
     if (m_buffer.handle != CGPU_INVALID_HANDLE)
-      cgpu_destroy_buffer(m_device, m_buffer);
+      cgpuDestroyBuffer(m_device, m_buffer);
   }
 
   uint64_t GiDataStoreGpu::allocate()
@@ -103,7 +103,7 @@ namespace gtl
     // Unmap buffer before resize. New buffer is mapped later.
     if (m_mappedMem)
     {
-      cgpu_unmap_buffer(m_device, m_buffer);
+      cgpuUnmapBuffer(m_device, m_buffer);
     }
 
     // Create new, larger buffer.
@@ -118,39 +118,39 @@ namespace gtl
     CgpuMemoryPropertyFlags bufferMemoryProperties =
       CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE;
 
-    if (!cgpu_create_buffer(m_device, bufferUsageFlags, bufferMemoryProperties, newSize, &buffer))
+    if (!cgpuCreateBuffer(m_device, bufferUsageFlags, bufferMemoryProperties, newSize, &buffer))
       goto cleanup;
 
     // Copy old buffer data if needed.
     if (m_bufferSize > 0)
     {
-      if (!cgpu_create_command_buffer(m_device, &commandBuffer))
+      if (!cgpuCreateCommandBuffer(m_device, &commandBuffer))
         goto cleanup;
 
-      if (!cgpu_begin_command_buffer(commandBuffer))
+      if (!cgpuBeginCommandBuffer(commandBuffer))
         goto cleanup;
 
-      if (!cgpu_cmd_copy_buffer(commandBuffer, m_buffer, 0, buffer, 0, m_bufferSize))
+      if (!cgpuCmdCopyBuffer(commandBuffer, m_buffer, 0, buffer, 0, m_bufferSize))
         goto cleanup;
 
-      if (!cgpu_end_command_buffer(commandBuffer))
+      if (!cgpuEndCommandBuffer(commandBuffer))
         goto cleanup;
 
-      if (!cgpu_create_fence(m_device, &fence))
+      if (!cgpuCreateFence(m_device, &fence))
         goto cleanup;
 
-      if (!cgpu_reset_fence(m_device, fence))
+      if (!cgpuResetFence(m_device, fence))
         goto cleanup;
 
-      if (!cgpu_submit_command_buffer(m_device, commandBuffer, fence))
+      if (!cgpuSubmitCommandBuffer(m_device, commandBuffer, fence))
         goto cleanup;
 
-      if (!cgpu_wait_for_fence(m_device, fence))
+      if (!cgpuWaitForFence(m_device, fence))
         goto cleanup;
     }
 
     // Persistently map buffer.
-    if (!cgpu_map_buffer(m_device, buffer, (void**) &m_mappedMem))
+    if (!cgpuMapBuffer(m_device, buffer, (void**) &m_mappedMem))
       goto cleanup;
 
     // Swap buffers, so that we always destroy the unused one.
@@ -167,11 +167,11 @@ namespace gtl
   cleanup:
     // TODO: add to deletion queue instead (with implicitly inserted semaphore)
     if (buffer.handle != CGPU_INVALID_HANDLE)
-      cgpu_destroy_buffer(m_device, buffer);
+      cgpuDestroyBuffer(m_device, buffer);
     if (commandBuffer.handle != CGPU_INVALID_HANDLE)
-      cgpu_destroy_command_buffer(m_device, commandBuffer);
+      cgpuDestroyCommandBuffer(m_device, commandBuffer);
     if (fence.handle != CGPU_INVALID_HANDLE)
-      cgpu_destroy_fence(m_device, fence);
+      cgpuDestroyFence(m_device, fence);
 
     return result;
   }
