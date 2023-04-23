@@ -22,13 +22,13 @@
 #include <stdint.h>
 #include <functional>
 
-namespace gi
+namespace gtl
 {
-  class Stager
+  class GiStager
   {
   public:
-    Stager(CgpuDevice device);
-    ~Stager();
+    GiStager(CgpuDevice device);
+    ~GiStager();
 
     bool allocate();
     void free();

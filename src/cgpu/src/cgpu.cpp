@@ -512,10 +512,10 @@ bool cgpuCreateDevice(CgpuDevice* device)
   }
 
 #ifndef __APPLE__
-  if (cgpuFindDeviceExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, device_ext_count, device_extensions.data()))
+  if (cgpuFindDeviceExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
   {
     idevice->features.debugPrintf = true;
-    enabled_device_extensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    enabledDeviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
   }
 #endif
 #endif
@@ -3031,7 +3031,7 @@ bool cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
 
   idevice->table.vkCmdPipelineBarrier(
     icommandBuffer->commandBuffer,
-    // FIXME: use correct pipeline flag bits
+    // FIXME: expose flags in desc struct
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
     0,

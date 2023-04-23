@@ -17,10 +17,10 @@
 
 #include "gi.h"
 
-#include "Stager.h"
+#include "stager.h"
 #include "texsys.h"
 #include "turbo.h"
-#include "asset_reader.h"
+#include "assetReader.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -100,7 +100,7 @@ CgpuDevice s_device = { CGPU_INVALID_HANDLE };
 CgpuPhysicalDeviceFeatures s_deviceFeatures;
 CgpuPhysicalDeviceProperties s_deviceProperties;
 CgpuSampler s_texSampler = { CGPU_INVALID_HANDLE };
-std::unique_ptr<gi::Stager> s_stager;
+std::unique_ptr<gtl::GiStager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
@@ -176,7 +176,7 @@ GiStatus giInitialize(const GiInitParams* params)
     return GI_ERROR;
   }
 
-  s_stager = std::make_unique<gi::Stager>(s_device);
+  s_stager = std::make_unique<gtl::GiStager>(s_device);
   if (!s_stager->allocate())
   {
     return GI_ERROR;
@@ -835,11 +835,11 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   // Create RT pipeline.
   {
     CgpuRtPipelineDesc pipeline_desc = {0};
-    pipeline_desc.rgen_shader = rgenShader;
-    pipeline_desc.miss_shader_count = missShaders.size();
-    pipeline_desc.miss_shaders = missShaders.data();
-    pipeline_desc.hit_group_count = hitGroups.size();
-    pipeline_desc.hit_groups = hitGroups.data();
+    pipeline_desc.rgenShader = rgenShader;
+    pipeline_desc.missShaderCount = missShaders.size();
+    pipeline_desc.missShaders = missShaders.data();
+    pipeline_desc.hitGroupCount = hitGroups.size();
+    pipeline_desc.hitGroups = hitGroups.data();
 
     if (!cgpuCreateRtPipeline(s_device, &pipeline_desc, &pipeline))
     {
@@ -991,14 +991,14 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   CgpuTlasBinding as = { 7, 0, geom_cache->tlas };
 
   CgpuBindings bindings = {0};
-  bindings.buffer_count = (uint32_t) buffers.size();
-  bindings.p_buffers = buffers.data();
-  bindings.image_count = (uint32_t) images.size();
-  bindings.p_images = images.data();
-  bindings.sampler_count = image_count ? 1 : 0;
-  bindings.p_samplers = &sampler;
-  bindings.tlas_count = 1;
-  bindings.p_tlases = &as;
+  bindings.bufferCount = (uint32_t) buffers.size();
+  bindings.buffers = buffers.data();
+  bindings.imageCount = (uint32_t) images.size();
+  bindings.images = images.data();
+  bindings.samplerCount = image_count ? 1 : 0;
+  bindings.samplers = &sampler;
+  bindings.tlasCount = 1;
+  bindings.tlases = &as;
 
   // Set up command buffer.
   if (!cgpuCreateCommandBuffer(s_device, &command_buffer))
@@ -1017,8 +1017,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
 
   // Trace rays.
-  CgpuShaderStageFlags pcStageFlags = CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT;
-  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, pcStageFlags, push_size, &push_data))
+  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, push_size, &push_data))
     goto cleanup;
 
   if (!cgpuCmdTraceRays(command_buffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
@@ -1026,8 +1025,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   // Copy output buffer to staging buffer.
   CgpuBufferMemoryBarrier barrier;
-  barrier.src_access_flags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  barrier.dst_access_flags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
+  barrier.srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
+  barrier.dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
   barrier.buffer = s_outputBuffer;
   barrier.offset = 0;
   barrier.size = CGPU_WHOLE_SIZE;

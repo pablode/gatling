@@ -17,7 +17,7 @@
 
 #include "texsys.h"
 
-#include "Stager.h"
+#include "stager.h"
 #include "mmap.h"
 #include "gi.h"
 
@@ -25,6 +25,8 @@
 #include <imgio.h>
 #include <assert.h>
 #include <inttypes.h>
+
+using namespace gtl;
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
@@ -50,7 +52,7 @@ namespace detail
 
 namespace gi
 {
-  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader, Stager& stager)
+  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader, GiStager& stager)
     : m_device(device)
     , m_assetReader(assetReader)
     , m_stager(stager)

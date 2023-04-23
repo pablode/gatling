@@ -15,26 +15,26 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "Stager.h"
+#include "stager.h"
 
 #include <assert.h>
 #include <algorithm>
 
 const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
 
-namespace gi
+namespace gtl
 {
-  Stager::Stager(CgpuDevice device)
+  GiStager::GiStager(CgpuDevice device)
     : m_device(device)
   {
   }
 
-  Stager::~Stager()
+  GiStager::~GiStager()
   {
     assert(m_stagedBytes == 0);
   }
 
-  bool Stager::allocate()
+  bool GiStager::allocate()
   {
     m_stagingBuffer = { CGPU_INVALID_HANDLE };
     m_commandBuffer = { CGPU_INVALID_HANDLE };
@@ -78,7 +78,7 @@ fail:
     return false;
   }
 
-  void Stager::free()
+  void GiStager::free()
   {
     assert(m_stagedBytes == 0);
     cgpuEndCommandBuffer(m_commandBuffer);
@@ -91,7 +91,7 @@ fail:
     cgpuDestroyBuffer(m_device, m_stagingBuffer);
   }
 
-  bool Stager::flush()
+  bool GiStager::flush()
   {
     if (m_stagedBytes == 0)
     {
@@ -120,7 +120,7 @@ fail:
     return true;
   }
 
-  bool Stager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
+  bool GiStager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
   {
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
       return cgpuCmdCopyBuffer(
@@ -136,7 +136,7 @@ fail:
     return stage(src, size, copyFunc);
   }
 
-  bool Stager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst)
+  bool GiStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst)
   {
     if (size > BUFFER_SIZE)
     {
@@ -166,7 +166,7 @@ fail:
     return stage(src, size, copyFunc);
   }
 
-  bool Stager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc)
+  bool GiStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc)
   {
     uint64_t bytesToStage = size;
 
