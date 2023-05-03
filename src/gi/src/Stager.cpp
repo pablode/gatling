@@ -15,12 +15,12 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "stager.h"
+#include "Stager.h"
 
 #include <assert.h>
 #include <algorithm>
 
-const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
+const static uint64_t BUFFER_SIZE = 32 * 1024 * 1024;
 
 namespace gtl
 {
@@ -49,15 +49,15 @@ namespace gtl
 
     if (!bufferCreated)
     {
-      if (!cgpuCreateBuffer(m_device,
-                            CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                            BUFFER_SIZE,
-                            &m_stagingBuffer))
-      {
-        goto fail;
-      }
+      bufferCreated = cgpuCreateBuffer(m_device,
+                                       CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                                       CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                                       BUFFER_SIZE,
+                                       &m_stagingBuffer);
     }
+
+    if (!bufferCreated)
+      goto fail;
 
     if (!cgpuCreateCommandBuffer(m_device, &m_commandBuffer))
       goto fail;
@@ -136,34 +136,84 @@ fail:
     return stage(src, size, copyFunc);
   }
 
-  bool GiStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst)
+  bool GiStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
   {
-    if (size > BUFFER_SIZE)
+    // If image fits in staging buffer, stage & copy only once.
+    if (size <= BUFFER_SIZE)
+    {
+      uint64_t availableSpace = BUFFER_SIZE - m_stagedBytes;
+
+      if (availableSpace < size)
+      {
+        if (!flush())
+        {
+          return false;
+        }
+      }
+
+      auto copyFunc = [this, dst, width, height, depth](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
+        CgpuBufferImageCopyDesc desc;
+        desc.bufferOffset = srcOffset;
+        desc.texelOffsetX = 0;
+        desc.texelExtentX = width;
+        desc.texelOffsetY = 0;
+        desc.texelExtentY = height;
+        desc.texelOffsetZ = 0;
+        desc.texelExtentZ = depth;
+
+        return cgpuCmdCopyBufferToImage(
+          m_commandBuffer,
+          m_stagingBuffer,
+          dst,
+          &desc
+        );
+      };
+
+      return stage(src, size, copyFunc);
+    }
+
+    // Otherwise, we stage & copy per width-depth slice.
+    uint64_t rowCount = height;
+    uint64_t rowSize = size / rowCount;
+
+    if (rowSize > BUFFER_SIZE)
     {
       return false;
     }
 
-    uint64_t availableSpace = BUFFER_SIZE - m_stagedBytes;
-
-    if (availableSpace < size)
+    for (uint32_t i = 0; i < rowCount; i++)
     {
-      // We don't partially copy to an image, so we need to make sure everything fits into the staging buffer.
       if (!flush())
+      {
+        return false;
+      }
+
+      auto copyFunc = [this, dst, i, width, depth](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
+        CgpuBufferImageCopyDesc desc;
+        desc.bufferOffset = srcOffset;
+        desc.texelOffsetX = 0;
+        desc.texelExtentX = width;
+        desc.texelOffsetY = i;
+        desc.texelExtentY = 1;
+        desc.texelOffsetZ = 0;
+        desc.texelExtentZ = depth;
+
+        return cgpuCmdCopyBufferToImage(
+          m_commandBuffer,
+          m_stagingBuffer,
+          dst,
+          &desc
+        );
+      };
+
+      uint64_t rowOffset = i * rowSize;
+      if (!stage(&src[rowOffset], rowSize, copyFunc))
       {
         return false;
       }
     }
 
-    auto copyFunc = [this, dst](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
-      return cgpuCmdCopyBufferToImage(
-        m_commandBuffer,
-        m_stagingBuffer,
-        srcOffset,
-        dst
-      );
-    };
-
-    return stage(src, size, copyFunc);
+    return true;
   }
 
   bool GiStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc)

@@ -2794,8 +2794,8 @@ bool cgpuCmdCopyBuffer(CgpuCommandBuffer commandBuffer,
 
 bool cgpuCmdCopyBufferToImage(CgpuCommandBuffer commandBuffer,
                               CgpuBuffer buffer,
-                              uint64_t bufferOffset,
-                              CgpuImage image)
+                              CgpuImage image,
+                              const CgpuBufferImageCopyDesc* desc)
 {
   CgpuICommandBuffer* icommandBuffer;
   if (!cgpuResolveCommandBuffer(commandBuffer, &icommandBuffer)) {
@@ -2860,17 +2860,17 @@ bool cgpuCmdCopyBufferToImage(CgpuCommandBuffer commandBuffer,
   layers.layerCount = 1;
 
   VkOffset3D offset;
-  offset.x = 0;
-  offset.y = 0;
-  offset.z = 0;
+  offset.x = desc->texelOffsetX;
+  offset.y = desc->texelOffsetY;
+  offset.z = desc->texelOffsetZ;
 
   VkExtent3D extent;
-  extent.width = iimage->width;
-  extent.height = iimage->height;
-  extent.depth = iimage->depth;
+  extent.width = desc->texelExtentX;
+  extent.height = desc->texelExtentY;
+  extent.depth = desc->texelExtentZ;
 
   VkBufferImageCopy region;
-  region.bufferOffset = bufferOffset;
+  region.bufferOffset = desc->bufferOffset;
   region.bufferRowLength = 0;
   region.bufferImageHeight = 0;
   region.imageSubresource = layers;

@@ -93,7 +93,7 @@ namespace gi
     image_desc.depth = 1;
 
     bool creationSuccessful = cgpuCreateImage(m_device, &image_desc, &image) &&
-                              m_stager.stageToImage(image_data.data, image_data.size, image);
+                              m_stager.stageToImage(image_data.data, image_data.size, image, image_data.width, image_data.height, 1);
 
     imgio_free_img(&image_data);
 
@@ -166,7 +166,7 @@ namespace gi
         if (!cgpuCreateImage(m_device, &image_desc, &image))
           return false;
 
-        result = m_stager.stageToImage(payload.data(), payloadSize, image);
+        result = m_stager.stageToImage(payload.data(), payloadSize, image, image_desc.width, image_desc.height, image_desc.depth);
         if (!result) return false;
 
         imageVector.push_back(image);
@@ -196,7 +196,7 @@ namespace gi
         return false;
 
       uint8_t black[4] = { 0, 0, 0, 0 };
-      result = m_stager.stageToImage(black, 4, image);
+      result = m_stager.stageToImage(black, 4, image, 1, 1, 1);
       if (!result) return false;
 
       imageVector.push_back(image);

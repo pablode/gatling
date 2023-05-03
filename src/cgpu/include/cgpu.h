@@ -640,11 +640,22 @@ bool cgpuCmdCopyBuffer(
   uint64_t size
 );
 
+struct CgpuBufferImageCopyDesc
+{
+  uint64_t bufferOffset;
+  uint32_t texelOffsetX;
+  uint32_t texelOffsetY;
+  uint32_t texelOffsetZ;
+  uint32_t texelExtentX;
+  uint32_t texelExtentY;
+  uint32_t texelExtentZ;
+};
+
 bool cgpuCmdCopyBufferToImage(
   CgpuCommandBuffer commandBuffer,
   CgpuBuffer buffer,
-  uint64_t bufferOffset,
-  CgpuImage image
+  CgpuImage image,
+  const CgpuBufferImageCopyDesc* desc
 );
 
 bool cgpuCmdPushConstants(
