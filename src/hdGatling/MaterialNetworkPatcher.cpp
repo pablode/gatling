@@ -43,10 +43,19 @@ TF_DEFINE_PRIVATE_TOKENS(
   (no)
   (sRGB)
   (raw)
+  (metallic)
   (roughness)
+  (clearcoat)
+  (clearcoatRoughness)
   (specular)
   (specularColor)
+  (opacity)
+  (opacityThreshold)
+  (ior)
+  (displacement)
+  (occlusion)
   (rgb)
+  (r)
 );
 
 void _PatchUsdTypes(HdMaterialNetwork2& network)
@@ -290,6 +299,58 @@ void _PatchUsdPreviewSurfaceNormalParamValue(VtValue& value)
   value = GfVec3f(0, 0, 1);
 }
 
+// In the first version of Intel's Moore Lane, many float inputs of UsdPreviewSurface materials
+// (such as roughness) were incorrectly connected to the color3 'rgb' output of UsdUVTexture nodes,
+// as opposed to a single-channel output ('r', 'g', 'b'). This is/could have been an artist mistake,
+// or caused by Houdini 19.0/19.5 USD export. https://dpel.aswf.io/4004-moore-lane/
+void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network)
+{
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+    {
+      continue;
+    }
+
+    auto& inputs = node.inputConnections;
+
+    const auto patchFloatChannelConnections = [&inputs](TfToken inputName)
+    {
+      auto inputIt = inputs.find(inputName);
+      if (inputIt == inputs.end())
+      {
+        return;
+      }
+
+      auto& connections = inputIt->second;
+      for (HdMaterialConnection2& connection : connections)
+      {
+        if (connection.upstreamOutputName != _tokens->rgb)
+        {
+          continue;
+        }
+
+        TF_WARN("patching UsdPreviewSurface:%s input to connect to UsdUVTexture:r", inputName.GetText());
+
+        // We can only guess that e.g. roughness is more likely to be encoded in a separate map
+        // as opposed to an occlusion-metalness-roughness map.
+        connection.upstreamOutputName = _tokens->r;
+      }
+    };
+
+    patchFloatChannelConnections(_tokens->metallic);
+    patchFloatChannelConnections(_tokens->roughness);
+    patchFloatChannelConnections(_tokens->clearcoat);
+    patchFloatChannelConnections(_tokens->clearcoatRoughness);
+    patchFloatChannelConnections(_tokens->opacity);
+    patchFloatChannelConnections(_tokens->opacityThreshold);
+    patchFloatChannelConnections(_tokens->ior);
+    patchFloatChannelConnections(_tokens->displacement);
+    patchFloatChannelConnections(_tokens->occlusion);
+  }
+}
+
 void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
 {
   for (auto& pathNodePair : network.nodes)
@@ -300,30 +361,23 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
       continue;
     }
 
+    auto& inputs = node.inputConnections;
     auto& parameters = node.parameters;
+
+    if (auto inputIt = inputs.find(_tokens->normal); inputIt != inputs.end())
+    {
+      auto& connections = inputIt->second;
+
+      for (HdMaterialConnection2& connection : connections)
+      {
+        _PatchUsdPreviewSurfaceNormalInputConnection(network, connection);
+      }
+    }
 
     auto normalParamIt = parameters.find(_tokens->normal);
     if (normalParamIt != parameters.end())
     {
       _PatchUsdPreviewSurfaceNormalParamValue(normalParamIt->second);
-
-      // We can't continue here because both parameter and input could be set at the same time. Example:
-      // https://github.com/usd-wg/assets/blob/25542a54739d36051a4d88a97d3c4e4975238d90/test_assets/AlphaBlendModeTest/AlphaBlendModeTest.usdz
-      //continue;
-    }
-
-    auto& inputs = node.inputConnections;
-
-    auto normalInputIt = inputs.find(_tokens->normal);
-    if (normalInputIt == inputs.end())
-    {
-      continue;
-    }
-
-    auto& connections = normalInputIt->second;
-    for (HdMaterialConnection2& connection : connections)
-    {
-      _PatchUsdPreviewSurfaceNormalInputConnection(network, connection);
     }
   }
 }
@@ -376,6 +430,8 @@ void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
   {
     _PatchUsdPreviewSurfaceNormalMap(network);
   }
+
+  _PatchUsdPreviewSurfaceFloatInputTypeMismatches(network);
 
   _PatchUsdUVTextureIsSrgbParam(network);
 
