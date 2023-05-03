@@ -62,6 +62,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_materialNetworkTranslator(materialNetworkTranslator)
   , m_isConverged(false)
   , m_lastSceneStateVersion(UINT32_MAX)
+  , m_lastSprimIndexVersion(UINT32_MAX)
   , m_lastRenderSettingsVersion(UINT32_MAX)
   , m_lastVisChangeCount(UINT32_MAX)
   , m_lastBackgroundColor(GfVec4f(0.0f, 0.0f, 0.0f, 0.0f))
@@ -438,11 +439,13 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   }
 
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
+  uint32_t sprimIndexVersion = changeTracker.GetSprimIndexVersion();
   uint32_t visibilityChangeCount = changeTracker.GetVisibilityChangeCount();
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
   GiAovId aovId = _GetAovId(aovBinding->aovName);
 
   bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
+  bool sprimsChanged = (sprimIndexVersion != m_lastSprimIndexVersion);
   bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
   bool visibilityChanged = (m_lastVisChangeCount != visibilityChangeCount);
   bool backgroundColorChanged = (backgroundColor != m_lastBackgroundColor);
@@ -454,12 +457,13 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   }
 
   m_lastSceneStateVersion = sceneStateVersion;
+  m_lastSprimIndexVersion = sprimIndexVersion;
   m_lastRenderSettingsVersion = renderSettingsStateVersion;
   m_lastVisChangeCount = visibilityChangeCount;
   m_lastBackgroundColor = backgroundColor;
   m_lastAovId = aovId;
 
-  bool rebuildShaderCache = !m_shaderCache || aovChanged;
+  bool rebuildShaderCache = !m_shaderCache || aovChanged || sprimsChanged /*dome light could have been added/removed*/;
 #ifndef NDEBUG
   // HACK: activating the NEE debug render setting requires shader recompilation.
   rebuildShaderCache |= renderSettingsChanged;
@@ -538,8 +542,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   float* img_data = (float*) renderBuffer->Map();
 
-  int32_t result = giRender(&renderParams,
-                            img_data);
+  int32_t result = giRender(&renderParams, img_data);
+
   TF_VERIFY(result == GI_OK, "Unable to render scene.");
 
   renderBuffer->Unmap();

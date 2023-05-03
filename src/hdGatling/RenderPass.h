@@ -70,6 +70,7 @@ private:
   std::vector<GiMaterial*> m_materials;
   bool m_isConverged;
   uint32_t m_lastSceneStateVersion;
+  uint32_t m_lastSprimIndexVersion;
   uint32_t m_lastRenderSettingsVersion;
   uint32_t m_lastVisChangeCount;
   GfVec4f m_lastBackgroundColor;
