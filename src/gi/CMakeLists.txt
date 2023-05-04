@@ -67,7 +67,7 @@ target_link_libraries(
 )
 
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(gi PRIVATE OpenMP::OpenMP_CXX)
+  target_link_libraries(gi PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
 # Required since library is linked into hdGatling DSO

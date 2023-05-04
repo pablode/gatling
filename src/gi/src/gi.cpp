@@ -17,7 +17,7 @@
 
 #include "gi.h"
 
-#include "stager.h"
+#include "Stager.h"
 #include "texsys.h"
 #include "turbo.h"
 #include "assetReader.h"
