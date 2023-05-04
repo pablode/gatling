@@ -65,6 +65,7 @@ target_link_libraries(
   hdGatling
   PRIVATE
     usdImaging
+    usdMtlx
     hdMtlx
     gi
   PUBLIC

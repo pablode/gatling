@@ -36,7 +36,7 @@ namespace gi::sg
   class MdlMaterialCompiler
   {
   public:
-    MdlMaterialCompiler(MdlRuntime& runtime, const std::string& mdlLibPath);
+    MdlMaterialCompiler(MdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths);
 
   public:
     bool compileFromString(std::string_view srcStr,
@@ -48,6 +48,8 @@ namespace gi::sg
                          mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
   private:
+    void addStandardSearchPaths();
+
     bool compile(std::string_view identifier,
                  std::string_view moduleName,
                  std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
@@ -59,7 +61,7 @@ namespace gi::sg
                                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
   private:
-    std::string m_mdlLibPath;
+    const std::vector<std::string> m_mdlSearchPaths;
 
     mi::base::Handle<MdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;

@@ -189,13 +189,18 @@ bool _GetMaterialNetworkSurfaceTerminal(const HdMaterialNetwork2& network2, HdMa
   return true;
 }
 
-MaterialNetworkTranslator::MaterialNetworkTranslator(const std::string& mtlxLibPath)
+MaterialNetworkTranslator::MaterialNetworkTranslator(const std::vector<std::string>& mtlxSearchPaths)
 {
   m_nodeLib = mx::createDocument();
 
+  mx::FileSearchPath fileSearchPath;
+  for (const std::string& s : mtlxSearchPaths)
+  {
+    fileSearchPath.append(mx::FilePath(s));
+  }
+
   mx::FilePathVec libFolders; // All directories if left empty.
-  mx::FileSearchPath folderSearchPath(mtlxLibPath);
-  mx::loadLibraries(libFolders, folderSearchPath, m_nodeLib);
+  mx::loadLibraries(libFolders, fileSearchPath, m_nodeLib);
 }
 
 GiMaterial* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,

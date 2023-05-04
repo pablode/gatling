@@ -182,11 +182,12 @@ GiStatus giInitialize(const GiInitParams* params)
     return GI_ERROR;
   }
 
-  sg::ShaderGen::InitParams sgParams;
-  sgParams.resourcePath = params->resourcePath;
-  sgParams.shaderPath = params->shaderPath;
-  sgParams.mtlxLibPath = params->mtlxLibPath;
-  sgParams.mdlLibPath = params->mdlLibPath;
+  sg::ShaderGen::InitParams sgParams = {
+    .resourcePath = params->resourcePath,
+    .shaderPath = params->shaderPath,
+    .mdlSearchPaths = params->mdlSearchPaths,
+    .mtlxSearchPaths = params->mtlxSearchPaths
+  };
 
   s_shaderGen = std::make_unique<sg::ShaderGen>();
   if (!s_shaderGen->init(sgParams))

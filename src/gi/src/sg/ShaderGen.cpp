@@ -57,9 +57,9 @@ namespace gi::sg
       return false;
     }
 
-    m_mdlMaterialCompiler = new sg::MdlMaterialCompiler(*m_mdlRuntime, params.mdlLibPath.data());
+    m_mdlMaterialCompiler = new sg::MdlMaterialCompiler(*m_mdlRuntime, params.mdlSearchPaths);
 
-    m_mtlxMdlCodeGen = new sg::MtlxMdlCodeGen(params.mtlxLibPath.data());
+    m_mtlxMdlCodeGen = new sg::MtlxMdlCodeGen(params.mtlxSearchPaths);
 
     if (!sg::GlslangShaderCompiler::init())
     {

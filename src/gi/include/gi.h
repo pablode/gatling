@@ -20,6 +20,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <memory>
+#include <string>
+#include <vector>
 
 enum GiStatus
 {
@@ -117,8 +119,8 @@ struct GiInitParams
 {
   const char* resourcePath;
   const char* shaderPath;
-  const char* mtlxLibPath;
-  const char* mdlLibPath;
+  const std::vector<std::string>& mdlSearchPaths;
+  const std::vector<std::string>& mtlxSearchPaths;
 };
 
 class GiAssetReader

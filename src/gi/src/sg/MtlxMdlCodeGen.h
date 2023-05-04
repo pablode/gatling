@@ -29,14 +29,14 @@ namespace gi::sg
   class MtlxMdlCodeGen
   {
   public:
-    explicit MtlxMdlCodeGen(const char* mtlxLibPath);
+    explicit MtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths);
 
   public:
     bool translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
     bool translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
 
   private:
-    const MaterialX::FileSearchPath m_mtlxLibPath;
+    MaterialX::FileSearchPath m_mtlxSearchPath;
     MaterialX::DocumentPtr m_stdLib;
     MaterialX::ShaderGeneratorPtr m_shaderGen;
   };

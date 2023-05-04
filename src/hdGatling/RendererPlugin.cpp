@@ -26,6 +26,7 @@
 #include <pxr/usd/ar/resolver.h>
 #include <pxr/usd/ar/resolvedPath.h>
 #include <pxr/usd/ar/packageUtils.h>
+#include <pxr/usd/usdMtlx/utils.h>
 
 #include <gi.h>
 
@@ -86,28 +87,46 @@ TF_REGISTRY_FUNCTION(TfType)
   HdRendererPluginRegistry::Define<HdGatlingRendererPlugin>();
 }
 
-HdGatlingRendererPlugin::HdGatlingRendererPlugin()
+bool _TryInitGi(const std::vector<std::string>& mtlxSearchPaths)
 {
   PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
 
   const std::string& resourcePath = plugin->GetResourcePath();
   std::string shaderPath = resourcePath + "/shaders";
-  std::string mdlLibPath = resourcePath + "/mdl";
-  std::string mtlxLibPath = resourcePath + "/materialx";
 
-  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxLibPath);
+  // USD installs the 'source/MaterialXGenMdl/mdl' folder to the MaterialX 'libraries' dir
+  std::vector<std::string> mdlSearchPaths = UsdMtlxStandardLibraryPaths();
+  // In addition, we also install Omni* MDL files to support TurboSquid files
+  mdlSearchPaths.push_back(resourcePath);
 
-  GiInitParams params;
-  params.resourcePath = resourcePath.c_str();
-  params.shaderPath = shaderPath.c_str();
-  params.mtlxLibPath = mtlxLibPath.c_str();
-  params.mdlLibPath = mdlLibPath.c_str();
+  // The 'mdl' folder is not part of the MDL package paths
+  for (std::string& s : mdlSearchPaths)
+  {
+    s += "/mdl";
+  }
 
-  m_isSupported = (giInitialize(&params) == GI_OK);
+  GiInitParams params = {
+    .resourcePath = resourcePath.c_str(),
+    .shaderPath = shaderPath.c_str(),
+    .mdlSearchPaths = mdlSearchPaths,
+    .mtlxSearchPaths = mtlxSearchPaths
+  };
+
+  return giInitialize(&params) == GI_OK;
+}
+
+HdGatlingRendererPlugin::HdGatlingRendererPlugin()
+{
+  const std::vector<std::string>& mtlxSearchPaths = UsdMtlxSearchPaths();
+
+  m_isSupported = _TryInitGi(mtlxSearchPaths);
+
   if (!m_isSupported)
   {
     return;
   }
+
+  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxSearchPaths);
 
   m_usdzAssetReader = std::make_unique<UsdzAssetReader>();
   giRegisterAssetReader(m_usdzAssetReader.get());

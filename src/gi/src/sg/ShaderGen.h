@@ -49,8 +49,8 @@ namespace gi::sg
     {
       std::string_view resourcePath;
       std::string_view shaderPath;
-      std::string_view mtlxLibPath;
-      std::string_view mdlLibPath;
+      const std::vector<std::string>& mdlSearchPaths;
+      const std::vector<std::string>& mtlxSearchPaths;
     };
 
   public:

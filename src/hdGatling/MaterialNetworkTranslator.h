@@ -30,10 +30,9 @@ struct HdMaterialNetwork2;
 class MaterialNetworkTranslator
 {
 public:
-  MaterialNetworkTranslator(const std::string& mtlxLibPath);
+  MaterialNetworkTranslator(const std::vector<std::string>& mtlxSearchPaths);
 
-  GiMaterial* ParseNetwork(const SdfPath& id,
-                           const HdMaterialNetwork2& network) const;
+  GiMaterial* ParseNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
 
 private:
   GiMaterial* TryParseMdlNetwork(const HdMaterialNetwork2& network) const;

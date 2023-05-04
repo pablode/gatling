@@ -36,8 +36,8 @@ namespace gi::sg
     return std::string(MODULE_PREFIX) + std::to_string(uniqueId) + "_" + std::string(identifier);
   }
 
-  MdlMaterialCompiler::MdlMaterialCompiler(MdlRuntime& runtime, const std::string& mdlLibPath)
-    : m_mdlLibPath(mdlLibPath)
+  MdlMaterialCompiler::MdlMaterialCompiler(MdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths)
+    : m_mdlSearchPaths(mdlSearchPaths)
   {
     m_logger = mi::base::Handle<MdlLogger>(runtime.getLogger());
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
@@ -53,12 +53,7 @@ namespace gi::sg
   {
     std::string moduleName = _makeModuleName(identifier);
 
-    // FIXME: is this thread-safe?
-    if (m_config->add_mdl_path(m_mdlLibPath.c_str()))
-    {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "MaterialX MDL library files not found");
-      return false;
-    }
+    addStandardSearchPaths();
 
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
@@ -83,14 +78,12 @@ namespace gi::sg
     {
       m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "Unable to add asset MDL files");
     }
+
     // The free TurboSquid USD+MDL models, and possibly thousand paid ones too, come with some of the required Omni* files,
     // but some others are referenced and missing. If we include the directory of the asset as an MDL path after our own Omni*
     // MDL files, the Omni* files that come with the asset will be loaded instead of ours. They link to the other files that do
     // not exist, causing compilation to fail. By changing the load order, our complete Omni*-file suite will be used instead.
-    if (m_config->add_mdl_path(m_mdlLibPath.c_str()))
-    {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "MDL library files not found; code generation may fail");
-    }
+    addStandardSearchPaths();
 
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
@@ -102,6 +95,19 @@ namespace gi::sg
     m_config->clear_mdl_paths();
 
     return result;
+  }
+
+  void MdlMaterialCompiler::addStandardSearchPaths()
+  {
+    for (const std::string s : m_mdlSearchPaths)
+    {
+      // TODO: is this thread-safe?
+      if (m_config->add_mdl_path(s.c_str()))
+      {
+        auto errorMsg = std::string("MDL search path could not be added: ") + s;
+        m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, errorMsg.c_str());
+      }
+    }
   }
 
   bool MdlMaterialCompiler::compile(std::string_view identifier,

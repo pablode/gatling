@@ -37,17 +37,21 @@ namespace mx = MaterialX;
 
 namespace gi::sg
 {
-  MtlxMdlCodeGen::MtlxMdlCodeGen(const char* mtlxLibPath)
-    : m_mtlxLibPath(mtlxLibPath)
+  MtlxMdlCodeGen::MtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths)
   {
     // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
     std::string target = m_shaderGen->getTarget();
 
     // MaterialX libs.
+    for (const std::string& s : mtlxSearchPaths)
+    {
+      m_mtlxSearchPath.append(mx::FilePath(s));
+    }
+
     m_stdLib = mx::createDocument();
     mx::FilePathVec libFolders;
-    mx::loadLibraries(libFolders, m_mtlxLibPath, m_stdLib);
+    mx::loadLibraries(libFolders, m_mtlxSearchPath, m_stdLib);
 
     // Color management.
     mx::DefaultColorManagementSystemPtr colorSystem = mx::DefaultColorManagementSystem::create(target);
@@ -122,7 +126,7 @@ namespace gi::sg
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
-    context.registerSourceCodeSearchPath(m_mtlxLibPath);
+    context.registerSourceCodeSearchPath(m_mtlxSearchPath);
 
     mx::GenOptions& contextOptions = context.getOptions();
     contextOptions.targetDistanceUnit = "meter";
