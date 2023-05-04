@@ -4,8 +4,8 @@ add_library(
   src/gi.cpp
   src/assetReader.h
   src/assetReader.cpp
-  src/dataStoreGpu.h
-  src/dataStoreGpu.cpp
+  src/linearDataStoreGpu.h
+  src/linearDataStoreGpu.cpp
   src/mmap.h
   src/mmap.cpp
   src/stager.h

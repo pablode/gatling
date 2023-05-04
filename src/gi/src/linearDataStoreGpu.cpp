@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "dataStoreGpu.h"
+#include "linearDataStoreGpu.h"
 
 namespace
 {
@@ -35,14 +35,14 @@ namespace
 
 namespace gtl
 {
-  GiDataStoreGpu::GiDataStoreGpu(CgpuDevice device, uint64_t objectSize, uint32_t initialCapacity)
+  GiLinearDataStoreGpu::GiLinearDataStoreGpu(CgpuDevice device, uint64_t objectSize, uint32_t initialCapacity)
     : m_device(device)
     , m_objectSize(objectSize)
   {
     resizeBuffer(objectSize * initialCapacity);
   }
 
-  GiDataStoreGpu::~GiDataStoreGpu()
+  GiLinearDataStoreGpu::~GiLinearDataStoreGpu()
   {
     if (m_mappedMem)
       cgpuUnmapBuffer(m_device, m_buffer);
@@ -52,17 +52,17 @@ namespace gtl
       cgpuDestroyBuffer(m_device, m_buffer);
   }
 
-  uint64_t GiDataStoreGpu::allocate()
+  uint64_t GiLinearDataStoreGpu::allocate()
   {
     return m_handleStore.allocateHandle();
   }
 
-  void GiDataStoreGpu::free(uint64_t handle)
+  void GiLinearDataStoreGpu::free(uint64_t handle)
   {
     m_handleStore.freeHandle(handle);
   }
 
-  bool GiDataStoreGpu::get(uint64_t handle, void** object)
+  bool GiLinearDataStoreGpu::get(uint64_t handle, void** object)
   {
     if (!m_handleStore.isHandleValid(handle))
     {
@@ -88,17 +88,17 @@ namespace gtl
     return true;
   }
 
-  CgpuBuffer GiDataStoreGpu::buffer() const
+  CgpuBuffer GiLinearDataStoreGpu::buffer() const
   {
     return m_buffer;
   }
 
-  uint64_t GiDataStoreGpu::bufferSize() const
+  uint64_t GiLinearDataStoreGpu::bufferSize() const
   {
     return m_bufferSize;
   }
 
-  bool GiDataStoreGpu::resizeBuffer(uint64_t newSize)
+  bool GiLinearDataStoreGpu::resizeBuffer(uint64_t newSize)
   {
     // Unmap buffer before resize. New buffer is mapped later.
     if (m_mappedMem)

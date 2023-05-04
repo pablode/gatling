@@ -27,12 +27,12 @@
 
 namespace gtl
 {
-  class GiDataStoreGpu
+  class GiLinearDataStoreGpu
   {
   public:
-    GiDataStoreGpu(CgpuDevice device, uint64_t objectSize, uint32_t initialCapacity);
+    GiLinearDataStoreGpu(CgpuDevice device, uint64_t objectSize, uint32_t initialCapacity);
 
-    ~GiDataStoreGpu();
+    ~GiLinearDataStoreGpu();
 
   public:
     uint64_t allocate();
