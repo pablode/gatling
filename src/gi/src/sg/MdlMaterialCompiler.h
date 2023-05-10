@@ -19,6 +19,7 @@
 
 #include <string_view>
 #include <functional>
+#include <vector>
 
 #include <mi/base/handle.h>
 #include <mi/neuraylib/icompiled_material.h>
