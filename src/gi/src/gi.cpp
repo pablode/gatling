@@ -943,7 +943,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   gml_vec3_normalize(params->camera->forward, cam_forward);
   gml_vec3_normalize(params->camera->up, cam_up);
 
-  float push_data[] = {
+  float pushData[] = {
     params->camera->position[0], params->camera->position[1], params->camera->position[2], // float3
     *((float*)&params->imageWidth),                                                        // uint
     cam_forward[0], cam_forward[1], cam_forward[2],                                        // float3
@@ -958,7 +958,6 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     params->rrInvMinTermProb,                                                              // float
     *((float*)&s_sampleOffset)                                                             // uint
   };
-  uint32_t push_size = sizeof(push_data);
 
   std::vector<CgpuBufferBinding> buffers;
   buffers.reserve(16);
@@ -972,10 +971,10 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   //}
   buffers.push_back({ 3, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
-  size_t image_count = shader_cache->images2d.size() + shader_cache->images3d.size();
+  size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size();
 
   std::vector<CgpuImageBinding> images;
-  images.reserve(image_count);
+  images.reserve(imageCount);
 
   CgpuSamplerBinding sampler = { 4, 0, s_texSampler };
 
@@ -996,7 +995,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   bindings.buffers = buffers.data();
   bindings.imageCount = (uint32_t) images.size();
   bindings.images = images.data();
-  bindings.samplerCount = image_count ? 1 : 0;
+  bindings.samplerCount = imageCount ? 1 : 0;
   bindings.samplers = &sampler;
   bindings.tlasCount = 1;
   bindings.tlases = &as;
@@ -1018,7 +1017,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
 
   // Trace rays.
-  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, push_size, &push_data))
+  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, sizeof(pushData), &pushData))
     goto cleanup;
 
   if (!cgpuCmdTraceRays(command_buffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
@@ -1135,5 +1134,5 @@ void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
 
 void giSetSphereLightTransform(GiSphereLight* light, float* transform3x4)
 {
-  memcpy(&light->transform, transform3x4, sizeof(light->transform));
+  memcpy(&light->transform, transform3x4, 3 * 4 * sizeof(float));
 }
