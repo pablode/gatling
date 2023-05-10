@@ -17,6 +17,7 @@
 
 #include "RenderPass.h"
 #include "RenderBuffer.h"
+#include "RenderParam.h"
 #include "Camera.h"
 #include "Mesh.h"
 #include "Instancer.h"
@@ -56,8 +57,10 @@ std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* nam
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
                                          const HdRprimCollection& collection,
                                          const HdRenderSettingsMap& settings,
-                                         const MaterialNetworkTranslator& materialNetworkTranslator)
+                                         const MaterialNetworkTranslator& materialNetworkTranslator,
+                                         GiScene* scene)
   : HdRenderPass(index, collection)
+  , m_scene(scene)
   , m_settings(settings)
   , m_materialNetworkTranslator(materialNetworkTranslator)
   , m_isConverged(false)
@@ -431,6 +434,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdRenderIndex* renderIndex = GetRenderIndex();
   HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
+  HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
 
   GfVec4f backgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
   if (aovBinding->clearValue.IsHolding<GfVec4f>())
@@ -498,8 +502,10 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
     GiShaderCacheParams shaderParams;
     shaderParams.aovId = aovId;
+    shaderParams.domeLight = renderParam->ActiveDomeLight();
     shaderParams.materialCount = materials.size();
     shaderParams.materials = materials.data();
+    shaderParams.scene = m_scene;
 
     m_shaderCache = giCreateShaderCache(&shaderParams);
     TF_VERIFY(m_shaderCache, "Unable to create shader cache");
@@ -535,6 +541,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   VtValue max_sample_value = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
   renderParams.rrInvMinTermProb = float(rr_inv_min_term_prob.Cast<double>().Get<double>());
   renderParams.maxSampleValue = float(max_sample_value.Cast<double>().Get<double>());
+  renderParams.scene = m_scene;
   for (uint32_t i = 0; i < 4; i++)
   {
     renderParams.bgColor[i] = backgroundColor[i];

@@ -94,7 +94,7 @@ void HdGatlingRenderDelegate::SetRenderSetting(TfToken const& key, VtValue const
 HdRenderPassSharedPtr HdGatlingRenderDelegate::CreateRenderPass(HdRenderIndex* index,
                                                                 const HdRprimCollection& collection)
 {
-  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, m_translator));
+  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, m_translator, m_giScene));
 }
 
 HdResourceRegistrySharedPtr HdGatlingRenderDelegate::GetResourceRegistry() const
@@ -165,7 +165,8 @@ const TfTokenVector SUPPORTED_SPRIM_TYPES =
   HdPrimTypeTokens->camera,
   HdPrimTypeTokens->material,
   HdPrimTypeTokens->sphereLight,
-  HdPrimTypeTokens->simpleLight
+  HdPrimTypeTokens->domeLight,
+  HdPrimTypeTokens->simpleLight // Required for usdview domeLight creation
 };
 
 const TfTokenVector& HdGatlingRenderDelegate::GetSupportedSprimTypes() const
@@ -186,6 +187,10 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   else if (typeId == HdPrimTypeTokens->sphereLight)
   {
     return new HdGatlingSphereLight(m_giScene, sprimId);
+  }
+  else if (typeId == HdPrimTypeTokens->domeLight)
+  {
+    return new HdGatlingDomeLight(m_giScene, sprimId);
   }
   else if (typeId == HdPrimTypeTokens->simpleLight)
   {

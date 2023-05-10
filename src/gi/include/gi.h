@@ -49,6 +49,7 @@ struct GiMeshInstance;
 struct GiShaderCache;
 struct GiScene;
 struct GiSphereLight;
+struct GiDomeLight;
 
 struct GiCameraDesc
 {
@@ -89,8 +90,10 @@ struct GiMeshInstance
 struct GiShaderCacheParams
 {
   GiAovId            aovId;
+  GiDomeLight*       domeLight;
   uint32_t           materialCount;
   const GiMaterial** materials;
+  GiScene*           scene;
 };
 
 struct GiGeomCacheParams
@@ -113,6 +116,7 @@ struct GiRenderParams
   float                rrInvMinTermProb;
   float                maxSampleValue;
   float                bgColor[4];
+  GiScene*             scene;
 };
 
 struct GiInitParams
@@ -161,3 +165,7 @@ void giDestroyScene(GiScene* scene);
 GiSphereLight* giCreateSphereLight(GiScene* scene);
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light);
 void giSetSphereLightTransform(GiSphereLight* light, float* transform3x4);
+
+GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
+void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);
+void giSetDomeLightTransform(GiDomeLight* light, float* transform3x3);

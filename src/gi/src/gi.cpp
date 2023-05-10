@@ -94,6 +94,14 @@ struct GiScene
 {
   std::unordered_set<GiSphereLight*> lights;
   std::mutex mutex;
+  CgpuImage domeLightTexture = { CGPU_INVALID_HANDLE };
+  float domeLightTransform[9];
+};
+
+struct GiDomeLight
+{
+  std::string textureFilePath;
+  float transform[3 * 3] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 };
 
 CgpuDevice s_device = { CGPU_INVALID_HANDLE };
@@ -542,6 +550,35 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   uint32_t texCount2d = 0;
   uint32_t texCount3d = 0;
 
+  // Upload / delete dome light.
+  bool domeLightEnabled = false;
+  {
+    GiScene* scene = params->scene;
+    if (scene->domeLightTexture.handle != CGPU_INVALID_HANDLE)
+    {
+      cgpuDestroyImage(s_device, scene->domeLightTexture);
+      scene->domeLightTexture.handle = CGPU_INVALID_HANDLE;
+    }
+
+    GiDomeLight* domeLight = params->domeLight;
+    if (domeLight)
+    {
+      const char* filePath = domeLight->textureFilePath.c_str();
+
+      bool is3dImage = false;
+      if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, false, false))
+      {
+        fprintf(stderr, "unable to load dome light texture at %s\n", filePath);
+      }
+      else
+      {
+        memcpy(scene->domeLightTransform, domeLight->transform, 3 * 3 * sizeof(float));
+      }
+    }
+
+    domeLightEnabled = scene->domeLightTexture.handle != CGPU_INVALID_HANDLE;
+  }
+
   // Create per-material closest-hit shaders.
   //
   // This is done in multiple phases: first, GLSL is generated from MDL, and
@@ -615,6 +652,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     }
 
     // 2. Sum up texture resources & calculate per-material index offsets.
+    texCount2d += int(domeLightEnabled);
+
     for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
     {
       HitShaderCompInfo& closestHitShaderCompInfo = groupInfo.closestHitInfo;
@@ -787,6 +826,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   // Create miss shaders.
   {
     sg::ShaderGen::MissShaderParams missParams;
+    missParams.domeLightEnabled = domeLightEnabled;
     missParams.texCount2d = texCount2d;
     missParams.texCount3d = texCount3d;
 
@@ -830,7 +870,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   {
     goto cleanup;
   }
-  assert(images_2d.size() == texCount2d);
+  assert(images_2d.size() == (texCount2d - int(domeLightEnabled)));
   assert(images_3d.size() == texCount3d);
 
   // Create RT pipeline.
@@ -914,6 +954,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 {
   const GiGeomCache* geom_cache = params->geomCache;
   const GiShaderCache* shader_cache = params->shaderCache;
+  GiScene* scene = params->scene;
 
   // Init state for goto error handling.
   int result = GI_ERROR;
@@ -943,20 +984,40 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   gml_vec3_normalize(params->camera->forward, cam_forward);
   gml_vec3_normalize(params->camera->up, cam_up);
 
-  float pushData[] = {
-    params->camera->position[0], params->camera->position[1], params->camera->position[2], // float3
-    *((float*)&params->imageWidth),                                                        // uint
-    cam_forward[0], cam_forward[1], cam_forward[2],                                        // float3
-    *((float*)&params->imageHeight),                                                       // uint
-    cam_up[0], cam_up[1], cam_up[2],                                                       // float3
-    params->camera->vfov,                                                                  // float
-    params->bgColor[0], params->bgColor[1], params->bgColor[2], params->bgColor[3],        // float4
-    *((float*)&params->spp),                                                               // uint
-    *((float*)&params->maxBounces),                                                        // uint
-    params->maxSampleValue,                                                                // float
-    *((float*)&params->rrBounceOffset),                                                    // uint
-    params->rrInvMinTermProb,                                                              // float
-    *((float*)&s_sampleOffset)                                                             // uint
+  struct PushData {
+    float camPos[3];
+    uint32_t imageWidth;
+    float cameraForward[3];
+    uint32_t imageHeight;
+    float cameraUp[3];
+    float cameraVFoV;
+    float backgroundColor[4];
+    uint32_t sampleCount;
+    uint32_t maxBounces;
+    float maxSampleValue;
+    uint32_t maxBounceOffset;
+    float domeLightTransformCol0[3];
+    float rrInvMinTermProb;
+    float domeLightTransformCol1[3];
+    uint32_t sampleOffset;
+    float domeLightTransformCol2[3];
+  } pushData = {
+    { params->camera->position[0], params->camera->position[1], params->camera->position[2] },
+    params->imageWidth,
+    { cam_forward[0], cam_forward[1], cam_forward[2] },
+    params->imageHeight,
+    { cam_up[0], cam_up[1], cam_up[2] },
+    params->camera->vfov,
+    { params->bgColor[0], params->bgColor[1], params->bgColor[2], params->bgColor[3] },
+    params->spp,
+    params->maxBounces,
+    params->maxSampleValue,
+    params->rrBounceOffset,
+    { scene->domeLightTransform[0], scene->domeLightTransform[1], scene->domeLightTransform[2] },
+    params->rrInvMinTermProb,
+    { scene->domeLightTransform[3], scene->domeLightTransform[4], scene->domeLightTransform[5] },
+    s_sampleOffset,
+    { scene->domeLightTransform[6], scene->domeLightTransform[7], scene->domeLightTransform[8] }
   };
 
   std::vector<CgpuBufferBinding> buffers;
@@ -971,18 +1032,22 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   //}
   buffers.push_back({ 3, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
-  size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size();
+  bool domeLightEnabled = (scene->domeLightTexture.handle != CGPU_INVALID_HANDLE);
+  size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + int(domeLightEnabled);
 
   std::vector<CgpuImageBinding> images;
   images.reserve(imageCount);
 
   CgpuSamplerBinding sampler = { 4, 0, s_texSampler };
 
+  if (domeLightEnabled)
+  {
+    images.push_back({ 5, 0, scene->domeLightTexture });
+  }
   for (uint32_t i = 0; i < shader_cache->images2d.size(); i++)
   {
-    images.push_back({ 5, i, shader_cache->images2d[i] });
+    images.push_back({ 5, int(domeLightEnabled) + i, shader_cache->images2d[i] });
   }
-
   for (uint32_t i = 0; i < shader_cache->images3d.size(); i++)
   {
     images.push_back({ 6, i, shader_cache->images3d[i] });
@@ -1017,7 +1082,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
 
   // Trace rays.
-  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, sizeof(pushData), &pushData))
+  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, sizeof(PushData), &pushData))
     goto cleanup;
 
   if (!cgpuCmdTraceRays(command_buffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
@@ -1103,6 +1168,11 @@ GiScene* giCreateScene()
 
 void giDestroyScene(GiScene* scene)
 {
+  if (scene->domeLightTexture.handle != CGPU_INVALID_HANDLE)
+  {
+    cgpuDestroyImage(s_device, scene->domeLightTexture);
+    scene->domeLightTexture.handle = CGPU_INVALID_HANDLE;
+  }
   delete scene;
 }
 
@@ -1135,4 +1205,21 @@ void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
 void giSetSphereLightTransform(GiSphereLight* light, float* transform3x4)
 {
   memcpy(&light->transform, transform3x4, 3 * 4 * sizeof(float));
+}
+
+GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)
+{
+  GiDomeLight* light = new GiDomeLight;
+  light->textureFilePath = filePath;
+  return light;
+}
+
+void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
+{
+  delete light;
+}
+
+void giSetDomeLightTransform(GiDomeLight* light, float* transform3x3)
+{
+  memcpy(&light->transform, transform3x3, 3 * 3 * sizeof(float));
 }

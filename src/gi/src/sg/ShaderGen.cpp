@@ -249,6 +249,11 @@ namespace gi::sg
 
     _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
+    if (params.domeLightEnabled)
+    {
+      stitcher.appendDefine("DOMELIGHT_ENABLED");
+    }
+
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))
     {

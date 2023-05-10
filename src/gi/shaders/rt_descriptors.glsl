@@ -36,6 +36,9 @@ layout(push_constant) uniform PCBuffer {
     uint  MAX_BOUNCES;
     float MAX_SAMPLE_VALUE;
     uint  RR_BOUNCE_OFFSET;
+    vec3  DOMELIGHT_TRANSFORM_COL0;
     float RR_INV_MIN_TERM_PROB;
+    vec3  DOMELIGHT_TRANSFORM_COL1;
     uint  SAMPLE_OFFSET;
+    vec3  DOMELIGHT_TRANSFORM_COL2;
 } PC;

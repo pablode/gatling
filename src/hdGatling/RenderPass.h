@@ -35,7 +35,8 @@ public:
   HdGatlingRenderPass(HdRenderIndex* index,
                       const HdRprimCollection& collection,
                       const HdRenderSettingsMap& settings,
-                      const MaterialNetworkTranslator& materialNetworkTranslator);
+                      const MaterialNetworkTranslator& materialNetworkTranslator,
+                      GiScene* scene);
 
   ~HdGatlingRenderPass() override;
 
@@ -64,6 +65,7 @@ private:
   void _ClearMaterials();
 
 private:
+  GiScene* m_scene;
   const HdRenderSettingsMap& m_settings;
   const MaterialNetworkTranslator& m_materialNetworkTranslator;
   GiMaterial* m_defaultMaterial;
