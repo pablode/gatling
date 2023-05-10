@@ -34,11 +34,6 @@ HdGatlingSphereLight::HdGatlingSphereLight(GiScene* scene, const SdfPath& id)
   m_giSphereLight = giCreateSphereLight(scene);
 }
 
-HdGatlingSphereLight::~HdGatlingSphereLight()
-{
-  giDestroySphereLight(m_giScene, m_giSphereLight);
-}
-
 void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
                            HdRenderParam* renderParam,
                            HdDirtyBits* dirtyBits)
@@ -57,7 +52,12 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
     giSetSphereLightTransform(m_giSphereLight, (float*) transform3x4);
   }
 
-  // TODO: intensity, radius (with treatAsPoint)
+  // FIXME: intensity, radius (with treatAsPoint)
+}
+
+void HdGatlingSphereLight::Finalize(HdRenderParam* renderParam)
+{
+  giDestroySphereLight(m_giScene, m_giSphereLight);
 }
 
 HdDirtyBits HdGatlingSphereLight::GetInitialDirtyBitsMask() const

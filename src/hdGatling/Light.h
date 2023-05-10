@@ -24,17 +24,16 @@ struct GiSphereLight;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+
 class HdGatlingSphereLight final : public HdLight
 {
 public:
   HdGatlingSphereLight(GiScene* scene, const SdfPath& id);
 
-  ~HdGatlingSphereLight();
-
 public:
-  void Sync(HdSceneDelegate* sceneDelegate,
-            HdRenderParam* renderParam,
-            HdDirtyBits* dirtyBits) override;
+  void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
+
+  void Finalize(HdRenderParam* renderParam) override;
 
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
