@@ -73,8 +73,15 @@ namespace gi
     m_imageCache.clear();
   }
 
-  bool TexSys::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flush)
+  bool TexSys::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flush, bool cache)
   {
+    auto cacheResult = m_imageCache.find(filePath);
+    if (cacheResult != m_imageCache.end())
+    {
+      image = cacheResult->second;
+      return true;
+    }
+
     imgio_img image_data;
     if (!detail::readImage(filePath, m_assetReader, &image_data))
     {
@@ -102,7 +109,10 @@ namespace gi
       return false;
     }
 
-    m_imageCache[filePath] = image;
+    if (cache)
+    {
+      m_imageCache[filePath] = image;
+    }
 
     if (flush)
     {
@@ -170,14 +180,6 @@ namespace gi
         if (!result) return false;
 
         imageVector.push_back(image);
-        continue;
-      }
-
-      auto cacheResult = m_imageCache.find(filePath);
-      if (cacheResult != m_imageCache.end())
-      {
-        printf("image %d found in cache\n", i);
-        imageVector.push_back(cacheResult->second);
         continue;
       }
 

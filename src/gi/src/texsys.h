@@ -50,7 +50,8 @@ namespace gi
     bool loadTextureFromFilePath(const char* filePath,
                                  CgpuImage& image,
                                  bool is3dImage = false,
-                                 bool flush = true);
+                                 bool flush = true,
+                                 bool cache = true);
 
     bool loadTextureResources(const std::vector<sg::TextureResource>& textureResources,
                               std::vector<CgpuImage>& images2d,
