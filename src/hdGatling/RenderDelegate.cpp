@@ -16,6 +16,7 @@
 //
 
 #include "RenderDelegate.h"
+#include "RenderParam.h"
 #include "RenderPass.h"
 #include "Camera.h"
 #include "Mesh.h"
@@ -36,6 +37,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
                                                  const MaterialNetworkTranslator& translator)
   : m_translator(translator)
   , m_resourceRegistry(std::make_shared<HdResourceRegistry>())
+  , m_renderParam(std::make_unique<HdGatlingRenderParam>())
 {
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Samples per pixel", HdGatlingSettingsTokens->spp, VtValue{1} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max bounces", HdGatlingSettingsTokens->max_bounces, VtValue{7} });
@@ -126,6 +128,11 @@ HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& 
   aovDescriptor.multiSampled = false;
   aovDescriptor.clearValue = GfVec4f(0.0f, 0.0f, 0.0f, 0.0f);
   return aovDescriptor;
+}
+
+HdRenderParam* HdGatlingRenderDelegate::GetRenderParam() const
+{
+  return m_renderParam.get();
 }
 
 const TfTokenVector SUPPORTED_RPRIM_TYPES =

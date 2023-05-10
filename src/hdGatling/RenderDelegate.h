@@ -53,6 +53,8 @@ public:
 
   HdAovDescriptor GetDefaultAovDescriptor(const TfToken& name) const override;
 
+  HdRenderParam* GetRenderParam() const override;
+
 public:
   // Rprim
   const TfTokenVector& GetSupportedRprimTypes() const override;
@@ -95,6 +97,7 @@ private:
   HdResourceRegistrySharedPtr m_resourceRegistry;
   HdRenderSettingDescriptorList m_settingDescriptors;
   HdRenderSettingDescriptorList m_debugSettingDescriptors;
+  std::unique_ptr<HdRenderParam> m_renderParam;
   GiScene* m_giScene = nullptr;
 };
 

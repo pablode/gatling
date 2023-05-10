@@ -20,6 +20,8 @@ add_library(
   Mesh.h
   RenderBuffer.cpp
   RenderBuffer.h
+  RenderParam.cpp
+  RenderParam.h
   RenderDelegate.cpp
   RenderDelegate.h
   RendererPlugin.cpp
