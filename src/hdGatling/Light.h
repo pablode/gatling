@@ -43,4 +43,22 @@ private:
   GiSphereLight* m_giSphereLight;
 };
 
+
+class HdGatlingSimpleLight final : public HdLight
+{
+public:
+  HdGatlingSimpleLight(GiScene* scene, const SdfPath& id);
+
+public:
+  void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
+
+  HdDirtyBits GetInitialDirtyBitsMask() const override;
+
+private:
+  GiScene* m_giScene;
+  GiSphereLight* m_giSphereLight = nullptr;
+  GiDomeLight* m_giDomeLight = nullptr;
+};
+
+
 PXR_NAMESPACE_CLOSE_SCOPE

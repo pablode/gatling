@@ -66,6 +66,7 @@ endif()
 target_link_libraries(
   hdGatling
   PRIVATE
+    glf
     usdImaging
     usdMtlx
     hdMtlx

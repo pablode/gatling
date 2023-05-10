@@ -17,13 +17,16 @@
 
 #include "Light.h"
 
-#include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/base/gf/matrix4f.h>
+#include <pxr/imaging/glf/simpleLight.h>
 
 #include <gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+//
+// Sphere Light
+//
 HdGatlingSphereLight::HdGatlingSphereLight(GiScene* scene, const SdfPath& id)
   : HdLight(id)
   , m_giScene(scene)
@@ -60,6 +63,38 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 HdDirtyBits HdGatlingSphereLight::GetInitialDirtyBitsMask() const
 {
   return DirtyBits::DirtyParams | DirtyBits::DirtyTransform;
+}
+
+//
+// Simple Light
+//
+HdGatlingSimpleLight::HdGatlingSimpleLight(GiScene* scene, const SdfPath& id)
+  : HdLight(id)
+  , m_giScene(scene)
+{
+}
+
+void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
+                                HdRenderParam* renderParam,
+                                HdDirtyBits* dirtyBits)
+{
+  const SdfPath& id = GetId();
+
+  VtValue boxedGlfLight = sceneDelegate->Get(id, HdLightTokens->params);
+  if (!boxedGlfLight.IsHolding<GlfSimpleLight>())
+  {
+    TF_CODING_ERROR("SimpleLight has no data payload!");
+    return;
+  }
+
+  const auto& glfLight = boxedGlfLight.UncheckedGet<GlfSimpleLight>();
+
+  // FIXME: implement instantiation & sync logic
+}
+
+HdDirtyBits HdGatlingSimpleLight::GetInitialDirtyBitsMask() const
+{
+  return DirtyBits::AllDirty;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
