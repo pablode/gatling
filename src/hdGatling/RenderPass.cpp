@@ -201,7 +201,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
   {
     const HdRprim* rprim = renderIndex->GetRprim(rprimId);
 
-    const HdGatlingMesh* mesh = dynamic_cast<const HdGatlingMesh*>(rprim);
+    const HdGatlingMesh* mesh = static_cast<const HdGatlingMesh*>(rprim);
     if (!mesh)
     {
       continue;
@@ -223,7 +223,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     else
     {
       HdInstancer* boxedInstancer = renderIndex->GetInstancer(instancerId);
-      HdGatlingInstancer* instancer = dynamic_cast<HdGatlingInstancer*>(boxedInstancer);
+      HdGatlingInstancer* instancer = static_cast<HdGatlingInstancer*>(boxedInstancer);
 
       const SdfPath& meshId = mesh->GetId();
       transforms = instancer->ComputeInstanceTransforms(meshId);
@@ -240,7 +240,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
     else
     {
       HdSprim* sprim = renderIndex->GetSprim(HdPrimTypeTokens->material, materialId);
-      HdGatlingMaterial* material = dynamic_cast<HdGatlingMaterial*>(sprim);
+      HdGatlingMaterial* material = static_cast<HdGatlingMaterial*>(sprim);
 
       GiMaterial* giMat = nullptr;
       if (material)
@@ -369,7 +369,7 @@ const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVect
       return &aovBinding;
     }
 
-    HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
+    HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
     renderBuffer->SetConverged(true);
     continue;
   }
@@ -402,7 +402,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   m_isConverged = false;
 
-  const auto* camera = dynamic_cast<const HdGatlingCamera*>(renderPassState->GetCamera());
+  const auto* camera = static_cast<const HdGatlingCamera*>(renderPassState->GetCamera());
   if (!camera)
   {
     return;
@@ -421,7 +421,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
-  HdGatlingRenderBuffer* renderBuffer = dynamic_cast<HdGatlingRenderBuffer*>(aovBinding->renderBuffer);
+  HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding->renderBuffer);
   if (renderBuffer->GetFormat() != HdFormatFloat32Vec4)
   {
     TF_RUNTIME_ERROR("Unsupported render buffer format");

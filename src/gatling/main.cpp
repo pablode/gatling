@@ -73,7 +73,7 @@ HdCamera* FindCamera(UsdStageRefPtr& stage, HdRenderIndex* renderIndex, std::str
     }
   }
 
-  HdCamera* camera = (HdCamera*) dynamic_cast<HdCamera*>(renderIndex->GetSprim(HdTokens->camera, cameraPath));
+  HdCamera* camera = static_cast<HdCamera*>(renderIndex->GetSprim(HdTokens->camera, cameraPath));
 
   return camera;
 }

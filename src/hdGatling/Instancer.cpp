@@ -192,7 +192,7 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
 
   const HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
   HdInstancer* boxedParentInstancer = renderIndex.GetInstancer(parentId);
-  HdGatlingInstancer* parentInstancer = dynamic_cast<HdGatlingInstancer*>(boxedParentInstancer);
+  HdGatlingInstancer* parentInstancer = static_cast<HdGatlingInstancer*>(boxedParentInstancer);
 
   VtMatrix4dArray parentTransforms = parentInstancer->ComputeInstanceTransforms(id);
 
