@@ -76,7 +76,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 ### Outlook
 
-Next up: improved opacity handling, backface DFs, AS compaction, NEE/MIS.
+Next up: double-sided surfaces, analytic lights.
 
 ### License
 
