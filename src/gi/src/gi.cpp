@@ -70,6 +70,8 @@ struct GiShaderCache
   std::vector<const GiMaterial*> materials;
   std::vector<CgpuShader>        missShaders;
   CgpuPipeline                   pipeline = { CGPU_INVALID_HANDLE };
+  bool                           hasPipelineClosestHitShader = false;
+  bool                           hasPipelineAnyHitShader = false;
   CgpuShader                     rgenShader = { CGPU_INVALID_HANDLE };
 };
 
@@ -549,6 +551,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   std::vector<sg::TextureResource> textureResources;
   uint32_t texCount2d = 0;
   uint32_t texCount3d = 0;
+  bool hasPipelineClosestHitShader = false;
+  bool hasPipelineAnyHitShader = false;
 
   // Upload / delete dome light.
   bool domeLightEnabled = false;
@@ -677,8 +681,12 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
           (tr.is3dImage ? texCount3d : texCount2d)++;
           textureResources.push_back(tr);
         }
+
+        hasPipelineAnyHitShader |= true;
       }
     }
+
+    hasPipelineClosestHitShader = hitGroupCompInfos.size() > 0;
 
     // 3. Generate final hit shader GLSL sources.
     threadWorkFailed = false;
@@ -901,6 +909,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   cache->missShaders = missShaders;
   cache->pipeline = pipeline;
   cache->rgenShader = rgenShader;
+  cache->hasPipelineClosestHitShader = hasPipelineClosestHitShader;
+  cache->hasPipelineAnyHitShader = hasPipelineAnyHitShader;
 
 cleanup:
   if (!cache)
@@ -1082,8 +1092,14 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
 
   // Trace rays.
-  if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS | CGPU_SHADER_STAGE_CLOSEST_HIT | CGPU_SHADER_STAGE_ANY_HIT, sizeof(PushData), &pushData))
-    goto cleanup;
+  {
+    CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS;
+    pushShaderStages |= shader_cache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_CLOSEST_HIT : 0;
+    pushShaderStages |= shader_cache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_ANY_HIT : 0;
+
+    if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, pushShaderStages, sizeof(PushData), &pushData))
+      goto cleanup;
+  }
 
   if (!cgpuCmdTraceRays(command_buffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
     goto cleanup;
