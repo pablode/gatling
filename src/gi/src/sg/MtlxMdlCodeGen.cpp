@@ -35,6 +35,67 @@
 
 namespace mx = MaterialX;
 
+namespace
+{
+  bool _IsBxdfWithInputValue(mx::NodePtr node,
+                             const std::string& category,
+                             const std::string& inputName,
+                             mx::ValuePtr expectedValue)
+  {
+    if (!node || node->getCategory() != category)
+    {
+      return false;
+    }
+
+    mx::ValuePtr inputValue = node->getInputValue(inputName);
+    float floatEps = 0.0001f;
+
+    if (inputValue && inputValue->isA<float>() && expectedValue->isA<float>())
+    {
+      return fabs(inputValue->asA<float>() - expectedValue->asA<float>()) < floatEps;
+    }
+
+    if (inputValue && inputValue->isA<mx::Color3>() && expectedValue->isA<mx::Color3>())
+    {
+      mx::Color3 diff = inputValue->asA<mx::Color3>() - expectedValue->asA<mx::Color3>();
+      return fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps;
+    }
+
+    if (inputValue && inputValue->isA<int>() && expectedValue->isA<int>())
+    {
+      return inputValue->asA<int>() == expectedValue->asA<int>();
+    }
+
+    return false;
+  }
+
+  bool _IsSurfaceShaderOpaque(mx::TypedElementPtr element)
+  {
+    mx::NodePtr node = element->asA<mx::Node>();
+
+    if (_IsBxdfWithInputValue(node, "UsdPreviewSurface", "opacity", mx::Value::createValue(1.0f)))
+    {
+      return true;
+    }
+
+    if (_IsBxdfWithInputValue(node, "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f))) &&
+        _IsBxdfWithInputValue(node, "standard_surface", "transmission", mx::Value::createValue(1.0f)) &&
+        _IsBxdfWithInputValue(node, "standard_surface", "subsurface", mx::Value::createValue(0.0f)))
+    {
+      return true;
+    }
+
+    if (_IsBxdfWithInputValue(node, "gltf_pbr", "alpha_mode", mx::Value::createValue(0)) &&
+        _IsBxdfWithInputValue(node, "gltf_pbr", "transmission", mx::Value::createValue(0.0f)))
+    {
+      return true;
+    }
+
+    // Use MaterialX helper function as fallback (not accurate, has false positives)
+    return !mx::isTransparentSurface(element);
+  }
+}
+
 namespace gi::sg
 {
   MtlxMdlCodeGen::MtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths)
@@ -146,8 +207,7 @@ namespace gi::sg
       }
 
       subIdentifier = element->getName();
-      // FIXME: this function has too many false positives; use custom logic
-      isOpaque = !mx::isTransparentSurface(element);
+      isOpaque = _IsSurfaceShaderOpaque(element);
       shader = m_shaderGen->generate(subIdentifier, element, context);
     }
     catch (const std::exception& ex)
