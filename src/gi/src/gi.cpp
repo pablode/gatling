@@ -894,6 +894,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   {
     sg::ShaderGen::RaygenShaderParams rgenParams;
     rgenParams.aovId = params->aovId;
+    rgenParams.filterImportanceSampling = params->filterImportanceSampling;
     rgenParams.materialCount = params->materialCount;
     rgenParams.nextEventEstimation = params->nextEventEstimation;
     rgenParams.progressiveAccumulation = params->progressiveAccumulation;

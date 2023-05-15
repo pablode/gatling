@@ -21,14 +21,15 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#define HD_GATLING_SETTINGS_TOKENS                         \
-  ((spp, "spp"))                                           \
-  ((max_bounces, "max-bounces"))                           \
-  ((rr_bounce_offset, "rr-bounce-offset"))                 \
-  ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))         \
-  ((max_sample_value, "max-sample-value"))                 \
-  ((next_event_estimation, "next-event-estimation"))       \
-  ((progressive_accumulation, "progressive-accumulation"))
+#define HD_GATLING_SETTINGS_TOKENS                             \
+  ((spp, "spp"))                                               \
+  ((max_bounces, "max-bounces"))                               \
+  ((rr_bounce_offset, "rr-bounce-offset"))                     \
+  ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))             \
+  ((max_sample_value, "max-sample-value"))                     \
+  ((next_event_estimation, "next-event-estimation"))           \
+  ((progressive_accumulation, "progressive-accumulation"))     \
+  ((filter_importance_sampling, "filter-importance-sampling"))
 
 // mtlx node identifier is given by UsdMtlx.
 #define HD_GATLING_NODE_IDENTIFIER_TOKENS            \

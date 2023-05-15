@@ -96,6 +96,7 @@ struct GiShaderCacheParams
   GiAovId            aovId;
   GiDomeLight*       domeLight;
   bool               domeLightCameraVisibility;
+  bool               filterImportanceSampling;
   uint32_t           materialCount;
   const GiMaterial** materials;
   bool               nextEventEstimation;

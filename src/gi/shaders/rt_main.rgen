@@ -144,6 +144,36 @@ vec3 evaluate_sample(vec3 ray_origin,
     return max(vec3(0.0), radiance);
 }
 
+// Filter Importance Sampling of a Gauss kernel
+// https://ieeexplore.ieee.org/document/4061554
+// We use the Box-Muller transform to draw samples from the distribution.
+// Also see: https://nvpro-samples.github.io/vk_mini_path_tracer/extras.html#gaussianfilterantialiasing
+#ifdef RAND_4D
+vec2 fisGauss(inout uvec4 rng_state)
+#else
+vec2 fisGauss(inout uint rng_state)
+#endif
+{
+    vec2 rand;
+#ifdef RAND_4D
+    rand = rng4d_next(rng_state).xy;
+#else
+    rand.x = rng_next(rng_state);
+    rand.y = rng_next(rng_state);
+#endif
+
+    float u1 = max(1e-38, rand.x); // needs to be in (0, 1]
+    float u2 = rand.y; // in [0, 1]
+
+    // https://academo.org/demos/gaussian-distribution/
+    float sigma = 0.375; // NV tutorial and Cycles
+
+    float r = sigma * sqrt(-2.0 * log(u1));
+    float phi = 2.0 * PI * u2;
+
+    return vec2(cos(phi), sin(phi)) * r;
+}
+
 void main()
 {
 #if AOV_ID == AOV_ID_DEBUG_CLOCK_CYCLES
@@ -174,19 +204,27 @@ void main()
         uint sampleIndex = PC.sampleOffset + s;
 #ifdef RAND_4D
         uvec4 rng_state = rng4d_init(pixel_pos.xy, sampleIndex);
-        vec4 k = rng4d_next(rng_state);
-        float k1 = k.x;
-        float k2 = k.y;
 #else
         uint rng_state = rng_init(pixel_index, sampleIndex);
-        float k1 = rng_next(rng_state);
-        float k2 = rng_next(rng_state);
+#endif
+
+        vec2 sampleOffset;
+#ifdef FILTER_IMPORTANCE_SAMPLING
+        // Importance sample multi-pixel filtering kernel
+        sampleOffset = vec2(0.5) + fisGauss(rng_state);
+#else
+        // Uniform pixel area sampling
+#ifdef RAND_4D
+        sampleOffset = rng4d_next(rng_state).xy;
+#else
+        sampleOffset = vec2(rng_next(rng_state), rng_next(rng_state));
+#endif
 #endif
 
         vec3 P =
             L +
-            (float(pixel_pos.x) + k1) * camera_right * WX +
-            (float(pixel_pos.y) + k2) * PC.cameraUp * HY;
+            (float(pixel_pos.x) + sampleOffset.x) * camera_right * WX +
+            (float(pixel_pos.y) + sampleOffset.y) * PC.cameraUp * HY;
 
         vec3 ray_origin = PC.cameraPosition;
         vec3 ray_dir = P - ray_origin;

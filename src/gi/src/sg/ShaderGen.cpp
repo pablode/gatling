@@ -240,6 +240,10 @@ namespace gi::sg
 
     _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
+    if (params.filterImportanceSampling)
+    {
+      stitcher.appendDefine("FILTER_IMPORTANCE_SAMPLING");
+    }
     if (params.nextEventEstimation)
     {
       stitcher.appendDefine("NEXT_EVENT_ESTIMATION", params.aovId);
