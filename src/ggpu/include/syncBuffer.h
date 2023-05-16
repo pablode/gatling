@@ -48,6 +48,10 @@ namespace gtl
     ~GgpuSyncBuffer();
 
   public:
+    uint8_t* getForReading(uint64_t byteOffset, uint64_t byteSize);
+
+    uint8_t* getForWriting(uint64_t byteOffset, uint64_t byteSize);
+
     template<typename T>
     T* getForWriting(uint64_t offset, uint64_t range)
     {
@@ -69,11 +73,6 @@ namespace gtl
     uint64_t byteSize() const;
 
     bool commitChanges(CgpuCommandBuffer commandBuffer);
-
-  private:
-    uint8_t* getForReading(uint64_t byteOffset, uint64_t byteSize);
-
-    uint8_t* getForWriting(uint64_t byteOffset, uint64_t byteSize);
 
   private:
     CgpuDevice m_device;

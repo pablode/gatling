@@ -22,29 +22,39 @@
 #include <assert.h>
 
 #include <cgpu.h>
-
 #include <handleStore.h>
+
+#include "syncBuffer.h"
 
 namespace gtl
 {
-  class GiLinearDataStoreGpu
+  class GgpuStager;
+
+  class GgpuLinearDataStore
   {
   public:
-    GiLinearDataStoreGpu(CgpuDevice device, uint64_t elementSize, uint32_t initialCapacity);
+    GgpuLinearDataStore(CgpuDevice device,
+                        GgpuStager& stager,
+                        uint64_t elementSize,
+                        uint32_t minCapacity);
 
-    ~GiLinearDataStoreGpu();
+    ~GgpuLinearDataStore();
 
   public:
     uint64_t allocate();
 
     void free(uint64_t handle);
 
-    bool get(uint64_t handle, void** element);
+    template<typename T>
+    T* getForReading(uint64_t handle)
+    {
+      return (T*) getForReadingRaw(handle);
+    }
 
     template<typename T>
-    bool get(uint64_t handle, T** element)
+    T* getForWriting(uint64_t handle)
     {
-      return get(handle, (void**)element);
+      return (T*) getForWritingRaw(handle);
     }
 
     CgpuBuffer buffer() const;
@@ -52,15 +62,19 @@ namespace gtl
     uint64_t bufferSize() const;
 
   private:
-    bool resizeBuffer(uint64_t newSize);
+    uint64_t resolveOffsetAndAlloc(uint64_t handle);
+
+    uint8_t* getForReadingRaw(uint64_t handle);
+
+    uint8_t* getForWritingRaw(uint64_t handle);
 
   private:
     CgpuDevice m_device;
     uint64_t m_elementSize;
+    uint32_t m_minCapacity;
 
     GbHandleStore m_handleStore;
-    CgpuBuffer m_buffer = { CGPU_INVALID_HANDLE };
-    uint64_t m_bufferSize = 0;
+    GgpuSyncBuffer m_buffer;
     uint8_t* m_mappedMem = nullptr;
   };
 }

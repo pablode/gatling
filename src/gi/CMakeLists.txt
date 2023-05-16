@@ -4,8 +4,6 @@ add_library(
   src/gi.cpp
   src/assetReader.h
   src/assetReader.cpp
-  src/linearDataStoreGpu.h
-  src/linearDataStoreGpu.cpp
   src/mmap.h
   src/mmap.cpp
   src/texsys.h
