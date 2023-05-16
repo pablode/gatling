@@ -4,6 +4,8 @@ add_library(
   src/resizableBuffer.cpp
   include/stager.h
   src/stager.cpp
+  include/syncBuffer.h
+  src/syncBuffer.cpp
 )
 
 target_include_directories(
