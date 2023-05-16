@@ -39,9 +39,10 @@ namespace gtl
 
     void free(uint64_t handle) override;
 
-    uint8_t* getForReadingRaw(uint64_t handle) override;
+  protected:
+    uint8_t* readRaw(uint64_t handle) override;
 
-    uint8_t* getForWritingRaw(uint64_t handle) override;
+    uint8_t* writeRaw(uint64_t handle) override;
 
   private:
     std::unordered_map<uint64_t/*handle*/, uint32_t/*index*/> m_indexMap;

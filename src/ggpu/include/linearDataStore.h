@@ -46,28 +46,32 @@ namespace gtl
     virtual void free(uint64_t handle);
 
     template<typename T>
-    T* getForReading(uint64_t handle)
+    T* read(uint64_t handle)
     {
-      return (T*) getForReadingRaw(handle);
+      return (T*) readRaw(handle);
     }
 
     template<typename T>
-    T* getForWriting(uint64_t handle)
+    T* write(uint64_t handle)
     {
-      return (T*) getForWritingRaw(handle);
+      return (T*) writeRaw(handle);
     }
 
     CgpuBuffer buffer() const;
 
     uint64_t bufferSize() const;
 
-  protected:
-    virtual uint8_t* getForReadingRaw(uint64_t handle);
+    bool commitChanges();
 
-    virtual uint8_t* getForWritingRaw(uint64_t handle);
+  protected:
+    virtual uint8_t* readRaw(uint64_t handle);
+    virtual uint8_t* writeRaw(uint64_t handle);
+    uint8_t* readFromIndex(uint32_t index);
+    uint8_t* writeToIndex(uint32_t index);
 
   private:
-    uint64_t resolveOffsetAndAlloc(uint64_t handle);
+    uint64_t returnOrAllocHandle(uint64_t handle);
+    uint64_t returnOrAllocIndex(uint32_t index);
 
   private:
     CgpuDevice m_device;

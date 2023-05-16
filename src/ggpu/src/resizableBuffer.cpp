@@ -59,6 +59,8 @@ namespace gtl
         cgpuDestroyBuffer(m_device, m_buffer);
         m_buffer.handle = CGPU_INVALID_HANDLE;
       }
+
+      m_size = 0;
       return true;
     }
 

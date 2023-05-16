@@ -112,6 +112,7 @@ fail:
     if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffer, m_fence))
       return false;
 
+    // TODO: get rid of this wait!
     if (!cgpuWaitForFence(m_device, m_fence))
       return false;
 
@@ -126,10 +127,17 @@ fail:
 
   bool GgpuStager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
   {
+    if (size == 0)
+    {
+      assert(false);
+      return true;
+    }
+
     if (size <= 65535)
     {
       m_commandsPending = true;
 
+      assert(dstBaseOffset < BUFFER_SIZE);
       return cgpuCmdUpdateBuffer(m_commandBuffer, src, size, dst, dstBaseOffset);
     }
 

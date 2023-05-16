@@ -65,21 +65,31 @@ namespace gtl
     m_handleStore.freeHandle(handle);
   }
 
-  uint8_t* GgpuLinearDataStore::getForReadingRaw(uint64_t handle)
+  uint8_t* GgpuLinearDataStore::readRaw(uint64_t handle)
   {
-    uint64_t byteOffset = resolveOffsetAndAlloc(handle);
-
-    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.getForReading(byteOffset, m_elementSize);
+    uint64_t byteOffset = returnOrAllocHandle(handle);
+    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.read(byteOffset, m_elementSize);
   }
 
-  uint8_t* GgpuLinearDataStore::getForWritingRaw(uint64_t handle)
+  uint8_t* GgpuLinearDataStore::writeRaw(uint64_t handle)
   {
-    uint64_t byteOffset = resolveOffsetAndAlloc(handle);
-
-    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.getForWriting(byteOffset, m_elementSize);
+    uint64_t byteOffset = returnOrAllocHandle(handle);
+    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.write(byteOffset, m_elementSize);
   }
 
-  uint64_t GgpuLinearDataStore::resolveOffsetAndAlloc(uint64_t handle)
+  uint8_t* GgpuLinearDataStore::readFromIndex(uint32_t index)
+  {
+    uint64_t byteOffset = returnOrAllocIndex(index);
+    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.read(byteOffset, m_elementSize);
+  }
+
+  uint8_t* GgpuLinearDataStore::writeToIndex(uint32_t index)
+  {
+    uint64_t byteOffset = returnOrAllocIndex(index);
+    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.write(byteOffset, m_elementSize);
+  }
+
+  uint64_t GgpuLinearDataStore::returnOrAllocHandle(uint64_t handle)
   {
     if (!m_handleStore.isHandleValid(handle))
     {
@@ -88,6 +98,11 @@ namespace gtl
     }
 
     uint32_t index = uint32_t(handle);
+    return returnOrAllocIndex(index);
+  }
+
+  uint64_t GgpuLinearDataStore::returnOrAllocIndex(uint32_t index)
+  {
     uint64_t byteOffset = index * m_elementSize;
 
     if (byteOffset >= m_buffer.byteSize())
@@ -114,5 +129,10 @@ namespace gtl
   uint64_t GgpuLinearDataStore::bufferSize() const
   {
     return m_buffer.byteSize();
+  }
+
+  bool GgpuLinearDataStore::commitChanges()
+  {
+    return m_buffer.commitChanges();
   }
 }

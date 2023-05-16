@@ -43,25 +43,25 @@ namespace gtl
                    GgpuStager& stager,
                    uint64_t elementSize,
                    UpdateStrategy updateStrategy = UpdateStrategy::OptimalStaging,
-                   CgpuBufferUsageFlags bufferUsage = 0);
+                   CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER);
 
     ~GgpuSyncBuffer();
 
   public:
-    uint8_t* getForReading(uint64_t byteOffset, uint64_t byteSize);
+    uint8_t* read(uint64_t byteOffset, uint64_t byteSize);
 
-    uint8_t* getForWriting(uint64_t byteOffset, uint64_t byteSize);
+    uint8_t* write(uint64_t byteOffset, uint64_t byteSize);
 
     template<typename T>
-    T* getForWriting(uint64_t offset, uint64_t range)
+    T* read(uint64_t offset, uint64_t range)
     {
-      return (T*) getForWriting(offset * m_elementSize, range * m_elementSize);
+      return (T*) write(offset * m_elementSize, range * m_elementSize);
     }
 
     template<typename T>
-    T* getForReading(uint64_t offset, uint64_t range)
+    T* write(uint64_t offset, uint64_t range)
     {
-      return (T*) getForReading(offset * m_elementSize, range * m_elementSize);
+      return (T*) write(offset * m_elementSize, range * m_elementSize);
     }
 
     bool resize(CgpuDevice device,
@@ -72,7 +72,7 @@ namespace gtl
 
     uint64_t byteSize() const;
 
-    bool commitChanges(CgpuCommandBuffer commandBuffer);
+    bool commitChanges();
 
   private:
     CgpuDevice m_device;
@@ -85,7 +85,7 @@ namespace gtl
     GgpuResizableBuffer m_hostBuffer;
 
     uint8_t* m_mappedHostMem = nullptr;
-    uint64_t m_dirtyRangeBegin = 0;
+    uint64_t m_dirtyRangeBegin = UINT64_MAX;
     uint64_t m_dirtyRangeEnd = 0;
   };
 }

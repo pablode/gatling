@@ -56,8 +56,8 @@ namespace gtl
     }
 
     uint32_t freedIndex = indexIt->second;
-    uint8_t* dstPtr = GgpuLinearDataStore::getForWritingRaw(freedIndex);
-    uint8_t* srcPtr = GgpuLinearDataStore::getForReadingRaw(m_highestIndex);
+    uint8_t* dstPtr = GgpuLinearDataStore::writeToIndex(freedIndex);
+    uint8_t* srcPtr = GgpuLinearDataStore::readFromIndex(m_highestIndex);
 
     memcpy((void*) dstPtr, (void*) srcPtr, m_elementSize);
     m_highestIndex--;
@@ -65,7 +65,7 @@ namespace gtl
     GgpuLinearDataStore::free(handle);
   }
 
-  uint8_t* GgpuDenseDataStore::getForReadingRaw(uint64_t handle)
+  uint8_t* GgpuDenseDataStore::readRaw(uint64_t handle)
   {
     auto indexIt = m_indexMap.find(handle);
     if (indexIt == m_indexMap.end())
@@ -74,10 +74,10 @@ namespace gtl
       return nullptr;
     }
 
-    return GgpuLinearDataStore::getForReadingRaw(indexIt->second);
+    return GgpuLinearDataStore::readFromIndex(indexIt->second);
   }
 
-  uint8_t* GgpuDenseDataStore::getForWritingRaw(uint64_t handle)
+  uint8_t* GgpuDenseDataStore::writeRaw(uint64_t handle)
   {
     auto indexIt = m_indexMap.find(handle);
     if (indexIt == m_indexMap.end())
@@ -86,6 +86,6 @@ namespace gtl
       return nullptr;
     }
 
-    return GgpuLinearDataStore::getForWritingRaw(indexIt->second);
+    return GgpuLinearDataStore::writeToIndex(indexIt->second);
   }
 }
