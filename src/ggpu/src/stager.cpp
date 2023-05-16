@@ -182,20 +182,25 @@ fail:
       return false;
     }
 
-    for (uint32_t i = 0; i < rowCount; i++)
+    uint64_t maxCopyRowCount = BUFFER_SIZE / rowSize; // truncate
+
+    for (uint32_t i = 0; i < rowCount; i += maxCopyRowCount)
     {
       if (!flush())
       {
         return false;
       }
 
-      auto copyFunc = [this, dst, i, width, depth](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
+      uint64_t remainingRowCount = rowCount - i;
+      uint64_t copyRowCount = std::min(remainingRowCount, maxCopyRowCount);
+
+      auto copyFunc = [this, dst, i, width, depth, copyRowCount](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
         CgpuBufferImageCopyDesc desc;
         desc.bufferOffset = srcOffset;
         desc.texelOffsetX = 0;
         desc.texelExtentX = width;
         desc.texelOffsetY = i;
-        desc.texelExtentY = 1;
+        desc.texelExtentY = copyRowCount;
         desc.texelOffsetZ = 0;
         desc.texelExtentZ = depth;
 
@@ -207,8 +212,9 @@ fail:
         );
       };
 
-      uint64_t rowOffset = i * rowSize;
-      if (!stage(&src[rowOffset], rowSize, copyFunc))
+      uint64_t srcOffset = i * rowSize;
+      uint64_t stageSize = copyRowCount * rowSize;
+      if (!stage(&src[srcOffset], stageSize, copyFunc))
       {
         return false;
       }
