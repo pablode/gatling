@@ -626,7 +626,7 @@ bool cgpuCmdTransitionShaderImageLayouts(
 );
 
 bool cgpuCmdUpdateBindings(
-  CgpuCommandBuffer command_buffer,
+  CgpuCommandBuffer commandBuffer,
   CgpuPipeline pipeline,
   const CgpuBindings* bindings
 );

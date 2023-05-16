@@ -2767,24 +2767,24 @@ bool cgpuCmdCopyBuffer(CgpuCommandBuffer commandBuffer,
   if (!cgpuResolveDevice(icommandBuffer->device, &idevice)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  CgpuIBuffer* isource_buffer;
-  if (!cgpuResolveBuffer(srcBuffer, &isource_buffer)) {
+  CgpuIBuffer* isrcBuffer;
+  if (!cgpuResolveBuffer(srcBuffer, &isrcBuffer)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  CgpuIBuffer* idestination_buffer;
-  if (!cgpuResolveBuffer(dstBuffer, &idestination_buffer)) {
+  CgpuIBuffer* idstBuffer;
+  if (!cgpuResolveBuffer(dstBuffer, &idstBuffer)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
   VkBufferCopy region;
   region.srcOffset = srcOffset;
   region.dstOffset = dstOffset;
-  region.size = (size == CGPU_WHOLE_SIZE) ? isource_buffer->size : size;
+  region.size = (size == CGPU_WHOLE_SIZE) ? isrcBuffer->size : size;
 
   idevice->table.vkCmdCopyBuffer(
     icommandBuffer->commandBuffer,
-    isource_buffer->buffer,
-    idestination_buffer->buffer,
+    isrcBuffer->buffer,
+    idstBuffer->buffer,
     1,
     &region
   );
