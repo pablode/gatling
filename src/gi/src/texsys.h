@@ -27,7 +27,7 @@ class GiAssetReader;
 
 namespace gtl
 {
-  class GiStager;
+  class GgpuStager;
 }
 
 namespace gi
@@ -40,7 +40,7 @@ namespace gi
   class TexSys
   {
   public:
-    TexSys(CgpuDevice device, GiAssetReader& assetReader, gtl::GiStager& stager);
+    TexSys(CgpuDevice device, GiAssetReader& assetReader, gtl::GgpuStager& stager);
 
     ~TexSys();
 
@@ -62,7 +62,7 @@ namespace gi
   private:
     CgpuDevice m_device;
     GiAssetReader& m_assetReader;
-    gtl::GiStager& m_stager;
+    gtl::GgpuStager& m_stager;
     // FIXME: implement a proper CPU and GPU-aware cache with eviction strategy
     std::unordered_map<std::string, CgpuImage> m_imageCache;
   };

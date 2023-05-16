@@ -17,7 +17,6 @@
 
 #include "gi.h"
 
-#include "Stager.h"
 #include "texsys.h"
 #include "turbo.h"
 #include "assetReader.h"
@@ -36,6 +35,7 @@
 #include <mutex>
 #include <assert.h>
 
+#include <stager.h>
 #include <cgpu.h>
 #include <gml.h>
 #include <sg/ShaderGen.h>
@@ -110,7 +110,7 @@ CgpuDevice s_device = { CGPU_INVALID_HANDLE };
 CgpuPhysicalDeviceFeatures s_deviceFeatures;
 CgpuPhysicalDeviceProperties s_deviceProperties;
 CgpuSampler s_texSampler = { CGPU_INVALID_HANDLE };
-std::unique_ptr<gtl::GiStager> s_stager;
+std::unique_ptr<gtl::GgpuStager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
@@ -186,7 +186,7 @@ GiStatus giInitialize(const GiInitParams* params)
     return GI_ERROR;
   }
 
-  s_stager = std::make_unique<gtl::GiStager>(s_device);
+  s_stager = std::make_unique<gtl::GgpuStager>(s_device);
   if (!s_stager->allocate())
   {
     return GI_ERROR;

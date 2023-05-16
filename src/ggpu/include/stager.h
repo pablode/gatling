@@ -24,11 +24,11 @@
 
 namespace gtl
 {
-  class GiStager
+  class GgpuStager
   {
   public:
-    GiStager(CgpuDevice device);
-    ~GiStager();
+    GgpuStager(CgpuDevice device);
+    ~GgpuStager();
 
     bool allocate();
     void free();

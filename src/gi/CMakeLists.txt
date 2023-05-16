@@ -8,8 +8,6 @@ add_library(
   src/linearDataStoreGpu.cpp
   src/mmap.h
   src/mmap.cpp
-  src/stager.h
-  src/stager.cpp
   src/texsys.h
   src/texsys.cpp
   src/turbo.h
@@ -57,6 +55,7 @@ target_link_libraries(
   PRIVATE
     gb
     cgpu
+    ggpu
     gml
     imgio
     MaterialXCore

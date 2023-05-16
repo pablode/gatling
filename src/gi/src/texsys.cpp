@@ -17,12 +17,13 @@
 
 #include "texsys.h"
 
-#include "Stager.h"
 #include "mmap.h"
 #include "gi.h"
 
 #include <sg/ShaderGen.h>
+#include <stager.h>
 #include <imgio.h>
+
 #include <assert.h>
 #include <inttypes.h>
 
@@ -52,7 +53,7 @@ namespace detail
 
 namespace gi
 {
-  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader, GiStager& stager)
+  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager)
     : m_device(device)
     , m_assetReader(assetReader)
     , m_stager(stager)

@@ -2,6 +2,8 @@ add_library(
   ggpu STATIC
   include/resizableBuffer.h
   src/resizableBuffer.cpp
+  include/stager.h
+  src/stager.cpp
 )
 
 target_include_directories(

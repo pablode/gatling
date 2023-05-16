@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "Stager.h"
+#include "stager.h"
 
 #include <assert.h>
 #include <algorithm>
@@ -24,17 +24,18 @@ const static uint64_t BUFFER_SIZE = 32 * 1024 * 1024;
 
 namespace gtl
 {
-  GiStager::GiStager(CgpuDevice device)
+  GgpuStager::GgpuStager(CgpuDevice device)
     : m_device(device)
   {
   }
 
-  GiStager::~GiStager()
+  GgpuStager::~GgpuStager()
   {
+    // Ensure data has been flushed.
     assert(m_stagedBytes == 0);
   }
 
-  bool GiStager::allocate()
+  bool GgpuStager::allocate()
   {
     m_stagingBuffer = { CGPU_INVALID_HANDLE };
     m_commandBuffer = { CGPU_INVALID_HANDLE };
@@ -78,7 +79,7 @@ fail:
     return false;
   }
 
-  void GiStager::free()
+  void GgpuStager::free()
   {
     assert(m_stagedBytes == 0);
     cgpuEndCommandBuffer(m_commandBuffer);
@@ -91,7 +92,7 @@ fail:
     cgpuDestroyBuffer(m_device, m_stagingBuffer);
   }
 
-  bool GiStager::flush()
+  bool GgpuStager::flush()
   {
     if (m_stagedBytes == 0)
     {
@@ -120,7 +121,7 @@ fail:
     return true;
   }
 
-  bool GiStager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
+  bool GgpuStager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
   {
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
       return cgpuCmdCopyBuffer(
@@ -136,7 +137,7 @@ fail:
     return stage(src, size, copyFunc);
   }
 
-  bool GiStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
+  bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
   {
     // If image fits in staging buffer, stage & copy only once.
     if (size <= BUFFER_SIZE)
@@ -216,7 +217,7 @@ fail:
     return true;
   }
 
-  bool GiStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc)
+  bool GgpuStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc)
   {
     uint64_t bytesToStage = size;
 
