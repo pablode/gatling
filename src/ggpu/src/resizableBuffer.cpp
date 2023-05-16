@@ -52,6 +52,16 @@ namespace gtl
       return true;
     }
 
+    if (newSize == 0)
+    {
+      if (m_buffer.handle != CGPU_INVALID_HANDLE)
+      {
+        cgpuDestroyBuffer(m_device, m_buffer);
+        m_buffer.handle = CGPU_INVALID_HANDLE;
+      }
+      return true;
+    }
+
     // Create new, larger buffer.
     bool result = false;
     CgpuCommandBuffer commandBuffer = { CGPU_INVALID_HANDLE };
