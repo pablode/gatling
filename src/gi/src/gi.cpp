@@ -439,8 +439,9 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 {
   GiGeomCache* cache = nullptr;
 
-  printf("creating geom cache\n");
   printf("instance count: %d\n", params->meshInstanceCount);
+  printf("creating geom cache..\n");
+  fflush(stdout);
 
   // Build HW ASes and vertex, index buffers.
   CgpuBuffer buffer = { CGPU_INVALID_HANDLE };
@@ -472,6 +473,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
     printf("total geom buffer size: %.2fMiB\n", buf_size * BYTES_TO_MIB);
     printf("> %.2fMiB faces\n", faceBufferView.size * BYTES_TO_MIB);
     printf("> %.2fMiB vertices\n", vertexBufferView.size * BYTES_TO_MIB);
+    fflush(stdout);
 
     CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
     CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
@@ -537,8 +539,9 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     return nullptr;
   }
 
-  printf("creating shader cache\n");
   printf("material count: %d\n", params->materialCount);
+  printf("creating shader cache..\n");
+  fflush(stdout);
 
   GiShaderCache* cache = nullptr;
   CgpuPipeline pipeline = { CGPU_INVALID_HANDLE };
@@ -883,6 +886,9 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   // Create RT pipeline.
   {
+    printf("creating RT pipeline..\n");
+    fflush(stdout);
+
     CgpuRtPipelineDesc pipeline_desc = {0};
     pipeline_desc.rgenShader = rgenShader;
     pipeline_desc.missShaderCount = missShaders.size();
