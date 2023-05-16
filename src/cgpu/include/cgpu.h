@@ -631,6 +631,14 @@ bool cgpuCmdUpdateBindings(
   const CgpuBindings* bindings
 );
 
+bool cgpuCmdUpdateBuffer(
+  CgpuCommandBuffer commandBuffer,
+  const uint8_t* data,
+  uint64_t size,
+  CgpuBuffer dstBuffer,
+  uint64_t dstOffset
+);
+
 bool cgpuCmdCopyBuffer(
   CgpuCommandBuffer commandBuffer,
   CgpuBuffer srcBuffer,

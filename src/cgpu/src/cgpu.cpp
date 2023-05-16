@@ -2752,6 +2752,36 @@ bool cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
   return true;
 }
 
+bool cgpuCmdUpdateBuffer(CgpuCommandBuffer commandBuffer,
+                         const uint8_t* data,
+                         uint64_t size,
+                         CgpuBuffer dstBuffer,
+                         uint64_t dstOffset)
+{
+  CgpuICommandBuffer* icommandBuffer;
+  if (!cgpuResolveCommandBuffer(commandBuffer, &icommandBuffer)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  CgpuIDevice* idevice;
+  if (!cgpuResolveDevice(icommandBuffer->device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  CgpuIBuffer* idstBuffer;
+  if (!cgpuResolveBuffer(dstBuffer, &idstBuffer)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+
+  idevice->table.vkCmdUpdateBuffer(
+    icommandBuffer->commandBuffer,
+    idstBuffer->buffer,
+    dstOffset,
+    size,
+    (const void*) data
+  );
+
+  return true;
+}
+
 bool cgpuCmdCopyBuffer(CgpuCommandBuffer commandBuffer,
                        CgpuBuffer srcBuffer,
                        uint64_t srcOffset,
