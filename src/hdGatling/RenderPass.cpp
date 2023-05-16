@@ -72,7 +72,8 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_geomCache(nullptr)
   , m_shaderCache(nullptr)
 {
-  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(GfVec3f(1.0f, 0.0f, 1.0f), "invalid");
+  auto defaultDiffuseColor = GfVec3f(0.18f); // UsdPreviewSurface spec
+  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(defaultDiffuseColor, "invalid");
 
   m_defaultMaterial = giCreateMaterialFromMtlxStr(defaultMatSrc.c_str());
   TF_AXIOM(m_defaultMaterial);
