@@ -52,6 +52,7 @@ namespace gtl
     CgpuCommandBuffer m_commandBuffer = { CGPU_INVALID_HANDLE };
     CgpuFence m_fence = { CGPU_INVALID_HANDLE };
 
+    bool m_commandsPending = false;
     uint64_t m_stagedBytes = 0;
     uint8_t* m_mappedMem = nullptr;
   };

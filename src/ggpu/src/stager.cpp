@@ -94,8 +94,9 @@ fail:
 
   bool GgpuStager::flush()
   {
-    if (m_stagedBytes == 0)
+    if (!m_commandsPending)
     {
+      assert(m_stagedBytes == 0);
       return true;
     }
 
@@ -118,11 +119,20 @@ fail:
       return false;
 
     m_stagedBytes = 0;
+    m_commandsPending = false;
+
     return true;
   }
 
   bool GgpuStager::stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstBaseOffset)
   {
+    if (size <= 65535)
+    {
+      m_commandsPending = true;
+
+      return cgpuCmdUpdateBuffer(m_commandBuffer, src, size, dst, dstBaseOffset);
+    }
+
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
       return cgpuCmdCopyBuffer(
         m_commandBuffer,
@@ -242,6 +252,7 @@ fail:
         return false;
       }
 
+      m_commandsPending = true;
       m_stagedBytes += memcpyByteCount;
 
       if (m_stagedBytes != BUFFER_SIZE)
