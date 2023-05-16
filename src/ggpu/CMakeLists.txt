@@ -1,9 +1,11 @@
 add_library(
   ggpu STATIC
+  include/denseDataStore.h
   include/linearDataStore.h
   include/resizableBuffer.h
   include/stager.h
   include/syncBuffer.h
+  src/denseDataStore.cpp
   src/linearDataStore.cpp
   src/resizableBuffer.cpp
   src/stager.cpp

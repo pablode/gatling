@@ -41,9 +41,9 @@ namespace gtl
     ~GgpuLinearDataStore();
 
   public:
-    uint64_t allocate();
+    virtual uint64_t allocate();
 
-    void free(uint64_t handle);
+    virtual void free(uint64_t handle);
 
     template<typename T>
     T* getForReading(uint64_t handle)
@@ -61,12 +61,13 @@ namespace gtl
 
     uint64_t bufferSize() const;
 
+  protected:
+    virtual uint8_t* getForReadingRaw(uint64_t handle);
+
+    virtual uint8_t* getForWritingRaw(uint64_t handle);
+
   private:
     uint64_t resolveOffsetAndAlloc(uint64_t handle);
-
-    uint8_t* getForReadingRaw(uint64_t handle);
-
-    uint8_t* getForWritingRaw(uint64_t handle);
 
   private:
     CgpuDevice m_device;

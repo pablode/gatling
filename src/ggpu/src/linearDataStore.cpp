@@ -65,6 +65,20 @@ namespace gtl
     m_handleStore.freeHandle(handle);
   }
 
+  uint8_t* GgpuLinearDataStore::getForReadingRaw(uint64_t handle)
+  {
+    uint64_t byteOffset = resolveOffsetAndAlloc(handle);
+
+    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.getForReading(byteOffset, m_elementSize);
+  }
+
+  uint8_t* GgpuLinearDataStore::getForWritingRaw(uint64_t handle)
+  {
+    uint64_t byteOffset = resolveOffsetAndAlloc(handle);
+
+    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.getForWriting(byteOffset, m_elementSize);
+  }
+
   uint64_t GgpuLinearDataStore::resolveOffsetAndAlloc(uint64_t handle)
   {
     if (!m_handleStore.isHandleValid(handle))
@@ -90,20 +104,6 @@ namespace gtl
     }
 
     return byteOffset;
-  }
-
-  uint8_t* GgpuLinearDataStore::getForReadingRaw(uint64_t handle)
-  {
-    uint64_t byteOffset = resolveOffsetAndAlloc(handle);
-    
-    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.getForReading(byteOffset, m_elementSize);
-  }
-
-  uint8_t* GgpuLinearDataStore::getForWritingRaw(uint64_t handle)
-  {
-    uint64_t byteOffset = resolveOffsetAndAlloc(handle);
-    
-    return (byteOffset == UINT64_MAX) ? nullptr : m_buffer.getForWriting(byteOffset, m_elementSize);
   }
 
   CgpuBuffer GgpuLinearDataStore::buffer() const
