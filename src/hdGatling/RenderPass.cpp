@@ -254,7 +254,11 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
         if (network)
         {
           giMat = m_materialNetworkTranslator.ParseNetwork(sprim->GetId(), *network);
-          m_materials.push_back(giMat);
+
+          if (giMat)
+          {
+            m_materials.push_back(giMat);
+          }
         }
       }
 
