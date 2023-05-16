@@ -30,7 +30,7 @@ namespace gtl
   class GiLinearDataStoreGpu
   {
   public:
-    GiLinearDataStoreGpu(CgpuDevice device, uint64_t objectSize, uint32_t initialCapacity);
+    GiLinearDataStoreGpu(CgpuDevice device, uint64_t elementSize, uint32_t initialCapacity);
 
     ~GiLinearDataStoreGpu();
 
@@ -39,12 +39,12 @@ namespace gtl
 
     void free(uint64_t handle);
 
-    bool get(uint64_t handle, void** object);
+    bool get(uint64_t handle, void** element);
 
     template<typename T>
-    bool get(uint64_t handle, T** object)
+    bool get(uint64_t handle, T** element)
     {
-      return get(handle, (void**)object);
+      return get(handle, (void**)element);
     }
 
     CgpuBuffer buffer() const;
@@ -56,7 +56,7 @@ namespace gtl
 
   private:
     CgpuDevice m_device;
-    uint64_t m_objectSize;
+    uint64_t m_elementSize;
 
     GbHandleStore m_handleStore;
     CgpuBuffer m_buffer = { CGPU_INVALID_HANDLE };

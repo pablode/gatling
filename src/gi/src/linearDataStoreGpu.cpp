@@ -35,11 +35,11 @@ namespace
 
 namespace gtl
 {
-  GiLinearDataStoreGpu::GiLinearDataStoreGpu(CgpuDevice device, uint64_t objectSize, uint32_t initialCapacity)
+  GiLinearDataStoreGpu::GiLinearDataStoreGpu(CgpuDevice device, uint64_t elementSize, uint32_t initialCapacity)
     : m_device(device)
-    , m_objectSize(objectSize)
+    , m_elementSize(elementSize)
   {
-    resizeBuffer(objectSize * initialCapacity);
+    resizeBuffer(elementSize * initialCapacity);
   }
 
   GiLinearDataStoreGpu::~GiLinearDataStoreGpu()
@@ -62,7 +62,7 @@ namespace gtl
     m_handleStore.freeHandle(handle);
   }
 
-  bool GiLinearDataStoreGpu::get(uint64_t handle, void** object)
+  bool GiLinearDataStoreGpu::get(uint64_t handle, void** element)
   {
     if (!m_handleStore.isHandleValid(handle))
     {
@@ -71,7 +71,7 @@ namespace gtl
     }
 
     uint32_t index = uint32_t(handle);
-    uint64_t byteOffset = index * m_objectSize;
+    uint64_t byteOffset = index * m_elementSize;
 
     if (byteOffset >= m_bufferSize)
     {
@@ -84,7 +84,7 @@ namespace gtl
       }
     }
 
-    *object = (void*) &m_mappedMem[byteOffset];
+    *element = (void*) &m_mappedMem[byteOffset];
     return true;
   }
 
