@@ -16,7 +16,6 @@
 //
 
 #include "cgpu.h"
-#include "linearDataStoreCpu.h"
 #include "shaderReflection.h"
 
 #include <stdint.h>
@@ -33,6 +32,7 @@
 
 // TODO: should be in 'gtl/gb' subfolder
 #include <smallVector.h>
+#include <linearDataStore.h>
 
 using namespace gtl;
 
@@ -131,16 +131,16 @@ struct CgpuISampler
 struct CgpuIInstance
 {
   VkInstance instance;
-  CgpuLinearDataStoreCpu<CgpuIDevice, 32> ideviceStore;
-  CgpuLinearDataStoreCpu<CgpuIBuffer, 16> ibufferStore;
-  CgpuLinearDataStoreCpu<CgpuIImage, 128> iimageStore;
-  CgpuLinearDataStoreCpu<CgpuIShader, 32> ishaderStore;
-  CgpuLinearDataStoreCpu<CgpuIPipeline, 8> ipipelineStore;
-  CgpuLinearDataStoreCpu<CgpuIFence, 8> ifenceStore;
-  CgpuLinearDataStoreCpu<CgpuICommandBuffer, 16> icommandBufferStore;
-  CgpuLinearDataStoreCpu<CgpuISampler, 8> isamplerStore;
-  CgpuLinearDataStoreCpu<CgpuIBlas, 1024> iblasStore;
-  CgpuLinearDataStoreCpu<CgpuITlas, 1> itlasStore;
+  GbLinearDataStore<CgpuIDevice, 32> ideviceStore;
+  GbLinearDataStore<CgpuIBuffer, 16> ibufferStore;
+  GbLinearDataStore<CgpuIImage, 128> iimageStore;
+  GbLinearDataStore<CgpuIShader, 32> ishaderStore;
+  GbLinearDataStore<CgpuIPipeline, 8> ipipelineStore;
+  GbLinearDataStore<CgpuIFence, 8> ifenceStore;
+  GbLinearDataStore<CgpuICommandBuffer, 16> icommandBufferStore;
+  GbLinearDataStore<CgpuISampler, 8> isamplerStore;
+  GbLinearDataStore<CgpuIBlas, 1024> iblasStore;
+  GbLinearDataStore<CgpuITlas, 1> itlasStore;
 };
 
 static std::unique_ptr<CgpuIInstance> iinstance = nullptr;

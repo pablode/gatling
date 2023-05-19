@@ -27,7 +27,7 @@
 namespace gtl
 {
   template<typename T, uint32_t C>
-  class CgpuLinearDataStoreCpu
+  class GbLinearDataStore
   {
   public:
     uint64_t allocate()
