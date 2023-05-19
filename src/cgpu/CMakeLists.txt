@@ -19,7 +19,7 @@ target_link_libraries(
   PRIVATE
     gb
     volk
-    vma-c
+    VulkanMemoryAllocator
     spirv-reflect-static
 )
 
