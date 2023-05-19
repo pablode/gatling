@@ -20,7 +20,7 @@
 #include <assert.h>
 #include <algorithm>
 
-const static uint64_t BUFFER_SIZE = 32 * 1024 * 1024;
+const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
 
 namespace gtl
 {
