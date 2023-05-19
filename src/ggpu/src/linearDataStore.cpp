@@ -19,7 +19,7 @@
 
 namespace
 {
-  // See: https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+  // https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
   uint32_t _NextPowerOfTwo(uint32_t v)
   {
     v--;

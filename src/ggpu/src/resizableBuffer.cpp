@@ -114,7 +114,7 @@ namespace gtl
     result = true;
 
   cleanup:
-    // TODO: add to deletion queue instead (with implicitly inserted semaphore)
+    // TODO: add to deletion queue instead (freed on fence signal)
     if (buffer.handle != CGPU_INVALID_HANDLE)
       cgpuDestroyBuffer(m_device, buffer);
     if (commandBuffer.handle != CGPU_INVALID_HANDLE)

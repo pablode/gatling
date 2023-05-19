@@ -30,7 +30,7 @@
 #include <algorithm>
 #include <float.h>
 
-// FIXME: don't downcast to uint8_t; store as RGBA16F / R11FB10F / ASTC_HDR
+// FIXME: don't downcast to uint8_t; store as RGBA16F / E5B9G9R9_UFLOAT_PACK32 / ASTC_HDR
 int imgio_hdr_decode(size_t size, const void* data, imgio_img* img)
 {
   if (!stbi_is_hdr_from_memory((const stbi_uc*) data, size))

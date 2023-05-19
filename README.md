@@ -12,9 +12,9 @@
 
 This is my toy path tracer I work on in my free time.
 
-It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform\*, GPU-accelerated, and supports [MaterialX](https://www.materialx.org/index.html), [MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) materials.
+It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform\*, GPU-accelerated, and implements the [MaterialX](https://www.materialx.org/index.html), [NVIDIA MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) material standards.
 
-gatling implements complex BSDFs like Autodesk's Standard Surface and the glTF shading model via MaterialX's MDL code generation backend.  The MDL SDK is then used to generate evaluation and importance sampling functions, which are emitted as GLSL code. This code is compiled to SPIR-V and executed via [Vulkan](https://www.vulkan.org/).
+Complex BSDFs like Autodesk's Standard Surface and the glTF shading model are supported using MaterialX's MDL code generation backend.  The MDL SDK then generates evaluation and importance sampling functions as GLSL code, which is compiled to SPIR-V and executed using Vulkan.
 
 \* Hardware ray tracing is required. MacOS will be supported [in the future](https://github.com/KhronosGroup/MoltenVK/issues/427).
 
@@ -59,7 +59,7 @@ Gatling can be used by every application which supports Hydra, either natively o
   <a href="http://pablode.com/gatling/usdview_coffeemaker.png"><img width=400 src="http://pablode.com/gatling/usdview_coffeemaker_sm.png" /></a>
 </p>
 <p align="middle">
-  <a href="https://www.blendswap.com/blend/16368">cekuhnen's Coffee Maker</a> (<a href="https://creativecommons.org/licenses/by/2.0/legalcode">CC-BY</a>), slightly modified, rendered using Gatling inside <a href="https://graphics.pixar.com/usd/docs/USD-Toolset.html#USDToolset-usdview">Pixar's usdview</a> tool.
+  Claas Kuhnen's <a href="https://github.com/pablode/usd-assets/tree/main/coffeemaker">Coffee Maker</a>, rendered using Gatling inside Pixar's <a href="https://openusd.org/release/toolset.html#usdview">usdview</a> tool.
 </p>
 
 A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .usdz) as input. Make sure that there is a polygonal light source in the scene.
