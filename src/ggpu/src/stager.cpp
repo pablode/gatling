@@ -21,6 +21,7 @@
 #include <algorithm>
 
 const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
+const static uint64_t BUFFER_HALF_SIZE = BUFFER_SIZE / 2;
 
 namespace gtl
 {
@@ -37,11 +38,6 @@ namespace gtl
 
   bool GgpuStager::allocate()
   {
-    m_stagingBuffer = { CGPU_INVALID_HANDLE };
-    m_commandBuffer = { CGPU_INVALID_HANDLE };
-    m_fence = { CGPU_INVALID_HANDLE };
-
-    // Try to use ReBAR if available.
     bool bufferCreated = cgpuCreateBuffer(m_device,
                                           CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
                                           CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE,
@@ -60,7 +56,8 @@ namespace gtl
     if (!bufferCreated)
       goto fail;
 
-    if (!cgpuCreateCommandBuffer(m_device, &m_commandBuffer))
+    if (!cgpuCreateCommandBuffer(m_device, &m_commandBuffers[0]) ||
+        !cgpuCreateCommandBuffer(m_device, &m_commandBuffers[1]))
       goto fail;
 
     if (!cgpuCreateFence(m_device, &m_fence))
@@ -69,7 +66,7 @@ namespace gtl
     if (!cgpuMapBuffer(m_device, m_stagingBuffer, (void**) &m_mappedMem))
       goto fail;
 
-    if (!cgpuBeginCommandBuffer(m_commandBuffer))
+    if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
       goto fail;
 
     return true;
@@ -81,46 +78,45 @@ fail:
 
   void GgpuStager::free()
   {
-    assert(m_stagedBytes == 0);
-    cgpuEndCommandBuffer(m_commandBuffer);
+    cgpuWaitForFence(m_device, m_fence);
     if (m_mappedMem)
     {
       cgpuUnmapBuffer(m_device, m_stagingBuffer);
     }
+    cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
     cgpuDestroyFence(m_device, m_fence);
-    cgpuDestroyCommandBuffer(m_device, m_commandBuffer);
+    cgpuDestroyCommandBuffer(m_device, m_commandBuffers[0]);
+    cgpuDestroyCommandBuffer(m_device, m_commandBuffers[1]);
     cgpuDestroyBuffer(m_device, m_stagingBuffer);
   }
 
   bool GgpuStager::flush()
   {
-    if (!m_commandsPending)
-    {
-      assert(m_stagedBytes == 0);
+    if (m_stagedBytes == 0 && !m_commandsPending)
       return true;
-    }
 
-    if (!cgpuFlushMappedMemory(m_device, m_stagingBuffer, 0, m_stagedBytes))
+    if (!cgpuWaitForFence(m_device, m_fence))
       return false;
 
     if (!cgpuResetFence(m_device, m_fence))
       return false;
 
-    if (!cgpuEndCommandBuffer(m_commandBuffer))
+    if (!cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]))
       return false;
 
-    if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffer, m_fence))
+    uint32_t halfOffset = m_writeableHalf * BUFFER_HALF_SIZE;
+    if (!cgpuFlushMappedMemory(m_device, m_stagingBuffer, halfOffset, halfOffset + m_stagedBytes))
       return false;
 
-    // TODO: get rid of this wait!
-    if (!cgpuWaitForFence(m_device, m_fence))
-      return false;
-
-    if (!cgpuBeginCommandBuffer(m_commandBuffer))
+    if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], m_fence))
       return false;
 
     m_stagedBytes = 0;
     m_commandsPending = false;
+    m_writeableHalf = (m_writeableHalf == 0) ? 1 : 0;
+
+    if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
+      return false;
 
     return true;
   }
@@ -137,13 +133,12 @@ fail:
     {
       m_commandsPending = true;
 
-      assert(dstBaseOffset < BUFFER_SIZE);
-      return cgpuCmdUpdateBuffer(m_commandBuffer, src, size, dst, dstBaseOffset);
+      return cgpuCmdUpdateBuffer(m_commandBuffers[m_writeableHalf], src, size, dst, dstBaseOffset);
     }
 
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
       return cgpuCmdCopyBuffer(
-        m_commandBuffer,
+        m_commandBuffers[m_writeableHalf],
         m_stagingBuffer,
         srcOffset,
         dst,
@@ -160,7 +155,7 @@ fail:
     uint64_t rowCount = height;
     uint64_t rowSize = size / rowCount;
 
-    if (rowSize > BUFFER_SIZE)
+    if (rowSize > BUFFER_HALF_SIZE)
     {
       return false;
     }
@@ -169,7 +164,7 @@ fail:
 
     while (rowsStaged < rowCount)
     {
-      uint64_t remainingSpace = BUFFER_SIZE - m_stagedBytes;
+      uint64_t remainingSpace = BUFFER_HALF_SIZE - m_stagedBytes;
       uint64_t maxCopyRowCount = remainingSpace / rowSize; // truncate
 
       if (maxCopyRowCount == 0)
@@ -179,7 +174,7 @@ fail:
           return false;
         }
 
-        maxCopyRowCount = BUFFER_SIZE / rowSize; // truncate
+        maxCopyRowCount = BUFFER_HALF_SIZE / rowSize; // truncate
       }
 
       uint64_t remainingRowCount = rowCount - rowsStaged;
@@ -196,7 +191,7 @@ fail:
         desc.texelExtentZ = depth;
 
         return cgpuCmdCopyBufferToImage(
-          m_commandBuffer,
+          m_commandBuffers[m_writeableHalf],
           m_stagingBuffer,
           dst,
           &desc
@@ -224,13 +219,14 @@ fail:
     {
       uint64_t bytesAlreadyCopied = size - bytesToStage;
 
-      uint64_t availableSpace = BUFFER_SIZE - m_stagedBytes;
+      uint64_t availableSpace = BUFFER_HALF_SIZE - m_stagedBytes;
       uint64_t memcpyByteCount = std::min(bytesToStage, availableSpace);
       bytesToStage -= memcpyByteCount;
 
-      memcpy(&m_mappedMem[m_stagedBytes], &src[bytesAlreadyCopied], memcpyByteCount);
+      uint64_t dstOffset = m_writeableHalf * BUFFER_HALF_SIZE + m_stagedBytes;
+      memcpy(&m_mappedMem[dstOffset], &src[bytesAlreadyCopied], memcpyByteCount);
 
-      if (!copyFunc(m_stagedBytes, bytesAlreadyCopied, memcpyByteCount))
+      if (!copyFunc(dstOffset, bytesAlreadyCopied, memcpyByteCount))
       {
         return false;
       }
@@ -238,7 +234,7 @@ fail:
       m_commandsPending = true;
       m_stagedBytes += memcpyByteCount;
 
-      if (m_stagedBytes != BUFFER_SIZE)
+      if (m_stagedBytes != BUFFER_HALF_SIZE)
       {
         continue;
       }

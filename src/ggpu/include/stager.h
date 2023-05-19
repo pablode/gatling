@@ -48,8 +48,9 @@ namespace gtl
   private:
     CgpuDevice m_device;
 
+    uint32_t m_writeableHalf = 0;
     CgpuBuffer m_stagingBuffer = { CGPU_INVALID_HANDLE };
-    CgpuCommandBuffer m_commandBuffer = { CGPU_INVALID_HANDLE };
+    CgpuCommandBuffer m_commandBuffers[2] = { CGPU_INVALID_HANDLE, CGPU_INVALID_HANDLE };
     CgpuFence m_fence = { CGPU_INVALID_HANDLE };
 
     bool m_commandsPending = false;
