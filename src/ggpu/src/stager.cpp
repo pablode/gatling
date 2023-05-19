@@ -157,41 +157,6 @@ fail:
 
   bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
   {
-    // If image fits in staging buffer, stage & copy only once.
-    if (size <= BUFFER_SIZE)
-    {
-      uint64_t availableSpace = BUFFER_SIZE - m_stagedBytes;
-
-      if (availableSpace < size)
-      {
-        if (!flush())
-        {
-          return false;
-        }
-      }
-
-      auto copyFunc = [this, dst, width, height, depth](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
-        CgpuBufferImageCopyDesc desc;
-        desc.bufferOffset = srcOffset;
-        desc.texelOffsetX = 0;
-        desc.texelExtentX = width;
-        desc.texelOffsetY = 0;
-        desc.texelExtentY = height;
-        desc.texelOffsetZ = 0;
-        desc.texelExtentZ = depth;
-
-        return cgpuCmdCopyBufferToImage(
-          m_commandBuffer,
-          m_stagingBuffer,
-          dst,
-          &desc
-        );
-      };
-
-      return stage(src, size, copyFunc);
-    }
-
-    // Otherwise, we stage & copy per width-depth slice.
     uint64_t rowCount = height;
     uint64_t rowSize = size / rowCount;
 
@@ -200,24 +165,32 @@ fail:
       return false;
     }
 
-    uint64_t maxCopyRowCount = BUFFER_SIZE / rowSize; // truncate
+    uint32_t rowsStaged = 0;
 
-    for (uint32_t i = 0; i < rowCount; i += maxCopyRowCount)
+    while (rowsStaged < rowCount)
     {
-      if (!flush())
+      uint64_t remainingSpace = BUFFER_SIZE - m_stagedBytes;
+      uint64_t maxCopyRowCount = remainingSpace / rowSize; // truncate
+
+      if (maxCopyRowCount == 0)
       {
-        return false;
+        if (!flush())
+        {
+          return false;
+        }
+
+        maxCopyRowCount = BUFFER_SIZE / rowSize; // truncate
       }
 
-      uint64_t remainingRowCount = rowCount - i;
+      uint64_t remainingRowCount = rowCount - rowsStaged;
       uint64_t copyRowCount = std::min(remainingRowCount, maxCopyRowCount);
 
-      auto copyFunc = [this, dst, i, width, depth, copyRowCount](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
+      auto copyFunc = [this, dst, rowsStaged, width, depth, copyRowCount](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
         CgpuBufferImageCopyDesc desc;
         desc.bufferOffset = srcOffset;
         desc.texelOffsetX = 0;
         desc.texelExtentX = width;
-        desc.texelOffsetY = i;
+        desc.texelOffsetY = rowsStaged;
         desc.texelExtentY = copyRowCount;
         desc.texelOffsetZ = 0;
         desc.texelExtentZ = depth;
@@ -230,12 +203,14 @@ fail:
         );
       };
 
-      uint64_t srcOffset = i * rowSize;
+      uint64_t srcOffset = rowsStaged * rowSize;
       uint64_t stageSize = copyRowCount * rowSize;
       if (!stage(&src[srcOffset], stageSize, copyFunc))
       {
         return false;
       }
+
+      rowsStaged += copyRowCount;
     }
 
     return true;
