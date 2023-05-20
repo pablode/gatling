@@ -27,6 +27,7 @@ class GiAssetReader;
 
 namespace gtl
 {
+  class GgpuResourceDestroyer;
   class GgpuStager;
 }
 
@@ -40,11 +41,10 @@ namespace gi
   class TexSys
   {
   public:
-    TexSys(CgpuDevice device, GiAssetReader& assetReader, gtl::GgpuStager& stager);
+    TexSys(CgpuDevice device, GiAssetReader& assetReader, gtl::GgpuStager& stager,
+      gtl::GgpuResourceDestroyer& resourceDestroyer);
 
     ~TexSys();
-
-    void destroy();
 
   public:
     bool loadTextureFromFilePath(const char* filePath,
@@ -63,6 +63,7 @@ namespace gi
     CgpuDevice m_device;
     GiAssetReader& m_assetReader;
     gtl::GgpuStager& m_stager;
+    gtl::GgpuResourceDestroyer& m_resourceDestroyer;
     // FIXME: implement a proper CPU and GPU-aware cache with eviction strategy
     std::unordered_map<std::string, CgpuImage> m_imageCache;
   };

@@ -22,6 +22,7 @@
 
 #include <sg/ShaderGen.h>
 #include <stager.h>
+#include <resourceDestroyer.h>
 #include <imgio.h>
 
 #include <assert.h>
@@ -53,23 +54,23 @@ namespace detail
 
 namespace gi
 {
-  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager)
+  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader,
+    GgpuStager& stager, GgpuResourceDestroyer& resourceDestroyer)
     : m_device(device)
     , m_assetReader(assetReader)
     , m_stager(stager)
+    , m_resourceDestroyer(resourceDestroyer)
   {
   }
 
   TexSys::~TexSys()
   {
-    assert(m_imageCache.empty());
-  }
-
-  void TexSys::destroy()
-  {
     for (const auto& pathImagePair : m_imageCache)
     {
-      cgpuDestroyImage(m_device, pathImagePair.second);
+      CgpuImage image = pathImagePair.second;
+      m_resourceDestroyer.enqueueDestruction([image](CgpuDevice device) {
+        return cgpuDestroyImage(device, image);
+      });
     }
     m_imageCache.clear();
   }
