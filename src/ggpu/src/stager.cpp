@@ -32,8 +32,10 @@ namespace gtl
 
   GgpuStager::~GgpuStager()
   {
-    // Ensure data has been flushed.
-    assert(m_stagedBytes == 0);
+    assert(m_fence.handle == CGPU_INVALID_HANDLE);
+    assert(m_commandBuffers[0].handle == CGPU_INVALID_HANDLE);
+    assert(m_commandBuffers[1].handle == CGPU_INVALID_HANDLE);
+    assert(m_stagingBuffer.handle == CGPU_INVALID_HANDLE);
   }
 
   bool GgpuStager::allocate()
@@ -88,6 +90,10 @@ fail:
     cgpuDestroyCommandBuffer(m_device, m_commandBuffers[0]);
     cgpuDestroyCommandBuffer(m_device, m_commandBuffers[1]);
     cgpuDestroyBuffer(m_device, m_stagingBuffer);
+    m_fence.handle = CGPU_INVALID_HANDLE;
+    m_commandBuffers[0].handle = CGPU_INVALID_HANDLE;
+    m_commandBuffers[1].handle = CGPU_INVALID_HANDLE;
+    m_stagingBuffer.handle = CGPU_INVALID_HANDLE;
   }
 
   bool GgpuStager::flush()
