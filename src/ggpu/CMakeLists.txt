@@ -3,11 +3,13 @@ add_library(
   include/denseDataStore.h
   include/linearDataStore.h
   include/resizableBuffer.h
+  include/resourceDestroyer.h
   include/stager.h
   include/syncBuffer.h
   src/denseDataStore.cpp
   src/linearDataStore.cpp
   src/resizableBuffer.cpp
+  src/resourceDestroyer.cpp
   src/stager.cpp
   src/syncBuffer.cpp
 )
