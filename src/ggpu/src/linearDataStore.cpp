@@ -17,6 +17,8 @@
 
 #include "linearDataStore.h"
 
+#include <resourceDestroyer.h>
+
 namespace
 {
   // https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
@@ -37,12 +39,13 @@ namespace gtl
 {
   GgpuLinearDataStore::GgpuLinearDataStore(CgpuDevice device,
                                            GgpuStager& stager,
+                                           GgpuResourceDestroyer& resourceDestroyer,
                                            uint64_t elementSize, 
                                            uint32_t minCapacity)
     : m_device(device)
     , m_elementSize(elementSize)
     , m_minCapacity(minCapacity)
-    , m_buffer(device, stager, elementSize)
+    , m_buffer(device, stager, resourceDestroyer, elementSize)
   {
   }
 

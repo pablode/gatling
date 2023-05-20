@@ -31,6 +31,7 @@ namespace gtl
   public:
     GgpuDenseDataStore(CgpuDevice device,
                        GgpuStager& stager,
+                       GgpuResourceDestroyer& resourceDestroyer,
                        uint64_t elementSize,
                        uint32_t minCapacity);
 

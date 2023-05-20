@@ -27,6 +27,7 @@
 
 namespace gtl
 {
+  class GgpuResourceDestroyer;
   class GgpuStager;
 
   class GgpuSyncBuffer
@@ -41,6 +42,7 @@ namespace gtl
   public:
     GgpuSyncBuffer(CgpuDevice device,
                    GgpuStager& stager,
+                   GgpuResourceDestroyer& resourceDestroyer,
                    uint64_t elementSize,
                    UpdateStrategy updateStrategy = UpdateStrategy::OptimalStaging,
                    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER);
@@ -77,6 +79,7 @@ namespace gtl
   private:
     CgpuDevice m_device;
     GgpuStager& m_stager;
+    GgpuResourceDestroyer& m_resourceDestroyer;
     uint64_t m_elementSize;
     UpdateStrategy m_updateStrategy;
 

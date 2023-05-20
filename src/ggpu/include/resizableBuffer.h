@@ -23,10 +23,13 @@
 
 namespace gtl
 {
+  class GgpuResourceDestroyer;
+
   class GgpuResizableBuffer
   {
   public:
     GgpuResizableBuffer(CgpuDevice device,
+                        GgpuResourceDestroyer& resourceDestroyer,
                         CgpuBufferUsageFlags usageFlags,
                         CgpuMemoryPropertyFlags memoryProperties);
 
@@ -41,6 +44,7 @@ namespace gtl
 
   private:
     CgpuDevice m_device;
+    GgpuResourceDestroyer& m_resourceDestroyer;
     CgpuBufferUsageFlags m_usageFlags;
     CgpuMemoryPropertyFlags m_memoryProperties;
 

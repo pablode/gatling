@@ -28,6 +28,7 @@
 
 namespace gtl
 {
+  class GgpuResourceDestroyer;
   class GgpuStager;
 
   class GgpuLinearDataStore
@@ -35,6 +36,7 @@ namespace gtl
   public:
     GgpuLinearDataStore(CgpuDevice device,
                         GgpuStager& stager,
+                        GgpuResourceDestroyer& resourceDestroyer,
                         uint64_t elementSize,
                         uint32_t minCapacity);
 

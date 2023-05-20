@@ -17,6 +17,7 @@
 
 #include "syncBuffer.h"
 
+#include "resourceDestroyer.h"
 #include "stager.h"
 
 #include <algorithm>
@@ -25,18 +26,22 @@ namespace gtl
 {
   GgpuSyncBuffer::GgpuSyncBuffer(CgpuDevice device,
                                  GgpuStager& stager,
+                                 GgpuResourceDestroyer& resourceDestroyer,
                                  uint64_t elementSize,
                                  UpdateStrategy updateStrategy,
                                  CgpuBufferUsageFlags bufferUsage)
     : m_device(device)
     , m_stager(stager)
+    , m_resourceDestroyer(resourceDestroyer)
     , m_elementSize(elementSize)
     , m_updateStrategy(updateStrategy)
     , m_hostBuffer(m_device,
+                   m_resourceDestroyer,
                    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
                    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
                      (updateStrategy == UpdateStrategy::PersistentMapping ? CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL : 0))
     , m_deviceBuffer(m_device,
+                     m_resourceDestroyer,
                      bufferUsage | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
                      CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
   {

@@ -21,9 +21,10 @@ namespace gtl
 {
   GgpuDenseDataStore::GgpuDenseDataStore(CgpuDevice device,
                                          GgpuStager& stager,
+                                         GgpuResourceDestroyer& resourceDestroyer,
                                          uint64_t elementSize,
                                          uint32_t minCapacity)
-    : GgpuLinearDataStore(device, stager, elementSize, minCapacity)
+    : GgpuLinearDataStore(device, stager, resourceDestroyer, elementSize, minCapacity)
     , m_elementSize(elementSize)
   {
     m_indexMap.reserve(minCapacity);
