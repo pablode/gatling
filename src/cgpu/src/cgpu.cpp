@@ -26,8 +26,12 @@
 
 #include <volk.h>
 
+#pragma clang diagnostic push
+// Silence nullability log spam on AppleClang
+#pragma clang diagnostic ignored "-Wnullability-completeness"
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
+#pragma clang diagnostic pop
 
 #include <memory>
 
