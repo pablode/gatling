@@ -741,6 +741,12 @@ bool cgpuWaitForFence(
   CgpuFence fence
 );
 
+bool cgpuGetFenceSignalled(
+  CgpuDevice device,
+  CgpuFence fence,
+  bool* signalled
+);
+
 bool cgpuDestroyFence(
   CgpuDevice device,
   CgpuFence fence
