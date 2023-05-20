@@ -59,6 +59,13 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
 
+  const SdfPath& id = GetId();
+
+  if (*dirtyBits & HdChangeTracker::DirtyDoubleSided)
+  {
+    m_doubleSided = sceneDelegate->GetDoubleSided(id);
+  }
+
   if ((*dirtyBits & HdChangeTracker::DirtyInstancer) |
       (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
   {
@@ -69,8 +76,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
     HdInstancer::_SyncInstancerAndParents(renderIndex, instancerId);
   }
-
-  const SdfPath& id = GetId();
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
   {
@@ -331,6 +336,11 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
   }
 }
 
+bool HdGatlingMesh::IsDoubleSided() const
+{
+  return m_doubleSided;
+}
+
 const VtVec3iArray& HdGatlingMesh::GetFaces() const
 {
   return m_faces;
@@ -375,7 +385,8 @@ HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const
          HdChangeTracker::DirtyInstanceIndex |
          HdChangeTracker::DirtyTransform |
          HdChangeTracker::DirtyMaterialId |
-         HdChangeTracker::DirtyVisibility;
+         HdChangeTracker::DirtyVisibility |
+         HdChangeTracker::DirtyDoubleSided;
 }
 
 HdDirtyBits HdGatlingMesh::_PropagateDirtyBits(HdDirtyBits bits) const

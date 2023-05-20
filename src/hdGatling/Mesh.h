@@ -47,6 +47,7 @@ public:
 
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
+  bool IsDoubleSided() const;
   const VtVec3iArray& GetFaces() const;
   const VtVec3fArray& GetPoints() const;
   const VertexAttr<GfVec3f>& GetNormals() const;
@@ -89,7 +90,8 @@ private:
   VertexAttr<GfVec3f> m_normals;
   VertexAttr<GfVec2f> m_texCoords;
   GfVec3f m_color;
-  bool m_hasColor;
+  bool m_hasColor = false;
+  bool m_doubleSided = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
