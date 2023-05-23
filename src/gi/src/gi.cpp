@@ -39,7 +39,8 @@
 #include <cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <sg/ShaderGen.h>
+#include "sg/ShaderGen.h"
+#include "interface/rp_main.h"
 
 #include <MaterialXCore/Document.h>
 
@@ -996,28 +997,13 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     _giResizeOutputBuffer(params->imageWidth, params->imageHeight, outputBufferSize);
   }
 
+  namespace Rp = gtl::shader_interface::rp_main;
+
   // Set up GPU data.
   auto camForward = glm::normalize(glm::make_vec3(params->camera->forward));
   auto camUp = glm::normalize(glm::make_vec3(params->camera->up));
 
-  struct PushData {
-    float camPos[3];
-    uint32_t imageWidth;
-    float cameraForward[3];
-    uint32_t imageHeight;
-    float cameraUp[3];
-    float cameraVFoV;
-    float backgroundColor[4];
-    uint32_t sampleCount;
-    uint32_t maxBounces;
-    float maxSampleValue;
-    uint32_t maxBounceOffset;
-    float domeLightTransformCol0[3];
-    float rrInvMinTermProb;
-    float domeLightTransformCol1[3];
-    uint32_t sampleOffset;
-    float domeLightTransformCol2[3];
-  } pushData = {
+  Rp::PushConstants pushData = {
     { params->camera->position[0], params->camera->position[1], params->camera->position[2] },
     params->imageWidth,
     { camForward[0], camForward[1], camForward[2] },
@@ -1039,14 +1025,14 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   std::vector<CgpuBufferBinding> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ 0, 0, s_outputBuffer, 0, outputBufferSize });
-  buffers.push_back({ 1, 0, geom_cache->buffer, geom_cache->faceBufferView.offset, geom_cache->faceBufferView.size });
+  buffers.push_back({ Rp::BINDING_INDEX_OUT_PIXELS, 0, s_outputBuffer, 0, outputBufferSize });
+  buffers.push_back({ Rp::BINDING_INDEX_FACES, 0, geom_cache->buffer, geom_cache->faceBufferView.offset, geom_cache->faceBufferView.size });
   // TODO: set sphere light buffer
   //if (shader_cache->nee_enabled)
   //{
-  //  buffers.push_back({ 2, 0, geom_cache->buffer, /* ... */ });
+  //  buffers.push_back({ Rp::BINDING_INDEX_EMISSIVE_FACES, 0, geom_cache->buffer, /* ... */ });
   //}
-  buffers.push_back({ 3, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
+  buffers.push_back({ Rp::BINDING_INDEX_VERTICES, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
   bool domeLightEnabled = (scene->domeLightTexture.handle != CGPU_INVALID_HANDLE);
   size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + int(domeLightEnabled);
@@ -1054,22 +1040,22 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   std::vector<CgpuImageBinding> images;
   images.reserve(imageCount);
 
-  CgpuSamplerBinding sampler = { 4, 0, s_texSampler };
+  CgpuSamplerBinding sampler = { Rp::BINDING_INDEX_SAMPLER, 0, s_texSampler };
 
   if (domeLightEnabled)
   {
-    images.push_back({ 5, 0, scene->domeLightTexture });
+    images.push_back({ Rp::BINDING_INDEX_TEXTURES_2D, 0, scene->domeLightTexture });
   }
   for (uint32_t i = 0; i < shader_cache->images2d.size(); i++)
   {
-    images.push_back({ 5, int(domeLightEnabled) + i, shader_cache->images2d[i] });
+    images.push_back({ Rp::BINDING_INDEX_TEXTURES_2D, int(domeLightEnabled) + i, shader_cache->images2d[i] });
   }
   for (uint32_t i = 0; i < shader_cache->images3d.size(); i++)
   {
-    images.push_back({ 6, i, shader_cache->images3d[i] });
+    images.push_back({ Rp::BINDING_INDEX_TEXTURES_3D, i, shader_cache->images3d[i] });
   }
 
-  CgpuTlasBinding as = { 7, 0, geom_cache->tlas };
+  CgpuTlasBinding as = { Rp::BINDING_INDEX_SCENE_AS, 0, geom_cache->tlas };
 
   CgpuBindings bindings = {0};
   bindings.bufferCount = (uint32_t) buffers.size();
@@ -1103,7 +1089,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     pushShaderStages |= shader_cache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_CLOSEST_HIT : 0;
     pushShaderStages |= shader_cache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_ANY_HIT : 0;
 
-    if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, pushShaderStages, sizeof(PushData), &pushData))
+    if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, pushShaderStages, sizeof(pushData), &pushData))
       goto cleanup;
   }
 
