@@ -61,6 +61,7 @@ target_link_libraries(
     MaterialXFormat
     MaterialXGenMdl
     glslang
+    glslang-default-resource-limits
     SPIRV
 )
 
