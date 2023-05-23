@@ -37,7 +37,7 @@
 
 #include <stager.h>
 #include <cgpu.h>
-#include <gml.h>
+#include <glm/glm.hpp>
 #include <sg/ShaderGen.h>
 
 #include <MaterialXCore/Document.h>
@@ -996,9 +996,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   }
 
   // Set up GPU data.
-  gml_vec3 cam_forward, cam_up;
-  gml_vec3_normalize(params->camera->forward, cam_forward);
-  gml_vec3_normalize(params->camera->up, cam_up);
+  auto camForward = glm::normalize(glm::vec3(params->camera->forward[0], params->camera->forward[1], params->camera->forward[2]));
+  auto camUp = glm::normalize(glm::vec3(params->camera->up[0], params->camera->up[1], params->camera->up[2]));
 
   struct PushData {
     float camPos[3];
@@ -1020,9 +1019,9 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   } pushData = {
     { params->camera->position[0], params->camera->position[1], params->camera->position[2] },
     params->imageWidth,
-    { cam_forward[0], cam_forward[1], cam_forward[2] },
+    { camForward[0], camForward[1], camForward[2] },
     params->imageHeight,
-    { cam_up[0], cam_up[1], cam_up[2] },
+    { camUp[0], camUp[1], camUp[2] },
     params->camera->vfov,
     { params->bgColor[0], params->bgColor[1], params->bgColor[2], params->bgColor[3] },
     params->spp,

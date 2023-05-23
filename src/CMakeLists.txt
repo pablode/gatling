@@ -1,6 +1,5 @@
 add_subdirectory(gb)
 add_subdirectory(cgpu)
-add_subdirectory(gml)
 add_subdirectory(imgio)
 add_subdirectory(ggpu)
 add_subdirectory(gi)

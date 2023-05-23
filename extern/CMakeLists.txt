@@ -121,3 +121,8 @@ set(SPIRV_REFLECT_EXECUTABLE OFF)
 set(SPIRV_REFLECT_EXAMPLES OFF)
 set(SPIRV_REFLECT_STATIC_LIB ON)
 add_subdirectory(SPIRV-Reflect)
+
+#
+# GLM
+#
+add_subdirectory(glm)

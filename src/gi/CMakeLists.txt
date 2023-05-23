@@ -54,8 +54,8 @@ target_link_libraries(
     gb
     cgpu
     ggpu
-    gml
     imgio
+    glm
     MaterialXCore
     MaterialXFormat
     MaterialXGenMdl
