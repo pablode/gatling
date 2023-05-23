@@ -125,9 +125,8 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   m_giDomeLight = giCreateDomeLight(m_giScene, path.c_str());
 
   const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
-  // FIXME: invert in gi once we have settled on a math library
-  auto invTransform = GfMatrix3f(transform.ExtractRotationMatrix().GetInverse());
-  giSetDomeLightTransform(m_giDomeLight, invTransform.data());
+  auto rotateTransform = GfMatrix3f(transform.ExtractRotationMatrix());
+  giSetDomeLightTransform(m_giDomeLight, rotateTransform.data());
 
   // We need to ensure that the correct dome light is displayed when usdview's additional
   // one has been enabled. Although the type isn't 'simpleLight' (which may be a bug), we

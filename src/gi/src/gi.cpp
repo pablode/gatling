@@ -1237,6 +1237,6 @@ void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
 
 void giSetDomeLightTransform(GiDomeLight* light, float* transformPtr)
 {
-  auto transform = glm::make_mat3(transformPtr);
+  auto transform = glm::inverse(glm::make_mat3(transformPtr));
   memcpy(&light->transform, glm::value_ptr(transform), sizeof(transform));
 }
