@@ -49,14 +49,8 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto T = GfMatrix4f(sceneDelegate->GetTransform(id));
-
-    float transform3x4[3][4] = {
-      (float) T[0][0], (float) T[1][0], (float) T[2][0], (float) T[3][0],
-      (float) T[0][1], (float) T[1][1], (float) T[2][1], (float) T[3][1],
-      (float) T[0][2], (float) T[1][2], (float) T[2][2], (float) T[3][2]
-    };
-    giSetSphereLightTransform(m_giSphereLight, (float*) transform3x4);
+    auto pos = sceneDelegate->GetTransform(id) * GfVec4f(0.0f, 0.0f, 0.0f, 1.0f);
+    giSetSphereLightPosition(m_giSphereLight, pos.data());
   }
 
   // FIXME: intensity, radius (with treatAsPoint)

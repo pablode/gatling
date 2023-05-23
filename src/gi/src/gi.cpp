@@ -90,7 +90,7 @@ struct GiMesh
 
 struct GiSphereLight
 {
-  glm::mat3x4 transform;
+  glm::vec3 position;
 };
 
 struct GiScene
@@ -1201,7 +1201,6 @@ void giDestroyScene(GiScene* scene)
 GiSphereLight* giCreateSphereLight(GiScene* scene)
 {
   auto light = new GiSphereLight;
-  light->transform = glm::mat3x4(1.0f);
   {
     std::lock_guard guard(scene->mutex);
     scene->lights.insert(light);
@@ -1218,9 +1217,9 @@ void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
   delete light;
 }
 
-void giSetSphereLightTransform(GiSphereLight* light, float* transform3x4)
+void giSetSphereLightPosition(GiSphereLight* light, float* pos)
 {
-  memcpy(&light->transform, transform3x4, 3 * 4 * sizeof(float));
+  light->position = glm::make_vec3(pos);
 }
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)

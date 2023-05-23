@@ -164,7 +164,7 @@ void giDestroyScene(GiScene* scene);
 
 GiSphereLight* giCreateSphereLight(GiScene* scene);
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light);
-void giSetSphereLightTransform(GiSphereLight* light, float* transform3x4);
+void giSetSphereLightPosition(GiSphereLight* light, float* position);
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
 void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);
