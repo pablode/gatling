@@ -24,6 +24,10 @@ vec3 evaluate_sample(vec3 ray_origin,
     rayPayload.radiance   = f16vec3(vec3(0.0));
     rayPayload.rng_state  = rng_state;
 
+#if AOV_ID == AOV_ID_DEBUG_BOUNCES
+    uint bounce = 0;
+#endif
+
     // Path trace
     [[loop]]
     while ((rayPayload.bitfield & 0x7FFFu) <= PC.MAX_BOUNCES)
@@ -44,11 +48,14 @@ vec3 evaluate_sample(vec3 ray_origin,
 
         ray_origin = rayPayload.ray_origin;
         ray_dir = decode_octahedral(rayPayload.ray_dir);
+
+#if AOV_ID == AOV_ID_DEBUG_BOUNCES
+        bounce++;
+#endif
     }
 
-    // FIXME: this is broken because we clear the bitfield to 0xFFFFu on termination
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
-    return vec3(float(rayPayload.bitfield & 0x7FFFu) / float(PC.MAX_BOUNCES), 0.0, 0.0);
+    return colormap_inferno(float(bounce) / float(PC.MAX_BOUNCES));
 #endif
 
     // Radiance clamping

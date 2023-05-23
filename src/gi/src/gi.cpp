@@ -1139,9 +1139,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   if (!cgpuUnmapBuffer(s_device, s_outputStagingBuffer))
     goto cleanup;
 
-  // Visualize red channel as heatmap for debug AOVs.
-  if (shader_cache->aovId == GI_AOV_ID_DEBUG_BOUNCES ||
-      shader_cache->aovId == GI_AOV_ID_DEBUG_CLOCK_CYCLES)
+  // Normalize debug AOV heatmaps.
+  if (shader_cache->aovId == GI_AOV_ID_DEBUG_CLOCK_CYCLES)
   {
     int valueCount = pixelCount * compCount;
 
