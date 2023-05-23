@@ -21,7 +21,7 @@ hitAttributeEXT vec2 baryCoord;
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
-    float p = min(max_throughput, PC.RR_INV_MIN_TERM_PROB);
+    float p = min(max_throughput, PC.rrInvMinTermProb);
 
     if (random_float > p)
     {
@@ -117,11 +117,11 @@ void main()
 #endif
 
     bool terminateRay = false;
-    if (bounce == PC.MAX_BOUNCES - 1)
+    if (bounce == PC.maxBounces - 1)
     {
         terminateRay = true;
     }
-    else if (bounce > PC.RR_BOUNCE_OFFSET)
+    else if (bounce > PC.rrBounceOffset)
     {
         terminateRay = russian_roulette(k1, throughput);
     }

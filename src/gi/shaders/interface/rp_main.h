@@ -22,24 +22,24 @@
 
 SI_NAMESPACE_BEGIN(rp_main)
 
-#define RP_MAIN_PUSH_CONSTANT_LIST    \
-{                                     \
-  SI_VEC3  CAMERA_POSITION;           \
-  SI_UINT  IMAGE_WIDTH;               \
-  SI_VEC3  CAMERA_FORWARD;            \
-  SI_UINT  IMAGE_HEIGHT;              \
-  SI_VEC3  CAMERA_UP;                 \
-  SI_FLOAT CAMERA_VFOV;               \
-  SI_VEC4  BACKGROUND_COLOR;          \
-  SI_UINT  SAMPLE_COUNT;              \
-  SI_UINT  MAX_BOUNCES;               \
-  SI_FLOAT MAX_SAMPLE_VALUE;          \
-  SI_UINT  RR_BOUNCE_OFFSET;          \
-  SI_VEC3  DOMELIGHT_TRANSFORM_COL0;  \
-  SI_FLOAT RR_INV_MIN_TERM_PROB;      \
-  SI_VEC3  DOMELIGHT_TRANSFORM_COL1;  \
-  SI_UINT  SAMPLE_OFFSET;             \
-  SI_VEC3  DOMELIGHT_TRANSFORM_COL2;  \
+#define RP_MAIN_PUSH_CONSTANT_LIST   \
+{                                    \
+  SI_VEC3  cameraPosition;           \
+  SI_UINT  imageWidth;               \
+  SI_VEC3  cameraForward;            \
+  SI_UINT  imageHeight;              \
+  SI_VEC3  cameraUp;                 \
+  SI_FLOAT cameraVFoV;               \
+  SI_VEC4  backgroundColor;          \
+  SI_UINT  sampleCount;              \
+  SI_UINT  maxBounces;               \
+  SI_FLOAT maxSampleValue;           \
+  SI_UINT  rrBounceOffset;           \
+  SI_VEC3  domeLightTransformCol0;   \
+  SI_FLOAT rrInvMinTermProb;         \
+  SI_VEC3  domeLightTransformCol1;   \
+  SI_UINT  sampleOffset;             \
+  SI_VEC3  domeLightTransformCol2;   \
 }
 #ifdef __cplusplus
 struct PushConstants RP_MAIN_PUSH_CONSTANT_LIST;

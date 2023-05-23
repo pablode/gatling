@@ -1004,22 +1004,22 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   auto camUp = glm::normalize(glm::make_vec3(params->camera->up));
 
   Rp::PushConstants pushData = {
-    { params->camera->position[0], params->camera->position[1], params->camera->position[2] },
-    params->imageWidth,
-    { camForward[0], camForward[1], camForward[2] },
-    params->imageHeight,
-    { camUp[0], camUp[1], camUp[2] },
-    params->camera->vfov,
-    { params->bgColor[0], params->bgColor[1], params->bgColor[2], params->bgColor[3] },
-    params->spp,
-    params->maxBounces,
-    params->maxSampleValue,
-    params->rrBounceOffset,
-    { scene->domeLightTransform[0][0], scene->domeLightTransform[0][1], scene->domeLightTransform[0][2] },
-    params->rrInvMinTermProb,
-    { scene->domeLightTransform[1][0], scene->domeLightTransform[1][1], scene->domeLightTransform[1][2] },
-    s_sampleOffset,
-    { scene->domeLightTransform[2][0], scene->domeLightTransform[2][1], scene->domeLightTransform[2][2] }
+    .cameraPosition         = glm::make_vec3(params->camera->position),
+    .imageWidth             = params->imageWidth,
+    .cameraForward          = camForward,
+    .imageHeight            = params->imageHeight,
+    .cameraUp               = camUp,
+    .cameraVFoV             = params->camera->vfov,
+    .backgroundColor        = glm::make_vec4(params->bgColor),
+    .sampleCount            = params->spp,
+    .maxBounces             = params->maxBounces,
+    .maxSampleValue         = params->maxSampleValue,
+    .rrBounceOffset         = params->rrBounceOffset,
+    .domeLightTransformCol0 = scene->domeLightTransform[0],
+    .rrInvMinTermProb       = params->rrInvMinTermProb,
+    .domeLightTransformCol1 = scene->domeLightTransform[1],
+    .sampleOffset           = s_sampleOffset,
+    .domeLightTransformCol2 = scene->domeLightTransform[2]
   };
 
   std::vector<CgpuBufferBinding> buffers;

@@ -30,7 +30,7 @@ vec3 evaluate_sample(vec3 ray_origin,
 
     // Path trace
     [[loop]]
-    while ((rayPayload.bitfield & 0x7FFFu) <= PC.MAX_BOUNCES)
+    while ((rayPayload.bitfield & 0x7FFFu) <= PC.maxBounces)
     {
         traceRayEXT(
             sceneAS,    // top-level AS
@@ -55,15 +55,15 @@ vec3 evaluate_sample(vec3 ray_origin,
     }
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
-    return colormap_inferno(float(bounce) / float(PC.MAX_BOUNCES));
+    return colormap_inferno(float(bounce) / float(PC.maxBounces));
 #endif
 
     // Radiance clamping
     vec3 radiance = vec3(rayPayload.radiance);
     float maxValue = max(radiance.r, max(radiance.g, radiance.b));
-    if (maxValue > PC.MAX_SAMPLE_VALUE)
+    if (maxValue > PC.maxSampleValue)
     {
-        radiance *= PC.MAX_SAMPLE_VALUE / maxValue;
+        radiance *= PC.maxSampleValue / maxValue;
     }
 
     return max(vec3(0.0), radiance);
@@ -76,27 +76,27 @@ void main()
 #endif
 
     uvec2 pixel_pos = gl_LaunchIDEXT.xy;
-    uint pixel_index = pixel_pos.x + pixel_pos.y * PC.IMAGE_WIDTH;
+    uint pixel_index = pixel_pos.x + pixel_pos.y * PC.imageWidth;
 
-    vec3 camera_right = cross(PC.CAMERA_FORWARD, PC.CAMERA_UP);
-    float aspect_ratio = float(PC.IMAGE_WIDTH) / float(PC.IMAGE_HEIGHT);
+    vec3 camera_right = cross(PC.cameraForward, PC.cameraUp);
+    float aspect_ratio = float(PC.imageWidth) / float(PC.imageHeight);
 
     float H = 1.0;
     float W = H * aspect_ratio;
-    float d = H / (2.0 * tan(PC.CAMERA_VFOV * 0.5));
+    float d = H / (2.0 * tan(PC.cameraVFoV * 0.5));
 
-    float WX = W / float(PC.IMAGE_WIDTH);
-    float HY = H / float(PC.IMAGE_HEIGHT);
+    float WX = W / float(PC.imageWidth);
+    float HY = H / float(PC.imageHeight);
 
-    vec3 C = PC.CAMERA_POSITION + PC.CAMERA_FORWARD * d;
-    vec3 L = C - camera_right * W * 0.5 - PC.CAMERA_UP * H * 0.5;
+    vec3 C = PC.cameraPosition + PC.cameraForward * d;
+    vec3 L = C - camera_right * W * 0.5 - PC.cameraUp * H * 0.5;
 
-    float inv_sample_count = 1.0 / float(PC.SAMPLE_COUNT);
+    float inv_sample_count = 1.0 / float(PC.sampleCount);
 
     vec3 pixel_color = vec3(0.0, 0.0, 0.0);
-    for (uint s = 0; s < PC.SAMPLE_COUNT; ++s)
+    for (uint s = 0; s < PC.sampleCount; ++s)
     {
-        uint sampleIndex = PC.SAMPLE_OFFSET + s;
+        uint sampleIndex = PC.sampleOffset + s;
 #ifdef RAND_4D
         uvec4 rng_state = rng4d_init(pixel_pos.xy, sampleIndex);
         vec4 k = rng4d_next(rng_state);
@@ -111,9 +111,9 @@ void main()
         vec3 P =
             L +
             (float(pixel_pos.x) + k1) * camera_right * WX +
-            (float(pixel_pos.y) + k2) * PC.CAMERA_UP * HY;
+            (float(pixel_pos.y) + k2) * PC.cameraUp * HY;
 
-        vec3 ray_origin = PC.CAMERA_POSITION;
+        vec3 ray_origin = PC.cameraPosition;
         vec3 ray_dir = P - ray_origin;
 
         /* Beware: a single direction component must not be zero,
@@ -132,12 +132,12 @@ void main()
     pixel_color = vec3(cycles_elapsed_norm, 0.0, 0.0);
 #endif
 
-    if (PC.SAMPLE_OFFSET > 0)
+    if (PC.sampleOffset > 0)
     {
-      float inv_total_sample_count = 1.0 / float(PC.SAMPLE_OFFSET + PC.SAMPLE_COUNT);
+      float inv_total_sample_count = 1.0 / float(PC.sampleOffset + PC.sampleCount);
 
-      float weight_old = float(PC.SAMPLE_OFFSET) * inv_total_sample_count;
-      float weight_new = float(PC.SAMPLE_COUNT) * inv_total_sample_count;
+      float weight_old = float(PC.sampleOffset) * inv_total_sample_count;
+      float weight_new = float(PC.sampleCount) * inv_total_sample_count;
 
       pixel_color = weight_old * pixels[pixel_index].rgb + weight_new * pixel_color;
     }
