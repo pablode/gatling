@@ -38,6 +38,7 @@
 #include <stager.h>
 #include <cgpu.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <sg/ShaderGen.h>
 
 #include <MaterialXCore/Document.h>
@@ -89,7 +90,7 @@ struct GiMesh
 
 struct GiSphereLight
 {
-  float transform[3][4];
+  glm::mat3x4 transform;
 };
 
 struct GiScene
@@ -97,13 +98,13 @@ struct GiScene
   std::unordered_set<GiSphereLight*> lights;
   std::mutex mutex;
   CgpuImage domeLightTexture = { CGPU_INVALID_HANDLE };
-  float domeLightTransform[9];
+  glm::mat3 domeLightTransform;
 };
 
 struct GiDomeLight
 {
   std::string textureFilePath;
-  float transform[3 * 3] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+  glm::mat3 transform{1.0f};
 };
 
 CgpuDevice s_device = { CGPU_INVALID_HANDLE };
@@ -579,7 +580,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       }
       else
       {
-        memcpy(scene->domeLightTransform, domeLight->transform, 3 * 3 * sizeof(float));
+        scene->domeLightTransform = domeLight->transform;
       }
     }
 
@@ -996,8 +997,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   }
 
   // Set up GPU data.
-  auto camForward = glm::normalize(glm::vec3(params->camera->forward[0], params->camera->forward[1], params->camera->forward[2]));
-  auto camUp = glm::normalize(glm::vec3(params->camera->up[0], params->camera->up[1], params->camera->up[2]));
+  auto camForward = glm::normalize(glm::make_vec3(params->camera->forward));
+  auto camUp = glm::normalize(glm::make_vec3(params->camera->up));
 
   struct PushData {
     float camPos[3];
@@ -1028,11 +1029,11 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     params->maxBounces,
     params->maxSampleValue,
     params->rrBounceOffset,
-    { scene->domeLightTransform[0], scene->domeLightTransform[1], scene->domeLightTransform[2] },
+    { scene->domeLightTransform[0][0], scene->domeLightTransform[0][1], scene->domeLightTransform[0][2] },
     params->rrInvMinTermProb,
-    { scene->domeLightTransform[3], scene->domeLightTransform[4], scene->domeLightTransform[5] },
+    { scene->domeLightTransform[1][0], scene->domeLightTransform[1][1], scene->domeLightTransform[1][2] },
     s_sampleOffset,
-    { scene->domeLightTransform[6], scene->domeLightTransform[7], scene->domeLightTransform[8] }
+    { scene->domeLightTransform[2][0], scene->domeLightTransform[2][1], scene->domeLightTransform[2][2] }
   };
 
   std::vector<CgpuBufferBinding> buffers;
@@ -1199,14 +1200,8 @@ void giDestroyScene(GiScene* scene)
 
 GiSphereLight* giCreateSphereLight(GiScene* scene)
 {
-  const float identityTransform[3][4] = {
-    1.0f, 0.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f, 0.0f,
-    0.0f, 0.0f, 1.0f, 0.0f
-  };
-
   auto light = new GiSphereLight;
-  memcpy(light->transform, identityTransform, sizeof(identityTransform));
+  light->transform = glm::mat3x4(1.0f);
   {
     std::lock_guard guard(scene->mutex);
     scene->lights.insert(light);
@@ -1240,7 +1235,8 @@ void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
   delete light;
 }
 
-void giSetDomeLightTransform(GiDomeLight* light, float* transform3x3)
+void giSetDomeLightTransform(GiDomeLight* light, float* transformPtr)
 {
-  memcpy(&light->transform, transform3x3, 3 * 3 * sizeof(float));
+  auto transform = glm::make_mat3(transformPtr);
+  memcpy(&light->transform, glm::value_ptr(transform), sizeof(transform));
 }
