@@ -58,6 +58,7 @@ add_subdirectory(SPIRV-Headers)
 
 # SPIRV-Tools (glslang dependency)
 set(SPIRV_SKIP_EXECUTABLES ON)
+set(SPIRV_WERROR OFF)
 add_subdirectory(SPIRV-Tools)
 
 #
