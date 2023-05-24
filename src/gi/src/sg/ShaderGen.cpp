@@ -110,7 +110,8 @@ namespace gi::sg
     mi::base::Handle<const mi::neuraylib::IValue_float> v1(color->get_value(1));
     mi::base::Handle<const mi::neuraylib::IValue_float> v2(color->get_value(2));
 
-    return v0->get_value() != 0.0f || v1->get_value() != 0.0f || v2->get_value() != 0.0f;
+    const float eps = 1e-7f;
+    return v0->get_value() > eps || v1->get_value() > eps || v2->get_value() > eps;
   }
 
   bool _sgIsMaterialOpaque(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
