@@ -4,16 +4,8 @@ set(BUILD_SHARED_LIBS OFF)
 
 # Make option() honor normal variables.
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
-
-#
-# Vulkan-Headers
-#
-add_subdirectory(Vulkan-Headers)
-
-#
-# volk
-#
-add_subdirectory(volk)
+# target_link_libraries() allows use with targets in other directories
+cmake_policy(SET CMP0079 NEW)
 
 #
 # MaterialX
@@ -45,11 +37,26 @@ install(
 endif()
 
 #
+# Vulkan-Headers
+#
+add_subdirectory(Vulkan-Headers)
+
+#
+# volk
+#
+set(VOLK_PULL_IN_VULKAN OFF)
+add_subdirectory(volk)
+# Volk tries to link against the Vulkan::Vulkan target provided by the SDK. We
+# use the Vulkan-Headers target (from above submodule with the same name) instead.
+target_link_libraries(volk PUBLIC Vulkan-Headers)
+
+#
 # VulkanMemoryAllocator
 #
 set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
 set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF)
 add_subdirectory(VulkanMemoryAllocator)
+target_link_libraries(VulkanMemoryAllocator PUBLIC $<BUILD_INTERFACE:Vulkan-Headers>)
 
 # SPIRV-Headers (SPIRV-Tools dependency)
 set(SPIRV_HEADERS_SKIP_EXAMPLES ON)
