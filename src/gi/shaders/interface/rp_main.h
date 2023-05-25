@@ -22,28 +22,25 @@
 
 SI_NAMESPACE_BEGIN(rp_main)
 
-#define RP_MAIN_PUSH_CONSTANT_LIST   \
-{                                    \
-  SI_VEC3  cameraPosition;           \
-  SI_UINT  imageWidth;               \
-  SI_VEC3  cameraForward;            \
-  SI_UINT  imageHeight;              \
-  SI_VEC3  cameraUp;                 \
-  SI_FLOAT cameraVFoV;               \
-  SI_VEC4  backgroundColor;          \
-  SI_UINT  sampleCount;              \
-  SI_UINT  maxBounces;               \
-  SI_FLOAT maxSampleValue;           \
-  SI_UINT  rrBounceOffset;           \
-  SI_VEC3  domeLightTransformCol0;   \
-  SI_FLOAT rrInvMinTermProb;         \
-  SI_VEC3  domeLightTransformCol1;   \
-  SI_UINT  sampleOffset;             \
-  SI_VEC3  domeLightTransformCol2;   \
-}
-#ifdef __cplusplus
-struct PushConstants RP_MAIN_PUSH_CONSTANT_LIST;
-#endif
+struct PushConstants
+{
+  SI_VEC3  cameraPosition;
+  SI_UINT  imageWidth;
+  SI_VEC3  cameraForward;
+  SI_UINT  imageHeight;
+  SI_VEC3  cameraUp;
+  SI_FLOAT cameraVFoV;
+  SI_VEC4  backgroundColor;
+  SI_UINT  sampleCount;
+  SI_UINT  maxBounces;
+  SI_FLOAT maxSampleValue;
+  SI_UINT  rrBounceOffset;
+  SI_VEC3  domeLightTransformCol0;
+  SI_FLOAT rrInvMinTermProb;
+  SI_VEC3  domeLightTransformCol1;
+  SI_UINT  sampleOffset;
+  SI_VEC3  domeLightTransformCol2;
+};
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)
 SI_BINDING_INDEX(FACES,          1)

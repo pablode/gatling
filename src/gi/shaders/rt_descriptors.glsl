@@ -25,4 +25,4 @@ layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[TEXTUR
 
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
 
-layout(push_constant) uniform PushConstantBlock RP_MAIN_PUSH_CONSTANT_LIST PC;
+layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
