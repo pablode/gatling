@@ -26,8 +26,6 @@ You need to
 - download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v23.05">USD</a> (22.08+) with MaterialX support
 - have NASM 2.13+ or YASM 1.2.0+ in your PATH
 
-> Note: EXR export requires building USD with OpenImageIO support.
-
 Do a recursive clone of the repository and set up a build folder:
 ```
 git clone https://github.com/pablode/gatling --recursive
