@@ -67,9 +67,12 @@ protected:
 private:
   void _UpdateGeometry(HdSceneDelegate* sceneDelegate);
 
-  bool _FindPrimvar(HdSceneDelegate* sceneDelegate,
-                    TfToken name,
-                    HdInterpolation& interpolation) const;
+  bool _FindPrimvarInterpolationByName(HdSceneDelegate* sceneDelegate,
+                                       TfToken name,
+                                       HdInterpolation& interpolation) const;
+
+  TfToken _FindPrimvarByRole(HdSceneDelegate* sceneDelegate,
+                             TfToken role) const;
 
   bool _ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
                                 VtIntArray primitiveParams,

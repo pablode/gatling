@@ -128,9 +128,9 @@ void HdGatlingMesh::_UpdateGeometry(HdSceneDelegate* sceneDelegate)
   _PullPrimvars(sceneDelegate, primitiveParams, m_color, m_hasColor);
 }
 
-bool HdGatlingMesh::_FindPrimvar(HdSceneDelegate* sceneDelegate,
-                                 TfToken name,
-                                 HdInterpolation& interpolation) const
+bool HdGatlingMesh::_FindPrimvarInterpolationByName(HdSceneDelegate* sceneDelegate,
+                                                    TfToken name,
+                                                    HdInterpolation& interpolation) const
 {
   for (int i = 0; i < int(HdInterpolationCount); i++)
   {
@@ -148,6 +148,25 @@ bool HdGatlingMesh::_FindPrimvar(HdSceneDelegate* sceneDelegate,
   }
 
   return false;
+}
+
+TfToken HdGatlingMesh::_FindPrimvarByRole(HdSceneDelegate* sceneDelegate,
+                                          TfToken role) const
+{
+  for (int i = 0; i < int(HdInterpolationCount); i++)
+  {
+    const auto& primvarDescs = GetPrimvarDescriptors(sceneDelegate, (HdInterpolation) i);
+
+    for (const HdPrimvarDescriptor& primvar : primvarDescs)
+    {
+      if (primvar.role == role)
+      {
+        return primvar.name;
+      }
+    }
+  }
+
+  return TfToken();
 }
 
 template<typename T>
@@ -188,7 +207,7 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
                                              VtValue& result) const
 {
   HdInterpolation interpolation;
-  if (!_FindPrimvar(sceneDelegate, name, interpolation))
+  if (!_FindPrimvarInterpolationByName(sceneDelegate, name, interpolation))
   {
     return false;
   }
@@ -255,7 +274,7 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
 
   // Points: required per vertex.
   HdInterpolation pointInterpolation;
-  bool foundPoints = _FindPrimvar(sceneDelegate, HdTokens->points, pointInterpolation);
+  bool foundPoints = _FindPrimvarInterpolationByName(sceneDelegate, HdTokens->points, pointInterpolation);
 
   if (!foundPoints)
   {
@@ -273,7 +292,7 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
 
   // Colors: only support constant interpolation because we can create a material for it.
   HdInterpolation colorInterpolation;
-  bool foundColor = _FindPrimvar(sceneDelegate, HdTokens->displayColor, colorInterpolation);
+  bool foundColor = _FindPrimvarInterpolationByName(sceneDelegate, HdTokens->displayColor, colorInterpolation);
 
   if (foundColor && colorInterpolation == HdInterpolation::HdInterpolationConstant)
   {
@@ -308,11 +327,10 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
     m_normals.indexed = true;
   }
 
-  // Tex Coords: since there is no standardization in respect to multiple sets, we have to guess.
-  TfToken defaultUvPrimvarName = UsdUtilsGetPrimaryUVSetName();
-
-  TfToken texcoordPrimvarNames[] = {
-    defaultUvPrimvarName,
+  // Tex Coords: ideally should be read explicitly from primvars. But since this isn't implemented yet, we use
+  //             heuristics to select a primvar likely containing tex coords. We start by checking well-known names.
+  const TfToken texcoordPrimvarNameHints[] = {
+     UsdUtilsGetPrimaryUVSetName(),
     _tokens->st,
     _tokens->st0,
     _tokens->st_0,
@@ -322,20 +340,36 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
     _tokens->UV1
   };
 
-  VtValue boxedTexCoords;
-  for (const TfToken& name : texcoordPrimvarNames)
+  TfToken texcoordPrimvarName;
+  for (const TfToken& name : texcoordPrimvarNameHints)
   {
+    HdInterpolation unusedInterpolation;
+    if (_FindPrimvarInterpolationByName(sceneDelegate, name, unusedInterpolation))
+    {
+      texcoordPrimvarName = name;
+      break;
+    }
+  }
+
+  // Otherwise, we select any primvar of a specific role.
+  if (texcoordPrimvarName.IsEmpty())
+  {
+    texcoordPrimvarName = _FindPrimvarByRole(sceneDelegate, HdPrimvarRoleTokens->textureCoordinate);
+  }
+
+  if (!texcoordPrimvarName.IsEmpty())
+  {
+    VtValue boxedTexCoords;
     bool isIndexed;
     if (_ReadTriangulatedPrimvar(sceneDelegate,
                                  primitiveParams,
-                                 name,
+                                 texcoordPrimvarName,
                                  HdTypeFloatVec2,
                                  isIndexed,
                                  boxedTexCoords))
     {
       m_texCoords.array = boxedTexCoords.Get<VtVec2fArray>();
       m_texCoords.indexed = isIndexed;
-      break;
     }
   }
 }
