@@ -52,6 +52,8 @@ public:
   const VtVec3fArray& GetPoints() const;
   const VertexAttr<GfVec3f>& GetNormals() const;
   const VertexAttr<GfVec2f>& GetTexCoords() const;
+  const VertexAttr<GfVec3f>& GetTangents() const;
+  const VertexAttr<float>& GetBitangentSigns() const;
 
   const GfMatrix4d& GetPrototypeTransform() const;
 
@@ -92,6 +94,8 @@ private:
   VtVec3fArray m_points;
   VertexAttr<GfVec3f> m_normals;
   VertexAttr<GfVec2f> m_texCoords;
+  VertexAttr<GfVec3f> m_tangents;
+  VertexAttr<float> m_bitangentSigns;
   GfVec3f m_color;
   bool m_hasColor = false;
   bool m_doubleSided = false;

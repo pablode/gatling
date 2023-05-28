@@ -35,6 +35,9 @@ TF_DEFINE_PRIVATE_TOKENS(
   (st_1)
   (UV0)
   (UV1)
+  (tangents)
+  (tangentSigns)
+  (bitangentSigns)
 );
 
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
@@ -187,13 +190,21 @@ VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, int elementExpansi
 
 VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, HdType type, int elementExpansion)
 {
-  if (type == HdTypeFloatVec3)
+  if (type == HdTypeFloatVec4)
+  {
+    return _ExpandBufferElements<GfVec4f>(buffer, elementExpansion);
+  }
+  else if (type == HdTypeFloatVec3)
   {
     return _ExpandBufferElements<GfVec3f>(buffer, elementExpansion);
   }
   else if (type == HdTypeFloatVec2)
   {
     return _ExpandBufferElements<GfVec2f>(buffer, elementExpansion);
+  }
+  else if (type == HdTypeFloat)
+  {
+    return _ExpandBufferElements<float>(buffer, elementExpansion);
   }
   TF_VERIFY(false);
   return VtValue();
@@ -215,6 +226,15 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
   const SdfPath& id = GetId();
 
   VtValue boxedValues = sceneDelegate->Get(id, name);
+
+  if ((type == HdTypeFloatVec4 && !boxedValues.IsHolding<VtVec4fArray>()) ||
+      (type == HdTypeFloatVec3 && !boxedValues.IsHolding<VtVec3fArray>()) ||
+      (type == HdTypeFloatVec2 && !boxedValues.IsHolding<VtVec2fArray>()) ||
+      (type == HdTypeFloat     && !boxedValues.IsHolding<VtFloatArray>()))
+  {
+    return false;
+  }
+
   HdVtBufferSource buffer(name, boxedValues);
 
   if (interpolation == HdInterpolationVertex)
@@ -372,6 +392,64 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
       m_texCoords.indexed = isIndexed;
     }
   }
+
+  // Tangents & bitangents: either read combined vec4 array, or two separate primvars.
+  VtValue boxedTangents;
+  bool areTangentsIndexed;
+  if (_ReadTriangulatedPrimvar(sceneDelegate,
+                               primitiveParams,
+                               _tokens->tangents,
+                               HdTypeFloatVec4,
+                               areTangentsIndexed,
+                               boxedTangents))
+  {
+    m_tangents.indexed = areTangentsIndexed;
+    m_bitangentSigns.indexed = areTangentsIndexed;
+
+    VtVec3fArray& tangents = m_tangents.array;
+    VtFloatArray& bitangentSigns = m_bitangentSigns.array;
+
+    VtVec4fArray vec4Tangents = boxedTangents.Get<VtVec4fArray>();
+    tangents.resize(vec4Tangents.size());
+    bitangentSigns.resize(vec4Tangents.size());
+
+    for (size_t i = 0; i < vec4Tangents.size(); i++)
+    {
+      tangents[i] = GfVec3f(vec4Tangents[i].data());
+      bitangentSigns[i] = vec4Tangents[i][3];
+    }
+  }
+  else if (_ReadTriangulatedPrimvar(sceneDelegate,
+           primitiveParams,
+           _tokens->tangents,
+           HdTypeFloatVec3,
+           areTangentsIndexed,
+           boxedTangents))
+  {
+    m_tangents.indexed = areTangentsIndexed;
+    m_tangents.array = boxedTangents.Get<VtVec3fArray>();
+
+    const TfToken bitangentSignPrimvarNameHints[] = {
+      _tokens->tangentSigns,   // <= guc 0.2
+      _tokens->bitangentSigns  //  > guc 0.2
+    };
+
+    for (const TfToken& name : bitangentSignPrimvarNameHints)
+    {
+      VtValue boxedBitangentSigns;
+      bool areBitangentSignsIndexed;
+      if (_ReadTriangulatedPrimvar(sceneDelegate,
+                                   primitiveParams,
+                                   name,
+                                   HdTypeFloat,
+                                   areBitangentSignsIndexed,
+                                   boxedBitangentSigns))
+      {
+        m_bitangentSigns.indexed = areBitangentSignsIndexed;
+        m_bitangentSigns.array = boxedBitangentSigns.Get<VtFloatArray>();
+      }
+    }
+  }
 }
 
 bool HdGatlingMesh::IsDoubleSided() const
@@ -397,6 +475,16 @@ const HdGatlingMesh::VertexAttr<GfVec3f>& HdGatlingMesh::GetNormals() const
 const HdGatlingMesh::VertexAttr<GfVec2f>& HdGatlingMesh::GetTexCoords() const
 {
   return m_texCoords;
+}
+
+const HdGatlingMesh::VertexAttr<GfVec3f>& HdGatlingMesh::GetTangents() const
+{
+  return m_tangents;
+}
+
+const HdGatlingMesh::VertexAttr<float>& HdGatlingMesh::GetBitangentSigns() const
+{
+  return m_bitangentSigns;
 }
 
 const GfMatrix4d& HdGatlingMesh::GetPrototypeTransform() const
