@@ -44,7 +44,7 @@ namespace gtl
     CgpuBufferUsageFlags m_usageFlags;
     CgpuMemoryPropertyFlags m_memoryProperties;
 
-    CgpuBuffer m_buffer = { CGPU_INVALID_HANDLE };
+    CgpuBuffer m_buffer;
     uint64_t m_size = 0;
   };
 }

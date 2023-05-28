@@ -31,7 +31,7 @@ namespace gtl
   GgpuResizableBuffer::~GgpuResizableBuffer()
   {
     // TODO: add to deletion queue instead
-    if (m_buffer.handle != CGPU_INVALID_HANDLE)
+    if (m_buffer.handle)
       cgpuDestroyBuffer(m_device, m_buffer);
   }
 
@@ -54,10 +54,10 @@ namespace gtl
 
     if (newSize == 0)
     {
-      if (m_buffer.handle != CGPU_INVALID_HANDLE)
+      if (m_buffer.handle)
       {
         cgpuDestroyBuffer(m_device, m_buffer);
-        m_buffer.handle = CGPU_INVALID_HANDLE;
+        m_buffer.handle = 0;
       }
 
       m_size = 0;
@@ -66,9 +66,9 @@ namespace gtl
 
     // Create new, larger buffer.
     bool result = false;
-    CgpuCommandBuffer commandBuffer = { CGPU_INVALID_HANDLE };
-    CgpuBuffer buffer = { CGPU_INVALID_HANDLE };
-    CgpuFence fence = { CGPU_INVALID_HANDLE };
+    CgpuCommandBuffer commandBuffer;
+    CgpuBuffer buffer;
+    CgpuFence fence;
 
     if (!cgpuCreateBuffer(m_device, m_usageFlags, m_memoryProperties, newSize, &buffer))
       goto cleanup;
@@ -115,11 +115,11 @@ namespace gtl
 
   cleanup:
     // TODO: add to deletion queue instead (freed on fence signal)
-    if (buffer.handle != CGPU_INVALID_HANDLE)
+    if (buffer.handle)
       cgpuDestroyBuffer(m_device, buffer);
-    if (commandBuffer.handle != CGPU_INVALID_HANDLE)
+    if (commandBuffer.handle)
       cgpuDestroyCommandBuffer(m_device, commandBuffer);
-    if (fence.handle != CGPU_INVALID_HANDLE)
+    if (fence.handle)
       cgpuDestroyFence(m_device, fence);
 
     return result;

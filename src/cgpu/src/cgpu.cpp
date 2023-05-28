@@ -1768,7 +1768,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
     const CgpuRtHitGroup* hitGroup = &desc->hitGroups[i];
 
     // Closest hit (optional)
-    if (hitGroup->closestHitShader.handle != CGPU_INVALID_HANDLE)
+    if (hitGroup->closestHitShader.handle)
     {
       CgpuIShader* iclosestHitShader;
       if (!cgpuResolveShader(hitGroup->closestHitShader, &iclosestHitShader)) {
@@ -1781,7 +1781,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
     }
 
     // Any hit (optional)
-    if (hitGroup->anyHitShader.handle != CGPU_INVALID_HANDLE)
+    if (hitGroup->anyHitShader.handle)
     {
       CgpuIShader* ianyHitShader;
       if (!cgpuResolveShader(hitGroup->anyHitShader, &ianyHitShader)) {
@@ -1825,7 +1825,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
     groups[groupIndex].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
     groups[groupIndex].generalShader = VK_SHADER_UNUSED_KHR;
 
-    if (hit_group->closestHitShader.handle != CGPU_INVALID_HANDLE)
+    if (hit_group->closestHitShader.handle)
     {
       groups[groupIndex].closestHitShader = (hitShaderStageIndex++);
     }
@@ -1834,7 +1834,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
       anyNullClosestHitShader |= true;
     }
 
-    if (hit_group->anyHitShader.handle != CGPU_INVALID_HANDLE)
+    if (hit_group->anyHitShader.handle)
     {
       groups[groupIndex].anyHitShader = (hitShaderStageIndex++);
     }

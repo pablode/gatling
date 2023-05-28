@@ -50,7 +50,7 @@ namespace gtl
   {
     if (m_buffer.byteSize() > 0)
     {
-      CgpuCommandBuffer commandBuffer = { CGPU_INVALID_HANDLE }; // TODO
+      CgpuCommandBuffer commandBuffer; // TODO
       m_buffer.resize(m_device, commandBuffer, 0);
     }
   }
@@ -110,7 +110,7 @@ namespace gtl
       uint32_t minSize = m_elementSize * m_minCapacity;
       uint32_t newSize = std::max(_NextPowerOfTwo(byteOffset), minSize);
 
-      CgpuCommandBuffer commandBuffer = { CGPU_INVALID_HANDLE }; // TODO
+      CgpuCommandBuffer commandBuffer; // TODO
       if (!m_buffer.resize(m_device, commandBuffer, newSize))
       {
         assert(false);

@@ -57,9 +57,9 @@ struct GiGpuBufferView
 struct GiGeomCache
 {
   std::vector<CgpuBlas> blases;
-  CgpuBuffer            buffer = { CGPU_INVALID_HANDLE };
+  CgpuBuffer            buffer;
   GiGpuBufferView       faceBufferView = {};
-  CgpuTlas              tlas = { CGPU_INVALID_HANDLE };
+  CgpuTlas              tlas;
   GiGpuBufferView       vertexBufferView = {};
 };
 
@@ -71,10 +71,10 @@ struct GiShaderCache
   std::vector<CgpuImage>         images3d;
   std::vector<const GiMaterial*> materials;
   std::vector<CgpuShader>        missShaders;
-  CgpuPipeline                   pipeline = { CGPU_INVALID_HANDLE };
+  CgpuPipeline                   pipeline;
   bool                           hasPipelineClosestHitShader = false;
   bool                           hasPipelineAnyHitShader = false;
-  CgpuShader                     rgenShader = { CGPU_INVALID_HANDLE };
+  CgpuShader                     rgenShader;
 };
 
 struct GiMaterial
@@ -98,7 +98,7 @@ struct GiScene
 {
   std::unordered_set<GiSphereLight*> lights;
   std::mutex mutex;
-  CgpuImage domeLightTexture = { CGPU_INVALID_HANDLE };
+  CgpuImage domeLightTexture;
   glm::mat3 domeLightTransform;
 };
 
@@ -108,17 +108,17 @@ struct GiDomeLight
   glm::mat3 transform{1.0f};
 };
 
-CgpuDevice s_device = { CGPU_INVALID_HANDLE };
+CgpuDevice s_device;
 CgpuPhysicalDeviceFeatures s_deviceFeatures;
 CgpuPhysicalDeviceProperties s_deviceProperties;
-CgpuSampler s_texSampler = { CGPU_INVALID_HANDLE };
+CgpuSampler s_texSampler;
 std::unique_ptr<gtl::GgpuStager> s_stager;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
 std::unique_ptr<gi::TexSys> s_texSys;
-CgpuBuffer s_outputBuffer = { CGPU_INVALID_HANDLE };
-CgpuBuffer s_outputStagingBuffer = { CGPU_INVALID_HANDLE };
+CgpuBuffer s_outputBuffer;
+CgpuBuffer s_outputStagingBuffer;
 uint32_t s_outputBufferWidth = 0;
 uint32_t s_outputBufferHeight = 0;
 uint32_t s_sampleOffset = 0;
@@ -128,15 +128,15 @@ bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
   s_outputBufferWidth = width;
   s_outputBufferHeight = height;
 
-  if (s_outputBuffer.handle != CGPU_INVALID_HANDLE)
+  if (s_outputBuffer.handle)
   {
     cgpuDestroyBuffer(s_device, s_outputBuffer);
-    s_outputBuffer.handle = CGPU_INVALID_HANDLE;
+    s_outputBuffer.handle = 0;
   }
-  if (s_outputStagingBuffer.handle != CGPU_INVALID_HANDLE)
+  if (s_outputStagingBuffer.handle)
   {
     cgpuDestroyBuffer(s_device, s_outputStagingBuffer);
-    s_outputStagingBuffer.handle = CGPU_INVALID_HANDLE;
+    s_outputStagingBuffer.handle = 0;
   }
 
   if (width == 0 || height == 0)
@@ -417,7 +417,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
     // Create mesh instance for TLAS.
     const ProtoBlasInstance& proto = protoBlasInstances[mesh];
 
-    CgpuBlasInstance blasInstance = { CGPU_INVALID_HANDLE };
+    CgpuBlasInstance blasInstance;
     blasInstance.as = proto.blas;
     blasInstance.faceIndexOffset = proto.faceIndexOffset;
     blasInstance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: regular & shadow
@@ -446,8 +446,8 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   fflush(stdout);
 
   // Build HW ASes and vertex, index buffers.
-  CgpuBuffer buffer = { CGPU_INVALID_HANDLE };
-  CgpuTlas tlas = { CGPU_INVALID_HANDLE };
+  CgpuBuffer buffer;
+  CgpuTlas tlas;
   std::vector<CgpuBlas> blases;
   std::vector<CgpuBlasInstance> blas_instances;
   std::vector<GiVertex> allVertices;
@@ -504,11 +504,11 @@ cleanup:
   if (!cache)
   {
     assert(false);
-    if (buffer.handle != CGPU_INVALID_HANDLE)
+    if (buffer.handle)
     {
       cgpuDestroyBuffer(s_device, buffer);
     }
-    if (tlas.handle != CGPU_INVALID_HANDLE)
+    if (tlas.handle)
     {
       cgpuDestroyTlas(s_device, tlas);
     }
@@ -546,8 +546,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   fflush(stdout);
 
   GiShaderCache* cache = nullptr;
-  CgpuPipeline pipeline = { CGPU_INVALID_HANDLE };
-  CgpuShader rgenShader = { CGPU_INVALID_HANDLE };
+  CgpuPipeline pipeline;
+  CgpuShader rgenShader;
   std::vector<CgpuShader> missShaders;
   std::vector<CgpuShader> hitShaders;
   std::vector<CgpuImage> images_2d;
@@ -563,10 +563,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   bool domeLightEnabled = false;
   {
     GiScene* scene = params->scene;
-    if (scene->domeLightTexture.handle != CGPU_INVALID_HANDLE)
+    if (scene->domeLightTexture.handle)
     {
       cgpuDestroyImage(s_device, scene->domeLightTexture);
-      scene->domeLightTexture.handle = CGPU_INVALID_HANDLE;
+      scene->domeLightTexture.handle = 0;
     }
 
     GiDomeLight* domeLight = params->domeLight;
@@ -585,7 +585,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       }
     }
 
-    domeLightEnabled = scene->domeLightTexture.handle != CGPU_INVALID_HANDLE;
+    domeLightEnabled = bool(scene->domeLightTexture.handle);
   }
 
   // Create per-material closest-hit shaders.
@@ -773,7 +773,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
           hitShaders.push_back(closestHitShader);
         }
 
-        CgpuShader anyHitShader{ CGPU_INVALID_HANDLE };
+        CgpuShader anyHitShader;
         if (compInfo.anyHitInfo)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
@@ -794,7 +794,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
       // shadow hit group
       {
-        CgpuShader anyHitShader{ CGPU_INVALID_HANDLE };
+        CgpuShader anyHitShader;
 
         if (compInfo.anyHitInfo)
         {
@@ -809,7 +809,6 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         }
 
         CgpuRtHitGroup hitGroup;
-        hitGroup.closestHitShader = { CGPU_INVALID_HANDLE };
         hitGroup.anyHitShader = anyHitShader;
         hitGroups.push_back(hitGroup);
       }
@@ -926,7 +925,7 @@ cleanup:
     assert(false);
     s_texSys->destroyUncachedImages(images_2d);
     s_texSys->destroyUncachedImages(images_3d);
-    if (rgenShader.handle != CGPU_INVALID_HANDLE)
+    if (rgenShader.handle)
     {
       cgpuDestroyShader(s_device, rgenShader);
     }
@@ -938,7 +937,7 @@ cleanup:
     {
       cgpuDestroyShader(s_device, shader);
     }
-    if (pipeline.handle != CGPU_INVALID_HANDLE)
+    if (pipeline.handle)
     {
       cgpuDestroyPipeline(s_device, pipeline);
     }
@@ -977,8 +976,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   // Init state for goto error handling.
   int result = GI_ERROR;
 
-  CgpuCommandBuffer command_buffer = { CGPU_INVALID_HANDLE };
-  CgpuFence fence = { CGPU_INVALID_HANDLE };
+  CgpuCommandBuffer command_buffer;
+  CgpuFence fence;
 
   // Set up output buffer.
   int compCount = 4;
@@ -1034,7 +1033,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   //}
   buffers.push_back({ Rp::BINDING_INDEX_VERTICES, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
-  bool domeLightEnabled = (scene->domeLightTexture.handle != CGPU_INVALID_HANDLE);
+  bool domeLightEnabled = bool(scene->domeLightTexture.handle);
   size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + int(domeLightEnabled);
 
   std::vector<CgpuImageBinding> images;
@@ -1097,15 +1096,17 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
 
   // Copy output buffer to staging buffer.
-  CgpuBufferMemoryBarrier barrier;
-  barrier.srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-  barrier.dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
-  barrier.buffer = s_outputBuffer;
-  barrier.offset = 0;
-  barrier.size = CGPU_WHOLE_SIZE;
+  {
+    CgpuBufferMemoryBarrier barrier;
+    barrier.srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
+    barrier.dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
+    barrier.buffer = s_outputBuffer;
+    barrier.offset = 0;
+    barrier.size = CGPU_WHOLE_SIZE;
 
-  if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
-    goto cleanup;
+    if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
+      goto cleanup;
+  }
 
   if (!cgpuCmdCopyBuffer(command_buffer, s_outputBuffer, 0, s_outputStagingBuffer, 0, outputBufferSize))
     goto cleanup;
@@ -1175,10 +1176,10 @@ GiScene* giCreateScene()
 
 void giDestroyScene(GiScene* scene)
 {
-  if (scene->domeLightTexture.handle != CGPU_INVALID_HANDLE)
+  if (scene->domeLightTexture.handle)
   {
     cgpuDestroyImage(s_device, scene->domeLightTexture);
-    scene->domeLightTexture.handle = CGPU_INVALID_HANDLE;
+    scene->domeLightTexture.handle = 0;
   }
   delete scene;
 }

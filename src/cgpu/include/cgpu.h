@@ -22,7 +22,6 @@
 #include <stdbool.h>
 
 #define CGPU_WHOLE_SIZE (~0ULL)
-#define CGPU_INVALID_HANDLE 0xFFFFFFFFFFFFFFFF
 
 #define CGPU_MAX_TIMESTAMP_QUERIES 32
 
@@ -265,17 +264,17 @@ enum CgpuShaderStageFlagBits
   CGPU_SHADER_STAGE_MISS        = 0x00000800
 };
 
-struct CgpuInstance      { uint64_t handle; };
-struct CgpuDevice        { uint64_t handle; };
-struct CgpuBuffer        { uint64_t handle; };
-struct CgpuImage         { uint64_t handle; };
-struct CgpuShader        { uint64_t handle; };
-struct CgpuPipeline      { uint64_t handle; };
-struct CgpuFence         { uint64_t handle; };
-struct CgpuCommandBuffer { uint64_t handle; };
-struct CgpuSampler       { uint64_t handle; };
-struct CgpuBlas          { uint64_t handle; };
-struct CgpuTlas          { uint64_t handle; };
+struct CgpuInstance      { uint64_t handle = 0; };
+struct CgpuDevice        { uint64_t handle = 0; };
+struct CgpuBuffer        { uint64_t handle = 0; };
+struct CgpuImage         { uint64_t handle = 0; };
+struct CgpuShader        { uint64_t handle = 0; };
+struct CgpuPipeline      { uint64_t handle = 0; };
+struct CgpuFence         { uint64_t handle = 0; };
+struct CgpuCommandBuffer { uint64_t handle = 0; };
+struct CgpuSampler       { uint64_t handle = 0; };
+struct CgpuBlas          { uint64_t handle = 0; };
+struct CgpuTlas          { uint64_t handle = 0; };
 
 struct CgpuImageDesc
 {

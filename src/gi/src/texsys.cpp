@@ -144,7 +144,7 @@ namespace gi
     for (int i = 0; i < texCount; i++)
     {
       fflush(stdout);
-      CgpuImage image = { CGPU_INVALID_HANDLE };
+      CgpuImage image;
 
       auto& textureResource = textureResources[i];
       auto& payload = textureResource.data;
