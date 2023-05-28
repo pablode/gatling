@@ -33,6 +33,8 @@ TF_DEFINE_PRIVATE_TOKENS(
   (st_0)
   (st1)
   (st_1)
+  (UV0)
+  (UV1)
 );
 
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
@@ -315,7 +317,9 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
     _tokens->st0,
     _tokens->st_0,
     _tokens->st1,
-    _tokens->st_1
+    _tokens->st_1,
+    _tokens->UV0,
+    _tokens->UV1
   };
 
   VtValue boxedTexCoords;
