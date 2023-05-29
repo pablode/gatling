@@ -139,7 +139,7 @@ bool _ConvertUsdNodesToMaterialXNodes(const HdMaterialNetwork2& network,
         }
         else
         {
-          TF_WARN("UsdUVTexture node has unsupported wrap mode %s\n", wrapToken.GetText());
+          TF_WARN("UsdUVTexture node has unsupported wrap mode %s", wrapToken.GetText());
           wrapType = _tokens->ND_UsdUVTexture_WrapMode_periodic;
         }
       };
