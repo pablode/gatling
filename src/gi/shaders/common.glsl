@@ -23,13 +23,6 @@ const float PI = 3.1415926535897932384626433832795;
 #define AOV_ID_DEBUG_CLOCK_CYCLES 6
 #define AOV_ID_DEBUG_OPACITY 7
 
-struct face
-{
-    uint v_0;
-    uint v_1;
-    uint v_2;
-};
-
 vec4 uvec4AsVec4(uvec4 v)
 {
     v >>= 9;

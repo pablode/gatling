@@ -32,6 +32,13 @@ struct FVertex
   SI_VEC4 tangent;
 };
 
+struct Face
+{
+  SI_UINT v_0;
+  SI_UINT v_1;
+  SI_UINT v_2;
+};
+
 struct PushConstants
 {
   SI_VEC3  cameraPosition;

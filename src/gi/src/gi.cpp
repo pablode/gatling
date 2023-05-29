@@ -322,7 +322,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
                                 std::vector<CgpuBlas>& blases,
                                 std::vector<CgpuBlasInstance>& blasInstances,
                                 std::vector<Rp::FVertex>& allVertices,
-                                std::vector<GiFace>& allFaces)
+                                std::vector<Rp::Face>& allFaces)
 {
   struct ProtoBlasInstance
   {
@@ -380,11 +380,11 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         indices.push_back(face->v_i[1]);
         indices.push_back(face->v_i[2]);
 
-        GiFace new_face;
-        new_face.v_i[0] = vertexIndexOffset + face->v_i[0];
-        new_face.v_i[1] = vertexIndexOffset + face->v_i[1];
-        new_face.v_i[2] = vertexIndexOffset + face->v_i[2];
-        allFaces.push_back(new_face);
+        allFaces.push_back(Rp::Face{
+          vertexIndexOffset + face->v_i[0],
+          vertexIndexOffset + face->v_i[1],
+          vertexIndexOffset + face->v_i[2]
+        });
       }
 
       // BLAS
@@ -459,7 +459,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   std::vector<CgpuBlas> blases;
   std::vector<CgpuBlasInstance> blas_instances;
   std::vector<Rp::FVertex> allVertices;
-  std::vector<GiFace> allFaces;
+  std::vector<Rp::Face> allFaces;
 
   if (!_giBuildGeometryStructures(params, blases, blas_instances, allVertices, allFaces))
     goto cleanup;
@@ -474,7 +474,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
     uint64_t buf_size = 0;
     const uint64_t offset_align = s_deviceProperties.minStorageBufferOffsetAlignment;
 
-    faceBufferView.size = allFaces.size() * sizeof(GiFace);
+    faceBufferView.size = allFaces.size() * sizeof(Rp::Face);
     vertexBufferView.size = allVertices.size() * sizeof(Rp::FVertex);
 
     faceBufferView.offset = giAlignBuffer(offset_align, faceBufferView.size, &buf_size);

@@ -2,7 +2,7 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
 {
     vec3 bc = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
 
-    face f = faces[hit_face_idx];
+    Face f = faces[hit_face_idx];
     FVertex v_0 = vertices[f.v_0];
     FVertex v_1 = vertices[f.v_1];
     FVertex v_2 = vertices[f.v_2];
