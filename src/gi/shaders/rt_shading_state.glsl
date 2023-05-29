@@ -3,9 +3,9 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     vec3 bc = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
 
     face f = faces[hit_face_idx];
-    fvertex v_0 = vertices[f.v_0];
-    fvertex v_1 = vertices[f.v_1];
-    fvertex v_2 = vertices[f.v_2];
+    FVertex v_0 = vertices[f.v_0];
+    FVertex v_1 = vertices[f.v_1];
+    FVertex v_2 = vertices[f.v_2];
 
     // Position and geometry normal
     vec3 p_0 = v_0.field1.xyz;

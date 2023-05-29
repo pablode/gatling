@@ -46,6 +46,8 @@
 
 using namespace gi;
 
+namespace Rp = gtl::shader_interface::rp_main;
+
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
 struct GiGpuBufferView
@@ -319,7 +321,7 @@ GiMesh* giCreateMesh(const GiMeshDesc* desc)
 bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
                                 std::vector<CgpuBlas>& blases,
                                 std::vector<CgpuBlasInstance>& blasInstances,
-                                std::vector<GiVertex>& allVertices,
+                                std::vector<Rp::FVertex>& allVertices,
                                 std::vector<GiFace>& allFaces)
 {
   struct ProtoBlasInstance
@@ -353,11 +355,17 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
       for (uint32_t i = 0; i < vertices.size(); i++)
       {
-        vertices[i].x = mesh->vertices[i].pos[0];
-        vertices[i].y = mesh->vertices[i].pos[1];
-        vertices[i].z = mesh->vertices[i].pos[2];
+        const GiVertex& cpuVert = mesh->vertices[i];
 
-        allVertices.push_back(mesh->vertices[i]);
+        vertices[i].x = cpuVert.pos[0];
+        vertices[i].y = cpuVert.pos[1];
+        vertices[i].z = cpuVert.pos[2];
+
+        allVertices.push_back(Rp::FVertex{
+          .field1  = { glm::make_vec3(cpuVert.pos),     cpuVert.u             },
+          .field2  = { glm::make_vec3(cpuVert.norm),    cpuVert.v             },
+          .tangent = { glm::make_vec3(cpuVert.tangent), cpuVert.bitangentSign }
+        });
       }
 
       // Indices
@@ -450,7 +458,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   CgpuTlas tlas;
   std::vector<CgpuBlas> blases;
   std::vector<CgpuBlasInstance> blas_instances;
-  std::vector<GiVertex> allVertices;
+  std::vector<Rp::FVertex> allVertices;
   std::vector<GiFace> allFaces;
 
   if (!_giBuildGeometryStructures(params, blases, blas_instances, allVertices, allFaces))
@@ -467,7 +475,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
     const uint64_t offset_align = s_deviceProperties.minStorageBufferOffsetAlignment;
 
     faceBufferView.size = allFaces.size() * sizeof(GiFace);
-    vertexBufferView.size = allVertices.size() * sizeof(GiVertex);
+    vertexBufferView.size = allVertices.size() * sizeof(Rp::FVertex);
 
     faceBufferView.offset = giAlignBuffer(offset_align, faceBufferView.size, &buf_size);
     vertexBufferView.offset = giAlignBuffer(offset_align, vertexBufferView.size, &buf_size);
@@ -995,8 +1003,6 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
     _giResizeOutputBuffer(params->imageWidth, params->imageHeight, outputBufferSize);
   }
-
-  namespace Rp = gtl::shader_interface::rp_main;
 
   // Set up GPU data.
   auto camForward = glm::normalize(glm::make_vec3(params->camera->forward));

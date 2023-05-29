@@ -22,6 +22,16 @@
 
 SI_NAMESPACE_BEGIN(rp_main)
 
+struct FVertex
+{
+  /* pos.{x, y, z}, tex.u */
+  SI_VEC4 field1;
+  /* norm.{x, y, z}, tex.v */
+  SI_VEC4 field2;
+  /* tangent.{x, y, z}, bitangent sign */
+  SI_VEC4 tangent;
+};
+
 struct PushConstants
 {
   SI_VEC3  cameraPosition;

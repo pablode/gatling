@@ -9,7 +9,7 @@ layout(binding = BINDING_INDEX_FACES, std430) readonly buffer FacesBuffer { face
 layout(binding = BINDING_INDEX_EMISSIVE_FACES, std430) readonly buffer EmissiveFacesBuffer { uint emissive_face_indices[]; };
 #endif
 
-layout(binding = BINDING_INDEX_VERTICES, std430) readonly buffer VerticesBuffer { fvertex vertices[]; };
+layout(binding = BINDING_INDEX_VERTICES, std430) readonly buffer VerticesBuffer { FVertex vertices[]; };
 
 #if defined(HAS_TEXTURES_2D) || defined(HAS_TEXTURES_3D)
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;

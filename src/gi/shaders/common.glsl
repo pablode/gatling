@@ -23,16 +23,6 @@ const float PI = 3.1415926535897932384626433832795;
 #define AOV_ID_DEBUG_CLOCK_CYCLES 6
 #define AOV_ID_DEBUG_OPACITY 7
 
-struct fvertex
-{
-    /* pos.{x, y, z}, tex.u */
-    vec4 field1;
-    /* norm.{x, y, z}, tex.v */
-    vec4 field2;
-    /* tangent.{x, y, z}, bitangent sign */
-    vec4 tangent;
-};
-
 struct face
 {
     uint v_0;
