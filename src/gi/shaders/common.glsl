@@ -134,19 +134,14 @@ vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
 }
 #endif
 
-float signNonZero(float v)
-{
-    return (v >= 0.0) ? 1.0 : -1.0;
-}
-
-vec2 signNonZero(vec2 v)
-{
-    return vec2(signNonZero(v.x), signNonZero(v.y));
-}
-
 // Octahedral encoding as described in Listings 1, 2 of Cigolle et al.
 // https://jcgt.org/published/0003/02/01/paper.pdf
-vec2 encode_octahedral(in vec3 v)
+vec2 signNonZero(vec2 v)
+{
+    return vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
+}
+
+vec2 encode_octahedral(vec3 v)
 {
     vec2 p = v.xy * (1.0 / (abs(v.x) + abs(v.y) + abs(v.z)));
     return (v.z <= 0.0) ? ((1.0 - abs(p.yx)) * signNonZero(p)) : p;
@@ -155,10 +150,10 @@ vec2 encode_octahedral(in vec3 v)
 vec3 decode_octahedral(vec2 e)
 {
     vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
-    if (v.z < 0.0)
-    {
-        v.xy = (1.0 - abs(v.yx)) * signNonZero(v.xy);
-    }
+    // Optimization by Rune Stubbe: https://twitter.com/Stubbesaurus/status/937994790553227264
+    float t = max(-v.z, 0.0);
+    v.x += v.x >= 0.0 ? -t : t;
+    v.y += v.y >= 0.0 ? -t : t;
     return normalize(v);
 }
 
