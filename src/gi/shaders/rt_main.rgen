@@ -47,7 +47,7 @@ vec3 evaluate_sample(vec3 ray_origin,
         );
 
         ray_origin = rayPayload.ray_origin;
-        ray_dir = decode_octahedral(rayPayload.ray_dir);
+        ray_dir = rayPayload.ray_dir;
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
         bounce++;

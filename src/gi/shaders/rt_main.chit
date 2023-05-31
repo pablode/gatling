@@ -153,7 +153,7 @@ void main()
             inside = !inside;
         }
 
-        rayPayload.ray_dir = encode_octahedral(bsdf_sample_data.k2);
+        rayPayload.ray_dir = bsdf_sample_data.k2;
         rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (is_transmission ? -1.0 : 1.0));
     }
 

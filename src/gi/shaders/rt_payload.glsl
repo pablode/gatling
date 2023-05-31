@@ -14,7 +14,7 @@ struct RayPayload
     /* inout */ uint rng_state;
 #endif
     /* out */   vec3 ray_origin;
-    /* out */   vec2 ray_dir; // octahedral encoded
+    /* out */   vec3 ray_dir;
 };
 
 struct ShadowRayPayload
