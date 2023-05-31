@@ -361,10 +361,24 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         vertices[i].y = cpuVert.pos[1];
         vertices[i].z = cpuVert.pos[2];
 
+        const auto encodeOctahedral = [](glm::vec3 v) {
+          v /= (fabsf(v.x) + fabsf(v.y) + fabsf(v.z));
+          glm::vec2 ps = glm::vec2(v.x >= 0.0f ? +1.0f : -1.0f, v.y >= 0.0f ? +1.0f : -1.0f);
+          return (v.z < 0.0f) ? ((1.0f - glm::abs(glm::vec2(v.y, v.x))) * ps) : glm::vec2(v.x, v.y);
+        };
+        const auto encodeDirection = [encodeOctahedral](glm::vec3 v) {
+          v = glm::normalize(v);
+          glm::vec2 e = encodeOctahedral(v);
+          e = e * 0.5f + 0.5f;
+          return glm::uintBitsToFloat(glm::packUnorm2x16(e));
+        };
+
+        float encodedNormal = encodeDirection(glm::make_vec3(cpuVert.norm));
+        float encodedTangent = encodeDirection(glm::make_vec3(cpuVert.tangent));
+
         allVertices.push_back(Rp::FVertex{
-          .field1  = { glm::make_vec3(cpuVert.pos),     cpuVert.u             },
-          .field2  = { glm::make_vec3(cpuVert.norm),    cpuVert.v             },
-          .tangent = { glm::make_vec3(cpuVert.tangent), cpuVert.bitangentSign }
+          .field1 = { glm::make_vec3(cpuVert.pos), cpuVert.bitangentSign },
+          .field2 = { encodedNormal, encodedTangent, cpuVert.u, cpuVert.v }
         });
       }
 

@@ -24,12 +24,10 @@ SI_NAMESPACE_BEGIN(rp_main)
 
 struct FVertex
 {
-  /* pos.{x, y, z}, tex.u */
+  /* f32 pos[3], u32 bsign */
   SI_VEC4 field1;
-  /* norm.{x, y, z}, tex.v */
+  /* u32 norm, u32 tan, f32 texcoords[2] */
   SI_VEC4 field2;
-  /* tangent.{x, y, z}, bitangent sign */
-  SI_VEC4 tangent;
 };
 
 struct Face

@@ -19,9 +19,9 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     geomNormal = normalize(vec3(geomNormal * gl_WorldToObjectEXT));
 
     // Shading normal
-    vec3 n_0 = v_0.field2.xyz;
-    vec3 n_1 = v_1.field2.xyz;
-    vec3 n_2 = v_2.field2.xyz;
+    vec3 n_0 = decode_direction(floatBitsToUint(v_0.field2.x));
+    vec3 n_1 = decode_direction(floatBitsToUint(v_1.field2.x));
+    vec3 n_2 = decode_direction(floatBitsToUint(v_2.field2.x));
 
     vec3 localNormal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
     vec3 normal = normalize(vec3(localNormal * gl_WorldToObjectEXT));
@@ -34,13 +34,13 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     }
 
     // Tangent and bitangent
-    vec4 t_0 = v_0.tangent;
-    vec4 t_1 = v_1.tangent;
-    vec4 t_2 = v_2.tangent;
+    vec4 t_0 = vec4(decode_direction(floatBitsToUint(v_0.field2.y)), v_0.field1.w);
+    vec4 t_1 = vec4(decode_direction(floatBitsToUint(v_1.field2.y)), v_1.field1.w);
+    vec4 t_2 = vec4(decode_direction(floatBitsToUint(v_2.field2.y)), v_2.field1.w);
 
     vec3 localTangent = normalize(bc.x * t_0.xyz + bc.y * t_1.xyz + bc.z * t_2.xyz);
     vec3 tangent = normalize(vec3(gl_ObjectToWorldEXT * vec4(localTangent, 0.0)));
-    // Re-orthonomalize to improve shading of surfaces with shared vertices. See:
+    // Re-orthonomalize to improve shading of surfaces with shared vertices
     // https://learnopengl.com/Advanced-Lighting/Normal-Mapping (bottom)
     tangent = normalize(tangent - dot(tangent, normal) * normal);
 
@@ -48,9 +48,9 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     vec3 bitangent = cross(normal, tangent) * bitangentSign;
 
     // UV coordinates
-    vec2 uv_0 = vec2(v_0.field1.w, v_0.field2.w);
-    vec2 uv_1 = vec2(v_1.field1.w, v_1.field2.w);
-    vec2 uv_2 = vec2(v_2.field1.w, v_2.field2.w);
+    vec2 uv_0 = vec2(v_0.field2.z, v_0.field2.w);
+    vec2 uv_1 = vec2(v_1.field2.z, v_1.field2.w);
+    vec2 uv_2 = vec2(v_2.field2.z, v_2.field2.w);
     vec2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
 
     // State
