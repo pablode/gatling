@@ -136,8 +136,8 @@ vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
 }
 #endif
 
-// Octahedral encoding as described in Listings 1, 2 of Cigolle et al.
-// https://jcgt.org/published/0003/02/01/paper.pdf
+// Octahedral normal encoding
+// https://knarkowicz.wordpress.com/2014/04/16/octahedron-normal-vector-encoding/
 vec2 signNonZero(vec2 v)
 {
     return vec2((v.x >= 0.0) ? 1.0 : -1.0, (v.y >= 0.0) ? 1.0 : -1.0);
@@ -146,17 +146,32 @@ vec2 signNonZero(vec2 v)
 vec2 encode_octahedral(vec3 v)
 {
     v /= (abs(v.x) + abs(v.y) + abs(v.z));
-    return (v.z < 0.0) ? ((1.0 - abs(v.yx)) * signNonZero(v.xy)) : v.xy;
+    vec2 e = (v.z < 0.0) ? ((1.0 - abs(v.yx)) * signNonZero(v.xy)) : v.xy;
+    return e * 0.5 + 0.5;
 }
 
 vec3 decode_octahedral(vec2 e)
 {
+    e = e * 2.0 - 1.0;
+
     vec3 v = vec3(e.xy, 1.0 - abs(e.x) - abs(e.y));
     // Optimization by Rune Stubbe: https://twitter.com/Stubbesaurus/status/937994790553227264
     float t = max(-v.z, 0.0);
     v.x += v.x >= 0.0 ? -t : t;
     v.y += v.y >= 0.0 ? -t : t;
     return normalize(v);
+}
+
+uint encode_direction(vec3 d)
+{
+    vec2 o = encode_octahedral(d);
+    return packUnorm2x16(o);
+}
+
+vec3 decode_direction(uint e)
+{
+    vec2 o = unpackUnorm2x16(e);
+    return decode_octahedral(o);
 }
 
 #endif
