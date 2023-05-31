@@ -143,8 +143,8 @@ vec2 signNonZero(vec2 v)
 
 vec2 encode_octahedral(vec3 v)
 {
-    vec2 p = v.xy * (1.0 / (abs(v.x) + abs(v.y) + abs(v.z)));
-    return (v.z <= 0.0) ? ((1.0 - abs(p.yx)) * signNonZero(p)) : p;
+    v /= (abs(v.x) + abs(v.y) + abs(v.z));
+    return (v.z < 0.0) ? ((1.0 - abs(v.yx)) * signNonZero(v.xy)) : v.xy;
 }
 
 vec3 decode_octahedral(vec2 e)
