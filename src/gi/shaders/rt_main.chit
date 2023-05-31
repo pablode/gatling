@@ -70,6 +70,14 @@ void main()
     rayPayload.radiance = f16vec3((normal + vec3(1.0, 1.0, 1.0)) * 0.5);
     rayPayload.bitfield = uint16_t(0xFFFFu);
     return;
+#elif AOV_ID == AOV_ID_DEBUG_TANGENTS
+    rayPayload.radiance = f16vec3((shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5);
+    rayPayload.bitfield = uint16_t(0xFFFFu);
+    return;
+#elif AOV_ID == AOV_ID_DEBUG_BITANGENTS
+    rayPayload.radiance = f16vec3((shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5);
+    rayPayload.bitfield = uint16_t(0xFFFFu);
+    return;
 #elif AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
     rayPayload.radiance = f16vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
     rayPayload.bitfield = uint16_t(0xFFFFu);

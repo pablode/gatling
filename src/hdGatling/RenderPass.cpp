@@ -594,6 +594,8 @@ const std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> s_aovIdMappings
   { HdGatlingAovTokens->debug_bounces,      GI_AOV_ID_DEBUG_BOUNCES      },
   { HdGatlingAovTokens->debug_clock_cycles, GI_AOV_ID_DEBUG_CLOCK_CYCLES },
   { HdGatlingAovTokens->debug_opacity,      GI_AOV_ID_DEBUG_OPACITY      },
+  { HdGatlingAovTokens->debug_tangents,     GI_AOV_ID_DEBUG_TANGENTS     },
+  { HdGatlingAovTokens->debug_bitangents,   GI_AOV_ID_DEBUG_BITANGENTS   },
 #endif
 };
 
