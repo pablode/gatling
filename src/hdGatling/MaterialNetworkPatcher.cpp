@@ -31,7 +31,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
   (ND_UsdPreviewSurface_surfaceshader)
-  (ND_UsdUVTexture)
+  (ND_UsdUVTexture_vector3)
   (glossiness)
   (normal)
   (bias)
@@ -101,7 +101,7 @@ void _PatchUsdPreviewSurfaceGlossinessInput(HdMaterialNetwork2& network, std::ma
   {
     HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
 
-    if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+    if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture_vector3)
     {
       continue;
     }
@@ -212,7 +212,7 @@ void _PatchUsdPreviewSurfaceSpecular(HdMaterialNetwork2& network)
       {
         HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
 
-        if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+        if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture_vector3)
         {
           continue;
         }
@@ -230,7 +230,7 @@ void _PatchUsdPreviewSurfaceNormalInputConnection(HdMaterialNetwork2& network, H
 {
   HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
 
-  if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+  if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture_vector3)
   {
     return;
   }
@@ -390,7 +390,7 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
   for (auto& pathNodePair : network.nodes)
   {
     HdMaterialNode2& node = pathNodePair.second;
-    if (node.nodeTypeId != _tokens->ND_UsdUVTexture)
+    if (node.nodeTypeId != _tokens->ND_UsdUVTexture_vector3)
     {
       continue;
     }

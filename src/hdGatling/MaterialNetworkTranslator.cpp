@@ -20,6 +20,7 @@
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdr/registry.h>
+#include <pxr/usd/sdf/types.h>
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 
 #include <MaterialXCore/Document.h>
@@ -72,15 +73,16 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_UsdPrimvarReader_vector4)
   (ND_UsdPrimvarReader_matrix44)
   (ND_UsdTransform2d)
-  (ND_UsdUVTexture)
+  (ND_UsdUVTexture_color3)
+  (ND_UsdUVTexture_vector3)
   ((ND_UsdUVTexture_WrapMode_black, "black"))
   ((ND_UsdUVTexture_WrapMode_clamp, "clamp"))
   ((ND_UsdUVTexture_WrapMode_periodic, "periodic"))
+  (rgb)
 );
 
 static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTypeIdMappings = {
   { _tokens->UsdPreviewSurface,       _tokens->ND_UsdPreviewSurface_surfaceshader },
-  { _tokens->UsdUVTexture,            _tokens->ND_UsdUVTexture                    },
   { _tokens->UsdTransform2d,          _tokens->ND_UsdTransform2d                  },
   { _tokens->UsdPrimvarReader_float,  _tokens->ND_UsdPrimvarReader_float          },
   { _tokens->UsdPrimvarReader_float2, _tokens->ND_UsdPrimvarReader_vector2        },
@@ -110,14 +112,45 @@ bool _ConvertUsdNodesToMaterialXNodes(const HdMaterialNetwork2& network,
     }
 
     auto mappingIt = _usdMtlxNodeTypeIdMappings.find(nodeTypeId);
-    if (mappingIt == _usdMtlxNodeTypeIdMappings.end())
-    {
-      TF_WARN("Unable to translate material node of type %s to MaterialX counterpart", nodeTypeId.GetText());
-      return false;
-    }
 
-    if (nodeTypeId == _tokens->UsdUVTexture)
+    if (mappingIt != _usdMtlxNodeTypeIdMappings.end())
     {
+      nodeTypeId = mappingIt->second;
+    }
+    else if (nodeTypeId == _tokens->UsdUVTexture)
+    {
+      nodeTypeId = _tokens->ND_UsdUVTexture_color3;
+
+      // Check input connections to determine if UsdUVTexture should be color or vector specialized
+      for (auto foreignNodeIt = network.nodes.begin(); foreignNodeIt != network.nodes.end(); foreignNodeIt++)
+      {
+        const HdMaterialNode2& foreignNode = foreignNodeIt->second;
+
+        for (auto input : foreignNode.inputConnections)
+        {
+          for (const HdMaterialConnection2& inputConnection : input.second)
+          {
+            if (inputConnection.upstreamNode == nodeIt->first && inputConnection.upstreamOutputName == _tokens->rgb)
+            {
+              SdrShaderNodeConstPtr foreignNodeSdr = sdrRegistry.GetShaderNodeByIdentifier(foreignNode.nodeTypeId);
+
+              if (!foreignNodeSdr)
+              {
+                continue;
+              }
+
+              NdrPropertyConstPtr usedInput = foreignNodeSdr->GetInput(input.first);
+
+              if (usedInput->GetTypeAsSdfType().first == SdfValueTypeNames->Normal3f ||
+                  usedInput->GetTypeAsSdfType().first == SdfValueTypeNames->Float3)
+              {
+                nodeTypeId = _tokens->ND_UsdUVTexture_vector3;
+              }
+            }
+          }
+        }
+      }
+
       // MaterialX node inputs do not match the USD spec; we need to remap.
       auto convertWrapType = [](VtValue& wrapType)
       {
@@ -157,8 +190,11 @@ bool _ConvertUsdNodesToMaterialXNodes(const HdMaterialNetwork2& network,
         convertWrapType(wrapT->second);
       }
     }
-
-    nodeTypeId = mappingIt->second;
+    else
+    {
+      TF_WARN("Unable to translate material node of type %s to MaterialX counterpart", nodeTypeId.GetText());
+      return false;
+    }
   }
 
   return true;
