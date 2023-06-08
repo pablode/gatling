@@ -54,6 +54,8 @@ vec3 evaluate_sample(vec3 ray_origin,
             PAYLOAD_INDEX_SHADE    // payload
         );
 
+        reorderThreadNV(hitObject);
+
         hitObjectExecuteShaderNV(hitObject, PAYLOAD_INDEX_SHADE);
 #else
         traceRayEXT(
