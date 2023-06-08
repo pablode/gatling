@@ -63,6 +63,8 @@ namespace gtl
 
     bool commitChanges();
 
+    uint32_t elementCount() const;
+
   protected:
     virtual uint8_t* readRaw(uint64_t handle);
     virtual uint8_t* writeRaw(uint64_t handle);
@@ -77,6 +79,7 @@ namespace gtl
     CgpuDevice m_device;
     uint64_t m_elementSize;
     uint32_t m_minCapacity;
+    uint32_t m_elementCount;
 
     GbHandleStore m_handleStore;
     GgpuSyncBuffer m_buffer;

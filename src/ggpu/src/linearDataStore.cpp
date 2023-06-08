@@ -42,6 +42,7 @@ namespace gtl
     : m_device(device)
     , m_elementSize(elementSize)
     , m_minCapacity(minCapacity)
+    , m_elementCount(0)
     , m_buffer(device, stager, elementSize)
   {
   }
@@ -57,11 +58,13 @@ namespace gtl
 
   uint64_t GgpuLinearDataStore::allocate()
   {
+    m_elementCount++;
     return m_handleStore.allocateHandle();
   }
 
   void GgpuLinearDataStore::free(uint64_t handle)
   {
+    m_elementCount--;
     m_handleStore.freeHandle(handle);
   }
 
@@ -134,5 +137,10 @@ namespace gtl
   bool GgpuLinearDataStore::commitChanges()
   {
     return m_buffer.commitChanges();
+  }
+
+  uint32_t GgpuLinearDataStore::elementCount() const
+  {
+    return m_elementCount;
   }
 }
