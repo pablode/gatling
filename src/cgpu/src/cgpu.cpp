@@ -532,6 +532,12 @@ bool cgpuCreateDevice(CgpuDevice* device)
     enabledDeviceExtensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
   }
 
+  if (cgpuFindDeviceExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  {
+    idevice->features.rayTracingInvocationReorder = true;
+    enabledDeviceExtensions.push_back(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
+  }
+
   uint32_t queueFamilyCount = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(
     idevice->physicalDevice,
@@ -593,6 +599,16 @@ bool cgpuCreateDevice(CgpuDevice* device)
   if (idevice->features.shaderClock)
   {
     pNext = &shaderClockFeatures;
+  }
+
+  VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV invocationReorderFeatures = {};
+  invocationReorderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_NV;
+  invocationReorderFeatures.pNext = pNext;
+  invocationReorderFeatures.rayTracingInvocationReorder = VK_TRUE;
+
+  if (idevice->features.rayTracingInvocationReorder)
+  {
+    pNext = &invocationReorderFeatures;
   }
 
   VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};

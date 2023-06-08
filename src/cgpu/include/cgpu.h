@@ -372,6 +372,7 @@ struct CgpuPhysicalDeviceFeatures
   bool sparseResidencyImage2D;
   bool sparseResidencyImage3D;
   bool sparseResidencyAliased;
+  bool rayTracingInvocationReorder;
 };
 
 struct CgpuPhysicalDeviceProperties
