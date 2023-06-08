@@ -35,7 +35,6 @@ namespace gi::sg
 
     void appendDefine(std::string_view name);
     void appendDefine(std::string_view name, int32_t value);
-    void appendDefine(std::string_view name, uint32_t value);
     void appendDefine(std::string_view name, float value);
 
     void appendRequiredExtension(std::string_view name);

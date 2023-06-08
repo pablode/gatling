@@ -62,11 +62,6 @@ namespace gi::sg
     m_source << "#define " << name << " " << value << "\n";
   }
 
-  void GlslSourceStitcher::appendDefine(std::string_view name, uint32_t value)
-  {
-    m_source << "#define " << name << " " << value << "u\n";
-  }
-
   void GlslSourceStitcher::appendDefine(std::string_view name, float value)
   {
     m_source << "#define " << name << " " << value << "\n";

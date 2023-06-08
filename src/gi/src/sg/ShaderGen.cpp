@@ -208,12 +208,12 @@ namespace gi::sg
     if (texCount2d > 0)
     {
       stitcher.appendDefine("HAS_TEXTURES_2D");
-      stitcher.appendDefine("TEXTURE_COUNT_2D", texCount2d);
+      stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) texCount2d);
     }
     if (texCount3d > 0)
     {
       stitcher.appendDefine("HAS_TEXTURES_3D");
-      stitcher.appendDefine("TEXTURE_COUNT_3D", texCount3d);
+      stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) texCount3d);
     }
   }
 
@@ -338,8 +338,8 @@ namespace gi::sg
     _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", params.textureIndexOffset2d);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", params.textureIndexOffset3d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
     if (params.isOpaque)
     {
       stitcher.appendDefine("IS_OPAQUE", params.aovId);
@@ -365,8 +365,8 @@ namespace gi::sg
     _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", params.textureIndexOffset2d);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", params.textureIndexOffset3d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
     if (params.shadowTest)
     {
       stitcher.appendDefine("SHADOW_TEST");
