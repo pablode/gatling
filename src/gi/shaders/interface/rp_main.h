@@ -24,7 +24,7 @@ SI_NAMESPACE_BEGIN(rp_main)
 
 struct FVertex
 {
-  /* f32 pos[3], u32 bsign */
+  /* f32 pos[3], f32 bsign */
   SI_VEC4 field1;
   /* u32 norm, u32 tan, f32 texcoords[2] */
   SI_VEC4 field2;
