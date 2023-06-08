@@ -12,6 +12,14 @@
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadEXT ShadeRayPayload rayPayload;
 layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadEXT ShadowRayPayload shadowRayPayload;
 
+#ifdef REORDER_INVOCATIONS
+layout(buffer_reference, hitobjectshaderrecordnv) buffer ShaderRecordBuffer
+{
+    uint closestHitShaderIndex;
+    uint anyHitShaderIndex;
+};
+#endif
+
 vec3 evaluate_sample(vec3 ray_origin,
                      vec3 ray_dir,
 #ifdef RAND_4D
@@ -54,7 +62,15 @@ vec3 evaluate_sample(vec3 ray_origin,
             PAYLOAD_INDEX_SHADE    // payload
         );
 
-        reorderThreadNV(hitObject);
+        uint reorderHint = 0xFFFFFFFFu;
+
+        if (hitObjectIsHitNV(hitObject))
+        {
+            uvec2 handle = hitObjectGetShaderRecordBufferHandleNV(hitObject);
+            reorderHint = ShaderRecordBuffer(handle).closestHitShaderIndex;
+        }
+
+        reorderThreadNV(hitObject, reorderHint, REORDER_HINT_BIT_COUNT);
 
         hitObjectExecuteShaderNV(hitObject, PAYLOAD_INDEX_SHADE);
 #else

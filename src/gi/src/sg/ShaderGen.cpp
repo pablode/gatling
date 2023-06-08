@@ -222,7 +222,20 @@ namespace gi::sg
     if (params.reorderInvocations)
     {
       stitcher.appendRequiredExtension("GL_NV_shader_invocation_reorder");
+      // For hit shader invocation reordering hint
+      stitcher.appendRequiredExtension("GL_EXT_buffer_reference");
+      stitcher.appendRequiredExtension("GL_EXT_buffer_reference_uvec2");
+
+      uint32_t reoderHintValueCount = params.materialCount + 1/* no hit */;
+      int32_t reorderHintBitCount = 0;
+
+      while (reoderHintValueCount >>= 1)
+      {
+        reorderHintBitCount++;
+      }
+
       stitcher.appendDefine("REORDER_INVOCATIONS");
+      stitcher.appendDefine("REORDER_HINT_BIT_COUNT", reorderHintBitCount);
     }
 
     _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);

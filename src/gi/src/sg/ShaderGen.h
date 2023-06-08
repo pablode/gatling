@@ -78,6 +78,7 @@ namespace gi::sg
     struct RaygenShaderParams
     {
       int32_t aovId;
+      uint32_t materialCount;
       bool nextEventEstimation;
       bool reorderInvocations;
       bool shaderClockExts;
