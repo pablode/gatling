@@ -129,6 +129,8 @@ set(SPIRV_REFLECT_EXECUTABLE OFF)
 set(SPIRV_REFLECT_EXAMPLES OFF)
 set(SPIRV_REFLECT_STATIC_LIB ON)
 add_subdirectory(SPIRV-Reflect)
+target_compile_definitions(spirv-reflect-static PRIVATE SPIRV_REFLECT_USE_SYSTEM_SPIRV_H)
+target_link_libraries(spirv-reflect-static PRIVATE SPIRV-Headers)
 
 #
 # GLM
