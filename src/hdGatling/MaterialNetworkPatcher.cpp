@@ -32,6 +32,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
   (ND_UsdPreviewSurface_surfaceshader)
   (ND_UsdUVTexture)
+  (ND_convert_color3_vector3)
   (glossiness)
   (normal)
   (bias)
@@ -43,6 +44,8 @@ TF_DEFINE_PRIVATE_TOKENS(
   (no)
   (sRGB)
   (raw)
+  (in)
+  (out)
   (metallic)
   (roughness)
   (clearcoat)
@@ -299,10 +302,6 @@ void _PatchUsdPreviewSurfaceNormalParamValue(VtValue& value)
   value = GfVec3f(0, 0, 1);
 }
 
-// In the first version of Intel's Moore Lane, many float inputs of UsdPreviewSurface materials
-// (such as roughness) were incorrectly connected to the color3 'rgb' output of UsdUVTexture nodes,
-// as opposed to a single-channel output ('r', 'g', 'b'). This is/could have been an artist mistake,
-// or caused by Houdini 19.0/19.5 USD export. https://dpel.aswf.io/4004-moore-lane/
 void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network)
 {
   for (auto& pathNodePair : network.nodes)
@@ -315,7 +314,11 @@ void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network
 
     auto& inputs = node.inputConnections;
 
-    const auto patchFloatChannelConnections = [&inputs](TfToken inputName)
+    // In the Intel Moore Lane 4004 asset, many float inputs of UsdPreviewSurface materials are
+    // (such as roughness) were incorrectly connected to the color3 'rgb' output of UsdUVTexture nodes,
+    // as opposed to a single-channel output ('r', 'g', 'b'). This is/could have been an artist mistake,
+    // or caused by Houdini 19.0/19.5 USD export. https://dpel.aswf.io/4004-moore-lane/
+    const auto patchFloatChannelConnection = [&inputs](TfToken inputName)
     {
       auto inputIt = inputs.find(inputName);
       if (inputIt == inputs.end())
@@ -339,15 +342,58 @@ void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network
       }
     };
 
-    patchFloatChannelConnections(_tokens->metallic);
-    patchFloatChannelConnections(_tokens->roughness);
-    patchFloatChannelConnections(_tokens->clearcoat);
-    patchFloatChannelConnections(_tokens->clearcoatRoughness);
-    patchFloatChannelConnections(_tokens->opacity);
-    patchFloatChannelConnections(_tokens->opacityThreshold);
-    patchFloatChannelConnections(_tokens->ior);
-    patchFloatChannelConnections(_tokens->displacement);
-    patchFloatChannelConnections(_tokens->occlusion);
+    patchFloatChannelConnection(_tokens->metallic);
+    patchFloatChannelConnection(_tokens->roughness);
+    patchFloatChannelConnection(_tokens->clearcoat);
+    patchFloatChannelConnection(_tokens->clearcoatRoughness);
+    patchFloatChannelConnection(_tokens->opacity);
+    patchFloatChannelConnection(_tokens->opacityThreshold);
+    patchFloatChannelConnection(_tokens->ior);
+    patchFloatChannelConnection(_tokens->displacement);
+    patchFloatChannelConnection(_tokens->occlusion);
+
+    // Unfortunately the UsdPreviewSurface standard nodes can't be mapped to MaterialX UsdPreviewSurface
+    // implementation nodes as-is. This is because the 'normal' input of the UsdPreviewSurface node expects
+    // a vector3, while UsdUVTexture nodes only output color3 - which can't be implicitly converted in MDL:
+    // https://github.com/AcademySoftwareFoundation/MaterialX/issues/1038
+    //
+    // To work around this issue, we insert an explicit type conversion node into the shading network.
+    const auto patchColor3Vector3InputConnection = [&inputs, &network](TfToken inputName)
+    {
+      auto inputIt = inputs.find(inputName);
+      if (inputIt == inputs.end())
+      {
+        return;
+      }
+
+      auto& connections = inputIt->second;
+      for (HdMaterialConnection2& connection : connections)
+      {
+        if (connection.upstreamOutputName != _tokens->rgb)
+        {
+          continue;
+        }
+
+        SdfPath upstreamNodePath = connection.upstreamNode;
+
+        SdfPath convertNodePath = upstreamNodePath;
+        for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
+        {
+          std::string convertNodeName = "convert" + std::to_string(i);
+          convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
+        }
+
+        HdMaterialNode2 convertNode;
+        convertNode.nodeTypeId = _tokens->ND_convert_color3_vector3;
+        convertNode.inputConnections[_tokens->in] = {{ upstreamNodePath, _tokens->rgb }};
+        network.nodes[convertNodePath] = convertNode;
+
+        connection.upstreamNode = convertNodePath;
+        connection.upstreamOutputName = _tokens->out;
+      }
+    };
+
+    patchColor3Vector3InputConnection(_tokens->normal);
   }
 }
 
