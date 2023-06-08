@@ -205,16 +205,8 @@ namespace gi::sg
     stitcher.appendDefine("NDEBUG");
 #endif
 
-    if (texCount2d > 0)
-    {
-      stitcher.appendDefine("HAS_TEXTURES_2D");
-      stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) texCount2d);
-    }
-    if (texCount3d > 0)
-    {
-      stitcher.appendDefine("HAS_TEXTURES_3D");
-      stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) texCount3d);
-    }
+    stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) texCount2d);
+    stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) texCount3d);
   }
 
   bool ShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)

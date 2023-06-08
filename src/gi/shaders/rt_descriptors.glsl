@@ -11,15 +11,15 @@ layout(binding = BINDING_INDEX_EMISSIVE_FACES, std430) readonly buffer EmissiveF
 
 layout(binding = BINDING_INDEX_VERTICES, std430) readonly buffer VerticesBuffer { FVertex vertices[]; };
 
-#if defined(HAS_TEXTURES_2D) || defined(HAS_TEXTURES_3D)
+#if (TEXTURE_COUNT_2D > 0) || (TEXTURE_COUNT_3D > 0)
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 #endif
 
-#ifdef HAS_TEXTURES_2D
+#if TEXTURE_COUNT_2D > 0
 layout(binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[TEXTURE_COUNT_2D];
 #endif
 
-#ifdef HAS_TEXTURES_3D
+#if TEXTURE_COUNT_3D > 0
 layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[TEXTURE_COUNT_3D];
 #endif
 

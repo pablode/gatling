@@ -39,7 +39,7 @@ bool tex_texture_isvalid(int tex)
 
 vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w, vec2 crop_u, vec2 crop_v, vec2 crop_w, float frame)
 {
-#ifdef HAS_TEXTURES_3D
+#if TEXTURE_COUNT_3D > 0
     if ((tex == 0) ||
         (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
         (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)) ||
@@ -87,7 +87,7 @@ vec3 tex_lookup_color_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w
 
 vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
 {
-#ifdef HAS_TEXTURES_3D
+#if TEXTURE_COUNT_3D > 0
     if (tex == 0)
     {
         return vec4(0, 0, 0, 0);
@@ -132,7 +132,7 @@ vec3 tex_texel_color_3d(int tex, ivec3 coord, float frame)
 
 vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop_u, vec2 crop_v, float frame)
 {
-#ifdef HAS_TEXTURES_2D
+#if TEXTURE_COUNT_2D > 0
     if ((tex == 0) ||
         (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
         (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
@@ -178,7 +178,7 @@ vec3 tex_lookup_color_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop_
 
 vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
 {
-#ifdef HAS_TEXTURES_2D
+#if TEXTURE_COUNT_2D > 0
     if (tex == 0)
     {
         return vec4(0, 0, 0, 0);
@@ -223,7 +223,7 @@ vec3 tex_texel_color_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
 
 ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
 {
-#ifdef HAS_TEXTURES_2D
+#if TEXTURE_COUNT_2D > 0
     if (tex == 0)
     {
         return ivec2(0, 0);
