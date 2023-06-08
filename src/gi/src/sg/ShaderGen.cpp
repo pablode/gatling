@@ -223,6 +223,11 @@ namespace gi::sg
       stitcher.appendRequiredExtension("GL_ARB_shader_clock");
     }
 
+    if (params.nextEventEstimation)
+    {
+      stitcher.appendDefine("NEXT_EVENT_ESTIMATION", params.aovId);
+    }
+
     stitcher.appendDefine("AOV_ID", params.aovId);
 
     fs::path filePath = m_shaderPath / fileName;
@@ -335,10 +340,6 @@ namespace gi::sg
     if (params.isOpaque)
     {
       stitcher.appendDefine("IS_OPAQUE", params.aovId);
-    }
-    if (params.nextEventEstimation)
-    {
-      stitcher.appendDefine("NEXT_EVENT_ESTIMATION", params.aovId);
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;

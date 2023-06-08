@@ -78,6 +78,7 @@ namespace gi::sg
     struct RaygenShaderParams
     {
       int32_t aovId;
+      bool nextEventEstimation;
       bool shaderClockExts;
       uint32_t texCount2d;
       uint32_t texCount3d;
@@ -93,7 +94,6 @@ namespace gi::sg
       int32_t aovId;
       std::string_view baseFileName;
       bool isOpaque;
-      bool nextEventEstimation;
       std::string_view shadingGlsl;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;

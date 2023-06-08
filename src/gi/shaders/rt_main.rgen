@@ -10,6 +10,7 @@
 #include "colormap.glsl"
 
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadEXT ShadeRayPayload rayPayload;
+layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadEXT ShadowRayPayload shadowRayPayload;
 
 vec3 evaluate_sample(vec3 ray_origin,
                      vec3 ray_dir,
@@ -23,6 +24,8 @@ vec3 evaluate_sample(vec3 ray_origin,
     rayPayload.bitfield   = uint16_t(0);
     rayPayload.radiance   = f16vec3(vec3(0.0));
     rayPayload.rng_state  = rng_state;
+    rayPayload.ray_origin = ray_origin;
+    rayPayload.ray_dir    = ray_dir;
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
     uint bounce = 0;
@@ -32,22 +35,55 @@ vec3 evaluate_sample(vec3 ray_origin,
     [[loop]]
     while ((rayPayload.bitfield & 0x7FFFu) <= PC.maxBounces)
     {
+        // Closest hit shading
         traceRayEXT(
-            sceneAS,            // top-level AS
-            0,                  // rayFlags
-            0xFF,               // cullMask
-            0,                  // sbtRecordOffset
-            2,                  // sbtRecordStride
-            0,                  // missIndex
-            ray_origin,         // ray origin
-            0.0,                // ray min range
-            ray_dir,            // ray direction
-            FLOAT_MAX,          // ray max range
-            PAYLOAD_INDEX_SHADE // payload
+            sceneAS,               // top-level AS
+            0,                     // rayFlags
+            0xFF,                  // cullMask
+            0,                     // sbtRecordOffset
+            2,                     // sbtRecordStride
+            0,                     // missIndex
+            rayPayload.ray_origin, // ray origin
+            0.0,                   // ray min range
+            rayPayload.ray_dir,    // ray direction
+            FLOAT_MAX,             // ray max range
+            PAYLOAD_INDEX_SHADE    // payload
         );
 
-        ray_origin = rayPayload.ray_origin;
-        ray_dir = rayPayload.ray_dir;
+        // Debug NEE shadow query
+#ifdef NEXT_EVENT_ESTIMATION
+        {
+#if AOV_ID == AOV_ID_DEBUG_NEE
+            shadowRayPayload.rng_state = rayPayload.rng_state;
+            shadowRayPayload.shadowed = true; // Gets set to false by miss shader
+
+            vec3 shadowRayOrigin = rayPayload.ray_origin; // temporary
+            vec3 shadowRayDir = rayPayload.ray_dir; // temporary
+
+            uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+            float tMin = 0.01;
+            float tMax = FLOAT_MAX;
+
+            traceRayEXT(
+                sceneAS,             // top-level acceleration structure
+                rayFlags,            // rayFlags
+                0xFF,                // cullMask
+                1,                   // sbtRecordOffset (shadow test: use second hit group)
+                2,                   // sbtRecordStride
+                1,                   // missIndex (differs because of shadow test)
+                shadowRayOrigin,     // ray origin
+                tMin,                // ray min range
+                shadowRayDir,        // ray direction
+                tMax,                // ray max range
+                PAYLOAD_INDEX_SHADOW // payload
+            );
+
+            rayPayload.rng_state = shadowRayPayload.rng_state;
+            rayPayload.radiance = f16vec3(shadowRayPayload.shadowed ? vec3(1,0,0) : vec3(0,1,0));
+            rayPayload.bitfield = uint16_t(0xFFFFu);
+#endif
+        }
+#endif
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
         bounce++;
