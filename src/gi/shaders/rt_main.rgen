@@ -36,6 +36,26 @@ vec3 evaluate_sample(vec3 ray_origin,
     while ((rayPayload.bitfield & 0x7FFFu) <= PC.maxBounces)
     {
         // Closest hit shading
+#ifdef REORDER_INVOCATIONS
+        hitObjectNV hitObject;
+
+        hitObjectTraceRayNV(
+            hitObject,             // hit object
+            sceneAS,               // top-level AS
+            0,                     // rayFlags
+            0xFF,                  // cullMask
+            0,                     // sbtRecordOffset
+            2,                     // sbtRecordStride
+            0,                     // missIndex
+            rayPayload.ray_origin, // ray origin
+            0.0,                   // ray min range
+            rayPayload.ray_dir,    // ray direction
+            FLOAT_MAX,             // ray max range
+            PAYLOAD_INDEX_SHADE    // payload
+        );
+
+        hitObjectExecuteShaderNV(hitObject, PAYLOAD_INDEX_SHADE);
+#else
         traceRayEXT(
             sceneAS,               // top-level AS
             0,                     // rayFlags
@@ -49,6 +69,7 @@ vec3 evaluate_sample(vec3 ray_origin,
             FLOAT_MAX,             // ray max range
             PAYLOAD_INDEX_SHADE    // payload
         );
+#endif
 
         // Debug NEE shadow query
 #ifdef NEXT_EVENT_ESTIMATION

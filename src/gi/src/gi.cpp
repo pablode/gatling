@@ -839,14 +839,15 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   // Create ray generation shader.
   {
-    std::vector<uint8_t> rgenSpirv;
     sg::ShaderGen::RaygenShaderParams rgenParams;
     rgenParams.aovId = params->aovId;
     rgenParams.nextEventEstimation = params->nextEventEstimation;
+    rgenParams.reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder;
     rgenParams.shaderClockExts = clockCyclesAov;
     rgenParams.texCount2d = texCount2d;
     rgenParams.texCount3d = texCount3d;
 
+    std::vector<uint8_t> rgenSpirv;
     if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, rgenSpirv))
     {
       goto cleanup;

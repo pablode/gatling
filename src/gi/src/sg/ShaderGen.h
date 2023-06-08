@@ -79,6 +79,7 @@ namespace gi::sg
     {
       int32_t aovId;
       bool nextEventEstimation;
+      bool reorderInvocations;
       bool shaderClockExts;
       uint32_t texCount2d;
       uint32_t texCount3d;

@@ -214,14 +214,18 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
-
-    // FIXME: 'enable' instead?
     if (params.shaderClockExts)
     {
       stitcher.appendRequiredExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
       stitcher.appendRequiredExtension("GL_ARB_shader_clock");
     }
+    if (params.reorderInvocations)
+    {
+      stitcher.appendRequiredExtension("GL_NV_shader_invocation_reorder");
+      stitcher.appendDefine("REORDER_INVOCATIONS");
+    }
+
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d);
 
     if (params.nextEventEstimation)
     {
