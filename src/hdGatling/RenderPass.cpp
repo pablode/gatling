@@ -705,57 +705,63 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastBackgroundColor = backgroundColor;
   m_lastAovId = aovId;
 
-  bool rebuildShaderCache = !m_shaderCache || aovChanged || sprimsChanged /*dome light could have been added/removed*/;
-#ifndef NDEBUG
-  // HACK: activating the NEE debug render setting requires shader recompilation.
-  rebuildShaderCache |= renderSettingsChanged;
-#endif
+  bool rebuildShaderCache = !m_shaderCache || aovChanged || renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/;
   bool rebuildGeomCache = !m_geomCache || visibilityChanged;
 
   if (rebuildShaderCache || rebuildGeomCache)
   {
-    if (m_shaderCache)
-    {
-      giDestroyShaderCache(m_shaderCache);
-    }
-    if (m_geomCache)
-    {
-      giDestroyGeomCache(m_geomCache);
-    }
-
-    const SdfPath& cameraId = camera->GetId();
-    printf("rebuilding geom cache for camera %s\n", cameraId.GetText());
-
     // Transform scene into camera space to increase floating point precision.
     // FIXME: reintroduce and don't apply rotation
     // https://pharr.org/matt/blog/2018/03/02/rendering-in-camera-space
     //GfMatrix4d viewMatrix = camera->GetTransform().GetInverse();
     m_rootMatrix = GfMatrix4d(1.0);// viewMatrix;
 
-    // FIXME: destroy these resources
+    // FIXME: cache results for shader cache rebuild
     std::vector<const GiMaterial*> materials;
     std::vector<const GiMesh*> meshes;
     std::vector<GiMeshInstance> instances;
     _BakeMeshes(renderIndex, m_rootMatrix, materials, meshes, instances);
 
-    GiShaderCacheParams shaderParams;
-    shaderParams.aovId = aovId;
-    shaderParams.domeLight = renderParam->ActiveDomeLight();
-    shaderParams.materialCount = materials.size();
-    shaderParams.materials = materials.data();
-    shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
-    shaderParams.scene = m_scene;
+    if (rebuildShaderCache)
+    {
+      if (m_shaderCache)
+      {
+        giDestroyShaderCache(m_shaderCache);
+      }
 
-    m_shaderCache = giCreateShaderCache(&shaderParams);
-    TF_VERIFY(m_shaderCache, "Unable to create shader cache");
+      printf("rebuilding shader cache\n");
+      fflush(stdout);
 
-    GiGeomCacheParams geomParams;
-    geomParams.meshInstanceCount = instances.size();
-    geomParams.meshInstances = instances.data();
-    geomParams.shaderCache = m_shaderCache;
+      GiShaderCacheParams shaderParams;
+      shaderParams.aovId = aovId;
+      shaderParams.domeLight = renderParam->ActiveDomeLight();
+      shaderParams.materialCount = materials.size();
+      shaderParams.materials = materials.data();
+      shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
+      shaderParams.scene = m_scene;
 
-    m_geomCache = giCreateGeomCache(&geomParams);
-    TF_VERIFY(m_geomCache, "Unable to create geom cache");
+      m_shaderCache = giCreateShaderCache(&shaderParams);
+      TF_VERIFY(m_shaderCache, "Unable to create shader cache");
+    }
+
+    if (rebuildGeomCache)
+    {
+      if (m_geomCache)
+      {
+        giDestroyGeomCache(m_geomCache);
+      }
+
+      printf("rebuilding geom cache\n");
+      fflush(stdout);
+
+      GiGeomCacheParams geomParams;
+      geomParams.meshInstanceCount = instances.size();
+      geomParams.meshInstances = instances.data();
+      geomParams.shaderCache = m_shaderCache;
+
+      m_geomCache = giCreateGeomCache(&geomParams);
+      TF_VERIFY(m_geomCache, "Unable to create geom cache");
+    }
   }
 
   if (!m_geomCache || !m_shaderCache)
