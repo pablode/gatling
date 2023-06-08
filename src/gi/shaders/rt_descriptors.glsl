@@ -6,7 +6,7 @@ layout(binding = BINDING_INDEX_OUT_PIXELS, std430) buffer PixelsBuffer { vec4 pi
 layout(binding = BINDING_INDEX_FACES, std430) readonly buffer FacesBuffer { Face faces[]; };
 
 #ifdef NEXT_EVENT_ESTIMATION
-layout(binding = BINDING_INDEX_EMISSIVE_FACES, std430) readonly buffer EmissiveFacesBuffer { uint emissive_face_indices[]; };
+//layout(binding = BINDING_INDEX_EMISSIVE_FACES, std430) readonly buffer EmissiveFacesBuffer { uint emissive_face_indices[]; };
 #endif
 
 layout(binding = BINDING_INDEX_VERTICES, std430) readonly buffer VerticesBuffer { FVertex vertices[]; };

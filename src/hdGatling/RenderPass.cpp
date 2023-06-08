@@ -743,6 +743,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     shaderParams.domeLight = renderParam->ActiveDomeLight();
     shaderParams.materialCount = materials.size();
     shaderParams.materials = materials.data();
+    shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
     shaderParams.scene = m_scene;
 
     m_shaderCache = giCreateShaderCache(&shaderParams);

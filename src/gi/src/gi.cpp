@@ -728,6 +728,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.chit";
         hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sgMat);
+        hitParams.nextEventEstimation = params->nextEventEstimation;
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
         hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;

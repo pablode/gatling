@@ -97,6 +97,7 @@ struct GiShaderCacheParams
   GiDomeLight*       domeLight;
   uint32_t           materialCount;
   const GiMaterial** materials;
+  bool               nextEventEstimation;
   GiScene*           scene;
 };
 

@@ -166,7 +166,7 @@ void main()
     }
 
     /* TODO 8. NEE shadow query */
-    // TODO: skip vs tMax==0.0
+#ifdef NEXT_EVENT_ESTIMATION
     {
 #if AOV_ID == AOV_ID_DEBUG_NEE
         shadowRayPayload.rng_state = rayPayload.rng_state;
@@ -197,6 +197,7 @@ void main()
         terminateRay = true;
 #endif
     }
+#endif
 
     uint bitfield = (uint(inside) << 15) | (bounce + 1);
     rayPayload.bitfield = uint16_t(terminateRay ? 0xFFFFu : bitfield);

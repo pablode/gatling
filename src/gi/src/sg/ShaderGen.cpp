@@ -336,6 +336,10 @@ namespace gi::sg
     {
       stitcher.appendDefine("IS_OPAQUE", params.aovId);
     }
+    if (params.nextEventEstimation)
+    {
+      stitcher.appendDefine("NEXT_EVENT_ESTIMATION", params.aovId);
+    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
