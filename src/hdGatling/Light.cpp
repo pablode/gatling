@@ -49,7 +49,8 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto pos = sceneDelegate->GetTransform(id) * GfVec4f(0.0f, 0.0f, 0.0f, 1.0f);
+    auto pos = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+
     giSetSphereLightPosition(m_giSphereLight, pos.data());
   }
 
