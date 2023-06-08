@@ -1,6 +1,6 @@
 #include "common.glsl"
 
-struct RayPayload
+struct ShadeRayPayload
 {
     /* inout */ f16vec3 throughput;
     /* inout */ uint16_t bitfield; // Bitfield values:
@@ -26,3 +26,6 @@ struct ShadowRayPayload
 #endif
     /* out */   bool shadowed;
 };
+
+const int PAYLOAD_INDEX_SHADE = 0;
+const int PAYLOAD_INDEX_SHADOW = 1;

@@ -7,7 +7,7 @@
 #include "rt_payload.glsl"
 #include "rt_descriptors.glsl"
 
-layout(location = 1) rayPayloadInEXT ShadowRayPayload rayPayload;
+layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayload;
 
 void main()
 {

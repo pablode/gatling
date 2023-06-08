@@ -15,9 +15,9 @@
 #include "rt_shading_state.glsl"
 
 #ifndef SHADOW_TEST
-layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
+layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 #else
-layout(location = 1) rayPayloadInEXT ShadowRayPayload rayPayload;
+layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayload;
 #endif
 
 hitAttributeEXT vec2 baryCoord;

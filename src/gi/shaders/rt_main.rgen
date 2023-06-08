@@ -9,7 +9,7 @@
 #include "rt_descriptors.glsl"
 #include "colormap.glsl"
 
-layout(location = 0) rayPayloadEXT RayPayload rayPayload;
+layout(location = PAYLOAD_INDEX_SHADE) rayPayloadEXT ShadeRayPayload rayPayload;
 
 vec3 evaluate_sample(vec3 ray_origin,
                      vec3 ray_dir,
@@ -33,17 +33,17 @@ vec3 evaluate_sample(vec3 ray_origin,
     while ((rayPayload.bitfield & 0x7FFFu) <= PC.maxBounces)
     {
         traceRayEXT(
-            sceneAS,    // top-level AS
-            0,          // rayFlags
-            0xFF,       // cullMask
-            0,          // sbtRecordOffset
-            2,          // sbtRecordStride
-            0,          // missIndex
-            ray_origin, // ray origin
-            0.0,        // ray min range
-            ray_dir,    // ray direction
-            FLOAT_MAX,  // ray max range
-            0           // payload (location = 0)
+            sceneAS,            // top-level AS
+            0,                  // rayFlags
+            0xFF,               // cullMask
+            0,                  // sbtRecordOffset
+            2,                  // sbtRecordStride
+            0,                  // missIndex
+            ray_origin,         // ray origin
+            0.0,                // ray min range
+            ray_dir,            // ray direction
+            FLOAT_MAX,          // ray max range
+            PAYLOAD_INDEX_SHADE // payload
         );
 
         ray_origin = rayPayload.ray_origin;

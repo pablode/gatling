@@ -7,7 +7,7 @@
 #include "rt_payload.glsl"
 #include "rt_descriptors.glsl"
 
-layout(location = 0) rayPayloadInEXT RayPayload rayPayload;
+layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 
 #ifdef DOMELIGHT_ENABLED
 vec3 sampleDomeLight(vec3 rayDir)
