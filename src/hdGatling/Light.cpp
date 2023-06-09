@@ -50,11 +50,25 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
     auto pos = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-
     giSetSphereLightPosition(m_giSphereLight, pos.data());
   }
 
-  // FIXME: intensity, radius (with treatAsPoint)
+  if (*dirtyBits & DirtyBits::DirtyParams)
+  {
+    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
+    float intensity = boxedIntensity.Cast<float>().Get<float>();
+    giSetSphereLightIntensity(m_giSphereLight, intensity);
+
+    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
+    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
+    giSetSphereLightColor(m_giSphereLight, color.data());
+
+    VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
+    float radius = boxedRadius.Cast<float>().Get<float>();
+    giSetSphereLightRadius(m_giSphereLight, radius);
+  }
+
+  *dirtyBits = HdChangeTracker::Clean;
 }
 
 void HdGatlingSphereLight::Finalize(HdRenderParam* renderParam)
@@ -181,7 +195,37 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
   const auto& glfLight = boxedGlfLight.UncheckedGet<GlfSimpleLight>();
 
-  // FIXME: implement instantiation & sync logic
+  if (!glfLight.IsDomeLight() && !m_giSphereLight)
+  {
+    m_giSphereLight = giCreateSphereLight(m_giScene);
+  }
+
+  if (*dirtyBits & DirtyBits::DirtyTransform)
+  {
+    auto pos = glfLight.GetPosition();
+    giSetSphereLightPosition(m_giSphereLight, pos.data());
+  }
+
+  if (*dirtyBits & DirtyBits::DirtyParams && glfLight.HasIntensity())
+  {
+    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
+    float intensity = boxedIntensity.Cast<float>().Get<float>();
+    giSetSphereLightIntensity(m_giSphereLight, intensity);
+
+    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
+    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
+    giSetSphereLightColor(m_giSphereLight, color.data());
+  }
+
+  *dirtyBits = HdChangeTracker::Clean;
+}
+
+void HdGatlingSimpleLight::Finalize(HdRenderParam* renderParam)
+{
+  if (m_giSphereLight)
+  {
+    giDestroySphereLight(m_giScene, m_giSphereLight);
+  }
 }
 
 HdDirtyBits HdGatlingSimpleLight::GetInitialDirtyBitsMask() const

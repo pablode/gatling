@@ -180,6 +180,9 @@ void giDestroyScene(GiScene* scene);
 GiSphereLight* giCreateSphereLight(GiScene* scene);
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light);
 void giSetSphereLightPosition(GiSphereLight* light, float* position);
+void giSetSphereLightIntensity(GiSphereLight* light, float intensity);
+void giSetSphereLightColor(GiSphereLight* light, float* rgb);
+void giSetSphereLightRadius(GiSphereLight* light, float radius);
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
 void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);

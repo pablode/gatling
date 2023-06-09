@@ -70,6 +70,8 @@ public:
 public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
 
+  void Finalize(HdRenderParam* renderParam) override;
+
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:

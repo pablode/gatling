@@ -37,6 +37,14 @@ struct Face
   SI_UINT v_2;
 };
 
+struct SphereLight
+{
+  SI_VEC3  pos;
+  SI_FLOAT intensity;
+  SI_VEC3  color;
+  SI_FLOAT radius;
+};
+
 struct PushConstants
 {
   SI_VEC3  cameraPosition;
@@ -60,7 +68,7 @@ struct PushConstants
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)
 SI_BINDING_INDEX(FACES,          1)
-SI_BINDING_INDEX(EMISSIVE_FACES, 2)
+SI_BINDING_INDEX(SPHERE_LIGHTS,  2)
 SI_BINDING_INDEX(VERTICES,       3)
 SI_BINDING_INDEX(SAMPLER,        4)
 SI_BINDING_INDEX(TEXTURES_2D,    5)

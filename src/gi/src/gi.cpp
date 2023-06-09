@@ -31,11 +31,11 @@
 #include <fstream>
 #include <atomic>
 #include <optional>
-#include <unordered_set>
 #include <mutex>
 #include <assert.h>
 
 #include <stager.h>
+#include <denseDataStore.h>
 #include <cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -48,6 +48,7 @@
 #include <MaterialXCore/Document.h>
 
 using namespace gi;
+using namespace gtl;
 
 namespace Rp = gtl::shader_interface::rp_main;
 
@@ -96,13 +97,13 @@ struct GiMesh
 
 struct GiSphereLight
 {
-  glm::vec3 position;
+  GiScene* scene;
+  uint64_t gpuHandle;
 };
 
 struct GiScene
 {
-  std::unordered_set<GiSphereLight*> lights;
-  std::mutex mutex;
+  GgpuDenseDataStore lights;
   CgpuImage domeLightTexture;
   glm::mat3 domeLightTransform;
   GiDomeLight* domeLight; // weak ptr
@@ -621,6 +622,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     return nullptr;
   }
 
+  GiScene* scene = params->scene;
+
   printf("material count: %d\n", params->materialCount);
   printf("creating shader cache..\n");
   fflush(stdout);
@@ -640,7 +643,6 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   bool hasPipelineAnyHitShader = false;
 
   // Upload dome light.
-  GiScene* scene = params->scene;
   if (scene->domeLight != params->domeLight)
   {
     if (scene->domeLightTexture.handle)
@@ -790,6 +792,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.baseFileName = "rt_main.chit";
         hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sgMat);
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
+        hitParams.sphereLightCount = scene->lights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -809,6 +812,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
+        hitParams.sphereLightCount = scene->lights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -907,6 +911,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     rgenParams.nextEventEstimation = params->nextEventEstimation;
     rgenParams.progressiveAccumulation = params->progressiveAccumulation;
     rgenParams.reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder;
+    rgenParams.sphereLightCount = scene->lights.elementCount();
     rgenParams.shaderClockExts = clockCyclesAov;
     rgenParams.texCount2d = texCount2d;
     rgenParams.texCount3d = texCount3d;
@@ -928,6 +933,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     sg::ShaderGen::MissShaderParams missParams;
     missParams.domeLightEnabled = domeLightEnabled;
     missParams.domeLightCameraVisibility = params->domeLightCameraVisibility;
+    missParams.sphereLightCount = scene->lights.elementCount();
     missParams.texCount2d = texCount2d;
     missParams.texCount3d = texCount3d;
 
@@ -1076,6 +1082,15 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   // Init state for goto error handling.
   int result = GI_ERROR;
 
+  if (!scene->lights.commitChanges())
+  {
+    fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
+  }
+  if (!s_stager->flush())
+  {
+    fprintf(stderr, "%s:%d: stager flush failed!\n", __FILE__, __LINE__);
+  }
+
   CgpuCommandBuffer command_buffer;
   CgpuFence fence;
 
@@ -1130,11 +1145,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   buffers.push_back({ Rp::BINDING_INDEX_OUT_PIXELS, 0, s_outputBuffer, 0, outputBufferSize });
   buffers.push_back({ Rp::BINDING_INDEX_FACES, 0, geom_cache->buffer, geom_cache->faceBufferView.offset, geom_cache->faceBufferView.size });
-  // TODO: set sphere light buffer
-  //if (shader_cache->nee_enabled)
-  //{
-  //  buffers.push_back({ Rp::BINDING_INDEX_EMISSIVE_FACES, 0, geom_cache->buffer, /* ... */ });
-  //}
+  buffers.push_back({ Rp::BINDING_INDEX_SPHERE_LIGHTS, 0, scene->lights.buffer(), 0, scene->lights.bufferSize() });
   buffers.push_back({ Rp::BINDING_INDEX_VERTICES, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
   bool domeLightEnabled = bool(scene->domeLight);
@@ -1275,7 +1286,10 @@ cleanup:
 
 GiScene* giCreateScene()
 {
-  return new GiScene;
+  GiScene* scene = new GiScene{
+    .lights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::SphereLight), 64)
+  };
+  return scene;
 }
 
 void giDestroyScene(GiScene* scene)
@@ -1291,25 +1305,64 @@ void giDestroyScene(GiScene* scene)
 GiSphereLight* giCreateSphereLight(GiScene* scene)
 {
   auto light = new GiSphereLight;
-  {
-    std::lock_guard guard(scene->mutex);
-    scene->lights.insert(light);
-  }
+  light->scene = scene;
+  light->gpuHandle = scene->lights.allocate();
+
+  Rp::SphereLight* data = scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  assert(data);
+
+  data->pos[0] = 0.0f;
+  data->pos[1] = 0.0f;
+  data->pos[2] = 0.0f;
+  data->intensity = 1000.0f; // Nits
+  data->color[0] = 1.0f;
+  data->color[1] = 1.0f;
+  data->color[2] = 1.0f;
+  data->radius = 0.0f;
+
   return light;
 }
 
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
 {
-  {
-    std::lock_guard guard(scene->mutex);
-    scene->lights.erase(light);
-  }
+  scene->lights.free(light->gpuHandle);
   delete light;
 }
 
 void giSetSphereLightPosition(GiSphereLight* light, float* pos)
 {
-  light->position = glm::make_vec3(pos);
+  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  assert(data);
+
+  data->pos[0] = pos[0];
+  data->pos[1] = pos[1];
+  data->pos[2] = pos[2];
+}
+
+void giSetSphereLightColor(GiSphereLight* light, float* rgb)
+{
+  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  assert(data);
+
+  data->color[0] = rgb[0];
+  data->color[1] = rgb[1];
+  data->color[2] = rgb[2];
+}
+
+void giSetSphereLightIntensity(GiSphereLight* light, float intensity)
+{
+  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  assert(data);
+
+  data->intensity = intensity;
+}
+
+void giSetSphereLightRadius(GiSphereLight* light, float radius)
+{
+  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  assert(data);
+
+  data->radius = radius;
 }
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)

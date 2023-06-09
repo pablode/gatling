@@ -84,6 +84,7 @@ namespace gi::sg
       bool progressiveAccumulation;
       bool reorderInvocations;
       bool shaderClockExts;
+      uint32_t sphereLightCount;
       uint32_t texCount2d;
       uint32_t texCount3d;
     };
@@ -91,6 +92,7 @@ namespace gi::sg
     {
       bool domeLightEnabled;
       bool domeLightCameraVisibility;
+      uint32_t sphereLightCount;
       uint32_t texCount2d;
       uint32_t texCount3d;
     };
@@ -100,6 +102,7 @@ namespace gi::sg
       std::string_view baseFileName;
       bool isOpaque;
       std::string_view shadingGlsl;
+      uint32_t sphereLightCount;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
       uint32_t texCount2d;
@@ -111,6 +114,7 @@ namespace gi::sg
       std::string_view baseFileName;
       std::string_view opacityEvalGlsl;
       bool shadowTest;
+      uint32_t sphereLightCount;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
       uint32_t texCount2d;
