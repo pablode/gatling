@@ -32,6 +32,23 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     return false;
 }
 
+void sampleLightUniform(
+#ifdef RAND_4D
+    inout uvec4 rng_state,
+#else
+    inout uint rng_state,
+#endif
+    out uint lightIndex, out float lightPdf)
+{
+#ifdef RAND_4D
+    float kx = rng4d_next(rng_state).x;
+#else
+    float kx = rng_next(rng_state);
+#endif
+    lightPdf = 1.0 / SPHERE_LIGHT_COUNT;
+    lightIndex = min(uint(kx * SPHERE_LIGHT_COUNT), SPHERE_LIGHT_COUNT - 1);
+}
+
 void main()
 {
     /* 1. Get hit info. */
@@ -106,15 +123,64 @@ void main()
         if (edf_evaluate_data.pdf > 0.0)
         {
             vec3 emission_intensity = mdl_edf_emission_intensity(shading_state);
-
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }
     }
 
-    // reassign normal, see declaration of variable.
-    shading_state.normal = normal;
+    /* 5. NEE light sampling */
+#ifdef NEXT_EVENT_ESTIMATION
+#if SPHERE_LIGHT_COUNT > 0
+    if (!inside)
+    {
+        vec3 neeContrib = vec3(0.0);
 
-    /* TODO 5. NEE light sampling */
+        // Randomly choose light from list
+        uint lightIndex;
+        float lightPdf;
+        sampleLightUniform(rayPayload.rng_state, lightIndex, lightPdf);
+
+        SphereLight light = lights[lightIndex];
+
+        vec3 neeOrigin = offset_ray_origin(shading_state.position, shading_state.geom_normal);
+        vec3 neeLightDir = light.pos - neeOrigin;
+        float neeLightDist = length(neeLightDir);
+        neeLightDir = (neeLightDist == 0.0) ? vec3(0.0) : neeLightDir / neeLightDist;
+
+        bool neeValid = (neeLightDist > 0.0) && dot(neeLightDir, shading_state.geom_normal) > 0.0;
+
+        if (neeValid)
+        {
+            // reassign normal, see declaration of variable.
+            shading_state.normal = normal;
+
+            // Eval BRDF in light direction
+            Bsdf_evaluate_data bsdf_eval_data;
+            bsdf_eval_data.ior1 = vec3(ior1);
+            bsdf_eval_data.ior2 = vec3(ior2);
+            bsdf_eval_data.k1 = -gl_WorldRayDirectionEXT;
+            bsdf_eval_data.k2 = neeLightDir;
+            mdl_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);
+
+            neeValid = (bsdf_eval_data.pdf > 0.0);
+
+            if (neeValid)
+            {
+                // Calc unshadowed light contribution
+                vec3 lightPower = light.color * light.intensity;
+                float distSq = neeLightDist * neeLightDist; // quad. attenuation
+
+                vec3 neeRadiance = lightPower / (lightPdf * distSq);
+
+                vec3 weight = throughput * neeRadiance;
+                neeContrib += weight * bsdf_eval_data.bsdf_diffuse;
+                neeContrib += weight * bsdf_eval_data.bsdf_glossy;
+            }
+        }
+
+        radiance += neeContrib;
+    }
+#endif
+#endif
 
     /* 6. Russian Roulette */
 #ifdef RAND_4D
@@ -126,19 +192,22 @@ void main()
     uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
     uint rrBounceOffset = PC.maxBouncesAndRrBounceOffset & 0xFFFFu;
 
-    bool terminateRay = false;
+    bool terminatePath = false;
     if (bounce == maxBounces - 1)
     {
-        terminateRay = true;
+        terminatePath = true;
     }
     else if (bounce > rrBounceOffset)
     {
-        terminateRay = russian_roulette(k1, throughput);
+        terminatePath = russian_roulette(k1, throughput);
     }
 
     /* 7. BSDF (importance) sampling. */
-    if (!terminateRay)
+    if (!terminatePath)
     {
+        // reassign normal, see declaration of variable.
+        shading_state.normal = normal;
+
         Bsdf_sample_data bsdf_sample_data;
         bsdf_sample_data.ior1 = vec3(ior1);
         bsdf_sample_data.ior2 = vec3(ior2);
@@ -154,21 +223,22 @@ void main()
         mdl_bsdf_scattering_init(shading_state);
         mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
 
-        terminateRay = (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB);
-        throughput *= bsdf_sample_data.bsdf_over_pdf;
+        terminatePath = (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB);
 
-        bool is_transmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;
-        if (is_transmission)
+        bool isTransmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;
+        if (isTransmission)
         {
             inside = !inside;
         }
 
+        throughput *= bsdf_sample_data.bsdf_over_pdf;
+
         rayPayload.ray_dir = bsdf_sample_data.k2;
-        rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (is_transmission ? -1.0 : 1.0));
+        rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (isTransmission ? -1.0 : 1.0));
     }
 
     uint bitfield = (uint(inside) << 15) | (bounce + 1);
-    rayPayload.bitfield = uint16_t(terminateRay ? 0xFFFFu : bitfield);
+    rayPayload.bitfield = uint16_t(terminatePath ? 0xFFFFu : bitfield);
     rayPayload.throughput = f16vec3(throughput);
     rayPayload.radiance = f16vec3(radiance);
 }

@@ -247,7 +247,7 @@ namespace gi::sg
     }
     if (params.nextEventEstimation)
     {
-      stitcher.appendDefine("NEXT_EVENT_ESTIMATION", params.aovId);
+      stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
     }
     if (params.progressiveAccumulation)
     {
@@ -370,6 +370,10 @@ namespace gi::sg
     if (params.isOpaque)
     {
       stitcher.appendDefine("IS_OPAQUE", params.aovId);
+    }
+    if (params.nextEventEstimation)
+    {
+      stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;

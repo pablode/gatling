@@ -101,6 +101,7 @@ namespace gi::sg
       int32_t aovId;
       std::string_view baseFileName;
       bool isOpaque;
+      bool nextEventEstimation;
       std::string_view shadingGlsl;
       uint32_t sphereLightCount;
       uint32_t textureIndexOffset2d;
