@@ -127,6 +127,12 @@ void main()
         }
     }
 
+    // reassign normal, see declaration of variable.
+    shading_state.normal = normal;
+
+    // init once and share between *_evaluate and *_sample calls
+    mdl_bsdf_scattering_init(shading_state);
+
     /* 5. NEE light sampling */
 #ifdef NEXT_EVENT_ESTIMATION
 #if SPHERE_LIGHT_COUNT > 0
@@ -150,9 +156,6 @@ void main()
 
         if (neeValid)
         {
-            // reassign normal, see declaration of variable.
-            shading_state.normal = normal;
-
             // Eval BRDF in light direction
             Bsdf_evaluate_data bsdf_eval_data;
             bsdf_eval_data.ior1 = vec3(ior1);
@@ -222,7 +225,6 @@ void main()
         bsdf_sample_data.xi[2] = rng_next(rayPayload.rng_state);
         bsdf_sample_data.xi[3] = rng_next(rayPayload.rng_state);
 #endif
-        mdl_bsdf_scattering_init(shading_state);
         mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
 
         terminatePath = (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB);
