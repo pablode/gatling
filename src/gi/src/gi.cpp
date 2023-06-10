@@ -39,6 +39,9 @@
 #include <cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#ifndef NDEBUG
+#include <efsw/efsw.hpp>
+#endif
 #include "sg/ShaderGen.h"
 #include "interface/rp_main.h"
 
@@ -124,6 +127,32 @@ CgpuBuffer s_outputStagingBuffer;
 uint32_t s_outputBufferWidth = 0;
 uint32_t s_outputBufferHeight = 0;
 uint32_t s_sampleOffset = 0;
+std::atomic_bool s_forceShaderCacheInvalid = false;
+
+#ifndef NDEBUG
+class ShaderFileListener : public efsw::FileWatchListener
+{
+public:
+  void handleFileAction(efsw::WatchID watchId, const std::string& dir, const std::string& filename,
+                        efsw::Action action, std::string oldFilename) override
+  {
+    switch (action)
+    {
+    case efsw::Actions::Delete:
+    case efsw::Actions::Modified:
+    case efsw::Actions::Moved:
+      s_forceShaderCacheInvalid = true;
+      s_sampleOffset = 0;
+      break;
+    default:
+      break;
+    }
+  }
+};
+
+std::unique_ptr<efsw::FileWatcher> s_fileWatcher;
+ShaderFileListener s_shaderFileListener;
+#endif
 
 bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
 {
@@ -196,9 +225,16 @@ GiStatus giInitialize(const GiInitParams* params)
     return GI_ERROR;
   }
 
+#ifdef NDEBUG
+  const char* shaderPath = params->shaderPath;
+#else
+  // Use shaders dir in source tree for auto-reloading
+  const char* shaderPath = GATLING_SHADER_SOURCE_DIR;
+#endif
+
   sg::ShaderGen::InitParams sgParams = {
     .resourcePath = params->resourcePath,
-    .shaderPath = params->shaderPath,
+    .shaderPath = shaderPath,
     .mdlSearchPaths = params->mdlSearchPaths,
     .mtlxSearchPaths = params->mtlxSearchPaths
   };
@@ -215,11 +251,20 @@ GiStatus giInitialize(const GiInitParams* params)
 
   s_texSys = std::make_unique<gi::TexSys>(s_device, *s_aggregateAssetReader, *s_stager);
 
+#ifndef NDEBUG
+  s_fileWatcher = std::make_unique<efsw::FileWatcher>();
+  s_fileWatcher->addWatch(shaderPath, &s_shaderFileListener, true);
+  s_fileWatcher->watch();
+#endif
+
   return GI_OK;
 }
 
 void giTerminate()
 {
+#ifndef NDEBUG
+  s_fileWatcher.reset();
+#endif
   s_aggregateAssetReader.reset();
   s_mmapAssetReader.reset();
   _giResizeOutputBuffer(0, 0, 0);
@@ -553,8 +598,16 @@ void giDestroyGeomCache(GiGeomCache* cache)
   delete cache;
 }
 
+// FIXME: get rid of this hack - we want to rebuild with cached data at shader granularity
+bool giShaderCacheNeedsRebuild()
+{
+  return s_forceShaderCacheInvalid;
+}
+
 GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 {
+  s_forceShaderCacheInvalid = false;
+
   bool clockCyclesAov = params->aovId == GI_AOV_ID_DEBUG_CLOCK_CYCLES;
 
   if (clockCyclesAov && !s_deviceFeatures.shaderClock)
@@ -947,7 +1000,6 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 cleanup:
   if (!cache)
   {
-    assert(false);
     s_texSys->destroyUncachedImages(images_2d);
     s_texSys->destroyUncachedImages(images_3d);
     if (rgenShader.handle)

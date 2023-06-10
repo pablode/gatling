@@ -47,6 +47,7 @@ target_compile_definitions(
     GATLING_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     GATLING_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     GATLING_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    GATLING_SHADER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
 )
 
 target_link_libraries(
@@ -63,6 +64,7 @@ target_link_libraries(
     glslang
     glslang-default-resource-limits
     SPIRV
+    efsw-static
 )
 
 if(OpenMP_CXX_FOUND)

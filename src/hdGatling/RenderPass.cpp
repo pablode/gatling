@@ -705,7 +705,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastBackgroundColor = backgroundColor;
   m_lastAovId = aovId;
 
-  bool rebuildShaderCache = !m_shaderCache || aovChanged || renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/;
+  bool rebuildShaderCache = !m_shaderCache || aovChanged || giShaderCacheNeedsRebuild() ||
+                            renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/;
   bool rebuildGeomCache = !m_geomCache || visibilityChanged;
 
   if (rebuildShaderCache || rebuildGeomCache)

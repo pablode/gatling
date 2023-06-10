@@ -159,6 +159,7 @@ void giDestroyGeomCache(GiGeomCache* cache);
 
 GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params);
 void giDestroyShaderCache(GiShaderCache* cache);
+bool giShaderCacheNeedsRebuild();
 
 void giInvalidateFramebuffer();
 
