@@ -195,4 +195,9 @@ vec3 sample_hemisphere(vec2 xi)
     );
 }
 
+float luminance(vec3 radiance)
+{
+    return dot(radiance, vec3(0.2126, 0.7152, 0.0722));
+}
+
 #endif

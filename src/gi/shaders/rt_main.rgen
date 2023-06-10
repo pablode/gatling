@@ -106,7 +106,7 @@ vec3 evaluate_sample(vec3 ray_origin,
             shadowRayDir = (lightDist == 0.0) ? vec3(1.0, 0.0, 0.0) : (shadowRayDir / lightDist);
 
             // NV best practices recommends unconditional dispatch with tMin = tMax = 0.0
-            bool traceRay = any(greaterThan(rayPayload.neeContrib, vec3(0.0001))) && lightDist > 0.0;
+            bool traceRay = luminance(rayPayload.neeContrib) > 0.0001 && lightDist > 0.0;
             uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
             float tMin = 0.001; // FIXME: why is origin offsetting not enough?
             float tMax = traceRay ? lightDist : tMin;
