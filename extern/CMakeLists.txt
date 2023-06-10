@@ -136,3 +136,8 @@ target_link_libraries(spirv-reflect-static PRIVATE SPIRV-Headers)
 # GLM
 #
 add_subdirectory(glm)
+
+#
+# efsw
+#
+add_subdirectory(efsw)
