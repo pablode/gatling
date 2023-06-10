@@ -742,6 +742,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       shaderParams.materialCount = materials.size();
       shaderParams.materials = materials.data();
       shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
+      shaderParams.progressiveAccumulation = m_settings.find(HdGatlingSettingsTokens->progressive_accumulation)->second.Get<bool>();
       shaderParams.scene = m_scene;
 
       m_shaderCache = giCreateShaderCache(&shaderParams);

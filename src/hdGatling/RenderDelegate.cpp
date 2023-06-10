@@ -45,6 +45,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette inverse minimum terminate probability", HdGatlingSettingsTokens->rr_inv_min_term_prob, VtValue{0.95f} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max sample value", HdGatlingSettingsTokens->max_sample_value, VtValue{10.0f} });
 
+  m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressive_accumulation, VtValue{true} });
   m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->next_event_estimation, VtValue{false} });
 
 #ifndef NDEBUG

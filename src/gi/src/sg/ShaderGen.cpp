@@ -244,6 +244,10 @@ namespace gi::sg
     {
       stitcher.appendDefine("NEXT_EVENT_ESTIMATION", params.aovId);
     }
+    if (params.progressiveAccumulation)
+    {
+      stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
+    }
 
     stitcher.appendDefine("AOV_ID", params.aovId);
 

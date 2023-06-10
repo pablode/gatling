@@ -896,6 +896,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     rgenParams.aovId = params->aovId;
     rgenParams.materialCount = params->materialCount;
     rgenParams.nextEventEstimation = params->nextEventEstimation;
+    rgenParams.progressiveAccumulation = params->progressiveAccumulation;
     rgenParams.reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder;
     rgenParams.shaderClockExts = clockCyclesAov;
     rgenParams.texCount2d = texCount2d;

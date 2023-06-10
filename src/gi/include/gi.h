@@ -99,6 +99,7 @@ struct GiShaderCacheParams
   uint32_t           materialCount;
   const GiMaterial** materials;
   bool               nextEventEstimation;
+  bool               progressiveAccumulation;
   GiScene*           scene;
 };
 

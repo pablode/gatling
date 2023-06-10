@@ -80,6 +80,7 @@ namespace gi::sg
       int32_t aovId;
       uint32_t materialCount;
       bool nextEventEstimation;
+      bool progressiveAccumulation;
       bool reorderInvocations;
       bool shaderClockExts;
       uint32_t texCount2d;

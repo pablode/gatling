@@ -207,6 +207,7 @@ void main()
     pixel_color = vec3(cycles_elapsed_norm, 0.0, 0.0);
 #endif
 
+#ifdef PROGRESSIVE_ACCUMULATION
     if (PC.sampleOffset > 0)
     {
       float inv_total_sample_count = 1.0 / float(PC.sampleOffset + PC.sampleCount);
@@ -216,6 +217,7 @@ void main()
 
       pixel_color = weight_old * pixels[pixel_index].rgb + weight_new * pixel_color;
     }
+#endif
 
     pixels[pixel_index] = vec4(pixel_color, 1.0);
 }
