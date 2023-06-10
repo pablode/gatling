@@ -15,6 +15,9 @@ struct ShadeRayPayload
 #endif
     /* out */   vec3 ray_origin;
     /* out */   vec3 ray_dir;
+    /* out */   vec3 neeOrigin;
+    /* out */   vec3 neeLightPos;
+    /* out */   vec3 neeContrib;
 };
 
 struct ShadowRayPayload

@@ -132,8 +132,6 @@ void main()
 #if SPHERE_LIGHT_COUNT > 0
     if (!inside)
     {
-        vec3 neeContrib = vec3(0.0);
-
         // Randomly choose light from list
         uint lightIndex;
         float lightPdf;
@@ -141,8 +139,10 @@ void main()
 
         SphereLight light = lights[lightIndex];
 
+        vec3 neeContrib = vec3(0.0);
         vec3 neeOrigin = offset_ray_origin(shading_state.position, shading_state.geom_normal);
-        vec3 neeLightDir = light.pos - neeOrigin;
+        vec3 neeLightPos = light.pos;
+        vec3 neeLightDir = neeLightPos - neeOrigin;
         float neeLightDist = length(neeLightDir);
         neeLightDir = (neeLightDist == 0.0) ? vec3(0.0) : neeLightDir / neeLightDist;
 
@@ -177,7 +177,9 @@ void main()
             }
         }
 
-        radiance += neeContrib;
+        rayPayload.neeOrigin = neeOrigin;
+        rayPayload.neeLightPos = neeLightPos;
+        rayPayload.neeContrib = neeContrib;
     }
 #endif
 #endif

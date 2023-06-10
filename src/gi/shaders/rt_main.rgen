@@ -46,6 +46,8 @@ vec3 evaluate_sample(vec3 ray_origin,
     while ((rayPayload.bitfield & 0x7FFFu) <= maxBounces)
     {
         // Closest hit shading
+        rayPayload.neeContrib = vec3(0.0);
+
 #ifdef REORDER_INVOCATIONS
         hitObjectNV hitObject;
 
@@ -91,19 +93,23 @@ vec3 evaluate_sample(vec3 ray_origin,
         );
 #endif
 
-        // Debug NEE shadow query
+        // NEE shadow query
 #ifdef NEXT_EVENT_ESTIMATION
+#if SPHERE_LIGHT_COUNT > 0
         {
-#if AOV_ID == AOV_ID_DEBUG_NEE
             shadowRayPayload.rng_state = rayPayload.rng_state;
             shadowRayPayload.shadowed = true; // Gets set to false by miss shader
 
-            vec3 shadowRayOrigin = rayPayload.ray_origin; // temporary
-            vec3 shadowRayDir = rayPayload.ray_dir; // temporary
+            vec3 shadowRayOrigin = rayPayload.neeOrigin;
+            vec3 shadowRayDir = rayPayload.neeLightPos - shadowRayOrigin;
+            float lightDist = length(shadowRayDir);
+            shadowRayDir = (lightDist == 0.0) ? vec3(1.0, 0.0, 0.0) : (shadowRayDir / lightDist);
 
+            // NV best practices recommends unconditional dispatch with tMin = tMax = 0.0
+            bool traceRay = any(greaterThan(rayPayload.neeContrib, vec3(0.0001))) && lightDist > 0.0;
             uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-            float tMin = 0.01;
-            float tMax = FLOAT_MAX;
+            float tMin = 0.001; // FIXME: why is origin offsetting not enough?
+            float tMax = traceRay ? lightDist : tMin;
 
             traceRayEXT(
                 sceneAS,             // top-level acceleration structure
@@ -119,11 +125,17 @@ vec3 evaluate_sample(vec3 ray_origin,
                 PAYLOAD_INDEX_SHADOW // payload
             );
 
+            bool addContrib = traceRay && !shadowRayPayload.shadowed;
+
             rayPayload.rng_state = shadowRayPayload.rng_state;
-            rayPayload.radiance = f16vec3(shadowRayPayload.shadowed ? vec3(1,0,0) : vec3(0,1,0));
+            rayPayload.radiance += f16vec3(rayPayload.neeContrib * float(addContrib));
+
+#if AOV_ID == AOV_ID_DEBUG_NEE
+            rayPayload.radiance = f16vec3(shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0));
             rayPayload.bitfield = uint16_t(0xFFFFu);
 #endif
         }
+#endif
 #endif
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
