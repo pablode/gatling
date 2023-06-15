@@ -27,6 +27,10 @@
 
 #include <string>
 
+static_assert(MI_NEURAYLIB_API_VERSION >= 48 &&
+              MI_NEURAYLIB_API_VERSION < 51,
+              "Unsupported MDL SDK version!");
+
 namespace gi::sg
 {
   MdlNeurayLoader::MdlNeurayLoader()
