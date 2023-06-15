@@ -142,3 +142,15 @@ add_subdirectory(glm)
 # efsw
 #
 add_subdirectory(efsw)
+
+#
+# Blosc
+#
+set(BUILD_TESTS OFF)
+set(BUILD_FUZZERS OFF)
+set(BUILD_BENCHMARKS OFF)
+set(BUILD_EXAMPLES OFF)
+set(BUILD_PLUGINS OFF)
+set(DEACTIVATE_ZSTD ON)
+set(PREFER_EXTERNAL_ZLIB ON)
+add_subdirectory(c-blosc2)

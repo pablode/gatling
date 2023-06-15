@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 include(CMakeDependentOption)
 
 project(gatling VERSION 0.3.0)
+enable_language(C CXX ASM) # ASM for Blosc
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 

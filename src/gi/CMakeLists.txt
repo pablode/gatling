@@ -49,6 +49,8 @@ target_link_libraries(
     glslang
     glslang-default-resource-limits
     SPIRV
+    efsw-static
+    blosc2_static
 )
 
 if(OpenMP_CXX_FOUND)
