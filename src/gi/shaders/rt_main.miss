@@ -23,12 +23,18 @@ vec3 sampleDomeLight(vec3 rayDir)
 
 void main()
 {
-#ifdef DOMELIGHT_ENABLED
-    mat3 domeLightTransform = mat3(PC.domeLightTransformCol0, PC.domeLightTransformCol1, PC.domeLightTransformCol2);
-    vec3 sampleDir = normalize(domeLightTransform * gl_WorldRayDirectionEXT);
-    vec3 backgroundColor = sampleDomeLight(sampleDir);
-#else
     vec3 backgroundColor = PC.backgroundColor.rgb;
+
+#ifdef DOMELIGHT_ENABLED
+#ifndef DOMELIGHT_CAMERA_VISIBLE
+    bool isPrimaryRay = (rayPayload.bitfield & 0x7FFFu) == 0;
+    if (!isPrimaryRay)
+#endif
+    {
+        mat3 domeLightTransform = mat3(PC.domeLightTransformCol0, PC.domeLightTransformCol1, PC.domeLightTransformCol2);
+        vec3 sampleDir = normalize(domeLightTransform * gl_WorldRayDirectionEXT);
+        backgroundColor = sampleDomeLight(sampleDir);
+    }
 #endif
 
     rayPayload.radiance += rayPayload.throughput * f16vec3(backgroundColor);

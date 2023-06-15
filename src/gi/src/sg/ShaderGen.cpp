@@ -268,6 +268,10 @@ namespace gi::sg
     {
       stitcher.appendDefine("DOMELIGHT_ENABLED");
     }
+    if (params.domeLightCameraVisibility)
+    {
+      stitcher.appendDefine("DOMELIGHT_CAMERA_VISIBLE");
+    }
 
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))

@@ -88,6 +88,7 @@ namespace gi::sg
     struct MissShaderParams
     {
       bool domeLightEnabled;
+      bool domeLightCameraVisibility;
       uint32_t texCount2d;
       uint32_t texCount3d;
     };

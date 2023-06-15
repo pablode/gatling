@@ -733,9 +733,12 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       printf("rebuilding shader cache\n");
       fflush(stdout);
 
+      auto domeLightCameraVisibilityValueIt = m_settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
+
       GiShaderCacheParams shaderParams;
       shaderParams.aovId = aovId;
       shaderParams.domeLight = renderParam->ActiveDomeLight();
+      shaderParams.domeLightCameraVisibility = (domeLightCameraVisibilityValueIt != m_settings.end()) && domeLightCameraVisibilityValueIt->second.Get<bool>();
       shaderParams.materialCount = materials.size();
       shaderParams.materials = materials.data();
       shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();

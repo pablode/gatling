@@ -917,6 +917,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   {
     sg::ShaderGen::MissShaderParams missParams;
     missParams.domeLightEnabled = domeLightEnabled;
+    missParams.domeLightCameraVisibility = params->domeLightCameraVisibility;
     missParams.texCount2d = texCount2d;
     missParams.texCount3d = texCount3d;
 
