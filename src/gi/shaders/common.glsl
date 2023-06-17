@@ -76,15 +76,23 @@ uint hash_theironborn(uint x)
     return x;
 }
 
+// https://www.shadertoy.com/view/XlGcRh
+uint hash_pcg32(inout uint state)
+{
+    state = state * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
 float rng_next(inout uint rng_state)
 {
-    rng_state = hash_theironborn(rng_state);
+    rng_state = hash_pcg32(rng_state);
     return uintAsFloat(rng_state);
 }
 
-uint rng_init(uint pixel_index, uint frame_num)
+uint rng_init(uint pixel_index, uint sampleIndex)
 {
-    return pixel_index ^ hash_theironborn(frame_num);
+    return hash_theironborn(pixel_index * (sampleIndex + 1));
 }
 #endif
 
