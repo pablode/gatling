@@ -1080,23 +1080,29 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   auto camForward = glm::normalize(glm::make_vec3(params->camera->forward));
   auto camUp = glm::normalize(glm::make_vec3(params->camera->up));
 
+  float lensRadius = 0.0f;
+  if (params->camera->fStop > 0.0f)
+  {
+    lensRadius = params->camera->focalLength / (2.0f * params->camera->fStop);
+  }
+
   Rp::PushConstants pushData = {
-    .cameraPosition         = glm::make_vec3(params->camera->position),
-    .imageWidth             = params->imageWidth,
-    .cameraForward          = camForward,
-    .imageHeight            = params->imageHeight,
-    .cameraUp               = camUp,
-    .cameraVFoV             = params->camera->vfov,
-    .backgroundColor        = glm::make_vec4(params->bgColor),
-    .sampleCount            = params->spp,
-    .maxBounces             = params->maxBounces,
-    .maxSampleValue         = params->maxSampleValue,
-    .rrBounceOffset         = params->rrBounceOffset,
-    .domeLightTransformCol0 = scene->domeLightTransform[0],
-    .rrInvMinTermProb       = params->rrInvMinTermProb,
-    .domeLightTransformCol1 = scene->domeLightTransform[1],
-    .sampleOffset           = s_sampleOffset,
-    .domeLightTransformCol2 = scene->domeLightTransform[2]
+    .cameraPosition              = glm::make_vec3(params->camera->position),
+    .imageDims                   = ((params->imageHeight << 16) | params->imageWidth),
+    .cameraForward               = camForward,
+    .focusDistance               = params->camera->focusDistance,
+    .cameraUp                    = camUp,
+    .cameraVFoV                  = params->camera->vfov,
+    .backgroundColor             = glm::make_vec4(params->bgColor),
+    .sampleOffset                = s_sampleOffset,
+    .lensRadius                  = lensRadius,
+    .sampleCount                 = params->spp,
+    .maxSampleValue              = params->maxSampleValue,
+    .domeLightTransformCol0      = scene->domeLightTransform[0],
+    .maxBouncesAndRrBounceOffset = ((params->maxBounces << 16) | params->rrBounceOffset),
+    .domeLightTransformCol1      = scene->domeLightTransform[1],
+    .rrInvMinTermProb            = params->rrInvMinTermProb,
+    .domeLightTransformCol2      = scene->domeLightTransform[2],
   };
 
   std::vector<CgpuBufferBinding> buffers;

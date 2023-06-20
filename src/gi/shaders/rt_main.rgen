@@ -40,8 +40,10 @@ vec3 evaluate_sample(vec3 ray_origin,
 #endif
 
     // Path trace
+    uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
+
     [[loop]]
-    while ((rayPayload.bitfield & 0x7FFFu) <= PC.maxBounces)
+    while ((rayPayload.bitfield & 0x7FFFu) <= maxBounces)
     {
         // Closest hit shading
 #ifdef REORDER_INVOCATIONS
@@ -130,7 +132,7 @@ vec3 evaluate_sample(vec3 ray_origin,
     }
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
-    return colormap_inferno(float(bounce) / float(PC.maxBounces));
+    return colormap_inferno(float(bounce) / float(maxBounces));
 #endif
 
     // Radiance clamping
@@ -148,22 +150,10 @@ vec3 evaluate_sample(vec3 ray_origin,
 // https://ieeexplore.ieee.org/document/4061554
 // We use the Box-Muller transform to draw samples from the distribution.
 // Also see: https://nvpro-samples.github.io/vk_mini_path_tracer/extras.html#gaussianfilterantialiasing
-#ifdef RAND_4D
-vec2 fisGauss(inout uvec4 rng_state)
-#else
-vec2 fisGauss(inout uint rng_state)
-#endif
+vec2 fisGauss(vec2 xi)
 {
-    vec2 rand;
-#ifdef RAND_4D
-    rand = rng4d_next(rng_state).xy;
-#else
-    rand.x = rng_next(rng_state);
-    rand.y = rng_next(rng_state);
-#endif
-
-    float u1 = max(1e-38, rand.x); // needs to be in (0, 1]
-    float u2 = rand.y; // in [0, 1]
+    float u1 = max(1e-38, xi.x); // needs to be in (0, 1]
+    float u2 = xi.y; // in [0, 1]
 
     // https://academo.org/demos/gaussian-distribution/
     float sigma = 0.375; // NV tutorial and Cycles
@@ -181,17 +171,20 @@ void main()
 #endif
 
     uvec2 pixel_pos = gl_LaunchIDEXT.xy;
-    uint pixel_index = pixel_pos.x + pixel_pos.y * PC.imageWidth;
+    uint imageWidth = PC.imageDims & 0xFFFFu;
+    uint imageHeight = PC.imageDims >> 16;
+
+    uint pixel_index = pixel_pos.x + pixel_pos.y * imageWidth;
 
     vec3 camera_right = cross(PC.cameraForward, PC.cameraUp);
-    float aspect_ratio = float(PC.imageWidth) / float(PC.imageHeight);
+    float aspect_ratio = float(imageWidth) / float(imageHeight);
 
     float H = 1.0;
     float W = H * aspect_ratio;
     float d = H / (2.0 * tan(PC.cameraVFoV * 0.5));
 
-    float WX = W / float(PC.imageWidth);
-    float HY = H / float(PC.imageHeight);
+    float WX = W / float(imageWidth);
+    float HY = H / float(imageHeight);
 
     vec3 C = PC.cameraPosition + PC.cameraForward * d;
     vec3 L = C - camera_right * W * 0.5 - PC.cameraUp * H * 0.5;
@@ -204,21 +197,19 @@ void main()
         uint sampleIndex = PC.sampleOffset + s;
 #ifdef RAND_4D
         uvec4 rng_state = rng4d_init(pixel_pos.xy, sampleIndex);
+        vec4 rand4 = rng4d_next(rng_state);
+        vec2 rand2_xy = rand4.xy;
 #else
         uint rng_state = rng_init(pixel_index, sampleIndex);
+        vec2 rand2_xy = vec2(rng_next(rng_state), rng_next(rng_state));
 #endif
 
-        vec2 sampleOffset;
+        // Uniform pixel area sampling
+        vec2 sampleOffset = rand2_xy;
+
 #ifdef FILTER_IMPORTANCE_SAMPLING
         // Importance sample multi-pixel filtering kernel
-        sampleOffset = vec2(0.5) + fisGauss(rng_state);
-#else
-        // Uniform pixel area sampling
-#ifdef RAND_4D
-        sampleOffset = rng4d_next(rng_state).xy;
-#else
-        sampleOffset = vec2(rng_next(rng_state), rng_next(rng_state));
-#endif
+        sampleOffset = vec2(0.5) + fisGauss(rand2_xy);
 #endif
 
         vec3 P =
@@ -226,17 +217,35 @@ void main()
             (float(pixel_pos.x) + sampleOffset.x) * camera_right * WX +
             (float(pixel_pos.y) + sampleOffset.y) * PC.cameraUp * HY;
 
-        vec3 ray_origin = PC.cameraPosition;
-        vec3 ray_dir = P - ray_origin;
+        vec3 rayOrigin = PC.cameraPosition;
+        vec3 rayDir = normalize(P - rayOrigin);
+
+        // Depth of Field
+        // (cmp. RT Gems II; Boksansky's Reference PT)
+
+        if (PC.lensRadius > 0.0)
+        {
+#ifdef RAND_4D
+            vec2 rand2_zw = rand4.zw;
+#else
+            vec2 rand2_zw = vec2(rng_next(rng_state), rng_next(rng_state));
+#endif
+
+            vec3 focalPoint = rayOrigin + rayDir * PC.focusDistance;
+            vec2 apertureSample = sample_hemisphere(rand2_zw).xy * PC.lensRadius;
+
+            rayOrigin += apertureSample.x * camera_right;
+            rayOrigin += apertureSample.y * PC.cameraUp;
+
+            rayDir = normalize(focalPoint - rayOrigin);
+        }
 
         /* Beware: a single direction component must not be zero,
          * because we often take the inverse of the direction. */
-        ray_dir += vec3(equal(ray_dir, vec3(0.0))) * FLOAT_MIN;
-
-        ray_dir = normalize(ray_dir);
+        rayDir += vec3(equal(rayDir, vec3(0.0))) * FLOAT_MIN;
 
         /* Path trace sample and accumulate color. */
-        vec3 sample_color = evaluate_sample(ray_origin, ray_dir, rng_state);
+        vec3 sample_color = evaluate_sample(rayOrigin, rayDir, rng_state);
         pixel_color += sample_color * inv_sample_count;
     }
 

@@ -59,6 +59,9 @@ struct GiCameraDesc
   float forward[3];
   float up[3];
   float vfov;
+  float fStop;
+  float focusDistance;
+  float focalLength;
 };
 
 struct GiVertex

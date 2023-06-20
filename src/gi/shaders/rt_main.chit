@@ -123,12 +123,15 @@ void main()
     float k1 = rng_next(rayPayload.rng_state);
 #endif
 
+    uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
+    uint rrBounceOffset = PC.maxBouncesAndRrBounceOffset & 0xFFFFu;
+
     bool terminateRay = false;
-    if (bounce == PC.maxBounces - 1)
+    if (bounce == maxBounces - 1)
     {
         terminateRay = true;
     }
-    else if (bounce > PC.rrBounceOffset)
+    else if (bounce > rrBounceOffset)
     {
         terminateRay = russian_roulette(k1, throughput);
     }

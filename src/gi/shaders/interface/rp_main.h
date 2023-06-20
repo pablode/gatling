@@ -40,21 +40,22 @@ struct Face
 struct PushConstants
 {
   SI_VEC3  cameraPosition;
-  SI_UINT  imageWidth;
+  SI_UINT  imageDims;
   SI_VEC3  cameraForward;
-  SI_UINT  imageHeight;
+  SI_FLOAT focusDistance;
   SI_VEC3  cameraUp;
   SI_FLOAT cameraVFoV;
   SI_VEC4  backgroundColor;
-  SI_UINT  sampleCount;
-  SI_UINT  maxBounces;
-  SI_FLOAT maxSampleValue;
-  SI_UINT  rrBounceOffset;
-  SI_VEC3  domeLightTransformCol0;
-  SI_FLOAT rrInvMinTermProb;
-  SI_VEC3  domeLightTransformCol1;
   SI_UINT  sampleOffset;
+  SI_FLOAT lensRadius;
+  SI_UINT  sampleCount;
+  SI_FLOAT maxSampleValue;
+  SI_VEC3  domeLightTransformCol0;
+  SI_UINT  maxBouncesAndRrBounceOffset;
+  SI_VEC3  domeLightTransformCol1;
+  SI_FLOAT rrInvMinTermProb;
   SI_VEC3  domeLightTransformCol2;
+  // 1 float remaining
 };
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)

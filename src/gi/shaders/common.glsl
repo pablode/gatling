@@ -182,4 +182,17 @@ vec3 decode_direction(uint e)
     return decode_octahedral(o);
 }
 
+// RT Gems, Shirley. Chapter 16 Sampling Transformations Zoo.
+vec3 sample_hemisphere(vec2 xi)
+{
+    float a = sqrt(xi.x);
+    float b = PI * 2.0 * xi.y;
+
+    return vec3(
+        a * cos(b),
+        a * sin(b),
+        sqrt(1.0 - xi.x)
+    );
+}
+
 #endif
