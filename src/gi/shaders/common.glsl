@@ -195,6 +195,17 @@ vec3 sample_hemisphere(vec2 xi)
     );
 }
 
+vec3 sample_sphere(vec2 xi, float radius, out float pdf)
+{
+    pdf = 1.0 / (4.0 * PI * radius * radius);
+
+    float a = 1.0 - 2.0 * xi.x;
+    float b = sqrt(1.0 - a * a);
+    float phi = 2.0 * PI * xi.y;
+
+    return vec3(b * cos(phi), b * sin(phi), a) * radius;
+}
+
 float luminance(vec3 radiance)
 {
     return dot(radiance, vec3(0.2126, 0.7152, 0.0722));
