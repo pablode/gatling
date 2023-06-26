@@ -6,7 +6,11 @@ layout(binding = BINDING_INDEX_OUT_PIXELS, std430) buffer PixelsBuffer { vec4 pi
 layout(binding = BINDING_INDEX_FACES, std430) readonly buffer FacesBuffer { Face faces[]; };
 
 #if SPHERE_LIGHT_COUNT > 0
-layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLightBuffer { SphereLight lights[]; };
+layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLightBuffer { SphereLight sphereLights[]; };
+#endif
+
+#if DISTANT_LIGHT_COUNT > 0
+layout(binding = BINDING_INDEX_DISTANT_LIGHTS, std430) readonly buffer DistantLightBuffer { DistantLight distantLights[]; };
 #endif
 
 layout(binding = BINDING_INDEX_VERTICES, std430) readonly buffer VerticesBuffer { FVertex vertices[]; };

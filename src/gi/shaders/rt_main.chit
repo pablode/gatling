@@ -32,10 +32,55 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     return false;
 }
 
-void sampleLightIndex(float k, out uint lightIndex, out float lightPdf)
+void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float pdf)
 {
-    lightPdf = 1.0 / SPHERE_LIGHT_COUNT;
-    lightIndex = min(uint(k * SPHERE_LIGHT_COUNT), SPHERE_LIGHT_COUNT - 1);
+    uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT;
+
+#if SPHERE_LIGHT_COUNT > 0 && DISTANT_LIGHT_COUNT > 0
+    bool selectSphereLight = (k4.x * totalLightCount) < SPHERE_LIGHT_COUNT;
+
+    if (selectSphereLight)
+#endif
+#if SPHERE_LIGHT_COUNT > 0
+    {
+        uint lightIndex = min(uint(k4.y * SPHERE_LIGHT_COUNT), SPHERE_LIGHT_COUNT - 1);
+
+        SphereLight light = sphereLights[lightIndex];
+
+        float samplePdf = 1.0;
+        vec3 samplePos = light.pos;
+        if (light.radius > 0.0)
+        {
+            // TODO: sample solid angle of sphere light
+            // https://schuttejoe.github.io/post/arealightsampling/
+            samplePos += sample_sphere(k4.zw, light.radius, samplePdf);
+        }
+
+        vec3 dir = samplePos - surfacePos;
+        dist = length(dir);
+        dirToLight = dir / dist;
+        power = light.intensity * light.color;
+
+        float distSq = dist * dist; // quad. attenuation
+        pdf = (1.0 / totalLightCount) * distSq * samplePdf;
+    }
+#endif
+#if SPHERE_LIGHT_COUNT > 0 && DISTANT_LIGHT_COUNT > 0
+    else // select distant light
+#endif
+#if DISTANT_LIGHT_COUNT > 0
+    {
+        uint lightIndex = min(uint(k4.y * DISTANT_LIGHT_COUNT), DISTANT_LIGHT_COUNT - 1);
+
+        // TODO: handle angle
+        DistantLight light = distantLights[lightIndex];
+
+        dist = FLOAT_MAX;
+        dirToLight = -light.direction;
+        power = light.intensity * light.color;
+        pdf = (1.0 / totalLightCount);
+    }
+#endif
 }
 
 void main()
@@ -128,56 +173,42 @@ void main()
     if (!inside)
     {
         // Sample light source
+        vec3 surfacePos = offset_ray_origin(shading_state.position, shading_state.geom_normal);
 #ifdef RAND_4D
-        vec3 k3 = rng4d_next(rayPayload.rng_state).xyz;
+        vec4 k4 = rng4d_next(rayPayload.rng_state);
 #else
-        vec3 k3 = vec3(rng_next(rayPayload.rng_state), rng_next(rayPayload.rng_state), rng_next(rayPayload.rng_state));
+        vec4 k4 = vec3(
+            rng_next(rayPayload.rng_state),
+            rng_next(rayPayload.rng_state),
+            rng_next(rayPayload.rng_state),
+            rng_next(rayPayload.rng_state)
+        );
 #endif
 
-        uint lightIndex;
+        vec3 dirToLight;
+        float lightDist;
+        vec3 lightPower;
         float lightPdf;
-        sampleLightIndex(k3.x, lightIndex, lightPdf);
-
-        SphereLight light = lights[lightIndex];
-        vec3 surfacePos = offset_ray_origin(shading_state.position, shading_state.geom_normal);
-
-        float samplePdf = 1.0;
-        vec3 samplePos = light.pos;
-        if (light.radius > 0.0)
-        {
-            // TODO: sample solid angle of sphere light
-            // https://schuttejoe.github.io/post/arealightsampling/
-            samplePos += sample_sphere(k3.yz, light.radius, samplePdf);
-        }
-
-        float jointPdf = lightPdf * samplePdf;
+        sampleLight(k4, surfacePos, dirToLight, lightDist, lightPower, lightPdf);
 
         vec3 neeContrib = vec3(0.0);
-        vec3 neeLightDir = samplePos - surfacePos;
-        float neeLightDist = length(neeLightDir);
-        neeLightDir = (neeLightDist == 0.0) ? vec3(0.0) : neeLightDir / neeLightDist;
+        bool neeValid = (lightDist > 0.0) && dot(dirToLight, shading_state.geom_normal) > 0.0;
 
-        bool neeValid = (neeLightDist > 0.0) && dot(neeLightDir, shading_state.geom_normal) > 0.0;
-
-        // Eval contribution in light direction
+        // Calc unshadowed light contribution
         if (neeValid)
         {
             Bsdf_evaluate_data bsdf_eval_data;
             bsdf_eval_data.ior1 = vec3(ior1);
             bsdf_eval_data.ior2 = vec3(ior2);
             bsdf_eval_data.k1 = -gl_WorldRayDirectionEXT;
-            bsdf_eval_data.k2 = neeLightDir;
+            bsdf_eval_data.k2 = dirToLight;
             mdl_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);
 
             neeValid = (bsdf_eval_data.pdf > 0.0);
 
             if (neeValid)
             {
-                // Calc unshadowed light contribution
-                vec3 lightPower = light.color * light.intensity / 100.0;
-                float distSq = neeLightDist * neeLightDist; // quad. attenuation
-
-                vec3 neeRadiance = lightPower / (jointPdf * distSq);
+                vec3 neeRadiance = lightPower / lightPdf;
 
                 vec3 weight = throughput * neeRadiance;
                 neeContrib += weight * bsdf_eval_data.bsdf_diffuse;
@@ -186,7 +217,8 @@ void main()
         }
 
         rayPayload.neeOrigin = surfacePos;
-        rayPayload.neeLightPos = samplePos;
+        rayPayload.neeLightDir = dirToLight;
+        rayPayload.neeLightDist = lightDist;
         rayPayload.neeContrib = neeContrib;
     }
 #endif

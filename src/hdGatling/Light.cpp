@@ -82,6 +82,56 @@ HdDirtyBits HdGatlingSphereLight::GetInitialDirtyBitsMask() const
 }
 
 //
+// Distant Light
+//
+HdGatlingDistantLight::HdGatlingDistantLight(GiScene* scene, const SdfPath& id)
+  : HdLight(id)
+  , m_giScene(scene)
+{
+  m_giDistantLight = giCreateDistantLight(scene);
+}
+
+void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
+                                 HdRenderParam* renderParam,
+                                 HdDirtyBits* dirtyBits)
+{
+  const SdfPath& id = GetId();
+
+  if (*dirtyBits & DirtyBits::DirtyTransform)
+  {
+    auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    giSetDistantLightDirection(m_giDistantLight, dir.data());
+  }
+
+  if (*dirtyBits & DirtyBits::DirtyParams)
+  {
+    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
+    float intensity = boxedIntensity.Cast<float>().Get<float>();
+    giSetDistantLightIntensity(m_giDistantLight, intensity);
+
+    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
+    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
+    giSetDistantLightColor(m_giDistantLight, color.data());
+
+    VtValue boxedAngle = sceneDelegate->GetLightParamValue(id, HdLightTokens->angle);
+    float angle = GfDegreesToRadians(boxedAngle.Cast<float>().Get<float>());
+    giSetDistantLightAngle(m_giDistantLight, angle);
+  }
+
+  *dirtyBits = HdChangeTracker::Clean;
+}
+
+void HdGatlingDistantLight::Finalize(HdRenderParam* renderParam)
+{
+  giDestroyDistantLight(m_giScene, m_giDistantLight);
+}
+
+HdDirtyBits HdGatlingDistantLight::GetInitialDirtyBitsMask() const
+{
+  return DirtyBits::DirtyParams | DirtyBits::DirtyTransform;
+}
+
+//
 // Dome Light
 //
 HdGatlingDomeLight::HdGatlingDomeLight(GiScene* scene, const SdfPath& id)

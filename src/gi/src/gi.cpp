@@ -101,9 +101,16 @@ struct GiSphereLight
   uint64_t gpuHandle;
 };
 
+struct GiDistantLight
+{
+  GiScene* scene;
+  uint64_t gpuHandle;
+};
+
 struct GiScene
 {
-  GgpuDenseDataStore lights;
+  GgpuDenseDataStore sphereLights;
+  GgpuDenseDataStore distantLights;
   CgpuImage domeLightTexture;
   glm::mat3 domeLightTransform;
   GiDomeLight* domeLight; // weak ptr
@@ -793,7 +800,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sgMat);
         hitParams.nextEventEstimation = params->nextEventEstimation;
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
-        hitParams.sphereLightCount = scene->lights.elementCount();
+        hitParams.sphereLightCount = scene->sphereLights.elementCount();
+        hitParams.distantLightCount = scene->distantLights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -813,7 +821,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
-        hitParams.sphereLightCount = scene->lights.elementCount();
+        hitParams.sphereLightCount = scene->sphereLights.elementCount();
+        hitParams.distantLightCount = scene->distantLights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -912,7 +921,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     rgenParams.nextEventEstimation = params->nextEventEstimation;
     rgenParams.progressiveAccumulation = params->progressiveAccumulation;
     rgenParams.reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder;
-    rgenParams.sphereLightCount = scene->lights.elementCount();
+    rgenParams.sphereLightCount = scene->sphereLights.elementCount();
+    rgenParams.distantLightCount = scene->distantLights.elementCount();
     rgenParams.shaderClockExts = clockCyclesAov;
     rgenParams.texCount2d = texCount2d;
     rgenParams.texCount3d = texCount3d;
@@ -934,7 +944,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     sg::ShaderGen::MissShaderParams missParams;
     missParams.domeLightEnabled = domeLightEnabled;
     missParams.domeLightCameraVisibility = params->domeLightCameraVisibility;
-    missParams.sphereLightCount = scene->lights.elementCount();
+    missParams.sphereLightCount = scene->sphereLights.elementCount();
+    missParams.distantLightCount = scene->distantLights.elementCount();
     missParams.texCount2d = texCount2d;
     missParams.texCount3d = texCount3d;
 
@@ -1083,10 +1094,15 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   // Init state for goto error handling.
   int result = GI_ERROR;
 
-  if (!scene->lights.commitChanges())
+  if (!scene->sphereLights.commitChanges())
   {
     fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
   }
+  if (!scene->distantLights.commitChanges())
+  {
+    fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
+  }
+
   if (!s_stager->flush())
   {
     fprintf(stderr, "%s:%d: stager flush failed!\n", __FILE__, __LINE__);
@@ -1146,7 +1162,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   buffers.push_back({ Rp::BINDING_INDEX_OUT_PIXELS, 0, s_outputBuffer, 0, outputBufferSize });
   buffers.push_back({ Rp::BINDING_INDEX_FACES, 0, geom_cache->buffer, geom_cache->faceBufferView.offset, geom_cache->faceBufferView.size });
-  buffers.push_back({ Rp::BINDING_INDEX_SPHERE_LIGHTS, 0, scene->lights.buffer(), 0, scene->lights.bufferSize() });
+  buffers.push_back({ Rp::BINDING_INDEX_SPHERE_LIGHTS, 0, scene->sphereLights.buffer(), 0, scene->sphereLights.bufferSize() });
+  buffers.push_back({ Rp::BINDING_INDEX_DISTANT_LIGHTS, 0, scene->distantLights.buffer(), 0, scene->distantLights.bufferSize() });
   buffers.push_back({ Rp::BINDING_INDEX_VERTICES, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
   bool domeLightEnabled = bool(scene->domeLight);
@@ -1288,7 +1305,8 @@ cleanup:
 GiScene* giCreateScene()
 {
   GiScene* scene = new GiScene{
-    .lights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::SphereLight), 64)
+    .sphereLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::SphereLight), 64),
+    .distantLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DistantLight), 64)
   };
   return scene;
 }
@@ -1307,9 +1325,9 @@ GiSphereLight* giCreateSphereLight(GiScene* scene)
 {
   auto light = new GiSphereLight;
   light->scene = scene;
-  light->gpuHandle = scene->lights.allocate();
+  light->gpuHandle = scene->sphereLights.allocate();
 
-  Rp::SphereLight* data = scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  Rp::SphereLight* data = scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->pos[0] = 0.0f;
@@ -1326,13 +1344,13 @@ GiSphereLight* giCreateSphereLight(GiScene* scene)
 
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
 {
-  scene->lights.free(light->gpuHandle);
+  scene->sphereLights.free(light->gpuHandle);
   delete light;
 }
 
 void giSetSphereLightPosition(GiSphereLight* light, float* pos)
 {
-  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->pos[0] = pos[0];
@@ -1342,7 +1360,7 @@ void giSetSphereLightPosition(GiSphereLight* light, float* pos)
 
 void giSetSphereLightColor(GiSphereLight* light, float* rgb)
 {
-  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->color[0] = rgb[0];
@@ -1352,7 +1370,7 @@ void giSetSphereLightColor(GiSphereLight* light, float* rgb)
 
 void giSetSphereLightIntensity(GiSphereLight* light, float intensity)
 {
-  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->intensity = intensity;
@@ -1360,10 +1378,73 @@ void giSetSphereLightIntensity(GiSphereLight* light, float intensity)
 
 void giSetSphereLightRadius(GiSphereLight* light, float radius)
 {
-  Rp::SphereLight* data = light->scene->lights.write<Rp::SphereLight>(light->gpuHandle);
+  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->radius = radius;
+}
+
+GiDistantLight* giCreateDistantLight(GiScene* scene)
+{
+  auto light = new GiDistantLight;
+  light->scene = scene;
+  light->gpuHandle = scene->distantLights.allocate();
+
+  Rp::DistantLight* data = scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  assert(data);
+
+  data->direction[0] = 0.0f;
+  data->direction[1] = 0.0f;
+  data->direction[2] = 0.0f;
+  data->intensity = 1000.0f; // Nits
+  data->color[0] = 1.0f;
+  data->color[1] = 1.0f;
+  data->color[2] = 1.0f;
+  data->angle = 0.0f;
+
+  return light;
+}
+
+void giDestroyDistantLight(GiScene* scene, GiDistantLight* light)
+{
+  scene->distantLights.free(light->gpuHandle);
+  delete light;
+}
+
+void giSetDistantLightDirection(GiDistantLight* light, float* direction)
+{
+  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  assert(data);
+
+  data->direction[0] = direction[0];
+  data->direction[1] = direction[1];
+  data->direction[2] = direction[2];
+}
+
+void giSetDistantLightIntensity(GiDistantLight* light, float intensity)
+{
+  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  assert(data);
+
+  data->intensity = intensity;
+}
+
+void giSetDistantLightColor(GiDistantLight* light, float* rgb)
+{
+  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  assert(data);
+
+  data->color[0] = rgb[0];
+  data->color[1] = rgb[1];
+  data->color[2] = rgb[2];
+}
+
+void giSetDistantLightAngle(GiDistantLight* light, float angle)
+{
+  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  assert(data);
+
+  data->angle = angle;
 }
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)
