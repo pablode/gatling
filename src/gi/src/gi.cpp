@@ -107,10 +107,17 @@ struct GiDistantLight
   uint64_t gpuHandle;
 };
 
+struct GiRectLight
+{
+  GiScene* scene;
+  uint64_t gpuHandle;
+};
+
 struct GiScene
 {
   GgpuDenseDataStore sphereLights;
   GgpuDenseDataStore distantLights;
+  GgpuDenseDataStore rectLights;
   CgpuImage domeLightTexture;
   glm::mat3 domeLightTransform;
   GiDomeLight* domeLight; // weak ptr
@@ -802,6 +809,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
         hitParams.distantLightCount = scene->distantLights.elementCount();
+        hitParams.rectLightCount = scene->rectLights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -823,6 +831,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
         hitParams.distantLightCount = scene->distantLights.elementCount();
+        hitParams.rectLightCount = scene->rectLights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -923,6 +932,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     rgenParams.reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder;
     rgenParams.sphereLightCount = scene->sphereLights.elementCount();
     rgenParams.distantLightCount = scene->distantLights.elementCount();
+    rgenParams.rectLightCount = scene->rectLights.elementCount();
     rgenParams.shaderClockExts = clockCyclesAov;
     rgenParams.texCount2d = texCount2d;
     rgenParams.texCount3d = texCount3d;
@@ -946,6 +956,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     missParams.domeLightCameraVisibility = params->domeLightCameraVisibility;
     missParams.sphereLightCount = scene->sphereLights.elementCount();
     missParams.distantLightCount = scene->distantLights.elementCount();
+    missParams.rectLightCount = scene->rectLights.elementCount();
     missParams.texCount2d = texCount2d;
     missParams.texCount3d = texCount3d;
 
@@ -1102,6 +1113,10 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   {
     fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
   }
+  if (!scene->rectLights.commitChanges())
+  {
+    fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
+  }
 
   if (!s_stager->flush())
   {
@@ -1164,6 +1179,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   buffers.push_back({ Rp::BINDING_INDEX_FACES, 0, geom_cache->buffer, geom_cache->faceBufferView.offset, geom_cache->faceBufferView.size });
   buffers.push_back({ Rp::BINDING_INDEX_SPHERE_LIGHTS, 0, scene->sphereLights.buffer(), 0, scene->sphereLights.bufferSize() });
   buffers.push_back({ Rp::BINDING_INDEX_DISTANT_LIGHTS, 0, scene->distantLights.buffer(), 0, scene->distantLights.bufferSize() });
+  buffers.push_back({ Rp::BINDING_INDEX_RECT_LIGHTS, 0, scene->rectLights.buffer(), 0, scene->rectLights.bufferSize() });
   buffers.push_back({ Rp::BINDING_INDEX_VERTICES, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
   bool domeLightEnabled = bool(scene->domeLight);
@@ -1306,7 +1322,8 @@ GiScene* giCreateScene()
 {
   GiScene* scene = new GiScene{
     .sphereLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::SphereLight), 64),
-    .distantLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DistantLight), 64)
+    .distantLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DistantLight), 64),
+    .rectLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::RectLight), 64)
   };
   return scene;
 }
@@ -1445,6 +1462,84 @@ void giSetDistantLightAngle(GiDistantLight* light, float angle)
   assert(data);
 
   data->angle = angle;
+}
+
+GiRectLight* giCreateRectLight(GiScene* scene)
+{
+  auto light = new GiRectLight;
+  light->scene = scene;
+  light->gpuHandle = scene->rectLights.allocate();
+
+  Rp::RectLight* data = scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->origin[0] = 0.0f;
+  data->origin[1] = 0.0f;
+  data->origin[2] = 0.0f;
+  data->direction[0] = 0.0f;
+  data->direction[1] = 0.0f;
+  data->direction[2] = 0.0f;
+  data->intensity = 1000.0f; // Nits
+  data->color[0] = 1.0f;
+  data->color[1] = 1.0f;
+  data->color[2] = 1.0f;
+  data->height = 0.0f;
+  data->width = 0.0f;
+
+  return light;
+}
+
+void giDestroyRectLight(GiScene* scene, GiRectLight* light)
+{
+  scene->rectLights.free(light->gpuHandle);
+  delete light;
+}
+
+void giSetRectLightOrigin(GiRectLight* light, float* origin)
+{
+  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->origin[0] = origin[0];
+  data->origin[1] = origin[1];
+  data->origin[2] = origin[2];
+}
+
+void giSetRectLightDirection(GiRectLight* light, float* direction)
+{
+  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->direction[0] = direction[0];
+  data->direction[1] = direction[1];
+  data->direction[2] = direction[2];
+}
+
+void giSetRectLightIntensity(GiRectLight* light, float intensity)
+{
+  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->intensity = intensity;
+}
+
+void giSetRectLightColor(GiRectLight* light, float* rgb)
+{
+  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->color[0] = rgb[0];
+  data->color[1] = rgb[1];
+  data->color[2] = rgb[2];
+}
+
+void giSetRectLightDimensions(GiRectLight* light, float width, float height)
+{
+  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->width = width;
+  data->height = height;
 }
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)

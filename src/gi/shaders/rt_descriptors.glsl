@@ -13,6 +13,10 @@ layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLigh
 layout(binding = BINDING_INDEX_DISTANT_LIGHTS, std430) readonly buffer DistantLightBuffer { DistantLight distantLights[]; };
 #endif
 
+#if RECT_LIGHT_COUNT > 0
+layout(binding = BINDING_INDEX_RECT_LIGHTS, std430) readonly buffer RectLightBuffer { RectLight rectLights[]; };
+#endif
+
 layout(binding = BINDING_INDEX_VERTICES, std430) readonly buffer VerticesBuffer { FVertex vertices[]; };
 
 #if (TEXTURE_COUNT_2D > 0) || (TEXTURE_COUNT_3D > 0)

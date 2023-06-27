@@ -132,6 +132,61 @@ HdDirtyBits HdGatlingDistantLight::GetInitialDirtyBitsMask() const
 }
 
 //
+// Rect Light
+//
+HdGatlingRectLight::HdGatlingRectLight(GiScene* scene, const SdfPath& id)
+  : HdLight(id)
+  , m_giScene(scene)
+{
+  m_giRectLight = giCreateRectLight(scene);
+}
+
+void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
+                              HdRenderParam* renderParam,
+                              HdDirtyBits* dirtyBits)
+{
+  const SdfPath& id = GetId();
+
+  if (*dirtyBits & DirtyBits::DirtyTransform)
+  {
+    auto origin = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    giSetRectLightOrigin(m_giRectLight, origin.data());
+
+    auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    giSetRectLightDirection(m_giRectLight, dir.data());
+  }
+
+  if (*dirtyBits & DirtyBits::DirtyParams)
+  {
+    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
+    float intensity = boxedIntensity.Cast<float>().Get<float>();
+    giSetRectLightIntensity(m_giRectLight, intensity);
+
+    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
+    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
+    giSetRectLightColor(m_giRectLight, color.data());
+
+    VtValue boxedWidth = sceneDelegate->GetLightParamValue(id, HdLightTokens->width);
+    float width = boxedWidth.Cast<float>().Get<float>();
+    VtValue boxedHeight = sceneDelegate->GetLightParamValue(id, HdLightTokens->height);
+    float height = boxedHeight.Cast<float>().Get<float>();
+    giSetRectLightDimensions(m_giRectLight, width, height);
+  }
+
+  *dirtyBits = HdChangeTracker::Clean;
+}
+
+void HdGatlingRectLight::Finalize(HdRenderParam* renderParam)
+{
+  giDestroyRectLight(m_giScene, m_giRectLight);
+}
+
+HdDirtyBits HdGatlingRectLight::GetInitialDirtyBitsMask() const
+{
+  return DirtyBits::DirtyParams | DirtyBits::DirtyTransform;
+}
+
+//
 // Dome Light
 //
 HdGatlingDomeLight::HdGatlingDomeLight(GiScene* scene, const SdfPath& id)

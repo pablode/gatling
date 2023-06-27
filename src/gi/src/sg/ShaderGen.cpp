@@ -199,7 +199,8 @@ namespace gi::sg
     return mat->isOpaque;
   }
 
-  void _sgGenerateCommonDefines(GlslSourceStitcher& stitcher, uint32_t texCount2d, uint32_t texCount3d, uint32_t sphereLightCount, uint32_t distantLightCount)
+  void _sgGenerateCommonDefines(GlslSourceStitcher& stitcher, uint32_t texCount2d, uint32_t texCount3d,
+    uint32_t sphereLightCount, uint32_t distantLightCount, uint32_t rectLightCount)
   {
 #if defined(NDEBUG) || defined(__APPLE__)
     stitcher.appendDefine("NDEBUG");
@@ -208,7 +209,8 @@ namespace gi::sg
     stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) texCount2d);
     stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) texCount3d);
     stitcher.appendDefine("SPHERE_LIGHT_COUNT", (int32_t) sphereLightCount);
-    stitcher.appendDefine("DISTANT_LIGHT_COUNT", (int32_t) distantLightCount);
+    stitcher.appendDefine("DISTANT_LIGHT_COUNT", (int32_t)distantLightCount);
+    stitcher.appendDefine("RECT_LIGHT_COUNT", (int32_t)rectLightCount);
   }
 
   bool ShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)
@@ -240,7 +242,7 @@ namespace gi::sg
       stitcher.appendDefine("REORDER_HINT_BIT_COUNT", reorderHintBitCount);
     }
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
 
     if (params.filterImportanceSampling)
     {
@@ -272,7 +274,7 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
 
     if (params.domeLightEnabled)
     {
@@ -363,7 +365,7 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
@@ -394,7 +396,7 @@ namespace gi::sg
     GlslSourceStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);

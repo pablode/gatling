@@ -22,6 +22,7 @@
 struct GiScene;
 struct GiSphereLight;
 struct GiDistantLight;
+struct GiRectLight;
 struct GiDomeLight;
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -60,6 +61,24 @@ public:
 private:
   GiScene* m_giScene;
   GiDistantLight* m_giDistantLight;
+};
+
+
+class HdGatlingRectLight final : public HdLight
+{
+public:
+  HdGatlingRectLight(GiScene* scene, const SdfPath& id);
+
+public:
+  void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
+
+  void Finalize(HdRenderParam* renderParam) override;
+
+  HdDirtyBits GetInitialDirtyBitsMask() const override;
+
+private:
+  GiScene* m_giScene;
+  GiRectLight* m_giRectLight;
 };
 
 

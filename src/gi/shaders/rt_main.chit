@@ -34,14 +34,10 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
 
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float pdf)
 {
-    uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT;
+    uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT;
 
-#if SPHERE_LIGHT_COUNT > 0 && DISTANT_LIGHT_COUNT > 0
-    bool selectSphereLight = (k4.x * totalLightCount) < SPHERE_LIGHT_COUNT;
-
-    if (selectSphereLight)
-#endif
 #if SPHERE_LIGHT_COUNT > 0
+    if ((k4.x * totalLightCount) <= SPHERE_LIGHT_COUNT)
     {
         uint lightIndex = min(uint(k4.y * SPHERE_LIGHT_COUNT), SPHERE_LIGHT_COUNT - 1);
 
@@ -60,15 +56,11 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         dist = length(dir);
         dirToLight = dir / dist;
         power = light.intensity * light.color;
-
-        float distSq = dist * dist; // quad. attenuation
-        pdf = (1.0 / totalLightCount) * distSq * samplePdf;
+        pdf = samplePdf * dist * dist; // quad. attenuation
     }
 #endif
-#if SPHERE_LIGHT_COUNT > 0 && DISTANT_LIGHT_COUNT > 0
-    else // select distant light
-#endif
 #if DISTANT_LIGHT_COUNT > 0
+    else if ((k4.x * totalLightCount) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT))
     {
         uint lightIndex = min(uint(k4.y * DISTANT_LIGHT_COUNT), DISTANT_LIGHT_COUNT - 1);
 
@@ -78,9 +70,31 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         dist = FLOAT_MAX;
         dirToLight = -light.direction;
         power = light.intensity * light.color;
-        pdf = (1.0 / totalLightCount);
+        pdf = 1.0;
     }
 #endif
+#if RECT_LIGHT_COUNT > 0
+    else
+    {
+        uint lightIndex = min(uint(k4.y * RECT_LIGHT_COUNT), RECT_LIGHT_COUNT - 1);
+
+        RectLight light = rectLights[lightIndex];
+
+        // TODO: solid angle sampling
+        vec2 sampleOnRect = (k4.zw - vec2(0.5)) * vec2(light.width, light.height);
+        vec3 samplePos = light.origin + vec3(sampleOnRect, 0.0) * light.direction;
+        vec3 dir = samplePos - surfacePos;
+
+        dist = length(dir);
+        dirToLight = dir / dist;
+        // https://graphics.cg.uni-saarland.de/courses/ris-2021/slides/03_ProbabilityTheory_MonteCarlo.pdf s.35
+        float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
+        power = light.intensity * light.color * geometryTerm;
+        pdf = 1.0 / (light.width * light.height);
+    }
+#endif
+
+    pdf /= float(totalLightCount);
 }
 
 void main()

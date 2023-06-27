@@ -52,6 +52,7 @@ struct GiShaderCache;
 struct GiScene;
 struct GiSphereLight;
 struct GiDistantLight;
+struct GiRectLight;
 struct GiDomeLight;
 
 struct GiCameraDesc
@@ -191,6 +192,14 @@ void giSetDistantLightDirection(GiDistantLight* light, float* direction);
 void giSetDistantLightIntensity(GiDistantLight* light, float intensity);
 void giSetDistantLightColor(GiDistantLight* light, float* rgb);
 void giSetDistantLightAngle(GiDistantLight* light, float angle);
+
+GiRectLight* giCreateRectLight(GiScene* scene);
+void giDestroyRectLight(GiScene* scene, GiRectLight* light);
+void giSetRectLightOrigin(GiRectLight* light, float* origin);
+void giSetRectLightDirection(GiRectLight* light, float* direction);
+void giSetRectLightIntensity(GiRectLight* light, float intensity);
+void giSetRectLightColor(GiRectLight* light, float* rgb);
+void giSetRectLightDimensions(GiRectLight* light, float width, float height);
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
 void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);
