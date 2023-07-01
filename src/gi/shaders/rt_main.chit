@@ -55,8 +55,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         vec3 dir = samplePos - surfacePos;
         dist = length(dir);
         dirToLight = dir / dist;
-        power = light.intensity * light.color;
-        pdf = samplePdf * dist * dist; // quad. attenuation
+
+        float cosTheta = (light.radius > 0.0) ? max(0.0, (dot(normalize(samplePos - light.pos), -dirToLight))) : 1.0;
+        float geometryTerm = cosTheta / (dist * dist);
+
+        power = light.intensity * light.color * geometryTerm;
+        pdf = samplePdf;
     }
 #endif
 #if DISTANT_LIGHT_COUNT > 0
