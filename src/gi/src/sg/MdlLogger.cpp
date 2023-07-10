@@ -86,6 +86,7 @@ namespace gi::sg
     // FIXME: use MDL 'warning' execution context option instead
     if (strstr(message, "unused parameter") ||
         strstr(message, "unused variable") ||
+        strstr(message, "unused let temporary") ||
         strstr(message, "unreferenced local function"))
     {
       return;

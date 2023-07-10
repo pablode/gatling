@@ -126,14 +126,27 @@ namespace gi::sg
   void MdlGlslCodeGen::extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
                                            std::vector<TextureResource>& textureResources)
   {
+#if MI_NEURAYLIB_API_VERSION < 51
     size_t texCount = targetCode->get_body_texture_count();
+#else
+    size_t texCount = targetCode->get_texture_count();
+#endif
     textureResources.reserve(texCount);
+
+    uint32_t binding = 0;
 
     // We start at 1 because index 0 is the invalid texture.
     for (int i = 1; i < texCount; i++)
     {
+#if MI_NEURAYLIB_API_VERSION >= 51
+      if (!targetCode->get_texture_is_body_resource(i))
+      {
+        continue;
+      }
+#endif
+
       TextureResource textureResource;
-      textureResource.binding = i - 1;
+      textureResource.binding = binding++;
       textureResource.is3dImage = false;
       textureResource.width = 1;
       textureResource.height = 1;
