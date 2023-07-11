@@ -73,12 +73,9 @@ namespace
     const float EPS = 0.0001f;
     size_t tangentCount = meshNormals.array.size();
 
-    VtVec3fArray tangents;
-    tangents.resize(tangentCount, GfVec3f(0.0f));
-    VtVec3fArray bitangents;
-    bitangents.resize(tangentCount, GfVec3f(0.0f));
-    VtVec3fArray normals;
-    normals.resize(tangentCount, GfVec3f(0.0f));
+    VtVec3fArray tangents(tangentCount, GfVec3f(0.0f));
+    VtVec3fArray bitangents(tangentCount, GfVec3f(0.0f));
+    VtVec3fArray normals(tangentCount, GfVec3f(0.0f));
 
     for (int i = 0; i < meshFaces.size(); i++)
     {
@@ -358,7 +355,7 @@ void HdGatlingRenderPass::_BakeMeshGeometry(const HdGatlingMesh* mesh,
 #else
     TF_WARN("tangents have been provided without handedness; assuming positive");
     size_t signCount = std::max(meshNormals.array.size(), meshTangents.array.size());
-    meshBitangentSigns.array.resize(signCount, 1.0f);
+    meshBitangentSigns.array = VtFloatArray(signCount, 1.0f);
     meshBitangentSigns.indexed = meshNormals.indexed && meshTangents.indexed;
 #endif
   }
