@@ -24,6 +24,8 @@
 #include <pxr/imaging/hd/vtBufferSource.h>
 #include <pxr/usd/usdUtils/pipeline.h>
 
+#include "gi.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -87,6 +89,8 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
 
     SetMaterialId(materialId);
+
+    giInvalidateGeomCache(); // FIXME: remove this hack
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyVisibility)

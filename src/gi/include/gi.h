@@ -166,9 +166,11 @@ void giDestroyGeomCache(GiGeomCache* cache);
 GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params);
 void giDestroyShaderCache(GiShaderCache* cache);
 bool giShaderCacheNeedsRebuild();
+bool giGeomCacheNeedsRebuild();
 
 void giInvalidateFramebuffer();
 void giInvalidateShaderCache();
+void giInvalidateGeomCache();
 
 int giRender(const GiRenderParams* params, float* rgbaImg);
 

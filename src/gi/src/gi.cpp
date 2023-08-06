@@ -129,6 +129,7 @@ uint32_t s_outputBufferWidth = 0;
 uint32_t s_outputBufferHeight = 0;
 uint32_t s_sampleOffset = 0;
 std::atomic_bool s_forceShaderCacheInvalid = false;
+std::atomic_bool s_forceGeomCacheInvalid = false;
 
 #ifndef NDEBUG
 class ShaderFileListener : public efsw::FileWatchListener
@@ -507,6 +508,8 @@ fail_cleanup:
 
 GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 {
+  s_forceGeomCacheInvalid = false;
+
   GiGeomCache* cache = nullptr;
 
   printf("instance count: %d\n", params->meshInstanceCount);
@@ -596,10 +599,14 @@ void giDestroyGeomCache(GiGeomCache* cache)
   delete cache;
 }
 
-// FIXME: get rid of this hack - we want to rebuild with cached data at shader granularity
+// FIXME: move this into the GiScene struct - also, want to rebuild with cached data at shader granularity
 bool giShaderCacheNeedsRebuild()
 {
   return s_forceShaderCacheInvalid;
+}
+bool giGeomCacheNeedsRebuild()
+{
+  return s_forceGeomCacheInvalid;
 }
 
 GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
@@ -1051,6 +1058,11 @@ void giInvalidateFramebuffer()
 void giInvalidateShaderCache()
 {
   s_forceShaderCacheInvalid = true;
+}
+
+void giInvalidateGeomCache()
+{
+  s_forceGeomCacheInvalid = true;
 }
 
 int giRender(const GiRenderParams* params, float* rgbaImg)
