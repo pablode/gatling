@@ -74,7 +74,7 @@ namespace gi
     m_imageCache.clear();
   }
 
-  bool TexSys::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flush, bool cache)
+  bool TexSys::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flushImmediately)
   {
     auto cacheResult = m_imageCache.find(filePath);
     if (cacheResult != m_imageCache.end())
@@ -110,12 +110,9 @@ namespace gi
       return false;
     }
 
-    if (cache)
-    {
-      m_imageCache[filePath] = image;
-    }
+    m_imageCache[filePath] = image;
 
-    if (flush)
+    if (flushImmediately)
     {
       m_stager.flush();
     }
@@ -232,5 +229,24 @@ namespace gi
         cgpuDestroyImage(m_device, image);
       }
     }
+  }
+
+  void TexSys::evictAndDestroyCachedImage(CgpuImage image)
+  {
+    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
+    {
+      if (it->second.handle != image.handle)
+      {
+        continue;
+      }
+
+      m_imageCache.erase(it);
+
+      cgpuDestroyImage(m_device, image);
+
+      return;
+    }
+
+    assert(false);
   }
 }

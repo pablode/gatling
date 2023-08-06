@@ -50,14 +50,15 @@ namespace gi
     bool loadTextureFromFilePath(const char* filePath,
                                  CgpuImage& image,
                                  bool is3dImage = false,
-                                 bool flush = true,
-                                 bool cache = true);
+                                 bool flushImmediately = true);
 
     bool loadTextureResources(const std::vector<sg::TextureResource>& textureResources,
                               std::vector<CgpuImage>& images2d,
                               std::vector<CgpuImage>& images3d);
 
     void destroyUncachedImages(const std::vector<CgpuImage>& images);
+
+    void evictAndDestroyCachedImage(CgpuImage image);
 
   private:
     CgpuDevice m_device;

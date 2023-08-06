@@ -105,6 +105,7 @@ struct GiScene
   std::mutex mutex;
   CgpuImage domeLightTexture;
   glm::mat3 domeLightTransform;
+  GiDomeLight* domeLight; // weak ptr
 };
 
 struct GiDomeLight
@@ -634,15 +635,16 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   bool hasPipelineClosestHitShader = false;
   bool hasPipelineAnyHitShader = false;
 
-  // Upload / delete dome light.
-  bool domeLightEnabled = false;
+  // Upload dome light.
+  GiScene* scene = params->scene;
+  if (scene->domeLight != params->domeLight)
   {
-    GiScene* scene = params->scene;
     if (scene->domeLightTexture.handle)
     {
-      cgpuDestroyImage(s_device, scene->domeLightTexture);
+      s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
       scene->domeLightTexture.handle = 0;
     }
+    scene->domeLight = nullptr;
 
     GiDomeLight* domeLight = params->domeLight;
     if (domeLight)
@@ -650,18 +652,20 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       const char* filePath = domeLight->textureFilePath.c_str();
 
       bool is3dImage = false;
-      if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, false, false))
+      bool flushImmediately = true;
+      if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, flushImmediately))
       {
         fprintf(stderr, "unable to load dome light texture at %s\n", filePath);
       }
       else
       {
         scene->domeLightTransform = domeLight->transform;
+        scene->domeLight = domeLight;
       }
     }
-
-    domeLightEnabled = bool(scene->domeLightTexture.handle);
   }
+
+  bool domeLightEnabled = bool(scene->domeLight);
 
   // Create per-material closest-hit shaders.
   //
@@ -1117,7 +1121,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   //}
   buffers.push_back({ Rp::BINDING_INDEX_VERTICES, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
 
-  bool domeLightEnabled = bool(scene->domeLightTexture.handle);
+  bool domeLightEnabled = bool(scene->domeLight);
   size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + int(domeLightEnabled);
 
   std::vector<CgpuImageBinding> images;
@@ -1260,9 +1264,9 @@ GiScene* giCreateScene()
 
 void giDestroyScene(GiScene* scene)
 {
-  if (scene->domeLightTexture.handle)
+  if (scene->domeLight)
   {
-    cgpuDestroyImage(s_device, scene->domeLightTexture);
+    s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
     scene->domeLightTexture.handle = 0;
   }
   delete scene;
