@@ -195,6 +195,8 @@ CGPU_RESOLVE_HANDLE(      Sampler,       CgpuSampler,       CgpuISampler,       
 CGPU_RESOLVE_HANDLE(         Blas,          CgpuBlas,          CgpuIBlas,           iblasStore)
 CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,           itlasStore)
 
+/* Helper methods. */
+
 static CgpuPhysicalDeviceFeatures cgpuTranslatePhysicalDeviceFeatures(const VkPhysicalDeviceFeatures* vkFeatures)
 {
   CgpuPhysicalDeviceFeatures features = {};
@@ -303,6 +305,26 @@ static VkSamplerAddressMode cgpuTranslateAddressMode(CgpuSamplerAddressMode mode
   case CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
   default: return VK_SAMPLER_ADDRESS_MODE_MAX_ENUM;
   }
+}
+
+static VkPipelineStageFlags cgpuPipelineStageFlagsFromShaderStageFlags(VkShaderStageFlags shaderStageFlags)
+{
+  VkPipelineStageFlags pipelineStageFlags = (VkPipelineStageFlags) 0;
+  if (shaderStageFlags & VK_SHADER_STAGE_COMPUTE_BIT)
+  {
+    pipelineStageFlags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  }
+  if ((shaderStageFlags & VK_SHADER_STAGE_RAYGEN_BIT_KHR) |
+      (shaderStageFlags & VK_SHADER_STAGE_ANY_HIT_BIT_KHR) |
+      (shaderStageFlags & VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) |
+      (shaderStageFlags & VK_SHADER_STAGE_MISS_BIT_KHR) |
+      (shaderStageFlags & VK_SHADER_STAGE_INTERSECTION_BIT_KHR))
+  {
+    pipelineStageFlags |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+  }
+
+  assert(int(pipelineStageFlags) != 0);
+  return pipelineStageFlags;
 }
 
 /* API method implementation. */
@@ -2552,10 +2574,12 @@ bool cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
 
   if (barriers.size() > 0)
   {
+    VkPipelineStageFlags stageFlags = cgpuPipelineStageFlagsFromShaderStageFlags(ishader->stageFlags);
+
     idevice->table.vkCmdPipelineBarrier(
       icommandBuffer->commandBuffer,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      stageFlags,
+      stageFlags,
       0,
       0,
       nullptr,
@@ -2888,9 +2912,9 @@ bool cgpuCmdCopyBufferToImage(CgpuCommandBuffer commandBuffer,
 
     idevice->table.vkCmdPipelineBarrier(
       icommandBuffer->commandBuffer,
-      // FIXME: batch this barrier and use correct pipeline flag bits
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+      // FIXME: batch this barrier and reduce pipeline flags scope
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
       0,
       0,
       nullptr,
@@ -3083,8 +3107,8 @@ bool cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
   idevice->table.vkCmdPipelineBarrier(
     icommandBuffer->commandBuffer,
     // FIXME: expose flags in desc struct
-    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
     0,
     vkMemBarriers.size(),
     vkMemBarriers.data(),
