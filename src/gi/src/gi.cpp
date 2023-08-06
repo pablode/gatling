@@ -555,9 +555,6 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
       goto cleanup;
     if (!s_stager->stageToBuffer((uint8_t*)allVertices.data(), vertexBufferView.size, buffer, vertexBufferView.offset))
       goto cleanup;
-
-    if (!s_stager->flush())
-      goto cleanup;
   }
 
   // Fill cache struct.
@@ -652,7 +649,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       const char* filePath = domeLight->textureFilePath.c_str();
 
       bool is3dImage = false;
-      bool flushImmediately = true;
+      bool flushImmediately = false;
       if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, flushImmediately))
       {
         fprintf(stderr, "unable to load dome light texture at %s\n", filePath);
@@ -1058,6 +1055,8 @@ void giInvalidateShaderCache()
 
 int giRender(const GiRenderParams* params, float* rgbaImg)
 {
+  s_stager->flush();
+
   const GiGeomCache* geom_cache = params->geomCache;
   const GiShaderCache* shader_cache = params->shaderCache;
   GiScene* scene = params->scene;
