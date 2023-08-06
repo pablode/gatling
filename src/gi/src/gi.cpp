@@ -1051,6 +1051,11 @@ void giInvalidateFramebuffer()
   s_sampleOffset = 0;
 }
 
+void giInvalidateShaderCache()
+{
+  s_forceShaderCacheInvalid = true;
+}
+
 int giRender(const GiRenderParams* params, float* rgbaImg)
 {
   const GiGeomCache* geom_cache = params->geomCache;

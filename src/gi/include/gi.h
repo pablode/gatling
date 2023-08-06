@@ -168,6 +168,7 @@ void giDestroyShaderCache(GiShaderCache* cache);
 bool giShaderCacheNeedsRebuild();
 
 void giInvalidateFramebuffer();
+void giInvalidateShaderCache();
 
 int giRender(const GiRenderParams* params, float* rgbaImg);
 

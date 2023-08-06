@@ -72,6 +72,8 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
 
   m_network = std::make_unique<HdMaterialNetwork2>();
   *m_network = network;
+
+  giInvalidateShaderCache(); // FIXME: track dirty state in RenderParam
 }
 
 const HdMaterialNetwork2* HdGatlingMaterial::GetNetwork() const
