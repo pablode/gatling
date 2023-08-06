@@ -1231,7 +1231,7 @@ bool cgpuCreateImage(CgpuDevice device,
   iimage->width = imageDesc->width;
   iimage->height = imageDesc->height;
   iimage->depth = imageDesc->is3d ? imageDesc->depth : 1;
-  iimage->layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  iimage->layout = imageCreateInfo.initialLayout;
   iimage->accessMask = 0;
 
   return true;
@@ -1745,7 +1745,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
 
   // Set up stages
   GbSmallVector<VkPipelineShaderStageCreateInfo, 128> stages;
-  VkShaderStageFlags pipelineStageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+  VkShaderStageFlags shaderStageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
   auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
     VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {};
@@ -1765,7 +1765,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
   // Miss
   if (desc->missShaderCount > 0)
   {
-    pipelineStageFlags |= VK_SHADER_STAGE_MISS_BIT_KHR;
+    shaderStageFlags |= VK_SHADER_STAGE_MISS_BIT_KHR;
   }
   for (uint32_t i = 0; i < desc->missShaderCount; i++)
   {
@@ -1793,7 +1793,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
       assert(iclosestHitShader->stageFlags == VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
 
       pushStage(iclosestHitShader->stageFlags, iclosestHitShader->module);
-      pipelineStageFlags |= iclosestHitShader->stageFlags;
+      shaderStageFlags |= iclosestHitShader->stageFlags;
     }
 
     // Any hit (optional)
@@ -1806,7 +1806,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
       assert(ianyHitShader->stageFlags == VK_SHADER_STAGE_ANY_HIT_BIT_KHR);
 
       pushStage(ianyHitShader->stageFlags, ianyHitShader->module);
-      pipelineStageFlags |= ianyHitShader->stageFlags;
+      shaderStageFlags |= ianyHitShader->stageFlags;
     }
   }
 
@@ -1861,11 +1861,11 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
   }
 
   // Create descriptor and pipeline layout.
-  if (!cgpuCreatePipelineDescriptors(idevice, ipipeline, irgenShader, pipelineStageFlags))
+  if (!cgpuCreatePipelineDescriptors(idevice, ipipeline, irgenShader, shaderStageFlags))
   {
     goto cleanup_fail;
   }
-  if (!cgpuCreatePipelineLayout(idevice, ipipeline, irgenShader, pipelineStageFlags))
+  if (!cgpuCreatePipelineLayout(idevice, ipipeline, irgenShader, shaderStageFlags))
   {
     goto cleanup_fail;
   }
