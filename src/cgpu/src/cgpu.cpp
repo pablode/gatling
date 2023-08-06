@@ -1151,8 +1151,8 @@ bool cgpuCreateImage(CgpuDevice device,
   }
 
   VkImageTiling vkImageTiling = VK_IMAGE_TILING_OPTIMAL;
-  if (imageDesc->usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC ||
-      imageDesc->usage == CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST)
+  if ((imageDesc->usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) |
+      (imageDesc->usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST))
   {
     vkImageTiling = VK_IMAGE_TILING_LINEAR;
   }
