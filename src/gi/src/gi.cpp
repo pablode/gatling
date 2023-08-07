@@ -36,6 +36,7 @@
 #include <assert.h>
 
 #include <stager.h>
+#include <fencedCallbackExecutor.h>
 #include <cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -119,6 +120,7 @@ CgpuPhysicalDeviceFeatures s_deviceFeatures;
 CgpuPhysicalDeviceProperties s_deviceProperties;
 CgpuSampler s_texSampler;
 std::unique_ptr<gtl::GgpuStager> s_stager;
+std::unique_ptr<gtl::GgpuFencedCallbackExecutor> s_fencedCallbackExecutor;
 std::unique_ptr<sg::ShaderGen> s_shaderGen;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
@@ -227,6 +229,8 @@ GiStatus giInitialize(const GiInitParams* params)
     return GI_ERROR;
   }
 
+  s_fencedCallbackExecutor = std::make_unique<gtl::GgpuFencedCallbackExecutor>(s_device);
+
 #ifdef NDEBUG
   const char* shaderPath = params->shaderPath;
 #else
@@ -281,6 +285,7 @@ void giTerminate()
     s_stager->free();
     s_stager.reset();
   }
+  s_fencedCallbackExecutor.reset();
   cgpuDestroySampler(s_device, s_texSampler);
   cgpuDestroyDevice(s_device);
   cgpuTerminate();
@@ -640,7 +645,6 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   bool hasPipelineAnyHitShader = false;
 
   // Upload dome light.
-  GiScene* scene = params->scene;
   if (scene->domeLight != params->domeLight)
   {
     if (scene->domeLightTexture.handle)
@@ -1068,6 +1072,8 @@ void giInvalidateGeomCache()
 int giRender(const GiRenderParams* params, float* rgbaImg)
 {
   s_stager->flush();
+
+  s_fencedCallbackExecutor->collectiveExecute();
 
   const GiGeomCache* geom_cache = params->geomCache;
   const GiShaderCache* shader_cache = params->shaderCache;

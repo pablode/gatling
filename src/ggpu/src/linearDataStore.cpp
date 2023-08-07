@@ -37,13 +37,14 @@ namespace gtl
 {
   GgpuLinearDataStore::GgpuLinearDataStore(CgpuDevice device,
                                            GgpuStager& stager,
-                                           uint64_t elementSize, 
+                                           GgpuFencedCallbackExecutor& fencedCallbackExecutor,
+                                           uint64_t elementSize,
                                            uint32_t minCapacity)
     : m_device(device)
     , m_elementSize(elementSize)
     , m_minCapacity(minCapacity)
     , m_elementCount(0)
-    , m_buffer(device, stager, elementSize)
+    , m_buffer(device, stager, fencedCallbackExecutor, elementSize)
   {
   }
 

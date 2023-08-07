@@ -28,6 +28,7 @@
 namespace gtl
 {
   class GgpuStager;
+  class GgpuFencedCallbackExecutor;
 
   class GgpuSyncBuffer
   {
@@ -41,6 +42,7 @@ namespace gtl
   public:
     GgpuSyncBuffer(CgpuDevice device,
                    GgpuStager& stager,
+                   GgpuFencedCallbackExecutor& fencedCallbackExecutor,
                    uint64_t elementSize,
                    UpdateStrategy updateStrategy = UpdateStrategy::OptimalStaging,
                    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER);

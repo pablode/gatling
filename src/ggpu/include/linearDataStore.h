@@ -35,6 +35,7 @@ namespace gtl
   public:
     GgpuLinearDataStore(CgpuDevice device,
                         GgpuStager& stager,
+                        GgpuFencedCallbackExecutor& fencedCallbackExecutor,
                         uint64_t elementSize,
                         uint32_t minCapacity);
 

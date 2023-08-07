@@ -16,13 +16,18 @@
 //
 
 #include "resizableBuffer.h"
+#include "fencedCallbackExecutor.h"
+
+#include <assert.h>
 
 namespace gtl
 {
   GgpuResizableBuffer::GgpuResizableBuffer(CgpuDevice device,
+                                           GgpuFencedCallbackExecutor& fencedCallbackExecutor,
                                            CgpuBufferUsageFlags usageFlags,
                                            CgpuMemoryPropertyFlags memoryProperties)
     : m_device(device)
+    , m_fencedCallbackExecutor(fencedCallbackExecutor)
     , m_usageFlags(usageFlags)
     , m_memoryProperties(memoryProperties)
   {
@@ -30,9 +35,8 @@ namespace gtl
 
   GgpuResizableBuffer::~GgpuResizableBuffer()
   {
-    // TODO: add to deletion queue instead
-    if (m_buffer.handle)
-      cgpuDestroyBuffer(m_device, m_buffer);
+    // Buffer has to be destroyed with resize(0) before destruction.
+    assert(m_size == 0);
   }
 
   CgpuBuffer GgpuResizableBuffer::buffer() const
@@ -45,7 +49,7 @@ namespace gtl
     return m_size;
   }
 
-  bool GgpuResizableBuffer::resize(uint64_t newSize)
+  bool GgpuResizableBuffer::resize(CgpuCommandBuffer commandBuffer, uint64_t newSize)
   {
     if (newSize == m_size)
     {
@@ -65,42 +69,16 @@ namespace gtl
     }
 
     // Create new, larger buffer.
-    bool result = false;
-    CgpuCommandBuffer commandBuffer;
     CgpuBuffer buffer;
-    CgpuFence fence;
-
     if (!cgpuCreateBuffer(m_device, m_usageFlags, m_memoryProperties, newSize, &buffer))
-      goto cleanup;
+    {
+      return false;
+    }
 
     // Copy old buffer data if needed.
-    if (m_size > 0)
-    {
-      // TODO: pass command buffer from the outside
-      if (!cgpuCreateCommandBuffer(m_device, &commandBuffer))
-        goto cleanup;
+    bool copySuccess = (m_size == 0) || cgpuCmdCopyBuffer(commandBuffer, m_buffer, 0, buffer, 0, m_size);
 
-      if (!cgpuBeginCommandBuffer(commandBuffer))
-        goto cleanup;
-
-      if (!cgpuCmdCopyBuffer(commandBuffer, m_buffer, 0, buffer, 0, m_size))
-        goto cleanup;
-
-      if (!cgpuEndCommandBuffer(commandBuffer))
-        goto cleanup;
-
-      if (!cgpuCreateFence(m_device, &fence))
-        goto cleanup;
-
-      if (!cgpuResetFence(m_device, fence))
-        goto cleanup;
-
-      if (!cgpuSubmitCommandBuffer(m_device, commandBuffer, fence))
-        goto cleanup;
-
-      if (!cgpuWaitForFence(m_device, fence))
-        goto cleanup;
-    }
+    m_size = newSize;
 
     // Swap buffers, so that we always destroy the unused one.
     {
@@ -109,19 +87,14 @@ namespace gtl
       buffer = temp;
     }
 
-    m_size = newSize;
-
-    result = true;
-
-  cleanup:
-    // TODO: add to deletion queue instead (freed on fence signal)
+    // Delete old buffer once unused.
     if (buffer.handle)
-      cgpuDestroyBuffer(m_device, buffer);
-    if (commandBuffer.handle)
-      cgpuDestroyCommandBuffer(m_device, commandBuffer);
-    if (fence.handle)
-      cgpuDestroyFence(m_device, fence);
+    {
+      m_fencedCallbackExecutor.enqueueCallbackExecution(commandBuffer, [buffer](CgpuDevice device) {
+        cgpuDestroyBuffer(device, buffer);
+      });
+    }
 
-    return result;
+    return copySuccess;
   }
 }

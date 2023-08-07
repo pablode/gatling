@@ -25,6 +25,7 @@ namespace gtl
 {
   GgpuSyncBuffer::GgpuSyncBuffer(CgpuDevice device,
                                  GgpuStager& stager,
+                                 GgpuFencedCallbackExecutor& fencedCallbackExecutor,
                                  uint64_t elementSize,
                                  UpdateStrategy updateStrategy,
                                  CgpuBufferUsageFlags bufferUsage)
@@ -32,11 +33,11 @@ namespace gtl
     , m_stager(stager)
     , m_elementSize(elementSize)
     , m_updateStrategy(updateStrategy)
-    , m_hostBuffer(m_device,
+    , m_hostBuffer(m_device, fencedCallbackExecutor,
                    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
                    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
                      (updateStrategy == UpdateStrategy::PersistentMapping ? CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL : 0))
-    , m_deviceBuffer(m_device,
+    , m_deviceBuffer(m_device, fencedCallbackExecutor,
                      bufferUsage | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
                      CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
   {
@@ -99,26 +100,24 @@ namespace gtl
     // Reset buffers if new size is 0.
     if (newSize == 0)
     {
-      m_hostBuffer.resize(0);
-      m_deviceBuffer.resize(0);
+      m_hostBuffer.resize(commandBuffer, 0);
+      m_deviceBuffer.resize(commandBuffer, 0);
       return true;
     }
 
     // Resize buffers.
     if (m_updateStrategy == UpdateStrategy::OptimalStaging)
     {
-      m_deviceBuffer.resize(/*m_device, commandBuffer,*/ newSize);
+      m_deviceBuffer.resize(commandBuffer, newSize);
     }
 
-    m_hostBuffer.resize(/*m_device, commandBuffer,*/ newSize);
+    m_hostBuffer.resize(commandBuffer, newSize);
 
     return cgpuMapBuffer(device, m_hostBuffer.buffer(), (void**) &m_mappedHostMem);
   }
 
   bool GgpuSyncBuffer::commitChanges()
   {
-    // TODO: should we enqueue to a foreign command buffer?
-
     if (m_dirtyRangeBegin == UINT64_MAX && m_dirtyRangeEnd == 0)
     {
       // Nothing to commit.

@@ -3341,6 +3341,24 @@ bool cgpuWaitForFence(CgpuDevice device, CgpuFence fence)
   return true;
 }
 
+bool cgpuGetFenceStatus(CgpuDevice device, CgpuFence fence, bool& reached)
+{
+  CgpuIDevice* idevice;
+  if (!cgpuResolveDevice(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  CgpuIFence* ifence;
+  if (!cgpuResolveFence(fence, &ifence)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  VkResult result = idevice->table.vkGetFenceStatus(idevice->logicalDevice, ifence->fence);
+  if (result == VK_ERROR_DEVICE_LOST) {
+    CGPU_RETURN_ERROR("failed to get fence status: device lost!");
+  }
+  reached = (result == VK_SUCCESS);
+  return true;
+}
+
 bool cgpuSubmitCommandBuffer(CgpuDevice device,
                              CgpuCommandBuffer commandBuffer,
                              CgpuFence fence)

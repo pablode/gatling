@@ -31,6 +31,7 @@ namespace gtl
   public:
     GgpuDenseDataStore(CgpuDevice device,
                        GgpuStager& stager,
+                       GgpuFencedCallbackExecutor& fencedCallbackExecutor,
                        uint64_t elementSize,
                        uint32_t minCapacity);
 

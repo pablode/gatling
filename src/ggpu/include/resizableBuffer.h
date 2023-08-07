@@ -23,10 +23,13 @@
 
 namespace gtl
 {
+  class GgpuFencedCallbackExecutor;
+
   class GgpuResizableBuffer
   {
   public:
     GgpuResizableBuffer(CgpuDevice device,
+                        GgpuFencedCallbackExecutor& fencedCallbackExecutor,
                         CgpuBufferUsageFlags usageFlags,
                         CgpuMemoryPropertyFlags memoryProperties);
 
@@ -37,10 +40,11 @@ namespace gtl
 
     uint64_t size() const;
 
-    bool resize(uint64_t newSize);
+    bool resize(CgpuCommandBuffer commandBuffer, uint64_t newSize);
 
   private:
     CgpuDevice m_device;
+    GgpuFencedCallbackExecutor& m_fencedCallbackExecutor;
     CgpuBufferUsageFlags m_usageFlags;
     CgpuMemoryPropertyFlags m_memoryProperties;
 
