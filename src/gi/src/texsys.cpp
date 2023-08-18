@@ -25,6 +25,7 @@
 #include <imgio.h>
 
 #include <assert.h>
+#include <string.h>
 #include <inttypes.h>
 
 using namespace gtl;

@@ -424,7 +424,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 {
   _ClearMaterials();
 
-  TfHashMap<std::string, uint32_t> materialMap;
+  TfHashMap<std::string, uint32_t, TfHash> materialMap;
   materialMap[""] = 0;
 
   materials.push_back(m_defaultMaterial);

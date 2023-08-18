@@ -1,6 +1,7 @@
 include(FetchContent)
 
 set(BUILD_SHARED_LIBS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Make option() honor normal variables.
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -113,7 +114,7 @@ add_subdirectory(Imath)
 set(OPENEXR_INSTALL OFF)
 set(OPENEXR_INSTALL_TOOLS OFF)
 set(OPENEXR_INSTALL_EXAMPLES OFF)
-add_subdirectory(OpenEXR)
+add_subdirectory(openexr)
 
 #
 # stb

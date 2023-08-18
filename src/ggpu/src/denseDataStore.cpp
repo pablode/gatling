@@ -17,6 +17,8 @@
 
 #include "denseDataStore.h"
 
+#include <string.h>
+
 namespace gtl
 {
   GgpuDenseDataStore::GgpuDenseDataStore(CgpuDevice device,
