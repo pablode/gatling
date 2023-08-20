@@ -32,18 +32,33 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 //
+// Base Light
+//
+
+HdGatlingLight::HdGatlingLight(const SdfPath& id, GiScene* scene)
+  : HdLight(id)
+  , m_scene(scene)
+{
+}
+
+GfVec3f HdGatlingLight::CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor)
+{
+  // TODO
+  return {};
+}
+
+//
 // Sphere Light
 //
-HdGatlingSphereLight::HdGatlingSphereLight(GiScene* scene, const SdfPath& id)
-  : HdLight(id)
-  , m_giScene(scene)
+HdGatlingSphereLight::HdGatlingSphereLight(const SdfPath& id, GiScene* scene)
+  : HdGatlingLight(id, scene)
 {
   m_giSphereLight = giCreateSphereLight(scene);
 }
 
 void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
-                           HdRenderParam* renderParam,
-                           HdDirtyBits* dirtyBits)
+                                HdRenderParam* renderParam,
+                                HdDirtyBits* dirtyBits)
 {
   const SdfPath& id = GetId();
 
@@ -73,7 +88,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingSphereLight::Finalize(HdRenderParam* renderParam)
 {
-  giDestroySphereLight(m_giScene, m_giSphereLight);
+  giDestroySphereLight(m_scene, m_giSphereLight);
 }
 
 HdDirtyBits HdGatlingSphereLight::GetInitialDirtyBitsMask() const
@@ -84,9 +99,8 @@ HdDirtyBits HdGatlingSphereLight::GetInitialDirtyBitsMask() const
 //
 // Distant Light
 //
-HdGatlingDistantLight::HdGatlingDistantLight(GiScene* scene, const SdfPath& id)
-  : HdLight(id)
-  , m_giScene(scene)
+HdGatlingDistantLight::HdGatlingDistantLight(const SdfPath& id, GiScene* scene)
+  : HdGatlingLight(id, scene)
 {
   m_giDistantLight = giCreateDistantLight(scene);
 }
@@ -123,7 +137,7 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingDistantLight::Finalize(HdRenderParam* renderParam)
 {
-  giDestroyDistantLight(m_giScene, m_giDistantLight);
+  giDestroyDistantLight(m_scene, m_giDistantLight);
 }
 
 HdDirtyBits HdGatlingDistantLight::GetInitialDirtyBitsMask() const
@@ -134,9 +148,8 @@ HdDirtyBits HdGatlingDistantLight::GetInitialDirtyBitsMask() const
 //
 // Rect Light
 //
-HdGatlingRectLight::HdGatlingRectLight(GiScene* scene, const SdfPath& id)
-  : HdLight(id)
-  , m_giScene(scene)
+HdGatlingRectLight::HdGatlingRectLight(const SdfPath& id, GiScene* scene)
+  : HdGatlingLight(id, scene)
 {
   m_giRectLight = giCreateRectLight(scene);
 }
@@ -178,7 +191,7 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingRectLight::Finalize(HdRenderParam* renderParam)
 {
-  giDestroyRectLight(m_giScene, m_giRectLight);
+  giDestroyRectLight(m_scene, m_giRectLight);
 }
 
 HdDirtyBits HdGatlingRectLight::GetInitialDirtyBitsMask() const
@@ -189,9 +202,8 @@ HdDirtyBits HdGatlingRectLight::GetInitialDirtyBitsMask() const
 //
 // Dome Light
 //
-HdGatlingDomeLight::HdGatlingDomeLight(GiScene* scene, const SdfPath& id)
-  : HdLight(id)
-  , m_giScene(scene)
+HdGatlingDomeLight::HdGatlingDomeLight(const SdfPath& id, GiScene* scene)
+  : HdGatlingLight(id, scene)
 {
 }
 
@@ -234,9 +246,9 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   if (m_giDomeLight)
   {
     // FIXME: don't recreate on transform change
-    giDestroyDomeLight(m_giScene, m_giDomeLight);
+    giDestroyDomeLight(m_scene, m_giDomeLight);
   }
-  m_giDomeLight = giCreateDomeLight(m_giScene, path.c_str());
+  m_giDomeLight = giCreateDomeLight(m_scene, path.c_str());
 
   const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
   auto rotateTransform = GfMatrix3f(transform.ExtractRotationMatrix());
@@ -268,7 +280,7 @@ void HdGatlingDomeLight::Finalize(HdRenderParam* renderParam)
   auto rp = static_cast<HdGatlingRenderParam*>(renderParam);
   rp->RemoveDomeLight(m_giDomeLight);
 
-  giDestroyDomeLight(m_giScene, m_giDomeLight);
+  giDestroyDomeLight(m_scene, m_giDomeLight);
 }
 
 HdDirtyBits HdGatlingDomeLight::GetInitialDirtyBitsMask() const
@@ -279,9 +291,8 @@ HdDirtyBits HdGatlingDomeLight::GetInitialDirtyBitsMask() const
 //
 // Simple Light
 //
-HdGatlingSimpleLight::HdGatlingSimpleLight(GiScene* scene, const SdfPath& id)
-  : HdLight(id)
-  , m_giScene(scene)
+HdGatlingSimpleLight::HdGatlingSimpleLight(const SdfPath& id, GiScene* scene)
+  : HdGatlingLight(id, scene)
 {
 }
 
@@ -302,7 +313,7 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (!glfLight.IsDomeLight() && !m_giSphereLight)
   {
-    m_giSphereLight = giCreateSphereLight(m_giScene);
+    m_giSphereLight = giCreateSphereLight(m_scene);
   }
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
@@ -329,7 +340,7 @@ void HdGatlingSimpleLight::Finalize(HdRenderParam* renderParam)
 {
   if (m_giSphereLight)
   {
-    giDestroySphereLight(m_giScene, m_giSphereLight);
+    giDestroySphereLight(m_scene, m_giSphereLight);
   }
 }
 

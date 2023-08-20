@@ -27,11 +27,21 @@ struct GiDomeLight;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HdGatlingLight : public HdLight
+{
+protected:
+  HdGatlingLight(const SdfPath& id, GiScene* scene);
 
-class HdGatlingSphereLight final : public HdLight
+  GfVec3f CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor);
+
+protected:
+  GiScene* m_scene;
+};
+
+class HdGatlingSphereLight final : public HdGatlingLight
 {
 public:
-  HdGatlingSphereLight(GiScene* scene, const SdfPath& id);
+  HdGatlingSphereLight(const SdfPath& id, GiScene* scene);
 
 public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
@@ -41,15 +51,14 @@ public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
-  GiScene* m_giScene;
   GiSphereLight* m_giSphereLight;
 };
 
 
-class HdGatlingDistantLight final : public HdLight
+class HdGatlingDistantLight final : public HdGatlingLight
 {
 public:
-  HdGatlingDistantLight(GiScene* scene, const SdfPath& id);
+  HdGatlingDistantLight(const SdfPath& id, GiScene* scene);
 
 public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
@@ -59,15 +68,14 @@ public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
-  GiScene* m_giScene;
   GiDistantLight* m_giDistantLight;
 };
 
 
-class HdGatlingRectLight final : public HdLight
+class HdGatlingRectLight final : public HdGatlingLight
 {
 public:
-  HdGatlingRectLight(GiScene* scene, const SdfPath& id);
+  HdGatlingRectLight(const SdfPath& id, GiScene* scene);
 
 public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
@@ -77,15 +85,14 @@ public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
-  GiScene* m_giScene;
   GiRectLight* m_giRectLight;
 };
 
 
-class HdGatlingDomeLight final : public HdLight
+class HdGatlingDomeLight final : public HdGatlingLight
 {
 public:
-  HdGatlingDomeLight(GiScene* scene, const SdfPath& id);
+  HdGatlingDomeLight(const SdfPath& id, GiScene* scene);
 
 public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
@@ -95,15 +102,14 @@ public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
-  GiScene* m_giScene;
   GiDomeLight* m_giDomeLight = nullptr;
 };
 
 
-class HdGatlingSimpleLight final : public HdLight
+class HdGatlingSimpleLight final : public HdGatlingLight
 {
 public:
-  HdGatlingSimpleLight(GiScene* scene, const SdfPath& id);
+  HdGatlingSimpleLight(const SdfPath& id, GiScene* scene);
 
 public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
@@ -113,7 +119,6 @@ public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
-  GiScene* m_giScene;
   GiSphereLight* m_giSphereLight = nullptr;
   GiDomeLight* m_giDomeLight = nullptr;
 };

@@ -190,23 +190,23 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   }
   else if (typeId == HdPrimTypeTokens->sphereLight)
   {
-    return new HdGatlingSphereLight(m_giScene, sprimId);
+    return new HdGatlingSphereLight(sprimId, m_giScene);
   }
   else if (typeId == HdPrimTypeTokens->distantLight)
   {
-    return new HdGatlingDistantLight(m_giScene, sprimId);
+    return new HdGatlingDistantLight(sprimId, m_giScene);
   }
   else if (typeId == HdPrimTypeTokens->rectLight)
   {
-    return new HdGatlingRectLight(m_giScene, sprimId);
+    return new HdGatlingRectLight(sprimId, m_giScene);
   }
   else if (typeId == HdPrimTypeTokens->domeLight)
   {
-    return new HdGatlingDomeLight(m_giScene, sprimId);
+    return new HdGatlingDomeLight(sprimId, m_giScene);
   }
   else if (typeId == HdPrimTypeTokens->simpleLight)
   {
-    return new HdGatlingSimpleLight(m_giScene, sprimId);
+    return new HdGatlingSimpleLight(sprimId, m_giScene);
   }
 
   return nullptr;
