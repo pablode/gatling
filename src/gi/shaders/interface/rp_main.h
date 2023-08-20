@@ -40,27 +40,27 @@ struct Face
 struct SphereLight
 {
   SI_VEC3  pos;
-  SI_FLOAT intensity;
-  SI_VEC3  color;
   SI_FLOAT radius;
+  SI_VEC3  baseEmission;
+  SI_FLOAT padding;
 };
 
 struct DistantLight
 {
   SI_VEC3  direction;
-  SI_FLOAT intensity;
-  SI_VEC3  color;
   SI_FLOAT angle;
+  SI_VEC3  baseEmission;
+  SI_FLOAT padding;
 };
 
 struct RectLight
 {
   SI_VEC3  origin;
-  SI_FLOAT intensity;
-  SI_VEC3  color;
+  SI_FLOAT width;
+  SI_VEC3  baseEmission;
   SI_FLOAT height;
   SI_VEC3  direction;
-  SI_FLOAT width;
+  SI_FLOAT padding;
 };
 
 struct PushConstants

@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/imaging/glf/simpleLight.h>
 #include <pxr/usd/sdf/assetPath.h>
+#include <pxr/usd/usdLux/blackbody.h>
 
 #include <gi.h>
 
@@ -41,10 +42,39 @@ HdGatlingLight::HdGatlingLight(const SdfPath& id, GiScene* scene)
 {
 }
 
+// We strive to conform to following UsdLux-enhancing specification:
+// https://github.com/anderslanglands/light_comparison/blob/777ccc7afd1c174a5dcbbde964ced950eb3af11b/specification/specification.md
 GfVec3f HdGatlingLight::CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor)
 {
-  // TODO
-  return {};
+  const SdfPath& id = GetId();
+
+  VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
+  float intensity = boxedIntensity.GetWithDefault<float>(1.0f);
+
+  VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
+  GfVec3f color = boxedColor.GetWithDefault<GfVec3f>({1.0f, 1.0f, 1.0f});
+
+  VtValue boxedEnableColorTemperature = sceneDelegate->GetLightParamValue(id, HdLightTokens->enableColorTemperature);
+  bool enableColorTemperature = boxedEnableColorTemperature.GetWithDefault<bool>(false);
+
+  VtValue boxedColorTemperature = sceneDelegate->GetLightParamValue(id, HdLightTokens->colorTemperature);
+  float colorTemperature = boxedColorTemperature.GetWithDefault<float>(6500.0f);
+
+  VtValue boxedExposureAttr = sceneDelegate->GetLightParamValue(id, HdLightTokens->exposure);
+  float exposure = boxedExposureAttr.GetWithDefault<float>(0.0f);
+
+  assert(normalizeFactor > 0.0f);
+
+  float normalizedIntensity = intensity * powf(2.0f, exposure) / normalizeFactor;
+
+  GfVec3f baseEmission = color * normalizedIntensity;
+
+  if (enableColorTemperature)
+  {
+    baseEmission = GfCompMult(baseEmission, UsdLuxBlackbodyTemperatureAsRgb(colorTemperature));
+  }
+
+  return baseEmission;
 }
 
 //
@@ -70,16 +100,15 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
-    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
-    float intensity = boxedIntensity.Cast<float>().Get<float>();
-    giSetSphereLightIntensity(m_giSphereLight, intensity);
-
-    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
-    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
-    giSetSphereLightColor(m_giSphereLight, color.data());
-
     VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
-    float radius = boxedRadius.Cast<float>().Get<float>();
+    float radius = boxedRadius.GetWithDefault<float>(0.0f);
+
+    VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
+    bool normalize = boxedNormalize.GetWithDefault<bool>(false);
+    float normalizeFactor = normalize ? ((radius > 0.001f ? 4.0 : 1.0f) * M_PI * radius * radius) : 1.0f;
+    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+
+    giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
     giSetSphereLightRadius(m_giSphereLight, radius);
   }
 
@@ -119,16 +148,15 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
-    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
-    float intensity = boxedIntensity.Cast<float>().Get<float>();
-    giSetDistantLightIntensity(m_giDistantLight, intensity);
-
-    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
-    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
-    giSetDistantLightColor(m_giDistantLight, color.data());
-
     VtValue boxedAngle = sceneDelegate->GetLightParamValue(id, HdLightTokens->angle);
-    float angle = GfDegreesToRadians(boxedAngle.Cast<float>().Get<float>());
+    float angle = GfDegreesToRadians(boxedAngle.GetWithDefault<float>(0.0f));
+
+    VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
+    bool normalize = boxedNormalize.GetWithDefault<bool>(false);
+    float normalizeFactor = normalize ? float(M_PI / (1.0 - cos(angle))) : 1.0f;
+    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+
+    giSetDistantLightBaseEmission(m_giDistantLight, baseEmission.data());
     giSetDistantLightAngle(m_giDistantLight, angle);
   }
 
@@ -163,26 +191,25 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
     auto origin = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    giSetRectLightOrigin(m_giRectLight, origin.data());
-
     auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+
+    giSetRectLightOrigin(m_giRectLight, origin.data());
     giSetRectLightDirection(m_giRectLight, dir.data());
   }
 
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
-    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
-    float intensity = boxedIntensity.Cast<float>().Get<float>();
-    giSetRectLightIntensity(m_giRectLight, intensity);
-
-    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
-    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
-    giSetRectLightColor(m_giRectLight, color.data());
-
     VtValue boxedWidth = sceneDelegate->GetLightParamValue(id, HdLightTokens->width);
-    float width = boxedWidth.Cast<float>().Get<float>();
+    float width = boxedWidth.GetWithDefault<float>(1.0f);
     VtValue boxedHeight = sceneDelegate->GetLightParamValue(id, HdLightTokens->height);
-    float height = boxedHeight.Cast<float>().Get<float>();
+    float height = boxedHeight.GetWithDefault<float>(1.0f);
+
+    VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
+    bool normalize = boxedNormalize.GetWithDefault<bool>(false);
+    float normalizeFactor = normalize ? float(width * height) : 1.0f;
+    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+
+    giSetRectLightBaseEmission(m_giRectLight, baseEmission.data());
     giSetRectLightDimensions(m_giRectLight, width, height);
   }
 
@@ -207,6 +234,7 @@ HdGatlingDomeLight::HdGatlingDomeLight(const SdfPath& id, GiScene* scene)
 {
 }
 
+// FIXME: apply intensity, color, exposure and other attributes
 void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
                               HdRenderParam* renderParam,
                               HdDirtyBits* dirtyBits)
@@ -324,13 +352,16 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyParams && glfLight.HasIntensity())
   {
-    VtValue boxedIntensity = sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity);
-    float intensity = boxedIntensity.Cast<float>().Get<float>();
-    giSetSphereLightIntensity(m_giSphereLight, intensity);
+    VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
+    float radius = boxedRadius.GetWithDefault<float>(0.0f);
 
-    VtValue boxedColor = sceneDelegate->GetLightParamValue(id, HdLightTokens->color);
-    GfVec3f color = boxedColor.Cast<GfVec3f>().Get<GfVec3f>();
-    giSetSphereLightColor(m_giSphereLight, color.data());
+    VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
+    bool normalize = boxedNormalize.GetWithDefault<bool>(false);
+    float normalizeFactor = normalize ? ((radius > 0.001f ? 4.0 : 1.0f) * M_PI * radius * radius) : 1.0f;
+    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+
+    giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
+    giSetSphereLightRadius(m_giSphereLight, radius);
   }
 
   *dirtyBits = HdChangeTracker::Clean;

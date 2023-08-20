@@ -182,23 +182,20 @@ void giDestroyScene(GiScene* scene);
 GiSphereLight* giCreateSphereLight(GiScene* scene);
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light);
 void giSetSphereLightPosition(GiSphereLight* light, float* position);
-void giSetSphereLightIntensity(GiSphereLight* light, float intensity);
-void giSetSphereLightColor(GiSphereLight* light, float* rgb);
+void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb);
 void giSetSphereLightRadius(GiSphereLight* light, float radius);
 
 GiDistantLight* giCreateDistantLight(GiScene* scene);
 void giDestroyDistantLight(GiScene* scene, GiDistantLight* light);
 void giSetDistantLightDirection(GiDistantLight* light, float* direction);
-void giSetDistantLightIntensity(GiDistantLight* light, float intensity);
-void giSetDistantLightColor(GiDistantLight* light, float* rgb);
+void giSetDistantLightBaseEmission(GiDistantLight* light, float* rgb);
 void giSetDistantLightAngle(GiDistantLight* light, float angle);
 
 GiRectLight* giCreateRectLight(GiScene* scene);
 void giDestroyRectLight(GiScene* scene, GiRectLight* light);
 void giSetRectLightOrigin(GiRectLight* light, float* origin);
 void giSetRectLightDirection(GiRectLight* light, float* direction);
-void giSetRectLightIntensity(GiRectLight* light, float intensity);
-void giSetRectLightColor(GiRectLight* light, float* rgb);
+void giSetRectLightBaseEmission(GiRectLight* light, float* rgb);
 void giSetRectLightDimensions(GiRectLight* light, float width, float height);
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);

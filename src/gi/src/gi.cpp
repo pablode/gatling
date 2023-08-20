@@ -1350,11 +1350,10 @@ GiSphereLight* giCreateSphereLight(GiScene* scene)
   data->pos[0] = 0.0f;
   data->pos[1] = 0.0f;
   data->pos[2] = 0.0f;
-  data->intensity = 1000.0f; // Nits
-  data->color[0] = 1.0f;
-  data->color[1] = 1.0f;
-  data->color[2] = 1.0f;
   data->radius = 0.0f;
+  data->baseEmission[0] = 0.0f;
+  data->baseEmission[1] = 0.0f;
+  data->baseEmission[2] = 0.0f;
 
   return light;
 }
@@ -1375,22 +1374,14 @@ void giSetSphereLightPosition(GiSphereLight* light, float* pos)
   data->pos[2] = pos[2];
 }
 
-void giSetSphereLightColor(GiSphereLight* light, float* rgb)
+void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb)
 {
   Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
-  data->color[0] = rgb[0];
-  data->color[1] = rgb[1];
-  data->color[2] = rgb[2];
-}
-
-void giSetSphereLightIntensity(GiSphereLight* light, float intensity)
-{
-  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
-  assert(data);
-
-  data->intensity = intensity;
+  data->baseEmission[0] = rgb[0];
+  data->baseEmission[1] = rgb[1];
+  data->baseEmission[2] = rgb[2];
 }
 
 void giSetSphereLightRadius(GiSphereLight* light, float radius)
@@ -1413,11 +1404,10 @@ GiDistantLight* giCreateDistantLight(GiScene* scene)
   data->direction[0] = 0.0f;
   data->direction[1] = 0.0f;
   data->direction[2] = 0.0f;
-  data->intensity = 1000.0f; // Nits
-  data->color[0] = 1.0f;
-  data->color[1] = 1.0f;
-  data->color[2] = 1.0f;
   data->angle = 0.0f;
+  data->baseEmission[0] = 0.0f;
+  data->baseEmission[1] = 0.0f;
+  data->baseEmission[2] = 0.0f;
 
   return light;
 }
@@ -1438,22 +1428,14 @@ void giSetDistantLightDirection(GiDistantLight* light, float* direction)
   data->direction[2] = direction[2];
 }
 
-void giSetDistantLightIntensity(GiDistantLight* light, float intensity)
+void giSetDistantLightBaseEmission(GiDistantLight* light, float* rgb)
 {
   Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
   assert(data);
 
-  data->intensity = intensity;
-}
-
-void giSetDistantLightColor(GiDistantLight* light, float* rgb)
-{
-  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
-  assert(data);
-
-  data->color[0] = rgb[0];
-  data->color[1] = rgb[1];
-  data->color[2] = rgb[2];
+  data->baseEmission[0] = rgb[0];
+  data->baseEmission[1] = rgb[1];
+  data->baseEmission[2] = rgb[2];
 }
 
 void giSetDistantLightAngle(GiDistantLight* light, float angle)
@@ -1476,15 +1458,14 @@ GiRectLight* giCreateRectLight(GiScene* scene)
   data->origin[0] = 0.0f;
   data->origin[1] = 0.0f;
   data->origin[2] = 0.0f;
+  data->width = 0.0f;
   data->direction[0] = 0.0f;
   data->direction[1] = 0.0f;
   data->direction[2] = 0.0f;
-  data->intensity = 1000.0f; // Nits
-  data->color[0] = 1.0f;
-  data->color[1] = 1.0f;
-  data->color[2] = 1.0f;
   data->height = 0.0f;
-  data->width = 0.0f;
+  data->baseEmission[0] = 0.0f;
+  data->baseEmission[1] = 0.0f;
+  data->baseEmission[2] = 0.0f;
 
   return light;
 }
@@ -1515,22 +1496,14 @@ void giSetRectLightDirection(GiRectLight* light, float* direction)
   data->direction[2] = direction[2];
 }
 
-void giSetRectLightIntensity(GiRectLight* light, float intensity)
+void giSetRectLightBaseEmission(GiRectLight* light, float* rgb)
 {
   Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
-  data->intensity = intensity;
-}
-
-void giSetRectLightColor(GiRectLight* light, float* rgb)
-{
-  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
-  assert(data);
-
-  data->color[0] = rgb[0];
-  data->color[1] = rgb[1];
-  data->color[2] = rgb[2];
+  data->baseEmission[0] = rgb[0];
+  data->baseEmission[1] = rgb[1];
+  data->baseEmission[2] = rgb[2];
 }
 
 void giSetRectLightDimensions(GiRectLight* light, float width, float height)
