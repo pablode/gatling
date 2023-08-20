@@ -2214,7 +2214,7 @@ bool cgpuCreateBlas(CgpuDevice device,
   asGeom.pNext = nullptr;
   asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
   asGeom.geometry = asGeomData;
-  asGeom.flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
+  asGeom.flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0;
 
   uint32_t triangleCount = indexCount / 3;
   if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, triangleCount, &iblas->buffer, &iblas->as))
