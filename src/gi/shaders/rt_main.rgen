@@ -100,9 +100,9 @@ vec3 evaluate_sample(vec3 ray_origin,
             shadowRayPayload.rng_state = rayPayload.rng_state;
             shadowRayPayload.shadowed = true; // Gets set to false by miss shader
 
-            vec3 shadowRayOrigin = rayPayload.neeOrigin;
-            vec3 shadowRayDir = rayPayload.neeLightDir;
-            float lightDist = rayPayload.neeLightDist;
+            vec3 shadowRayOrigin = rayPayload.ray_origin; // actually not correct, but we compensate with tMin
+            float lightDist = length(rayPayload.neeToLight);
+            vec3 shadowRayDir = rayPayload.neeToLight / lightDist;
 
             // NV best practices recommends unconditional dispatch with tMin = tMax = 0.0
             bool traceRay = luminance(rayPayload.neeContrib) > 0.0001 && lightDist > 0.0;

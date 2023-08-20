@@ -70,7 +70,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         DistantLight light = distantLights[lightIndex];
 
-        dist = FLOAT_MAX;
+        dist = 100000.0;
         dirToLight = -light.direction;
         power = light.baseEmission;
         pdf = 1.0;
@@ -201,7 +201,6 @@ void main()
     if (!inside)
     {
         // Sample light source
-        vec3 surfacePos = offset_ray_origin(shading_state.position, shading_state.geom_normal);
 #ifdef RAND_4D
         vec4 k4 = rng4d_next(rayPayload.rng_state);
 #else
@@ -217,7 +216,7 @@ void main()
         float lightDist;
         vec3 lightPower;
         float lightPdf;
-        sampleLight(k4, surfacePos, dirToLight, lightDist, lightPower, lightPdf);
+        sampleLight(k4, shading_state.position, dirToLight, lightDist, lightPower, lightPdf);
 
         vec3 neeContrib = vec3(0.0);
         bool neeValid = (lightDist > 0.0) && dot(dirToLight, shading_state.geom_normal) > 0.0;
@@ -244,9 +243,7 @@ void main()
             }
         }
 
-        rayPayload.neeOrigin = surfacePos;
-        rayPayload.neeLightDir = dirToLight;
-        rayPayload.neeLightDist = lightDist;
+        rayPayload.neeToLight = dirToLight * lightDist;
         rayPayload.neeContrib = neeContrib;
     }
 #endif
