@@ -68,13 +68,23 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     {
         uint lightIndex = min(uint(k4.y * DISTANT_LIGHT_COUNT), DISTANT_LIGHT_COUNT - 1);
 
-        // TODO: handle angle
         DistantLight light = distantLights[lightIndex];
 
         dist = FLOAT_MAX;
         dirToLight = -light.direction;
         power = light.baseEmission;
         pdf = 1.0;
+
+        if (light.angle > 0.0)
+        {
+            vec3 t1, t2;
+            orthonormal_basis(dirToLight, t1, t2);
+
+            // https://math.stackexchange.com/questions/56784/generate-a-random-direction-within-a-cone/182936#182936
+            float phi = (k4.z * 2 * PI) - PI;
+            float theta = k4.w * light.angle;
+            dirToLight = normalize(sin(theta) * (cos(phi) * t1 + sin(phi) * t2) + cos(theta) * dirToLight);
+        }
     }
 #endif
 #if RECT_LIGHT_COUNT > 0
