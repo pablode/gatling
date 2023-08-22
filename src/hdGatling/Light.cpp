@@ -149,7 +149,7 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
     VtValue boxedAngle = sceneDelegate->GetLightParamValue(id, HdLightTokens->angle);
-    float angle = GfDegreesToRadians(boxedAngle.GetWithDefault<float>(0.0f));
+    float angle = GfDegreesToRadians(boxedAngle.GetWithDefault<float>(0.53f));
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
