@@ -1262,6 +1262,18 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   if (!cgpuCmdCopyBuffer(command_buffer, s_outputBuffer, 0, s_outputStagingBuffer, 0, outputBufferSize))
     goto cleanup;
 
+  {
+    CgpuBufferMemoryBarrier barrier;
+    barrier.srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE;
+    barrier.dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_HOST_READ;
+    barrier.buffer = s_outputBuffer;
+    barrier.offset = 0;
+    barrier.size = CGPU_WHOLE_SIZE;
+
+    if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
+      goto cleanup;
+  }
+
   // Submit command buffer.
   if (!cgpuEndCommandBuffer(command_buffer))
     goto cleanup;
