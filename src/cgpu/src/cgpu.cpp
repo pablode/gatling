@@ -329,28 +329,66 @@ static VkPipelineStageFlags cgpuPipelineStageFlagsFromShaderStageFlags(VkShaderS
 
 /* API method implementation. */
 
+static bool cgpuFindLayer(const char* name, uint32_t layerCount, VkLayerProperties* layers)
+{
+  for (uint32_t i = 0; i < layerCount; i++)
+  {
+    if (!strcmp(layers[i].layerName, name))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool cgpuFindExtension(const char* name, uint32_t extensionCount, VkExtensionProperties* extensions)
+{
+  for (uint32_t i = 0; i < extensionCount; ++i)
+  {
+    if (!strcmp(extensions[i].extensionName, name))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
 {
-  if (volkInitialize() != VK_SUCCESS ||
-      volkGetInstanceVersion() < CGPU_MIN_VK_API_VERSION)
+  if (volkInitialize() != VK_SUCCESS || volkGetInstanceVersion() < CGPU_MIN_VK_API_VERSION)
   {
     CGPU_RETURN_ERROR("failed to initialize volk");
   }
 
+  GbSmallVector<const char*, 8> enabledLayers;
+  GbSmallVector<const char*, 8> enabledExtensions;
 #ifndef NDEBUG
-  const char* validationLayers[] = {
-      "VK_LAYER_KHRONOS_validation"
-  };
-  const char* instanceExtensions[] = {
-      VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-  };
-  uint32_t validationLayerCount = 1;
-  uint32_t instanceExtensionCount = 1;
-#else
-  const char** validationLayers = nullptr;
-  uint32_t validationLayerCount = 0;
-  const char** instanceExtensions = nullptr;
-  uint32_t instanceExtensionCount = 0;
+  {
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+    GbSmallVector<VkLayerProperties, 16> availableLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+    const char* VK_LAYER_KHRONOS_VALIDATION_NAME = "VK_LAYER_KHRONOS_validation";
+
+    if (cgpuFindLayer(VK_LAYER_KHRONOS_VALIDATION_NAME, availableLayers.size(), availableLayers.data()))
+    {
+      enabledLayers.push_back(VK_LAYER_KHRONOS_VALIDATION_NAME);
+    }
+  }
+  {
+    uint32_t extensionCount;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+    GbSmallVector<VkExtensionProperties, 512> availableExtensions(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
+
+    if (cgpuFindExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
+    {
+      enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
+  }
 #endif
 
   VkApplicationInfo appInfo;
@@ -367,10 +405,10 @@ bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t version
   createInfo.pNext = nullptr;
   createInfo.flags = 0;
   createInfo.pApplicationInfo = &appInfo;
-  createInfo.enabledLayerCount = validationLayerCount;
-  createInfo.ppEnabledLayerNames = validationLayers;
-  createInfo.enabledExtensionCount = instanceExtensionCount;
-  createInfo.ppEnabledExtensionNames = instanceExtensions;
+  createInfo.enabledLayerCount = enabledLayers.size();
+  createInfo.ppEnabledLayerNames = enabledLayers.data();
+  createInfo.enabledExtensionCount = enabledExtensions.size();
+  createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 
   VkInstance instance;
   if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS)
@@ -389,22 +427,6 @@ void cgpuTerminate()
 {
   vkDestroyInstance(iinstance->instance, nullptr);
   iinstance.reset();
-}
-
-static bool cgpuFindDeviceExtension(const char* extensionName,
-                                    uint32_t extensionCount,
-                                    VkExtensionProperties* extensions)
-{
-  for (uint32_t i = 0; i < extensionCount; ++i)
-  {
-    const VkExtensionProperties* extension = &extensions[i];
-
-    if (strcmp(extension->extensionName, extensionName) == 0)
-    {
-      return true;
-    }
-  }
-  return false;
 }
 
 bool cgpuCreateDevice(CgpuDevice* device)
@@ -514,7 +536,7 @@ bool cgpuCreateDevice(CgpuDevice* device)
   {
     const char* extension = requiredExtensions[i];
 
-    if (!cgpuFindDeviceExtension(extension, deviceExtCount, deviceExtensions.data()))
+    if (!cgpuFindExtension(extension, deviceExtCount, deviceExtensions.data()))
     {
       iinstance->ideviceStore.free(device->handle);
 
@@ -526,35 +548,35 @@ bool cgpuCreateDevice(CgpuDevice* device)
   }
 
   const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
-  if (cgpuFindDeviceExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
   {
     enabledDeviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
   }
 
 #ifndef NDEBUG
-  if (cgpuFindDeviceExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()) && features.shaderInt64)
+  if (cgpuFindExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()) && features.shaderInt64)
   {
     idevice->features.shaderClock = true;
     enabledDeviceExtensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
   }
 
 #ifndef __APPLE__
-  if (cgpuFindDeviceExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
   {
     idevice->features.debugPrintf = true;
     enabledDeviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
   }
 #endif
 #endif
-  if (cgpuFindDeviceExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()) &&
-      cgpuFindDeviceExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()) &&
+      cgpuFindExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
   {
     idevice->features.pageableDeviceLocalMemory = true;
     enabledDeviceExtensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
     enabledDeviceExtensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
   }
 
-  if (cgpuFindDeviceExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
   {
     idevice->features.rayTracingInvocationReorder = true;
     enabledDeviceExtensions.push_back(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
