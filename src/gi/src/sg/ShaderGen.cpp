@@ -244,6 +244,10 @@ namespace gi::sg
 
     _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
 
+    if (params.depthOfField)
+    {
+      stitcher.appendDefine("DEPTH_OF_FIELD");
+    }
     if (params.filterImportanceSampling)
     {
       stitcher.appendDefine("FILTER_IMPORTANCE_SAMPLING");

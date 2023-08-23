@@ -99,6 +99,7 @@ struct GiMeshInstance
 struct GiShaderCacheParams
 {
   GiAovId            aovId;
+  bool               depthOfField;
   GiDomeLight*       domeLight;
   bool               domeLightCameraVisibility;
   bool               filterImportanceSampling;

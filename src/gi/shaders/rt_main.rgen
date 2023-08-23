@@ -234,6 +234,7 @@ void main()
         // Depth of Field
         // (cmp. RT Gems II; Boksansky's Reference PT)
 
+#ifdef DEPTH_OF_FIELD
         if (PC.lensRadius > 0.0)
         {
 #ifdef RAND_4D
@@ -250,6 +251,7 @@ void main()
 
             rayDir = normalize(focalPoint - rayOrigin);
         }
+#endif
 
         /* Beware: a single direction component must not be zero,
          * because we often take the inverse of the direction. */

@@ -737,6 +737,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
       GiShaderCacheParams shaderParams;
       shaderParams.aovId = aovId;
+      shaderParams.depthOfField = m_settings.find(HdGatlingSettingsTokens->depth_of_field)->second.Get<bool>();
       shaderParams.domeLight = renderParam->ActiveDomeLight();
       shaderParams.domeLightCameraVisibility = (domeLightCameraVisibilityValueIt == m_settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true);
       shaderParams.filterImportanceSampling = m_settings.find(HdGatlingSettingsTokens->filter_importance_sampling)->second.Get<bool>();
