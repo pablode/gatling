@@ -278,54 +278,55 @@ struct CgpuTlas          { uint64_t handle = 0; };
 
 struct CgpuImageDesc
 {
-  bool is3d;
   uint32_t width;
   uint32_t height;
-  uint32_t depth;
-  CgpuImageFormat format;
-  CgpuImageUsageFlags usage;
+  bool is3d = false;
+  uint32_t depth = 1;
+  CgpuImageFormat format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+  CgpuImageUsageFlags usage = CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST |
+                              CGPU_IMAGE_USAGE_FLAG_SAMPLED;
 };
 
 struct CgpuBufferBinding
 {
   uint32_t binding;
-  uint32_t index;
   CgpuBuffer buffer;
-  uint64_t offset;
-  uint64_t size;
+  uint32_t index = 0;
+  uint64_t offset = 0;
+  uint64_t size = CGPU_WHOLE_SIZE;
 };
 
 struct CgpuImageBinding
 {
   uint32_t binding;
-  uint32_t index;
   CgpuImage image;
+  uint32_t index = 0;
 };
 
 struct CgpuSamplerBinding
 {
   uint32_t binding;
-  uint32_t index;
   CgpuSampler sampler;
+  uint32_t index = 0;
 };
 
 struct CgpuTlasBinding
 {
   uint32_t binding;
-  uint32_t index;
   CgpuTlas as;
+  uint32_t index = 0;
 };
 
 struct CgpuBindings
 {
-  uint32_t bufferCount;
-  const CgpuBufferBinding* buffers;
-  uint32_t imageCount;
-  const CgpuImageBinding* images;
-  uint32_t samplerCount;
-  const CgpuSamplerBinding* samplers;
-  uint32_t tlasCount;
-  const CgpuTlasBinding* tlases;
+  uint32_t bufferCount = 0;
+  const CgpuBufferBinding* buffers = nullptr;
+  uint32_t imageCount = 0;
+  const CgpuImageBinding* images = nullptr;
+  uint32_t samplerCount = 0;
+  const CgpuSamplerBinding* samplers = nullptr;
+  uint32_t tlasCount = 0;
+  const CgpuTlasBinding* tlases = nullptr;
 };
 
 struct CgpuMemoryBarrier
@@ -339,8 +340,8 @@ struct CgpuBufferMemoryBarrier
   CgpuBuffer buffer;
   CgpuMemoryAccessFlags srcAccessFlags;
   CgpuMemoryAccessFlags dstAccessFlags;
-  uint64_t offset;
-  uint64_t size;
+  uint64_t offset = 0;
+  uint64_t size = CGPU_WHOLE_SIZE;
 };
 
 struct CgpuImageMemoryBarrier
@@ -560,10 +561,10 @@ bool cgpuCreateComputePipeline(
 struct CgpuRtPipelineDesc
 {
   CgpuShader rgenShader;
-  uint32_t missShaderCount;
-  CgpuShader* missShaders;
-  uint32_t hitGroupCount;
-  const CgpuRtHitGroup* hitGroups;
+  uint32_t missShaderCount = 0;
+  CgpuShader* missShaders = nullptr;
+  uint32_t hitGroupCount = 0;
+  const CgpuRtHitGroup* hitGroups = nullptr;
 };
 
 bool cgpuCreateRtPipeline(
@@ -650,10 +651,10 @@ bool cgpuCmdCopyBuffer(
 
 struct CgpuBufferImageCopyDesc
 {
-  uint64_t bufferOffset;
-  uint32_t texelOffsetX;
-  uint32_t texelOffsetY;
-  uint32_t texelOffsetZ;
+  uint64_t bufferOffset = 0;
+  uint32_t texelOffsetX = 0;
+  uint32_t texelOffsetY = 0;
+  uint32_t texelOffsetZ = 0;
   uint32_t texelExtentX;
   uint32_t texelExtentY;
   uint32_t texelExtentZ;
@@ -683,12 +684,12 @@ bool cgpuCmdDispatch(
 
 bool cgpuCmdPipelineBarrier(
   CgpuCommandBuffer commandBuffer,
-  uint32_t barrierCount,
-  const CgpuMemoryBarrier* barriers,
-  uint32_t bufferBarrierCount,
-  const CgpuBufferMemoryBarrier* bufferBarriers,
-  uint32_t imageBarrierCount,
-  const CgpuImageMemoryBarrier* imageBarriers
+  uint32_t barrierCount = 0,
+  const CgpuMemoryBarrier* barriers = nullptr,
+  uint32_t bufferBarrierCount = 0,
+  const CgpuBufferMemoryBarrier* bufferBarriers = nullptr,
+  uint32_t imageBarrierCount = 0,
+  const CgpuImageMemoryBarrier* imageBarriers = nullptr
 );
 
 bool cgpuCmdResetTimestamps(

@@ -1009,14 +1009,15 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     printf("creating RT pipeline..\n");
     fflush(stdout);
 
-    CgpuRtPipelineDesc pipeline_desc = {0};
-    pipeline_desc.rgenShader = rgenShader;
-    pipeline_desc.missShaderCount = missShaders.size();
-    pipeline_desc.missShaders = missShaders.data();
-    pipeline_desc.hitGroupCount = hitGroups.size();
-    pipeline_desc.hitGroups = hitGroups.data();
+    CgpuRtPipelineDesc pipelineDesc = {
+      .rgenShader = rgenShader,
+      .missShaderCount = (uint32_t) missShaders.size(),
+      .missShaders = missShaders.data(),
+      .hitGroupCount = (uint32_t) hitGroups.size(),
+      .hitGroups = hitGroups.data(),
+    };
 
-    if (!cgpuCreateRtPipeline(s_device, &pipeline_desc, &pipeline))
+    if (!cgpuCreateRtPipeline(s_device, &pipelineDesc, &pipeline))
     {
       goto cleanup;
     }
@@ -1177,12 +1178,14 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   std::vector<CgpuBufferBinding> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ Rp::BINDING_INDEX_OUT_PIXELS, 0, s_outputBuffer, 0, outputBufferSize });
-  buffers.push_back({ Rp::BINDING_INDEX_FACES, 0, geom_cache->buffer, geom_cache->faceBufferView.offset, geom_cache->faceBufferView.size });
-  buffers.push_back({ Rp::BINDING_INDEX_SPHERE_LIGHTS, 0, scene->sphereLights.buffer(), 0, scene->sphereLights.bufferSize() });
-  buffers.push_back({ Rp::BINDING_INDEX_DISTANT_LIGHTS, 0, scene->distantLights.buffer(), 0, scene->distantLights.bufferSize() });
-  buffers.push_back({ Rp::BINDING_INDEX_RECT_LIGHTS, 0, scene->rectLights.buffer(), 0, scene->rectLights.bufferSize() });
-  buffers.push_back({ Rp::BINDING_INDEX_VERTICES, 0, geom_cache->buffer, geom_cache->vertexBufferView.offset, geom_cache->vertexBufferView.size });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_OUT_PIXELS, .buffer = s_outputBuffer });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_FACES, .buffer = geom_cache->buffer,
+                      .offset = geom_cache->faceBufferView.offset, .size = geom_cache->faceBufferView.size });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_VERTICES, .buffer = geom_cache->buffer,
+                      .offset = geom_cache->vertexBufferView.offset, .size = geom_cache->vertexBufferView.size });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
 
   bool domeLightEnabled = bool(scene->domeLight);
   size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + int(domeLightEnabled);
@@ -1190,32 +1193,35 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   std::vector<CgpuImageBinding> images;
   images.reserve(imageCount);
 
-  CgpuSamplerBinding sampler = { Rp::BINDING_INDEX_SAMPLER, 0, s_texSampler };
+  CgpuSamplerBinding sampler = { .binding = Rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
 
   if (domeLightEnabled)
   {
-    images.push_back({ Rp::BINDING_INDEX_TEXTURES_2D, 0, scene->domeLightTexture });
+    images.push_back({ .binding = Rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture });
   }
   for (uint32_t i = 0; i < shader_cache->images2d.size(); i++)
   {
-    images.push_back({ Rp::BINDING_INDEX_TEXTURES_2D, int(domeLightEnabled) + i, shader_cache->images2d[i] });
+    images.push_back({ .binding = Rp::BINDING_INDEX_TEXTURES_2D,
+                       .image = shader_cache->images2d[i],
+                       .index = int(domeLightEnabled) + i });
   }
   for (uint32_t i = 0; i < shader_cache->images3d.size(); i++)
   {
-    images.push_back({ Rp::BINDING_INDEX_TEXTURES_3D, i, shader_cache->images3d[i] });
+    images.push_back({ .binding = Rp::BINDING_INDEX_TEXTURES_3D, .image = shader_cache->images3d[i], .index = i });
   }
 
-  CgpuTlasBinding as = { Rp::BINDING_INDEX_SCENE_AS, 0, geom_cache->tlas };
+  CgpuTlasBinding as = { .binding = Rp::BINDING_INDEX_SCENE_AS, .as = geom_cache->tlas };
 
-  CgpuBindings bindings = {0};
-  bindings.bufferCount = (uint32_t) buffers.size();
-  bindings.buffers = buffers.data();
-  bindings.imageCount = (uint32_t) images.size();
-  bindings.images = images.data();
-  bindings.samplerCount = imageCount ? 1 : 0;
-  bindings.samplers = &sampler;
-  bindings.tlasCount = 1;
-  bindings.tlases = &as;
+  CgpuBindings bindings = {
+    .bufferCount = (uint32_t) buffers.size(),
+    .buffers = buffers.data(),
+    .imageCount = (uint32_t) images.size(),
+    .images = images.data(),
+    .samplerCount = imageCount ? 1u : 0u,
+    .samplers = &sampler,
+    .tlasCount = 1u,
+    .tlases = &as
+  };
 
   // Set up command buffer.
   if (!cgpuCreateCommandBuffer(s_device, &command_buffer))
@@ -1248,12 +1254,11 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   // Copy output buffer to staging buffer.
   {
-    CgpuBufferMemoryBarrier barrier;
-    barrier.srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE;
-    barrier.dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ;
-    barrier.buffer = s_outputBuffer;
-    barrier.offset = 0;
-    barrier.size = CGPU_WHOLE_SIZE;
+    CgpuBufferMemoryBarrier barrier = {
+      .buffer = s_outputBuffer,
+      .srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+      .dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ
+    };
 
     if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
       goto cleanup;
@@ -1263,12 +1268,11 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
 
   {
-    CgpuBufferMemoryBarrier barrier;
-    barrier.srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE;
-    barrier.dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_HOST_READ;
-    barrier.buffer = s_outputBuffer;
-    barrier.offset = 0;
-    barrier.size = CGPU_WHOLE_SIZE;
+    CgpuBufferMemoryBarrier barrier = {
+      .buffer = s_outputBuffer,
+      .srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
+      .dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_HOST_READ,
+    };
 
     if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
       goto cleanup;

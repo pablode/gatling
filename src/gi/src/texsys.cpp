@@ -84,27 +84,24 @@ namespace gi
       return true;
     }
 
-    imgio_img image_data;
-    if (!detail::readImage(filePath, m_assetReader, &image_data))
+    imgio_img imageData;
+    if (!detail::readImage(filePath, m_assetReader, &imageData))
     {
       return false;
     }
 
     printf("image read from path %s of size %.2fMiB\n",
-      filePath, image_data.size * BYTES_TO_MIB);
+      filePath, imageData.size * BYTES_TO_MIB);
 
-    CgpuImageDesc image_desc;
-    image_desc.is3d = is3dImage;
-    image_desc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-    image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
-    image_desc.width = image_data.width;
-    image_desc.height = image_data.height;
-    image_desc.depth = 1;
+    CgpuImageDesc imageDesc = {
+      .width = imageData.width,
+      .height = imageData.height,
+      .is3d = is3dImage
+    };
+    bool creationSuccessful = cgpuCreateImage(m_device, &imageDesc, &image) &&
+                              m_stager.stageToImage(imageData.data, imageData.size, image, imageData.width, imageData.height, 1);
 
-    bool creationSuccessful = cgpuCreateImage(m_device, &image_desc, &image) &&
-                              m_stager.stageToImage(image_data.data, image_data.size, image, image_data.width, image_data.height, 1);
-
-    imgio_free_img(&image_data);
+    imgio_free_img(&imageData);
 
     if (!creationSuccessful)
     {
@@ -147,12 +144,12 @@ namespace gi
       auto& textureResource = textureResources[i];
       auto& payload = textureResource.data;
 
-      CgpuImageDesc image_desc;
-      image_desc.is3d = textureResource.is3dImage;
-      image_desc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-      image_desc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
+      CgpuImageDesc imageDesc;
+      imageDesc.is3d = textureResource.is3dImage;
+      imageDesc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+      imageDesc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
-      auto& imageVector = image_desc.is3d ? images3d : images2d;
+      auto& imageVector = imageDesc.is3d ? images3d : images2d;
 
       int binding = textureResource.binding;
 
@@ -168,14 +165,14 @@ namespace gi
 
         printf("image %d has binary payload of %.2fMiB\n", i, payloadSize * BYTES_TO_MIB);
 
-        image_desc.width = textureResource.width;
-        image_desc.height = textureResource.height;
-        image_desc.depth = textureResource.depth;
+        imageDesc.width = textureResource.width;
+        imageDesc.height = textureResource.height;
+        imageDesc.depth = textureResource.depth;
 
-        if (!cgpuCreateImage(m_device, &image_desc, &image))
+        if (!cgpuCreateImage(m_device, &imageDesc, &image))
           return false;
 
-        result = m_stager.stageToImage(payload.data(), payloadSize, image, image_desc.width, image_desc.height, image_desc.depth);
+        result = m_stager.stageToImage(payload.data(), payloadSize, image, imageDesc.width, imageDesc.height, imageDesc.depth);
         if (!result) return false;
 
         imageVector.push_back(image);
@@ -189,11 +186,11 @@ namespace gi
       }
 
       fprintf(stderr, "failed to read image %d from path %s\n", i, filePath);
-      image_desc.width = 1;
-      image_desc.height = 1;
-      image_desc.depth = 1;
+      imageDesc.width = 1;
+      imageDesc.height = 1;
+      imageDesc.depth = 1;
 
-      if (!cgpuCreateImage(m_device, &image_desc, &image))
+      if (!cgpuCreateImage(m_device, &imageDesc, &image))
         return false;
 
       uint8_t black[4] = { 0, 0, 0, 0 };
