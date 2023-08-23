@@ -1171,6 +1171,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     .domeLightTransformCol1      = scene->domeLightTransform[1],
     .rrInvMinTermProb            = params->rrInvMinTermProb,
     .domeLightTransformCol2      = scene->domeLightTransform[2],
+    .lightIntensityMultiplier    = params->lightIntensityMultiplier
   };
 
   std::vector<CgpuBufferBinding> buffers;

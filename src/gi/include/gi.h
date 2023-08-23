@@ -124,6 +124,7 @@ struct GiRenderParams
   const GiShaderCache* shaderCache;
   uint32_t             imageWidth;
   uint32_t             imageHeight;
+  float                lightIntensityMultiplier;
   uint32_t             maxBounces;
   uint32_t             spp;
   uint32_t             rrBounceOffset;

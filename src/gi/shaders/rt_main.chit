@@ -59,7 +59,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float cosTheta = (light.radius > 0.0) ? max(0.0, (dot(normalize(samplePos - light.pos), -dirToLight))) : 1.0;
         float geometryTerm = cosTheta / (dist * dist);
 
-        power = light.baseEmission * geometryTerm;
+        power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         pdf = samplePdf;
     }
 #endif
@@ -72,7 +72,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         dist = 100000.0;
         dirToLight = -light.direction;
-        power = light.baseEmission;
+        power = light.baseEmission * PC.lightIntensityMultiplier;
         pdf = 1.0;
 
         if (light.angle > 0.0)
@@ -103,7 +103,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         dirToLight = dir / dist;
         // https://graphics.cg.uni-saarland.de/courses/ris-2021/slides/03_ProbabilityTheory_MonteCarlo.pdf s.35
         float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
-        power = light.baseEmission * geometryTerm;
+        power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         pdf = 1.0 / (light.width * light.height);
     }
 #endif

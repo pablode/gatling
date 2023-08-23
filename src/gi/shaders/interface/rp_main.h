@@ -81,7 +81,7 @@ struct PushConstants
   SI_VEC3  domeLightTransformCol1;
   SI_FLOAT rrInvMinTermProb;
   SI_VEC3  domeLightTransformCol2;
-  // 1 float remaining
+  SI_FLOAT lightIntensityMultiplier;
 };
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)

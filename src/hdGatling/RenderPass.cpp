@@ -789,10 +789,12 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   renderParams.spp = m_settings.find(HdGatlingSettingsTokens->spp)->second.Get<int>();
   renderParams.rrBounceOffset = m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second.Get<int>();
   // Workaround for bug https://github.com/PixarAnimationStudios/USD/issues/913
-  VtValue rr_inv_min_term_prob = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
-  VtValue max_sample_value = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
-  renderParams.rrInvMinTermProb = float(rr_inv_min_term_prob.Cast<double>().Get<double>());
-  renderParams.maxSampleValue = float(max_sample_value.Cast<double>().Get<double>());
+  VtValue lightIntensityMultiplier = m_settings.find(HdGatlingSettingsTokens->light_intensity_multiplier)->second;
+  VtValue rrInvMinTermProb = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
+  VtValue maxSampleValue = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
+  renderParams.lightIntensityMultiplier = float(lightIntensityMultiplier.Cast<double>().Get<double>());
+  renderParams.rrInvMinTermProb = float(rrInvMinTermProb.Cast<double>().Get<double>());
+  renderParams.maxSampleValue = float(maxSampleValue.Cast<double>().Get<double>());
   renderParams.scene = m_scene;
   for (uint32_t i = 0; i < 4; i++)
   {
