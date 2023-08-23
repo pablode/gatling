@@ -17,10 +17,13 @@
 
 #include "shaderReflection.h"
 
+#include <smallVector.h>
 #include <volk.h>
 #include <spirv_reflect.h>
 #include <stdlib.h>
 #include <assert.h>
+
+using namespace gtl;
 
 bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection)
 {
@@ -31,8 +34,8 @@ bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection*
     return false;
   }
 
-  SpvReflectDescriptorBinding** bindings = nullptr;
   bool result = false;
+  GbSmallVector<SpvReflectDescriptorBinding*, 32> bindings;
 
   uint32_t bindingCount;
   if (spvReflectEnumerateDescriptorBindings(&shaderModule, &bindingCount, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
@@ -42,15 +45,16 @@ bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection*
 
   if (bindingCount > 0)
   {
-    reflection->bindings.resize(bindingCount);
+    bindings.resize(bindingCount);
 
-    bindings = (SpvReflectDescriptorBinding**) malloc(bindingCount * sizeof(SpvReflectDescriptorBinding*));
-    if (spvReflectEnumerateDescriptorBindings(&shaderModule, &bindingCount, bindings) != SPV_REFLECT_RESULT_SUCCESS)
+    if (spvReflectEnumerateDescriptorBindings(&shaderModule, &bindingCount, bindings.data()) != SPV_REFLECT_RESULT_SUCCESS)
     {
       goto fail;
     }
 
-    for (uint32_t i = 0; i < bindingCount; i++)
+    reflection->bindings.resize(bindingCount);
+
+    for (uint32_t i = 0; i < bindings.size(); i++)
     {
       const SpvReflectDescriptorBinding* srcBinding = bindings[i];
 
@@ -81,7 +85,6 @@ bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection*
   result = true;
 
 fail:
-  free(bindings);
   spvReflectDestroyShaderModule(&shaderModule);
   return result;
 }

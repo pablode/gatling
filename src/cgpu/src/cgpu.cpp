@@ -451,16 +451,10 @@ bool cgpuCreateDevice(CgpuDevice* device)
     CGPU_RETURN_ERROR("no physical device found");
   }
 
-  GbSmallVector<VkPhysicalDevice, 8> phys_devices;
-  phys_devices.resize(physDeviceCount);
+  GbSmallVector<VkPhysicalDevice, 8> physicalDevices(physDeviceCount);
+  vkEnumeratePhysicalDevices(iinstance->instance, &physDeviceCount, physicalDevices.data());
 
-  vkEnumeratePhysicalDevices(
-    iinstance->instance,
-    &physDeviceCount,
-    phys_devices.data()
-  );
-
-  idevice->physicalDevice = phys_devices[0];
+  idevice->physicalDevice = physicalDevices[0];
 
   VkPhysicalDeviceFeatures features;
   vkGetPhysicalDeviceFeatures(idevice->physicalDevice, &features);
@@ -501,23 +495,11 @@ bool cgpuCreateDevice(CgpuDevice* device)
   const VkPhysicalDeviceLimits* limits = &deviceProperties.properties.limits;
   idevice->properties = cgpuTranslatePhysicalDeviceProperties(limits, &subgroupProperties, &asProperties, &rtPipelineProperties);
 
-  uint32_t deviceExtCount;
-  vkEnumerateDeviceExtensionProperties(
-    idevice->physicalDevice,
-    nullptr,
-    &deviceExtCount,
-    nullptr
-  );
+  uint32_t extensionCount;
+  vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, nullptr);
 
-  GbSmallVector<VkExtensionProperties, 1024> deviceExtensions;
-  deviceExtensions.resize(deviceExtCount);
-
-  vkEnumerateDeviceExtensionProperties(
-    idevice->physicalDevice,
-    nullptr,
-    &deviceExtCount,
-    deviceExtensions.data()
-  );
+  GbSmallVector<VkExtensionProperties, 1024> extensions(extensionCount);
+  vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
   const char* requiredExtensions[] = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -531,12 +513,12 @@ bool cgpuCreateDevice(CgpuDevice* device)
   };
   uint32_t requiredExtensionCount = sizeof(requiredExtensions) / sizeof(requiredExtensions[0]);
 
-  GbSmallVector<const char*, 32> enabledDeviceExtensions;
+  GbSmallVector<const char*, 32> enabledExtensions;
   for (uint32_t i = 0; i < requiredExtensionCount; i++)
   {
     const char* extension = requiredExtensions[i];
 
-    if (!cgpuFindExtension(extension, deviceExtCount, deviceExtensions.data()))
+    if (!cgpuFindExtension(extension, extensionCount, extensions.data()))
     {
       iinstance->ideviceStore.free(device->handle);
 
@@ -544,59 +526,49 @@ bool cgpuCreateDevice(CgpuDevice* device)
       return false;
     }
 
-    enabledDeviceExtensions.push_back(extension);
+    enabledExtensions.push_back(extension);
   }
 
   const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
-  if (cgpuFindExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, extensions.size(), extensions.data()))
   {
-    enabledDeviceExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
   }
 
 #ifndef NDEBUG
-  if (cgpuFindExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()) && features.shaderInt64)
+  if (cgpuFindExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, extensions.size(), extensions.data()) && features.shaderInt64)
   {
     idevice->features.shaderClock = true;
-    enabledDeviceExtensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
   }
 
 #ifndef __APPLE__
-  if (cgpuFindExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, extensions.size(), extensions.data()))
   {
     idevice->features.debugPrintf = true;
-    enabledDeviceExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
   }
 #endif
 #endif
-  if (cgpuFindExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()) &&
-      cgpuFindExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, extensions.size(), extensions.data()) &&
+      cgpuFindExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, extensions.size(), extensions.data()))
   {
     idevice->features.pageableDeviceLocalMemory = true;
-    enabledDeviceExtensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
-    enabledDeviceExtensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
   }
 
-  if (cgpuFindExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, deviceExtCount, deviceExtensions.data()))
+  if (cgpuFindExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, extensions.size(), extensions.data()))
   {
     idevice->features.rayTracingInvocationReorder = true;
-    enabledDeviceExtensions.push_back(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
+    enabledExtensions.push_back(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
   }
 
-  uint32_t queueFamilyCount = 0;
-  vkGetPhysicalDeviceQueueFamilyProperties(
-    idevice->physicalDevice,
-    &queueFamilyCount,
-    nullptr
-  );
+  uint32_t queueFamilyCount;
+  vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, nullptr);
 
-  GbSmallVector<VkQueueFamilyProperties, 32> queueFamilies;
-  queueFamilies.resize(queueFamilyCount);
-
-  vkGetPhysicalDeviceQueueFamilyProperties(
-    idevice->physicalDevice,
-    &queueFamilyCount,
-    queueFamilies.data()
-  );
+  GbSmallVector<VkQueueFamilyProperties, 32> queueFamilies(queueFamilyCount);
+  vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, queueFamilies.data());
 
   int32_t queueFamilyIndex = -1;
   for (uint32_t i = 0; i < queueFamilyCount; ++i)
@@ -608,7 +580,8 @@ bool cgpuCreateDevice(CgpuDevice* device)
       queueFamilyIndex = i;
     }
   }
-  if (queueFamilyIndex == -1) {
+  if (queueFamilyIndex == -1)
+  {
     iinstance->ideviceStore.free(device->handle);
     CGPU_RETURN_ERROR("no suitable queue family");
   }
@@ -787,8 +760,8 @@ bool cgpuCreateDevice(CgpuDevice* device)
    * nowadays, there is no difference to instance validation layers. */
   deviceCreateInfo.enabledLayerCount = 0;
   deviceCreateInfo.ppEnabledLayerNames = nullptr;
-  deviceCreateInfo.enabledExtensionCount = enabledDeviceExtensions.size();
-  deviceCreateInfo.ppEnabledExtensionNames = enabledDeviceExtensions.data();
+  deviceCreateInfo.enabledExtensionCount = enabledExtensions.size();
+  deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions.data();
   deviceCreateInfo.pEnabledFeatures = nullptr;
 
   VkResult result = vkCreateDevice(
