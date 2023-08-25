@@ -197,25 +197,26 @@ CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,       
 
 static CgpuPhysicalDeviceFeatures cgpuTranslatePhysicalDeviceFeatures(const VkPhysicalDeviceFeatures* vkFeatures)
 {
-  CgpuPhysicalDeviceFeatures features = {};
-  features.textureCompressionBC = vkFeatures->textureCompressionBC;
-  features.pipelineStatisticsQuery = vkFeatures->pipelineStatisticsQuery;
-  features.shaderImageGatherExtended = vkFeatures->shaderImageGatherExtended;
-  features.shaderStorageImageExtendedFormats = vkFeatures->shaderStorageImageExtendedFormats;
-  features.shaderStorageImageReadWithoutFormat = vkFeatures->shaderStorageImageReadWithoutFormat;
-  features.shaderStorageImageWriteWithoutFormat = vkFeatures->shaderStorageImageWriteWithoutFormat;
-  features.shaderUniformBufferArrayDynamicIndexing = vkFeatures->shaderUniformBufferArrayDynamicIndexing;
-  features.shaderSampledImageArrayDynamicIndexing = vkFeatures->shaderSampledImageArrayDynamicIndexing;
-  features.shaderStorageBufferArrayDynamicIndexing = vkFeatures->shaderStorageBufferArrayDynamicIndexing;
-  features.shaderStorageImageArrayDynamicIndexing = vkFeatures->shaderStorageImageArrayDynamicIndexing;
-  features.shaderFloat64 = vkFeatures->shaderFloat64;
-  features.shaderInt64 = vkFeatures->shaderInt64;
-  features.shaderInt16 = vkFeatures->shaderInt16;
-  features.sparseBinding = vkFeatures->sparseBinding;
-  features.sparseResidencyBuffer = vkFeatures->sparseResidencyBuffer;
-  features.sparseResidencyImage2D = vkFeatures->sparseResidencyImage2D;
-  features.sparseResidencyImage3D = vkFeatures->sparseResidencyImage3D;
-  features.sparseResidencyAliased = vkFeatures->sparseResidencyAliased;
+  CgpuPhysicalDeviceFeatures features = {
+    .textureCompressionBC = bool(vkFeatures->textureCompressionBC),
+    .pipelineStatisticsQuery = bool(vkFeatures->pipelineStatisticsQuery),
+    .shaderImageGatherExtended = bool(vkFeatures->shaderImageGatherExtended),
+    .shaderStorageImageExtendedFormats = bool(vkFeatures->shaderStorageImageExtendedFormats),
+    .shaderStorageImageReadWithoutFormat = bool(vkFeatures->shaderStorageImageReadWithoutFormat),
+    .shaderStorageImageWriteWithoutFormat = bool(vkFeatures->shaderStorageImageWriteWithoutFormat),
+    .shaderUniformBufferArrayDynamicIndexing = bool(vkFeatures->shaderUniformBufferArrayDynamicIndexing),
+    .shaderSampledImageArrayDynamicIndexing = bool(vkFeatures->shaderSampledImageArrayDynamicIndexing),
+    .shaderStorageBufferArrayDynamicIndexing = bool(vkFeatures->shaderStorageBufferArrayDynamicIndexing),
+    .shaderStorageImageArrayDynamicIndexing = bool(vkFeatures->shaderStorageImageArrayDynamicIndexing),
+    .shaderFloat64 = bool(vkFeatures->shaderFloat64),
+    .shaderInt64 = bool(vkFeatures->shaderInt64),
+    .shaderInt16 = bool(vkFeatures->shaderInt16),
+    .sparseBinding = bool(vkFeatures->sparseBinding),
+    .sparseResidencyBuffer = bool(vkFeatures->sparseResidencyBuffer),
+    .sparseResidencyImage2D = bool(vkFeatures->sparseResidencyImage2D),
+    .sparseResidencyImage3D = bool(vkFeatures->sparseResidencyImage3D),
+    .sparseResidencyAliased = bool(vkFeatures->sparseResidencyAliased),
+  };
   return features;
 }
 
@@ -224,72 +225,69 @@ static CgpuPhysicalDeviceProperties cgpuTranslatePhysicalDeviceProperties(const 
                                                                           const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vkAsProps,
                                                                           const VkPhysicalDeviceRayTracingPipelinePropertiesKHR* vkRtPipelineProps)
 {
-  CgpuPhysicalDeviceProperties properties = {};
-  properties.maxImageDimension1D = vkLimits->maxImageDimension1D;
-  properties.maxImageDimension2D = vkLimits->maxImageDimension2D;
-  properties.maxImageDimension3D = vkLimits->maxImageDimension3D;
-  properties.maxImageDimensionCube = vkLimits->maxImageDimensionCube;
-  properties.maxImageArrayLayers = vkLimits->maxImageArrayLayers;
-  properties.maxUniformBufferRange = vkLimits->maxUniformBufferRange;
-  properties.maxStorageBufferRange = vkLimits->maxStorageBufferRange;
-  properties.maxPushConstantsSize = vkLimits->maxPushConstantsSize;
-  properties.maxMemoryAllocationCount = vkLimits->maxMemoryAllocationCount;
-  properties.maxSamplerAllocationCount = vkLimits->maxSamplerAllocationCount;
-  properties.bufferImageGranularity = vkLimits->bufferImageGranularity;
-  properties.sparseAddressSpaceSize = vkLimits->sparseAddressSpaceSize;
-  properties.maxBoundDescriptorSets = vkLimits->maxBoundDescriptorSets;
-  properties.maxPerStageDescriptorSamplers = vkLimits->maxPerStageDescriptorSamplers;
-  properties.maxPerStageDescriptorUniformBuffers = vkLimits->maxPerStageDescriptorUniformBuffers;
-  properties.maxPerStageDescriptorStorageBuffers = vkLimits->maxPerStageDescriptorStorageBuffers;
-  properties.maxPerStageDescriptorSampledImages = vkLimits->maxPerStageDescriptorSampledImages;
-  properties.maxPerStageDescriptorStorageImages = vkLimits->maxPerStageDescriptorStorageImages;
-  properties.maxPerStageDescriptorInputAttachments = vkLimits->maxPerStageDescriptorInputAttachments;
-  properties.maxPerStageResources = vkLimits->maxPerStageResources;
-  properties.maxDescriptorSetSamplers = vkLimits->maxDescriptorSetSamplers;
-  properties.maxDescriptorSetUniformBuffers = vkLimits->maxDescriptorSetUniformBuffers;
-  properties.maxDescriptorSetUniformBuffersDynamic = vkLimits->maxDescriptorSetUniformBuffersDynamic;
-  properties.maxDescriptorSetStorageBuffers = vkLimits->maxDescriptorSetStorageBuffers;
-  properties.maxDescriptorSetStorageBuffersDynamic = vkLimits->maxDescriptorSetStorageBuffersDynamic;
-  properties.maxDescriptorSetSampledImages = vkLimits->maxDescriptorSetSampledImages;
-  properties.maxDescriptorSetStorageImages = vkLimits->maxDescriptorSetStorageImages;
-  properties.maxDescriptorSetInputAttachments = vkLimits->maxDescriptorSetInputAttachments;
-  properties.maxComputeSharedMemorySize = vkLimits->maxComputeSharedMemorySize;
-  properties.maxComputeWorkGroupCount[0] = vkLimits->maxComputeWorkGroupCount[0];
-  properties.maxComputeWorkGroupCount[1] = vkLimits->maxComputeWorkGroupCount[1];
-  properties.maxComputeWorkGroupCount[2] = vkLimits->maxComputeWorkGroupCount[2];
-  properties.maxComputeWorkGroupInvocations = vkLimits->maxComputeWorkGroupInvocations;
-  properties.maxComputeWorkGroupSize[0] = vkLimits->maxComputeWorkGroupSize[0];
-  properties.maxComputeWorkGroupSize[1] = vkLimits->maxComputeWorkGroupSize[1];
-  properties.maxComputeWorkGroupSize[2] = vkLimits->maxComputeWorkGroupSize[2];
-  properties.mipmapPrecisionBits = vkLimits->mipmapPrecisionBits;
-  properties.maxSamplerLodBias = vkLimits->maxSamplerLodBias;
-  properties.maxSamplerAnisotropy = vkLimits->maxSamplerAnisotropy;
-  properties.minMemoryMapAlignment = vkLimits->minMemoryMapAlignment;
-  properties.minUniformBufferOffsetAlignment = vkLimits->minUniformBufferOffsetAlignment;
-  properties.minStorageBufferOffsetAlignment = vkLimits->minStorageBufferOffsetAlignment;
-  properties.minTexelOffset = vkLimits->minTexelOffset;
-  properties.maxTexelOffset = vkLimits->maxTexelOffset;
-  properties.minTexelGatherOffset = vkLimits->minTexelGatherOffset;
-  properties.maxTexelGatherOffset = vkLimits->maxTexelGatherOffset;
-  properties.minInterpolationOffset = vkLimits->minInterpolationOffset;
-  properties.maxInterpolationOffset = vkLimits->maxInterpolationOffset;
-  properties.subPixelInterpolationOffsetBits = vkLimits->subPixelInterpolationOffsetBits;
-  properties.maxSampleMaskWords = vkLimits->maxSampleMaskWords;
-  properties.timestampComputeAndGraphics = vkLimits->timestampComputeAndGraphics;
-  properties.timestampPeriod = vkLimits->timestampPeriod;
-  properties.discreteQueuePriorities = vkLimits->discreteQueuePriorities;
-  properties.optimalBufferCopyOffsetAlignment = vkLimits->optimalBufferCopyOffsetAlignment;
-  properties.optimalBufferCopyRowPitchAlignment = vkLimits->optimalBufferCopyRowPitchAlignment;
-  properties.nonCoherentAtomSize = vkLimits->nonCoherentAtomSize;
-  properties.subgroupSize = vkSubgroupProps->subgroupSize;
-  properties.minAccelerationStructureScratchOffsetAlignment = vkAsProps->minAccelerationStructureScratchOffsetAlignment;
-  properties.shaderGroupHandleSize = vkRtPipelineProps->shaderGroupHandleSize;
-  properties.maxShaderGroupStride = vkRtPipelineProps->maxShaderGroupStride;
-  properties.shaderGroupBaseAlignment = vkRtPipelineProps->shaderGroupBaseAlignment;
-  properties.shaderGroupHandleCaptureReplaySize = vkRtPipelineProps->shaderGroupHandleCaptureReplaySize;
-  properties.maxRayDispatchInvocationCount = vkRtPipelineProps->maxRayDispatchInvocationCount;
-  properties.shaderGroupHandleAlignment = vkRtPipelineProps->shaderGroupHandleAlignment;
-  properties.maxRayHitAttributeSize = vkRtPipelineProps->maxRayHitAttributeSize;
+  CgpuPhysicalDeviceProperties properties = {
+    .maxImageDimension1D = vkLimits->maxImageDimension1D,
+    .maxImageDimension2D = vkLimits->maxImageDimension2D,
+    .maxImageDimension3D = vkLimits->maxImageDimension3D,
+    .maxImageDimensionCube = vkLimits->maxImageDimensionCube,
+    .maxImageArrayLayers = vkLimits->maxImageArrayLayers,
+    .maxUniformBufferRange = vkLimits->maxUniformBufferRange,
+    .maxStorageBufferRange = vkLimits->maxStorageBufferRange,
+    .maxPushConstantsSize = vkLimits->maxPushConstantsSize,
+    .maxMemoryAllocationCount = vkLimits->maxMemoryAllocationCount,
+    .maxSamplerAllocationCount = vkLimits->maxSamplerAllocationCount,
+    .bufferImageGranularity = vkLimits->bufferImageGranularity,
+    .sparseAddressSpaceSize = vkLimits->sparseAddressSpaceSize,
+    .maxBoundDescriptorSets = vkLimits->maxBoundDescriptorSets,
+    .maxPerStageDescriptorSamplers = vkLimits->maxPerStageDescriptorSamplers,
+    .maxPerStageDescriptorUniformBuffers = vkLimits->maxPerStageDescriptorUniformBuffers,
+    .maxPerStageDescriptorStorageBuffers = vkLimits->maxPerStageDescriptorStorageBuffers,
+    .maxPerStageDescriptorSampledImages = vkLimits->maxPerStageDescriptorSampledImages,
+    .maxPerStageDescriptorStorageImages = vkLimits->maxPerStageDescriptorStorageImages,
+    .maxPerStageDescriptorInputAttachments = vkLimits->maxPerStageDescriptorInputAttachments,
+    .maxPerStageResources = vkLimits->maxPerStageResources,
+    .maxDescriptorSetSamplers = vkLimits->maxDescriptorSetSamplers,
+    .maxDescriptorSetUniformBuffers = vkLimits->maxDescriptorSetUniformBuffers,
+    .maxDescriptorSetUniformBuffersDynamic = vkLimits->maxDescriptorSetUniformBuffersDynamic,
+    .maxDescriptorSetStorageBuffers = vkLimits->maxDescriptorSetStorageBuffers,
+    .maxDescriptorSetStorageBuffersDynamic = vkLimits->maxDescriptorSetStorageBuffersDynamic,
+    .maxDescriptorSetSampledImages = vkLimits->maxDescriptorSetSampledImages,
+    .maxDescriptorSetStorageImages = vkLimits->maxDescriptorSetStorageImages,
+    .maxDescriptorSetInputAttachments = vkLimits->maxDescriptorSetInputAttachments,
+    .maxComputeSharedMemorySize = vkLimits->maxComputeSharedMemorySize,
+    .maxComputeWorkGroupCount = { vkLimits->maxComputeWorkGroupCount[0], vkLimits->maxComputeWorkGroupCount[1], vkLimits->maxComputeWorkGroupCount[2] },
+    .maxComputeWorkGroupInvocations = vkLimits->maxComputeWorkGroupInvocations,
+    .maxComputeWorkGroupSize = { vkLimits->maxComputeWorkGroupSize[0], vkLimits->maxComputeWorkGroupSize[1], vkLimits->maxComputeWorkGroupSize[2] },
+    .mipmapPrecisionBits = vkLimits->mipmapPrecisionBits,
+    .maxSamplerLodBias = vkLimits->maxSamplerLodBias,
+    .maxSamplerAnisotropy = vkLimits->maxSamplerAnisotropy,
+    .minMemoryMapAlignment = vkLimits->minMemoryMapAlignment,
+    .minUniformBufferOffsetAlignment = vkLimits->minUniformBufferOffsetAlignment,
+    .minStorageBufferOffsetAlignment = vkLimits->minStorageBufferOffsetAlignment,
+    .minTexelOffset = vkLimits->minTexelOffset,
+    .maxTexelOffset = vkLimits->maxTexelOffset,
+    .minTexelGatherOffset = vkLimits->minTexelGatherOffset,
+    .maxTexelGatherOffset = vkLimits->maxTexelGatherOffset,
+    .minInterpolationOffset = vkLimits->minInterpolationOffset,
+    .maxInterpolationOffset = vkLimits->maxInterpolationOffset,
+    .subPixelInterpolationOffsetBits = vkLimits->subPixelInterpolationOffsetBits,
+    .maxSampleMaskWords = vkLimits->maxSampleMaskWords,
+    .timestampComputeAndGraphics = bool(vkLimits->timestampComputeAndGraphics),
+    .timestampPeriod = vkLimits->timestampPeriod,
+    .discreteQueuePriorities = vkLimits->discreteQueuePriorities,
+    .optimalBufferCopyOffsetAlignment = vkLimits->optimalBufferCopyOffsetAlignment,
+    .optimalBufferCopyRowPitchAlignment = vkLimits->optimalBufferCopyRowPitchAlignment,
+    .nonCoherentAtomSize = vkLimits->nonCoherentAtomSize,
+    .subgroupSize = vkSubgroupProps->subgroupSize,
+    .minAccelerationStructureScratchOffsetAlignment = vkAsProps->minAccelerationStructureScratchOffsetAlignment,
+    .shaderGroupHandleSize = vkRtPipelineProps->shaderGroupHandleSize,
+    .maxShaderGroupStride = vkRtPipelineProps->maxShaderGroupStride,
+    .shaderGroupBaseAlignment = vkRtPipelineProps->shaderGroupBaseAlignment,
+    .shaderGroupHandleCaptureReplaySize = vkRtPipelineProps->shaderGroupHandleCaptureReplaySize,
+    .maxRayDispatchInvocationCount = vkRtPipelineProps->maxRayDispatchInvocationCount,
+    .shaderGroupHandleAlignment = vkRtPipelineProps->shaderGroupHandleAlignment,
+    .maxRayHitAttributeSize = vkRtPipelineProps->maxRayHitAttributeSize,
+  };
   return properties;
 }
 
@@ -391,24 +389,26 @@ bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t version
   }
 #endif
 
-  VkApplicationInfo appInfo;
-  appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  appInfo.pNext = nullptr;
-  appInfo.pApplicationName = appName;
-  appInfo.applicationVersion = VK_MAKE_VERSION(versionMajor, versionMinor, versionPatch);
-  appInfo.pEngineName = appName;
-  appInfo.engineVersion = VK_MAKE_VERSION(versionMajor, versionMinor, versionPatch);
-  appInfo.apiVersion = CGPU_MIN_VK_API_VERSION;
+  VkApplicationInfo appInfo = {
+    .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+    .pNext = nullptr,
+    .pApplicationName = appName,
+    .applicationVersion = VK_MAKE_VERSION(versionMajor, versionMinor, versionPatch),
+    .pEngineName = appName,
+    .engineVersion = VK_MAKE_VERSION(versionMajor, versionMinor, versionPatch),
+    .apiVersion = CGPU_MIN_VK_API_VERSION,
+  };
 
-  VkInstanceCreateInfo createInfo;
-  createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-  createInfo.pNext = nullptr;
-  createInfo.flags = 0;
-  createInfo.pApplicationInfo = &appInfo;
-  createInfo.enabledLayerCount = enabledLayers.size();
-  createInfo.ppEnabledLayerNames = enabledLayers.data();
-  createInfo.enabledExtensionCount = enabledExtensions.size();
-  createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+  VkInstanceCreateInfo createInfo = {
+    .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .pApplicationInfo = &appInfo,
+    .enabledLayerCount = (uint32_t) enabledLayers.size(),
+    .ppEnabledLayerNames = enabledLayers.data(),
+    .enabledExtensionCount = (uint32_t) enabledExtensions.size(),
+    .ppEnabledExtensionNames = enabledExtensions.data(),
+  };
 
   VkInstance instance;
   if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS)
@@ -586,42 +586,36 @@ bool cgpuCreateDevice(CgpuDevice* device)
     CGPU_RETURN_ERROR("no suitable queue family");
   }
 
-  VkDeviceQueueCreateInfo queueCreateInfo = {};
-  queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  queueCreateInfo.pNext = nullptr;
-  queueCreateInfo.flags = 0;
-  queueCreateInfo.queueFamilyIndex = queueFamilyIndex;
-  queueCreateInfo.queueCount = 1;
-  const float queue_priority = 1.0f;
-  queueCreateInfo.pQueuePriorities = &queue_priority;
-
   void* pNext = nullptr;
 
-  VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableMemoryFeatures = {};
-  pageableMemoryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
-  pageableMemoryFeatures.pNext = nullptr;
-  pageableMemoryFeatures.pageableDeviceLocalMemory = VK_TRUE;
+  VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableMemoryFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT,
+    .pNext = pNext,
+    .pageableDeviceLocalMemory = VK_TRUE,
+  };
 
   if (idevice->features.pageableDeviceLocalMemory)
   {
     pNext = &pageableMemoryFeatures;
   }
 
-  VkPhysicalDeviceShaderClockFeaturesKHR shaderClockFeatures = {};
-  shaderClockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR;
-  shaderClockFeatures.pNext = pNext;
-  shaderClockFeatures.shaderSubgroupClock = VK_TRUE;
-  shaderClockFeatures.shaderDeviceClock = VK_FALSE;
+  VkPhysicalDeviceShaderClockFeaturesKHR shaderClockFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR,
+    .pNext = pNext,
+    .shaderSubgroupClock = VK_TRUE,
+    .shaderDeviceClock = VK_FALSE,
+  };
 
   if (idevice->features.shaderClock)
   {
     pNext = &shaderClockFeatures;
   }
 
-  VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV invocationReorderFeatures = {};
-  invocationReorderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_NV;
-  invocationReorderFeatures.pNext = pNext;
-  invocationReorderFeatures.rayTracingInvocationReorder = VK_TRUE;
+  VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV invocationReorderFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_NV,
+    .pNext = pNext,
+    .rayTracingInvocationReorder = VK_TRUE,
+  };
 
   if (idevice->features.rayTracingInvocationReorder)
   {
@@ -634,141 +628,162 @@ bool cgpuCreateDevice(CgpuDevice* device)
     .synchronization2 = VK_TRUE
   };
 
-  VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};
-  accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-  accelerationStructureFeatures.pNext = &synchronization2Features;
-  accelerationStructureFeatures.accelerationStructure = VK_TRUE;
-  accelerationStructureFeatures.accelerationStructureCaptureReplay = VK_FALSE;
-  accelerationStructureFeatures.accelerationStructureIndirectBuild = VK_FALSE;
-  accelerationStructureFeatures.accelerationStructureHostCommands = VK_FALSE;
-  accelerationStructureFeatures.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+    .pNext = &synchronization2Features,
+    .accelerationStructure = VK_TRUE,
+    .accelerationStructureCaptureReplay = VK_FALSE,
+    .accelerationStructureIndirectBuild = VK_FALSE,
+    .accelerationStructureHostCommands = VK_FALSE,
+    .descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE,
+  };
 
-  VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures = {};
-  rayTracingPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
-  rayTracingPipelineFeatures.pNext = &accelerationStructureFeatures;
-  rayTracingPipelineFeatures.rayTracingPipeline = VK_TRUE;
-  rayTracingPipelineFeatures.rayTracingPipelineShaderGroupHandleCaptureReplay = VK_FALSE;
-  rayTracingPipelineFeatures.rayTracingPipelineShaderGroupHandleCaptureReplayMixed = VK_FALSE;
-  rayTracingPipelineFeatures.rayTracingPipelineTraceRaysIndirect = VK_FALSE;
-  rayTracingPipelineFeatures.rayTraversalPrimitiveCulling = VK_FALSE;
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR,
+    .pNext = &accelerationStructureFeatures,
+    .rayTracingPipeline = VK_TRUE,
+    .rayTracingPipelineShaderGroupHandleCaptureReplay = VK_FALSE,
+    .rayTracingPipelineShaderGroupHandleCaptureReplayMixed = VK_FALSE,
+    .rayTracingPipelineTraceRaysIndirect = VK_FALSE,
+    .rayTraversalPrimitiveCulling = VK_FALSE,
+  };
 
-  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeatures = {};
-  bufferDeviceAddressFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-  bufferDeviceAddressFeatures.pNext = &rayTracingPipelineFeatures;
-  bufferDeviceAddressFeatures.bufferDeviceAddress = VK_TRUE;
-  bufferDeviceAddressFeatures.bufferDeviceAddressCaptureReplay = VK_FALSE;
-  bufferDeviceAddressFeatures.bufferDeviceAddressMultiDevice = VK_FALSE;
+  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddressFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+    .pNext = &rayTracingPipelineFeatures,
+    .bufferDeviceAddress = VK_TRUE,
+    .bufferDeviceAddressCaptureReplay = VK_FALSE,
+    .bufferDeviceAddressMultiDevice = VK_FALSE,
+  };
 
-  VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexingFeatures = {};
-  descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-  descriptorIndexingFeatures.pNext = &bufferDeviceAddressFeatures;
-  descriptorIndexingFeatures.shaderInputAttachmentArrayDynamicIndexing = VK_FALSE;
-  descriptorIndexingFeatures.shaderUniformTexelBufferArrayDynamicIndexing = VK_FALSE;
-  descriptorIndexingFeatures.shaderStorageTexelBufferArrayDynamicIndexing = VK_FALSE;
-  descriptorIndexingFeatures.shaderUniformBufferArrayNonUniformIndexing = VK_FALSE;
-  descriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-  descriptorIndexingFeatures.shaderStorageBufferArrayNonUniformIndexing = VK_FALSE;
-  descriptorIndexingFeatures.shaderStorageImageArrayNonUniformIndexing = VK_TRUE;
-  descriptorIndexingFeatures.shaderInputAttachmentArrayNonUniformIndexing = VK_FALSE;
-  descriptorIndexingFeatures.shaderUniformTexelBufferArrayNonUniformIndexing = VK_FALSE;
-  descriptorIndexingFeatures.shaderStorageTexelBufferArrayNonUniformIndexing = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingUniformBufferUpdateAfterBind = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingSampledImageUpdateAfterBind = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingStorageImageUpdateAfterBind = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingStorageBufferUpdateAfterBind = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingUniformTexelBufferUpdateAfterBind = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingStorageTexelBufferUpdateAfterBind = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingUpdateUnusedWhilePending = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingPartiallyBound = VK_FALSE;
-  descriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_FALSE;
-  descriptorIndexingFeatures.runtimeDescriptorArray = VK_FALSE;
+  VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexingFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
+    .pNext = &bufferDeviceAddressFeatures,
+    .shaderInputAttachmentArrayDynamicIndexing = VK_FALSE,
+    .shaderUniformTexelBufferArrayDynamicIndexing = VK_FALSE,
+    .shaderStorageTexelBufferArrayDynamicIndexing = VK_FALSE,
+    .shaderUniformBufferArrayNonUniformIndexing = VK_FALSE,
+    .shaderSampledImageArrayNonUniformIndexing = VK_TRUE,
+    .shaderStorageBufferArrayNonUniformIndexing = VK_FALSE,
+    .shaderStorageImageArrayNonUniformIndexing = VK_TRUE,
+    .shaderInputAttachmentArrayNonUniformIndexing = VK_FALSE,
+    .shaderUniformTexelBufferArrayNonUniformIndexing = VK_FALSE,
+    .shaderStorageTexelBufferArrayNonUniformIndexing = VK_FALSE,
+    .descriptorBindingUniformBufferUpdateAfterBind = VK_FALSE,
+    .descriptorBindingSampledImageUpdateAfterBind = VK_FALSE,
+    .descriptorBindingStorageImageUpdateAfterBind = VK_FALSE,
+    .descriptorBindingStorageBufferUpdateAfterBind = VK_FALSE,
+    .descriptorBindingUniformTexelBufferUpdateAfterBind = VK_FALSE,
+    .descriptorBindingStorageTexelBufferUpdateAfterBind = VK_FALSE,
+    .descriptorBindingUpdateUnusedWhilePending = VK_FALSE,
+    .descriptorBindingPartiallyBound = VK_FALSE,
+    .descriptorBindingVariableDescriptorCount = VK_FALSE,
+    .runtimeDescriptorArray = VK_FALSE,
+  };
 
-  VkPhysicalDeviceShaderFloat16Int8Features shaderFloat16Int8Features = {};
-  shaderFloat16Int8Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
-  shaderFloat16Int8Features.pNext = &descriptorIndexingFeatures;
-  shaderFloat16Int8Features.shaderFloat16 = VK_TRUE;
-  shaderFloat16Int8Features.shaderInt8 = VK_FALSE;
+  VkPhysicalDeviceShaderFloat16Int8Features shaderFloat16Int8Features = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+    .pNext = &descriptorIndexingFeatures,
+    .shaderFloat16 = VK_TRUE,
+    .shaderInt8 = VK_FALSE,
+  };
 
-  VkPhysicalDevice16BitStorageFeatures device16bitStorageFeatures = {};
-  device16bitStorageFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
-  device16bitStorageFeatures.pNext = &shaderFloat16Int8Features;
-  device16bitStorageFeatures.storageBuffer16BitAccess = VK_TRUE;
-  device16bitStorageFeatures.uniformAndStorageBuffer16BitAccess = VK_TRUE;
-  device16bitStorageFeatures.storagePushConstant16 = VK_FALSE;
-  device16bitStorageFeatures.storageInputOutput16 = VK_FALSE;
+  VkPhysicalDevice16BitStorageFeatures device16bitStorageFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
+    .pNext = &shaderFloat16Int8Features,
+    .storageBuffer16BitAccess = VK_TRUE,
+    .uniformAndStorageBuffer16BitAccess = VK_TRUE,
+    .storagePushConstant16 = VK_FALSE,
+    .storageInputOutput16 = VK_FALSE,
+  };
 
-  VkPhysicalDeviceFeatures2 deviceFeatures2;
-  deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  deviceFeatures2.pNext = &device16bitStorageFeatures;
-  deviceFeatures2.features.robustBufferAccess = VK_FALSE;
-  deviceFeatures2.features.fullDrawIndexUint32 = VK_FALSE;
-  deviceFeatures2.features.imageCubeArray = VK_FALSE;
-  deviceFeatures2.features.independentBlend = VK_FALSE;
-  deviceFeatures2.features.geometryShader = VK_FALSE;
-  deviceFeatures2.features.tessellationShader = VK_FALSE;
-  deviceFeatures2.features.sampleRateShading = VK_FALSE;
-  deviceFeatures2.features.dualSrcBlend = VK_FALSE;
-  deviceFeatures2.features.logicOp = VK_FALSE;
-  deviceFeatures2.features.multiDrawIndirect = VK_FALSE;
-  deviceFeatures2.features.drawIndirectFirstInstance = VK_FALSE;
-  deviceFeatures2.features.depthClamp = VK_FALSE;
-  deviceFeatures2.features.depthBiasClamp = VK_FALSE;
-  deviceFeatures2.features.fillModeNonSolid = VK_FALSE;
-  deviceFeatures2.features.depthBounds = VK_FALSE;
-  deviceFeatures2.features.wideLines = VK_FALSE;
-  deviceFeatures2.features.largePoints = VK_FALSE;
-  deviceFeatures2.features.alphaToOne = VK_FALSE;
-  deviceFeatures2.features.multiViewport = VK_FALSE;
-  deviceFeatures2.features.samplerAnisotropy = VK_TRUE;
-  deviceFeatures2.features.textureCompressionETC2 = VK_FALSE;
-  deviceFeatures2.features.textureCompressionASTC_LDR = VK_FALSE;
-  deviceFeatures2.features.textureCompressionBC = VK_FALSE;
-  deviceFeatures2.features.occlusionQueryPrecise = VK_FALSE;
-  deviceFeatures2.features.pipelineStatisticsQuery = VK_FALSE;
-  deviceFeatures2.features.vertexPipelineStoresAndAtomics = VK_FALSE;
-  deviceFeatures2.features.fragmentStoresAndAtomics = VK_FALSE;
-  deviceFeatures2.features.shaderTessellationAndGeometryPointSize = VK_FALSE;
-  deviceFeatures2.features.shaderImageGatherExtended = VK_TRUE;
-  deviceFeatures2.features.shaderStorageImageExtendedFormats = VK_FALSE;
-  deviceFeatures2.features.shaderStorageImageMultisample = VK_FALSE;
-  deviceFeatures2.features.shaderStorageImageReadWithoutFormat = VK_FALSE;
-  deviceFeatures2.features.shaderStorageImageWriteWithoutFormat = VK_FALSE;
-  deviceFeatures2.features.shaderUniformBufferArrayDynamicIndexing = VK_FALSE;
-  deviceFeatures2.features.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
-  deviceFeatures2.features.shaderStorageBufferArrayDynamicIndexing = VK_FALSE;
-  deviceFeatures2.features.shaderStorageImageArrayDynamicIndexing = VK_FALSE;
-  deviceFeatures2.features.shaderClipDistance = VK_FALSE;
-  deviceFeatures2.features.shaderCullDistance = VK_FALSE;
-  deviceFeatures2.features.shaderFloat64 = VK_FALSE;
-  deviceFeatures2.features.shaderInt64 = idevice->features.shaderClock;
-  deviceFeatures2.features.shaderInt16 = VK_TRUE;
-  deviceFeatures2.features.shaderResourceResidency = VK_FALSE;
-  deviceFeatures2.features.shaderResourceMinLod = VK_FALSE;
-  deviceFeatures2.features.sparseBinding = VK_FALSE;
-  deviceFeatures2.features.sparseResidencyBuffer = VK_FALSE;
-  deviceFeatures2.features.sparseResidencyImage2D = VK_FALSE;
-  deviceFeatures2.features.sparseResidencyImage3D = VK_FALSE;
-  deviceFeatures2.features.sparseResidency2Samples = VK_FALSE;
-  deviceFeatures2.features.sparseResidency4Samples = VK_FALSE;
-  deviceFeatures2.features.sparseResidency8Samples = VK_FALSE;
-  deviceFeatures2.features.sparseResidency16Samples = VK_FALSE;
-  deviceFeatures2.features.sparseResidencyAliased = VK_FALSE;
-  deviceFeatures2.features.variableMultisampleRate = VK_FALSE;
-  deviceFeatures2.features.inheritedQueries = VK_FALSE;
+  VkPhysicalDeviceFeatures2 deviceFeatures2 = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+    .pNext = &device16bitStorageFeatures,
+    .features = {
+      .robustBufferAccess = VK_FALSE,
+      .fullDrawIndexUint32 = VK_FALSE,
+      .imageCubeArray = VK_FALSE,
+      .independentBlend = VK_FALSE,
+      .geometryShader = VK_FALSE,
+      .tessellationShader = VK_FALSE,
+      .sampleRateShading = VK_FALSE,
+      .dualSrcBlend = VK_FALSE,
+      .logicOp = VK_FALSE,
+      .multiDrawIndirect = VK_FALSE,
+      .drawIndirectFirstInstance = VK_FALSE,
+      .depthClamp = VK_FALSE,
+      .depthBiasClamp = VK_FALSE,
+      .fillModeNonSolid = VK_FALSE,
+      .depthBounds = VK_FALSE,
+      .wideLines = VK_FALSE,
+      .largePoints = VK_FALSE,
+      .alphaToOne = VK_FALSE,
+      .multiViewport = VK_FALSE,
+      .samplerAnisotropy = VK_TRUE,
+      .textureCompressionETC2 = VK_FALSE,
+      .textureCompressionASTC_LDR = VK_FALSE,
+      .textureCompressionBC = VK_FALSE,
+      .occlusionQueryPrecise = VK_FALSE,
+      .pipelineStatisticsQuery = VK_FALSE,
+      .vertexPipelineStoresAndAtomics = VK_FALSE,
+      .fragmentStoresAndAtomics = VK_FALSE,
+      .shaderTessellationAndGeometryPointSize = VK_FALSE,
+      .shaderImageGatherExtended = VK_TRUE,
+      .shaderStorageImageExtendedFormats = VK_FALSE,
+      .shaderStorageImageMultisample = VK_FALSE,
+      .shaderStorageImageReadWithoutFormat = VK_FALSE,
+      .shaderStorageImageWriteWithoutFormat = VK_FALSE,
+      .shaderUniformBufferArrayDynamicIndexing = VK_FALSE,
+      .shaderSampledImageArrayDynamicIndexing = VK_TRUE,
+      .shaderStorageBufferArrayDynamicIndexing = VK_FALSE,
+      .shaderStorageImageArrayDynamicIndexing = VK_FALSE,
+      .shaderClipDistance = VK_FALSE,
+      .shaderCullDistance = VK_FALSE,
+      .shaderFloat64 = VK_FALSE,
+      .shaderInt64 = idevice->features.shaderClock,
+      .shaderInt16 = VK_TRUE,
+      .shaderResourceResidency = VK_FALSE,
+      .shaderResourceMinLod = VK_FALSE,
+      .sparseBinding = VK_FALSE,
+      .sparseResidencyBuffer = VK_FALSE,
+      .sparseResidencyImage2D = VK_FALSE,
+      .sparseResidencyImage3D = VK_FALSE,
+      .sparseResidency2Samples = VK_FALSE,
+      .sparseResidency4Samples = VK_FALSE,
+      .sparseResidency8Samples = VK_FALSE,
+      .sparseResidency16Samples = VK_FALSE,
+      .sparseResidencyAliased = VK_FALSE,
+      .variableMultisampleRate = VK_FALSE,
+      .inheritedQueries = VK_FALSE,
+    }
+  };
 
-  VkDeviceCreateInfo deviceCreateInfo;
-  deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  deviceCreateInfo.pNext = &deviceFeatures2;
-  deviceCreateInfo.flags = 0;
-  deviceCreateInfo.queueCreateInfoCount = 1;
-  deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-  /* These two fields are ignored by up-to-date implementations since
-   * nowadays, there is no difference to instance validation layers. */
-  deviceCreateInfo.enabledLayerCount = 0;
-  deviceCreateInfo.ppEnabledLayerNames = nullptr;
-  deviceCreateInfo.enabledExtensionCount = enabledExtensions.size();
-  deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions.data();
-  deviceCreateInfo.pEnabledFeatures = nullptr;
+  const float queuePriority = 1.0f;
+
+  VkDeviceQueueCreateInfo queueCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .queueFamilyIndex = (uint32_t) queueFamilyIndex,
+    .queueCount = 1,
+    .pQueuePriorities = &queuePriority,
+  };
+
+  VkDeviceCreateInfo deviceCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    .pNext = &deviceFeatures2,
+    .flags = 0,
+    .queueCreateInfoCount = 1,
+    .pQueueCreateInfos = &queueCreateInfo,
+    /* These two fields are ignored by up-to-date implementations since
+     * nowadays, there is no difference to instance validation layers. */
+    .enabledLayerCount = 0,
+    .ppEnabledLayerNames = nullptr,
+    .enabledExtensionCount = (uint32_t) enabledExtensions.size(),
+    .ppEnabledExtensionNames = enabledExtensions.data(),
+    .pEnabledFeatures = nullptr,
+  };
 
   VkResult result = vkCreateDevice(
     idevice->physicalDevice,
@@ -793,11 +808,12 @@ bool cgpuCreateDevice(CgpuDevice* device)
     &idevice->computeQueue
   );
 
-  VkCommandPoolCreateInfo poolCreateInfo = {};
-  poolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  poolCreateInfo.pNext = nullptr;
-  poolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  poolCreateInfo.queueFamilyIndex = queueFamilyIndex;
+  VkCommandPoolCreateInfo poolCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .queueFamilyIndex = (uint32_t) queueFamilyIndex,
+  };
 
   result = idevice->table.vkCreateCommandPool(
     idevice->logicalDevice,
@@ -818,13 +834,14 @@ bool cgpuCreateDevice(CgpuDevice* device)
     CGPU_RETURN_ERROR("failed to create command pool");
   }
 
-  VkQueryPoolCreateInfo timestampPoolCreateInfo = {};
-  timestampPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
-  timestampPoolCreateInfo.pNext = nullptr;
-  timestampPoolCreateInfo.flags = 0;
-  timestampPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
-  timestampPoolCreateInfo.queryCount = CGPU_MAX_TIMESTAMP_QUERIES;
-  timestampPoolCreateInfo.pipelineStatistics = 0;
+  VkQueryPoolCreateInfo timestampPoolCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .queryType = VK_QUERY_TYPE_TIMESTAMP,
+    .queryCount = CGPU_MAX_TIMESTAMP_QUERIES,
+    .pipelineStatistics = 0,
+  };
 
   result = idevice->table.vkCreateQueryPool(
     idevice->logicalDevice,
@@ -850,29 +867,34 @@ bool cgpuCreateDevice(CgpuDevice* device)
     CGPU_RETURN_ERROR("failed to create query pool");
   }
 
-  VmaVulkanFunctions vmaVulkanFunctions = {};
-  vmaVulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
-  vmaVulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
-  vmaVulkanFunctions.vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2;
-  vmaVulkanFunctions.vkAllocateMemory = idevice->table.vkAllocateMemory;
-  vmaVulkanFunctions.vkFreeMemory = idevice->table.vkFreeMemory;
-  vmaVulkanFunctions.vkMapMemory = idevice->table.vkMapMemory;
-  vmaVulkanFunctions.vkUnmapMemory = idevice->table.vkUnmapMemory;
-  vmaVulkanFunctions.vkFlushMappedMemoryRanges = idevice->table.vkFlushMappedMemoryRanges;
-  vmaVulkanFunctions.vkInvalidateMappedMemoryRanges = idevice->table.vkInvalidateMappedMemoryRanges;
-  vmaVulkanFunctions.vkBindBufferMemory = idevice->table.vkBindBufferMemory;
-  vmaVulkanFunctions.vkBindImageMemory = idevice->table.vkBindImageMemory;
-  vmaVulkanFunctions.vkGetBufferMemoryRequirements = idevice->table.vkGetBufferMemoryRequirements;
-  vmaVulkanFunctions.vkGetImageMemoryRequirements = idevice->table.vkGetImageMemoryRequirements;
-  vmaVulkanFunctions.vkCreateBuffer = idevice->table.vkCreateBuffer;
-  vmaVulkanFunctions.vkDestroyBuffer = idevice->table.vkDestroyBuffer;
-  vmaVulkanFunctions.vkCreateImage = idevice->table.vkCreateImage;
-  vmaVulkanFunctions.vkDestroyImage = idevice->table.vkDestroyImage;
-  vmaVulkanFunctions.vkCmdCopyBuffer = idevice->table.vkCmdCopyBuffer;
-  vmaVulkanFunctions.vkGetBufferMemoryRequirements2KHR = idevice->table.vkGetBufferMemoryRequirements2;
-  vmaVulkanFunctions.vkGetImageMemoryRequirements2KHR = idevice->table.vkGetImageMemoryRequirements2;
-  vmaVulkanFunctions.vkBindBufferMemory2KHR = idevice->table.vkBindBufferMemory2;
-  vmaVulkanFunctions.vkBindImageMemory2KHR = idevice->table.vkBindImageMemory2;
+  VmaVulkanFunctions vmaVulkanFunctions = {
+    .vkGetInstanceProcAddr = nullptr,
+    .vkGetDeviceProcAddr = nullptr,
+    .vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties,
+    .vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties,
+    .vkAllocateMemory = idevice->table.vkAllocateMemory,
+    .vkFreeMemory = idevice->table.vkFreeMemory,
+    .vkMapMemory = idevice->table.vkMapMemory,
+    .vkUnmapMemory = idevice->table.vkUnmapMemory,
+    .vkFlushMappedMemoryRanges = idevice->table.vkFlushMappedMemoryRanges,
+    .vkInvalidateMappedMemoryRanges = idevice->table.vkInvalidateMappedMemoryRanges,
+    .vkBindBufferMemory = idevice->table.vkBindBufferMemory,
+    .vkBindImageMemory = idevice->table.vkBindImageMemory,
+    .vkGetBufferMemoryRequirements = idevice->table.vkGetBufferMemoryRequirements,
+    .vkGetImageMemoryRequirements = idevice->table.vkGetImageMemoryRequirements,
+    .vkCreateBuffer = idevice->table.vkCreateBuffer,
+    .vkDestroyBuffer = idevice->table.vkDestroyBuffer,
+    .vkCreateImage = idevice->table.vkCreateImage,
+    .vkDestroyImage = idevice->table.vkDestroyImage,
+    .vkCmdCopyBuffer = idevice->table.vkCmdCopyBuffer,
+    .vkGetBufferMemoryRequirements2KHR = idevice->table.vkGetBufferMemoryRequirements2,
+    .vkGetImageMemoryRequirements2KHR = idevice->table.vkGetImageMemoryRequirements2,
+    .vkBindBufferMemory2KHR = idevice->table.vkBindBufferMemory2,
+    .vkBindImageMemory2KHR = idevice->table.vkBindImageMemory2,
+    .vkGetPhysicalDeviceMemoryProperties2KHR = vkGetPhysicalDeviceMemoryProperties2,
+    .vkGetDeviceBufferMemoryRequirements = vkGetDeviceBufferMemoryRequirements,
+    .vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements,
+  };
 
   VmaAllocatorCreateInfo allocCreateInfo = {};
   allocCreateInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
@@ -954,12 +976,13 @@ bool cgpuCreateShader(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkShaderModuleCreateInfo shaderModuleCreateInfo;
-  shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  shaderModuleCreateInfo.pNext = nullptr;
-  shaderModuleCreateInfo.flags = 0;
-  shaderModuleCreateInfo.codeSize = size;
-  shaderModuleCreateInfo.pCode = (uint32_t*) source;
+  VkShaderModuleCreateInfo shaderModuleCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .codeSize = size,
+    .pCode = (uint32_t*)source,
+  };
 
   VkResult result = idevice->table.vkCreateShaderModule(
     idevice->logicalDevice,
@@ -1017,15 +1040,16 @@ static bool cgpuCreateIBufferAligned(CgpuIDevice* idevice,
                                      uint64_t alignment,
                                      CgpuIBuffer* ibuffer)
 {
-  VkBufferCreateInfo buffer_info;
-  buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  buffer_info.pNext = nullptr;
-  buffer_info.flags = 0;
-  buffer_info.size = size;
-  buffer_info.usage = (VkBufferUsageFlags) usage;
-  buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  buffer_info.queueFamilyIndexCount = 0;
-  buffer_info.pQueueFamilyIndices = nullptr;
+  VkBufferCreateInfo bufferInfo = {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .size = size,
+    .usage = (VkBufferUsageFlags) usage,
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0,
+    .pQueueFamilyIndices = nullptr,
+  };
 
   VmaAllocationCreateInfo vmaAllocCreateInfo = {};
   vmaAllocCreateInfo.requiredFlags = (VkMemoryPropertyFlags) memoryProperties;
@@ -1035,7 +1059,7 @@ static bool cgpuCreateIBufferAligned(CgpuIDevice* idevice,
   {
     result = vmaCreateBufferWithAlignment(
       idevice->allocator,
-      &buffer_info,
+      &bufferInfo,
       &vmaAllocCreateInfo,
       alignment,
       &ibuffer->buffer,
@@ -1047,7 +1071,7 @@ static bool cgpuCreateIBufferAligned(CgpuIDevice* idevice,
   {
     result = vmaCreateBuffer(
       idevice->allocator,
-      &buffer_info,
+      &bufferInfo,
       &vmaAllocCreateInfo,
       &ibuffer->buffer,
       &ibuffer->allocation,
@@ -1179,24 +1203,27 @@ bool cgpuCreateImage(CgpuDevice device,
     vkImageTiling = VK_IMAGE_TILING_LINEAR;
   }
 
-  VkImageCreateInfo imageCreateInfo;
-  imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-  imageCreateInfo.pNext = nullptr;
-  imageCreateInfo.flags = 0;
-  imageCreateInfo.imageType = imageDesc->is3d ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
-  imageCreateInfo.format = (VkFormat) imageDesc->format;
-  imageCreateInfo.extent.width = imageDesc->width;
-  imageCreateInfo.extent.height = imageDesc->height;
-  imageCreateInfo.extent.depth = imageDesc->is3d ? imageDesc->depth : 1;
-  imageCreateInfo.mipLevels = 1;
-  imageCreateInfo.arrayLayers = 1;
-  imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-  imageCreateInfo.tiling = vkImageTiling;
-  imageCreateInfo.usage = (VkImageUsageFlags) imageDesc->usage;
-  imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  imageCreateInfo.queueFamilyIndexCount = 0;
-  imageCreateInfo.pQueueFamilyIndices = nullptr;
-  imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  VkImageCreateInfo imageCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .imageType = imageDesc->is3d ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D,
+    .format = (VkFormat)imageDesc->format,
+    .extent = {
+      .width = imageDesc->width,
+      .height = imageDesc->height,
+      .depth = imageDesc->is3d ? imageDesc->depth : 1,
+    },
+    .mipLevels = 1,
+    .arrayLayers = 1,
+    .samples = VK_SAMPLE_COUNT_1_BIT,
+    .tiling = vkImageTiling,
+    .usage = (VkImageUsageFlags)imageDesc->usage,
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0,
+    .pQueueFamilyIndices = nullptr,
+    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+  };
 
   VmaAllocationCreateInfo allocationCreateInfo = {};
   allocationCreateInfo.requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -1220,22 +1247,27 @@ bool cgpuCreateImage(CgpuDevice device,
 
   iimage->size = allocationInfo.size;
 
-  VkImageViewCreateInfo imageViewCreateInfo;
-  imageViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  imageViewCreateInfo.pNext = nullptr;
-  imageViewCreateInfo.flags = 0;
-  imageViewCreateInfo.image = iimage->image;
-  imageViewCreateInfo.viewType = imageDesc->is3d ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D;
-  imageViewCreateInfo.format = (VkFormat) imageDesc->format;
-  imageViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-  imageViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-  imageViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-  imageViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-  imageViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  imageViewCreateInfo.subresourceRange.baseMipLevel = 0;
-  imageViewCreateInfo.subresourceRange.levelCount = 1;
-  imageViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-  imageViewCreateInfo.subresourceRange.layerCount = 1;
+  VkImageViewCreateInfo imageViewCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .image = iimage->image,
+    .viewType = imageDesc->is3d ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D,
+    .format = (VkFormat) imageDesc->format,
+    .components = {
+      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+    },
+    .subresourceRange = {
+    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1,
+    },
+  };
 
   result = idevice->table.vkCreateImageView(
     idevice->logicalDevice,
@@ -1336,25 +1368,26 @@ bool cgpuCreateSampler(CgpuDevice device,
                       (addressModeV == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
                       (addressModeW == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK);
 
-  VkSamplerCreateInfo samplerCreateInfo;
-  samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  samplerCreateInfo.pNext = nullptr;
-  samplerCreateInfo.flags = 0;
-  samplerCreateInfo.magFilter = VK_FILTER_LINEAR;
-  samplerCreateInfo.minFilter = VK_FILTER_LINEAR;
-  samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  samplerCreateInfo.addressModeU = cgpuTranslateAddressMode(addressModeU);
-  samplerCreateInfo.addressModeV = cgpuTranslateAddressMode(addressModeV);
-  samplerCreateInfo.addressModeW = cgpuTranslateAddressMode(addressModeW);
-  samplerCreateInfo.mipLodBias = 0.0f;
-  samplerCreateInfo.anisotropyEnable = VK_FALSE;
-  samplerCreateInfo.maxAnisotropy = 1.0f;
-  samplerCreateInfo.compareEnable = VK_FALSE;
-  samplerCreateInfo.compareOp = VK_COMPARE_OP_NEVER;
-  samplerCreateInfo.minLod = 0.0f;
-  samplerCreateInfo.maxLod = VK_LOD_CLAMP_NONE;
-  samplerCreateInfo.borderColor = clampToBlack ? VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
-  samplerCreateInfo.unnormalizedCoordinates = VK_FALSE;
+  VkSamplerCreateInfo samplerCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .magFilter = VK_FILTER_LINEAR,
+    .minFilter = VK_FILTER_LINEAR,
+    .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+    .addressModeU = cgpuTranslateAddressMode(addressModeU),
+    .addressModeV = cgpuTranslateAddressMode(addressModeV),
+    .addressModeW = cgpuTranslateAddressMode(addressModeW),
+    .mipLodBias = 0.0f,
+    .anisotropyEnable = VK_FALSE,
+    .maxAnisotropy = 1.0f,
+    .compareEnable = VK_FALSE,
+    .compareOp = VK_COMPARE_OP_NEVER,
+    .minLod = 0.0f,
+    .maxLod = VK_LOD_CLAMP_NONE,
+    .borderColor = clampToBlack ? VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK : VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
+    .unnormalizedCoordinates = VK_FALSE,
+  };
 
   VkResult result = idevice->table.vkCreateSampler(
     idevice->logicalDevice,
@@ -1391,19 +1424,21 @@ bool cgpuDestroySampler(CgpuDevice device, CgpuSampler sampler)
 
 static bool cgpuCreatePipelineLayout(CgpuIDevice* idevice, CgpuIPipeline* ipipeline, CgpuIShader* ishader, VkShaderStageFlags stageFlags)
 {
-  VkPushConstantRange pushConstRange;
-  pushConstRange.stageFlags = stageFlags;
-  pushConstRange.offset = 0;
-  pushConstRange.size = ishader->reflection.pushConstantsSize;
+  VkPushConstantRange pushConstRange = {
+    .stageFlags = stageFlags,
+    .offset = 0,
+    .size = ishader->reflection.pushConstantsSize,
+  };
 
-  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo;
-  pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipelineLayoutCreateInfo.pNext = nullptr;
-  pipelineLayoutCreateInfo.flags = 0;
-  pipelineLayoutCreateInfo.setLayoutCount = 1;
-  pipelineLayoutCreateInfo.pSetLayouts = &ipipeline->descriptorSetLayout;
-  pipelineLayoutCreateInfo.pushConstantRangeCount = pushConstRange.size ? 1 : 0;
-  pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstRange;
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .setLayoutCount = 1,
+    .pSetLayouts = &ipipeline->descriptorSetLayout,
+    .pushConstantRangeCount = pushConstRange.size ? 1u : 0u,
+    .pPushConstantRanges = &pushConstRange,
+  };
 
   return idevice->table.vkCreatePipelineLayout(idevice->logicalDevice,
                                                &pipelineLayoutCreateInfo,
@@ -1419,22 +1454,24 @@ static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice, CgpuIPipeline* i
   {
     const CgpuShaderReflectionBinding* binding_reflection = &shaderReflection->bindings[i];
 
-    VkDescriptorSetLayoutBinding layout_binding;
-    layout_binding.binding = binding_reflection->binding;
-    layout_binding.descriptorType = (VkDescriptorType) binding_reflection->descriptorType;
-    layout_binding.descriptorCount = binding_reflection->count;
-    layout_binding.stageFlags = stageFlags;
-    layout_binding.pImmutableSamplers = nullptr;
+    VkDescriptorSetLayoutBinding layoutBinding = {
+      .binding = binding_reflection->binding,
+      .descriptorType = (VkDescriptorType) binding_reflection->descriptorType,
+      .descriptorCount = binding_reflection->count,
+      .stageFlags = stageFlags,
+      .pImmutableSamplers = nullptr,
+    };
 
-    ipipeline->descriptorSetLayoutBindings.push_back(layout_binding);
+    ipipeline->descriptorSetLayoutBindings.push_back(layoutBinding);
   }
 
-  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo;
-  descriptorSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  descriptorSetLayoutCreateInfo.pNext = nullptr;
-  descriptorSetLayoutCreateInfo.flags = 0;
-  descriptorSetLayoutCreateInfo.bindingCount = ipipeline->descriptorSetLayoutBindings.size();
-  descriptorSetLayoutCreateInfo.pBindings = ipipeline->descriptorSetLayoutBindings.data();
+  VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .bindingCount = (uint32_t) ipipeline->descriptorSetLayoutBindings.size(),
+    .pBindings = ipipeline->descriptorSetLayoutBindings.data(),
+  };
 
   VkResult result = idevice->table.vkCreateDescriptorSetLayout(
     idevice->logicalDevice,
@@ -1509,13 +1546,14 @@ static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice, CgpuIPipeline* i
     poolSizeCount++;
   }
 
-  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
-  descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  descriptorPoolCreateInfo.pNext = nullptr;
-  descriptorPoolCreateInfo.flags = 0;
-  descriptorPoolCreateInfo.maxSets = 1;
-  descriptorPoolCreateInfo.poolSizeCount = poolSizeCount;
-  descriptorPoolCreateInfo.pPoolSizes = poolSizes;
+  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .maxSets = 1,
+    .poolSizeCount = poolSizeCount,
+    .pPoolSizes = poolSizes,
+  };
 
   result = idevice->table.vkCreateDescriptorPool(
     idevice->logicalDevice,
@@ -1532,12 +1570,13 @@ static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice, CgpuIPipeline* i
     CGPU_RETURN_ERROR("failed to create descriptor pool");
   }
 
-  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
-  descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  descriptorSetAllocateInfo.pNext = nullptr;
-  descriptorSetAllocateInfo.descriptorPool = ipipeline->descriptorPool;
-  descriptorSetAllocateInfo.descriptorSetCount = 1;
-  descriptorSetAllocateInfo.pSetLayouts = &ipipeline->descriptorSetLayout;
+  VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+    .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+    .pNext = nullptr,
+    .descriptorPool = ipipeline->descriptorPool,
+    .descriptorSetCount = 1,
+    .pSetLayouts = &ipipeline->descriptorSetLayout,
+  };
 
   result = idevice->table.vkAllocateDescriptorSets(
     idevice->logicalDevice,
@@ -1603,23 +1642,25 @@ bool cgpuCreateComputePipeline(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to create pipeline layout");
   }
 
-  VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = {};
-  pipelineShaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-  pipelineShaderStageCreateInfo.pNext = nullptr;
-  pipelineShaderStageCreateInfo.flags = 0;
-  pipelineShaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-  pipelineShaderStageCreateInfo.module = ishader->module;
-  pipelineShaderStageCreateInfo.pName = "main";
-  pipelineShaderStageCreateInfo.pSpecializationInfo = nullptr;
+  VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+    .module = ishader->module,
+    .pName = "main",
+    .pSpecializationInfo = nullptr,
+  };
 
-  VkComputePipelineCreateInfo pipelineCreateInfo = {};
-  pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-  pipelineCreateInfo.pNext = nullptr;
-  pipelineCreateInfo.flags = 0;
-  pipelineCreateInfo.stage = pipelineShaderStageCreateInfo;
-  pipelineCreateInfo.layout = ipipeline->layout;
-  pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE;
-  pipelineCreateInfo.basePipelineIndex = 0;
+  VkComputePipelineCreateInfo pipelineCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .stage = pipelineShaderStageCreateInfo,
+    .layout = ipipeline->layout,
+    .basePipelineHandle = VK_NULL_HANDLE,
+    .basePipelineIndex = 0,
+  };
 
   VkResult result = idevice->table.vkCreateComputePipelines(
     idevice->logicalDevice,
@@ -1657,10 +1698,11 @@ bool cgpuCreateComputePipeline(CgpuDevice device,
 
 static VkDeviceAddress cgpuGetBufferDeviceAddress(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
 {
-  VkBufferDeviceAddressInfoKHR addressInfo = {};
-  addressInfo.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
-  addressInfo.pNext = nullptr;
-  addressInfo.buffer = ibuffer->buffer;
+  VkBufferDeviceAddressInfoKHR addressInfo = {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+    .pNext = nullptr,
+    .buffer = ibuffer->buffer,
+  };
   return idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
 }
 
@@ -1770,14 +1812,15 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
   VkShaderStageFlags shaderStageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
   auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
-    VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {};
-    pipeline_shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    pipeline_shader_stage_create_info.pNext = nullptr;
-    pipeline_shader_stage_create_info.flags = 0;
-    pipeline_shader_stage_create_info.stage = stage;
-    pipeline_shader_stage_create_info.module = module;
-    pipeline_shader_stage_create_info.pName = "main";
-    pipeline_shader_stage_create_info.pSpecializationInfo = nullptr;
+    VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .stage = stage,
+      .module = module,
+      .pName = "main",
+      .pSpecializationInfo = nullptr,
+    };
     stages.push_back(pipeline_shader_stage_create_info);
   };
 
@@ -1838,15 +1881,16 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
 
   for (uint32_t i = 0; i < groups.size(); i++)
   {
-    VkRayTracingShaderGroupCreateInfoKHR createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-    createInfo.pNext = nullptr;
-    createInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-    createInfo.generalShader = i;
-    createInfo.closestHitShader = VK_SHADER_UNUSED_KHR;
-    createInfo.anyHitShader = VK_SHADER_UNUSED_KHR;
-    createInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
-    createInfo.pShaderGroupCaptureReplayHandle = nullptr;
+    VkRayTracingShaderGroupCreateInfoKHR createInfo = {
+      .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
+      .pNext = nullptr,
+      .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
+      .generalShader = i,
+      .closestHitShader = VK_SHADER_UNUSED_KHR,
+      .anyHitShader = VK_SHADER_UNUSED_KHR,
+      .intersectionShader = VK_SHADER_UNUSED_KHR,
+      .pShaderGroupCaptureReplayHandle = nullptr,
+    };
     groups[i] = createInfo;
   }
 
@@ -1906,27 +1950,28 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
       flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
     }
 
-    VkRayTracingPipelineCreateInfoKHR rt_pipeline_create_info = {};
-    rt_pipeline_create_info.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
-    rt_pipeline_create_info.pNext = nullptr;
-    rt_pipeline_create_info.flags = flags;
-    rt_pipeline_create_info.stageCount = stages.size();
-    rt_pipeline_create_info.pStages = stages.data();
-    rt_pipeline_create_info.groupCount = groups.size();
-    rt_pipeline_create_info.pGroups = groups.data();
-    rt_pipeline_create_info.maxPipelineRayRecursionDepth = 1;
-    rt_pipeline_create_info.pLibraryInfo = nullptr;
-    rt_pipeline_create_info.pLibraryInterface = nullptr;
-    rt_pipeline_create_info.pDynamicState = nullptr;
-    rt_pipeline_create_info.layout = ipipeline->layout;
-    rt_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
-    rt_pipeline_create_info.basePipelineIndex = 0;
+    VkRayTracingPipelineCreateInfoKHR rtPipelineCreateInfo = {
+      .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
+      .pNext = nullptr,
+      .flags = flags,
+      .stageCount = (uint32_t) stages.size(),
+      .pStages = stages.data(),
+      .groupCount = (uint32_t) groups.size(),
+      .pGroups = groups.data(),
+      .maxPipelineRayRecursionDepth = 1,
+      .pLibraryInfo = nullptr,
+      .pLibraryInterface = nullptr,
+      .pDynamicState = nullptr,
+      .layout = ipipeline->layout,
+      .basePipelineHandle = VK_NULL_HANDLE,
+      .basePipelineIndex = 0,
+    };
 
     if (idevice->table.vkCreateRayTracingPipelinesKHR(idevice->logicalDevice,
                                                       VK_NULL_HANDLE,
                                                       VK_NULL_HANDLE,
                                                       1,
-                                                      &rt_pipeline_create_info,
+                                                      &rtPipelineCreateInfo,
                                                       nullptr,
                                                       &ipipeline->pipeline) != VK_SUCCESS)
     {
@@ -2006,26 +2051,29 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
   cgpuResolveDevice(device, &idevice);
 
   // Get AS size
-  VkAccelerationStructureBuildGeometryInfoKHR asBuildGeomInfo = {};
-  asBuildGeomInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
-  asBuildGeomInfo.pNext = nullptr;
-  asBuildGeomInfo.type = asType;
-  asBuildGeomInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-  asBuildGeomInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-  asBuildGeomInfo.srcAccelerationStructure = VK_NULL_HANDLE;
-  asBuildGeomInfo.dstAccelerationStructure = VK_NULL_HANDLE; // set in second round
-  asBuildGeomInfo.geometryCount = 1;
-  asBuildGeomInfo.pGeometries = asGeom;
-  asBuildGeomInfo.ppGeometries = nullptr;
-  asBuildGeomInfo.scratchData.hostAddress = nullptr;
-  asBuildGeomInfo.scratchData.deviceAddress = 0; // set in second round
+  VkAccelerationStructureBuildGeometryInfoKHR asBuildGeomInfo = {
+    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR,
+    .pNext = nullptr,
+    .type = asType,
+    .flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+    .mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR,
+    .srcAccelerationStructure = VK_NULL_HANDLE,
+    .dstAccelerationStructure = VK_NULL_HANDLE, // set in second round
+    .geometryCount = 1,
+    .pGeometries = asGeom,
+    .ppGeometries = nullptr,
+    .scratchData = {
+      .deviceAddress = 0, // set in second round
+    }
+  };
 
-  VkAccelerationStructureBuildSizesInfoKHR asBuildSizesInfo = {};
-  asBuildSizesInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-  asBuildSizesInfo.pNext = nullptr;
-  asBuildSizesInfo.accelerationStructureSize = 0; // output
-  asBuildSizesInfo.updateScratchSize = 0; // output
-  asBuildSizesInfo.buildScratchSize = 0; // output
+  VkAccelerationStructureBuildSizesInfoKHR asBuildSizesInfo = {
+    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR,
+    .pNext = nullptr,
+    .accelerationStructureSize = 0, // output
+    .updateScratchSize = 0, // output
+    .buildScratchSize = 0, // output
+  };
 
   idevice->table.vkGetAccelerationStructureBuildSizesKHR(idevice->logicalDevice,
                                                          VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
@@ -2043,15 +2091,16 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to create AS buffer");
   }
 
-  VkAccelerationStructureCreateInfoKHR asCreateInfo = {};
-  asCreateInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
-  asCreateInfo.pNext = nullptr;
-  asCreateInfo.createFlags = 0;
-  asCreateInfo.buffer = iasBuffer->buffer;
-  asCreateInfo.offset = 0;
-  asCreateInfo.size = asBuildSizesInfo.accelerationStructureSize;
-  asCreateInfo.type = asType;
-  asCreateInfo.deviceAddress = 0; // used for capture-replay feature
+  VkAccelerationStructureCreateInfoKHR asCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR,
+    .pNext = nullptr,
+    .createFlags = 0,
+    .buffer = iasBuffer->buffer,
+    .offset = 0,
+    .size = asBuildSizesInfo.accelerationStructureSize,
+    .type = asType,
+    .deviceAddress = 0, // used for capture-replay feature
+  };
 
   if (idevice->table.vkCreateAccelerationStructureKHR(idevice->logicalDevice, &asCreateInfo, nullptr, as) != VK_SUCCESS)
   {
@@ -2077,13 +2126,14 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
   asBuildGeomInfo.scratchData.hostAddress = 0;
   asBuildGeomInfo.scratchData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &iscratchBuffer);
 
-  VkAccelerationStructureBuildRangeInfoKHR asBuildRangeInfo = {};
-  asBuildRangeInfo.primitiveCount = primitiveCount;
-  asBuildRangeInfo.primitiveOffset = 0;
-  asBuildRangeInfo.firstVertex = 0;
-  asBuildRangeInfo.transformOffset = 0;
+  VkAccelerationStructureBuildRangeInfoKHR asBuildRangeInfo = {
+    .primitiveCount = primitiveCount,
+    .primitiveOffset = 0,
+    .firstVertex = 0,
+    .transformOffset = 0,
+  };
 
-  const VkAccelerationStructureBuildRangeInfoKHR* as_build_range_info_ptr = &asBuildRangeInfo;
+  const VkAccelerationStructureBuildRangeInfoKHR* asBuildRangeInfoPtr = &asBuildRangeInfo;
 
   CgpuCommandBuffer commandBuffer;
   if (!cgpuCreateCommandBuffer(device, &commandBuffer))
@@ -2099,7 +2149,7 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
 
   // Build AS on device
   cgpuBeginCommandBuffer(commandBuffer);
-  idevice->table.vkCmdBuildAccelerationStructuresKHR(icommandBuffer->commandBuffer, 1, &asBuildGeomInfo, &as_build_range_info_ptr);
+  idevice->table.vkCmdBuildAccelerationStructuresKHR(icommandBuffer->commandBuffer, 1, &asBuildGeomInfo, &asBuildRangeInfoPtr);
   cgpuEndCommandBuffer(commandBuffer);
 
   CgpuFence fence;
@@ -2195,29 +2245,35 @@ bool cgpuCreateBlas(CgpuDevice device,
   }
 
   // Create BLAS
-  VkAccelerationStructureGeometryTrianglesDataKHR asTriangleData = {};
-  asTriangleData.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-  asTriangleData.pNext = nullptr;
-  asTriangleData.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-  asTriangleData.vertexData.hostAddress = nullptr;
-  asTriangleData.vertexData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &vertexBuffer);
-  asTriangleData.vertexStride = sizeof(CgpuVertex);
-  asTriangleData.maxVertex = vertexCount;
-  asTriangleData.indexType = VK_INDEX_TYPE_UINT32;
-  asTriangleData.indexData.hostAddress = nullptr;
-  asTriangleData.indexData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &indexBuffer);
-  asTriangleData.transformData.hostAddress = nullptr;
-  asTriangleData.transformData.deviceAddress = 0; // optional
+  VkAccelerationStructureGeometryTrianglesDataKHR asTriangleData = {
+    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
+    .pNext = nullptr,
+    .vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
+    .vertexData = {
+      .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &vertexBuffer),
+    },
+    .vertexStride = sizeof(CgpuVertex),
+    .maxVertex = vertexCount,
+    .indexType = VK_INDEX_TYPE_UINT32,
+    .indexData = {
+      .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &indexBuffer),
+    },
+    .transformData = {
+      .deviceAddress = 0, // optional
+    },
+  };
 
-  VkAccelerationStructureGeometryDataKHR asGeomData = {};
-  asGeomData.triangles = asTriangleData;
+  VkAccelerationStructureGeometryDataKHR asGeomData = {
+    .triangles = asTriangleData,
+  };
 
-  VkAccelerationStructureGeometryKHR asGeom = {};
-  asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  asGeom.pNext = nullptr;
-  asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-  asGeom.geometry = asGeomData;
-  asGeom.flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0;
+  VkAccelerationStructureGeometryKHR asGeom = {
+    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+    .pNext = nullptr,
+    .geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
+    .geometry = asGeomData,
+    .flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
+  };
 
   uint32_t triangleCount = indexCount / 3;
   bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, triangleCount, &iblas->buffer, &iblas->as);
@@ -2230,10 +2286,11 @@ bool cgpuCreateBlas(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to build BLAS");
   }
 
-  VkAccelerationStructureDeviceAddressInfoKHR asAddressInfo = {};
-  asAddressInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-  asAddressInfo.pNext = nullptr;
-  asAddressInfo.accelerationStructure = iblas->as;
+  VkAccelerationStructureDeviceAddressInfoKHR asAddressInfo = {
+    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
+    .pNext = nullptr,
+    .accelerationStructure = iblas->as,
+  };
   iblas->address = idevice->table.vkGetAccelerationStructureDeviceAddressKHR(idevice->logicalDevice, &asAddressInfo);
 
   iblas->isOpaque = isOpaque;
@@ -2300,16 +2357,22 @@ bool cgpuCreateTlas(CgpuDevice device,
   }
 
   // Create TLAS
-  VkAccelerationStructureGeometryKHR asGeom = {};
-  asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  asGeom.pNext = nullptr;
-  asGeom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-  asGeom.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-  asGeom.geometry.instances.pNext = nullptr;
-  asGeom.geometry.instances.arrayOfPointers = VK_FALSE;
-  asGeom.geometry.instances.data.hostAddress = nullptr;
-  asGeom.geometry.instances.data.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &itlas->instances);
-  asGeom.flags = areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0;
+  VkAccelerationStructureGeometryKHR asGeom = {
+    .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
+    .pNext = nullptr,
+    .geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
+    .geometry = {
+      .instances = {
+        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
+        .pNext = nullptr,
+        .arrayOfPointers = VK_FALSE,
+        .data = {
+          .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &itlas->instances),
+        }
+      },
+    },
+    .flags = areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
+  };
 
   if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, instanceCount, &itlas->buffer, &itlas->as))
   {
@@ -2372,12 +2435,13 @@ bool cgpuCreateCommandBuffer(CgpuDevice device, CgpuCommandBuffer* commandBuffer
   }
   icommandBuffer->device.handle = device.handle;
 
-  VkCommandBufferAllocateInfo cmdbufAllocInfo = {};
-  cmdbufAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmdbufAllocInfo.pNext = nullptr;
-  cmdbufAllocInfo.commandPool = idevice->commandPool;
-  cmdbufAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cmdbufAllocInfo.commandBufferCount = 1;
+  VkCommandBufferAllocateInfo cmdbufAllocInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .pNext = nullptr,
+    .commandPool = idevice->commandPool,
+    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1,
+  };
 
   VkResult result = idevice->table.vkAllocateCommandBuffers(
     idevice->logicalDevice,
@@ -2425,11 +2489,12 @@ bool cgpuBeginCommandBuffer(CgpuCommandBuffer commandBuffer)
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkCommandBufferBeginInfo beginInfo = {};
-  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  beginInfo.pNext = nullptr;
-  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-  beginInfo.pInheritanceInfo = nullptr;
+  VkCommandBufferBeginInfo beginInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    .pNext = nullptr,
+    .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+    .pInheritanceInfo = nullptr,
+  };
 
   VkResult result = idevice->table.vkBeginCommandBuffer(
     icommandBuffer->commandBuffer,
@@ -2635,17 +2700,18 @@ bool cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
   {
     const VkDescriptorSetLayoutBinding* layoutBinding = &ipipeline->descriptorSetLayoutBindings[i];
 
-    VkWriteDescriptorSet writeDescriptorSet = {};
-    writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writeDescriptorSet.pNext = nullptr;
-    writeDescriptorSet.dstSet = ipipeline->descriptorSet;
-    writeDescriptorSet.dstBinding = layoutBinding->binding;
-    writeDescriptorSet.dstArrayElement = 0;
-    writeDescriptorSet.descriptorCount = layoutBinding->descriptorCount;
-    writeDescriptorSet.descriptorType = layoutBinding->descriptorType;
-    writeDescriptorSet.pTexelBufferView = nullptr;
-    writeDescriptorSet.pBufferInfo = nullptr;
-    writeDescriptorSet.pImageInfo = nullptr;
+    VkWriteDescriptorSet writeDescriptorSet = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .pNext = nullptr,
+      .dstSet = ipipeline->descriptorSet,
+      .dstBinding = layoutBinding->binding,
+      .dstArrayElement = 0,
+      .descriptorCount = layoutBinding->descriptorCount,
+      .descriptorType = layoutBinding->descriptorType,
+      .pImageInfo = nullptr,
+      .pBufferInfo = nullptr,
+      .pTexelBufferView = nullptr,
+    };
 
     for (uint32_t j = 0; j < layoutBinding->descriptorCount; j++)
     {
@@ -2672,10 +2738,11 @@ bool cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
             CGPU_RETURN_ERROR("buffer binding offset not aligned");
           }
 
-          VkDescriptorBufferInfo bufferInfo = {};
-          bufferInfo.buffer = ibuffer->buffer;
-          bufferInfo.offset = bufferBinding->offset;
-          bufferInfo.range = (bufferBinding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - bufferBinding->offset) : bufferBinding->size;
+          VkDescriptorBufferInfo bufferInfo = {
+            .buffer = ibuffer->buffer,
+            .offset = bufferBinding->offset,
+            .range = (bufferBinding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - bufferBinding->offset) : bufferBinding->size,
+          };
           bufferInfos.push_back(bufferInfo);
 
           if (j == 0)
@@ -2705,10 +2772,11 @@ bool cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          VkDescriptorImageInfo imageInfo = {};
-          imageInfo.sampler = VK_NULL_HANDLE;
-          imageInfo.imageView = iimage->imageView;
-          imageInfo.imageLayout = iimage->layout;
+          VkDescriptorImageInfo imageInfo = {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = iimage->imageView,
+            .imageLayout = iimage->layout,
+          };
           imageInfos.push_back(imageInfo);
 
           if (j == 0)
@@ -2737,10 +2805,11 @@ bool cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          VkDescriptorImageInfo imageInfo = {};
-          imageInfo.sampler = isampler->sampler;
-          imageInfo.imageView = VK_NULL_HANDLE;
-          imageInfo.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+          VkDescriptorImageInfo imageInfo = {
+            .sampler = isampler->sampler,
+            .imageView = VK_NULL_HANDLE,
+            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+          };
           imageInfos.push_back(imageInfo);
 
           if (j == 0)
@@ -2769,11 +2838,12 @@ bool cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
             CGPU_RETURN_ERROR_INVALID_HANDLE;
           }
 
-          VkWriteDescriptorSetAccelerationStructureKHR asInfo = {};
-          asInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-          asInfo.pNext = nullptr;
-          asInfo.accelerationStructureCount = 1;
-          asInfo.pAccelerationStructures = &itlas->as;
+          VkWriteDescriptorSetAccelerationStructureKHR asInfo = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+            .pNext = nullptr,
+            .accelerationStructureCount = 1,
+            .pAccelerationStructures = &itlas->as,
+          };
           asInfos.push_back(asInfo);
 
           if (j == 0)
@@ -2797,7 +2867,7 @@ bool cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
 
   idevice->table.vkUpdateDescriptorSets(
     idevice->logicalDevice,
-    writeDescriptorSets.size(),
+    (uint32_t) writeDescriptorSets.size(),
     writeDescriptorSets.data(),
     0,
     nullptr
@@ -2860,10 +2930,11 @@ bool cgpuCmdCopyBuffer(CgpuCommandBuffer commandBuffer,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkBufferCopy region;
-  region.srcOffset = srcOffset;
-  region.dstOffset = dstOffset;
-  region.size = (size == CGPU_WHOLE_SIZE) ? isrcBuffer->size : size;
+  VkBufferCopy region = {
+    .srcOffset = srcOffset,
+    .dstOffset = dstOffset,
+    .size = (size == CGPU_WHOLE_SIZE) ? isrcBuffer->size : size,
+  };
 
   idevice->table.vkCmdCopyBuffer(
     icommandBuffer->commandBuffer,
@@ -2944,29 +3015,33 @@ bool cgpuCmdCopyBufferToImage(CgpuCommandBuffer commandBuffer,
     iimage->accessMask = accessMask;
   }
 
-  VkImageSubresourceLayers layers;
-  layers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  layers.mipLevel = 0;
-  layers.baseArrayLayer = 0;
-  layers.layerCount = 1;
+  VkImageSubresourceLayers layers = {
+    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+    .mipLevel = 0,
+    .baseArrayLayer = 0,
+    .layerCount = 1,
+  };
 
-  VkOffset3D offset;
-  offset.x = desc->texelOffsetX;
-  offset.y = desc->texelOffsetY;
-  offset.z = desc->texelOffsetZ;
+  VkOffset3D offset = {
+    .x = desc->texelOffsetX,
+    .y = desc->texelOffsetY,
+    .z = desc->texelOffsetZ,
+  };
 
-  VkExtent3D extent;
-  extent.width = desc->texelExtentX;
-  extent.height = desc->texelExtentY;
-  extent.depth = desc->texelExtentZ;
+  VkExtent3D extent = {
+    .width = desc->texelExtentX,
+    .height = desc->texelExtentY,
+    .depth = desc->texelExtentZ,
+  };
 
-  VkBufferImageCopy region;
-  region.bufferOffset = desc->bufferOffset;
-  region.bufferRowLength = 0;
-  region.bufferImageHeight = 0;
-  region.imageSubresource = layers;
-  region.imageOffset = offset;
-  region.imageExtent = extent;
+  VkBufferImageCopy region = {
+    .bufferOffset = desc->bufferOffset,
+    .bufferRowLength = 0,
+    .bufferImageHeight = 0,
+    .imageSubresource = layers,
+    .imageOffset = offset,
+    .imageExtent = extent,
+  };
 
   idevice->table.vkCmdCopyBufferToImage(
     icommandBuffer->commandBuffer,
@@ -3283,10 +3358,11 @@ bool cgpuCreateFence(CgpuDevice device, CgpuFence* fence)
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkFenceCreateInfo createInfo;
-  createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  createInfo.pNext = nullptr;
-  createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+  VkFenceCreateInfo createInfo = {
+    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+  };
 
   VkResult result = idevice->table.vkCreateFence(
     idevice->logicalDevice,

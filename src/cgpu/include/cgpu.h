@@ -681,9 +681,9 @@ bool cgpuCmdCopyBuffer(
 struct CgpuBufferImageCopyDesc
 {
   uint64_t bufferOffset = 0;
-  uint32_t texelOffsetX = 0;
-  uint32_t texelOffsetY = 0;
-  uint32_t texelOffsetZ = 0;
+  int32_t texelOffsetX = 0;
+  int32_t texelOffsetY = 0;
+  int32_t texelOffsetZ = 0;
   uint32_t texelExtentX;
   uint32_t texelExtentY;
   uint32_t texelExtentZ;
