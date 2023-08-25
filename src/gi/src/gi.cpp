@@ -871,7 +871,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
 
-          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_CLOSEST_HIT, &closestHitShader))
+          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT, &closestHitShader))
           {
             goto cleanup;
           }
@@ -884,7 +884,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
 
-          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_FLAG_ANY_HIT, &anyHitShader))
           {
             goto cleanup;
           }
@@ -906,7 +906,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
 
-          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_ANY_HIT, &anyHitShader))
+          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_FLAG_ANY_HIT, &anyHitShader))
           {
             goto cleanup;
           }
@@ -944,7 +944,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       goto cleanup;
     }
 
-    if (!cgpuCreateShader(s_device, rgenSpirv.size(), rgenSpirv.data(), CGPU_SHADER_STAGE_RAYGEN, &rgenShader))
+    if (!cgpuCreateShader(s_device, rgenSpirv.size(), rgenSpirv.data(), CGPU_SHADER_STAGE_FLAG_RAYGEN, &rgenShader))
     {
       goto cleanup;
     }
@@ -970,7 +970,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       }
 
       CgpuShader missShader;
-      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_FLAG_MISS, &missShader))
       {
         goto cleanup;
       }
@@ -987,7 +987,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       }
 
       CgpuShader missShader;
-      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_MISS, &missShader))
+      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_FLAG_MISS, &missShader))
       {
         goto cleanup;
       }
@@ -1241,9 +1241,9 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   // Trace rays.
   {
-    CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_RAYGEN | CGPU_SHADER_STAGE_MISS;
-    pushShaderStages |= shader_cache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_CLOSEST_HIT : 0;
-    pushShaderStages |= shader_cache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_ANY_HIT : 0;
+    CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_FLAG_RAYGEN | CGPU_SHADER_STAGE_FLAG_MISS;
+    pushShaderStages |= shader_cache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT : 0;
+    pushShaderStages |= shader_cache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_FLAG_ANY_HIT : 0;
 
     if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, pushShaderStages, sizeof(pushData), &pushData))
       goto cleanup;
@@ -1254,13 +1254,19 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   // Copy output buffer to staging buffer.
   {
-    CgpuBufferMemoryBarrier barrier = {
+    CgpuBufferMemoryBarrier bufferBarrier = {
       .buffer = s_outputBuffer,
-      .srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-      .dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ
+      .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
+      .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+      .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
+      .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ
+    };
+    CgpuPipelineBarrier barrier = {
+      .bufferBarrierCount = 1,
+      .bufferBarriers = &bufferBarrier
     };
 
-    if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
+    if (!cgpuCmdPipelineBarrier(command_buffer, &barrier))
       goto cleanup;
   }
 
@@ -1268,13 +1274,19 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     goto cleanup;
 
   {
-    CgpuBufferMemoryBarrier barrier = {
+    CgpuBufferMemoryBarrier bufferBarrier = {
       .buffer = s_outputBuffer,
-      .srcAccessFlags = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-      .dstAccessFlags = CGPU_MEMORY_ACCESS_FLAG_HOST_READ,
+      .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
+      .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
+      .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
+      .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_HOST_READ
+    };
+    CgpuPipelineBarrier barrier = {
+      .bufferBarrierCount = 1,
+      .bufferBarriers = &bufferBarrier
     };
 
-    if (!cgpuCmdPipelineBarrier(command_buffer, 0, nullptr, 1, &barrier, 0, nullptr))
+    if (!cgpuCmdPipelineBarrier(command_buffer, &barrier))
       goto cleanup;
   }
 

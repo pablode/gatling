@@ -234,15 +234,17 @@ typedef uint32_t CgpuMemoryAccessFlags;
 
 enum CgpuMemoryAccessFlagBits
 {
-  CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ   = 0x00000008,
-  CGPU_MEMORY_ACCESS_FLAG_SHADER_READ    = 0x00000020,
-  CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE   = 0x00000040,
-  CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ  = 0x00000800,
-  CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE = 0x00001000,
-  CGPU_MEMORY_ACCESS_FLAG_HOST_READ      = 0x00002000,
-  CGPU_MEMORY_ACCESS_FLAG_HOST_WRITE     = 0x00004000,
-  CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ    = 0x00008000,
-  CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE   = 0x00010000
+  CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ                 = 0x00000008,
+  CGPU_MEMORY_ACCESS_FLAG_SHADER_READ                  = 0x00000020,
+  CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE                 = 0x00000040,
+  CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ                = 0x00000800,
+  CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE               = 0x00001000,
+  CGPU_MEMORY_ACCESS_FLAG_HOST_READ                    = 0x00002000,
+  CGPU_MEMORY_ACCESS_FLAG_HOST_WRITE                   = 0x00004000,
+  CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ                  = 0x00008000,
+  CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE                 = 0x00010000,
+  CGPU_MEMORY_ACCESS_FLAG_ACCELERATION_STRUCTURE_READ  = 0x00200000,
+  CGPU_MEMORY_ACCESS_FLAG_ACCELERATION_STRUCTURE_WRITE = 0x00400000,
 };
 
 enum CgpuSamplerAddressMode
@@ -257,11 +259,22 @@ typedef uint32_t CgpuShaderStageFlags;
 
 enum CgpuShaderStageFlagBits
 {
-  CGPU_SHADER_STAGE_COMPUTE     = 0x00000020,
-  CGPU_SHADER_STAGE_RAYGEN      = 0x00000100,
-  CGPU_SHADER_STAGE_ANY_HIT     = 0x00000200,
-  CGPU_SHADER_STAGE_CLOSEST_HIT = 0x00000400,
-  CGPU_SHADER_STAGE_MISS        = 0x00000800
+  CGPU_SHADER_STAGE_FLAG_COMPUTE     = 0x00000020,
+  CGPU_SHADER_STAGE_FLAG_RAYGEN      = 0x00000100,
+  CGPU_SHADER_STAGE_FLAG_ANY_HIT     = 0x00000200,
+  CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT = 0x00000400,
+  CGPU_SHADER_STAGE_FLAG_MISS        = 0x00000800
+};
+
+typedef uint32_t CgpuPipelineStageFlags;
+
+enum CgpuPipelineStageFlagBits
+{
+  CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER               = 0x00000800,
+  CGPU_PIPELINE_STAGE_FLAG_TRANSFER                     = 0x00001000,
+  CGPU_PIPELINE_STAGE_FLAG_HOST                         = 0x00004000,
+  CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER           = 0x00200000,
+  CGPU_PIPELINE_STAGE_FLAG_ACCELERATION_STRUCTURE_BUILD = 0x02000000,
 };
 
 struct CgpuInstance      { uint64_t handle = 0; };
@@ -331,15 +344,19 @@ struct CgpuBindings
 
 struct CgpuMemoryBarrier
 {
-  CgpuMemoryAccessFlags srcAccessFlags;
-  CgpuMemoryAccessFlags dstAccessFlags;
+  CgpuPipelineStageFlags srcStageMask;
+  CgpuMemoryAccessFlags srcAccessMask;
+  CgpuPipelineStageFlags dstStageMask;
+  CgpuMemoryAccessFlags dstAccessMask;
 };
 
 struct CgpuBufferMemoryBarrier
 {
   CgpuBuffer buffer;
-  CgpuMemoryAccessFlags srcAccessFlags;
-  CgpuMemoryAccessFlags dstAccessFlags;
+  CgpuPipelineStageFlags srcStageMask;
+  CgpuMemoryAccessFlags srcAccessMask;
+  CgpuPipelineStageFlags dstStageMask;
+  CgpuMemoryAccessFlags dstAccessMask;
   uint64_t offset = 0;
   uint64_t size = CGPU_WHOLE_SIZE;
 };
@@ -347,7 +364,19 @@ struct CgpuBufferMemoryBarrier
 struct CgpuImageMemoryBarrier
 {
   CgpuImage image;
+  CgpuPipelineStageFlags srcStageMask;
+  CgpuPipelineStageFlags dstStageMask;
   CgpuMemoryAccessFlags accessMask;
+};
+
+struct CgpuPipelineBarrier
+{
+  uint32_t memoryBarrierCount = 0;
+  const CgpuMemoryBarrier* memoryBarriers = nullptr;
+  uint32_t bufferBarrierCount = 0;
+  const CgpuBufferMemoryBarrier* bufferBarriers = nullptr;
+  uint32_t imageBarrierCount = 0;
+  const CgpuImageMemoryBarrier* imageBarriers = nullptr;
 };
 
 struct CgpuPhysicalDeviceFeatures
@@ -684,12 +713,7 @@ bool cgpuCmdDispatch(
 
 bool cgpuCmdPipelineBarrier(
   CgpuCommandBuffer commandBuffer,
-  uint32_t barrierCount = 0,
-  const CgpuMemoryBarrier* barriers = nullptr,
-  uint32_t bufferBarrierCount = 0,
-  const CgpuBufferMemoryBarrier* bufferBarriers = nullptr,
-  uint32_t imageBarrierCount = 0,
-  const CgpuImageMemoryBarrier* imageBarriers = nullptr
+  const CgpuPipelineBarrier* barrier
 );
 
 bool cgpuCmdResetTimestamps(

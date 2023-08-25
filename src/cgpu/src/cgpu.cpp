@@ -67,15 +67,15 @@ struct CgpuIBuffer
 
 struct CgpuIImage
 {
-  VkImage       image;
-  VkImageView   imageView;
-  VmaAllocation allocation;
-  uint64_t      size;
-  uint32_t      width;
-  uint32_t      height;
-  uint32_t      depth;
-  VkImageLayout layout;
-  VkAccessFlags accessMask;
+  VkImage           image;
+  VkImageView       imageView;
+  VmaAllocation     allocation;
+  uint64_t          size;
+  uint32_t          width;
+  uint32_t          height;
+  uint32_t          depth;
+  VkImageLayout     layout;
+  VkAccessFlags2KHR accessMask;
 };
 
 struct CgpuIPipeline
@@ -307,23 +307,25 @@ static VkSamplerAddressMode cgpuTranslateAddressMode(CgpuSamplerAddressMode mode
   }
 }
 
-static VkPipelineStageFlags cgpuPipelineStageFlagsFromShaderStageFlags(VkShaderStageFlags shaderStageFlags)
+static VkPipelineStageFlags2KHR cgpuPipelineStageFlagsFromShaderStageFlags(VkShaderStageFlags shaderStageFlags)
 {
-  VkPipelineStageFlags pipelineStageFlags = (VkPipelineStageFlags) 0;
+  VkPipelineStageFlags2KHR pipelineStageFlags = VK_PIPELINE_STAGE_2_NONE_KHR;
+
   if (shaderStageFlags & VK_SHADER_STAGE_COMPUTE_BIT)
   {
-    pipelineStageFlags |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    pipelineStageFlags |= VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR;
   }
+
   if ((shaderStageFlags & VK_SHADER_STAGE_RAYGEN_BIT_KHR) |
       (shaderStageFlags & VK_SHADER_STAGE_ANY_HIT_BIT_KHR) |
       (shaderStageFlags & VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR) |
       (shaderStageFlags & VK_SHADER_STAGE_MISS_BIT_KHR) |
       (shaderStageFlags & VK_SHADER_STAGE_INTERSECTION_BIT_KHR))
   {
-    pipelineStageFlags |= VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+    pipelineStageFlags |= VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR;
   }
 
-  assert(int(pipelineStageFlags) != 0);
+  assert(pipelineStageFlags != VK_PIPELINE_STAGE_2_NONE_KHR);
   return pipelineStageFlags;
 }
 
@@ -501,7 +503,7 @@ bool cgpuCreateDevice(CgpuDevice* device)
   GbSmallVector<VkExtensionProperties, 1024> extensions(extensionCount);
   vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
-  const char* requiredExtensions[] = {
+  GbSmallVector<const char*, 16> requiredExtensions = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -509,12 +511,12 @@ bool cgpuCreateDevice(CgpuDevice* device)
     VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
     VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
     VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME, // required by VK_KHR_spirv_1_4
-    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME
+    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
+    VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
   };
-  uint32_t requiredExtensionCount = sizeof(requiredExtensions) / sizeof(requiredExtensions[0]);
 
   GbSmallVector<const char*, 32> enabledExtensions;
-  for (uint32_t i = 0; i < requiredExtensionCount; i++)
+  for (uint32_t i = 0; i < requiredExtensions.size(); i++)
   {
     const char* extension = requiredExtensions[i];
 
@@ -628,9 +630,15 @@ bool cgpuCreateDevice(CgpuDevice* device)
     pNext = &invocationReorderFeatures;
   }
 
+  VkPhysicalDeviceSynchronization2FeaturesKHR synchronization2Features = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR,
+    .pNext = pNext,
+    .synchronization2 = VK_TRUE
+  };
+
   VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures = {};
   accelerationStructureFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
-  accelerationStructureFeatures.pNext = pNext;
+  accelerationStructureFeatures.pNext = &synchronization2Features;
   accelerationStructureFeatures.accelerationStructure = VK_TRUE;
   accelerationStructureFeatures.accelerationStructureCaptureReplay = VK_FALSE;
   accelerationStructureFeatures.accelerationStructureIndirectBuild = VK_FALSE;
@@ -2485,7 +2493,7 @@ bool cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  GbSmallVector<VkImageMemoryBarrier, 64> barriers;
+  GbSmallVector<VkImageMemoryBarrier2KHR, 64> barriers;
 
   /* FIXME: this has quadratic complexity */
   const CgpuShaderReflection* reflection = &ishader->reflection;
@@ -2496,7 +2504,7 @@ bool cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
     VkImageLayout newLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     if (binding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
     {
-      newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      newLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL_KHR;
     }
     else if (binding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
     {
@@ -2536,29 +2544,36 @@ bool cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
         continue;
       }
 
-      VkAccessFlags accessMask = 0;
+      VkAccessFlags2KHR accessMask = VK_ACCESS_2_NONE_KHR;
       if (binding->readAccess) {
-        accessMask = VK_ACCESS_SHADER_READ_BIT;
+        accessMask = VK_ACCESS_2_SHADER_READ_BIT_KHR;
       }
       if (binding->writeAccess) {
-        accessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        accessMask = VK_ACCESS_2_SHADER_WRITE_BIT_KHR;
       }
 
-      VkImageMemoryBarrier barrier = {};
-      barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      barrier.pNext = nullptr;
-      barrier.srcAccessMask = iimage->accessMask;
-      barrier.dstAccessMask = accessMask;
-      barrier.oldLayout = oldLayout;
-      barrier.newLayout = newLayout;
-      barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.image = iimage->image;
-      barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      barrier.subresourceRange.baseMipLevel = 0;
-      barrier.subresourceRange.levelCount = 1;
-      barrier.subresourceRange.baseArrayLayer = 0;
-      barrier.subresourceRange.layerCount = 1;
+      VkImageSubresourceRange range = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1
+      };
+
+      VkImageMemoryBarrier2KHR barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2_KHR,
+        .pNext = nullptr,
+        .srcStageMask = cgpuPipelineStageFlagsFromShaderStageFlags(ishader->stageFlags),
+        .srcAccessMask = iimage->accessMask,
+        .dstStageMask = cgpuPipelineStageFlagsFromShaderStageFlags(ishader->stageFlags),
+        .dstAccessMask = accessMask,
+        .oldLayout = oldLayout,
+        .newLayout = newLayout,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = iimage->image,
+        .subresourceRange = range
+      };
       barriers.push_back(barrier);
 
       iimage->accessMask = accessMask;
@@ -2568,20 +2583,19 @@ bool cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
 
   if (barriers.size() > 0)
   {
-    VkPipelineStageFlags stageFlags = cgpuPipelineStageFlagsFromShaderStageFlags(ishader->stageFlags);
+    VkDependencyInfoKHR dependencyInfo = {
+      .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR,
+      .pNext = nullptr,
+      .dependencyFlags = 0,
+      .memoryBarrierCount = 0,
+      .pMemoryBarriers = nullptr,
+      .bufferMemoryBarrierCount = 0,
+      .pBufferMemoryBarriers = nullptr,
+      .imageMemoryBarrierCount = (uint32_t) barriers.size(),
+      .pImageMemoryBarriers = barriers.data()
+    };
 
-    idevice->table.vkCmdPipelineBarrier(
-      icommandBuffer->commandBuffer,
-      stageFlags,
-      stageFlags,
-      0,
-      0,
-      nullptr,
-      0,
-      nullptr,
-      barriers.size(),
-      barriers.data()
-    );
+    idevice->table.vkCmdPipelineBarrier2KHR(icommandBuffer->commandBuffer, &dependencyInfo);
   }
 
   return true;
@@ -2885,38 +2899,45 @@ bool cgpuCmdCopyBufferToImage(CgpuCommandBuffer commandBuffer,
 
   if (iimage->layout != VK_IMAGE_LAYOUT_GENERAL)
   {
-    VkAccessFlags accessMask = iimage->accessMask | VK_ACCESS_MEMORY_WRITE_BIT;
+    VkAccessFlags2KHR accessMask = iimage->accessMask | VK_ACCESS_2_MEMORY_WRITE_BIT_KHR;
     VkImageLayout layout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.pNext = nullptr;
-    barrier.srcAccessMask = iimage->accessMask;
-    barrier.dstAccessMask = accessMask;
-    barrier.oldLayout = iimage->layout;
-    barrier.newLayout = layout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = iimage->image;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
+    VkImageSubresourceRange range = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1
+    };
 
-    idevice->table.vkCmdPipelineBarrier(
-      icommandBuffer->commandBuffer,
-      // FIXME: batch this barrier and reduce pipeline flags scope
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-      0,
-      0,
-      nullptr,
-      0,
-      nullptr,
-      1,
-      &barrier
-    );
+    VkImageMemoryBarrier2KHR barrier = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2_KHR,
+      .pNext = nullptr,
+      .srcStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR | VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR | VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR, // FIXME
+      .srcAccessMask = iimage->accessMask,
+      .dstStageMask = VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR | VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR | VK_PIPELINE_STAGE_2_RAY_TRACING_SHADER_BIT_KHR, // FIXME
+      .dstAccessMask = accessMask,
+      .oldLayout = iimage->layout,
+      .newLayout = layout,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = iimage->image,
+      .subresourceRange = range
+    };
+
+    VkDependencyInfoKHR dependencyInfo = {
+      .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR,
+      .pNext = nullptr,
+      .dependencyFlags = 0,
+      .memoryBarrierCount = 0,
+      .pMemoryBarriers = nullptr,
+      .bufferMemoryBarrierCount = 0,
+      .pBufferMemoryBarriers = nullptr,
+      .imageMemoryBarrierCount = 1,
+      .pImageMemoryBarriers = &barrier
+    };
+
+    idevice->table.vkCmdPipelineBarrier2KHR(icommandBuffer->commandBuffer, &dependencyInfo);
 
     iimage->layout = layout;
     iimage->accessMask = accessMask;
@@ -3012,12 +3033,7 @@ bool cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
 }
 
 bool cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
-                            uint32_t barrierCount,
-                            const CgpuMemoryBarrier* barriers,
-                            uint32_t bufferBarrierCount,
-                            const CgpuBufferMemoryBarrier* bufferBarriers,
-                            uint32_t imageBarrierCount,
-                            const CgpuImageMemoryBarrier* imageBarriers)
+                            const CgpuPipelineBarrier* barrier)
 {
   CgpuICommandBuffer* icommandBuffer;
   if (!cgpuResolveCommandBuffer(commandBuffer, &icommandBuffer)) {
@@ -3028,89 +3044,101 @@ bool cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  GbSmallVector<VkMemoryBarrier, 128> vkMemBarriers;
+  GbSmallVector<VkMemoryBarrier2KHR, 128> vkMemBarriers;
 
-  for (uint32_t i = 0; i < barrierCount; ++i)
+  for (uint32_t i = 0; i < barrier->memoryBarrierCount; ++i)
   {
-    const CgpuMemoryBarrier* bCgpu = &barriers[i];
+    const CgpuMemoryBarrier* bCgpu = &barrier->memoryBarriers[i];
 
-    VkMemoryBarrier bVk = {};
-    bVk.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-    bVk.pNext = nullptr;
-    bVk.srcAccessMask = (VkAccessFlags) bCgpu->srcAccessFlags;
-    bVk.dstAccessMask = (VkAccessFlags) bCgpu->dstAccessFlags;
+    VkMemoryBarrier2KHR bVk = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR,
+      .pNext = nullptr,
+      .srcStageMask = (VkPipelineStageFlagBits2KHR) bCgpu->srcStageMask,
+      .srcAccessMask = (VkAccessFlags2KHR) bCgpu->srcAccessMask,
+      .dstStageMask = (VkPipelineStageFlagBits2KHR) bCgpu->dstStageMask,
+      .dstAccessMask = (VkAccessFlags2KHR) bCgpu->dstAccessMask
+    };
     vkMemBarriers.push_back(bVk);
   }
 
-  GbSmallVector<VkBufferMemoryBarrier, 32> vkBufferMemBarriers;
-  GbSmallVector<VkImageMemoryBarrier, 128> vkImageMemBarriers;
+  GbSmallVector<VkBufferMemoryBarrier2KHR, 32> vkBufferMemBarriers;
+  GbSmallVector<VkImageMemoryBarrier2KHR, 128> vkImageMemBarriers;
 
-  for (uint32_t i = 0; i < bufferBarrierCount; ++i)
+  for (uint32_t i = 0; i < barrier->bufferBarrierCount; ++i)
   {
-    const CgpuBufferMemoryBarrier* bCgpu = &bufferBarriers[i];
+    const CgpuBufferMemoryBarrier* bCgpu = &barrier->bufferBarriers[i];
 
     CgpuIBuffer* ibuffer;
     if (!cgpuResolveBuffer(bCgpu->buffer, &ibuffer)) {
       CGPU_RETURN_ERROR_INVALID_HANDLE;
     }
 
-    VkBufferMemoryBarrier bVk = {};
-    bVk.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    bVk.pNext = nullptr;
-    bVk.srcAccessMask = (VkAccessFlags) bCgpu->srcAccessFlags;
-    bVk.dstAccessMask = (VkAccessFlags) bCgpu->dstAccessFlags;
-    bVk.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    bVk.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    bVk.buffer = ibuffer->buffer;
-    bVk.offset = bCgpu->offset;
-    bVk.size = (bCgpu->size == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : bCgpu->size;
+    VkBufferMemoryBarrier2KHR bVk = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2_KHR,
+      .pNext = nullptr,
+      .srcStageMask = (VkPipelineStageFlagBits2KHR) bCgpu->srcStageMask,
+      .srcAccessMask = (VkAccessFlags2KHR) bCgpu->srcAccessMask,
+      .dstStageMask = (VkPipelineStageFlagBits2KHR) bCgpu->dstStageMask,
+      .dstAccessMask = (VkAccessFlags2KHR) bCgpu->dstAccessMask,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .buffer = ibuffer->buffer,
+      .offset = bCgpu->offset,
+      .size = (bCgpu->size == CGPU_WHOLE_SIZE) ? VK_WHOLE_SIZE : bCgpu->size
+    };
     vkBufferMemBarriers.push_back(bVk);
   }
 
-  for (uint32_t i = 0; i < imageBarrierCount; ++i)
+  for (uint32_t i = 0; i < barrier->imageBarrierCount; ++i)
   {
-    const CgpuImageMemoryBarrier* bCgpu = &imageBarriers[i];
+    const CgpuImageMemoryBarrier* bCgpu = &barrier->imageBarriers[i];
 
     CgpuIImage* iimage;
     if (!cgpuResolveImage(bCgpu->image, &iimage)) {
       CGPU_RETURN_ERROR_INVALID_HANDLE;
     }
 
-    VkAccessFlags accessMask = (VkAccessFlags) bCgpu->accessMask;
+    VkAccessFlags2KHR accessMask = (VkAccessFlags2KHR) bCgpu->accessMask;
 
-    VkImageMemoryBarrier bVk = {};
-    bVk.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    bVk.pNext = nullptr;
-    bVk.srcAccessMask = iimage->accessMask;
-    bVk.dstAccessMask = accessMask;
-    bVk.oldLayout = iimage->layout;
-    bVk.newLayout = iimage->layout;
-    bVk.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    bVk.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    bVk.image = iimage->image;
-    bVk.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    bVk.subresourceRange.baseMipLevel = 0;
-    bVk.subresourceRange.levelCount = 1;
-    bVk.subresourceRange.baseArrayLayer = 0;
-    bVk.subresourceRange.layerCount = 1;
+    VkImageSubresourceRange range = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1
+    };
+    VkImageMemoryBarrier2KHR bVk = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2_KHR,
+      .pNext = nullptr,
+      .srcStageMask = (VkPipelineStageFlagBits2KHR) bCgpu->srcStageMask,
+      .srcAccessMask = iimage->accessMask,
+      .dstStageMask = (VkPipelineStageFlagBits2KHR) bCgpu->dstStageMask,
+      .dstAccessMask = accessMask,
+      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .newLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = iimage->image,
+      .subresourceRange = range
+    };
     vkImageMemBarriers.push_back(bVk);
 
     iimage->accessMask = accessMask;
   }
 
-  idevice->table.vkCmdPipelineBarrier(
-    icommandBuffer->commandBuffer,
-    // FIXME: expose flags in desc struct
-    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_HOST_BIT,
-    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_HOST_BIT,
-    0,
-    vkMemBarriers.size(),
-    vkMemBarriers.data(),
-    vkBufferMemBarriers.size(),
-    vkBufferMemBarriers.data(),
-    vkImageMemBarriers.size(),
-    vkImageMemBarriers.data()
-  );
+  VkDependencyInfoKHR dependencyInfo = {
+    .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO_KHR,
+    .pNext = nullptr,
+    .dependencyFlags = 0,
+    .memoryBarrierCount = (uint32_t) vkMemBarriers.size(),
+    .pMemoryBarriers = vkMemBarriers.data(),
+    .bufferMemoryBarrierCount = (uint32_t)vkBufferMemBarriers.size(),
+    .pBufferMemoryBarriers = vkBufferMemBarriers.data(),
+    .imageMemoryBarrierCount = (uint32_t) vkImageMemBarriers.size(),
+    .pImageMemoryBarriers = vkImageMemBarriers.data()
+  };
+
+  idevice->table.vkCmdPipelineBarrier2KHR(icommandBuffer->commandBuffer, &dependencyInfo);
 
   return true;
 }
@@ -3150,10 +3178,10 @@ bool cgpuCmdWriteTimestamp(CgpuCommandBuffer commandBuffer,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  idevice->table.vkCmdWriteTimestamp(
+  idevice->table.vkCmdWriteTimestamp2KHR(
     icommandBuffer->commandBuffer,
     // FIXME: use correct pipeline flag bits
-    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+    VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR,
     idevice->timestamp_pool,
     timestampIndex
   );
@@ -3353,18 +3381,25 @@ bool cgpuSubmitCommandBuffer(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkSubmitInfo submitInfo;
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.pNext = nullptr;
-  submitInfo.waitSemaphoreCount = 0;
-  submitInfo.pWaitSemaphores = nullptr;
-  submitInfo.pWaitDstStageMask = nullptr;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &icommandBuffer->commandBuffer;
-  submitInfo.signalSemaphoreCount = 0;
-  submitInfo.pSignalSemaphores = nullptr;
+  VkCommandBufferSubmitInfo commandBufferSubmitInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
+    .pNext = nullptr,
+    .commandBuffer = icommandBuffer->commandBuffer,
+    .deviceMask = 0
+  };
 
-  VkResult result = idevice->table.vkQueueSubmit(
+  VkSubmitInfo2KHR submitInfo = {
+    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
+    .pNext = nullptr,
+    .waitSemaphoreInfoCount = 0,
+    .pWaitSemaphoreInfos = nullptr,
+    .commandBufferInfoCount = 1,
+    .pCommandBufferInfos = &commandBufferSubmitInfo,
+    .signalSemaphoreInfoCount = 0,
+    .pSignalSemaphoreInfos = nullptr
+  };
+
+  VkResult result = idevice->table.vkQueueSubmit2KHR(
     idevice->computeQueue,
     1,
     &submitInfo,
