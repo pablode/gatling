@@ -49,7 +49,7 @@ namespace gtl
     {
       bufferCreated = cgpuCreateBuffer(m_device,
                                        CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                                       CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+                                       CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
                                        BUFFER_SIZE,
                                        &m_stagingBuffer);
     }
