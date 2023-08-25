@@ -116,8 +116,6 @@ struct CgpuIBlas
   VkAccelerationStructureKHR as;
   uint64_t address;
   CgpuIBuffer buffer;
-  CgpuIBuffer indices;
-  CgpuIBuffer vertices;
   bool isOpaque;
 };
 
@@ -2150,48 +2148,50 @@ bool cgpuCreateBlas(CgpuDevice device,
   }
 
   // Create index buffer & copy data into it
+  CgpuIBuffer indexBuffer;
   uint64_t indexBufferSize = indexCount * sizeof(uint32_t);
   if (!cgpuCreateIBufferAligned(idevice,
                                 CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                                 CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
                                 indexBufferSize, 0,
-                                &iblas->indices))
+                                &indexBuffer))
   {
     CGPU_RETURN_ERROR("failed to create BLAS index buffer");
   }
 
   {
     void* mappedMem;
-    if (vmaMapMemory(idevice->allocator, iblas->indices.allocation, (void**) &mappedMem) != VK_SUCCESS) {
-      cgpuDestroyIBuffer(idevice, &iblas->indices);
+    if (vmaMapMemory(idevice->allocator, indexBuffer.allocation, (void**) &mappedMem) != VK_SUCCESS) {
+      cgpuDestroyIBuffer(idevice, &indexBuffer);
       CGPU_RETURN_ERROR("failed to map buffer memory");
     }
     memcpy(mappedMem, indices, indexBufferSize);
-    vmaUnmapMemory(idevice->allocator, iblas->indices.allocation);
+    vmaUnmapMemory(idevice->allocator, indexBuffer.allocation);
   }
 
   // Create vertex buffer & copy data into it
+  CgpuIBuffer vertexBuffer;
   uint64_t vertexBufferSize = vertexCount * sizeof(CgpuVertex);
   if (!cgpuCreateIBufferAligned(idevice,
                                 CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                                 CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
                                 vertexBufferSize, 0,
-                                &iblas->vertices))
+                                &vertexBuffer))
   {
-    cgpuDestroyIBuffer(idevice, &iblas->indices);
+    cgpuDestroyIBuffer(idevice, &indexBuffer);
     CGPU_RETURN_ERROR("failed to create BLAS vertex buffer");
   }
 
   {
     void* mappedMem;
-    if (vmaMapMemory(idevice->allocator, iblas->vertices.allocation, (void**)&mappedMem) != VK_SUCCESS)
+    if (vmaMapMemory(idevice->allocator, vertexBuffer.allocation, (void**)&mappedMem) != VK_SUCCESS)
     {
-      cgpuDestroyIBuffer(idevice, &iblas->indices);
-      cgpuDestroyIBuffer(idevice, &iblas->vertices);
+      cgpuDestroyIBuffer(idevice, &indexBuffer);
+      cgpuDestroyIBuffer(idevice, &vertexBuffer);
       CGPU_RETURN_ERROR("failed to map buffer memory");
     }
     memcpy(mappedMem, vertices, vertexBufferSize);
-    vmaUnmapMemory(idevice->allocator, iblas->vertices.allocation);
+    vmaUnmapMemory(idevice->allocator, vertexBuffer.allocation);
   }
 
   // Create BLAS
@@ -2200,12 +2200,12 @@ bool cgpuCreateBlas(CgpuDevice device,
   asTriangleData.pNext = nullptr;
   asTriangleData.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
   asTriangleData.vertexData.hostAddress = nullptr;
-  asTriangleData.vertexData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &iblas->vertices);
+  asTriangleData.vertexData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &vertexBuffer);
   asTriangleData.vertexStride = sizeof(CgpuVertex);
   asTriangleData.maxVertex = vertexCount;
   asTriangleData.indexType = VK_INDEX_TYPE_UINT32;
   asTriangleData.indexData.hostAddress = nullptr;
-  asTriangleData.indexData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &iblas->indices);
+  asTriangleData.indexData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &indexBuffer);
   asTriangleData.transformData.hostAddress = nullptr;
   asTriangleData.transformData.deviceAddress = 0; // optional
 
@@ -2220,10 +2220,13 @@ bool cgpuCreateBlas(CgpuDevice device,
   asGeom.flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0;
 
   uint32_t triangleCount = indexCount / 3;
-  if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, triangleCount, &iblas->buffer, &iblas->as))
+  bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, triangleCount, &iblas->buffer, &iblas->as);
+
+  cgpuDestroyIBuffer(idevice, &indexBuffer);
+  cgpuDestroyIBuffer(idevice, &vertexBuffer);
+
+  if (!creationSuccessul)
   {
-    cgpuDestroyIBuffer(idevice, &iblas->indices);
-    cgpuDestroyIBuffer(idevice, &iblas->vertices);
     CGPU_RETURN_ERROR("failed to build BLAS");
   }
 
@@ -2330,8 +2333,6 @@ bool cgpuDestroyBlas(CgpuDevice device, CgpuBlas blas)
 
   idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, iblas->as, nullptr);
   cgpuDestroyIBuffer(idevice, &iblas->buffer);
-  cgpuDestroyIBuffer(idevice, &iblas->indices);
-  cgpuDestroyIBuffer(idevice, &iblas->vertices);
 
   iinstance->iblasStore.free(blas.handle);
   return true;
