@@ -2174,10 +2174,10 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
 
 
 bool cgpuCreateBlas(CgpuDevice device,
-                    uint32_t vertexCount,
-                    const CgpuVertex* vertices,
-                    uint32_t indexCount,
-                    const uint32_t* indices,
+                    CgpuBuffer vertexBuffer,
+                    CgpuBuffer indexBuffer,
+                    uint32_t maxVertex,
+                    uint32_t triangleCount,
                     bool isOpaque,
                     CgpuBlas* blas)
 {
@@ -2192,71 +2192,27 @@ bool cgpuCreateBlas(CgpuDevice device,
   if (!cgpuResolveBlas(*blas, &iblas)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-
-  if ((indexCount % 3) != 0) {
-    CGPU_RETURN_ERROR("BLAS indices do not represent triangles");
+  CgpuIBuffer* ivertexBuffer;
+  if (!cgpuResolveBuffer(vertexBuffer, &ivertexBuffer)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  CgpuIBuffer* iindexBuffer;
+  if (!cgpuResolveBuffer(indexBuffer, &iindexBuffer)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  // Create index buffer & copy data into it
-  CgpuIBuffer indexBuffer;
-  uint64_t indexBufferSize = indexCount * sizeof(uint32_t);
-  if (!cgpuCreateIBufferAligned(idevice,
-                                CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                                CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                                indexBufferSize, 0,
-                                &indexBuffer))
-  {
-    CGPU_RETURN_ERROR("failed to create BLAS index buffer");
-  }
-
-  {
-    void* mappedMem;
-    if (vmaMapMemory(idevice->allocator, indexBuffer.allocation, (void**) &mappedMem) != VK_SUCCESS) {
-      cgpuDestroyIBuffer(idevice, &indexBuffer);
-      CGPU_RETURN_ERROR("failed to map buffer memory");
-    }
-    memcpy(mappedMem, indices, indexBufferSize);
-    vmaUnmapMemory(idevice->allocator, indexBuffer.allocation);
-  }
-
-  // Create vertex buffer & copy data into it
-  CgpuIBuffer vertexBuffer;
-  uint64_t vertexBufferSize = vertexCount * sizeof(CgpuVertex);
-  if (!cgpuCreateIBufferAligned(idevice,
-                                CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                                CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                                vertexBufferSize, 0,
-                                &vertexBuffer))
-  {
-    cgpuDestroyIBuffer(idevice, &indexBuffer);
-    CGPU_RETURN_ERROR("failed to create BLAS vertex buffer");
-  }
-
-  {
-    void* mappedMem;
-    if (vmaMapMemory(idevice->allocator, vertexBuffer.allocation, (void**)&mappedMem) != VK_SUCCESS)
-    {
-      cgpuDestroyIBuffer(idevice, &indexBuffer);
-      cgpuDestroyIBuffer(idevice, &vertexBuffer);
-      CGPU_RETURN_ERROR("failed to map buffer memory");
-    }
-    memcpy(mappedMem, vertices, vertexBufferSize);
-    vmaUnmapMemory(idevice->allocator, vertexBuffer.allocation);
-  }
-
-  // Create BLAS
   VkAccelerationStructureGeometryTrianglesDataKHR asTriangleData = {
     .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
     .pNext = nullptr,
     .vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
     .vertexData = {
-      .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &vertexBuffer),
+      .deviceAddress = cgpuGetBufferDeviceAddress(idevice, ivertexBuffer),
     },
     .vertexStride = sizeof(CgpuVertex),
-    .maxVertex = vertexCount,
+    .maxVertex = maxVertex,
     .indexType = VK_INDEX_TYPE_UINT32,
     .indexData = {
-      .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &indexBuffer),
+      .deviceAddress = cgpuGetBufferDeviceAddress(idevice, iindexBuffer),
     },
     .transformData = {
       .deviceAddress = 0, // optional
@@ -2275,11 +2231,7 @@ bool cgpuCreateBlas(CgpuDevice device,
     .flags = isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
   };
 
-  uint32_t triangleCount = indexCount / 3;
   bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, triangleCount, &iblas->buffer, &iblas->as);
-
-  cgpuDestroyIBuffer(idevice, &indexBuffer);
-  cgpuDestroyIBuffer(idevice, &vertexBuffer);
 
   if (!creationSuccessul)
   {

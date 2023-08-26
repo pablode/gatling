@@ -609,10 +609,10 @@ bool cgpuDestroyPipeline(
 
 bool cgpuCreateBlas(
   CgpuDevice device,
-  uint32_t vertexCount,
-  const CgpuVertex* vertices,
-  uint32_t indexCount,
-  const uint32_t* indices,
+  CgpuBuffer vertexBuffer,
+  CgpuBuffer indexBuffer,
+  uint32_t maxVertex,
+  uint32_t triangleCount,
   bool isOpaque,
   CgpuBlas* blas
 );

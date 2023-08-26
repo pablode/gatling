@@ -407,6 +407,23 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
     // Build mesh BLAS if it doesn't exist yet.
     if (protoBlasInstances.count(mesh) == 0)
     {
+      // Find material for SBT index (FIXME: find a better solution)
+      uint32_t materialIndex = UINT32_MAX;
+      GiShaderCache* shaderCache = params->shaderCache;
+      for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
+      {
+        if (shaderCache->materials[i] == mesh->material)
+        {
+          materialIndex = i;
+          break;
+        }
+      }
+      if (materialIndex == UINT32_MAX)
+      {
+        fprintf(stderr, "invalid BLAS material\n");
+        continue;
+      }
+
       uint32_t faceIndexOffset = allFaces.size();
       uint32_t vertexIndexOffset = allVertices.size();
 
@@ -463,33 +480,66 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         });
       }
 
+      if ((indices.size() % 3) != 0)
+      {
+        fprintf(stderr, "BLAS indices do not represent triangles\n");
+        continue;
+      }
+      uint32_t triangleCount = indices.size() / 3;
+
+      // Buffer upload
+      CgpuBuffer indexBuffer;
+      CgpuBuffer vertexBuffer;
+
+      uint64_t indexBufferSize = indices.size() * sizeof(uint32_t);
+      uint64_t vertexBufferSize = vertices.size() * sizeof(CgpuVertex);
+
+      if (!cgpuCreateBuffer(s_device,
+                            CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                            indexBufferSize,
+                            &indexBuffer))
+      {
+        fprintf(stderr, "failed to allocate BLAS indices memory\n");
+        continue;
+      }
+      if (!cgpuCreateBuffer(s_device,
+                            CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                            vertexBufferSize,
+                            &vertexBuffer))
+      {
+        cgpuDestroyBuffer(s_device, vertexBuffer);
+        fprintf(stderr, "failed to allocate BLAS vertex memory\n");
+        continue;
+      }
+
+      void* mappedMem;
+      cgpuMapBuffer(s_device, indexBuffer, &mappedMem);
+      memcpy(mappedMem, indices.data(), indexBufferSize);
+      cgpuUnmapBuffer(s_device, indexBuffer);
+
+      cgpuMapBuffer(s_device, vertexBuffer, &mappedMem);
+      memcpy(mappedMem, vertices.data(), vertexBufferSize);
+      cgpuUnmapBuffer(s_device, vertexBuffer);
+
       // BLAS
       bool isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sgMat);
+      uint32_t maxVertex = vertices.size();
 
       CgpuBlas blas;
-      if (!cgpuCreateBlas(s_device, (uint32_t)vertices.size(), vertices.data(),
-                          (uint32_t)indices.size(), indices.data(), isOpaque, &blas))
+      bool blasCreated = cgpuCreateBlas(s_device, vertexBuffer, indexBuffer, maxVertex, triangleCount, isOpaque, &blas);
+
+      cgpuDestroyBuffer(s_device, indexBuffer);
+      cgpuDestroyBuffer(s_device, vertexBuffer);
+
+      if (!blasCreated)
       {
-        goto fail_cleanup;
+        fprintf(stderr, "failed to allocate BLAS vertex memory");
+        continue;
       }
 
       blases.push_back(blas);
-
-      // FIXME: find a better solution
-      uint32_t materialIndex = UINT32_MAX;
-      GiShaderCache* shader_cache = params->shaderCache;
-      for (uint32_t i = 0; i < shader_cache->materials.size(); i++)
-      {
-        if (shader_cache->materials[i] == mesh->material)
-        {
-          materialIndex = i;
-          break;
-        }
-      }
-      if (materialIndex == UINT32_MAX)
-      {
-        goto fail_cleanup;
-      }
 
       ProtoBlasInstance proto;
       proto.blas = blas;
