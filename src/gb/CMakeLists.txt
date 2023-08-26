@@ -15,3 +15,6 @@ target_include_directories(
   PRIVATE
     src
 )
+
+# Required since library is linked into hdGatling DSO
+set_target_properties(gb PROPERTIES POSITION_INDEPENDENT_CODE ON)
