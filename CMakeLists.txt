@@ -31,9 +31,6 @@ endif()
 find_package(MDL REQUIRED)
 find_package(OpenMP)
 
-include(CheckIPOSupported)
-check_ipo_supported(RESULT ENABLE_IPO)
-
 include(CheckLibraryExists)
 check_library_exists(m exp2f "" C_MATH_LIBRARY_EXISTS)
 if(C_MATH_LIBRARY_EXISTS)

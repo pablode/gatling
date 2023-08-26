@@ -74,10 +74,6 @@ endif()
 # Required since library is linked into hdGatling DSO
 set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-if(ENABLE_IPO)
-  set_target_properties(gi PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()
-
 install(
   FILES ${MDL_SHARED_LIB}
   DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"

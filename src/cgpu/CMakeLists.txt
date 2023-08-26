@@ -29,7 +29,3 @@ set_target_properties(
     # Required since library is linked into hdGatling DSO
     POSITION_INDEPENDENT_CODE ON
 )
-
-if(ENABLE_IPO)
-  set_target_properties(cgpu PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()

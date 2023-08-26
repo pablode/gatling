@@ -15,7 +15,3 @@ target_include_directories(
   PRIVATE
     src
 )
-
-if(ENABLE_IPO)
-  set_target_properties(gb PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-endif()
