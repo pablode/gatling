@@ -39,19 +39,20 @@ namespace gtl
 
   bool GgpuStager::allocate()
   {
-    bool bufferCreated = cgpuCreateBuffer(m_device,
-                                          CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                                          CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE,
-                                          BUFFER_SIZE,
-                                          &m_stagingBuffer);
+    CgpuBufferCreateInfo createInfo = {
+      .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE,
+      .size = BUFFER_SIZE,
+      .debugName = "Staging"
+    };
+
+    bool bufferCreated = cgpuCreateBuffer(m_device, &createInfo, &m_stagingBuffer);
 
     if (!bufferCreated)
     {
-      bufferCreated = cgpuCreateBuffer(m_device,
-                                       CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                                       CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                                       BUFFER_SIZE,
-                                       &m_stagingBuffer);
+      createInfo.memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
+
+      bufferCreated = cgpuCreateBuffer(m_device, &createInfo, &m_stagingBuffer);
     }
 
     if (!bufferCreated)

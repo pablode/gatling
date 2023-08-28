@@ -93,12 +93,13 @@ namespace gi
     printf("image read from path %s of size %.2fMiB\n",
       filePath, imageData.size * BYTES_TO_MIB);
 
-    CgpuImageDesc imageDesc = {
+    CgpuImageCreateInfo createInfo = {
       .width = imageData.width,
       .height = imageData.height,
-      .is3d = is3dImage
+      .is3d = is3dImage,
+      .debugName = filePath
     };
-    bool creationSuccessful = cgpuCreateImage(m_device, &imageDesc, &image) &&
+    bool creationSuccessful = cgpuCreateImage(m_device, &createInfo, &image) &&
                               m_stager.stageToImage(imageData.data, imageData.size, image, imageData.width, imageData.height, 1);
 
     imgio_free_img(&imageData);
@@ -144,12 +145,12 @@ namespace gi
       auto& textureResource = textureResources[i];
       auto& payload = textureResource.data;
 
-      CgpuImageDesc imageDesc;
-      imageDesc.is3d = textureResource.is3dImage;
-      imageDesc.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-      imageDesc.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
+      CgpuImageCreateInfo createInfo;
+      createInfo.is3d = textureResource.is3dImage;
+      createInfo.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+      createInfo.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
-      auto& imageVector = imageDesc.is3d ? images3d : images2d;
+      auto& imageVector = createInfo.is3d ? images3d : images2d;
 
       int binding = textureResource.binding;
 
@@ -165,14 +166,14 @@ namespace gi
 
         printf("image %d has binary payload of %.2fMiB\n", i, payloadSize * BYTES_TO_MIB);
 
-        imageDesc.width = textureResource.width;
-        imageDesc.height = textureResource.height;
-        imageDesc.depth = textureResource.depth;
+        createInfo.width = textureResource.width;
+        createInfo.height = textureResource.height;
+        createInfo.depth = textureResource.depth;
 
-        if (!cgpuCreateImage(m_device, &imageDesc, &image))
+        if (!cgpuCreateImage(m_device, &createInfo, &image))
           return false;
 
-        result = m_stager.stageToImage(payload.data(), payloadSize, image, imageDesc.width, imageDesc.height, imageDesc.depth);
+        result = m_stager.stageToImage(payload.data(), payloadSize, image, createInfo.width, createInfo.height, createInfo.depth);
         if (!result) return false;
 
         imageVector.push_back(image);
@@ -186,11 +187,11 @@ namespace gi
       }
 
       fprintf(stderr, "failed to read image %d from path %s\n", i, filePath);
-      imageDesc.width = 1;
-      imageDesc.height = 1;
-      imageDesc.depth = 1;
+      createInfo.width = 1;
+      createInfo.height = 1;
+      createInfo.depth = 1;
 
-      if (!cgpuCreateImage(m_device, &imageDesc, &image))
+      if (!cgpuCreateImage(m_device, &createInfo, &image))
         return false;
 
       uint8_t black[4] = { 0, 0, 0, 0 };

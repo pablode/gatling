@@ -70,8 +70,16 @@ namespace gtl
     CgpuBuffer buffer;
     CgpuFence fence;
 
-    if (!cgpuCreateBuffer(m_device, m_usageFlags, m_memoryProperties, newSize, &buffer))
-      goto cleanup;
+    {
+      CgpuBufferCreateInfo createInfo = {
+        .usage = m_usageFlags,
+        .memoryProperties = m_memoryProperties,
+        .size = newSize,
+      };
+
+      if (!cgpuCreateBuffer(m_device, &createInfo, &buffer))
+        goto cleanup;
+    }
 
     // Copy old buffer data if needed.
     if (m_size > 0)

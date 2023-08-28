@@ -289,7 +289,7 @@ struct CgpuSampler       { uint64_t handle = 0; };
 struct CgpuBlas          { uint64_t handle = 0; };
 struct CgpuTlas          { uint64_t handle = 0; };
 
-struct CgpuImageDesc
+struct CgpuImageCreateInfo
 {
   uint32_t width;
   uint32_t height;
@@ -298,6 +298,85 @@ struct CgpuImageDesc
   CgpuImageFormat format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
   CgpuImageUsageFlags usage = CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST |
                               CGPU_IMAGE_USAGE_FLAG_SAMPLED;
+  const char* debugName = nullptr;
+};
+
+struct CgpuBufferCreateInfo
+{
+  CgpuBufferUsageFlags usage;
+  CgpuMemoryPropertyFlags memoryProperties;
+  uint64_t size;
+  const char* debugName = nullptr;
+};
+
+struct CgpuShaderCreateInfo
+{
+  uint64_t size;
+  const uint8_t* source;
+  CgpuShaderStageFlags stageFlags;
+  const char* debugName = nullptr;
+};
+
+struct CgpuSamplerCreateInfo
+{
+  CgpuSamplerAddressMode addressModeU;
+  CgpuSamplerAddressMode addressModeV;
+  CgpuSamplerAddressMode addressModeW;
+};
+
+struct CgpuComputePipelineCreateInfo
+{
+  CgpuShader shader;
+  const char* debugName = nullptr;
+};
+
+// TODO: replace with buffer offset & stride
+struct CgpuVertex
+{
+  float x;
+  float y;
+  float z;
+};
+
+struct CgpuBlasInstance
+{
+  CgpuBlas as;
+  uint32_t faceIndexOffset;
+  uint32_t hitGroupIndex;
+  float transform[3][4];
+};
+
+struct CgpuRtHitGroup
+{
+  CgpuShader closestHitShader; // optional
+  CgpuShader anyHitShader;     // optional
+};
+
+struct CgpuRtPipelineCreateInfo
+{
+  CgpuShader rgenShader;
+  uint32_t missShaderCount = 0;
+  CgpuShader* missShaders = nullptr;
+  uint32_t hitGroupCount = 0;
+  const CgpuRtHitGroup* hitGroups = nullptr;
+  const char* debugName = nullptr;
+};
+
+struct CgpuBlasCreateInfo
+{
+  CgpuBuffer vertexBuffer;
+  CgpuBuffer indexBuffer;
+  uint32_t maxVertex;
+  uint32_t triangleCount;
+  bool isOpaque;
+  const char* debugName = nullptr;
+};
+
+struct CgpuTlasCreateInfo
+{
+  uint32_t instanceCount;
+  const CgpuBlasInstance* instances;
+  const char* debugName = nullptr;
 };
 
 struct CgpuBufferBinding
@@ -470,28 +549,6 @@ struct CgpuPhysicalDeviceProperties
   uint32_t maxRayHitAttributeSize;
 };
 
-// TODO: replace with buffer offset & stride
-struct CgpuVertex
-{
-  float x;
-  float y;
-  float z;
-};
-
-struct CgpuBlasInstance
-{
-  CgpuBlas as;
-  uint32_t faceIndexOffset;
-  uint32_t hitGroupIndex;
-  float transform[3][4];
-};
-
-struct CgpuRtHitGroup
-{
-  CgpuShader closestHitShader; // optional
-  CgpuShader anyHitShader;     // optional
-};
-
 bool cgpuInitialize(
   const char* appName,
   uint32_t versionMajor,
@@ -511,9 +568,7 @@ bool cgpuDestroyDevice(
 
 bool cgpuCreateShader(
   CgpuDevice device,
-  uint64_t size,
-  const uint8_t* source,
-  CgpuShaderStageFlags stageFlags,
+  const CgpuShaderCreateInfo* createInfo,
   CgpuShader* shader
 );
 
@@ -524,9 +579,7 @@ bool cgpuDestroyShader(
 
 bool cgpuCreateBuffer(
   CgpuDevice device,
-  CgpuBufferUsageFlags usage,
-  CgpuMemoryPropertyFlags memoryProperties,
-  uint64_t size,
+  const CgpuBufferCreateInfo* createInfo,
   CgpuBuffer* buffer
 );
 
@@ -548,7 +601,7 @@ bool cgpuUnmapBuffer(
 
 bool cgpuCreateImage(
   CgpuDevice device,
-  const CgpuImageDesc* imageDesc,
+  const CgpuImageCreateInfo* createInfo,
   CgpuImage* image
 );
 
@@ -570,9 +623,7 @@ bool cgpuUnmapImage(
 
 bool cgpuCreateSampler(
   CgpuDevice device,
-  CgpuSamplerAddressMode addressModeU,
-  CgpuSamplerAddressMode addressModeV,
-  CgpuSamplerAddressMode addressModeW,
+  const CgpuSamplerCreateInfo* createInfo,
   CgpuSampler* sampler
 );
 
@@ -583,22 +634,13 @@ bool cgpuDestroySampler(
 
 bool cgpuCreateComputePipeline(
   CgpuDevice device,
-  CgpuShader shader,
+  const CgpuComputePipelineCreateInfo* createInfo,
   CgpuPipeline* pipeline
 );
 
-struct CgpuRtPipelineDesc
-{
-  CgpuShader rgenShader;
-  uint32_t missShaderCount = 0;
-  CgpuShader* missShaders = nullptr;
-  uint32_t hitGroupCount = 0;
-  const CgpuRtHitGroup* hitGroups = nullptr;
-};
-
 bool cgpuCreateRtPipeline(
   CgpuDevice device,
-  const CgpuRtPipelineDesc* desc,
+  const CgpuRtPipelineCreateInfo* createInfo,
   CgpuPipeline* pipeline
 );
 
@@ -609,18 +651,13 @@ bool cgpuDestroyPipeline(
 
 bool cgpuCreateBlas(
   CgpuDevice device,
-  CgpuBuffer vertexBuffer,
-  CgpuBuffer indexBuffer,
-  uint32_t maxVertex,
-  uint32_t triangleCount,
-  bool isOpaque,
+  const CgpuBlasCreateInfo* createInfo,
   CgpuBlas* blas
 );
 
 bool cgpuCreateTlas(
   CgpuDevice device,
-  uint32_t instanceCount,
-  const CgpuBlasInstance* instances,
+  const CgpuTlasCreateInfo* createInfo,
   CgpuTlas* tlas
 );
 

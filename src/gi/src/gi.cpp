@@ -192,22 +192,32 @@ bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
     return true;
   }
 
-  if (!cgpuCreateBuffer(s_device,
-                        CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                        CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                        bufferSize,
-                        &s_outputBuffer))
   {
-    return false;
+    CgpuBufferCreateInfo createInfo = {
+      .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+      .size = bufferSize,
+      .debugName = "Output"
+    };
+
+    if (!cgpuCreateBuffer(s_device, &createInfo, &s_outputBuffer))
+    {
+      return false;
+    }
   }
 
-  if (!cgpuCreateBuffer(s_device,
-                        CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                        CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                        bufferSize,
-                        &s_outputStagingBuffer))
   {
-    return false;
+    CgpuBufferCreateInfo createInfo = {
+      .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+      .size = bufferSize,
+      .debugName = "OutputStaging"
+    };
+
+    if (!cgpuCreateBuffer(s_device, &createInfo, &s_outputStagingBuffer))
+    {
+      return false;
+    }
   }
 
   return true;
@@ -227,13 +237,17 @@ GiStatus giInitialize(const GiInitParams* params)
   if (!cgpuGetPhysicalDeviceProperties(s_device, &s_deviceProperties))
     return GI_ERROR;
 
-  if (!cgpuCreateSampler(s_device,
-                           CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-                           CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-                           CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-                           &s_texSampler))
   {
-    return GI_ERROR;
+    CgpuSamplerCreateInfo createInfo = {
+      .addressModeU = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+      .addressModeV = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+      .addressModeW = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+    };
+
+    if (!cgpuCreateSampler(s_device, &createInfo , &s_texSampler))
+    {
+      return GI_ERROR;
+    }
   }
 
   s_stager = std::make_unique<gtl::GgpuStager>(s_device);
@@ -485,7 +499,6 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         fprintf(stderr, "BLAS indices do not represent triangles\n");
         continue;
       }
-      uint32_t triangleCount = indices.size() / 3;
 
       // Buffer upload
       CgpuBuffer indexBuffer;
@@ -494,23 +507,30 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       uint64_t indexBufferSize = indices.size() * sizeof(uint32_t);
       uint64_t vertexBufferSize = vertices.size() * sizeof(CgpuVertex);
 
-      if (!cgpuCreateBuffer(s_device,
-                            CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                            indexBufferSize,
-                            &indexBuffer))
+      CgpuBufferCreateInfo iboCreateInfo = {
+        .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+        .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+        .size = indexBufferSize,
+        .debugName = "BlasIndices"
+      };
+
+      if (!cgpuCreateBuffer(s_device, &iboCreateInfo, &indexBuffer))
       {
         fprintf(stderr, "failed to allocate BLAS indices memory\n");
         continue;
       }
-      if (!cgpuCreateBuffer(s_device,
-                            CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                            CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                            vertexBufferSize,
-                            &vertexBuffer))
+
+      CgpuBufferCreateInfo vboCreateInfo = {
+        .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+        .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+        .size = vertexBufferSize,
+        .debugName = "BlasVertices"
+      };
+
+      if (!cgpuCreateBuffer(s_device, &vboCreateInfo, &vertexBuffer))
       {
         cgpuDestroyBuffer(s_device, vertexBuffer);
-        fprintf(stderr, "failed to allocate BLAS vertex memory\n");
+        fprintf(stderr, "failed to allocate BLAS vertices memory\n");
         continue;
       }
 
@@ -524,11 +544,16 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       cgpuUnmapBuffer(s_device, vertexBuffer);
 
       // BLAS
-      bool isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sgMat);
-      uint32_t maxVertex = vertices.size();
+      CgpuBlasCreateInfo blasCreateInfo = {
+        .vertexBuffer = vertexBuffer,
+        .indexBuffer = indexBuffer,
+        .maxVertex = (uint32_t) vertices.size(),
+        .triangleCount = (uint32_t) indices.size() / 3,
+        .isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sgMat)
+      };
 
       CgpuBlas blas;
-      bool blasCreated = cgpuCreateBlas(s_device, vertexBuffer, indexBuffer, maxVertex, triangleCount, isOpaque, &blas);
+      bool blasCreated = cgpuCreateBlas(s_device, &blasCreateInfo, &blas);
 
       cgpuDestroyBuffer(s_device, indexBuffer);
       cgpuDestroyBuffer(s_device, vertexBuffer);
@@ -585,38 +610,49 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   CgpuBuffer buffer;
   CgpuTlas tlas;
   std::vector<CgpuBlas> blases;
-  std::vector<CgpuBlasInstance> blas_instances;
+  std::vector<CgpuBlasInstance> blasInstances;
   std::vector<Rp::FVertex> allVertices;
   std::vector<Rp::Face> allFaces;
 
-  if (!_giBuildGeometryStructures(params, blases, blas_instances, allVertices, allFaces))
+  if (!_giBuildGeometryStructures(params, blases, blasInstances, allVertices, allFaces))
     goto cleanup;
 
-  if (!cgpuCreateTlas(s_device, blas_instances.size(), blas_instances.data(), &tlas))
-    goto cleanup;
+  {
+    CgpuTlasCreateInfo tlasCreateInfo = {
+      .instanceCount = (uint32_t) blasInstances.size(),
+      .instances = blasInstances.data()
+    };
 
-  // Upload vertex & index buffers to single GPU buffer.
+    if (!cgpuCreateTlas(s_device, &tlasCreateInfo, &tlas))
+      goto cleanup;
+  }
+
+  // Upload attribute buffer to GPU.
   GiGpuBufferView faceBufferView;
   GiGpuBufferView vertexBufferView;
   {
-    uint64_t buf_size = 0;
+    uint64_t attributeBufferSize = 0;
     const uint64_t offset_align = s_deviceProperties.minStorageBufferOffsetAlignment;
 
     faceBufferView.size = allFaces.size() * sizeof(Rp::Face);
     vertexBufferView.size = allVertices.size() * sizeof(Rp::FVertex);
 
-    faceBufferView.offset = giAlignBuffer(offset_align, faceBufferView.size, &buf_size);
-    vertexBufferView.offset = giAlignBuffer(offset_align, vertexBufferView.size, &buf_size);
+    faceBufferView.offset = giAlignBuffer(offset_align, faceBufferView.size, &attributeBufferSize);
+    vertexBufferView.offset = giAlignBuffer(offset_align, vertexBufferView.size, &attributeBufferSize);
 
-    printf("total geom buffer size: %.2fMiB\n", buf_size * BYTES_TO_MIB);
+    printf("total attribute buffer size: %.2fMiB\n", attributeBufferSize * BYTES_TO_MIB);
     printf("> %.2fMiB faces\n", faceBufferView.size * BYTES_TO_MIB);
     printf("> %.2fMiB vertices\n", vertexBufferView.size * BYTES_TO_MIB);
     fflush(stdout);
 
-    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-    CgpuMemoryPropertyFlags bufferMemProps = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
+    CgpuBufferCreateInfo createInfo = {
+      .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+      .size = attributeBufferSize,
+      .debugName = "AsAttributes"
+    };
 
-    if (!cgpuCreateBuffer(s_device, bufferUsage, bufferMemProps, buf_size, &buffer))
+    if (!cgpuCreateBuffer(s_device, &createInfo, &buffer))
       goto cleanup;
 
     if (!s_stager->stageToBuffer((uint8_t*)allFaces.data(), faceBufferView.size, buffer, faceBufferView.offset))
@@ -921,7 +957,13 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
 
-          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT, &closestHitShader))
+          CgpuShaderCreateInfo createInfo = {
+            .size = spv.size(),
+            .source = spv.data(),
+            .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT
+          };
+
+          if (!cgpuCreateShader(s_device, &createInfo, &closestHitShader))
           {
             goto cleanup;
           }
@@ -934,7 +976,13 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
 
-          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_FLAG_ANY_HIT, &anyHitShader))
+          CgpuShaderCreateInfo createInfo = {
+            .size = spv.size(),
+            .source = spv.data(),
+            .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
+          };
+
+          if (!cgpuCreateShader(s_device, &createInfo, &anyHitShader))
           {
             goto cleanup;
           }
@@ -956,7 +1004,13 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
 
-          if (!cgpuCreateShader(s_device, spv.size(), spv.data(), CGPU_SHADER_STAGE_FLAG_ANY_HIT, &anyHitShader))
+          CgpuShaderCreateInfo createInfo = {
+            .size = spv.size(),
+            .source = spv.data(),
+            .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
+          };
+
+          if (!cgpuCreateShader(s_device, &createInfo, &anyHitShader))
           {
             goto cleanup;
           }
@@ -988,13 +1042,19 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     rgenParams.texCount2d = texCount2d;
     rgenParams.texCount3d = texCount3d;
 
-    std::vector<uint8_t> rgenSpirv;
-    if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, rgenSpirv))
+    std::vector<uint8_t> spv;
+    if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, spv))
     {
       goto cleanup;
     }
 
-    if (!cgpuCreateShader(s_device, rgenSpirv.size(), rgenSpirv.data(), CGPU_SHADER_STAGE_FLAG_RAYGEN, &rgenShader))
+    CgpuShaderCreateInfo createInfo = {
+      .size = spv.size(),
+      .source = spv.data(),
+      .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN
+    };
+
+    if (!cgpuCreateShader(s_device, &createInfo, &rgenShader))
     {
       goto cleanup;
     }
@@ -1013,14 +1073,20 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
     // regular miss shader
     {
-      std::vector<uint8_t> missSpirv;
-      if (!s_shaderGen->generateMissSpirv("rt_main.miss", missParams, missSpirv))
+      std::vector<uint8_t> spv;
+      if (!s_shaderGen->generateMissSpirv("rt_main.miss", missParams, spv))
       {
         goto cleanup;
       }
 
+      CgpuShaderCreateInfo createInfo = {
+        .size = spv.size(),
+        .source = spv.data(),
+        .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
+      };
+
       CgpuShader missShader;
-      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_FLAG_MISS, &missShader))
+      if (!cgpuCreateShader(s_device, &createInfo, &missShader))
       {
         goto cleanup;
       }
@@ -1030,14 +1096,20 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
     // shadow test miss shader
     {
-      std::vector<uint8_t> missSpirv;
-      if (!s_shaderGen->generateMissSpirv("rt_shadow.miss", missParams, missSpirv))
+      std::vector<uint8_t> spv;
+      if (!s_shaderGen->generateMissSpirv("rt_shadow.miss", missParams, spv))
       {
         goto cleanup;
       }
 
+      CgpuShaderCreateInfo createInfo = {
+        .size = spv.size(),
+        .source = spv.data(),
+        .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
+      };
+
       CgpuShader missShader;
-      if (!cgpuCreateShader(s_device, missSpirv.size(), missSpirv.data(), CGPU_SHADER_STAGE_FLAG_MISS, &missShader))
+      if (!cgpuCreateShader(s_device, &createInfo, &missShader))
       {
         goto cleanup;
       }
@@ -1059,7 +1131,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     printf("creating RT pipeline..\n");
     fflush(stdout);
 
-    CgpuRtPipelineDesc pipelineDesc = {
+    CgpuRtPipelineCreateInfo pipelineDesc = {
       .rgenShader = rgenShader,
       .missShaderCount = (uint32_t) missShaders.size(),
       .missShaders = missShaders.data(),
