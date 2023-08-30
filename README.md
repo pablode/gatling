@@ -1,11 +1,16 @@
 
 ## gatling
 
+![Evermotion Kitchen](https://github.com/pablode/gatling/assets/3663466/3f4fa9d9-2c40-43a3-96cb-9c490c7a0e8d)
+
 <p align="middle">
-  <a href="http://pablode.com/gatling/wwc_mustang.png"><img width=520 src="http://pablode.com/gatling/wwc_mustang_sm.png" /></a>
+  Evermotion <a href="https://evermotion.org/shop/show_product/scene-06-ai48-for-blender/14835">Scene 06 AI48</a>, rendered in Gatling using Blender's Hydra/MaterialX support.
 </p>
+
+![Porsche 911 GT3](https://github.com/pablode/gatling/assets/3663466/b6595991-de77-407e-a2e1-af427386382c)
+
 <p align="middle">
-  1965 Ford Mustang Fastback from <a href="https://wirewheelsclub.com/models/1965-ford-mustang-fastback/">Wire Wheels Club</a>, rendered in Gatling.
+  <a href="https://www.artstation.com/marketplace/p/JpgoB/porsche-911-gt3-2022-manthey-racing">Porsche 911 GT3</a>, modified with materials from the <a href="https://matlib.gpuopen.com/main/materials/all">GPUOpen MaterialX library</a>.
 </p>
 
 ### About
@@ -14,16 +19,18 @@ This is my toy path tracer I work on in my free time.
 
 It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform\*, GPU-accelerated, and implements the [MaterialX](https://www.materialx.org/index.html), [NVIDIA MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) material standards.
 
-Complex BSDFs like Autodesk's Standard Surface and the glTF shading model are supported using MaterialX's MDL code generation backend.  The MDL SDK then generates evaluation and importance sampling functions as GLSL code, which is compiled to SPIR-V and executed using Vulkan.
+Complex BSDFs like [OpenPBR](https://academysoftwarefoundation.github.io/OpenPBR/), Autodesk's Standard Surface, and the glTF shading model are supported using MaterialX and its MDL code generation backend.  The MDL SDK is used to generate evaluation and importance sampling functions as GLSL code, which is compiled to SPIR-V and executed with Vulkan.
 
 \* Hardware ray tracing is required. MacOS will be supported [in the future](https://github.com/KhronosGroup/MoltenVK/issues/427).
 
 ### Build
 
-You need to
+There are [prebuilt binaries](https://github.com/pablode/gatling/releases) which can be copied to the `<USD_INSTALL>/plugin/usd` directory.
+
+Alternatively, for a full source build you need to
 
 - download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK</a> (2022.0+) binaries
-- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v23.05">USD</a> (22.08+) with MaterialX support
+- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v23.11">USD</a> (22.08+) with MaterialX support
 - have NASM 2.13+ or YASM 1.2.0+ in your PATH
 
 Do a recursive clone of the repository and set up a build folder:
@@ -41,11 +48,9 @@ cmake .. -Wno-dev \
          -DCMAKE_BUILD_TYPE=Release
 ```
 
-> Note: If you're using MSVC, be sure to select a 64-bit generator.
-
 Build the relevant targets and install the Hydra delegate to the USD plugin folder:
 ```
-cmake --build . -j8 --target hdGatling gatling --config Release
+cmake --build . --target hdGatling --config Release
 cmake --install . --component hdGatling
 ```
 
@@ -54,13 +59,13 @@ cmake --install . --component hdGatling
 Gatling can be used by every application which supports Hydra, either natively or through a plugin.
 
 <p align="middle">
-  <a href="http://pablode.com/gatling/usdview_coffeemaker.png"><img width=400 src="http://pablode.com/gatling/usdview_coffeemaker_sm.png" /></a>
+  <img width=740 src="https://github.com/pablode/gatling/assets/3663466/22326db0-3c4d-4913-a68c-371c8b83463a" />
 </p>
 <p align="middle">
-  Claas Kuhnen's <a href="https://github.com/pablode/usd-assets/tree/main/coffeemaker">Coffee Maker</a>, rendered using Gatling inside Pixar's <a href="https://openusd.org/release/toolset.html#usdview">usdview</a> tool.
+  Alex Treviño's <a href="https://cloud.blender.org/p/gallery/5dd6d7044441651fa3decb56">Junk Shop</a> (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY</a>), distilled to UsdPreviewSurfaces, rendered within <a href="https://openusd.org/release/toolset.html#usdview">usdview</a>.
 </p>
 
-A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .usdz) as input. Make sure that there is a polygonal light source in the scene.
+A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .usdz) as input. It exposes the Hydra render settings as command line arguments:
 
 ```
 ./bin/gatling <scene.usd> render.png \
@@ -70,11 +75,15 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
     --max-bounces 8
 ```
 
-> Note: Disable the system's GPU watchdog or set an appropriate timeout value.
+> Note: high sample counts may require adjusting the system watchdog settings.
 
-### Outlook
+### Issues
 
-Next up: double-sided surfaces, analytic lights.
+* Features: certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (GeomSubset, subdivision) are not yet supported. UDIM textures, volumes, displacement and other rendering features have yet to be implemented.
+
+* Arbitrary primvar reading: Gatling currently does not implement MDL scene data, which means that MaterialX `geompropvalue` and UsdPreviewSurface `UsdPrimvarReader` nodes are unsupported.
+
+* Real-time editing: changing material parameters, transforming meshes or instances, and adjusting render settings currently result in full or partial cache rebuilds.
 
 ### License
 
@@ -82,7 +91,7 @@ Gatling is licensed under the GNU General Public License, as included in the [LI
 
 ```
 
-    Copyright (C) 2019-2022 Pablo Delgado Krämer
+    Copyright (C) 2019 Pablo Delgado Krämer
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -99,10 +108,4 @@ Gatling is licensed under the GNU General Public License, as included in the [LI
 
 ```
 
-It contains code from the Ray Tracing Gems I book, which is [MIT](docs/licenses/LICENSE.MIT.rtgems) licensed and copyrighted:
-
-* Copyright 2019 NVIDIA Corporation
-
-It contains code from the MDL SDK, which is [BSD](docs/licenses/LICENSE.BSD-3.mdl-sdk) licensed and copyrighted:
-
-* Copyright (c) 2018-2021, NVIDIA CORPORATION. All rights reserved.
+Licenses of third-party code and libraries are listed in the same file.
