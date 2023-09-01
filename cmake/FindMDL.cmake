@@ -14,18 +14,17 @@ find_path(MDL_INCLUDE_DIR
 
 if(WIN32)
   set(MDL_BIN_DIR "nt-x86-64")
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll")
 elseif(APPLE)
   set(MDL_BIN_DIR "macosx-uni")
 else()
   set(MDL_BIN_DIR "linux-x86-64")
 endif()
 
-set(CMAKE_FIND_LIBRARY_SUFFIXES .dll ${CMAKE_FIND_LIBRARY_SUFFIXES})
-
 find_library(MDL_SHARED_LIB
   NAMES mdl_sdk libmdl_sdk
   HINTS ${MDL_ROOT}
-  PATH_SUFFIXES ${MDL_BIN_DIR}/lib
+  PATH_SUFFIXES bin lib ${MDL_BIN_DIR}/lib
 )
 
 include(FindPackageHandleStandardArgs)
