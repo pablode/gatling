@@ -1,0 +1,117 @@
+name: Build gatling
+
+on:
+  workflow_call:
+    inputs:
+      image:
+        required: true
+        type: string
+      build-config:
+        required: true
+        type: string
+      # Must match CI installation path (see USD issue #1025)
+      usd-download-url:
+        required: true
+        type: string
+      usd-install-path:
+        required: true
+        type: string
+      upload-archive:
+        required: false
+        type: boolean
+        default: false
+      archive-name:
+        required: true
+        type: string
+      archive-file-name:
+        required: false
+        type: string
+      mdl-sdk-cache-key:
+        required: true
+        type: string
+      cmake-params:
+        required: false
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build gatling
+    runs-on: ${{ inputs.image }}
+
+    env:
+      mdl-sdk-dir: "MDL-SDK/INSTALL"
+
+    steps:
+    - name: Set up Python (MacOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install pyenv
+        env PYTHON_CONFIGURE_OPTS="--enable-framework" pyenv install 3.7.13
+        pyenv global 3.7.13
+        echo "$HOME/.pyenv/shims" >> $GITHUB_PATH
+
+    - name: Check out repository
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Install libgl1 package
+      if: runner.os == 'Linux'
+      # There seems to be a transitive dependency on libGL (perhaps by hgi)
+      run: sudo apt-get update && sudo apt-get install libgl1-mesa-dev
+
+    - name: Fetch USD binaries
+      run: curl ${{ inputs.usd-download-url }} -L -v -o USD.tar.gz
+
+    - name: Unpack USD binaries
+      run: mkdir -p ${{ inputs.usd-install-path }} && tar -xvf USD.tar.gz -C ${{ inputs.usd-install-path }}
+
+    - name: Create temporary folders
+      run: mkdir BUILD INSTALL
+
+    - name: Restore MDL SDK
+      id: restore-mdl-sdk
+      uses: actions/cache/restore@v3
+      with:
+        path: "${{ env.mdl-sdk-dir }}"
+        key: ${{ inputs.mdl-sdk-cache-key }}
+        fail-on-cache-miss: true
+
+    - name: Install NASM
+      if: matrix.name == 'Windows'
+      uses: ilammy/setup-nasm@v1.4.0
+
+    - name: Generate build system files using CMake
+      working-directory: BUILD
+      run: |
+        cmake .. \
+          -DUSD_ROOT=${{ inputs.usd-install-path }} \
+          -DMDL_ROOT=../${{ env.mdl-sdk-dir }} \
+          -DCMAKE_BUILD_TYPE=${{ inputs.build-config }} \
+          -DCMAKE_INSTALL_PREFIX="$PWD/../INSTALL" \
+          ${{ inputs.cmake-params }}
+
+    - name: Build gatling
+      working-directory: BUILD
+      run: cmake --build . --config ${{ inputs.build-config }} -j 2 --target hdGatling gatling
+
+    - name: Install gatling
+      working-directory: BUILD
+      run: cmake --install . --config ${{ inputs.build-config }} --component hdGatling
+
+    - name: Create archive
+      if: inputs.upload-archive
+      working-directory: INSTALL
+      run: tar -zcvf ${{ inputs.archive-file-name }} *
+
+    - name: Upload archive
+      if: inputs.upload-archive
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ inputs.archive-name }}
+        path: INSTALL/${{ inputs.archive-file-name }}
+        retention-days: 7
