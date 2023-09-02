@@ -144,3 +144,51 @@ namespace gtl
     return m_elementCount;
   }
 }
+
+#ifdef TEST_EXECUTABLE
+#include <doctest/doctest.h>
+#include "stager.h"
+#include <memory>
+
+using namespace gtl;
+
+class GgpuTestFixture {
+protected:
+  CgpuDevice m_device;
+public:
+  GgpuTestFixture()
+  {
+    REQUIRE(cgpuInitialize("ggpu_test", 1, 0, 0));
+    REQUIRE(cgpuCreateDevice(&m_device));
+  }
+  ~GgpuTestFixture()
+  {
+    REQUIRE(cgpuDestroyDevice(m_device));
+    cgpuTerminate();
+  }
+};
+
+TEST_CASE_FIXTURE(GgpuTestFixture, "SimpleWriteRead")
+{
+  struct TestElement {
+    uint32_t e0 = 0x40;
+    uint32_t e1 = 0x80;
+  } testElement1;
+
+  GgpuStager stager(m_device);
+  REQUIRE(stager.allocate());
+  GgpuLinearDataStore dataStore(m_device, stager, sizeof(TestElement), 1);
+
+  uint64_t handle = dataStore.allocate();
+  *dataStore.write<TestElement>(handle) = testElement1;
+  REQUIRE(dataStore.commitChanges());
+  REQUIRE(dataStore.elementCount() == 1);
+
+  TestElement testElement2 = *dataStore.read<TestElement>(handle);
+  CHECK(testElement2.e0 == testElement1.e0);
+  CHECK(testElement2.e1 == testElement1.e1);
+
+  dataStore.free(handle);
+  stager.free();
+}
+#endif
