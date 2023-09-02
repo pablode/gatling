@@ -142,3 +142,8 @@ add_subdirectory(glm)
 # efsw
 #
 add_subdirectory(efsw)
+
+#
+# doctest
+#
+add_subdirectory(doctest)

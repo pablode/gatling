@@ -46,3 +46,6 @@
 [submodule "extern/SPIRV-Reflect"]
 	path = extern/SPIRV-Reflect
 	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
+[submodule "extern/doctest"]
+	path = extern/doctest
+	url = https://github.com/doctest/doctest.git
