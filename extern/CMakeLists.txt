@@ -148,3 +148,9 @@ add_subdirectory(efsw)
 # quill
 #
 add_subdirectory(quill)
+
+#
+# doctest
+#
+set(DOCTEST_NO_INSTALL ON)
+add_subdirectory(doctest)

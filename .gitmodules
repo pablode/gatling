@@ -49,3 +49,6 @@
 [submodule "extern/quill"]
 	path = extern/quill
 	url = https://github.com/odygrd/quill.git
+[submodule "extern/doctest"]
+	path = extern/doctest
+	url = https://github.com/doctest/doctest.git

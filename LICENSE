@@ -2346,6 +2346,7 @@ distribution.
     robin_hood.h (from MDL SDK)
     Ray Tracing Gems
     Ray Tracing Gems II
+    doctest
 ============================================================
 
 
@@ -2392,6 +2393,8 @@ distribution.
   Copyright 2019 NVIDIA
 * For Ray Tracing Gems II, see also this required NOTICE:
   Copyright (c) 2021 NVIDIA
+* For doctest, see also this required NOTICE:
+  Copyright (c) 2016-2023 Viktor Kirilov
 
 
 ============================================================
