@@ -22,6 +22,7 @@
 #include <pxr/base/gf/matrix3d.h>
 #include <pxr/base/gf/matrix3f.h>
 #include <pxr/base/gf/matrix4f.h>
+#include <pxr/base/gf/quatf.h>
 #include <pxr/imaging/hd/changeTracker.h>
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/imaging/glf/simpleLight.h>
@@ -279,8 +280,9 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   m_giDomeLight = giCreateDomeLight(m_scene, path.c_str());
 
   const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
-  auto rotateTransform = GfMatrix3f(transform.ExtractRotationMatrix());
-  giSetDomeLightTransform(m_giDomeLight, rotateTransform.data());
+  auto rotateQuat = GfMatrix4f(transform.GetOrthonormalized()).ExtractRotationQuat();
+  float rawQuatData[4] = { rotateQuat.GetImaginary()[0], rotateQuat.GetImaginary()[1], rotateQuat.GetImaginary()[2], -/*flip handedness*/rotateQuat.GetReal() };
+  giSetDomeLightRotation(m_giDomeLight, rawQuatData);
 
   // We need to ensure that the correct dome light is displayed when usdview's additional
   // one has been enabled. Although the type isn't 'simpleLight' (which may be a bug), we

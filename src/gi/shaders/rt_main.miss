@@ -9,6 +9,15 @@
 
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 
+// Optimized implementation from GLM with only cross products:
+// https://github.com/g-truc/glm/blob/47585fde0c49fa77a2bf2fb1d2ead06999fd4b6e/glm/detail/type_quat.inl#L356-L363
+vec3 quatRotateDir(vec4 q, vec3 dir)
+{
+    vec3 a = cross(q.xyz, dir);
+    vec3 b = cross(q.xyz, a);
+    return dir + ((a * q.w) + b) * 2.0;
+}
+
 #ifdef DOMELIGHT_ENABLED
 vec3 sampleDomeLight(vec3 rayDir)
 {
@@ -31,8 +40,7 @@ void main()
     if (!isPrimaryRay)
 #endif
     {
-        mat3 domeLightTransform = mat3(PC.domeLightTransformCol0, PC.domeLightTransformCol1, PC.domeLightTransformCol2);
-        vec3 sampleDir = normalize(domeLightTransform * gl_WorldRayDirectionEXT);
+        vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, gl_WorldRayDirectionEXT));
         backgroundColor = sampleDomeLight(sampleDir);
     }
 #endif

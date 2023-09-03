@@ -119,14 +119,14 @@ struct GiScene
   GgpuDenseDataStore distantLights;
   GgpuDenseDataStore rectLights;
   CgpuImage domeLightTexture;
-  glm::mat3 domeLightTransform;
+  glm::quat domeLightRotation;
   GiDomeLight* domeLight; // weak ptr
 };
 
 struct GiDomeLight
 {
   std::string textureFilePath;
-  glm::mat3 transform{1.0f};
+  glm::quat rotation;
 };
 
 CgpuDevice s_device;
@@ -765,7 +765,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       }
       else
       {
-        scene->domeLightTransform = domeLight->transform;
+        scene->domeLightRotation = domeLight->rotation;
         scene->domeLight = domeLight;
       }
     }
@@ -1289,11 +1289,9 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     .lensRadius                  = lensRadius,
     .sampleCount                 = params->spp,
     .maxSampleValue              = params->maxSampleValue,
-    .domeLightTransformCol0      = scene->domeLightTransform[0],
+    .domeLightRotation           = glm::make_vec4(&scene->domeLightRotation[0]),
     .maxBouncesAndRrBounceOffset = ((params->maxBounces << 16) | params->rrBounceOffset),
-    .domeLightTransformCol1      = scene->domeLightTransform[1],
     .rrInvMinTermProb            = params->rrInvMinTermProb,
-    .domeLightTransformCol2      = scene->domeLightTransform[2],
     .lightIntensityMultiplier    = params->lightIntensityMultiplier
   };
 
@@ -1679,8 +1677,7 @@ void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
   delete light;
 }
 
-void giSetDomeLightTransform(GiDomeLight* light, float* transformPtr)
+void giSetDomeLightRotation(GiDomeLight* light, float* quat)
 {
-  auto transform = glm::inverse(glm::make_mat3(transformPtr));
-  memcpy(&light->transform, glm::value_ptr(transform), sizeof(transform));
+  light->rotation = glm::make_quat(quat);
 }

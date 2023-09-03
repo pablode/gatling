@@ -76,12 +76,11 @@ struct PushConstants
   SI_FLOAT lensRadius;
   SI_UINT  sampleCount;
   SI_FLOAT maxSampleValue;
-  SI_VEC3  domeLightTransformCol0;
+  SI_VEC4  domeLightRotation;
   SI_UINT  maxBouncesAndRrBounceOffset;
-  SI_VEC3  domeLightTransformCol1;
   SI_FLOAT rrInvMinTermProb;
-  SI_VEC3  domeLightTransformCol2;
   SI_FLOAT lightIntensityMultiplier;
+  /* 5 floats free */
 };
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)
