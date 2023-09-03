@@ -99,7 +99,6 @@ struct GiMesh
 {
   std::vector<GiFace> faces;
   std::vector<GiVertex> vertices;
-  const GiMaterial* material;
 };
 
 struct GiSphereLight
@@ -411,7 +410,6 @@ GiMesh* giCreateMesh(const GiMeshDesc* desc)
   GiMesh* mesh = new GiMesh;
   mesh->faces = std::vector<GiFace>(&desc->faces[0], &desc->faces[desc->faceCount]);
   mesh->vertices = std::vector<GiVertex>(&desc->vertices[0], &desc->vertices[desc->vertexCount]);
-  mesh->material = desc->material;
   return mesh;
 }
 
@@ -447,7 +445,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       GiShaderCache* shaderCache = params->shaderCache;
       for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
       {
-        if (shaderCache->materials[i] == mesh->material)
+        if (shaderCache->materials[i] == instance->material)
         {
           materialIndex = i;
           break;
@@ -565,12 +563,14 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       cgpuUnmapBuffer(s_device, vertexBuffer);
 
       // BLAS
+      const GiMaterial* material = params->shaderCache->materials[materialIndex];
+
       CgpuBlasCreateInfo blasCreateInfo = {
         .vertexBuffer = vertexBuffer,
         .indexBuffer = indexBuffer,
         .maxVertex = (uint32_t) vertices.size(),
         .triangleCount = (uint32_t) indices.size() / 3,
-        .isOpaque = mesh->material->mcMat->isOpaque
+        .isOpaque = material->mcMat->isOpaque
       };
 
       CgpuBlas blas;
