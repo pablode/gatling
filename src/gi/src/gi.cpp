@@ -120,11 +120,13 @@ struct GiScene
   GgpuDenseDataStore rectLights;
   CgpuImage domeLightTexture;
   glm::quat domeLightRotation;
+  glm::vec3 domeLightBaseEmission;
   GiDomeLight* domeLight; // weak ptr
 };
 
 struct GiDomeLight
 {
+  GiScene* scene;
   std::string textureFilePath;
   glm::quat rotation;
 };
@@ -1290,6 +1292,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     .sampleCount                 = params->spp,
     .maxSampleValue              = params->maxSampleValue,
     .domeLightRotation           = glm::make_vec4(&scene->domeLightRotation[0]),
+    .domeLightEmissionMultiplier = scene->domeLightBaseEmission,
     .maxBouncesAndRrBounceOffset = ((params->maxBounces << 16) | params->rrBounceOffset),
     .rrInvMinTermProb            = params->rrInvMinTermProb,
     .lightIntensityMultiplier    = params->lightIntensityMultiplier
@@ -1668,6 +1671,7 @@ void giSetRectLightDimensions(GiRectLight* light, float width, float height)
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)
 {
   GiDomeLight* light = new GiDomeLight;
+  light->scene = scene;
   light->textureFilePath = filePath;
   return light;
 }
@@ -1680,4 +1684,9 @@ void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
 void giSetDomeLightRotation(GiDomeLight* light, float* quat)
 {
   light->rotation = glm::make_quat(quat);
+}
+
+void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb)
+{
+  light->scene->domeLightBaseEmission = glm::make_vec3(rgb);
 }

@@ -77,10 +77,11 @@ struct PushConstants
   SI_UINT  sampleCount;
   SI_FLOAT maxSampleValue;
   SI_VEC4  domeLightRotation;
+  SI_VEC3  domeLightEmissionMultiplier;
   SI_UINT  maxBouncesAndRrBounceOffset;
   SI_FLOAT rrInvMinTermProb;
   SI_FLOAT lightIntensityMultiplier;
-  /* 5 floats free */
+  /* 2 floats free */
 };
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)

@@ -41,7 +41,7 @@ void main()
 #endif
     {
         vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, gl_WorldRayDirectionEXT));
-        backgroundColor = sampleDomeLight(sampleDir);
+        backgroundColor = sampleDomeLight(sampleDir) * PC.domeLightEmissionMultiplier;
     }
 #endif
 

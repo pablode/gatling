@@ -235,7 +235,6 @@ HdGatlingDomeLight::HdGatlingDomeLight(const SdfPath& id, GiScene* scene)
 {
 }
 
-// FIXME: apply intensity, color, exposure and other attributes
 void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
                               HdRenderParam* renderParam,
                               HdDirtyBits* dirtyBits)
@@ -283,6 +282,9 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   auto rotateQuat = GfMatrix4f(transform.GetOrthonormalized()).ExtractRotationQuat();
   float rawQuatData[4] = { rotateQuat.GetImaginary()[0], rotateQuat.GetImaginary()[1], rotateQuat.GetImaginary()[2], -/*flip handedness*/rotateQuat.GetReal() };
   giSetDomeLightRotation(m_giDomeLight, rawQuatData);
+
+  GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, 1.0f);
+  giSetDomeLightBaseEmission(m_giDomeLight, baseEmission.data());
 
   // We need to ensure that the correct dome light is displayed when usdview's additional
   // one has been enabled. Although the type isn't 'simpleLight' (which may be a bug), we

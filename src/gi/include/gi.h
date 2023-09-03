@@ -203,3 +203,4 @@ void giSetRectLightDimensions(GiRectLight* light, float width, float height);
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
 void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);
 void giSetDomeLightRotation(GiDomeLight* light, float* quat);
+void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb);
