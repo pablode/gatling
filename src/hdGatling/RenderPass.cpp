@@ -437,7 +437,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       TF_VERIFY(m_shaderCache, "Unable to create shader cache");
     }
 
-    if (rebuildGeomCache || giGeomCacheNeedsRebuild())
+    if (rebuildGeomCache)
     {
       if (m_geomCache)
       {

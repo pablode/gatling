@@ -174,7 +174,6 @@ bool giGeomCacheNeedsRebuild();
 
 void giInvalidateFramebuffer();
 void giInvalidateShaderCache();
-void giInvalidateGeomCache();
 
 int giRender(const GiRenderParams* params, float* rgbaImg);
 
