@@ -95,10 +95,16 @@ struct GiMaterial
   McMaterial* mcMat;
 };
 
-struct GiMesh
+struct GiMeshCpuData
 {
   std::vector<GiFace> faces;
   std::vector<GiVertex> vertices;
+};
+
+struct GiMesh
+{
+  std::optional<GiMeshCpuData> cpuData;
+  CgpuBlas blas;
 };
 
 struct GiSphereLight
@@ -407,9 +413,13 @@ uint64_t giAlignBuffer(uint64_t alignment, uint64_t bufferSize, uint64_t* totalS
 
 GiMesh* giCreateMesh(const GiMeshDesc* desc)
 {
+  GiMeshCpuData cpuData = {
+    .faces = std::vector<GiFace>(&desc->faces[0], &desc->faces[desc->faceCount]),
+    .vertices = std::vector<GiVertex>(&desc->vertices[0], &desc->vertices[desc->vertexCount])
+  };
+
   GiMesh* mesh = new GiMesh;
-  mesh->faces = std::vector<GiFace>(&desc->faces[0], &desc->faces[desc->faceCount]);
-  mesh->vertices = std::vector<GiVertex>(&desc->vertices[0], &desc->vertices[desc->vertexCount]);
+  mesh->cpuData = cpuData;
   return mesh;
 }
 
@@ -430,16 +440,23 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
   for (uint32_t m = 0; m < params->meshInstanceCount; m++)
   {
     const GiMeshInstance* instance = &params->meshInstances[m];
-    const GiMesh* mesh = instance->mesh;
-
-    if (mesh->faces.empty())
-    {
-      continue;
-    }
+    GiMesh* mesh = const_cast<GiMesh*>(instance->mesh); // FIXME
 
     // Build mesh BLAS if it doesn't exist yet.
-    if (protoBlasInstances.count(mesh) == 0)
+    if (!mesh->blas.handle)
     {
+      if (!mesh->cpuData)
+      {
+        continue;
+      }
+
+      const GiMeshCpuData& cpuData = *mesh->cpuData;
+
+      if (cpuData.faces.empty())
+      {
+        continue;
+      }
+
       // Find material for SBT index (FIXME: find a better solution)
       uint32_t materialIndex = UINT32_MAX;
       GiShaderCache* shaderCache = params->shaderCache;
@@ -462,12 +479,12 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
       // Vertices
       std::vector<CgpuVertex> vertices;
-      vertices.resize(mesh->vertices.size());
-      allVertices.reserve(allVertices.size() + mesh->vertices.size());
+      vertices.resize(cpuData.vertices.size());
+      allVertices.reserve(allVertices.size() + cpuData.vertices.size());
 
       for (uint32_t i = 0; i < vertices.size(); i++)
       {
-        const GiVertex& cpuVert = mesh->vertices[i];
+        const GiVertex& cpuVert = cpuData.vertices[i];
 
         vertices[i].x = cpuVert.pos[0];
         vertices[i].y = cpuVert.pos[1];
@@ -496,12 +513,12 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
       // Indices
       std::vector<uint32_t> indices;
-      indices.reserve(mesh->faces.size() * 3);
-      allFaces.reserve(allFaces.size() + mesh->faces.size());
+      indices.reserve(cpuData.faces.size() * 3);
+      allFaces.reserve(allFaces.size() + cpuData.faces.size());
 
-      for (uint32_t i = 0; i < mesh->faces.size(); i++)
+      for (uint32_t i = 0; i < cpuData.faces.size(); i++)
       {
-        const auto* face = &mesh->faces[i];
+        const auto* face = &cpuData.faces[i];
         indices.push_back(face->v_i[0]);
         indices.push_back(face->v_i[1]);
         indices.push_back(face->v_i[2]);
@@ -585,6 +602,9 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         continue;
       }
 
+      mesh->cpuData.reset();
+      mesh->blas = blas;
+
       blases.push_back(blas);
 
       ProtoBlasInstance proto;
@@ -600,7 +620,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
     CgpuBlasInstance blasInstance;
     blasInstance.as = proto.blas;
     blasInstance.faceIndexOffset = proto.faceIndexOffset;
-    blasInstance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: regular & shadow
+    blasInstance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: shade & shadow
     memcpy(blasInstance.transform, instance->transform, sizeof(float) * 12);
 
     blasInstances.push_back(blasInstance);

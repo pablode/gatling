@@ -385,17 +385,16 @@ HdGatlingMesh::~HdGatlingMesh()
 }
 
 void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
-                         HdRenderParam* renderParam,
+                         HdRenderParam* hdRenderParam,
                          HdDirtyBits* dirtyBits,
                          const TfToken& reprToken)
 {
-  TF_UNUSED(renderParam);
   TF_UNUSED(reprToken);
 
   HdDirtyBits dirtyBitsCopy = *dirtyBits;
 
   HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
-  auto renderParam = static_cast<HdGatlingRenderParam*>(renderParam);
+  auto renderParam = static_cast<HdGatlingRenderParam*>(hdRenderParam);
 
   const SdfPath& id = GetId();
 
