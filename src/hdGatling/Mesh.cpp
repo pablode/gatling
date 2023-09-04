@@ -24,6 +24,7 @@
 #include <pxr/imaging/hd/vtBufferSource.h>
 #include <pxr/usd/usdUtils/pipeline.h>
 
+#include "RenderParam.h"
 #include "gi.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -394,18 +395,20 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   HdDirtyBits dirtyBitsCopy = *dirtyBits;
 
   HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
+  auto renderParam = static_cast<HdGatlingRenderParam*>(renderParam);
 
   const SdfPath& id = GetId();
 
   if ((*dirtyBits & HdChangeTracker::DirtyInstancer) |
       (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
   {
-
     _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
 
     const SdfPath& instancerId = GetInstancerId();
 
     HdInstancer::_SyncInstancerAndParents(renderIndex, instancerId);
+
+    renderParam->SetMeshInstancesDirty(true);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
@@ -414,17 +417,21 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
     SetMaterialId(materialId);
 
-    giInvalidateGeomCache(); // FIXME: remove this hack
+    renderParam->SetMeshInstancesDirty(true);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyVisibility)
   {
     _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
+
+    renderParam->SetMeshInstancesDirty(true);
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform)
   {
     m_prototypeTransform = sceneDelegate->GetTransform(id);
+
+    renderParam->SetMeshInstancesDirty(true);
   }
 
   bool updateGeometry =

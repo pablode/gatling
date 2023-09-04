@@ -49,4 +49,14 @@ GiDomeLight* HdGatlingRenderParam::ActiveDomeLight() const
   return m_domeLights.size() > 0 ? m_domeLights.back() : nullptr;
 }
 
+void HdGatlingRenderParam::SetMeshInstancesDirty(bool dirty)
+{
+  m_meshInstancesDirty = dirty;
+}
+
+bool HdGatlingRenderParam::GetMeshInstancesDirty() const
+{
+  return m_meshInstancesDirty;
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

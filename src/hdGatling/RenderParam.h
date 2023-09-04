@@ -34,9 +34,15 @@ public:
 
   GiDomeLight* ActiveDomeLight() const;
 
+public:
+  void SetMeshInstancesDirty(bool dirty);
+
+  bool GetMeshInstancesDirty() const;
+
 private:
   std::vector<GiDomeLight*> m_domeLights;
   GiDomeLight* m_domeLightOverride = nullptr;
+  bool m_meshInstancesDirty = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

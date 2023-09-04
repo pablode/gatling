@@ -391,8 +391,9 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastAovId = aovId;
 
   bool rebuildShaderCache = !m_shaderCache || aovChanged || giShaderCacheNeedsRebuild() ||
-                            renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/;
-  bool rebuildGeomCache = !m_geomCache || visibilityChanged;
+                            renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/ ||
+                            renderParam->GetMeshInstancesDirty() /*tmp: material assignment changed*/;
+  bool rebuildGeomCache = !m_geomCache || visibilityChanged || renderParam->GetMeshInstancesDirty();
 
   if (rebuildShaderCache || rebuildGeomCache)
   {
@@ -455,6 +456,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       TF_VERIFY(m_geomCache, "Unable to create geom cache");
     }
   }
+
+  renderParam->SetMeshInstancesDirty(false);
 
   if (!m_geomCache || !m_shaderCache)
   {
