@@ -281,8 +281,14 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
     }
     isIndexed = false;
   }
+  else if (interpolation == HdInterpolationInstance)
+  {
+    TF_CODING_ERROR("primvar interpolation mode 'instance' not supported");
+    return false;
+  }
   else
   {
+    TF_CODING_ERROR("primvar interpolation mode not handled");
     return false;
   }
 

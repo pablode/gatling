@@ -83,9 +83,9 @@ namespace
 
       int i0 = f[0], i1 = f[1], i2 = f[2];
       const auto& p0 = meshPoints[i0], p1 = meshPoints[i1], p2 = meshPoints[i2];
-      const auto& t0 = meshTexCoords.array[meshTexCoords.indexed ? i0 : i * 3 + 0];
-      const auto& t1 = meshTexCoords.array[meshTexCoords.indexed ? i1 : i * 3 + 1];
-      const auto& t2 = meshTexCoords.array[meshTexCoords.indexed ? i2 : i * 3 + 2];
+      const auto& t0 = meshTexCoords.array[meshTexCoords.indexed ? i0 : (i * 3 + 0)];
+      const auto& t1 = meshTexCoords.array[meshTexCoords.indexed ? i1 : (i * 3 + 1)];
+      const auto& t2 = meshTexCoords.array[meshTexCoords.indexed ? i2 : (i * 3 + 2)];
 
       GfVec3f e1 = p1 - p0, e2 = p2 - p0;
       float x1 = t1[0] - t0[0], x2 = t2[0] - t0[0];
@@ -115,9 +115,9 @@ namespace
       bitangents[i0] += b;
       bitangents[i1] += b;
       bitangents[i2] += b;
-      normals[i0] += meshNormals.array[meshNormals.indexed ? i0 : i * 3 + 0];
-      normals[i1] += meshNormals.array[meshNormals.indexed ? i1 : i * 3 + 1];
-      normals[i2] += meshNormals.array[meshNormals.indexed ? i2 : i * 3 + 2];
+      normals[i0] += meshNormals.array[meshNormals.indexed ? i0 : (i * 3 + 0)];
+      normals[i1] += meshNormals.array[meshNormals.indexed ? i1 : (i * 3 + 1)];
+      normals[i2] += meshNormals.array[meshNormals.indexed ? i2 : (i * 3 + 2)];
     }
 
     meshTangents.resize(tangentCount);
@@ -200,7 +200,6 @@ namespace
   }
 
   void _CalculateFallbackTangents(const VtVec3iArray& meshFaces,
-                                  const VtVec3fArray& meshPoints,
                                   const HdGatlingMesh::VertexAttr<GfVec3f>& meshNormals,
                                   VtVec3fArray& meshTangents,
                                   VtFloatArray& meshBitangentSigns)
@@ -237,7 +236,7 @@ namespace
     }
     else
     {
-      _CalculateFallbackTangents(meshFaces, meshPoints, meshNormals, meshTangents.array, meshBitangentSigns.array);
+      _CalculateFallbackTangents(meshFaces, meshNormals, meshTangents.array, meshBitangentSigns.array);
     }
 
     meshTangents.indexed = meshNormals.indexed;
