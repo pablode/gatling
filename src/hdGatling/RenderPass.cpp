@@ -81,11 +81,15 @@ namespace
     {
       const auto& f = meshFaces[i];
 
-      int i0 = f[0], i1 = f[1], i2 = f[2];
-      const auto& p0 = meshPoints[i0], p1 = meshPoints[i1], p2 = meshPoints[i2];
-      const auto& t0 = meshTexCoords.array[meshTexCoords.indexed ? i0 : (i * 3 + 0)];
-      const auto& t1 = meshTexCoords.array[meshTexCoords.indexed ? i1 : (i * 3 + 1)];
-      const auto& t2 = meshTexCoords.array[meshTexCoords.indexed ? i2 : (i * 3 + 2)];
+      const auto& p0 = meshPoints[f[0]];
+      const auto& p1 = meshPoints[f[1]];
+      const auto& p2 = meshPoints[f[2]];
+      const auto& n0 = meshNormals.array[meshNormals.indexed ? f[0] : (i * 3 + 0)];
+      const auto& n1 = meshNormals.array[meshNormals.indexed ? f[1] : (i * 3 + 1)];
+      const auto& n2 = meshNormals.array[meshNormals.indexed ? f[2] : (i * 3 + 2)];
+      const auto& t0 = meshTexCoords.array[meshTexCoords.indexed ? f[0] : (i * 3 + 0)];
+      const auto& t1 = meshTexCoords.array[meshTexCoords.indexed ? f[1] : (i * 3 + 1)];
+      const auto& t2 = meshTexCoords.array[meshTexCoords.indexed ? f[2] : (i * 3 + 2)];
 
       GfVec3f e1 = p1 - p0, e2 = p2 - p0;
       float x1 = t1[0] - t0[0], x2 = t2[0] - t0[0];
@@ -109,15 +113,19 @@ namespace
         b = GfVec3f::XAxis();
       }
 
-      tangents[i0] += t;
-      tangents[i1] += t;
-      tangents[i2] += t;
-      bitangents[i0] += b;
-      bitangents[i1] += b;
-      bitangents[i2] += b;
-      normals[i0] += meshNormals.array[meshNormals.indexed ? i0 : (i * 3 + 0)];
-      normals[i1] += meshNormals.array[meshNormals.indexed ? i1 : (i * 3 + 1)];
-      normals[i2] += meshNormals.array[meshNormals.indexed ? i2 : (i * 3 + 2)];
+      int outIndex0 = meshNormals.indexed ? f[0] : (i * 3 + 0);
+      int outIndex1 = meshNormals.indexed ? f[1] : (i * 3 + 1);
+      int outIndex2 = meshNormals.indexed ? f[2] : (i * 3 + 2);
+
+      normals[outIndex0] += n0;
+      normals[outIndex1] += n1;
+      normals[outIndex2] += n2;
+      tangents[outIndex0] += t;
+      tangents[outIndex1] += t;
+      tangents[outIndex2] += t;
+      bitangents[outIndex0] += b;
+      bitangents[outIndex1] += b;
+      bitangents[outIndex2] += b;
     }
 
     meshTangents.resize(tangentCount);
