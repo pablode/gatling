@@ -391,8 +391,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastAovId = aovId;
 
   bool rebuildShaderCache = !m_shaderCache || aovChanged || giShaderCacheNeedsRebuild() ||
-                            renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/ ||
-                            renderParam->GetMeshInstancesDirty() /*tmp: material assignment changed*/;
+                            renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/;// ||
+                            //renderParam->GetMeshInstancesDirty() /*tmp: material assignment changed*/;
   bool rebuildGeomCache = !m_geomCache || visibilityChanged || renderParam->GetMeshInstancesDirty();
 
   if (rebuildShaderCache || rebuildGeomCache)

@@ -105,6 +105,8 @@ struct GiMesh
 {
   std::optional<GiMeshCpuData> cpuData;
   CgpuBlas blas;
+  uint32_t faceIndexOffset = UINT32_MAX;
+  uint32_t materialIndex = UINT32_MAX;
 };
 
 struct GiSphereLight
@@ -428,14 +430,6 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
                                 std::vector<Rp::FVertex>& allVertices,
                                 std::vector<Rp::Face>& allFaces)
 {
-  struct ProtoBlasInstance
-  {
-    CgpuBlas blas;
-    uint32_t faceIndexOffset;
-    uint32_t materialIndex;
-  };
-  std::unordered_map<const GiMesh*, ProtoBlasInstance> protoBlasInstances;
-
   for (uint32_t m = 0; m < params->meshInstanceCount; m++)
   {
     const GiMeshInstance* instance = &params->meshInstances[m];
@@ -603,23 +597,22 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
       mesh->cpuData.reset();
       mesh->blas = blas;
+      mesh->faceIndexOffset = faceIndexOffset;
+      mesh->materialIndex = materialIndex;
 
       blases.push_back(blas);
+    }
 
-      ProtoBlasInstance proto;
-      proto.blas = blas;
-      proto.faceIndexOffset = faceIndexOffset;
-      proto.materialIndex = materialIndex;
-      protoBlasInstances[mesh] = proto;
+    if (!mesh->blas.handle)
+    {
+      continue;
     }
 
     // Create mesh instance for TLAS.
-    const ProtoBlasInstance& proto = protoBlasInstances[mesh];
-
     CgpuBlasInstance blasInstance;
-    blasInstance.as = proto.blas;
-    blasInstance.faceIndexOffset = proto.faceIndexOffset;
-    blasInstance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: shade & shadow
+    blasInstance.as = mesh->blas;
+    blasInstance.faceIndexOffset = mesh->faceIndexOffset;
+    blasInstance.hitGroupIndex = mesh->materialIndex * 2; // always two hit groups per material: shade & shadow
     memcpy(blasInstance.transform, instance->transform, sizeof(float) * 12);
 
     blasInstances.push_back(blasInstance);
