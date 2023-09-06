@@ -117,6 +117,13 @@ namespace
       int outIndex1 = meshNormals.indexed ? f[1] : (i * 3 + 1);
       int outIndex2 = meshNormals.indexed ? f[2] : (i * 3 + 2);
 
+      // Assets can author out-of-range indices (f.i. Intel's Sponza scene). Skip those.
+      if (outIndex0 >= tangentCount || outIndex1 >= tangentCount || outIndex2 >= tangentCount)
+      {
+        TF_WARN("invalid primvar index; skipping");
+        continue;
+      }
+
       normals[outIndex0] += n0;
       normals[outIndex1] += n1;
       normals[outIndex2] += n2;
