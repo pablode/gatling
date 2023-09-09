@@ -17,21 +17,13 @@
 
 #pragma once
 
-#include <mi/base/handle.h>
 #include <mi/neuraylib/icompiled_material.h>
-#include <mi/neuraylib/ineuray.h>
-#include <mi/neuraylib/idatabase.h>
-#include <mi/neuraylib/itransaction.h>
-#include <mi/neuraylib/imdl_backend.h>
-#include <mi/neuraylib/imdl_execution_context.h>
 
 #include <stdint.h>
 #include <string>
 #include <vector>
 
 #include "ShaderGen.h"
-#include "MdlRuntime.h"
-#include "MdlLogger.h"
 
 namespace gi::sg
 {
@@ -40,6 +32,8 @@ namespace gi::sg
     std::string glslSource;
     std::vector<TextureResource> textureResources;
   };
+
+  class MdlRuntime;
 
   class MdlGlslCodeGen
   {
@@ -53,21 +47,6 @@ namespace gi::sg
                                 MdlGlslCodeGenResult& result);
 
   private:
-    bool generateGlslWithDfs(const mi::neuraylib::ICompiled_material* compiledMaterial,
-                             std::vector<mi::neuraylib::Target_function_description>& genFunctions,
-                             std::string& glslSrc,
-                             std::vector<TextureResource>& textureResources);
-
-    void extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
-                             std::vector<TextureResource>& textureResources);
-
-    std::string extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, int i);
-
-  private:
-    mi::base::Handle<MdlLogger> m_logger;
-    mi::base::Handle<mi::neuraylib::IMdl_backend> m_backend;
-    mi::base::Handle<mi::neuraylib::IDatabase> m_database;
-    mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
-    mi::base::Handle<mi::neuraylib::IMdl_execution_context> m_context;
+    std::shared_ptr<class Impl> m_impl;
   };
 }
