@@ -23,15 +23,35 @@
 
 #include <fstream>
 
-namespace detail
+namespace
 {
-  class FileIncluder : public glslang::TShader::Includer
+  using ShaderStage = gi::sg::GlslangShaderCompiler::ShaderStage;
+
+  EShLanguage _GetGlslangShaderLanguage(ShaderStage stage)
+  {
+    switch (stage)
+    {
+    case ShaderStage::AnyHit:     return EShLangAnyHit;
+    case ShaderStage::ClosestHit: return EShLangClosestHit;
+    case ShaderStage::Compute:    return EShLangCompute;
+    case ShaderStage::Miss:       return EShLangMiss;
+    case ShaderStage::RayGen:     return EShLangRayGen;
+    default:
+      assert(false);
+      return EShLangCount;
+    }
+  }
+}
+
+namespace gi::sg
+{
+  class _FileIncluder : public glslang::TShader::Includer
   {
   private:
     fs::path m_rootPath;
 
   public:
-    FileIncluder(const fs::path& rootPath)
+    _FileIncluder(const fs::path& rootPath)
       : m_rootPath(rootPath)
     {
     }
@@ -76,26 +96,6 @@ namespace detail
     }
   };
 
-  using ShaderStage = gi::sg::GlslangShaderCompiler::ShaderStage;
-
-  EShLanguage getGlslangShaderLanguage(ShaderStage stage)
-  {
-    switch (stage)
-    {
-    case ShaderStage::AnyHit:     return EShLangAnyHit;
-    case ShaderStage::ClosestHit: return EShLangClosestHit;
-    case ShaderStage::Compute:    return EShLangCompute;
-    case ShaderStage::Miss:       return EShLangMiss;
-    case ShaderStage::RayGen:     return EShLangRayGen;
-    default:
-      assert(false);
-      return EShLangCount;
-    }
-  }
-}
-
-namespace gi::sg
-{
   static bool s_glslangInitialized = false;
 
   bool GlslangShaderCompiler::init()
@@ -117,20 +117,15 @@ namespace gi::sg
   }
 
   GlslangShaderCompiler::GlslangShaderCompiler(const fs::path& shaderPath)
-    : m_fileIncluder(new detail::FileIncluder(shaderPath))
+    : m_fileIncluder(std::make_shared<_FileIncluder>(shaderPath))
   {
-  }
-
-  GlslangShaderCompiler::~GlslangShaderCompiler()
-  {
-    delete (detail::FileIncluder*) m_fileIncluder;
   }
 
   bool GlslangShaderCompiler::compileGlslToSpv(ShaderStage stage,
                                                std::string_view source,
                                                std::vector<uint8_t>& spv)
   {
-    EShLanguage language = detail::getGlslangShaderLanguage(stage);
+    EShLanguage language = _GetGlslangShaderLanguage(stage);
 
     glslang::TShader shader(language);
 
@@ -162,9 +157,8 @@ namespace gi::sg
     const TBuiltInResource* resourceLimits = GetDefaultResources(); // TODO: do we want to use the actual device limits?
     int defaultVersion = 450; // Will be overriden by #version in source.
     bool forwardCompatible = false;
-    auto fileIncluder = *reinterpret_cast<detail::FileIncluder*>(m_fileIncluder);
 
-    bool success = shader.parse(resourceLimits, defaultVersion, forwardCompatible, messages, fileIncluder);
+    bool success = shader.parse(resourceLimits, defaultVersion, forwardCompatible, messages, *m_fileIncluder);
     if (!success)
     {
       printErrorMessage("Failed to compile shader: %s");

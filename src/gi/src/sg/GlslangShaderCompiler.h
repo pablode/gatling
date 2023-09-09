@@ -40,8 +40,6 @@ namespace gi::sg
   public:
     GlslangShaderCompiler(const fs::path& shaderPath);
 
-    ~GlslangShaderCompiler();
-
   public:
     bool compileGlslToSpv(ShaderStage stage,
                           std::string_view source,
@@ -52,6 +50,6 @@ namespace gi::sg
     static void deinit();
 
   private:
-    void* m_fileIncluder;
+    std::shared_ptr<class _FileIncluder> m_fileIncluder;
   };
 }

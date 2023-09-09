@@ -782,13 +782,6 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   // the descriptor sets for the pipeline. Lastly, the GLSL is stiched, #defines
   // are added, and the code is compiled to SPIR-V.
   {
-    std::vector<sg::Material*> materials;
-    materials.resize(params->materialCount);
-    for (int i = 0; i < params->materialCount; i++)
-    {
-      materials[i] = params->materials[i]->sgMat;
-    }
-
     // 1. Generate GLSL from MDL
     struct HitShaderCompInfo
     {

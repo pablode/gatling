@@ -38,10 +38,10 @@ namespace gi::sg
   const char* CUTOUT_OPACITY_FUNC_NAME = "mdl_cutout_opacity";
   const char* MATERIAL_STATE_NAME = "State";
 
-  class Impl
+  class _Impl
   {
   public:
-    Impl(MdlRuntime& runtime, mi::base::Handle<mi::neuraylib::IMdl_backend> backend)
+    _Impl(MdlRuntime& runtime, mi::base::Handle<mi::neuraylib::IMdl_backend> backend)
     {
       m_backend = backend;
       m_backend->set_option("enable_exceptions", "off");
@@ -237,7 +237,7 @@ namespace gi::sg
       return false;
     }
 
-    m_impl = std::make_shared<Impl>(runtime, backend);
+    m_impl = std::make_shared<_Impl>(runtime, backend);
     return true;
   }
 

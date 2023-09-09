@@ -47,6 +47,6 @@ namespace gi::sg
                                 MdlGlslCodeGenResult& result);
 
   private:
-    std::shared_ptr<class Impl> m_impl;
+    std::shared_ptr<class _Impl> m_impl;
   };
 }
