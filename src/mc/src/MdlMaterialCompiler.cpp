@@ -17,6 +17,8 @@
 
 #include "MdlMaterialCompiler.h"
 
+#include "MdlRuntime.h"
+
 #include <mi/mdl_sdk.h>
 
 #include <atomic>
@@ -25,21 +27,24 @@
 
 namespace fs = std::filesystem;
 
-namespace gi::sg
+namespace
 {
-  const char* MODULE_PREFIX = "::gatling::";
+  static const char* MODULE_PREFIX = "::gatling::";
   std::atomic_uint32_t s_idCounter(0);
 
-  std::string _makeModuleName(std::string_view identifier)
+  std::string _MakeModuleName(std::string_view identifier)
   {
     uint32_t uniqueId = ++s_idCounter;
     return std::string(MODULE_PREFIX) + std::to_string(uniqueId) + "_" + std::string(identifier);
   }
+}
 
-  MdlMaterialCompiler::MdlMaterialCompiler(MdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths)
+namespace gtl
+{
+  McMdlMaterialCompiler::McMdlMaterialCompiler(McMdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths)
     : m_mdlSearchPaths(mdlSearchPaths)
   {
-    m_logger = mi::base::Handle<MdlLogger>(runtime.getLogger());
+    m_logger = mi::base::Handle<McMdlLogger>(runtime.getLogger());
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
     m_transaction = mi::base::Handle<mi::neuraylib::ITransaction>(runtime.getTransaction());
     m_config = mi::base::Handle<mi::neuraylib::IMdl_configuration>(runtime.getConfig());
@@ -47,11 +52,11 @@ namespace gi::sg
     m_impExpApi = mi::base::Handle<mi::neuraylib::IMdl_impexp_api>(runtime.getImpExpApi());
   }
 
-  bool MdlMaterialCompiler::compileFromString(std::string_view srcStr,
-                                              std::string_view identifier,
-                                              mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
+  bool McMdlMaterialCompiler::compileFromString(std::string_view srcStr,
+                                                std::string_view identifier,
+                                                mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
-    std::string moduleName = _makeModuleName(identifier);
+    std::string moduleName = _MakeModuleName(identifier);
 
     addStandardSearchPaths();
 
@@ -67,9 +72,9 @@ namespace gi::sg
     return result;
   }
 
-  bool MdlMaterialCompiler::compileFromFile(std::string_view filePath,
-                                            std::string_view identifier,
-                                            mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
+  bool McMdlMaterialCompiler::compileFromFile(std::string_view filePath,
+                                              std::string_view identifier,
+                                              mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
     std::string fileDir = fs::path(filePath).parent_path().string();
     std::string moduleName = "::" + fs::path(filePath).stem().string();
@@ -97,7 +102,7 @@ namespace gi::sg
     return result;
   }
 
-  void MdlMaterialCompiler::addStandardSearchPaths()
+  void McMdlMaterialCompiler::addStandardSearchPaths()
   {
     for (const std::string s : m_mdlSearchPaths)
     {
@@ -110,10 +115,10 @@ namespace gi::sg
     }
   }
 
-  bool MdlMaterialCompiler::compile(std::string_view identifier,
-                                    std::string_view moduleName,
-                                    std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
-                                    mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
+  bool McMdlMaterialCompiler::compile(std::string_view identifier,
+                                      std::string_view moduleName,
+                                      std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
+                                      mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
     mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
     context->set_option("resolve_resources", false);
@@ -128,10 +133,10 @@ namespace gi::sg
     return compResult;
   }
 
-  bool MdlMaterialCompiler::createCompiledMaterial(mi::neuraylib::IMdl_execution_context* context,
-                                                   std::string_view moduleName,
-                                                   std::string_view identifier,
-                                                   mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
+  bool McMdlMaterialCompiler::createCompiledMaterial(mi::neuraylib::IMdl_execution_context* context,
+                                                     std::string_view moduleName,
+                                                     std::string_view identifier,
+                                                     mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
     mi::base::Handle<const mi::IString> moduleDbName(m_factory->get_db_module_name(moduleName.data()));
     assert(moduleDbName);

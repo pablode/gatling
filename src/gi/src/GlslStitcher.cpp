@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "GlslSourceStitcher.h"
+#include "GlslStitcher.h"
 
 #include <string>
 #include <fstream>
@@ -37,9 +37,9 @@ namespace detail
   }
 }
 
-namespace gi::sg
+namespace gtl
 {
-  GlslSourceStitcher::GlslSourceStitcher()
+  GiGlslStitcher::GiGlslStitcher()
   {
     // Full float precision so that we don't cut off epsilons
     m_source.precision(std::numeric_limits<float>::max_digits10);
@@ -47,37 +47,37 @@ namespace gi::sg
     m_source.setf(std::ios::fixed | std::ios::showpoint);
   }
 
-  void GlslSourceStitcher::appendVersion()
+  void GiGlslStitcher::appendVersion()
   {
     m_source << "#version 460 core\n";
   }
 
-  void GlslSourceStitcher::appendDefine(std::string_view name)
+  void GiGlslStitcher::appendDefine(std::string_view name)
   {
     m_source << "#define " << name << "\n";
   }
 
-  void GlslSourceStitcher::appendDefine(std::string_view name, int32_t value)
+  void GiGlslStitcher::appendDefine(std::string_view name, int32_t value)
   {
     m_source << "#define " << name << " " << value << "\n";
   }
 
-  void GlslSourceStitcher::appendDefine(std::string_view name, float value)
+  void GiGlslStitcher::appendDefine(std::string_view name, float value)
   {
     m_source << "#define " << name << " " << value << "\n";
   }
 
-  void GlslSourceStitcher::appendRequiredExtension(std::string_view name)
+  void GiGlslStitcher::appendRequiredExtension(std::string_view name)
   {
     m_source << "#extension " << name << ": require\n";
   }
 
-  void GlslSourceStitcher::appendString(std::string_view value)
+  void GiGlslStitcher::appendString(std::string_view value)
   {
     m_source << value;
   }
 
-  bool GlslSourceStitcher::appendSourceFile(fs::path path)
+  bool GiGlslStitcher::appendSourceFile(fs::path path)
   {
     std::string text;
     if (!detail::readTextFromFile(path, text))
@@ -89,7 +89,7 @@ namespace gi::sg
     return true;
   }
 
-  bool GlslSourceStitcher::replaceFirst(std::string_view substring, std::string_view replacement)
+  bool GiGlslStitcher::replaceFirst(std::string_view substring, std::string_view replacement)
   {
     std::string tmp = m_source.str();
 
@@ -105,7 +105,7 @@ namespace gi::sg
     return true;
   }
 
-  std::string GlslSourceStitcher::source()
+  std::string GiGlslStitcher::source()
   {
     return m_source.str();
   }

@@ -17,15 +17,18 @@
 
 #include "MdlRuntime.h"
 
+#include "MdlLogger.h"
+#include "MdlNeurayLoader.h"
+
 #include <mi/mdl_sdk.h>
 
-namespace gi::sg
+namespace gtl
 {
-  MdlRuntime::MdlRuntime()
+  McMdlRuntime::McMdlRuntime()
   {
   }
 
-  MdlRuntime::~MdlRuntime()
+  McMdlRuntime::~McMdlRuntime()
   {
     if (m_transaction)
     {
@@ -37,9 +40,9 @@ namespace gi::sg
     }
   }
 
-  bool MdlRuntime::init(const char* resourcePath)
+  bool McMdlRuntime::init(std::string_view resourcePath)
   {
-    m_loader = std::make_unique<MdlNeurayLoader>();
+    m_loader = std::make_shared<McMdlNeurayLoader>();
     if (!m_loader->init(resourcePath))
     {
       return false;
@@ -48,7 +51,7 @@ namespace gi::sg
     m_neuray = mi::base::Handle<mi::neuraylib::INeuray>(m_loader->getNeuray());
 
     m_config = mi::base::Handle<mi::neuraylib::IMdl_configuration>(m_neuray->get_api_component<mi::neuraylib::IMdl_configuration>());
-    m_logger = mi::base::Handle<MdlLogger>(new MdlLogger());
+    m_logger = mi::base::Handle<McMdlLogger>(new McMdlLogger());
     m_config->set_logger(m_logger.get());
 
     if (m_neuray->start() != 0)
@@ -67,37 +70,37 @@ namespace gi::sg
     return true;
   }
 
-  mi::base::Handle<MdlLogger> MdlRuntime::getLogger()
+  mi::base::Handle<McMdlLogger> McMdlRuntime::getLogger()
   {
     return m_logger;
   }
 
-  mi::base::Handle<mi::neuraylib::IDatabase> MdlRuntime::getDatabase()
+  mi::base::Handle<mi::neuraylib::IDatabase> McMdlRuntime::getDatabase()
   {
     return m_database;
   }
 
-  mi::base::Handle<mi::neuraylib::ITransaction> MdlRuntime::getTransaction()
+  mi::base::Handle<mi::neuraylib::ITransaction> McMdlRuntime::getTransaction()
   {
     return m_transaction;
   }
 
-  mi::base::Handle<mi::neuraylib::IMdl_factory> MdlRuntime::getFactory()
+  mi::base::Handle<mi::neuraylib::IMdl_factory> McMdlRuntime::getFactory()
   {
     return m_factory;
   }
 
-  mi::base::Handle<mi::neuraylib::IMdl_configuration> MdlRuntime::getConfig()
+  mi::base::Handle<mi::neuraylib::IMdl_configuration> McMdlRuntime::getConfig()
   {
     return m_config;
   }
 
-  mi::base::Handle<mi::neuraylib::IMdl_impexp_api> MdlRuntime::getImpExpApi()
+  mi::base::Handle<mi::neuraylib::IMdl_impexp_api> McMdlRuntime::getImpExpApi()
   {
     return m_impExpApi;
   }
 
-  mi::base::Handle<mi::neuraylib::IMdl_backend_api> MdlRuntime::getBackendApi()
+  mi::base::Handle<mi::neuraylib::IMdl_backend_api> McMdlRuntime::getBackendApi()
   {
     return m_backendApi;
   }

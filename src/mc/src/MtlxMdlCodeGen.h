@@ -17,17 +17,27 @@
 
 #pragma once
 
-#include <mi/neuraylib/icompiled_material.h>
-
+#include <stdint.h>
 #include <string>
 
-namespace gi::sg
+#include <MaterialXCore/Document.h>
+#include <MaterialXFormat/File.h>
+#include <MaterialXGenShader/ShaderGenerator.h>
+
+namespace gtl
 {
-  struct MdlMaterial
+  class McMtlxMdlCodeGen
   {
-    mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    bool isEmissive;
-    bool isOpaque;
-    std::string resourcePathPrefix;
+  public:
+    explicit McMtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths);
+
+  public:
+    bool translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
+    bool translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
+
+  private:
+    MaterialX::FileSearchPath m_mtlxSearchPath;
+    MaterialX::DocumentPtr m_stdLib;
+    MaterialX::ShaderGeneratorPtr m_shaderGen;
   };
 }

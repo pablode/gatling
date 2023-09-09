@@ -31,45 +31,9 @@ static_assert(MI_NEURAYLIB_API_VERSION >= 48 &&
               MI_NEURAYLIB_API_VERSION < 52,
               "Unsupported MDL SDK version!");
 
-namespace gi::sg
+namespace
 {
-  MdlNeurayLoader::MdlNeurayLoader()
-    : m_dsoHandle(nullptr)
-    , m_neuray(nullptr)
-  {
-  }
-
-  MdlNeurayLoader::~MdlNeurayLoader()
-  {
-    if (m_neuray)
-    {
-      m_neuray.reset();
-    }
-    if (m_dsoHandle)
-    {
-      unloadDso();
-    }
-  }
-
-  bool MdlNeurayLoader::init(const char* resourcePath)
-  {
-    if (!loadDso(resourcePath))
-    {
-      return false;
-    }
-    if (!loadNeuray())
-    {
-      return false;
-    }
-    return true;
-  }
-
-  mi::base::Handle<mi::neuraylib::INeuray> MdlNeurayLoader::getNeuray() const
-  {
-    return m_neuray;
-  }
-
-  bool MdlNeurayLoader::loadDso(const char* resourcePath)
+  void* _LoadDso(std::string_view resourcePath)
   {
     std::string dsoFilename = std::string(resourcePath) + std::string("/libmdl_sdk" MI_BASE_DLL_FILE_EXT);
 
@@ -91,7 +55,7 @@ namespace gi::sg
       {
         LocalFree(buffer);
       }
-      return false;
+      return nullptr;
     }
 #else
     void* handle = dlopen(dsoFilename.c_str(), RTLD_LAZY);
@@ -103,74 +67,17 @@ namespace gi::sg
         error = "unknown error";
       }
       fprintf(stderr, "Failed to load MDL library: %s\n", error);
-      return false;
+      return nullptr;
     }
 #endif
 
-    m_dsoHandle = handle;
-    return true;
+    return handle;
   }
 
-  bool MdlNeurayLoader::loadNeuray()
+  void _UnloadDso(void* handle)
   {
 #ifdef MI_PLATFORM_WINDOWS
-    void* symbol = GetProcAddress(reinterpret_cast<HMODULE>(m_dsoHandle), "mi_factory");
-    if (!symbol)
-    {
-      LPTSTR buffer = NULL;
-      LPCTSTR message = TEXT("unknown error");
-      DWORD error_code = GetLastError();
-      if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                        FORMAT_MESSAGE_IGNORE_INSERTS, 0, error_code,
-                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &buffer, 0, 0))
-      {
-        message = buffer;
-      }
-      fprintf(stderr, "Failed to locate MDL library entry point (%u): %s\n", error_code, message);
-      if (buffer)
-      {
-        LocalFree(buffer);
-      }
-      return false;
-    }
-#else
-    void* symbol = dlsym(m_dsoHandle, "mi_factory");
-    if (!symbol)
-    {
-      const char* error = dlerror();
-      if (!error)
-      {
-        error = "unknown error";
-      }
-      fprintf(stderr, "Failed to locate MDL library entry point: %s\n", error);
-      return false;
-    }
-#endif
-
-    m_neuray = mi::base::Handle<mi::neuraylib::INeuray>(mi::neuraylib::mi_factory<mi::neuraylib::INeuray>(symbol));
-    if (m_neuray.is_valid_interface())
-    {
-      return true;
-    }
-
-    mi::base::Handle<mi::neuraylib::IVersion> version(mi::neuraylib::mi_factory<mi::neuraylib::IVersion>(symbol));
-    if (!version)
-    {
-      fprintf(stderr, "Failed to load MDL library: invalid library\n");
-    }
-    else
-    {
-      fprintf(stderr, "Failed to load MDL library: version %s does not match header version %s\n",
-        version->get_product_version(), MI_NEURAYLIB_PRODUCT_VERSION_STRING);
-    }
-
-    return false;
-  }
-
-  void MdlNeurayLoader::unloadDso()
-  {
-#ifdef MI_PLATFORM_WINDOWS
-    if (FreeLibrary(reinterpret_cast<HMODULE>(m_dsoHandle)))
+    if (FreeLibrary(reinterpret_cast<HMODULE>(handle)))
     {
       return;
     }
@@ -189,7 +96,7 @@ namespace gi::sg
       LocalFree(buffer);
     }
 #else
-    if (dlclose(m_dsoHandle) == 0)
+    if (dlclose(handle) == 0)
     {
       return;
     }
@@ -200,5 +107,104 @@ namespace gi::sg
     }
     fprintf(stderr, "Failed to unload MDL library: %s\n", error);
 #endif
+  }
+
+  mi::base::Handle<mi::neuraylib::INeuray> _LoadNeuray(void* dsoHandle)
+  {
+#ifdef MI_PLATFORM_WINDOWS
+    void* symbol = GetProcAddress(reinterpret_cast<HMODULE>(dsoHandle), "mi_factory");
+    if (!symbol)
+    {
+      LPTSTR buffer = NULL;
+      LPCTSTR message = TEXT("unknown error");
+      DWORD error_code = GetLastError();
+      if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                        FORMAT_MESSAGE_IGNORE_INSERTS, 0, error_code,
+                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &buffer, 0, 0))
+      {
+        message = buffer;
+      }
+      fprintf(stderr, "Failed to locate MDL library entry point (%u): %s\n", error_code, message);
+      if (buffer)
+      {
+        LocalFree(buffer);
+      }
+      return {};
+    }
+#else
+    void* symbol = dlsym(dsoHandle, "mi_factory");
+    if (!symbol)
+    {
+      const char* error = dlerror();
+      if (!error)
+      {
+        error = "unknown error";
+      }
+      fprintf(stderr, "Failed to locate MDL library entry point: %s\n", error);
+      return {};
+    }
+#endif
+
+    mi::base::Handle<mi::neuraylib::INeuray> neuray(mi::neuraylib::mi_factory<mi::neuraylib::INeuray>(symbol));
+    if (neuray.is_valid_interface())
+    {
+      return neuray;
+    }
+
+    mi::base::Handle<mi::neuraylib::IVersion> version(mi::neuraylib::mi_factory<mi::neuraylib::IVersion>(symbol));
+    if (!version)
+    {
+      fprintf(stderr, "Failed to load MDL library: invalid library\n");
+    }
+    else if (strcmp(version->get_product_version(), MI_NEURAYLIB_PRODUCT_VERSION_STRING))
+    {
+      fprintf(stderr, "Failed to load MDL library: version %s does not match header version %s\n",
+        version->get_product_version(), MI_NEURAYLIB_PRODUCT_VERSION_STRING);
+    }
+    else
+    {
+      fprintf(stderr, "Failed to load MDL library: unknown error\n");
+    }
+    return {};
+  }
+}
+
+namespace gtl
+{
+  McMdlNeurayLoader::McMdlNeurayLoader()
+    : m_dsoHandle(nullptr)
+    , m_neuray(nullptr)
+  {
+  }
+
+  McMdlNeurayLoader::~McMdlNeurayLoader()
+  {
+    m_neuray.reset();
+    if (m_dsoHandle)
+    {
+      _UnloadDso(m_dsoHandle);
+    }
+  }
+
+  bool McMdlNeurayLoader::init(std::string_view resourcePath)
+  {
+    m_dsoHandle = _LoadDso(resourcePath);
+    if (!m_dsoHandle)
+    {
+      return false;
+    }
+
+    m_neuray = _LoadNeuray(m_dsoHandle);
+    if (!m_neuray)
+    {
+      return false;
+    }
+
+    return true;
+  }
+
+  mi::base::Handle<mi::neuraylib::INeuray> McMdlNeurayLoader::getNeuray() const
+  {
+    return m_neuray;
   }
 }

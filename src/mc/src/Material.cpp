@@ -15,17 +15,4 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#pragma once
-
-#include <MaterialXCore/Document.h>
-
-#include <memory>
-
-namespace gi::sg
-{
-  class MtlxDocumentPatcher
-  {
-  public:
-    void patch(MaterialX::DocumentPtr document);
-  };
-}
+#include "Material.h"

@@ -24,12 +24,12 @@
 
 namespace fs = std::filesystem;
 
-namespace gi::sg
+namespace gtl
 {
-  class GlslSourceStitcher
+  class GiGlslStitcher
   {
   public:
-    GlslSourceStitcher();
+    GiGlslStitcher();
 
     void appendVersion();
 

@@ -26,18 +26,21 @@
 #include <mi/neuraylib/idatabase.h>
 #include <mi/neuraylib/itransaction.h>
 #include <mi/neuraylib/imaterial_instance.h>
-#include <mi/neuraylib/imdl_impexp_api.h>
+#include <mi/neuraylib/imdl_configuration.h>
 #include <mi/neuraylib/imdl_execution_context.h>
 #include <mi/neuraylib/imdl_factory.h>
+#include <mi/neuraylib/imdl_impexp_api.h>
 
-#include "MdlRuntime.h"
+#include "MdlLogger.h"
 
-namespace gi::sg
+namespace gtl
 {
-  class MdlMaterialCompiler
+  class McMdlRuntime;
+
+  class McMdlMaterialCompiler
   {
   public:
-    MdlMaterialCompiler(MdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths);
+    McMdlMaterialCompiler(McMdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths);
 
   public:
     bool compileFromString(std::string_view srcStr,
@@ -64,7 +67,7 @@ namespace gi::sg
   private:
     const std::vector<std::string> m_mdlSearchPaths;
 
-    mi::base::Handle<MdlLogger> m_logger;
+    mi::base::Handle<McMdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
     mi::base::Handle<mi::neuraylib::IMdl_configuration> m_config;

@@ -9,28 +9,12 @@ add_library(
   src/texsys.h
   src/texsys.cpp
   src/turbo.h
-  src/sg/ShaderGen.h
-  src/sg/ShaderGen.cpp
-  src/sg/GlslangShaderCompiler.h
-  src/sg/GlslangShaderCompiler.cpp
-  src/sg/GlslSourceStitcher.h
-  src/sg/GlslSourceStitcher.cpp
-  src/sg/MdlGlslCodeGen.h
-  src/sg/MdlGlslCodeGen.cpp
-  src/sg/MdlLogger.h
-  src/sg/MdlLogger.cpp
-  src/sg/MdlMaterial.h
-  src/sg/MdlMaterial.cpp
-  src/sg/MdlMaterialCompiler.h
-  src/sg/MdlMaterialCompiler.cpp
-  src/sg/MdlNeurayLoader.h
-  src/sg/MdlNeurayLoader.cpp
-  src/sg/MdlRuntime.h
-  src/sg/MdlRuntime.cpp
-  src/sg/MtlxDocumentPatcher.h
-  src/sg/MtlxDocumentPatcher.cpp
-  src/sg/MtlxMdlCodeGen.h
-  src/sg/MtlxMdlCodeGen.cpp
+  src/GlslShaderCompiler.h
+  src/GlslShaderCompiler.cpp
+  src/GlslShaderGen.h
+  src/GlslShaderGen.cpp
+  src/GlslStitcher.h
+  src/GlslStitcher.cpp
 )
 
 target_include_directories(
@@ -40,7 +24,6 @@ target_include_directories(
   PRIVATE
     src
     shaders
-    ${MDL_INCLUDE_DIR}
 )
 
 target_compile_definitions(
@@ -56,17 +39,16 @@ target_link_libraries(
   gi
   PRIVATE
     gb
+    mc
     cgpu
     ggpu
     imgio
     glm
     MaterialXCore
-    MaterialXFormat
-    MaterialXGenMdl
+    efsw-static
     glslang
     glslang-default-resource-limits
     SPIRV
-    efsw-static
 )
 
 if(OpenMP_CXX_FOUND)

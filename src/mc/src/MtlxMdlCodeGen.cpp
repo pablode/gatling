@@ -96,9 +96,9 @@ namespace
   }
 }
 
-namespace gi::sg
+namespace gtl
 {
-  MtlxMdlCodeGen::MtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths)
+  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths)
   {
     // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
@@ -166,7 +166,7 @@ namespace gi::sg
     return nullptr;
   }
 
-  bool MtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
+  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
   {
     try
     {
@@ -183,7 +183,7 @@ namespace gi::sg
     }
   }
 
-  bool MtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
+  bool McMtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -196,7 +196,7 @@ namespace gi::sg
     mx::ShaderPtr shader = nullptr;
     try
     {
-      MtlxDocumentPatcher patcher;
+      McMtlxDocumentPatcher patcher;
       patcher.patch(mtlxDoc);
 
       mx::TypedElementPtr element = _FindSurfaceShaderElement(mtlxDoc);

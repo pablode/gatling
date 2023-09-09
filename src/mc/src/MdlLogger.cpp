@@ -21,9 +21,9 @@
 
 #include <stdio.h>
 
-namespace gi::sg
+namespace
 {
-  const char* _miMessageSeverityToCStr(mi::base::Message_severity severity)
+  const char* _MiMessageSeverityToCStr(mi::base::Message_severity severity)
   {
     switch (severity)
     {
@@ -45,7 +45,7 @@ namespace gi::sg
     return "";
   }
 
-  const char* _miMessageKindToCStr(mi::neuraylib::IMessage::Kind kind)
+  const char* _MiMessageKindToCStr(mi::neuraylib::IMessage::Kind kind)
   {
     switch (kind)
     {
@@ -66,11 +66,14 @@ namespace gi::sg
     }
     return "";
   }
+}
 
-  void MdlLogger::message(mi::base::Message_severity level,
-                          const char* moduleCategory,
-                          const mi::base::Message_details& details,
-                          const char* message)
+namespace gtl
+{
+  void McMdlLogger::message(mi::base::Message_severity level,
+                            const char* moduleCategory,
+                            const mi::base::Message_details& details,
+                            const char* message)
   {
 #ifdef NDEBUG
     const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_ERROR;
@@ -92,7 +95,7 @@ namespace gi::sg
       return;
     }
 
-    const char* s_severity = _miMessageSeverityToCStr(level);
+    const char* s_severity = _MiMessageSeverityToCStr(level);
     FILE* os = (level <= mi::base::MESSAGE_SEVERITY_ERROR) ? stderr : stdout;
     fprintf(os, "[%s] (%s) %s\n", s_severity, moduleCategory, message);
 #ifdef MI_PLATFORM_WINDOWS
@@ -100,28 +103,28 @@ namespace gi::sg
 #endif
   }
 
-  void MdlLogger::message(mi::base::Message_severity level,
-                          const char* moduleCategory,
-                          const char* message)
+  void McMdlLogger::message(mi::base::Message_severity level,
+                            const char* moduleCategory,
+                            const char* message)
   {
     this->message(level, moduleCategory, mi::base::Message_details{}, message);
   }
 
-  void MdlLogger::message(mi::base::Message_severity level,
-                          const char* message)
+  void McMdlLogger::message(mi::base::Message_severity level,
+                            const char* message)
   {
     const char* MODULE_CATEGORY = "shadergen";
     this->message(level, MODULE_CATEGORY, message);
   }
 
-  void MdlLogger::flushContextMessages(mi::neuraylib::IMdl_execution_context* context)
+  void McMdlLogger::flushContextMessages(mi::neuraylib::IMdl_execution_context* context)
   {
     for (mi::Size i = 0, n = context->get_messages_count(); i < n; ++i)
     {
       mi::base::Handle<const mi::neuraylib::IMessage> message(context->get_message(i));
 
       const char* s_msg = message->get_string();
-      const char* s_kind = _miMessageKindToCStr(message->get_kind());
+      const char* s_kind = _MiMessageKindToCStr(message->get_kind());
       this->message(message->get_severity(), s_kind, s_msg);
     }
     context->clear_messages();

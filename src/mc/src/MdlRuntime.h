@@ -17,10 +17,8 @@
 
 #pragma once
 
-#include "MdlLogger.h"
-#include "MdlNeurayLoader.h"
-
 #include <mi/base/handle.h>
+#include <mi/neuraylib/ineuray.h>
 #include <mi/neuraylib/idatabase.h>
 #include <mi/neuraylib/itransaction.h>
 #include <mi/neuraylib/imdl_configuration.h>
@@ -29,19 +27,25 @@
 #include <mi/neuraylib/imdl_factory.h>
 
 #include <memory>
+#include <string_view>
 
-namespace gi::sg
+#include "MdlLogger.h"
+
+namespace gtl
 {
-  class MdlRuntime
+  class McMdlLogger;
+  class McMdlNeurayLoader;
+
+  class McMdlRuntime
   {
   public:
-    MdlRuntime();
-    ~MdlRuntime();
+    McMdlRuntime();
+    ~McMdlRuntime();
 
   public:
-    bool init(const char* resourcePath);
+    bool init(std::string_view resourcePath);
 
-    mi::base::Handle<MdlLogger> getLogger();
+    mi::base::Handle<McMdlLogger> getLogger();
     mi::base::Handle<mi::neuraylib::IDatabase> getDatabase();
     mi::base::Handle<mi::neuraylib::ITransaction> getTransaction();
     mi::base::Handle<mi::neuraylib::IMdl_factory> getFactory();
@@ -50,9 +54,9 @@ namespace gi::sg
     mi::base::Handle<mi::neuraylib::IMdl_backend_api> getBackendApi();
 
   private:
-    std::unique_ptr<MdlNeurayLoader> m_loader;
+    std::shared_ptr<McMdlNeurayLoader> m_loader;
 
-    mi::base::Handle<MdlLogger> m_logger;
+    mi::base::Handle<McMdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::INeuray> m_neuray;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;

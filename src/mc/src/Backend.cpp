@@ -15,40 +15,46 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MdlGlslCodeGen.h"
+#include "Backend.h"
 
 #include <mi/mdl_sdk.h>
 
 #include <sstream>
 #include <cassert>
+#include <array>
 #include <filesystem>
 
+#include <smallVector.h>
+
 #include "MdlMaterial.h"
-#include "MdlRuntime.h"
 #include "MdlLogger.h"
+#include "MdlRuntime.h"
+#include "Runtime.h"
 
 namespace fs = std::filesystem;
 
-namespace gi::sg
+namespace gtl
 {
-  const char* SCATTERING_FUNC_NAME = "mdl_bsdf_scattering";
-  const char* EMISSION_FUNC_NAME = "mdl_edf_emission";
-  const char* EMISSION_INTENSITY_FUNC_NAME = "mdl_edf_emission_intensity";
-  const char* THIN_WALLED_FUNC_NAME = "mdl_thin_walled";
-  const char* VOLUME_ABSORPTION_FUNC_NAME = "mdl_absorption_coefficient";
-  const char* CUTOUT_OPACITY_FUNC_NAME = "mdl_cutout_opacity";
-  const char* MATERIAL_STATE_NAME = "State";
+  const static std::array<mi::neuraylib::Target_function_description, MC_DF_FLAG_COUNT> FUNC_DESCS = {
+    mi::neuraylib::Target_function_description("surface.scattering", "mdl_bsdf_scattering"),
+    mi::neuraylib::Target_function_description("surface.emission.emission", "mdl_edf_emission"),
+    mi::neuraylib::Target_function_description("surface.emission.intensity", "mdl_edf_emission_intensity"),
+    mi::neuraylib::Target_function_description("thin_walled", "mdl_thin_walled"),
+    mi::neuraylib::Target_function_description("volume.absorption_coefficient", "mdl_absorption_coefficient"),
+    mi::neuraylib::Target_function_description("geometry.cutout_opacity", "mdl_cutout_opacity")
+  };
+  const static char* MATERIAL_STATE_NAME = "State";
 
   class _Impl
   {
   public:
-    _Impl(MdlRuntime& runtime, mi::base::Handle<mi::neuraylib::IMdl_backend> backend)
+    _Impl(McMdlRuntime& runtime, mi::base::Handle<mi::neuraylib::IMdl_backend> backend)
     {
       m_backend = backend;
       m_backend->set_option("enable_exceptions", "off");
       m_backend->set_option("use_renderer_adapt_normal", "on");
 
-      m_logger = mi::base::Handle<MdlLogger>(runtime.getLogger());
+      m_logger = mi::base::Handle<McMdlLogger>(runtime.getLogger());
       m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
       m_transaction = mi::base::Handle<mi::neuraylib::ITransaction>(runtime.getTransaction());
 
@@ -60,7 +66,7 @@ namespace gi::sg
     bool generateGlslWithDfs(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                              std::string& glslSrc,
-                             std::vector<TextureResource>& textureResources)
+                             std::vector<McTextureDescription>& textureDescriptions)
     {
       mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), m_context.get()));
       m_logger->flushContextMessages(m_context.get());
@@ -93,21 +99,21 @@ namespace gi::sg
 
       assert(targetCode->get_ro_data_segment_count() == 0);
 
-      extractTextureInfos(targetCode, textureResources);
+      extractTextureInfos(targetCode, textureDescriptions);
       glslSrc = targetCode->get_code();
 
       return true;
     }
 
     void extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
-                             std::vector<TextureResource>& textureResources)
+                             std::vector<McTextureDescription>& textureDescriptions)
     {
 #if MI_NEURAYLIB_API_VERSION < 51
       size_t texCount = targetCode->get_body_texture_count();
 #else
       size_t texCount = targetCode->get_texture_count();
 #endif
-      textureResources.reserve(texCount);
+      textureDescriptions.reserve(texCount);
 
       uint32_t binding = 0;
 
@@ -121,7 +127,7 @@ namespace gi::sg
         }
 #endif
 
-        TextureResource textureResource;
+        McTextureDescription textureResource;
         textureResource.binding = binding++;
         textureResource.is3dImage = false;
         textureResource.width = 1;
@@ -174,7 +180,7 @@ namespace gi::sg
           break;
         }
 
-        textureResources.push_back(textureResource);
+        textureDescriptions.push_back(textureResource);
       }
     }
 
@@ -218,47 +224,43 @@ namespace gi::sg
     }
 
   public:
-    mi::base::Handle<MdlLogger> m_logger;
+    mi::base::Handle<McMdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IMdl_backend> m_backend;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
     mi::base::Handle<mi::neuraylib::IMdl_execution_context> m_context;
   };
 
-  bool MdlGlslCodeGen::init(MdlRuntime& runtime)
+  bool McBackend::init(McRuntime& runtime)
   {
     assert(!m_impl);
 
-    mi::base::Handle<mi::neuraylib::IMdl_backend_api> backendApi(runtime.getBackendApi());
+    McMdlRuntime& mdlRuntime = runtime.getMdlRuntime();
+    mi::base::Handle<mi::neuraylib::IMdl_backend_api> backendApi(mdlRuntime.getBackendApi());
     mi::base::Handle<mi::neuraylib::IMdl_backend> backend(backendApi->get_backend(mi::neuraylib::IMdl_backend_api::MB_GLSL));
     if (!backend.is_valid_interface())
     {
-      mi::base::Handle<MdlLogger> logger(runtime.getLogger());
+      mi::base::Handle<McMdlLogger> logger(mdlRuntime.getLogger());
       logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "GLSL backend not supported by MDL runtime");
       return false;
     }
 
-    m_impl = std::make_shared<_Impl>(runtime, backend);
+    m_impl = std::make_shared<_Impl>(mdlRuntime, backend);
     return true;
   }
 
-  bool MdlGlslCodeGen::genMaterialShadingCode(const MdlMaterial& material, MdlGlslCodeGenResult& result)
+  bool McBackend::genGlsl(const McMdlMaterial& material, McDfFlags dfFlags, McGlslGenResult& result)
   {
-    std::vector<mi::neuraylib::Target_function_description> genFunctions;
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.scattering", SCATTERING_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.emission", EMISSION_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("surface.emission.intensity", EMISSION_INTENSITY_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", THIN_WALLED_FUNC_NAME));
-    genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", VOLUME_ABSORPTION_FUNC_NAME));
+    GbSmallVector<mi::neuraylib::Target_function_description, MC_DF_FLAG_COUNT> fDescs;
 
-    return m_impl->generateGlslWithDfs(material.compiledMaterial, genFunctions, result.glslSource, result.textureResources);
-  }
+    for (int i = 0; i < MC_DF_FLAG_COUNT; i++)
+    {
+      if (dfFlags & (1 << i))
+      {
+        fDescs.push_back(FUNC_DESCS[i]);
+      }
+    }
 
-  bool MdlGlslCodeGen::genMaterialOpacityCode(const MdlMaterial& material, MdlGlslCodeGenResult& result)
-  {
-    std::vector<mi::neuraylib::Target_function_description> genFunctions;
-    genFunctions.push_back(mi::neuraylib::Target_function_description("geometry.cutout_opacity", CUTOUT_OPACITY_FUNC_NAME));
-
-    return m_impl->generateGlslWithDfs(material.compiledMaterial, genFunctions, result.glslSource, result.textureResources);
+    return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source, result.textureDescriptions);
   }
 }

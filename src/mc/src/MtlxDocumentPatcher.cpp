@@ -401,9 +401,9 @@ void _PatchNodeNames(mx::DocumentPtr document)
   }
 }
 
-namespace gi::sg
+namespace gtl
 {
-  void MtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
+  void McMtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
   {
     _SanitizeFilePaths(document);
 

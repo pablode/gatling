@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "GlslangShaderCompiler.h"
+#include "GlslShaderCompiler.h"
 
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Public/ResourceLimits.h>
@@ -25,7 +25,7 @@
 
 namespace
 {
-  using ShaderStage = gi::sg::GlslangShaderCompiler::ShaderStage;
+  using ShaderStage = gtl::GiGlslShaderCompiler::ShaderStage;
 
   EShLanguage _GetGlslangShaderLanguage(ShaderStage stage)
   {
@@ -43,7 +43,7 @@ namespace
   }
 }
 
-namespace gi::sg
+namespace gtl
 {
   class _FileIncluder : public glslang::TShader::Includer
   {
@@ -98,30 +98,38 @@ namespace gi::sg
 
   static bool s_glslangInitialized = false;
 
-  bool GlslangShaderCompiler::init()
+  bool GiGlslShaderCompiler::init()
   {
     if (s_glslangInitialized)
     {
+      assert(false);
       return true;
     }
-    return glslang::InitializeProcess();
+
+    s_glslangInitialized = glslang::InitializeProcess();
+
+    return s_glslangInitialized;
   }
 
-  void GlslangShaderCompiler::deinit()
+  void GiGlslShaderCompiler::deinit()
   {
     if (!s_glslangInitialized)
     {
+      assert(false);
       return;
     }
+
     glslang::FinalizeProcess();
+
+    s_glslangInitialized = false;
   }
 
-  GlslangShaderCompiler::GlslangShaderCompiler(const fs::path& shaderPath)
+  GiGlslShaderCompiler::GiGlslShaderCompiler(const fs::path& shaderPath)
     : m_fileIncluder(std::make_shared<_FileIncluder>(shaderPath))
   {
   }
 
-  bool GlslangShaderCompiler::compileGlslToSpv(ShaderStage stage,
+  bool GiGlslShaderCompiler::compileGlslToSpv(ShaderStage stage,
                                                std::string_view source,
                                                std::vector<uint8_t>& spv)
   {

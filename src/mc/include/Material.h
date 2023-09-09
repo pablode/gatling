@@ -17,27 +17,18 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <string>
+#include <memory>
 
-#include <MaterialXCore/Document.h>
-#include <MaterialXFormat/File.h>
-#include <MaterialXGenShader/ShaderGenerator.h>
-
-namespace gi::sg
+namespace gtl
 {
-  class MtlxMdlCodeGen
+  struct McMdlMaterial;
+
+  struct McMaterial
   {
-  public:
-    explicit MtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths);
-
-  public:
-    bool translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
-    bool translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
-
-  private:
-    MaterialX::FileSearchPath m_mtlxSearchPath;
-    MaterialX::DocumentPtr m_stdLib;
-    MaterialX::ShaderGeneratorPtr m_shaderGen;
+    bool isEmissive;
+    bool isOpaque;
+    std::shared_ptr<McMdlMaterial> mdlMaterial;
+    std::string resourcePathPrefix;
   };
 }

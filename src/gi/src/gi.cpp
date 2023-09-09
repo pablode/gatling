@@ -42,7 +42,10 @@
 #ifndef NDEBUG
 #include <efsw/efsw.hpp>
 #endif
-#include "sg/ShaderGen.h"
+#include "GlslShaderGen.h"
+#include <Material.h>
+#include <Frontend.h>
+#include <Runtime.h>
 #include "interface/rp_main.h"
 
 #include <MaterialXCore/Document.h>
@@ -53,6 +56,11 @@ using namespace gtl;
 namespace Rp = gtl::shader_interface::rp_main;
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
+
+namespace gtl
+{
+  class McRuntime;
+}
 
 struct GiGpuBufferView
 {
@@ -85,7 +93,7 @@ struct GiShaderCache
 
 struct GiMaterial
 {
-  sg::MdlMaterial* sgMat;
+  McMaterial* mcMat;
 };
 
 struct GiMesh
@@ -136,7 +144,9 @@ CgpuPhysicalDeviceFeatures s_deviceFeatures;
 CgpuPhysicalDeviceProperties s_deviceProperties;
 CgpuSampler s_texSampler;
 std::unique_ptr<gtl::GgpuStager> s_stager;
-std::unique_ptr<sg::ShaderGen> s_shaderGen;
+std::unique_ptr<GiGlslShaderGen> s_shaderGen;
+std::unique_ptr<McRuntime> s_mcRuntime;
+std::unique_ptr<McFrontend> s_mcFrontend;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
 std::unique_ptr<gi::TexSys> s_texSys;
@@ -265,15 +275,23 @@ GiStatus giInitialize(const GiInitParams* params)
   const char* shaderPath = GATLING_SHADER_SOURCE_DIR;
 #endif
 
-  sg::ShaderGen::InitParams sgParams = {
+  s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params->resourcePath));
+  if (!s_mcRuntime)
+  {
+    return GI_ERROR;
+  }
+
+  s_mcFrontend = std::make_unique<McFrontend>(params->mdlSearchPaths, params->mtlxSearchPaths, *s_mcRuntime);
+
+  GiGlslShaderGen::InitParams shaderGenParams = {
     .resourcePath = params->resourcePath,
     .shaderPath = shaderPath,
     .mdlSearchPaths = params->mdlSearchPaths,
     .mtlxSearchPaths = params->mtlxSearchPaths
   };
 
-  s_shaderGen = std::make_unique<sg::ShaderGen>();
-  if (!s_shaderGen->init(sgParams))
+  s_shaderGen = std::make_unique<GiGlslShaderGen>();
+  if (!s_shaderGen->init(shaderGenParams, *s_mcRuntime))
   {
     return GI_ERROR;
   }
@@ -315,6 +333,8 @@ void giTerminate()
   cgpuDestroySampler(s_device, s_texSampler);
   cgpuDestroyDevice(s_device);
   cgpuTerminate();
+  s_mcFrontend.reset();
+  s_mcRuntime.reset();
 }
 
 void giRegisterAssetReader(GiAssetReader* reader)
@@ -324,14 +344,14 @@ void giRegisterAssetReader(GiAssetReader* reader)
 
 GiMaterial* giCreateMaterialFromMtlxStr(const char* str)
 {
-  sg::MdlMaterial* sgMat = s_shaderGen->createMaterialFromMtlxStr(str);
-  if (!sgMat)
+  McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(str);
+  if (!mcMat)
   {
     return nullptr;
   }
 
   GiMaterial* mat = new GiMaterial;
-  mat->sgMat = sgMat;
+  mat->mcMat = mcMat;
   return mat;
 }
 
@@ -343,33 +363,33 @@ GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::D
     return nullptr;
   }
 
-  sg::MdlMaterial* sgMat = s_shaderGen->createMaterialFromMtlxDoc(resolvedDoc);
-  if (!sgMat)
+  McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc);
+  if (!mcMat)
   {
     return nullptr;
   }
 
   GiMaterial* mat = new GiMaterial;
-  mat->sgMat = sgMat;
+  mat->mcMat = mcMat;
   return mat;
 }
 
 GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier)
 {
-  sg::MdlMaterial* sgMat = s_shaderGen->createMaterialFromMdlFile(filePath, subIdentifier);
-  if (!sgMat)
+  McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier);
+  if (!mcMat)
   {
     return nullptr;
   }
 
   GiMaterial* mat = new GiMaterial;
-  mat->sgMat = sgMat;
+  mat->mcMat = mcMat;
   return mat;
 }
 
 void giDestroyMaterial(GiMaterial* mat)
 {
-  s_shaderGen->destroyMaterial(mat->sgMat);
+  delete mat->mcMat;
   delete mat;
 }
 
@@ -551,7 +571,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         .indexBuffer = indexBuffer,
         .maxVertex = (uint32_t) vertices.size(),
         .triangleCount = (uint32_t) indices.size() / 3,
-        .isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sgMat)
+        .isOpaque = mesh->material->mcMat->isOpaque
       };
 
       CgpuBlas blas;
@@ -738,7 +758,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   std::vector<CgpuImage> images_2d;
   std::vector<CgpuImage> images_3d;
   std::vector<CgpuRtHitGroup> hitGroups;
-  std::vector<sg::TextureResource> textureResources;
+  std::vector<McTextureDescription> textureDescriptions;
   uint32_t texCount2d = 0;
   uint32_t texCount3d = 0;
   bool hasPipelineClosestHitShader = false;
@@ -785,7 +805,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     // 1. Generate GLSL from MDL
     struct HitShaderCompInfo
     {
-      sg::ShaderGen::MaterialGlslGenInfo genInfo;
+      GiGlslShaderGen::MaterialGenInfo genInfo;
       uint32_t texOffset2d = 0;
       uint32_t texOffset3d = 0;
       std::vector<uint8_t> spv;
@@ -808,8 +828,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
       HitGroupCompInfo groupInfo;
       {
-        sg::ShaderGen::MaterialGlslGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialShadingGenInfo(*mat->sgMat, genInfo))
+        GiGlslShaderGen::MaterialGenInfo genInfo;
+        if (!s_shaderGen->generateMaterialShadingGenInfo(*mat->mcMat, genInfo))
         {
           threadWorkFailed = true;
           continue;
@@ -819,10 +839,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitInfo.genInfo = genInfo;
         groupInfo.closestHitInfo = hitInfo;
       }
-      if (!s_shaderGen->isMaterialOpaque(mat->sgMat))
+      if (!mat->mcMat->isOpaque)
       {
-        sg::ShaderGen::MaterialGlslGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialOpacityGenInfo(*mat->sgMat, genInfo))
+        GiGlslShaderGen::MaterialGenInfo genInfo;
+        if (!s_shaderGen->generateMaterialOpacityGenInfo(*mat->mcMat, genInfo))
         {
           threadWorkFailed = true;
           continue;
@@ -849,10 +869,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       closestHitShaderCompInfo.texOffset2d = texCount2d;
       closestHitShaderCompInfo.texOffset3d = texCount3d;
 
-      for (const sg::TextureResource& tr : closestHitShaderCompInfo.genInfo.textureResources)
+      for (const McTextureDescription& tr : closestHitShaderCompInfo.genInfo.textureDescriptions)
       {
         (tr.is3dImage ? texCount3d : texCount2d)++;
-        textureResources.push_back(tr);
+        textureDescriptions.push_back(tr);
       }
 
       if (groupInfo.anyHitInfo)
@@ -861,10 +881,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         anyHitShaderCompInfo.texOffset2d = texCount2d;
         anyHitShaderCompInfo.texOffset3d = texCount3d;
 
-        for (const sg::TextureResource& tr : anyHitShaderCompInfo.genInfo.textureResources)
+        for (const McTextureDescription& tr : anyHitShaderCompInfo.genInfo.textureDescriptions)
         {
           (tr.is3dImage ? texCount3d : texCount2d)++;
-          textureResources.push_back(tr);
+          textureDescriptions.push_back(tr);
         }
 
         hasPipelineAnyHitShader |= true;
@@ -882,10 +902,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
       // Closest hit
       {
-        sg::ShaderGen::ClosestHitShaderParams hitParams;
+        GiGlslShaderGen::ClosestHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.chit";
-        hitParams.isOpaque = s_shaderGen->isMaterialOpaque(params->materials[i]->sgMat);
+        hitParams.isOpaque = params->materials[i]->mcMat->isOpaque;
         hitParams.nextEventEstimation = params->nextEventEstimation;
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
@@ -906,7 +926,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       // Any hit
       if (compInfo.anyHitInfo)
       {
-        sg::ShaderGen::AnyHitShaderParams hitParams;
+        GiGlslShaderGen::AnyHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
@@ -1022,7 +1042,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   // Create ray generation shader.
   {
-    sg::ShaderGen::RaygenShaderParams rgenParams;
+    GiGlslShaderGen::RaygenShaderParams rgenParams;
     rgenParams.aovId = params->aovId;
     rgenParams.depthOfField = params->depthOfField;
     rgenParams.filterImportanceSampling = params->filterImportanceSampling;
@@ -1057,7 +1077,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   // Create miss shaders.
   {
-    sg::ShaderGen::MissShaderParams missParams;
+    GiGlslShaderGen::MissShaderParams missParams;
     missParams.domeLightEnabled = domeLightEnabled;
     missParams.domeLightCameraVisibility = params->domeLightCameraVisibility;
     missParams.sphereLightCount = scene->sphereLights.elementCount();
@@ -1114,7 +1134,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   }
 
   // Upload textures.
-  if (textureResources.size() > 0 && !s_texSys->loadTextureResources(textureResources, images_2d, images_3d))
+  if (textureDescriptions.size() > 0 && !s_texSys->loadtextureDescriptions(textureDescriptions, images_2d, images_3d))
   {
     goto cleanup;
   }

@@ -17,34 +17,39 @@
 
 #pragma once
 
-
-#include <stdint.h>
-#include <string>
 #include <vector>
+#include <string_view>
+#include <filesystem>
 
-#include "ShaderGen.h"
+namespace fs = std::filesystem;
 
-namespace gi::sg
+namespace gtl
 {
-  struct MdlGlslCodeGenResult
-  {
-    std::string glslSource;
-    std::vector<TextureResource> textureResources;
-  };
-
-  class MdlMaterial;
-  class MdlRuntime;
-
-  class MdlGlslCodeGen
+  class GiGlslShaderCompiler
   {
   public:
-    bool init(MdlRuntime& runtime);
+    enum class ShaderStage
+    {
+      AnyHit,
+      ClosestHit,
+      Compute,
+      Miss,
+      RayGen
+    };
 
-    bool genMaterialShadingCode(const MdlMaterial& material, MdlGlslCodeGenResult& result);
+  public:
+    GiGlslShaderCompiler(const fs::path& shaderPath);
 
-    bool genMaterialOpacityCode(const MdlMaterial& material, MdlGlslCodeGenResult& result);
+  public:
+    bool compileGlslToSpv(ShaderStage stage,
+                          std::string_view source,
+                          std::vector<uint8_t>& spv);
+
+    static bool init();
+
+    static void deinit();
 
   private:
-    std::shared_ptr<class _Impl> m_impl;
+    std::shared_ptr<class _FileIncluder> m_fileIncluder;
   };
 }

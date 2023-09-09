@@ -17,39 +17,27 @@
 
 #pragma once
 
-#include <vector>
-#include <string_view>
-#include <filesystem>
+#include <mi/base/interface_implement.h>
+#include <mi/base/ilogger.h>
+#include <mi/neuraylib/imdl_execution_context.h>
 
-namespace fs = std::filesystem;
-
-namespace gi::sg
+namespace gtl
 {
-  class GlslangShaderCompiler
+  class McMdlLogger : public mi::base::Interface_implement<mi::base::ILogger>
   {
   public:
-    enum class ShaderStage
-    {
-      AnyHit,
-      ClosestHit,
-      Compute,
-      Miss,
-      RayGen
-    };
+    void message(mi::base::Message_severity level,
+                 const char* moduleCategory,
+                 const mi::base::Message_details& details,
+                 const char* message) override;
 
-  public:
-    GlslangShaderCompiler(const fs::path& shaderPath);
+    void message(mi::base::Message_severity level,
+                 const char* moduleCategory,
+                 const char* message) override;
 
-  public:
-    bool compileGlslToSpv(ShaderStage stage,
-                          std::string_view source,
-                          std::vector<uint8_t>& spv);
+    void message(mi::base::Message_severity level,
+                 const char* message);
 
-    static bool init();
-
-    static void deinit();
-
-  private:
-    std::shared_ptr<class _FileIncluder> m_fileIncluder;
+    void flushContextMessages(mi::neuraylib::IMdl_execution_context* context);
   };
 }

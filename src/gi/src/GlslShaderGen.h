@@ -23,26 +23,19 @@
 #include <string>
 #include <memory>
 #include <filesystem>
-#include <MaterialXCore/Document.h>
+
+#include <Backend.h>
 
 namespace fs = std::filesystem;
 
-namespace gi::sg
+namespace gtl
 {
-  struct MdlMaterial;
+  struct McMaterial;
+  class McRuntime;
+  class McBackend;
+  class GiGlslShaderCompiler;
 
-  struct TextureResource
-  {
-    bool is3dImage;
-    uint32_t binding;
-    uint32_t width;
-    uint32_t height;
-    uint32_t depth;
-    std::vector<uint8_t> data;
-    std::string filePath;
-  };
-
-  class ShaderGen
+  class GiGlslShaderGen
   {
   public:
     struct InitParams
@@ -54,27 +47,21 @@ namespace gi::sg
     };
 
   public:
-    bool init(const InitParams& params);
-    ~ShaderGen();
+    bool init(const InitParams& params, McRuntime& runtime);
+
+    ~GiGlslShaderGen();
 
   public:
-    MdlMaterial* createMaterialFromMtlxStr(std::string_view docStr);
-    MdlMaterial* createMaterialFromMtlxDoc(const MaterialX::DocumentPtr doc);
-    MdlMaterial* createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
-    void destroyMaterial(MdlMaterial* mat);
-    bool isMaterialEmissive(const MdlMaterial* mat);
-    bool isMaterialOpaque(const MdlMaterial* mat);
-
-  public:
-    struct MaterialGlslGenInfo
+    struct MaterialGenInfo
     {
       std::string glslSource;
-      std::vector<TextureResource> textureResources;
+      std::vector<McTextureDescription> textureDescriptions;
     };
 
-    bool generateMaterialShadingGenInfo(const MdlMaterial& material, MaterialGlslGenInfo& genInfo);
-    bool generateMaterialOpacityGenInfo(const MdlMaterial& material, MaterialGlslGenInfo& genInfo);
+    bool generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo);
+    bool generateMaterialOpacityGenInfo(const McMaterial& material, MaterialGenInfo& genInfo);
 
+  public:
     struct RaygenShaderParams
     {
       int32_t aovId;
@@ -91,6 +78,7 @@ namespace gi::sg
       uint32_t texCount2d;
       uint32_t texCount3d;
     };
+
     struct MissShaderParams
     {
       bool domeLightEnabled;
@@ -101,6 +89,7 @@ namespace gi::sg
       uint32_t texCount2d;
       uint32_t texCount3d;
     };
+
     struct ClosestHitShaderParams
     {
       int32_t aovId;
@@ -116,6 +105,7 @@ namespace gi::sg
       uint32_t texCount2d;
       uint32_t texCount3d;
     };
+
     struct AnyHitShaderParams
     {
       int32_t aovId;
@@ -137,11 +127,8 @@ namespace gi::sg
     bool generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv);
 
   private:
-    class MdlRuntime* m_mdlRuntime = nullptr;
-    class MdlMaterialCompiler* m_mdlMaterialCompiler = nullptr;
-    class MdlGlslCodeGen* m_mdlGlslCodeGen = nullptr;
-    class MtlxMdlCodeGen* m_mtlxMdlCodeGen = nullptr;
-    class GlslangShaderCompiler* m_shaderCompiler = nullptr;
+    std::shared_ptr<McBackend> m_mcBackend;
+    std::shared_ptr<GiGlslShaderCompiler> m_shaderCompiler;
     fs::path m_shaderPath;
   };
 }

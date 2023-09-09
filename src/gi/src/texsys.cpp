@@ -20,7 +20,8 @@
 #include "mmap.h"
 #include "gi.h"
 
-#include <sg/ShaderGen.h>
+#include <GlslShaderGen.h> // TODO: remove this dependency
+#include <Backend.h>
 #include <stager.h>
 #include <imgio.h>
 
@@ -119,11 +120,11 @@ namespace gi
     return true;
   }
 
-  bool TexSys::loadTextureResources(const std::vector<sg::TextureResource>& textureResources,
+  bool TexSys::loadtextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
                                     std::vector<CgpuImage>& images2d,
                                     std::vector<CgpuImage>& images3d)
   {
-    size_t texCount = textureResources.size();
+    size_t texCount = textureDescriptions.size();
 
     if (texCount == 0)
     {
@@ -142,7 +143,7 @@ namespace gi
       fflush(stdout);
       CgpuImage image;
 
-      auto& textureResource = textureResources[i];
+      auto& textureResource = textureDescriptions[i];
       auto& payload = textureResource.data;
 
       CgpuImageCreateInfo createInfo;

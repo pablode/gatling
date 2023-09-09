@@ -23,6 +23,8 @@
 
 #include <cgpu.h>
 
+#include <Backend.h>
+
 class GiAssetReader;
 
 namespace gtl
@@ -32,11 +34,6 @@ namespace gtl
 
 namespace gi
 {
-  namespace sg
-  {
-    struct TextureResource;
-  }
-
   class TexSys
   {
   public:
@@ -52,7 +49,7 @@ namespace gi
                                  bool is3dImage = false,
                                  bool flushImmediately = true);
 
-    bool loadTextureResources(const std::vector<sg::TextureResource>& textureResources,
+    bool loadtextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
                               std::vector<CgpuImage>& images2d,
                               std::vector<CgpuImage>& images3d);
 
