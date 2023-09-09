@@ -85,7 +85,7 @@ struct GiShaderCache
 
 struct GiMaterial
 {
-  sg::Material* sgMat;
+  sg::MdlMaterial* sgMat;
 };
 
 struct GiMesh
@@ -324,7 +324,7 @@ void giRegisterAssetReader(GiAssetReader* reader)
 
 GiMaterial* giCreateMaterialFromMtlxStr(const char* str)
 {
-  sg::Material* sgMat = s_shaderGen->createMaterialFromMtlxStr(str);
+  sg::MdlMaterial* sgMat = s_shaderGen->createMaterialFromMtlxStr(str);
   if (!sgMat)
   {
     return nullptr;
@@ -343,7 +343,7 @@ GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::D
     return nullptr;
   }
 
-  sg::Material* sgMat = s_shaderGen->createMaterialFromMtlxDoc(resolvedDoc);
+  sg::MdlMaterial* sgMat = s_shaderGen->createMaterialFromMtlxDoc(resolvedDoc);
   if (!sgMat)
   {
     return nullptr;
@@ -356,7 +356,7 @@ GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::D
 
 GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier)
 {
-  sg::Material* sgMat = s_shaderGen->createMaterialFromMdlFile(filePath, subIdentifier);
+  sg::MdlMaterial* sgMat = s_shaderGen->createMaterialFromMdlFile(filePath, subIdentifier);
   if (!sgMat)
   {
     return nullptr;
@@ -809,7 +809,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       HitGroupCompInfo groupInfo;
       {
         sg::ShaderGen::MaterialGlslGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialShadingGenInfo(mat->sgMat, genInfo))
+        if (!s_shaderGen->generateMaterialShadingGenInfo(*mat->sgMat, genInfo))
         {
           threadWorkFailed = true;
           continue;
@@ -822,7 +822,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       if (!s_shaderGen->isMaterialOpaque(mat->sgMat))
       {
         sg::ShaderGen::MaterialGlslGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialOpacityGenInfo(mat->sgMat, genInfo))
+        if (!s_shaderGen->generateMaterialOpacityGenInfo(*mat->sgMat, genInfo))
         {
           threadWorkFailed = true;
           continue;

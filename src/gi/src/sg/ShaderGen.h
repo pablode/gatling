@@ -29,7 +29,7 @@ namespace fs = std::filesystem;
 
 namespace gi::sg
 {
-  struct Material;
+  struct MdlMaterial;
 
   struct TextureResource
   {
@@ -58,12 +58,12 @@ namespace gi::sg
     ~ShaderGen();
 
   public:
-    Material* createMaterialFromMtlxStr(std::string_view docStr);
-    Material* createMaterialFromMtlxDoc(const MaterialX::DocumentPtr doc);
-    Material* createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
-    void destroyMaterial(Material* mat);
-    bool isMaterialEmissive(const Material* mat);
-    bool isMaterialOpaque(const Material* mat);
+    MdlMaterial* createMaterialFromMtlxStr(std::string_view docStr);
+    MdlMaterial* createMaterialFromMtlxDoc(const MaterialX::DocumentPtr doc);
+    MdlMaterial* createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
+    void destroyMaterial(MdlMaterial* mat);
+    bool isMaterialEmissive(const MdlMaterial* mat);
+    bool isMaterialOpaque(const MdlMaterial* mat);
 
   public:
     struct MaterialGlslGenInfo
@@ -72,8 +72,8 @@ namespace gi::sg
       std::vector<TextureResource> textureResources;
     };
 
-    bool generateMaterialShadingGenInfo(const Material* material, MaterialGlslGenInfo& genInfo);
-    bool generateMaterialOpacityGenInfo(const Material* material, MaterialGlslGenInfo& genInfo);
+    bool generateMaterialShadingGenInfo(const MdlMaterial& material, MaterialGlslGenInfo& genInfo);
+    bool generateMaterialOpacityGenInfo(const MdlMaterial& material, MaterialGlslGenInfo& genInfo);
 
     struct RaygenShaderParams
     {

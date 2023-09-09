@@ -17,34 +17,17 @@
 
 #pragma once
 
+#include <mi/neuraylib/icompiled_material.h>
 
-#include <stdint.h>
 #include <string>
-#include <vector>
-
-#include "ShaderGen.h"
 
 namespace gi::sg
 {
-  struct MdlGlslCodeGenResult
+  struct MdlMaterial
   {
-    std::string glslSource;
-    std::vector<TextureResource> textureResources;
-  };
-
-  class MdlMaterial;
-  class MdlRuntime;
-
-  class MdlGlslCodeGen
-  {
-  public:
-    bool init(MdlRuntime& runtime);
-
-    bool genMaterialShadingCode(const MdlMaterial& material, MdlGlslCodeGenResult& result);
-
-    bool genMaterialOpacityCode(const MdlMaterial& material, MdlGlslCodeGenResult& result);
-
-  private:
-    std::shared_ptr<class _Impl> m_impl;
+    mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
+    bool isEmissive;
+    bool isOpaque;
+    std::string resourcePathPrefix;
   };
 }

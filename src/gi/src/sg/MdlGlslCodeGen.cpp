@@ -23,6 +23,7 @@
 #include <cassert>
 #include <filesystem>
 
+#include "MdlMaterial.h"
 #include "MdlRuntime.h"
 #include "MdlLogger.h"
 
@@ -56,7 +57,7 @@ namespace gi::sg
       m_context->set_option("resolve_resources", false);
     }
 
-    bool generateGlslWithDfs(const mi::neuraylib::ICompiled_material* compiledMaterial,
+    bool generateGlslWithDfs(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                              std::string& glslSrc,
                              std::vector<TextureResource>& textureResources)
@@ -70,7 +71,7 @@ namespace gi::sg
       }
 
       mi::Sint32 linkResult = linkUnit->add_material(
-        compiledMaterial,
+        compiledMaterial.get(),
         genFunctions.data(),
         genFunctions.size(),
         m_context.get()
@@ -241,8 +242,7 @@ namespace gi::sg
     return true;
   }
 
-  bool MdlGlslCodeGen::genMaterialShadingCode(const mi::neuraylib::ICompiled_material* material,
-                                              MdlGlslCodeGenResult& result)
+  bool MdlGlslCodeGen::genMaterialShadingCode(const MdlMaterial& material, MdlGlslCodeGenResult& result)
   {
     std::vector<mi::neuraylib::Target_function_description> genFunctions;
     genFunctions.push_back(mi::neuraylib::Target_function_description("surface.scattering", SCATTERING_FUNC_NAME));
@@ -251,15 +251,14 @@ namespace gi::sg
     genFunctions.push_back(mi::neuraylib::Target_function_description("thin_walled", THIN_WALLED_FUNC_NAME));
     genFunctions.push_back(mi::neuraylib::Target_function_description("volume.absorption_coefficient", VOLUME_ABSORPTION_FUNC_NAME));
 
-    return m_impl->generateGlslWithDfs(material, genFunctions, result.glslSource, result.textureResources);
+    return m_impl->generateGlslWithDfs(material.compiledMaterial, genFunctions, result.glslSource, result.textureResources);
   }
 
-  bool MdlGlslCodeGen::genMaterialOpacityCode(const mi::neuraylib::ICompiled_material* material,
-                                              MdlGlslCodeGenResult& result)
+  bool MdlGlslCodeGen::genMaterialOpacityCode(const MdlMaterial& material, MdlGlslCodeGenResult& result)
   {
     std::vector<mi::neuraylib::Target_function_description> genFunctions;
     genFunctions.push_back(mi::neuraylib::Target_function_description("geometry.cutout_opacity", CUTOUT_OPACITY_FUNC_NAME));
 
-    return m_impl->generateGlslWithDfs(material, genFunctions, result.glslSource, result.textureResources);
+    return m_impl->generateGlslWithDfs(material.compiledMaterial, genFunctions, result.glslSource, result.textureResources);
   }
 }

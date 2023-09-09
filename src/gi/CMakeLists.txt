@@ -19,6 +19,8 @@ add_library(
   src/sg/MdlGlslCodeGen.cpp
   src/sg/MdlLogger.h
   src/sg/MdlLogger.cpp
+  src/sg/MdlMaterial.h
+  src/sg/MdlMaterial.cpp
   src/sg/MdlMaterialCompiler.h
   src/sg/MdlMaterialCompiler.cpp
   src/sg/MdlNeurayLoader.h

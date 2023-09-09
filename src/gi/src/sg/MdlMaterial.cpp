@@ -15,36 +15,4 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#pragma once
-
-
-#include <stdint.h>
-#include <string>
-#include <vector>
-
-#include "ShaderGen.h"
-
-namespace gi::sg
-{
-  struct MdlGlslCodeGenResult
-  {
-    std::string glslSource;
-    std::vector<TextureResource> textureResources;
-  };
-
-  class MdlMaterial;
-  class MdlRuntime;
-
-  class MdlGlslCodeGen
-  {
-  public:
-    bool init(MdlRuntime& runtime);
-
-    bool genMaterialShadingCode(const MdlMaterial& material, MdlGlslCodeGenResult& result);
-
-    bool genMaterialOpacityCode(const MdlMaterial& material, MdlGlslCodeGenResult& result);
-
-  private:
-    std::shared_ptr<class _Impl> m_impl;
-  };
-}
+#include "MdlMaterial.h"

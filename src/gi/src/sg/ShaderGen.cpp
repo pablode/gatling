@@ -18,6 +18,7 @@
 #include "ShaderGen.h"
 
 #include "MtlxMdlCodeGen.h"
+#include "MdlMaterial.h"
 #include "MdlRuntime.h"
 #include "MdlMaterialCompiler.h"
 #include "MdlGlslCodeGen.h"
@@ -33,14 +34,6 @@
 
 namespace gi::sg
 {
-  struct Material
-  {
-    mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    bool isEmissive;
-    bool isOpaque;
-    std::string resourcePathPrefix;
-  };
-
   bool ShaderGen::init(const InitParams& params)
   {
     m_shaderPath = fs::path(params.shaderPath);
@@ -119,7 +112,7 @@ namespace gi::sg
     return compiledMaterial->get_opacity() == mi::neuraylib::OPACITY_OPAQUE;
   }
 
-  Material* ShaderGen::createMaterialFromMtlxStr(std::string_view docStr)
+  MdlMaterial* ShaderGen::createMaterialFromMtlxStr(std::string_view docStr)
   {
     std::string mdlSrc;
     std::string subIdentifier;
@@ -135,14 +128,16 @@ namespace gi::sg
       return nullptr;
     }
 
-    Material* m = new Material();
-    m->compiledMaterial = compiledMaterial;
-    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
-    m->isOpaque = isOpaque;
+    MdlMaterial* m = new MdlMaterial {
+      .compiledMaterial = compiledMaterial,
+      .isEmissive = _sgIsMaterialEmissive(compiledMaterial),
+      .isOpaque = isOpaque,
+      .resourcePathPrefix = "" // no source file
+    };
     return m;
   }
 
-  Material* ShaderGen::createMaterialFromMtlxDoc(const MaterialX::DocumentPtr doc)
+  MdlMaterial* ShaderGen::createMaterialFromMtlxDoc(const MaterialX::DocumentPtr doc)
   {
     // FIXME: deduplicate code
     std::string mdlSrc;
@@ -159,14 +154,16 @@ namespace gi::sg
       return nullptr;
     }
 
-    Material* m = new Material();
-    m->compiledMaterial = compiledMaterial;
-    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
-    m->isOpaque = isOpaque;
+    MdlMaterial* m = new MdlMaterial {
+      .compiledMaterial = compiledMaterial,
+      .isEmissive = _sgIsMaterialEmissive(compiledMaterial),
+      .isOpaque = isOpaque,
+      .resourcePathPrefix = "" // no source file
+    };
     return m;
   }
 
-  Material* ShaderGen::createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
+  MdlMaterial* ShaderGen::createMaterialFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
     if (!m_mdlMaterialCompiler->compileFromFile(filePath, subIdentifier, compiledMaterial))
@@ -176,25 +173,26 @@ namespace gi::sg
 
     std::string resourcePathPrefix = fs::path(filePath).parent_path().string();
 
-    Material* m = new Material();
-    m->compiledMaterial = compiledMaterial;
-    m->isEmissive = _sgIsMaterialEmissive(compiledMaterial);
-    m->isOpaque = _sgIsMaterialOpaque(compiledMaterial);
-    m->resourcePathPrefix = resourcePathPrefix;
+    MdlMaterial* m = new MdlMaterial {
+      .compiledMaterial = compiledMaterial,
+      .isEmissive = _sgIsMaterialEmissive(compiledMaterial),
+      .isOpaque = _sgIsMaterialOpaque(compiledMaterial),
+      .resourcePathPrefix = resourcePathPrefix
+    };
     return m;
   }
 
-  void ShaderGen::destroyMaterial(Material* mat)
+  void ShaderGen::destroyMaterial(MdlMaterial* mat)
   {
     delete mat;
   }
 
-  bool ShaderGen::isMaterialEmissive(const Material* mat)
+  bool ShaderGen::isMaterialEmissive(const MdlMaterial* mat)
   {
     return mat->isEmissive;
   }
 
-  bool ShaderGen::isMaterialOpaque(const Material* mat)
+  bool ShaderGen::isMaterialOpaque(const MdlMaterial* mat)
   {
     return mat->isOpaque;
   }
@@ -338,30 +336,26 @@ namespace gi::sg
     return true;
   }
 
-  bool ShaderGen::generateMaterialShadingGenInfo(const Material* material, MaterialGlslGenInfo& genInfo)
+  bool ShaderGen::generateMaterialShadingGenInfo(const MdlMaterial& material, MaterialGlslGenInfo& genInfo)
   {
-    const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
-
     MdlGlslCodeGenResult codeGenResult;
-    if (!m_mdlGlslCodeGen->genMaterialShadingCode(compiledMaterial, codeGenResult))
+    if (!m_mdlGlslCodeGen->genMaterialShadingCode(material, codeGenResult))
     {
       return false;
     }
 
-    return _genInfoFromCodeGenResult(codeGenResult, material->resourcePathPrefix, m_shaderPath, genInfo);
+    return _genInfoFromCodeGenResult(codeGenResult, material.resourcePathPrefix, m_shaderPath, genInfo);
   }
 
-  bool ShaderGen::generateMaterialOpacityGenInfo(const Material* material, MaterialGlslGenInfo& genInfo)
+  bool ShaderGen::generateMaterialOpacityGenInfo(const MdlMaterial& material, MaterialGlslGenInfo& genInfo)
   {
-    const mi::neuraylib::ICompiled_material* compiledMaterial = material->compiledMaterial.get();
-
     MdlGlslCodeGenResult codeGenResult;
-    if (!m_mdlGlslCodeGen->genMaterialOpacityCode(compiledMaterial, codeGenResult))
+    if (!m_mdlGlslCodeGen->genMaterialOpacityCode(material, codeGenResult))
     {
       return false;
     }
 
-    return _genInfoFromCodeGenResult(codeGenResult, material->resourcePathPrefix, m_shaderPath, genInfo);
+    return _genInfoFromCodeGenResult(codeGenResult, material.resourcePathPrefix, m_shaderPath, genInfo);
   }
 
   bool ShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)
