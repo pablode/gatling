@@ -47,9 +47,9 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Filter Importance Sampling", HdGatlingSettingsTokens->filter_importance_sampling, VtValue{true} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Depth of field", HdGatlingSettingsTokens->depth_of_field, VtValue{false} });
   m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Light intensity multiplier", HdGatlingSettingsTokens->light_intensity_multiplier, VtValue{1.0f} });
+  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->next_event_estimation, VtValue{false} });
 
   m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressive_accumulation, VtValue{true} });
-  m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->next_event_estimation, VtValue{false} });
 
 #ifndef NDEBUG
   m_settingDescriptors.insert(m_settingDescriptors.end(), m_debugSettingDescriptors.begin(), m_debugSettingDescriptors.end());
