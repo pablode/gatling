@@ -28,9 +28,6 @@
 [submodule "extern/openexr"]
 	path = extern/openexr
 	url = https://github.com/AcademySoftwareFoundation/openexr
-[submodule "extern/SPIRV-Reflect"]
-	path = extern/SPIRV-Reflect
-	url = https://github.com/pablode/SPIRV-Reflect
 [submodule "extern/MaterialX"]
 	path = extern/MaterialX
 	url = https://github.com/AcademySoftwareFoundation/MaterialX
@@ -46,3 +43,6 @@
 [submodule "extern/efsw"]
 	path = extern/efsw
 	url = https://github.com/SpartanJ/efsw.git
+[submodule "extern/SPIRV-Reflect"]
+	path = extern/SPIRV-Reflect
+	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
