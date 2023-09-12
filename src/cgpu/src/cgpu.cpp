@@ -2080,6 +2080,7 @@ bool cgpuDestroyPipeline(CgpuDevice device, CgpuPipeline pipeline)
 static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
                                     VkAccelerationStructureTypeKHR asType,
                                     VkAccelerationStructureGeometryKHR* asGeom,
+                                    uint32_t primitiveOffset,
                                     uint32_t primitiveCount,
                                     CgpuIBuffer* iasBuffer,
                                     VkAccelerationStructureKHR* as)
@@ -2165,7 +2166,7 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
 
   VkAccelerationStructureBuildRangeInfoKHR asBuildRangeInfo = {
     .primitiveCount = primitiveCount,
-    .primitiveOffset = 0,
+    .primitiveOffset = primitiveOffset,
     .firstVertex = 0,
     .transformOffset = 0,
   };
@@ -2241,7 +2242,7 @@ bool cgpuCreateBlas(CgpuDevice device,
     .vertexData = {
       .deviceAddress = cgpuGetBufferDeviceAddress(idevice, ivertexBuffer),
     },
-    .vertexStride = sizeof(CgpuVertex),
+    .vertexStride = createInfo->vertexStride,
     .maxVertex = createInfo->maxVertex,
     .indexType = VK_INDEX_TYPE_UINT32,
     .indexData = {
@@ -2264,7 +2265,8 @@ bool cgpuCreateBlas(CgpuDevice device,
     .flags = createInfo->isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
   };
 
-  bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, createInfo->triangleCount, &iblas->buffer, &iblas->as);
+  bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom,
+                                                   createInfo->triangleOffset, createInfo->triangleCount, &iblas->buffer, &iblas->as);
 
   if (!creationSuccessul)
   {
@@ -2363,7 +2365,9 @@ bool cgpuCreateTlas(CgpuDevice device,
     .flags = areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
   };
 
-  if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo->instanceCount, &itlas->buffer, &itlas->as))
+  uint32_t instanceOffset = 0;
+  if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom,
+                               instanceOffset, createInfo->instanceCount, &itlas->buffer, &itlas->as))
   {
     cgpuDestroyIBuffer(idevice, &itlas->instances);
     CGPU_RETURN_ERROR("failed to build TLAS");

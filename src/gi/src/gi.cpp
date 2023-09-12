@@ -402,6 +402,11 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
                                 std::vector<Rp::FVertex>& allVertices,
                                 std::vector<Rp::Face>& allFaces)
 {
+  struct BlasVertex
+  {
+    float pos[3];
+  };
+
   struct ProtoBlasInstance
   {
     CgpuBlas blas;
@@ -444,17 +449,16 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       uint32_t vertexIndexOffset = allVertices.size();
 
       // Vertices
-      std::vector<CgpuVertex> vertices;
-      vertices.resize(mesh->vertices.size());
+      std::vector<BlasVertex> blasVertices;
+      blasVertices.resize(mesh->vertices.size());
+
       allVertices.reserve(allVertices.size() + mesh->vertices.size());
 
-      for (uint32_t i = 0; i < vertices.size(); i++)
+      for (uint32_t i = 0; i < blasVertices.size(); i++)
       {
         const GiVertex& cpuVert = mesh->vertices[i];
 
-        vertices[i].x = cpuVert.pos[0];
-        vertices[i].y = cpuVert.pos[1];
-        vertices[i].z = cpuVert.pos[2];
+        memcpy(blasVertices[i].pos, cpuVert.pos, sizeof(BlasVertex));
 
         const auto encodeOctahedral = [](glm::vec3 v) {
           v /= (fabsf(v.x) + fabsf(v.y) + fabsf(v.z));
@@ -507,7 +511,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       CgpuBuffer vertexBuffer;
 
       uint64_t indexBufferSize = indices.size() * sizeof(uint32_t);
-      uint64_t vertexBufferSize = vertices.size() * sizeof(CgpuVertex);
+      uint64_t vertexBufferSize = blasVertices.size() * sizeof(BlasVertex);
 
       CgpuBufferCreateInfo iboCreateInfo = {
         .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
@@ -542,14 +546,16 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       cgpuUnmapBuffer(s_device, indexBuffer);
 
       cgpuMapBuffer(s_device, vertexBuffer, &mappedMem);
-      memcpy(mappedMem, vertices.data(), vertexBufferSize);
+      memcpy(mappedMem, blasVertices.data(), vertexBufferSize);
       cgpuUnmapBuffer(s_device, vertexBuffer);
 
       // BLAS
       CgpuBlasCreateInfo blasCreateInfo = {
         .vertexBuffer = vertexBuffer,
         .indexBuffer = indexBuffer,
-        .maxVertex = (uint32_t) vertices.size(),
+        .maxVertex = (uint32_t) blasVertices.size(),
+        .vertexStride = sizeof(BlasVertex),
+        .triangleOffset = 0,
         .triangleCount = (uint32_t) indices.size() / 3,
         .isOpaque = s_shaderGen->isMaterialOpaque(mesh->material->sgMat)
       };

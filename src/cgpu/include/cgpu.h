@@ -330,14 +330,6 @@ struct CgpuComputePipelineCreateInfo
   const char* debugName = nullptr;
 };
 
-// TODO: replace with buffer offset & stride
-struct CgpuVertex
-{
-  float x;
-  float y;
-  float z;
-};
-
 struct CgpuBlasInstance
 {
   CgpuBlas as;
@@ -367,6 +359,8 @@ struct CgpuBlasCreateInfo
   CgpuBuffer vertexBuffer;
   CgpuBuffer indexBuffer;
   uint32_t maxVertex;
+  uint32_t vertexStride;
+  uint32_t triangleOffset;
   uint32_t triangleCount;
   bool isOpaque;
   const char* debugName = nullptr;
