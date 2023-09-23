@@ -6,12 +6,24 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 
-#include "rt_payload.glsl"
+#include "mdl_types.glsl"
 #include "rt_descriptors.glsl"
 
-#pragma MDL_GENERATED_CODE
-
+#include "mdl_interface.glsl"
+#include "rt_payload.glsl"
 #include "rt_shading_state.glsl"
+
+vec3 mdl_absorption_coefficient(in State state);
+bool mdl_thin_walled(in State state);
+vec3 mdl_edf_emission_intensity(in State state);
+void mdl_edf_emission_init(inout State state);
+void mdl_edf_emission_sample(inout Edf_sample_data sret_ptr, in State state);
+void mdl_edf_emission_pdf(inout Edf_pdf_data sret_ptr, in State state);
+void mdl_edf_emission_evaluate(inout Edf_evaluate_data sret_ptr, in State state);
+void mdl_bsdf_scattering_init(inout State state);
+void mdl_bsdf_scattering_sample(inout Bsdf_sample_data sret_ptr, in State state);
+void mdl_bsdf_scattering_pdf(inout Bsdf_pdf_data sret_ptr, in State state);
+void mdl_bsdf_scattering_evaluate(inout Bsdf_evaluate_data sret_ptr, in State state);
 
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 

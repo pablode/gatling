@@ -6,13 +6,16 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 
-#include "rt_payload.glsl"
-#include "rt_descriptors.glsl"
 #include "colormap.glsl"
 
-#pragma MDL_GENERATED_CODE
+#include "mdl_types.glsl"
+#include "rt_descriptors.glsl"
 
+#include "mdl_interface.glsl"
+#include "rt_payload.glsl"
 #include "rt_shading_state.glsl"
+
+float mdl_cutout_opacity(in State state);
 
 #ifndef SHADOW_TEST
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;

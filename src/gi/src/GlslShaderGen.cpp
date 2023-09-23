@@ -181,19 +181,8 @@ namespace gtl
     assert(mdlCodeOffset != std::string::npos);
     glslSource = glslSource.substr(mdlCodeOffset, glslSource.size() - mdlCodeOffset);
 
-    GiGlslStitcher stitcher;
-    if (!stitcher.appendSourceFile(shaderPath / "mdl_types.glsl"))
-    {
-      return false;
-    }
-    if (!stitcher.appendSourceFile(shaderPath / "mdl_interface.glsl"))
-    {
-      return false;
-    }
-    stitcher.appendString(glslSource);
-
     genInfo = GiGlslShaderGen::MaterialGenInfo {
-      .glslSource = stitcher.source(),
+      .glslSource = glslSource,
       .textureDescriptions = textureDescriptions
     };
 
@@ -255,7 +244,7 @@ namespace gtl
       return false;
     }
 
-    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", params.shadingGlsl);
+    stitcher.appendString(params.shadingGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::ClosestHit, source, spv);
@@ -282,7 +271,7 @@ namespace gtl
       return false;
     }
 
-    stitcher.replaceFirst("#pragma MDL_GENERATED_CODE", params.opacityEvalGlsl);
+    stitcher.appendString(params.opacityEvalGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::AnyHit, source, spv);

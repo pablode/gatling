@@ -1,3 +1,8 @@
+#ifndef H_MDL_INTERFACE
+#define H_MDL_INTERFACE
+
+#include "common.glsl"
+
 // See also: https://github.com/NVIDIA/MDL-SDK/blob/master/examples/mdl_sdk/dxr/content/mdl_renderer_runtime.hlsl
 
 float apply_wrap_and_crop(float coord, int wrap, vec2 crop, int res)
@@ -283,3 +288,5 @@ vec3 mdl_adapt_normal(State state, vec3 normal)
 
     return new_normal;
 }
+
+#endif

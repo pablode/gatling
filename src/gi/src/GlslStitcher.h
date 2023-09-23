@@ -43,8 +43,6 @@ namespace gtl
 
     bool appendSourceFile(fs::path path);
 
-    bool replaceFirst(std::string_view substring, std::string_view replacement);
-
     std::string source();
 
   private:

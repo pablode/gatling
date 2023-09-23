@@ -1,3 +1,6 @@
+#ifndef H_MDL_TYPES
+#define H_MDL_TYPES
+
 /******************************************************************************
  * Copyright (c) 2019-2021, NVIDIA CORPORATION. All rights reserved.
  *
@@ -249,3 +252,5 @@ void Bsdf_pdf_function(
     Shading_state_material state,
     vec4 texture_results[16],
     uint arg_block_index);*/
+
+#endif
