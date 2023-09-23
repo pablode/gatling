@@ -1,6 +1,6 @@
 #pragma once
 
-namespace gi
+namespace gtl
 {
   // "Turbo, An Improved Rainbow Colormap for Visualization"
   //

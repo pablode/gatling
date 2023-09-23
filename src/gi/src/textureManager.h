@@ -30,16 +30,13 @@ class GiAssetReader;
 namespace gtl
 {
   class GgpuStager;
-}
 
-namespace gi
-{
-  class TexSys
+  class GiTextureManager
   {
   public:
-    TexSys(CgpuDevice device, GiAssetReader& assetReader, gtl::GgpuStager& stager);
+    GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, gtl::GgpuStager& stager);
 
-    ~TexSys();
+    ~GiTextureManager();
 
     void destroy();
 

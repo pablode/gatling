@@ -17,7 +17,7 @@
 
 #include "gi.h"
 
-#include "texsys.h"
+#include "textureManager.h"
 #include "turbo.h"
 #include "assetReader.h"
 
@@ -50,7 +50,6 @@
 
 #include <MaterialXCore/Document.h>
 
-using namespace gi;
 using namespace gtl;
 
 namespace Rp = gtl::shader_interface::rp_main;
@@ -149,7 +148,7 @@ std::unique_ptr<McRuntime> s_mcRuntime;
 std::unique_ptr<McFrontend> s_mcFrontend;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
-std::unique_ptr<gi::TexSys> s_texSys;
+std::unique_ptr<gtl::GiTextureManager> s_texSys;
 CgpuBuffer s_outputBuffer;
 CgpuBuffer s_outputStagingBuffer;
 uint32_t s_outputBufferWidth = 0;
@@ -300,7 +299,7 @@ GiStatus giInitialize(const GiInitParams* params)
   s_aggregateAssetReader = std::make_unique<GiAggregateAssetReader>();
   s_aggregateAssetReader->addAssetReader(s_mmapAssetReader.get());
 
-  s_texSys = std::make_unique<gi::TexSys>(s_device, *s_aggregateAssetReader, *s_stager);
+  s_texSys = std::make_unique<gtl::GiTextureManager>(s_device, *s_aggregateAssetReader, *s_stager);
 
 #ifndef NDEBUG
   s_fileWatcher = std::make_unique<efsw::FileWatcher>();
@@ -337,7 +336,7 @@ void giTerminate()
   s_mcRuntime.reset();
 }
 
-void giRegisterAssetReader(GiAssetReader* reader)
+void giRegisterAssetReader(::GiAssetReader* reader)
 {
   s_aggregateAssetReader->addAssetReader(reader);
 }
@@ -1466,9 +1465,9 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     }
     for (int i = 0; i < valueCount && max_value > 0.0f; i += 4) {
       int val_index = std::min(int((rgbaImg[i] / max_value) * 255.0), 255);
-      rgbaImg[i + 0] = (float) gi::TURBO_SRGB_FLOATS[val_index][0];
-      rgbaImg[i + 1] = (float) gi::TURBO_SRGB_FLOATS[val_index][1];
-      rgbaImg[i + 2] = (float) gi::TURBO_SRGB_FLOATS[val_index][2];
+      rgbaImg[i + 0] = (float) gtl::TURBO_SRGB_FLOATS[val_index][0];
+      rgbaImg[i + 1] = (float) gtl::TURBO_SRGB_FLOATS[val_index][1];
+      rgbaImg[i + 2] = (float) gtl::TURBO_SRGB_FLOATS[val_index][2];
       rgbaImg[i + 3] = 255;
     }
   }

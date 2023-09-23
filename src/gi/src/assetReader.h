@@ -5,33 +5,35 @@
 
 #include "gi.h"
 
-class GiMmapAssetReader : public GiAssetReader
+namespace gtl
 {
-public:
-  GiAsset* open(const char* path) override;
+  class GiMmapAssetReader : public ::GiAssetReader
+  {
+  public:
+    GiAsset* open(const char* path) override;
 
-  size_t size(const GiAsset* asset) const override;
+    size_t size(const GiAsset* asset) const override;
 
-  void* data(const GiAsset* asset) const override;
+    void* data(const GiAsset* asset) const override;
 
-  void close(GiAsset* asset) override;
-};
+    void close(GiAsset* asset) override;
+  };
 
-class GiAggregateAssetReader : public GiAssetReader
-{
-public:
-  void addAssetReader(GiAssetReader* reader);
+  class GiAggregateAssetReader : public ::GiAssetReader
+  {
+  public:
+    void addAssetReader(GiAssetReader* reader);
 
-public:
-  GiAsset* open(const char* path) override;
+  public:
+    GiAsset* open(const char* path) override;
 
-  size_t size(const GiAsset* asset) const override;
+    size_t size(const GiAsset* asset) const override;
 
-  void* data(const GiAsset* asset) const override;
+    void* data(const GiAsset* asset) const override;
 
-  void close(GiAsset* asset) override;
+    void close(GiAsset* asset) override;
 
-private:
-  std::vector<GiAssetReader*> m_readers;
-};
-
+  private:
+    std::vector<GiAssetReader*> m_readers;
+  };
+}

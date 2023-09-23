@@ -6,8 +6,8 @@ add_library(
   src/assetReader.cpp
   src/mmap.h
   src/mmap.cpp
-  src/texsys.h
-  src/texsys.cpp
+  src/textureManager.h
+  src/textureManager.cpp
   src/turbo.h
   src/GlslShaderCompiler.h
   src/GlslShaderCompiler.cpp

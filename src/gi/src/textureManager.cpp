@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "texsys.h"
+#include "textureManager.h"
 
 #include "mmap.h"
 #include "gi.h"
@@ -33,9 +33,9 @@ using namespace gtl;
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
-namespace detail
+namespace
 {
-  bool readImage(const char* filePath, GiAssetReader& assetReader, imgio_img* img)
+  bool _ReadImage(const char* filePath, ::GiAssetReader& assetReader, imgio_img* img)
   {
     GiAsset* asset = assetReader.open(filePath);
     if (!asset)
@@ -53,21 +53,21 @@ namespace detail
   }
 }
 
-namespace gi
+namespace gtl
 {
-  TexSys::TexSys(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager)
+  GiTextureManager::GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager)
     : m_device(device)
     , m_assetReader(assetReader)
     , m_stager(stager)
   {
   }
 
-  TexSys::~TexSys()
+  GiTextureManager::~GiTextureManager()
   {
     assert(m_imageCache.empty());
   }
 
-  void TexSys::destroy()
+  void GiTextureManager::destroy()
   {
     for (const auto& pathImagePair : m_imageCache)
     {
@@ -76,7 +76,7 @@ namespace gi
     m_imageCache.clear();
   }
 
-  bool TexSys::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flushImmediately)
+  bool GiTextureManager::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flushImmediately)
   {
     auto cacheResult = m_imageCache.find(filePath);
     if (cacheResult != m_imageCache.end())
@@ -86,7 +86,7 @@ namespace gi
     }
 
     imgio_img imageData;
-    if (!detail::readImage(filePath, m_assetReader, &imageData))
+    if (!_ReadImage(filePath, m_assetReader, &imageData))
     {
       return false;
     }
@@ -120,9 +120,9 @@ namespace gi
     return true;
   }
 
-  bool TexSys::loadtextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
-                                    std::vector<CgpuImage>& images2d,
-                                    std::vector<CgpuImage>& images3d)
+  bool GiTextureManager::loadtextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
+                                                 std::vector<CgpuImage>& images2d,
+                                                 std::vector<CgpuImage>& images3d)
   {
     size_t texCount = textureDescriptions.size();
 
@@ -207,7 +207,7 @@ namespace gi
     return true;
   }
 
-  void TexSys::destroyUncachedImages(const std::vector<CgpuImage>& images)
+  void GiTextureManager::destroyUncachedImages(const std::vector<CgpuImage>& images)
   {
     for (CgpuImage image : images)
     {
@@ -231,7 +231,7 @@ namespace gi
     }
   }
 
-  void TexSys::evictAndDestroyCachedImage(CgpuImage image)
+  void GiTextureManager::evictAndDestroyCachedImage(CgpuImage image)
   {
     for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
     {
