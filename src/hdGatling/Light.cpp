@@ -109,8 +109,14 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
     float normalizeFactor = normalize ? ((radius > 0.001f ? 4.0 : 1.0f) * M_PI * radius * radius) : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
-    giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
+    VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
+    float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
+    VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
+    float specular = boxedSpecular.GetWithDefault<float>(1.0f);
+
     giSetSphereLightRadius(m_giSphereLight, radius);
+    giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
+    giSetSphereLightDiffuseSpecular(m_giSphereLight, diffuse, specular);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -157,8 +163,14 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
     float normalizeFactor = normalize ? float(M_PI / (1.0 - cos(angle))) : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
-    giSetDistantLightBaseEmission(m_giDistantLight, baseEmission.data());
+    VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
+    float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
+    VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
+    float specular = boxedSpecular.GetWithDefault<float>(1.0f);
+
     giSetDistantLightAngle(m_giDistantLight, angle);
+    giSetDistantLightBaseEmission(m_giDistantLight, baseEmission.data());
+    giSetDistantLightDiffuseSpecular(m_giDistantLight, diffuse, specular);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -210,8 +222,14 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
     float normalizeFactor = normalize ? float(width * height) : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
-    giSetRectLightBaseEmission(m_giRectLight, baseEmission.data());
+    VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
+    float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
+    VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
+    float specular = boxedSpecular.GetWithDefault<float>(1.0f);
+
     giSetRectLightDimensions(m_giRectLight, width, height);
+    giSetRectLightBaseEmission(m_giRectLight, baseEmission.data());
+    giSetRectLightDiffuseSpecular(m_giRectLight, diffuse, specular);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -285,6 +303,12 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
 
   GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, 1.0f);
   giSetDomeLightBaseEmission(m_giDomeLight, baseEmission.data());
+
+  VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
+  float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
+  VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
+  float specular = boxedSpecular.GetWithDefault<float>(1.0f);
+  giSetDomeLightDiffuseSpecular(m_giDomeLight, diffuse, specular);
 
   // We need to ensure that the correct dome light is displayed when usdview's additional
   // one has been enabled. Although the type isn't 'simpleLight' (which may be a bug), we

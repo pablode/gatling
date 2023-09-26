@@ -42,7 +42,7 @@ struct SphereLight
   SI_VEC3  pos;
   SI_FLOAT radius;
   SI_VEC3  baseEmission;
-  SI_FLOAT padding;
+  SI_UINT  diffuseSpecularPacked;
 };
 
 struct DistantLight
@@ -50,7 +50,7 @@ struct DistantLight
   SI_VEC3  direction;
   SI_FLOAT angle;
   SI_VEC3  baseEmission;
-  SI_FLOAT padding;
+  SI_UINT  diffuseSpecularPacked;
 };
 
 struct RectLight
@@ -60,7 +60,7 @@ struct RectLight
   SI_VEC3  baseEmission;
   SI_FLOAT height;
   SI_VEC3  direction;
-  SI_FLOAT padding;
+  SI_UINT  diffuseSpecularPacked;
 };
 
 struct PushConstants
@@ -78,10 +78,11 @@ struct PushConstants
   SI_FLOAT maxSampleValue;
   SI_VEC4  domeLightRotation;
   SI_VEC3  domeLightEmissionMultiplier;
+  SI_UINT  domeLightDiffuseSpecularPacked;
   SI_UINT  maxBouncesAndRrBounceOffset;
   SI_FLOAT rrInvMinTermProb;
   SI_FLOAT lightIntensityMultiplier;
-  /* 2 floats free */
+  /* 1 float free */
 };
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)

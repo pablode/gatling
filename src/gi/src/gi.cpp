@@ -128,6 +128,8 @@ struct GiScene
   CgpuImage domeLightTexture;
   glm::quat domeLightRotation;
   glm::vec3 domeLightBaseEmission;
+  float domeLightDiffuse = 1.0f;
+  float domeLightSpecular = 1.0f;
   GiDomeLight* domeLight; // weak ptr
 };
 
@@ -1292,22 +1294,23 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   }
 
   Rp::PushConstants pushData = {
-    .cameraPosition              = glm::make_vec3(params->camera->position),
-    .imageDims                   = ((params->imageHeight << 16) | params->imageWidth),
-    .cameraForward               = camForward,
-    .focusDistance               = params->camera->focusDistance,
-    .cameraUp                    = camUp,
-    .cameraVFoV                  = params->camera->vfov,
-    .backgroundColor             = glm::make_vec4(params->bgColor),
-    .sampleOffset                = s_sampleOffset,
-    .lensRadius                  = lensRadius,
-    .sampleCount                 = params->spp,
-    .maxSampleValue              = params->maxSampleValue,
-    .domeLightRotation           = glm::make_vec4(&scene->domeLightRotation[0]),
-    .domeLightEmissionMultiplier = scene->domeLightBaseEmission,
-    .maxBouncesAndRrBounceOffset = ((params->maxBounces << 16) | params->rrBounceOffset),
-    .rrInvMinTermProb            = params->rrInvMinTermProb,
-    .lightIntensityMultiplier    = params->lightIntensityMultiplier
+    .cameraPosition                 = glm::make_vec3(params->camera->position),
+    .imageDims                      = ((params->imageHeight << 16) | params->imageWidth),
+    .cameraForward                  = camForward,
+    .focusDistance                  = params->camera->focusDistance,
+    .cameraUp                       = camUp,
+    .cameraVFoV                     = params->camera->vfov,
+    .backgroundColor                = glm::make_vec4(params->bgColor),
+    .sampleOffset                   = s_sampleOffset,
+    .lensRadius                     = lensRadius,
+    .sampleCount                    = params->spp,
+    .maxSampleValue                 = params->maxSampleValue,
+    .domeLightRotation              = glm::make_vec4(&scene->domeLightRotation[0]),
+    .domeLightEmissionMultiplier    = scene->domeLightBaseEmission,
+    .domeLightDiffuseSpecularPacked = glm::packHalf2x16(glm::vec2(scene->domeLightDiffuse, scene->domeLightSpecular)),
+    .maxBouncesAndRrBounceOffset    = ((params->maxBounces << 16) | params->rrBounceOffset),
+    .rrInvMinTermProb               = params->rrInvMinTermProb,
+    .lightIntensityMultiplier       = params->lightIntensityMultiplier
   };
 
   std::vector<CgpuBufferBinding> buffers;
@@ -1519,6 +1522,7 @@ GiSphereLight* giCreateSphereLight(GiScene* scene)
   data->baseEmission[0] = 0.0f;
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
   return light;
 }
@@ -1557,6 +1561,14 @@ void giSetSphereLightRadius(GiSphereLight* light, float radius)
   data->radius = radius;
 }
 
+void giSetSphereLightDiffuseSpecular(GiSphereLight* light, float diffuse, float specular)
+{
+  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
+  assert(data);
+
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+}
+
 GiDistantLight* giCreateDistantLight(GiScene* scene)
 {
   auto light = new GiDistantLight;
@@ -1573,6 +1585,7 @@ GiDistantLight* giCreateDistantLight(GiScene* scene)
   data->baseEmission[0] = 0.0f;
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
   return light;
 }
@@ -1611,6 +1624,14 @@ void giSetDistantLightAngle(GiDistantLight* light, float angle)
   data->angle = angle;
 }
 
+void giSetDistantLightDiffuseSpecular(GiDistantLight* light, float diffuse, float specular)
+{
+  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  assert(data);
+
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+}
+
 GiRectLight* giCreateRectLight(GiScene* scene)
 {
   auto light = new GiRectLight;
@@ -1631,6 +1652,7 @@ GiRectLight* giCreateRectLight(GiScene* scene)
   data->baseEmission[0] = 0.0f;
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
   return light;
 }
@@ -1680,6 +1702,14 @@ void giSetRectLightDimensions(GiRectLight* light, float width, float height)
   data->height = height;
 }
 
+void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float specular)
+{
+  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+}
+
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)
 {
   GiDomeLight* light = new GiDomeLight;
@@ -1701,4 +1731,10 @@ void giSetDomeLightRotation(GiDomeLight* light, float* quat)
 void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb)
 {
   light->scene->domeLightBaseEmission = glm::make_vec3(rgb);
+}
+
+void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular)
+{
+  light->scene->domeLightDiffuse = diffuse;
+  light->scene->domeLightSpecular = specular;
 }

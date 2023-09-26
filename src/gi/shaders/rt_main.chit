@@ -44,7 +44,7 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     return false;
 }
 
-void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float pdf)
+void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float pdf, out uint diffuseSpecularPacked)
 {
     uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT;
 
@@ -73,6 +73,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         pdf = samplePdf;
+        diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
 #endif
 #if DISTANT_LIGHT_COUNT > 0
@@ -86,6 +87,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         dirToLight = -light.direction;
         power = light.baseEmission * PC.lightIntensityMultiplier;
         pdf = 1.0;
+        diffuseSpecularPacked = light.diffuseSpecularPacked;
 
         if (light.angle > 0.0)
         {
@@ -117,6 +119,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
         power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         pdf = 1.0 / (light.width * light.height);
+        diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
 #endif
 
@@ -228,7 +231,8 @@ void main()
         float lightDist;
         vec3 lightPower;
         float lightPdf;
-        sampleLight(k4, shading_state.position, dirToLight, lightDist, lightPower, lightPdf);
+        uint diffuseSpecularPacked;
+        sampleLight(k4, shading_state.position, dirToLight, lightDist, lightPower, lightPdf, diffuseSpecularPacked);
 
         vec3 neeContrib = vec3(0.0);
         bool neeValid = (lightDist > 0.0) && dot(dirToLight, shading_state.geom_normal) > 0.0;
@@ -247,11 +251,13 @@ void main()
 
             if (neeValid)
             {
+                vec2 diffuseSpecular = unpackHalf2x16(diffuseSpecularPacked);
+
                 vec3 neeRadiance = lightPower / lightPdf;
 
                 vec3 weight = throughput * neeRadiance;
-                neeContrib += weight * bsdf_eval_data.bsdf_diffuse;
-                neeContrib += weight * bsdf_eval_data.bsdf_glossy;
+                neeContrib += weight * bsdf_eval_data.bsdf_diffuse * diffuseSpecular.x;
+                neeContrib += weight * bsdf_eval_data.bsdf_glossy * diffuseSpecular.y;
             }
         }
 
