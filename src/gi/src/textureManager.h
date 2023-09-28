@@ -46,7 +46,7 @@ namespace gtl
                                  bool is3dImage = false,
                                  bool flushImmediately = true);
 
-    bool loadtextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
+    bool loadTextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
                               std::vector<CgpuImage>& images2d,
                               std::vector<CgpuImage>& images3d);
 

@@ -151,10 +151,10 @@ std::unique_ptr<McFrontend> s_mcFrontend;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
 std::unique_ptr<gtl::GiTextureManager> s_texSys;
-CgpuBuffer s_outputBuffer;
+CgpuBuffer s_framebuffer;
 CgpuBuffer s_outputStagingBuffer;
-uint32_t s_outputBufferWidth = 0;
-uint32_t s_outputBufferHeight = 0;
+uint32_t s_framebufferWidth = 0;
+uint32_t s_framebufferHeight = 0;
 uint32_t s_sampleOffset = 0;
 std::atomic_bool s_forceShaderCacheInvalid = false;
 std::atomic_bool s_forceGeomCacheInvalid = false;
@@ -184,15 +184,15 @@ std::unique_ptr<efsw::FileWatcher> s_fileWatcher;
 ShaderFileListener s_shaderFileListener;
 #endif
 
-bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
+bool _giResizeFramebuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
 {
-  s_outputBufferWidth = width;
-  s_outputBufferHeight = height;
+  s_framebufferWidth = width;
+  s_framebufferHeight = height;
 
-  if (s_outputBuffer.handle)
+  if (s_framebuffer.handle)
   {
-    cgpuDestroyBuffer(s_device, s_outputBuffer);
-    s_outputBuffer.handle = 0;
+    cgpuDestroyBuffer(s_device, s_framebuffer);
+    s_framebuffer.handle = 0;
   }
   if (s_outputStagingBuffer.handle)
   {
@@ -213,7 +213,7 @@ bool _giResizeOutputBuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
       .debugName = "Output"
     };
 
-    if (!cgpuCreateBuffer(s_device, &createInfo, &s_outputBuffer))
+    if (!cgpuCreateBuffer(s_device, &createInfo, &s_framebuffer))
     {
       return false;
     }
@@ -319,7 +319,7 @@ void giTerminate()
 #endif
   s_aggregateAssetReader.reset();
   s_mmapAssetReader.reset();
-  _giResizeOutputBuffer(0, 0, 0);
+  _giResizeFramebuffer(0, 0, 0);
   if (s_texSys)
   {
     s_texSys->destroy();
@@ -756,8 +756,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   CgpuShader rgenShader;
   std::vector<CgpuShader> missShaders;
   std::vector<CgpuShader> hitShaders;
-  std::vector<CgpuImage> images_2d;
-  std::vector<CgpuImage> images_3d;
+  std::vector<CgpuImage> images2d;
+  std::vector<CgpuImage> images3d;
   std::vector<CgpuRtHitGroup> hitGroups;
   std::vector<McTextureDescription> textureDescriptions;
   uint32_t texCount2d = 0;
@@ -1135,12 +1135,12 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   }
 
   // Upload textures.
-  if (textureDescriptions.size() > 0 && !s_texSys->loadtextureDescriptions(textureDescriptions, images_2d, images_3d))
+  if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images2d, images3d))
   {
     goto cleanup;
   }
-  assert(images_2d.size() == (texCount2d - int(domeLightEnabled)));
-  assert(images_3d.size() == texCount3d);
+  assert(images2d.size() == (texCount2d - int(domeLightEnabled)));
+  assert(images3d.size() == texCount3d);
 
   // Create RT pipeline.
   {
@@ -1164,8 +1164,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   cache = new GiShaderCache;
   cache->aovId = params->aovId;
   cache->hitShaders = std::move(hitShaders);
-  cache->images2d = std::move(images_2d);
-  cache->images3d = std::move(images_3d);
+  cache->images2d = std::move(images2d);
+  cache->images3d = std::move(images3d);
   cache->materials.resize(params->materialCount);
   for (int i = 0; i < params->materialCount; i++)
   {
@@ -1180,8 +1180,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 cleanup:
   if (!cache)
   {
-    s_texSys->destroyUncachedImages(images_2d);
-    s_texSys->destroyUncachedImages(images_3d);
+    s_texSys->destroyUncachedImages(images2d);
+    s_texSys->destroyUncachedImages(images3d);
     if (rgenShader.handle)
     {
       cgpuDestroyShader(s_device, rgenShader);
@@ -1270,17 +1270,17 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   int compCount = 4;
   int pixelStride = compCount * sizeof(float);
   int pixelCount = params->imageWidth * params->imageHeight;
-  uint64_t outputBufferSize = pixelCount * pixelStride;
+  uint64_t framebufferSize = pixelCount * pixelStride;
 
-  bool reallocOutputBuffer = s_outputBufferWidth != params->imageWidth ||
-                             s_outputBufferHeight != params->imageHeight;
+  bool reallocFramebuffer= s_framebufferWidth != params->imageWidth ||
+                           s_framebufferHeight != params->imageHeight;
 
-  if (reallocOutputBuffer)
+  if (reallocFramebuffer)
   {
     printf("recreating output buffer with size %dx%d (%.2fMiB)\n", params->imageWidth,
-      params->imageHeight, outputBufferSize * BYTES_TO_MIB);
+      params->imageHeight, framebufferSize * BYTES_TO_MIB);
 
-    _giResizeOutputBuffer(params->imageWidth, params->imageHeight, outputBufferSize);
+    _giResizeFramebuffer(params->imageWidth, params->imageHeight, framebufferSize);
   }
 
   // Set up GPU data.
@@ -1316,7 +1316,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   std::vector<CgpuBufferBinding> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ .binding = Rp::BINDING_INDEX_OUT_PIXELS, .buffer = s_outputBuffer });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_OUT_PIXELS, .buffer = s_framebuffer });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_FACES, .buffer = geom_cache->buffer,
                       .offset = geom_cache->faceBufferView.offset, .size = geom_cache->faceBufferView.size });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_VERTICES, .buffer = geom_cache->buffer,
@@ -1393,7 +1393,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   // Copy output buffer to staging buffer.
   {
     CgpuBufferMemoryBarrier bufferBarrier = {
-      .buffer = s_outputBuffer,
+      .buffer = s_framebuffer,
       .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
       .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
       .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
@@ -1408,12 +1408,12 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
       goto cleanup;
   }
 
-  if (!cgpuCmdCopyBuffer(command_buffer, s_outputBuffer, 0, s_outputStagingBuffer, 0, outputBufferSize))
+  if (!cgpuCmdCopyBuffer(command_buffer, s_framebuffer, 0, s_outputStagingBuffer, 0, framebufferSize))
     goto cleanup;
 
   {
     CgpuBufferMemoryBarrier bufferBarrier = {
-      .buffer = s_outputBuffer,
+      .buffer = s_framebuffer,
       .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
       .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
       .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
@@ -1452,7 +1452,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   if (!cgpuMapBuffer(s_device, s_outputStagingBuffer, (void**) &mapped_staging_mem))
     goto cleanup;
 
-  memcpy(rgbaImg, mapped_staging_mem, outputBufferSize);
+  memcpy(rgbaImg, mapped_staging_mem, framebufferSize);
 
   if (!cgpuUnmapBuffer(s_device, s_outputStagingBuffer))
     goto cleanup;

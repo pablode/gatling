@@ -1,7 +1,7 @@
 #include "interface/rp_main.h"
 #include "common.glsl"
 
-layout(binding = BINDING_INDEX_OUT_PIXELS, std430) buffer PixelsBuffer { vec4 pixels[]; };
+layout(binding = BINDING_INDEX_OUT_PIXELS, std430) buffer Framebuffer { vec4 pixels[]; };
 
 layout(binding = BINDING_INDEX_FACES, std430) readonly buffer FacesBuffer { Face faces[]; };
 

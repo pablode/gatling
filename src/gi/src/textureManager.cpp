@@ -120,7 +120,7 @@ namespace gtl
     return true;
   }
 
-  bool GiTextureManager::loadtextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
+  bool GiTextureManager::loadTextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
                                                  std::vector<CgpuImage>& images2d,
                                                  std::vector<CgpuImage>& images3d)
   {
