@@ -73,12 +73,14 @@ void _PatchUsdTypes(HdMaterialNetwork2& network)
     {
       VtValue& value = tokenValuePair.second;
 
+#if PXR_VERSION <= 2308
       // Workaround for HdMtlxConvertToString not handling the TfToken type:
       // https://github.com/PixarAnimationStudios/USD/blob/3abc46452b1271df7650e9948fef9f0ce602e3b2/pxr/imaging/hdMtlx/hdMtlx.cpp#L117
       if (value.IsHolding<TfToken>())
       {
         value = value.Cast<std::string>();
       }
+#endif
 
       // When serializing the network to a MaterialX document again, the SdfAssetPath
       // gets replaced by its non-resolved path and we don't have any other way of resolving
