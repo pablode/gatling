@@ -55,15 +55,21 @@ void HdGatlingInstancer::Sync(HdSceneDelegate* sceneDelegate,
   {
     TfToken primName = primvar.name;
 
-    if (primName != HdInstancerTokens->translate &&
-        primName != HdInstancerTokens->rotate &&
-        primName != HdInstancerTokens->scale &&
-        primName != HdInstancerTokens->instanceTransform)
+    if (!HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, primName))
     {
       continue;
     }
 
-    if (!HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, primName))
+    bool doesPrimvarAffectInstances =
+#if PXR_VERSION <= 2308
+      primName == HdInstancerTokens->translate || primName == HdInstancerTokens->rotate ||
+      primName == HdInstancerTokens->scale || primName == HdInstancerTokens->instanceTransform;
+#else
+      primName == HdInstancerTokens->instanceTranslations || primName == HdInstancerTokens->instanceRotations ||
+      primName == HdInstancerTokens->instanceScales || primName == HdInstancerTokens->instanceTransforms;
+#endif
+
+    if (!doesPrimvarAffectInstances)
     {
       continue;
     }
@@ -90,41 +96,48 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
   const SdfPath& id = GetId();
 
   // Calculate instance transforms for this instancer.
-  VtValue boxedTranslates = m_primvarMap[HdInstancerTokens->translate];
-  VtValue boxedRotates = m_primvarMap[HdInstancerTokens->rotate];
+#if PXR_VERSION <= 2308
+  VtValue boxedTranslations = m_primvarMap[HdInstancerTokens->translate];
+  VtValue boxedRotations = m_primvarMap[HdInstancerTokens->rotate];
   VtValue boxedScales = m_primvarMap[HdInstancerTokens->scale];
   VtValue boxedInstanceTransforms = m_primvarMap[HdInstancerTokens->instanceTransform];
+#else
+  VtValue boxedTranslations = m_primvarMap[HdInstancerTokens->instanceTranslations];
+  VtValue boxedRotations = m_primvarMap[HdInstancerTokens->instanceRotations];
+  VtValue boxedScales = m_primvarMap[HdInstancerTokens->instanceScales];
+  VtValue boxedInstanceTransforms = m_primvarMap[HdInstancerTokens->instanceTransforms];
+#endif
 
-  VtVec3dArray translates;
-  if (boxedTranslates.CanCast<VtVec3dArray>())
+  VtVec3dArray translations;
+  if (boxedTranslations.CanCast<VtVec3dArray>())
   {
-    translates = boxedTranslates.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
+    translations = boxedTranslations.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
   }
-  else if (!boxedTranslates.IsEmpty())
+  else if (!boxedTranslations.IsEmpty())
   {
-    TF_CODING_WARNING("Instancer translate value type %s not supported", boxedTranslates.GetTypeName().c_str());
+    TF_CODING_WARNING("Instancer translate value type %s not supported", boxedTranslations.GetTypeName().c_str());
   }
 
-  VtQuatdArray rotates;
-  if (boxedRotates.IsHolding<VtQuatdArray>())
+  VtQuatdArray rotations;
+  if (boxedRotations.IsHolding<VtQuatdArray>())
   {
-    rotates = boxedRotates.UncheckedGet<VtQuatdArray>();
+    rotations = boxedRotations.UncheckedGet<VtQuatdArray>();
   }
-  else if (boxedRotates.IsHolding<VtQuatfArray>())
+  else if (boxedRotations.IsHolding<VtQuatfArray>())
   {
-    auto& rawArray = boxedRotates.UncheckedGet<VtQuatfArray>();
-    rotates.resize(rawArray.size());
-    std::transform(rawArray.begin(), rawArray.end(), rotates.begin(), _TypeConversionHelper<GfQuatd>());
+    auto& rawArray = boxedRotations.UncheckedGet<VtQuatfArray>();
+    rotations.resize(rawArray.size());
+    std::transform(rawArray.begin(), rawArray.end(), rotations.begin(), _TypeConversionHelper<GfQuatd>());
   }
-  else if (boxedRotates.IsHolding<VtQuathArray>())
+  else if (boxedRotations.IsHolding<VtQuathArray>())
   {
-    auto& rawArray = boxedRotates.UncheckedGet<VtQuathArray>();
-    rotates.resize(rawArray.size());
-    std::transform(rawArray.begin(), rawArray.end(), rotates.begin(), _TypeConversionHelper<GfQuatd>());
+    auto& rawArray = boxedRotations.UncheckedGet<VtQuathArray>();
+    rotations.resize(rawArray.size());
+    std::transform(rawArray.begin(), rawArray.end(), rotations.begin(), _TypeConversionHelper<GfQuatd>());
   }
-  else if (!boxedRotates.IsEmpty())
+  else if (!boxedRotations.IsEmpty())
   {
-    TF_CODING_WARNING("Instancer rotate value type %s not supported", boxedRotates.GetTypeName().c_str());
+    TF_CODING_WARNING("Instancer rotate value type %s not supported", boxedRotations.GetTypeName().c_str());
   }
 
   VtVec3dArray scales;
@@ -158,14 +171,14 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
 
     GfMatrix4d temp;
 
-    if (i < translates.size())
+    if (i < translations.size())
     {
-      temp.SetTranslate(translates[instanceIndex]);
+      temp.SetTranslate(translations[instanceIndex]);
       mat = temp * mat;
     }
-    if (i < rotates.size())
+    if (i < rotations.size())
     {
-      temp.SetRotate(rotates[instanceIndex]);
+      temp.SetRotate(rotations[instanceIndex]);
       mat = temp * mat;
     }
     if (i < scales.size())
