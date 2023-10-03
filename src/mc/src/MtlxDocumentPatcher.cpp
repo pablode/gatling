@@ -409,11 +409,13 @@ namespace gtl
 
     _PatchColor3Vector3Mismatches(document);
 
+#if PXR_VERSION <= 2308
     _PatchUsdUVTextureSourceColorSpaces(document);
 
-    _PatchGeomprops(document);
-
     _PatchImageSrgbColorSpaces(document);
+#endif
+
+    _PatchGeomprops(document);
 
     _PatchNodeNames(document);
   }

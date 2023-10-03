@@ -20,6 +20,7 @@
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdr/registry.h>
+#include <pxr/usd/sdf/schema.h>
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 
 #include <MaterialXCore/Document.h>
@@ -60,7 +61,10 @@ TF_DEFINE_PRIVATE_TOKENS(
   (clamp)
   (repeat)
   (mirror)
-  (useMetadata)
+  (sourceColorSpace)
+  (raw)
+  (sRGB)
+  ((_auto, "auto"))
   // MaterialX USD node type equivalents
   (ND_UsdPreviewSurface_surfaceshader)
   (ND_UsdPrimvarReader_integer)
@@ -74,6 +78,8 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_UsdTransform2d)
   (ND_UsdUVTexture)
   (periodic)
+  (srgb_texture)
+  (lin_rec709)
 );
 
 static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTypeIdMappings = {
@@ -94,6 +100,72 @@ static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTy
 
 bool _ConvertUsdNodesToMtlxXNodes(HdMaterialNetwork2& network)
 {
+  // First pass: substitute UsdUVTexture:sourceColorSpace input with parent input colorSpace attribute
+  for (auto nodeIt = network.nodes.begin(); nodeIt != network.nodes.end(); nodeIt++)
+  {
+    TfToken& nodeTypeId = nodeIt->second.nodeTypeId;
+
+    if (nodeTypeId != _tokens->UsdPreviewSurface)
+    {
+      continue;
+    }
+
+    auto handleUsdUVTextureSourceColorSpaceInput = [&](HdMaterialNode2& parentNode, TfToken input, HdMaterialNode2& node)
+    {
+      auto& parameters = node.parameters;
+
+      auto sourceColorSpace = parameters.find(_tokens->sourceColorSpace);
+      if (sourceColorSpace == parameters.end())
+      {
+        return;
+      }
+
+      TfToken colorSpaceInputName(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, input));
+
+      if (sourceColorSpace->second == _tokens->raw)
+      {
+        parentNode.parameters[colorSpaceInputName] = _tokens->lin_rec709;
+      }
+      else if (sourceColorSpace->second == _tokens->sRGB)
+      {
+        parentNode.parameters[colorSpaceInputName] = _tokens->srgb_texture;
+      }
+      else if (sourceColorSpace->second == _tokens->_auto)
+      {
+        // don't set color space explicitly
+      }
+      else
+      {
+        TF_CODING_ERROR("unsupported UsdUVTexture color space");
+      }
+
+      parameters.erase(sourceColorSpace);
+    };
+
+    for (const auto& inputConnections : nodeIt->second.inputConnections)
+    {
+      TfToken input = inputConnections.first;
+
+      for (const HdMaterialConnection2& connection : inputConnections.second)
+      {
+        auto upstreamNode = network.nodes.find(connection.upstreamNode);
+
+        if (upstreamNode == network.nodes.end())
+        {
+          continue;
+        }
+
+        if (upstreamNode->second.nodeTypeId != _tokens->UsdUVTexture)
+        {
+          continue;
+        }
+
+        handleUsdUVTextureSourceColorSpaceInput(nodeIt->second, input, upstreamNode->second);
+      }
+    }
+  }
+
+  // Second pass: substitute node names and parameters
   for (auto nodeIt = network.nodes.begin(); nodeIt != network.nodes.end(); nodeIt++)
   {
     TfToken& nodeTypeId = nodeIt->second.nodeTypeId;
