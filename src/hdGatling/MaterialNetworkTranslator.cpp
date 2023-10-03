@@ -54,13 +54,13 @@ TF_DEFINE_PRIVATE_TOKENS(
   (UsdPrimvarReader_matrix)
   (UsdTransform2d)
   (UsdUVTexture)
-  ((UsdUVTexture_wrapS, "wrapS"))
-  ((UsdUVTexture_wrapT, "wrapT"))
-  ((UsdUVTexture_WrapMode_black, "black"))
-  ((UsdUVTexture_WrapMode_clamp, "clamp"))
-  ((UsdUVTexture_WrapMode_repeat, "repeat"))
-  ((UsdUVTexture_WrapMode_mirror, "mirror"))
-  ((UsdUVTexture_WrapMode_useMetadata, "useMetdata"))
+  (wrapS)
+  (wrapT)
+  (black)
+  (clamp)
+  (repeat)
+  (mirror)
+  (useMetadata)
   // MaterialX USD node type equivalents
   (ND_UsdPreviewSurface_surfaceshader)
   (ND_UsdPrimvarReader_integer)
@@ -73,9 +73,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_UsdPrimvarReader_matrix44)
   (ND_UsdTransform2d)
   (ND_UsdUVTexture)
-  ((ND_UsdUVTexture_WrapMode_black, "black"))
-  ((ND_UsdUVTexture_WrapMode_clamp, "clamp"))
-  ((ND_UsdUVTexture_WrapMode_periodic, "periodic"))
+  (periodic)
 );
 
 static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTypeIdMappings = {
@@ -94,12 +92,9 @@ static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTy
   { _tokens->UsdPrimvarReader_matrix, _tokens->ND_UsdPrimvarReader_matrix44       }
 };
 
-bool _ConvertUsdNodesToMaterialXNodes(const HdMaterialNetwork2& network,
-                                      HdMaterialNetwork2& mtlxNetwork)
+bool _ConvertUsdNodesToMtlxXNodes(HdMaterialNetwork2& network)
 {
-  mtlxNetwork = network;
-
-  for (auto nodeIt = mtlxNetwork.nodes.begin(); nodeIt != mtlxNetwork.nodes.end(); nodeIt++)
+  for (auto nodeIt = network.nodes.begin(); nodeIt != network.nodes.end(); nodeIt++)
   {
     TfToken& nodeTypeId = nodeIt->second.nodeTypeId;
 
@@ -123,30 +118,30 @@ bool _ConvertUsdNodesToMaterialXNodes(const HdMaterialNetwork2& network,
       {
         auto wrapToken = wrapType.UncheckedGet<TfToken>();
 
-        if (wrapToken == _tokens->UsdUVTexture_WrapMode_black)
+        if (wrapToken == _tokens->black)
         {
           // It's internally mapped to 'constant' which uses the fallback color
           TF_WARN("UsdUVTexture wrap mode black is not fully supported");
         }
-        else if (wrapToken == _tokens->UsdUVTexture_WrapMode_mirror ||
-                 wrapToken == _tokens->UsdUVTexture_WrapMode_clamp)
+        else if (wrapToken == _tokens->mirror ||
+                 wrapToken == _tokens->clamp)
         {
           // These are valid, do nothing.
         }
-        else if (wrapToken == _tokens->UsdUVTexture_WrapMode_repeat)
+        else if (wrapToken == _tokens->repeat)
         {
-          wrapType = _tokens->ND_UsdUVTexture_WrapMode_periodic;
+          wrapType = _tokens->periodic;
         }
         else
         {
           TF_WARN("UsdUVTexture node has unsupported wrap mode %s", wrapToken.GetText());
-          wrapType = _tokens->ND_UsdUVTexture_WrapMode_periodic;
+          wrapType = _tokens->periodic;
         }
       };
 
       auto& parameters = nodeIt->second.parameters;
-      auto wrapS = parameters.find(_tokens->UsdUVTexture_wrapS);
-      auto wrapT = parameters.find(_tokens->UsdUVTexture_wrapT);
+      auto wrapS = parameters.find(_tokens->wrapS);
+      auto wrapT = parameters.find(_tokens->wrapT);
 
       if (wrapS != parameters.end())
       {
@@ -245,8 +240,8 @@ GiMaterial* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwor
 
 GiMaterial* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
-  HdMaterialNetwork2 mtlxNetwork;
-  if (!_ConvertUsdNodesToMaterialXNodes(network, mtlxNetwork))
+  HdMaterialNetwork2 mtlxNetwork = network;
+  if (!_ConvertUsdNodesToMtlxXNodes(mtlxNetwork))
   {
     return nullptr;
   }
