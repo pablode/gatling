@@ -59,20 +59,24 @@ target_compile_definitions(
 )
 
 # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
-if (MSVC_VERSION GREATER_EQUAL 1920)
-    target_compile_options(hdGatling PRIVATE "/Zc:inline-")
+if(MSVC_VERSION GREATER_EQUAL 1920)
+  target_compile_options(hdGatling PRIVATE "/Zc:inline-")
+endif()
+
+if(TARGET usd_ms)
+  set(USD_LIBS_PUBLIC usd_ms)
+else()
+  set(USD_LIBS_PUBLIC hd)
+  set(USD_LIBS_PRIVATE usdImaging usdMtlx hdMtlx glf)
 endif()
 
 target_link_libraries(
   hdGatling
-  PRIVATE
-    glf
-    usdImaging
-    usdMtlx
-    hdMtlx
-    gi
   PUBLIC
-    hd
+    ${USD_LIBS_PUBLIC}
+  PRIVATE
+    gi
+    ${USD_LIBS_PRIVATE}
 )
 
 set(PLUGINFO_PATH "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json")
