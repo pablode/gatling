@@ -28,7 +28,8 @@ namespace gtl
   {
     bool isEmissive;
     bool isOpaque;
-    std::shared_ptr<McMdlMaterial> mdlMaterial;
     std::string resourcePathPrefix;
+    std::shared_ptr<McMdlMaterial> mdlMaterial;
+    bool requiresSceneTransforms;
   };
 }

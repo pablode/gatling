@@ -907,6 +907,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.chit";
         hitParams.isOpaque = params->materials[i]->mcMat->isOpaque;
+        hitParams.enableSceneTransforms = params->materials[i]->mcMat->requiresSceneTransforms;
         hitParams.nextEventEstimation = params->nextEventEstimation;
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
@@ -929,6 +930,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       {
         GiGlslShaderGen::AnyHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
+        hitParams.enableSceneTransforms = params->materials[i]->mcMat->requiresSceneTransforms;
         hitParams.baseFileName = "rt_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();

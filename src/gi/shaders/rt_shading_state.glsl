@@ -61,4 +61,8 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     state.tangent_v[0] = bitangent;
     state.animation_time = 0.0;
     state.text_coords[0] = vec3(uv, 0.0);
+#ifdef SCENE_TRANSFORMS
+    state.world_to_object = mat4(gl_WorldToObjectEXT);
+    state.object_to_world = mat4(gl_ObjectToWorldEXT);
+#endif
 }

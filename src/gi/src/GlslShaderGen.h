@@ -95,6 +95,7 @@ namespace gtl
       int32_t aovId;
       std::string_view baseFileName;
       bool isOpaque;
+      bool enableSceneTransforms;
       bool nextEventEstimation;
       std::string_view shadingGlsl;
       uint32_t distantLightCount;
@@ -109,6 +110,7 @@ namespace gtl
     struct AnyHitShaderParams
     {
       int32_t aovId;
+      bool enableSceneTransforms;
       std::string_view baseFileName;
       std::string_view opacityEvalGlsl;
       bool shadowTest;

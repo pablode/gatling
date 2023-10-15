@@ -94,8 +94,9 @@ namespace gtl
     return new McMaterial{
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isOpaque = isOpaque,
+      .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
-      .resourcePathPrefix = "" // no source file
+      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()
     };
   }
 
@@ -142,8 +143,9 @@ namespace gtl
     return new McMaterial {
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isOpaque = _IsCompiledMaterialOpaque(compiledMaterial),
+      .resourcePathPrefix = resourcePathPrefix,
       .mdlMaterial = mdlMaterial,
-      .resourcePathPrefix = resourcePathPrefix
+      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()
     };
   }
 }

@@ -31,6 +31,18 @@
 
 struct State // Shading_state_material
 {
+#ifdef SCENE_TRANSFORMS
+    /// A 4x4 transformation matrix transforming from world to object coordinates.
+    /// It is used by the state::transform_*() methods.
+    /// This field is only used if the uniform state is included.
+    mat4                world_to_object;
+
+    /// A 4x4 transformation matrix transforming from object to world coordinates.
+    /// It is used by the state::transform_*() methods.
+    /// This field is only used if the uniform state is included.
+    mat4                object_to_world;
+#endif
+
     /// The result of state::normal().
     /// It represents the shading normal as determined by the renderer.
     /// This field will be updated to the result of \c "geometry.normal" by BSDF init functions,
@@ -74,16 +86,6 @@ struct State // Shading_state_material
     /// The data of the read-only data segment is accessible as the first segment
     /// (index 0) returned by #mi::neuraylib::ITarget_code::get_ro_data_segment_data().
     uint                ro_data_segment_offset;
-
-    /// A 4x4 transformation matrix transforming from world to object coordinates.
-    /// It is used by the state::transform_*() methods.
-    /// This field is only used if the uniform state is included.
-    vec4x4              world_to_object;
-
-    /// A 4x4 transformation matrix transforming from object to world coordinates.
-    /// It is used by the state::transform_*() methods.
-    /// This field is only used if the uniform state is included.
-    vec4x4              object_to_world;
 
     /// The result of state::object_id().
     /// It is an application-specific identifier of the hit object as provided in a scene.

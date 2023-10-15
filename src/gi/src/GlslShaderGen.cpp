@@ -237,6 +237,10 @@ namespace gtl
     {
       stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
     }
+    if (params.enableSceneTransforms)
+    {
+      stitcher.appendDefine("SCENE_TRANSFORMS");
+    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
@@ -263,6 +267,10 @@ namespace gtl
     if (params.shadowTest)
     {
       stitcher.appendDefine("SHADOW_TEST");
+    }
+    if (params.enableSceneTransforms)
+    {
+      stitcher.appendDefine("SCENE_TRANSFORMS");
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
