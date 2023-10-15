@@ -825,12 +825,12 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 #pragma omp parallel for
     for (int i = 0; i < hitGroupCompInfos.size(); i++)
     {
-      const GiMaterial* mat = params->materials[i];
+      const McMaterial* material = params->materials[i]->mcMat;
 
       HitGroupCompInfo groupInfo;
       {
         GiGlslShaderGen::MaterialGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialShadingGenInfo(*mat->mcMat, genInfo))
+        if (!s_shaderGen->generateMaterialShadingGenInfo(*material, genInfo))
         {
           threadWorkFailed = true;
           continue;
@@ -840,10 +840,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitInfo.genInfo = genInfo;
         groupInfo.closestHitInfo = hitInfo;
       }
-      if (!mat->mcMat->isOpaque)
+      if (!material->isOpaque)
       {
         GiGlslShaderGen::MaterialGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialOpacityGenInfo(*mat->mcMat, genInfo))
+        if (!s_shaderGen->generateMaterialOpacityGenInfo(*material, genInfo))
         {
           threadWorkFailed = true;
           continue;
@@ -899,6 +899,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 #pragma omp parallel for
     for (int i = 0; i < hitGroupCompInfos.size(); i++)
     {
+      const McMaterial* material = params->materials[i]->mcMat;
+
       HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
       // Closest hit
@@ -906,8 +908,8 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         GiGlslShaderGen::ClosestHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
         hitParams.baseFileName = "rt_main.chit";
-        hitParams.isOpaque = params->materials[i]->mcMat->isOpaque;
-        hitParams.enableSceneTransforms = params->materials[i]->mcMat->requiresSceneTransforms;
+        hitParams.isOpaque = material->isOpaque;
+        hitParams.enableSceneTransforms = material->requiresSceneTransforms;
         hitParams.nextEventEstimation = params->nextEventEstimation;
         hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
@@ -930,7 +932,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       {
         GiGlslShaderGen::AnyHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
-        hitParams.enableSceneTransforms = params->materials[i]->mcMat->requiresSceneTransforms;
+        hitParams.enableSceneTransforms = material->requiresSceneTransforms;
         hitParams.baseFileName = "rt_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
