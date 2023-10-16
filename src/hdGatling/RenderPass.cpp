@@ -799,16 +799,12 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   renderParams.shaderCache = m_shaderCache;
   renderParams.imageWidth = renderBuffer->GetWidth();
   renderParams.imageHeight = renderBuffer->GetHeight();
-  renderParams.maxBounces = m_settings.find(HdGatlingSettingsTokens->max_bounces)->second.Get<int>();
-  renderParams.spp = m_settings.find(HdGatlingSettingsTokens->spp)->second.Get<int>();
-  renderParams.rrBounceOffset = m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second.Get<int>();
-  // Workaround for bug https://github.com/PixarAnimationStudios/USD/issues/913
-  VtValue lightIntensityMultiplier = m_settings.find(HdGatlingSettingsTokens->light_intensity_multiplier)->second;
-  VtValue rrInvMinTermProb = m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second;
-  VtValue maxSampleValue = m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second;
-  renderParams.lightIntensityMultiplier = float(lightIntensityMultiplier.Cast<double>().Get<double>());
-  renderParams.rrInvMinTermProb = float(rrInvMinTermProb.Cast<double>().Get<double>());
-  renderParams.maxSampleValue = float(maxSampleValue.Cast<double>().Get<double>());
+  renderParams.maxBounces = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->max_bounces)->second).Get<int>();
+  renderParams.spp = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->spp)->second).Get<int>();
+  renderParams.rrBounceOffset = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second).Get<int>();
+  renderParams.lightIntensityMultiplier = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->light_intensity_multiplier)->second).Get<float>();
+  renderParams.rrInvMinTermProb = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second).Get<float>();
+  renderParams.maxSampleValue = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second).Get<float>();
   renderParams.scene = m_scene;
   for (uint32_t i = 0; i < 4; i++)
   {
