@@ -22,6 +22,7 @@
 #include <SPIRV/GlslangToSpv.h>
 
 #include <fstream>
+#include <log.h>
 
 namespace
 {
@@ -74,7 +75,7 @@ namespace gtl
       if (!fileStream.is_open())
       {
         std::string pathStr = filePath.string();
-        fprintf(stderr, "Failed to find shader include '%s'\n", pathStr.c_str());
+        GB_ERROR("failed to find shader include '{}'", pathStr);
         return nullptr;
       }
 
@@ -150,18 +151,6 @@ namespace gtl
     messages = static_cast<EShMessages>(messages | EShMsgDebugInfo);
 #endif
 
-    auto printErrorMessage = [&shader](const char* baseFmtString) {
-      fprintf(stderr, baseFmtString, shader.getInfoLog());
-#ifndef NDEBUG
-      const char* debugInfoLog = shader.getInfoDebugLog();
-      if (strlen(debugInfoLog) > 0)
-      {
-        fprintf(stderr, " (%s)", debugInfoLog);
-      }
-#endif
-      fprintf(stderr, "\n");
-    };
-
     const TBuiltInResource* resourceLimits = GetDefaultResources(); // TODO: do we want to use the actual device limits?
     int defaultVersion = 450; // Will be overriden by #version in source.
     bool forwardCompatible = false;
@@ -169,7 +158,12 @@ namespace gtl
     bool success = shader.parse(resourceLimits, defaultVersion, forwardCompatible, messages, *m_fileIncluder);
     if (!success)
     {
-      printErrorMessage("Failed to compile shader: %s");
+      const char* msgDesc = "failed to compile shader";
+#ifndef NDEBUG
+      GB_ERROR("{}: {} ({})", msgDesc, shader.getInfoLog(), shader.getInfoDebugLog());
+#else
+      GB_ERROR("{}: {}", msgDesc, shader.getInfoLog());
+#endif
       return false;
     }
 
@@ -179,7 +173,7 @@ namespace gtl
     success = program.link(messages);
     if (!success)
     {
-      printErrorMessage("Failed to link program: %s");
+      GB_ERROR("failed to link program");
       return false;
     }
 

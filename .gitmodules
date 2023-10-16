@@ -46,3 +46,6 @@
 [submodule "extern/SPIRV-Reflect"]
 	path = extern/SPIRV-Reflect
 	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
+[submodule "extern/quill"]
+	path = extern/quill
+	url = https://github.com/odygrd/quill.git

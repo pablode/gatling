@@ -20,6 +20,7 @@
 #include <mi/mdl_sdk.h>
 
 #include <stdio.h>
+#include <log.h>
 
 namespace
 {
@@ -95,12 +96,14 @@ namespace gtl
       return;
     }
 
-    const char* s_severity = _MiMessageSeverityToCStr(level);
-    FILE* os = (level <= mi::base::MESSAGE_SEVERITY_ERROR) ? stderr : stdout;
-    fprintf(os, "[%s] (%s) %s\n", s_severity, moduleCategory, message);
-#ifdef MI_PLATFORM_WINDOWS
-    fflush(stderr);
-#endif
+    if (level <= mi::base::MESSAGE_SEVERITY_ERROR)
+    {
+      GB_ERROR("{}", message);
+    }
+    else
+    {
+      GB_LOG("{}", message);
+    }
   }
 
   void McMdlLogger::message(mi::base::Message_severity level,
@@ -113,8 +116,7 @@ namespace gtl
   void McMdlLogger::message(mi::base::Message_severity level,
                             const char* message)
   {
-    const char* MODULE_CATEGORY = "shadergen";
-    this->message(level, MODULE_CATEGORY, message);
+    this->message(level, nullptr, message);
   }
 
   void McMdlLogger::flushContextMessages(mi::neuraylib::IMdl_execution_context* context)

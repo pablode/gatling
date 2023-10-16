@@ -26,6 +26,7 @@
 #endif
 
 #include <string>
+#include <log.h>
 
 #define MI_NEURAYLIB_LATEST_VERSION 51
 
@@ -44,14 +45,14 @@ namespace
     {
       LPTSTR buffer = NULL;
       LPCTSTR message = TEXT("unknown error");
-      DWORD error_code = GetLastError();
+      DWORD errorCode = GetLastError();
       if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                        FORMAT_MESSAGE_IGNORE_INSERTS, 0, error_code,
+                        FORMAT_MESSAGE_IGNORE_INSERTS, 0, errorCode,
                         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buffer, 0, 0))
       {
         message = buffer;
       }
-      fprintf(stderr, "Failed to load MDL library (%u): %s\n", error_code, message);
+      GB_ERROR("failed to load MDL library ({}): {}", errorCode, message);
       if (buffer)
       {
         LocalFree(buffer);
@@ -67,7 +68,7 @@ namespace
       {
         error = "unknown error";
       }
-      fprintf(stderr, "Failed to load MDL library: %s\n", error);
+      GB_ERROR("failed to load MDL library: {}", error);
       return nullptr;
     }
 #endif
@@ -84,14 +85,14 @@ namespace
     }
     LPTSTR buffer = 0;
     LPCTSTR message = TEXT("unknown error");
-    DWORD error_code = GetLastError();
+    DWORD errorCode = GetLastError();
     if (FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_IGNORE_INSERTS, 0, error_code,
+        FORMAT_MESSAGE_IGNORE_INSERTS, 0, errorCode,
         MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR) &buffer, 0, 0))
     {
         message = buffer;
     }
-    fprintf(stderr, "Failed to unload MDL library (%u): %s\n", error_code, message);
+    GB_ERROR("failed to unload MDL library ({}): {}", errorCode, message);
     if (buffer)
     {
       LocalFree(buffer);
@@ -106,7 +107,7 @@ namespace
     {
       error = "unknown error";
     }
-    fprintf(stderr, "Failed to unload MDL library: %s\n", error);
+    GB_ERROR("failed to unload MDL library: {}", error);
 #endif
   }
 
@@ -125,7 +126,7 @@ namespace
       {
         message = buffer;
       }
-      fprintf(stderr, "Failed to locate MDL library entry point (%u): %s\n", errorCode, message);
+      GB_ERROR("failed to locate MDL library entry point ({}): {}", errorCode, message);
       if (buffer)
       {
         LocalFree(buffer);
@@ -141,7 +142,7 @@ namespace
       {
         error = "unknown error";
       }
-      fprintf(stderr, "Failed to locate MDL library entry point: %s\n", error);
+      GB_ERROR("failed to locate MDL library entry point: {}", error);
       return {};
     }
 #endif
@@ -149,12 +150,12 @@ namespace
     mi::base::Handle<mi::neuraylib::IVersion> version(mi::neuraylib::mi_factory<mi::neuraylib::IVersion>(symbol));
     if (!version)
     {
-      fprintf(stderr, "Failed to load MDL library: invalid library\n");
+      GB_ERROR("failed to load MDL library: invalid library");
       return {};
     }
     else if (strcmp(version->get_product_version(), MI_NEURAYLIB_PRODUCT_VERSION_STRING) != 0)
     {
-      fprintf(stderr, "Failed to load MDL library: version %s does not match header version %s\n",
+      GB_ERROR("failed to load MDL library: version {} does not match header version {}",
         version->get_product_version(), MI_NEURAYLIB_PRODUCT_VERSION_STRING);
       return {};
     }
@@ -162,13 +163,13 @@ namespace
     mi::base::Handle<mi::neuraylib::INeuray> neuray(mi::neuraylib::mi_factory<mi::neuraylib::INeuray>(symbol));
     if (!neuray.is_valid_interface())
     {
-      fprintf(stderr, "Failed to load MDL library: unknown error\n");
+      GB_ERROR("failed to load MDL library: unknown error");
       return {};
     }
 
     if (MI_NEURAYLIB_API_VERSION != MI_NEURAYLIB_LATEST_VERSION)
     {
-      fprintf(stderr, "Warning: not using the latest MDL SDK - update for bugfixes\n");
+      GB_WARN("not using the latest MDL SDK - update for bugfixes");
     }
 
     return neuray;

@@ -81,7 +81,7 @@ namespace gtl
 
     if (m_config->add_mdl_path(fileDir.c_str()))
     {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "Unable to add asset MDL files");
+      m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "unable to add asset MDL files");
     }
 
     // The free TurboSquid USD+MDL models, and possibly thousand paid ones too, come with some of the required Omni* files,
@@ -109,8 +109,8 @@ namespace gtl
       // TODO: is this thread-safe?
       if (m_config->add_mdl_path(s.c_str()))
       {
-        auto errorMsg = std::string("MDL search path could not be added: ") + s;
-        m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, errorMsg.c_str());
+        auto logMsg = std::string("MDL search path could not be added: \"") + s + "\"";
+        m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, logMsg.c_str());
       }
     }
   }
@@ -147,13 +147,13 @@ namespace gtl
     mi::base::Handle<const mi::IArray> funcs(module->get_function_overloads(materialDbName.c_str(), (const mi::neuraylib::IExpression_list*)nullptr));
     if (funcs->get_length() == 0)
     {
-      std::string errorMsg = std::string("Material with identifier ") + std::string(identifier) + " not found in MDL module\n";
+      std::string errorMsg = std::string("material with identifier ") + std::string(identifier) + " not found in MDL module";
       m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, errorMsg.c_str());
       return false;
     }
     if (funcs->get_length() > 1)
     {
-      std::string errorMsg = std::string("Ambigious material identifier ") + std::string(identifier) + " for MDL module\n";
+      std::string errorMsg = std::string("ambigious material identifier ") + std::string(identifier) + " for MDL module";
       m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, errorMsg.c_str());
       return false;
     }

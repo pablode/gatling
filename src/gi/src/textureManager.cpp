@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <string.h>
 #include <inttypes.h>
+#include <log.h>
 
 using namespace gtl;
 
@@ -91,8 +92,7 @@ namespace gtl
       return false;
     }
 
-    printf("image read from path %s of size %.2fMiB\n",
-      filePath, imageData.size * BYTES_TO_MIB);
+    GB_LOG("image read from path \"{}\" of size {:.2f} MiB", filePath, imageData.size * BYTES_TO_MIB);
 
     CgpuImageCreateInfo createInfo = {
       .width = imageData.width,
@@ -131,7 +131,7 @@ namespace gtl
       return true;
     }
 
-    printf("staging %zu images\n", texCount);
+    GB_LOG("staging {} images", texCount);
 
     images2d.reserve(texCount);
     images3d.reserve(texCount);
@@ -161,11 +161,11 @@ namespace gtl
         uint64_t payloadSize = payload.size();
         if (payloadSize == 0)
         {
-          fprintf(stderr, "image %d has no payload\n", i);
+          GB_ERROR("image {} has no payload", i);
           continue;
         }
 
-        printf("image %d has binary payload of %.2fMiB\n", i, payloadSize * BYTES_TO_MIB);
+        GB_LOG("image {} has binary payload of {:.2f} MiB", i, payloadSize * BYTES_TO_MIB);
 
         createInfo.width = textureResource.width;
         createInfo.height = textureResource.height;
@@ -187,7 +187,7 @@ namespace gtl
         continue;
       }
 
-      fprintf(stderr, "failed to read image %d from path %s\n", i, filePath);
+      GB_ERROR("failed to read image {} from path {}", i, filePath);
       createInfo.width = 1;
       createInfo.height = 1;
       createInfo.depth = 1;

@@ -744,9 +744,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
         giDestroyShaderCache(m_shaderCache);
       }
 
-      printf("rebuilding shader cache\n");
-      fflush(stdout);
-
       auto domeLightCameraVisibilityValueIt = m_settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
 
       GiShaderCacheParams shaderParams;
@@ -771,9 +768,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       {
         giDestroyGeomCache(m_geomCache);
       }
-
-      printf("rebuilding geom cache\n");
-      fflush(stdout);
 
       GiGeomCacheParams geomParams;
       geomParams.meshInstanceCount = instances.size();

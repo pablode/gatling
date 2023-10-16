@@ -46,6 +46,7 @@
 #include <Material.h>
 #include <Frontend.h>
 #include <Runtime.h>
+#include <log.h>
 #include "interface/rp_main.h"
 
 #include <MaterialXCore/Document.h>
@@ -140,6 +141,7 @@ struct GiDomeLight
   glm::quat rotation;
 };
 
+bool s_loggerInitialized = false;
 CgpuDevice s_device;
 CgpuPhysicalDeviceFeatures s_deviceFeatures;
 CgpuPhysicalDeviceProperties s_deviceProperties;
@@ -236,8 +238,26 @@ bool _giResizeFramebuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
   return true;
 }
 
+void _PrintInitInfo(const GiInitParams* params)
+{
+  GB_LOG("gatling {}.{}.{} built against MaterialX {}.{}.{}", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH,
+                                                              MATERIALX_MAJOR_VERSION, MATERIALX_MINOR_VERSION, MATERIALX_BUILD_VERSION);
+  GB_LOG("> resource path: \"{}\"", params->resourcePath);
+  GB_LOG("> shader path: \"{}\"", params->shaderPath);
+  GB_LOG("> MDL search paths: {}", params->mdlSearchPaths);
+  GB_LOG("> Mtlx search paths: {}", params->mtlxSearchPaths);
+}
+
 GiStatus giInitialize(const GiInitParams* params)
 {
+  if (!s_loggerInitialized)
+  {
+    gbLogInit();
+    s_loggerInitialized = true;
+  }
+
+  _PrintInitInfo(params);
+
   if (!cgpuInitialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH))
     return GI_ERROR;
 
@@ -314,6 +334,7 @@ GiStatus giInitialize(const GiInitParams* params)
 
 void giTerminate()
 {
+  GB_LOG("terminating...");
 #ifndef NDEBUG
   s_fileWatcher.reset();
 #endif
@@ -457,7 +478,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       }
       if (materialIndex == UINT32_MAX)
       {
-        fprintf(stderr, "invalid BLAS material\n");
+        GB_ERROR("invalid BLAS material");
         continue;
       }
 
@@ -519,7 +540,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
       if ((indices.size() % 3) != 0)
       {
-        fprintf(stderr, "BLAS indices do not represent triangles\n");
+        GB_ERROR("BLAS indices do not represent triangles");
         continue;
       }
 
@@ -539,7 +560,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
       if (!cgpuCreateBuffer(s_device, &iboCreateInfo, &indexBuffer))
       {
-        fprintf(stderr, "failed to allocate BLAS indices memory\n");
+        GB_ERROR("failed to allocate BLAS indices memory");
         continue;
       }
 
@@ -553,7 +574,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       if (!cgpuCreateBuffer(s_device, &vboCreateInfo, &vertexBuffer))
       {
         cgpuDestroyBuffer(s_device, vertexBuffer);
-        fprintf(stderr, "failed to allocate BLAS vertices memory\n");
+        GB_ERROR("failed to allocate BLAS vertices memory");
         continue;
       }
 
@@ -583,7 +604,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
       if (!blasCreated)
       {
-        fprintf(stderr, "failed to allocate BLAS vertex memory");
+        GB_ERROR("failed to allocate BLAS vertex memory");
         continue;
       }
 
@@ -625,8 +646,8 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 
   GiGeomCache* cache = nullptr;
 
-  printf("instance count: %d\n", params->meshInstanceCount);
-  printf("creating geom cache..\n");
+  GB_LOG("instance count: {}", params->meshInstanceCount);
+  GB_LOG("creating geom cache..");
   fflush(stdout);
 
   // Build HW ASes and vertex, index buffers.
@@ -663,9 +684,9 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
     faceBufferView.offset = giAlignBuffer(offset_align, faceBufferView.size, &attributeBufferSize);
     vertexBufferView.offset = giAlignBuffer(offset_align, vertexBufferView.size, &attributeBufferSize);
 
-    printf("total attribute buffer size: %.2fMiB\n", attributeBufferSize * BYTES_TO_MIB);
-    printf("> %.2fMiB faces\n", faceBufferView.size * BYTES_TO_MIB);
-    printf("> %.2fMiB vertices\n", vertexBufferView.size * BYTES_TO_MIB);
+    GB_LOG("total attribute buffer size: {:.2f} MiB", attributeBufferSize * BYTES_TO_MIB);
+    GB_LOG("> {:.2f} MiB faces", faceBufferView.size * BYTES_TO_MIB);
+    GB_LOG("> {:.2f} MiB vertices", vertexBufferView.size * BYTES_TO_MIB);
     fflush(stdout);
 
     CgpuBufferCreateInfo createInfo = {
@@ -741,14 +762,14 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   if (clockCyclesAov && !s_deviceFeatures.shaderClock)
   {
-    fprintf(stderr, "error: unsupported AOV - device feature missing\n");
+    GB_ERROR("unsupported AOV - device feature missing");
     return nullptr;
   }
 
   GiScene* scene = params->scene;
 
-  printf("material count: %d\n", params->materialCount);
-  printf("creating shader cache..\n");
+  GB_LOG("material count: {}", params->materialCount);
+  GB_LOG("creating shader cache..");
   fflush(stdout);
 
   GiShaderCache* cache = nullptr;
@@ -784,7 +805,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       bool flushImmediately = false;
       if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, flushImmediately))
       {
-        fprintf(stderr, "unable to load dome light texture at %s\n", filePath);
+        GB_ERROR("unable to load dome light texture at {}", filePath);
       }
       else
       {
@@ -1148,7 +1169,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   // Create RT pipeline.
   {
-    printf("creating RT pipeline..\n");
+    GB_LOG("creating RT pipeline..");
     fflush(stdout);
 
     CgpuRtPipelineCreateInfo pipelineDesc = {
@@ -1251,20 +1272,20 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   if (!scene->sphereLights.commitChanges())
   {
-    fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
+    GB_ERROR("{}:{}: light commit failed!", __FILE__, __LINE__);
   }
   if (!scene->distantLights.commitChanges())
   {
-    fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
+    GB_ERROR("{}:{}: light commit failed!", __FILE__, __LINE__);
   }
   if (!scene->rectLights.commitChanges())
   {
-    fprintf(stderr, "%s:%d: light commit failed!\n", __FILE__, __LINE__);
+    GB_ERROR("{}:{}: light commit failed!", __FILE__, __LINE__);
   }
 
   if (!s_stager->flush())
   {
-    fprintf(stderr, "%s:%d: stager flush failed!\n", __FILE__, __LINE__);
+    GB_ERROR("{}:{}: stager flush failed!", __FILE__, __LINE__);
   }
 
   CgpuCommandBuffer command_buffer;
@@ -1281,7 +1302,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   if (reallocFramebuffer)
   {
-    printf("recreating output buffer with size %dx%d (%.2fMiB)\n", params->imageWidth,
+    GB_LOG("recreating output buffer with size {}x{} ({:.2f} MiB)", params->imageWidth,
       params->imageHeight, framebufferSize * BYTES_TO_MIB);
 
     _giResizeFramebuffer(params->imageWidth, params->imageHeight, framebufferSize);

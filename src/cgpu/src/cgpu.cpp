@@ -38,6 +38,7 @@
 // TODO: should be in 'gtl/gb' subfolder
 #include <smallVector.h>
 #include <linearDataStore.h>
+#include <log.h>
 
 using namespace gtl;
 
@@ -163,10 +164,10 @@ static std::unique_ptr<CgpuIInstance> iinstance = nullptr;
   #define CGPU_INLINE
 #endif
 
-#define CGPU_RETURN_ERROR(msg)                                        \
-  do {                                                                \
-    fprintf(stderr, "error in %s:%d: %s\n", __FILE__, __LINE__, msg); \
-    return false;                                                     \
+#define CGPU_RETURN_ERROR(msg)                      \
+  do {                                              \
+    GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); \
+    return false;                                   \
   } while (false)
 
 #define CGPU_RETURN_ERROR_INVALID_HANDLE                              \
@@ -326,6 +327,21 @@ static VkPipelineStageFlags2KHR cgpuPipelineStageFlagsFromShaderStageFlags(VkSha
   return pipelineStageFlags;
 }
 
+static const char* cgpuGetVendorName(uint32_t deviceId)
+{
+  switch (deviceId)
+  {
+  case 0x1002:
+    return "AMD";
+  case 0x10DE:
+    return "NVIDIA";
+  case 0x8086:
+    return "INTEL";
+  default:
+    return "UNKNOWN";
+  }
+}
+
 /* API method implementation. */
 
 static bool cgpuFindLayer(const char* name, uint32_t layerCount, VkLayerProperties* layers)
@@ -369,9 +385,21 @@ static void cgpuSetObjectName(VkDevice device, VkObjectType type, uint64_t handl
 
 bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
 {
-  if (volkInitialize() != VK_SUCCESS || volkGetInstanceVersion() < CGPU_MIN_VK_API_VERSION)
+  if (volkInitialize() != VK_SUCCESS)
   {
     CGPU_RETURN_ERROR("failed to initialize volk");
+  }
+
+  uint32_t instanceVersion = volkGetInstanceVersion();
+  GB_LOG("Vulkan instance version {}.{}.{}", VK_VERSION_MAJOR(instanceVersion),
+    VK_VERSION_MINOR(instanceVersion), VK_VERSION_PATCH(instanceVersion));
+
+  if (instanceVersion < CGPU_MIN_VK_API_VERSION)
+  {
+    GB_ERROR("Vulkan instance version does match minimum of {}.{}.{}",
+      VK_VERSION_MAJOR(CGPU_MIN_VK_API_VERSION), VK_VERSION_MINOR(CGPU_MIN_VK_API_VERSION),
+      VK_VERSION_PATCH(CGPU_MIN_VK_API_VERSION));
+    return false;
   }
 
   GbSmallVector<const char*, 8> enabledLayers;
@@ -390,6 +418,7 @@ bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t version
     if (cgpuFindLayer(VK_LAYER_KHRONOS_VALIDATION_NAME, availableLayers.size(), availableLayers.data()))
     {
       enabledLayers.push_back(VK_LAYER_KHRONOS_VALIDATION_NAME);
+      GB_LOG("> enabled layer {}", VK_LAYER_KHRONOS_VALIDATION_NAME);
     }
   }
   {
@@ -402,6 +431,8 @@ bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t version
     if (cgpuFindExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
     {
       enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+      GB_LOG("> enabled instance extension {}", VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
       debugUtilsEnabled = true;
     }
   }
@@ -469,6 +500,10 @@ bool cgpuCreateDevice(CgpuDevice* device)
     iinstance->ideviceStore.free(device->handle);
     CGPU_RETURN_ERROR("no physical device found");
   }
+  else if (physDeviceCount > 1)
+  {
+    GB_WARN("more than one device found -- choosing first one");
+  }
 
   GbSmallVector<VkPhysicalDevice, 8> physicalDevices(physDeviceCount);
   vkEnumeratePhysicalDevices(iinstance->instance, &physDeviceCount, physicalDevices.data());
@@ -497,10 +532,27 @@ bool cgpuCreateDevice(CgpuDevice* device)
 
   vkGetPhysicalDeviceProperties2(idevice->physicalDevice, &deviceProperties);
 
-  if (deviceProperties.properties.apiVersion < CGPU_MIN_VK_API_VERSION)
+  GB_LOG("Vulkan device properties:");
+  uint32_t apiVersion = deviceProperties.properties.apiVersion;
+  {
+    uint32_t major = VK_VERSION_MAJOR(apiVersion);
+    uint32_t minor = VK_VERSION_MINOR(apiVersion);
+    uint32_t patch = VK_VERSION_PATCH(apiVersion);
+    GB_LOG("> API version: {}.{}.{}", major, minor, patch);
+  }
+
+  GB_LOG("> name: {}", deviceProperties.properties.deviceName);
+  GB_LOG("> vendor: {} ({})", cgpuGetVendorName(deviceProperties.properties.vendorID), deviceProperties.properties.vendorID);
+
+  if (apiVersion < CGPU_MIN_VK_API_VERSION)
   {
     iinstance->ideviceStore.free(device->handle);
-    CGPU_RETURN_ERROR("unsupported vulkan version");
+
+    GB_ERROR("Vulkan device API version does match minimum of {}.{}.{}",
+      VK_VERSION_MAJOR(CGPU_MIN_VK_API_VERSION), VK_VERSION_MINOR(CGPU_MIN_VK_API_VERSION),
+      VK_VERSION_PATCH(CGPU_MIN_VK_API_VERSION));
+
+    return false;
   }
 
   if ((subgroupProperties.supportedStages & VK_QUEUE_COMPUTE_BIT) != VK_QUEUE_COMPUTE_BIT ||
@@ -541,7 +593,7 @@ bool cgpuCreateDevice(CgpuDevice* device)
     {
       iinstance->ideviceStore.free(device->handle);
 
-      fprintf(stderr, "error in %s:%d: extension %s not supported\n", __FILE__, __LINE__, extension);
+      GB_ERROR("extension {} not supported", extension);
       return false;
     }
 
@@ -552,6 +604,8 @@ bool cgpuCreateDevice(CgpuDevice* device)
   if (cgpuFindExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, extensions.size(), extensions.data()))
   {
     enabledExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+
+    GB_LOG("extension {} enabled", VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
   }
 
 #ifndef NDEBUG
@@ -559,6 +613,8 @@ bool cgpuCreateDevice(CgpuDevice* device)
   {
     idevice->features.shaderClock = true;
     enabledExtensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
+
+    GB_LOG("extension {} enabled", VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
   }
 
 #ifndef __APPLE__
@@ -566,6 +622,8 @@ bool cgpuCreateDevice(CgpuDevice* device)
   {
     idevice->features.debugPrintf = true;
     enabledExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+
+    GB_LOG("extension {} enabled", VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
   }
 #endif
 #endif
@@ -575,12 +633,17 @@ bool cgpuCreateDevice(CgpuDevice* device)
     idevice->features.pageableDeviceLocalMemory = true;
     enabledExtensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
     enabledExtensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
+
+    GB_LOG("extension {} enabled", VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
+    GB_LOG("extension {} enabled", VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
   }
 
   if (cgpuFindExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, extensions.size(), extensions.data()))
   {
     idevice->features.rayTracingInvocationReorder = true;
     enabledExtensions.push_back(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
+
+    GB_LOG("extension {} enabled", VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
   }
 
   uint32_t queueFamilyCount;

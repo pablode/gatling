@@ -32,6 +32,7 @@
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/Util.h>
 #include <MaterialXGenMdl/MdlShaderGenerator.h>
+#include <log.h>
 
 namespace mx = MaterialX;
 
@@ -178,7 +179,7 @@ namespace gtl
     }
     catch (const std::exception& ex)
     {
-      fprintf(stderr, "Exception creating MaterialX document: %s\n", ex.what());
+      GB_ERROR("exception creating MaterialX document: {}", ex.what());
       return false;
     }
   }
@@ -202,7 +203,7 @@ namespace gtl
       mx::TypedElementPtr element = _FindSurfaceShaderElement(mtlxDoc);
       if (!element)
       {
-        fprintf(stderr, "Generation failed: surface shader not found\n");
+        GB_ERROR("generation failed: surface shader not found");
         return false;
       }
 
@@ -212,7 +213,7 @@ namespace gtl
     }
     catch (const std::exception& ex)
     {
-      fprintf(stderr, "Exception generating MDL code: %s\n", ex.what());
+      GB_ERROR("exception generating MDL code: {}", ex.what());
     }
 
     if (!shader)
@@ -225,7 +226,7 @@ namespace gtl
 
     if (getenv("GATLING_DUMP_MDL"))
     {
-      printf("MDL source: %s\n", mdlSrc.c_str());
+      GB_LOG("MDL source: \n{}", mdlSrc);
     }
 
     return true;
