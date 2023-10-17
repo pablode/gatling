@@ -32,6 +32,17 @@ TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
   (UsdPreviewSurface)
   (UsdUVTexture)
+  (UsdPrimvarReader_float)
+  (UsdPrimvarReader_float2)
+  (UsdPrimvarReader_float3)
+  (UsdPrimvarReader_float4)
+  (UsdPrimvarReader_int)
+  (UsdPrimvarReader_string)
+  (UsdPrimvarReader_normal)
+  (UsdPrimvarReader_point)
+  (UsdPrimvarReader_vector)
+  (UsdPrimvarReader_matrix)
+  ((_default, "default"))
   (glossiness)
   (normal)
   (bias)
@@ -54,39 +65,44 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ior)
   (displacement)
   (occlusion)
+  (fallback)
   (rgb)
   (r)
 );
 
-void _PatchUsdTypes(HdMaterialNetwork2& network)
+// Following file has 'default' parameters that should be called 'fallback':
+// https://usdzshare.com/?ug-gallery=photo-detail&photo_id=490
+void _PatchDefaultParam(HdMaterialNetwork2& network)
 {
   for (auto& pathNodePair : network.nodes)
   {
     HdMaterialNode2& node = pathNodePair.second;
 
-    auto& parameters = node.parameters;
-
-    for (auto& tokenValuePair : parameters)
+    if (node.nodeTypeId != _tokens->UsdUVTexture &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_float &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_float2 &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_float3 &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_float4 &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_int &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_string &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_normal &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_point &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_vector &&
+        node.nodeTypeId != _tokens->UsdPrimvarReader_matrix)
     {
-      VtValue& value = tokenValuePair.second;
-
-#if PXR_VERSION <= 2308
-      // Workaround for HdMtlxConvertToString not handling the TfToken type:
-      // https://github.com/PixarAnimationStudios/USD/blob/3abc46452b1271df7650e9948fef9f0ce602e3b2/pxr/imaging/hdMtlx/hdMtlx.cpp#L117
-      if (value.IsHolding<TfToken>())
-      {
-        value = value.Cast<std::string>();
-      }
-#endif
-
-      // When serializing the network to a MaterialX document again, the SdfAssetPath
-      // gets replaced by its non-resolved path and we don't have any other way of resolving
-      // it at a later point in time, since this is done by the Sdf/Ar layer.
-      if (value.IsHolding<SdfAssetPath>())
-      {
-        value = value.UncheckedGet<SdfAssetPath>().GetResolvedPath();
-      }
+      continue;
     }
+
+    auto& params = node.parameters;
+
+    auto defaultParam = params.find(_tokens->_default);
+    if (defaultParam == params.end())
+    {
+      continue;
+    }
+
+    params[_tokens->fallback] = defaultParam->second;
+    params.erase(defaultParam);
   }
 }
 
@@ -422,8 +438,42 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
   }
 }
 
+void _PatchUsdTypes(HdMaterialNetwork2& network)
+{
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+
+    auto& parameters = node.parameters;
+
+    for (auto& tokenValuePair : parameters)
+    {
+      VtValue& value = tokenValuePair.second;
+
+#if PXR_VERSION <= 2308
+      // Workaround for HdMtlxConvertToString not handling the TfToken type:
+      // https://github.com/PixarAnimationStudios/USD/blob/3abc46452b1271df7650e9948fef9f0ce602e3b2/pxr/imaging/hdMtlx/hdMtlx.cpp#L117
+      if (value.IsHolding<TfToken>())
+      {
+        value = value.Cast<std::string>();
+      }
+#endif
+
+      // When serializing the network to a MaterialX document again, the SdfAssetPath
+      // gets replaced by its non-resolved path and we don't have any other way of resolving
+      // it at a later point in time, since this is done by the Sdf/Ar layer.
+      if (value.IsHolding<SdfAssetPath>())
+      {
+        value = value.UncheckedGet<SdfAssetPath>().GetResolvedPath();
+      }
+    }
+  }
+}
+
 void PreviewSurfaceNetworkPatcher::Patch(HdMaterialNetwork2& network)
 {
+  _PatchDefaultParam(network);
+
   _PatchUsdPreviewSurfaceGlossiness(network);
 
   _PatchUsdPreviewSurfaceSpecular(network);
