@@ -19,7 +19,7 @@
 
 #include <pxr/imaging/hd/renderDelegate.h>
 
-#include "MaterialNetworkTranslator.h"
+#include "MaterialNetworkCompiler.h"
 
 struct GiScene;
 
@@ -29,7 +29,7 @@ class HdGatlingRenderDelegate final : public HdRenderDelegate
 {
 public:
   HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                          const MaterialNetworkTranslator& translator);
+                          const MaterialNetworkCompiler& translator);
 
   ~HdGatlingRenderDelegate() override;
 
@@ -93,7 +93,7 @@ public:
   TfTokenVector GetShaderSourceTypes() const override;
 
 private:
-  const MaterialNetworkTranslator& m_translator;
+  const MaterialNetworkCompiler& m_translator;
   HdResourceRegistrySharedPtr m_resourceRegistry;
   HdRenderSettingDescriptorList m_settingDescriptors;
   HdRenderSettingDescriptorList m_debugSettingDescriptors;

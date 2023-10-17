@@ -17,7 +17,7 @@
 
 #include "RendererPlugin.h"
 #include "RenderDelegate.h"
-#include "MaterialNetworkTranslator.h"
+#include "MaterialNetworkCompiler.h"
 
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/base/plug/plugin.h>
@@ -126,7 +126,7 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
     return;
   }
 
-  m_translator = std::make_unique<MaterialNetworkTranslator>(mtlxSearchPaths);
+  m_translator = std::make_unique<MaterialNetworkCompiler>(mtlxSearchPaths);
 
   m_usdzAssetReader = std::make_unique<UsdzAssetReader>();
   giRegisterAssetReader(m_usdzAssetReader.get());

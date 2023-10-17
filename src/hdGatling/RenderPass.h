@@ -27,7 +27,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingCamera;
 class HdGatlingMesh;
-class MaterialNetworkTranslator;
+class MaterialNetworkCompiler;
 
 class HdGatlingRenderPass final : public HdRenderPass
 {
@@ -35,7 +35,7 @@ public:
   HdGatlingRenderPass(HdRenderIndex* index,
                       const HdRprimCollection& collection,
                       const HdRenderSettingsMap& settings,
-                      const MaterialNetworkTranslator& materialNetworkTranslator,
+                      const MaterialNetworkCompiler& MaterialNetworkCompiler,
                       GiScene* scene);
 
   ~HdGatlingRenderPass() override;
@@ -67,7 +67,7 @@ private:
 private:
   GiScene* m_scene;
   const HdRenderSettingsMap& m_settings;
-  const MaterialNetworkTranslator& m_materialNetworkTranslator;
+  const MaterialNetworkCompiler& m_MaterialNetworkCompiler;
   GiMaterial* m_defaultMaterial;
   std::vector<GiMaterial*> m_materials;
   bool m_isConverged;

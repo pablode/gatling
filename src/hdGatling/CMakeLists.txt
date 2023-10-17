@@ -8,24 +8,24 @@ add_library(
   Light.h
   Material.cpp
   Material.h
-  MaterialNetworkPatcher.cpp
-  MaterialNetworkPatcher.h
-  MaterialNetworkTranslator.cpp
-  MaterialNetworkTranslator.h
+  MaterialNetworkCompiler.cpp
+  MaterialNetworkCompiler.h
   MdlDiscoveryPlugin.cpp
   MdlDiscoveryPlugin.h
   MdlParserPlugin.cpp
   MdlParserPlugin.h
   Mesh.cpp
   Mesh.h
+  PreviewSurfaceNetworkPatcher.cpp
+  PreviewSurfaceNetworkPatcher.h
   RenderBuffer.cpp
   RenderBuffer.h
-  RenderParam.cpp
-  RenderParam.h
   RenderDelegate.cpp
   RenderDelegate.h
   RendererPlugin.cpp
   RendererPlugin.h
+  RenderParam.cpp
+  RenderParam.h
   RenderPass.cpp
   RenderPass.h
   Tokens.cpp

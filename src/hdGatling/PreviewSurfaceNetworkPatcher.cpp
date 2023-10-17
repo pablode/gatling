@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MaterialNetworkPatcher.h"
+#include "PreviewSurfaceNetworkPatcher.h"
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/gf/vec4f.h>
@@ -30,9 +30,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
-  (ND_UsdPreviewSurface_surfaceshader)
-  (ND_UsdUVTexture)
-  (ND_convert_color3_vector3)
+  (UsdPreviewSurface)
+  (UsdUVTexture)
   (glossiness)
   (normal)
   (bias)
@@ -44,8 +43,6 @@ TF_DEFINE_PRIVATE_TOKENS(
   (no)
   (sRGB)
   (raw)
-  (in)
-  (out)
   (metallic)
   (roughness)
   (clearcoat)
@@ -106,7 +103,7 @@ void _PatchUsdPreviewSurfaceGlossinessInput(HdMaterialNetwork2& network, std::ma
   {
     HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
 
-    if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+    if (upstreamNode.nodeTypeId != _tokens->UsdUVTexture)
     {
       continue;
     }
@@ -161,7 +158,7 @@ void _PatchUsdPreviewSurfaceGlossiness(HdMaterialNetwork2& network)
   {
     HdMaterialNode2& node = pathNodePair.second;
 
-    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+    if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
     }
@@ -185,7 +182,7 @@ void _PatchUsdPreviewSurfaceSpecular(HdMaterialNetwork2& network)
   {
     HdMaterialNode2& node = pathNodePair.second;
 
-    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+    if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
     }
@@ -217,7 +214,7 @@ void _PatchUsdPreviewSurfaceSpecular(HdMaterialNetwork2& network)
       {
         HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
 
-        if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+        if (upstreamNode.nodeTypeId != _tokens->UsdUVTexture)
         {
           continue;
         }
@@ -235,7 +232,7 @@ void _PatchUsdPreviewSurfaceNormalInputConnection(HdMaterialNetwork2& network, H
 {
   HdMaterialNode2& upstreamNode = network.nodes[connection.upstreamNode];
 
-  if (upstreamNode.nodeTypeId != _tokens->ND_UsdUVTexture)
+  if (upstreamNode.nodeTypeId != _tokens->UsdUVTexture)
   {
     return;
   }
@@ -309,7 +306,7 @@ void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network
   for (auto& pathNodePair : network.nodes)
   {
     HdMaterialNode2& node = pathNodePair.second;
-    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+    if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
     }
@@ -353,49 +350,6 @@ void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network
     patchFloatChannelConnection(_tokens->ior);
     patchFloatChannelConnection(_tokens->displacement);
     patchFloatChannelConnection(_tokens->occlusion);
-
-    // Unfortunately the UsdPreviewSurface standard nodes can't be mapped to MaterialX UsdPreviewSurface
-    // implementation nodes as-is. This is because the 'normal' input of the UsdPreviewSurface node expects
-    // a vector3, while UsdUVTexture nodes only output color3 - which can't be implicitly converted in MDL:
-    // https://github.com/AcademySoftwareFoundation/MaterialX/issues/1038
-    //
-    // To work around this issue, we insert an explicit type conversion node into the shading network.
-    const auto patchColor3Vector3InputConnection = [&inputs, &network](TfToken inputName)
-    {
-      auto inputIt = inputs.find(inputName);
-      if (inputIt == inputs.end())
-      {
-        return;
-      }
-
-      auto& connections = inputIt->second;
-      for (HdMaterialConnection2& connection : connections)
-      {
-        if (connection.upstreamOutputName != _tokens->rgb)
-        {
-          continue;
-        }
-
-        SdfPath upstreamNodePath = connection.upstreamNode;
-
-        SdfPath convertNodePath = upstreamNodePath;
-        for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
-        {
-          std::string convertNodeName = "convert" + std::to_string(i);
-          convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
-        }
-
-        HdMaterialNode2 convertNode;
-        convertNode.nodeTypeId = _tokens->ND_convert_color3_vector3;
-        convertNode.inputConnections[_tokens->in] = {{ upstreamNodePath, _tokens->rgb }};
-        network.nodes[convertNodePath] = convertNode;
-
-        connection.upstreamNode = convertNodePath;
-        connection.upstreamOutputName = _tokens->out;
-      }
-    };
-
-    patchColor3Vector3InputConnection(_tokens->normal);
   }
 }
 
@@ -404,7 +358,7 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
   for (auto& pathNodePair : network.nodes)
   {
     HdMaterialNode2& node = pathNodePair.second;
-    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+    if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
     }
@@ -438,7 +392,7 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
   for (auto& pathNodePair : network.nodes)
   {
     HdMaterialNode2& node = pathNodePair.second;
-    if (node.nodeTypeId != _tokens->ND_UsdUVTexture)
+    if (node.nodeTypeId != _tokens->UsdUVTexture)
     {
       continue;
     }
@@ -468,7 +422,7 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
   }
 }
 
-void MaterialNetworkPatcher::Patch(HdMaterialNetwork2& network)
+void PreviewSurfaceNetworkPatcher::Patch(HdMaterialNetwork2& network)
 {
   _PatchUsdPreviewSurfaceGlossiness(network);
 

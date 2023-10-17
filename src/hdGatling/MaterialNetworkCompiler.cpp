@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MaterialNetworkTranslator.h"
+#include "MaterialNetworkCompiler.h"
 
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -32,7 +32,7 @@
 
 #include <gi.h>
 
-#include "MaterialNetworkPatcher.h"
+#include "PreviewSurfaceNetworkPatcher.h"
 #include "Tokens.h"
 
 namespace mx = MaterialX;
@@ -55,6 +55,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (UsdPrimvarReader_matrix)
   (UsdTransform2d)
   (UsdUVTexture)
+  (normal)
   (wrapS)
   (wrapT)
   (black)
@@ -63,7 +64,10 @@ TF_DEFINE_PRIVATE_TOKENS(
   (mirror)
   (sourceColorSpace)
   (raw)
+  (rgb)
   (sRGB)
+  (in)
+  (out)
   ((_auto, "auto"))
   // MaterialX USD node type equivalents
   (ND_UsdPreviewSurface_surfaceshader)
@@ -77,6 +81,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_UsdPrimvarReader_matrix44)
   (ND_UsdTransform2d)
   (ND_UsdUVTexture)
+  (ND_convert_color3_vector3)
   (periodic)
   (srgb_texture)
   (lin_rec709)
@@ -98,7 +103,60 @@ static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTy
   { _tokens->UsdPrimvarReader_matrix, _tokens->ND_UsdPrimvarReader_matrix44       }
 };
 
-bool _ConvertUsdNodesToMtlxXNodes(HdMaterialNetwork2& network)
+// Unfortunately the UsdPreviewSurface standard nodes can't be mapped to MaterialX UsdPreviewSurface
+// implementation nodes as-is. This is because the 'normal' input of the UsdPreviewSurface node expects
+// a vector3, while UsdUVTexture nodes only output color3 -- which can't be implicitly converted in MDL:
+// https://github.com/AcademySoftwareFoundation/MaterialX/issues/1038
+//
+// We implement this patch on the MaterialX document level too, however we replicate it here so that
+// HdMtlx does not throw validation errors due to mismatching NodeDefs.
+void _PatchUsdPreviewSurfaceNormalColor3Vector3Mismatch(HdMaterialNetwork2& network)
+{
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+    {
+      continue;
+    }
+
+    auto& inputs = node.inputConnections;
+
+    auto inputIt = inputs.find(_tokens->normal);
+    if (inputIt == inputs.end())
+    {
+      return;
+    }
+
+    auto& connections = inputIt->second;
+    for (HdMaterialConnection2& connection : connections)
+    {
+      if (connection.upstreamOutputName != _tokens->rgb)
+      {
+        continue;
+      }
+
+      SdfPath upstreamNodePath = connection.upstreamNode;
+
+      SdfPath convertNodePath = upstreamNodePath;
+      for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
+      {
+        std::string convertNodeName = "convert" + std::to_string(i);
+        convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
+      }
+
+      HdMaterialNode2 convertNode;
+      convertNode.nodeTypeId = _tokens->ND_convert_color3_vector3;
+      convertNode.inputConnections[_tokens->in] = { { upstreamNodePath, _tokens->rgb } };
+      network.nodes[convertNodePath] = convertNode;
+
+      connection.upstreamNode = convertNodePath;
+      connection.upstreamOutputName = _tokens->out;
+    }
+  }
+}
+
+bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
 {
   // First pass: substitute UsdUVTexture:sourceColorSpace input with parent input colorSpace attribute
   for (auto nodeIt = network.nodes.begin(); nodeIt != network.nodes.end(); nodeIt++)
@@ -256,7 +314,7 @@ bool _GetMaterialNetworkSurfaceTerminal(const HdMaterialNetwork2& network2, HdMa
   return true;
 }
 
-MaterialNetworkTranslator::MaterialNetworkTranslator(const std::vector<std::string>& mtlxSearchPaths)
+MaterialNetworkCompiler::MaterialNetworkCompiler(const std::vector<std::string>& mtlxSearchPaths)
 {
   m_nodeLib = mx::createDocument();
 
@@ -270,20 +328,24 @@ MaterialNetworkTranslator::MaterialNetworkTranslator(const std::vector<std::stri
   mx::loadLibraries(libFolders, fileSearchPath, m_nodeLib);
 }
 
-GiMaterial* MaterialNetworkTranslator::ParseNetwork(const SdfPath& id,
-                                                     const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
-  GiMaterial* result = TryParseMdlNetwork(network);
+  GiMaterial* result = TryCompileMdlNetwork(network);
 
   if (!result)
   {
-    result = TryParseMtlxNetwork(id, network);
+    HdMaterialNetwork2 patchedNetwork = network;
+
+    PreviewSurfaceNetworkPatcher patcher;
+    patcher.Patch(patchedNetwork);
+
+    result = TryCompileMtlxNetwork(id, patchedNetwork);
   }
 
   return result;
 }
 
-GiMaterial* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::TryCompileMdlNetwork(const HdMaterialNetwork2& network) const
 {
   if (network.nodes.size() != 1)
   {
@@ -310,16 +372,15 @@ GiMaterial* MaterialNetworkTranslator::TryParseMdlNetwork(const HdMaterialNetwor
   return giCreateMaterialFromMdlFile(fileUri.c_str(), subIdentifier.c_str());
 }
 
-GiMaterial* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   HdMaterialNetwork2 mtlxNetwork = network;
-  if (!_ConvertUsdNodesToMtlxXNodes(mtlxNetwork))
+  if (!_ConvertUsdNodesToMtlxNodes(mtlxNetwork))
   {
     return nullptr;
   }
 
-  MaterialNetworkPatcher patcher;
-  patcher.Patch(mtlxNetwork);
+  _PatchUsdPreviewSurfaceNormalColor3Vector3Mismatch(mtlxNetwork);
 
   mx::DocumentPtr doc = CreateMaterialXDocumentFromNetwork(id, mtlxNetwork);
   if (!doc)
@@ -330,8 +391,8 @@ GiMaterial* MaterialNetworkTranslator::TryParseMtlxNetwork(const SdfPath& id, co
   return giCreateMaterialFromMtlxDoc(doc);
 }
 
-mx::DocumentPtr MaterialNetworkTranslator::CreateMaterialXDocumentFromNetwork(const SdfPath& id,
-                                                                              const HdMaterialNetwork2& network) const
+mx::DocumentPtr MaterialNetworkCompiler::CreateMaterialXDocumentFromNetwork(const SdfPath& id,
+                                                                            const HdMaterialNetwork2& network) const
 {
   HdMaterialNode2 terminalNode;
   SdfPath terminalPath;

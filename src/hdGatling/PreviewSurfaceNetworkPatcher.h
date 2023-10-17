@@ -17,33 +17,16 @@
 
 #pragma once
 
-#include <pxr/usd/sdf/path.h>
-
-#include <MaterialXCore/Document.h>
-
-struct GiMaterial;
+#include <pxr/pxr.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct HdMaterialNetwork2;
 
-class MaterialNetworkTranslator
+class PreviewSurfaceNetworkPatcher
 {
 public:
-  MaterialNetworkTranslator(const std::vector<std::string>& mtlxSearchPaths);
-
-  GiMaterial* ParseNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
-
-private:
-  GiMaterial* TryParseMdlNetwork(const HdMaterialNetwork2& network) const;
-
-  GiMaterial* TryParseMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
-
-  MaterialX::DocumentPtr CreateMaterialXDocumentFromNetwork(const SdfPath& id,
-                                                            const HdMaterialNetwork2& network) const;
-
-private:
-  MaterialX::DocumentPtr m_nodeLib;
+  void Patch(HdMaterialNetwork2& network);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

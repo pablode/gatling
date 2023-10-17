@@ -34,7 +34,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                                                 const MaterialNetworkTranslator& translator)
+                                                 const MaterialNetworkCompiler& translator)
   : m_translator(translator)
   , m_resourceRegistry(std::make_shared<HdResourceRegistry>())
   , m_renderParam(std::make_unique<HdGatlingRenderParam>())

@@ -23,7 +23,7 @@
 #include "Instancer.h"
 #include "Material.h"
 #include "Tokens.h"
-#include "MaterialNetworkTranslator.h"
+#include "MaterialNetworkCompiler.h"
 
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>
@@ -262,12 +262,12 @@ namespace
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
                                          const HdRprimCollection& collection,
                                          const HdRenderSettingsMap& settings,
-                                         const MaterialNetworkTranslator& materialNetworkTranslator,
+                                         const MaterialNetworkCompiler& MaterialNetworkCompiler,
                                          GiScene* scene)
   : HdRenderPass(index, collection)
   , m_scene(scene)
   , m_settings(settings)
-  , m_materialNetworkTranslator(materialNetworkTranslator)
+  , m_MaterialNetworkCompiler(MaterialNetworkCompiler)
   , m_isConverged(false)
   , m_lastSceneStateVersion(UINT32_MAX)
   , m_lastSprimIndexVersion(UINT32_MAX)
@@ -495,7 +495,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
         if (network)
         {
-          giMat = m_materialNetworkTranslator.ParseNetwork(sprim->GetId(), *network);
+          giMat = m_MaterialNetworkCompiler.CompileNetwork(sprim->GetId(), *network);
 
           if (giMat)
           {
