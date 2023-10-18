@@ -34,6 +34,8 @@ protected:
 
   GfVec3f CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor);
 
+  HdDirtyBits GetInitialDirtyBitsMask() const override;
+
 protected:
   GiScene* m_scene;
 };
@@ -47,8 +49,6 @@ public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
 
   void Finalize(HdRenderParam* renderParam) override;
-
-  HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
   GiSphereLight* m_giSphereLight;
@@ -65,8 +65,6 @@ public:
 
   void Finalize(HdRenderParam* renderParam) override;
 
-  HdDirtyBits GetInitialDirtyBitsMask() const override;
-
 private:
   GiDistantLight* m_giDistantLight;
 };
@@ -81,8 +79,6 @@ public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
 
   void Finalize(HdRenderParam* renderParam) override;
-
-  HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
   GiRectLight* m_giRectLight;
@@ -115,8 +111,6 @@ public:
   void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
 
   void Finalize(HdRenderParam* renderParam) override;
-
-  HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
   GiSphereLight* m_giSphereLight = nullptr;

@@ -78,6 +78,11 @@ GfVec3f HdGatlingLight::CalcBaseEmission(HdSceneDelegate* sceneDelegate, float n
   return baseEmission;
 }
 
+HdDirtyBits HdGatlingLight::GetInitialDirtyBitsMask() const
+{
+  return DirtyBits::DirtyParams | DirtyBits::DirtyTransform;
+}
+
 //
 // Sphere Light
 //
@@ -127,11 +132,6 @@ void HdGatlingSphereLight::Finalize(HdRenderParam* renderParam)
   giDestroySphereLight(m_scene, m_giSphereLight);
 }
 
-HdDirtyBits HdGatlingSphereLight::GetInitialDirtyBitsMask() const
-{
-  return DirtyBits::DirtyParams | DirtyBits::DirtyTransform;
-}
-
 //
 // Distant Light
 //
@@ -179,11 +179,6 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 void HdGatlingDistantLight::Finalize(HdRenderParam* renderParam)
 {
   giDestroyDistantLight(m_scene, m_giDistantLight);
-}
-
-HdDirtyBits HdGatlingDistantLight::GetInitialDirtyBitsMask() const
-{
-  return DirtyBits::DirtyParams | DirtyBits::DirtyTransform;
 }
 
 //
@@ -238,11 +233,6 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 void HdGatlingRectLight::Finalize(HdRenderParam* renderParam)
 {
   giDestroyRectLight(m_scene, m_giRectLight);
-}
-
-HdDirtyBits HdGatlingRectLight::GetInitialDirtyBitsMask() const
-{
-  return DirtyBits::DirtyParams | DirtyBits::DirtyTransform;
 }
 
 //
@@ -401,11 +391,6 @@ void HdGatlingSimpleLight::Finalize(HdRenderParam* renderParam)
   {
     giDestroySphereLight(m_scene, m_giSphereLight);
   }
-}
-
-HdDirtyBits HdGatlingSimpleLight::GetInitialDirtyBitsMask() const
-{
-  return DirtyBits::AllDirty;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

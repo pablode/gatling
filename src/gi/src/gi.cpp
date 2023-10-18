@@ -1533,11 +1533,11 @@ void giDestroyScene(GiScene* scene)
 
 GiSphereLight* giCreateSphereLight(GiScene* scene)
 {
-  auto light = new GiSphereLight;
+  auto* light = new GiSphereLight;
   light->scene = scene;
   light->gpuHandle = scene->sphereLights.allocate();
 
-  Rp::SphereLight* data = scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
+  auto* data = scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->pos[0] = 0.0f;
@@ -1560,7 +1560,7 @@ void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
 
 void giSetSphereLightPosition(GiSphereLight* light, float* pos)
 {
-  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
+  auto* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->pos[0] = pos[0];
@@ -1570,7 +1570,7 @@ void giSetSphereLightPosition(GiSphereLight* light, float* pos)
 
 void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb)
 {
-  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
+  auto* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->baseEmission[0] = rgb[0];
@@ -1580,7 +1580,7 @@ void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb)
 
 void giSetSphereLightRadius(GiSphereLight* light, float radius)
 {
-  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
+  auto* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->radius = radius;
@@ -1588,7 +1588,7 @@ void giSetSphereLightRadius(GiSphereLight* light, float radius)
 
 void giSetSphereLightDiffuseSpecular(GiSphereLight* light, float diffuse, float specular)
 {
-  Rp::SphereLight* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
+  auto* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
   data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
@@ -1596,11 +1596,11 @@ void giSetSphereLightDiffuseSpecular(GiSphereLight* light, float diffuse, float 
 
 GiDistantLight* giCreateDistantLight(GiScene* scene)
 {
-  auto light = new GiDistantLight;
+  auto* light = new GiDistantLight;
   light->scene = scene;
   light->gpuHandle = scene->distantLights.allocate();
 
-  Rp::DistantLight* data = scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  auto* data = scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
   assert(data);
 
   data->direction[0] = 0.0f;
@@ -1623,7 +1623,7 @@ void giDestroyDistantLight(GiScene* scene, GiDistantLight* light)
 
 void giSetDistantLightDirection(GiDistantLight* light, float* direction)
 {
-  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  auto* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
   assert(data);
 
   data->direction[0] = direction[0];
@@ -1633,7 +1633,7 @@ void giSetDistantLightDirection(GiDistantLight* light, float* direction)
 
 void giSetDistantLightBaseEmission(GiDistantLight* light, float* rgb)
 {
-  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  auto* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
   assert(data);
 
   data->baseEmission[0] = rgb[0];
@@ -1643,7 +1643,7 @@ void giSetDistantLightBaseEmission(GiDistantLight* light, float* rgb)
 
 void giSetDistantLightAngle(GiDistantLight* light, float angle)
 {
-  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  auto* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
   assert(data);
 
   data->angle = angle;
@@ -1651,7 +1651,7 @@ void giSetDistantLightAngle(GiDistantLight* light, float angle)
 
 void giSetDistantLightDiffuseSpecular(GiDistantLight* light, float diffuse, float specular)
 {
-  Rp::DistantLight* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
+  auto* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
   assert(data);
 
   data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
@@ -1659,11 +1659,11 @@ void giSetDistantLightDiffuseSpecular(GiDistantLight* light, float diffuse, floa
 
 GiRectLight* giCreateRectLight(GiScene* scene)
 {
-  auto light = new GiRectLight;
+  auto* light = new GiRectLight;
   light->scene = scene;
   light->gpuHandle = scene->rectLights.allocate();
 
-  Rp::RectLight* data = scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  auto* data = scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
   data->origin[0] = 0.0f;
@@ -1690,7 +1690,7 @@ void giDestroyRectLight(GiScene* scene, GiRectLight* light)
 
 void giSetRectLightOrigin(GiRectLight* light, float* origin)
 {
-  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  auto* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
   data->origin[0] = origin[0];
@@ -1700,7 +1700,7 @@ void giSetRectLightOrigin(GiRectLight* light, float* origin)
 
 void giSetRectLightDirection(GiRectLight* light, float* direction)
 {
-  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  auto* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
   data->direction[0] = direction[0];
@@ -1710,7 +1710,7 @@ void giSetRectLightDirection(GiRectLight* light, float* direction)
 
 void giSetRectLightBaseEmission(GiRectLight* light, float* rgb)
 {
-  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  auto* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
   data->baseEmission[0] = rgb[0];
@@ -1720,7 +1720,7 @@ void giSetRectLightBaseEmission(GiRectLight* light, float* rgb)
 
 void giSetRectLightDimensions(GiRectLight* light, float width, float height)
 {
-  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  auto* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
   data->width = width;
@@ -1729,7 +1729,7 @@ void giSetRectLightDimensions(GiRectLight* light, float width, float height)
 
 void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float specular)
 {
-  Rp::RectLight* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  auto* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
   data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
@@ -1737,7 +1737,7 @@ void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float spec
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)
 {
-  GiDomeLight* light = new GiDomeLight;
+  auto* light = new GiDomeLight;
   light->scene = scene;
   light->textureFilePath = filePath;
   return light;
