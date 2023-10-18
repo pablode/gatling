@@ -371,7 +371,7 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
   if (*dirtyBits & DirtyBits::DirtyParams && glfLight.HasIntensity())
   {
     VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
-    float radius = boxedRadius.GetWithDefault<float>(0.0f);
+    float radius = boxedRadius.GetWithDefault<float>(0.5f);
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
