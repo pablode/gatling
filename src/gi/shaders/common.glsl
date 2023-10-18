@@ -206,6 +206,30 @@ vec3 sample_sphere(vec2 xi, float radius, out float pdf)
     return vec3(b * cos(phi), b * sin(phi), a) * radius;
 }
 
+// Concentric mapping from Shirley's Sampling Transformations Zoo (16.5.1.2)
+// https://link.springer.com/content/pdf/10.1007/978-1-4842-4427-2_16.pdf
+vec2 sample_disk(vec2 xi, float radius, out float pdf)
+{
+    pdf = 1.0 / (PI * radius * radius);
+
+    float a = 2.0 * xi.x - 1.0;
+    float b = 2.0 * xi.y - 1.0;
+
+    float r, phi;
+    if ((a * a) > (b * b))
+    {
+        r = radius * a;
+        phi = (PI / 4) * (b / a);
+    }
+    else
+    {
+        r = radius * b;
+        phi = (PI / 2) - (PI / 4) * (a / b);
+    }
+
+    return r * vec2(cos(phi), sin(phi));
+}
+
 float luminance(vec3 radiance)
 {
     return dot(radiance, vec3(0.2126, 0.7152, 0.0722));

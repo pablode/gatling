@@ -236,6 +236,58 @@ void HdGatlingRectLight::Finalize(HdRenderParam* renderParam)
 }
 
 //
+// Disk Light
+//
+HdGatlingDiskLight::HdGatlingDiskLight(const SdfPath& id, GiScene* scene)
+  : HdGatlingLight(id, scene)
+{
+  m_giDiskLight = giCreateDiskLight(scene);
+}
+
+void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
+                              HdRenderParam* renderParam,
+                              HdDirtyBits* dirtyBits)
+{
+  const SdfPath& id = GetId();
+
+  if (*dirtyBits & DirtyBits::DirtyTransform)
+  {
+    auto origin = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+
+    giSetDiskLightOrigin(m_giDiskLight, origin.data());
+    giSetDiskLightDirection(m_giDiskLight, dir.data());
+  }
+
+  if (*dirtyBits & DirtyBits::DirtyParams)
+  {
+    VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
+    float radius = boxedRadius.GetWithDefault<float>(0.5f);
+
+    VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
+    bool normalize = boxedNormalize.GetWithDefault<bool>(false);
+    float normalizeFactor = normalize ? (M_PI * radius * radius) : 1.0f;
+    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+
+    VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
+    float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
+    VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
+    float specular = boxedSpecular.GetWithDefault<float>(1.0f);
+
+    giSetDiskLightRadius(m_giDiskLight, radius);
+    giSetDiskLightBaseEmission(m_giDiskLight, baseEmission.data());
+    giSetDiskLightDiffuseSpecular(m_giDiskLight, diffuse, specular);
+  }
+
+  *dirtyBits = HdChangeTracker::Clean;
+}
+
+void HdGatlingDiskLight::Finalize(HdRenderParam* renderParam)
+{
+  giDestroyDiskLight(m_scene, m_giDiskLight);
+}
+
+//
 // Dome Light
 //
 HdGatlingDomeLight::HdGatlingDomeLight(const SdfPath& id, GiScene* scene)

@@ -121,11 +121,18 @@ struct GiRectLight
   uint64_t gpuHandle;
 };
 
+struct GiDiskLight
+{
+  GiScene* scene;
+  uint64_t gpuHandle;
+};
+
 struct GiScene
 {
   GgpuDenseDataStore sphereLights;
   GgpuDenseDataStore distantLights;
   GgpuDenseDataStore rectLights;
+  GgpuDenseDataStore diskLights;
   CgpuImage domeLightTexture;
   glm::quat domeLightRotation;
   glm::vec3 domeLightBaseEmission;
@@ -936,6 +943,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
         hitParams.distantLightCount = scene->distantLights.elementCount();
         hitParams.rectLightCount = scene->rectLights.elementCount();
+        hitParams.diskLightCount = scene->diskLights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -959,6 +967,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
         hitParams.distantLightCount = scene->distantLights.elementCount();
         hitParams.rectLightCount = scene->rectLights.elementCount();
+        hitParams.diskLightCount = scene->diskLights.elementCount();
         hitParams.textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d;
         hitParams.textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d;
         hitParams.texCount2d = texCount2d;
@@ -1079,6 +1088,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     rgenParams.sphereLightCount = scene->sphereLights.elementCount();
     rgenParams.distantLightCount = scene->distantLights.elementCount();
     rgenParams.rectLightCount = scene->rectLights.elementCount();
+    rgenParams.diskLightCount = scene->diskLights.elementCount();
     rgenParams.shaderClockExts = clockCyclesAov;
     rgenParams.texCount2d = texCount2d;
     rgenParams.texCount3d = texCount3d;
@@ -1109,6 +1119,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     missParams.sphereLightCount = scene->sphereLights.elementCount();
     missParams.distantLightCount = scene->distantLights.elementCount();
     missParams.rectLightCount = scene->rectLights.elementCount();
+    missParams.diskLightCount = scene->diskLights.elementCount();
     missParams.texCount2d = texCount2d;
     missParams.texCount3d = texCount3d;
 
@@ -1282,6 +1293,10 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   {
     GB_ERROR("{}:{}: light commit failed!", __FILE__, __LINE__);
   }
+  if (!scene->diskLights.commitChanges())
+  {
+    GB_ERROR("{}:{}: light commit failed!", __FILE__, __LINE__);
+  }
 
   if (!s_stager->flush())
   {
@@ -1349,6 +1364,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   buffers.push_back({ .binding = Rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
 
   bool domeLightEnabled = bool(scene->domeLight);
   size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + int(domeLightEnabled);
@@ -1516,7 +1532,8 @@ GiScene* giCreateScene()
   GiScene* scene = new GiScene{
     .sphereLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::SphereLight), 64),
     .distantLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DistantLight), 64),
-    .rectLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::RectLight), 64)
+    .rectLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::RectLight), 64),
+    .diskLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DiskLight), 64)
   };
   return scene;
 }
@@ -1730,6 +1747,82 @@ void giSetRectLightDimensions(GiRectLight* light, float width, float height)
 void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float specular)
 {
   auto* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
+  assert(data);
+
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+}
+
+GiDiskLight* giCreateDiskLight(GiScene* scene)
+{
+  auto* light = new GiDiskLight;
+  light->scene = scene;
+  light->gpuHandle = scene->diskLights.allocate();
+
+  auto* data = scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
+  assert(data);
+
+  data->origin[0] = 0.0f;
+  data->origin[1] = 0.0f;
+  data->origin[2] = 0.0f;
+  data->radius = 0.5f;
+  data->direction[0] = 0.0f;
+  data->direction[1] = 0.0f;
+  data->direction[2] = 0.0f;
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
+  data->baseEmission[0] = 0.0f;
+  data->baseEmission[1] = 0.0f;
+  data->baseEmission[2] = 0.0f;
+
+  return light;
+}
+
+void giDestroyDiskLight(GiScene* scene, GiDiskLight* light)
+{
+  scene->diskLights.free(light->gpuHandle);
+  delete light;
+}
+
+void giSetDiskLightOrigin(GiDiskLight* light, float* origin)
+{
+  auto* data = light->scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
+  assert(data);
+
+  data->origin[0] = origin[0];
+  data->origin[1] = origin[1];
+  data->origin[2] = origin[2];
+}
+
+void giSetDiskLightDirection(GiDiskLight* light, float* direction)
+{
+  auto* data = light->scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
+  assert(data);
+
+  data->direction[0] = direction[0];
+  data->direction[1] = direction[1];
+  data->direction[2] = direction[2];
+}
+
+void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb)
+{
+  auto* data = light->scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
+  assert(data);
+
+  data->baseEmission[0] = rgb[0];
+  data->baseEmission[1] = rgb[1];
+  data->baseEmission[2] = rgb[2];
+}
+
+void giSetDiskLightRadius(GiDiskLight* light, float radius)
+{
+  auto* data = light->scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
+  assert(data);
+
+  data->radius = radius;
+}
+
+void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular)
+{
+  auto* data = light->scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
   assert(data);
 
   data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));

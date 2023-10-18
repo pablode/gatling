@@ -171,6 +171,7 @@ const TfTokenVector SUPPORTED_SPRIM_TYPES =
   HdPrimTypeTokens->sphereLight,
   HdPrimTypeTokens->distantLight,
   HdPrimTypeTokens->rectLight,
+  HdPrimTypeTokens->diskLight,
   HdPrimTypeTokens->domeLight,
   HdPrimTypeTokens->simpleLight // Required for usdview domeLight creation
 };
@@ -201,6 +202,10 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   else if (typeId == HdPrimTypeTokens->rectLight)
   {
     return new HdGatlingRectLight(sprimId, m_giScene);
+  }
+  else if (typeId == HdPrimTypeTokens->diskLight)
+  {
+    return new HdGatlingDiskLight(sprimId, m_giScene);
   }
   else if (typeId == HdPrimTypeTokens->domeLight)
   {

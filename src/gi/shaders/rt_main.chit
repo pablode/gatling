@@ -46,7 +46,7 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
 
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float pdf, out uint diffuseSpecularPacked)
 {
-    uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT;
+    uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT + DISK_LIGHT_COUNT;
 
 #if SPHERE_LIGHT_COUNT > 0
     if ((k4.x * totalLightCount) <= SPHERE_LIGHT_COUNT)
@@ -102,7 +102,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     }
 #endif
 #if RECT_LIGHT_COUNT > 0
-    else
+    else if ((k4.x * totalLightCount) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT))
     {
         uint lightIndex = min(uint(k4.y * RECT_LIGHT_COUNT), RECT_LIGHT_COUNT - 1);
 
@@ -119,6 +119,24 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
         power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         pdf = 1.0 / (light.width * light.height);
+        diffuseSpecularPacked = light.diffuseSpecularPacked;
+    }
+#endif
+#if DISK_LIGHT_COUNT > 0
+    else
+    {
+        uint lightIndex = min(uint(k4.y * DISK_LIGHT_COUNT), DISK_LIGHT_COUNT - 1);
+
+        DiskLight light = diskLights[lightIndex];
+
+        vec2 sampleOnDisk = sample_disk(k4.zw, light.radius, pdf);
+        vec3 samplePos = light.origin + vec3(sampleOnDisk, 0.0) * light.direction;
+        vec3 dir = samplePos - surfacePos;
+
+        dist = length(dir);
+        dirToLight = dir / dist;
+        float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
+        power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
 #endif

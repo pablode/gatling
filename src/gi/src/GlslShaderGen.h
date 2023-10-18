@@ -75,6 +75,7 @@ namespace gtl
       uint32_t distantLightCount;
       uint32_t sphereLightCount;
       uint32_t rectLightCount;
+      uint32_t diskLightCount;
       uint32_t texCount2d;
       uint32_t texCount3d;
     };
@@ -86,6 +87,7 @@ namespace gtl
       uint32_t distantLightCount;
       uint32_t sphereLightCount;
       uint32_t rectLightCount;
+      uint32_t diskLightCount;
       uint32_t texCount2d;
       uint32_t texCount3d;
     };
@@ -101,6 +103,7 @@ namespace gtl
       uint32_t distantLightCount;
       uint32_t sphereLightCount;
       uint32_t rectLightCount;
+      uint32_t diskLightCount;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
       uint32_t texCount2d;
@@ -117,6 +120,7 @@ namespace gtl
       uint32_t distantLightCount;
       uint32_t sphereLightCount;
       uint32_t rectLightCount;
+      uint32_t diskLightCount;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
       uint32_t texCount2d;

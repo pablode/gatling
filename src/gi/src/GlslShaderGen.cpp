@@ -58,8 +58,8 @@ namespace gtl
     GiGlslShaderCompiler::deinit();
   }
 
-  void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, uint32_t texCount2d, uint32_t texCount3d,
-                                uint32_t sphereLightCount, uint32_t distantLightCount, uint32_t rectLightCount)
+  void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, uint32_t texCount2d, uint32_t texCount3d, uint32_t sphereLightCount,
+                                uint32_t distantLightCount, uint32_t rectLightCount, uint32_t diskLightCount)
   {
 #if defined(NDEBUG) || defined(__APPLE__)
     stitcher.appendDefine("NDEBUG");
@@ -68,8 +68,9 @@ namespace gtl
     stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) texCount2d);
     stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) texCount3d);
     stitcher.appendDefine("SPHERE_LIGHT_COUNT", (int32_t) sphereLightCount);
-    stitcher.appendDefine("DISTANT_LIGHT_COUNT", (int32_t)distantLightCount);
-    stitcher.appendDefine("RECT_LIGHT_COUNT", (int32_t)rectLightCount);
+    stitcher.appendDefine("DISTANT_LIGHT_COUNT", (int32_t) distantLightCount);
+    stitcher.appendDefine("RECT_LIGHT_COUNT", (int32_t) rectLightCount);
+    stitcher.appendDefine("DISK_LIGHT_COUNT", (int32_t) diskLightCount);
   }
 
   bool GiGlslShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)
@@ -101,7 +102,8 @@ namespace gtl
       stitcher.appendDefine("REORDER_HINT_BIT_COUNT", reorderHintBitCount);
     }
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount,
+                             params.distantLightCount, params.rectLightCount, params.diskLightCount);
 
     if (params.depthOfField)
     {
@@ -137,7 +139,8 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount,
+                             params.distantLightCount, params.rectLightCount, params.diskLightCount);
 
     if (params.domeLightEnabled)
     {
@@ -224,7 +227,8 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount,
+                             params.distantLightCount, params.rectLightCount, params.diskLightCount);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
@@ -259,7 +263,8 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount, params.distantLightCount, params.rectLightCount);
+    _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount,
+                             params.distantLightCount, params.rectLightCount, params.diskLightCount);
 
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);

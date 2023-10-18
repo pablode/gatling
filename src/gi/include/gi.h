@@ -53,6 +53,7 @@ struct GiScene;
 struct GiSphereLight;
 struct GiDistantLight;
 struct GiRectLight;
+struct GiDiskLight;
 struct GiDomeLight;
 
 struct GiCameraDesc
@@ -202,6 +203,14 @@ void giSetRectLightDirection(GiRectLight* light, float* direction);
 void giSetRectLightBaseEmission(GiRectLight* light, float* rgb);
 void giSetRectLightDimensions(GiRectLight* light, float width, float height);
 void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float specular);
+
+GiDiskLight* giCreateDiskLight(GiScene* scene);
+void giDestroyDiskLight(GiScene* scene, GiDiskLight* light);
+void giSetDiskLightOrigin(GiDiskLight* light, float* origin);
+void giSetDiskLightDirection(GiDiskLight* light, float* direction);
+void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb);
+void giSetDiskLightRadius(GiDiskLight* light, float radius);
+void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular);
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
 void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);
