@@ -65,6 +65,7 @@ namespace gtl
                  McGlslGenResult& result);
 
   private:
-    std::shared_ptr<class _Impl> m_impl;
+    class _Impl;
+    std::shared_ptr<_Impl> m_impl;
   };
 }

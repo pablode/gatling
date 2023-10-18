@@ -45,7 +45,7 @@ namespace gtl
   };
   const static char* MATERIAL_STATE_NAME = "State";
 
-  class _Impl
+  class McBackend::_Impl
   {
   public:
     _Impl(McMdlRuntime& runtime, mi::base::Handle<mi::neuraylib::IMdl_backend> backend)
