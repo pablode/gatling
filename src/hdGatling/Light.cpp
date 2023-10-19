@@ -45,7 +45,7 @@ HdGatlingLight::HdGatlingLight(const SdfPath& id, GiScene* scene)
 
 // We strive to conform to following UsdLux-enhancing specification:
 // https://github.com/anderslanglands/light_comparison/blob/777ccc7afd1c174a5dcbbde964ced950eb3af11b/specification/specification.md
-GfVec3f HdGatlingLight::CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor)
+GfVec3f HdGatlingLight::CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor = 1.0f)
 {
   const SdfPath& id = GetId();
 
@@ -343,7 +343,7 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   float rawQuatData[4] = { rotateQuat.GetImaginary()[0], rotateQuat.GetImaginary()[1], rotateQuat.GetImaginary()[2], -/*flip handedness*/rotateQuat.GetReal() };
   giSetDomeLightRotation(m_giDomeLight, rawQuatData);
 
-  GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, 1.0f);
+  GfVec3f baseEmission = CalcBaseEmission(sceneDelegate);
   giSetDomeLightBaseEmission(m_giDomeLight, baseEmission.data());
 
   VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
@@ -409,29 +409,24 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
   const auto& glfLight = boxedGlfLight.UncheckedGet<GlfSimpleLight>();
 
-  if (!glfLight.IsDomeLight() && !m_giSphereLight)
+  if (!glfLight.IsDomeLight())
   {
-    m_giSphereLight = giCreateSphereLight(m_scene);
-  }
+    if (!m_giSphereLight)
+    {
+      m_giSphereLight = giCreateSphereLight(m_scene);
+    }
 
-  if (*dirtyBits & DirtyBits::DirtyTransform)
-  {
-    auto pos = glfLight.GetPosition();
-    giSetSphereLightPosition(m_giSphereLight, pos.data());
-  }
+    if (*dirtyBits & DirtyBits::DirtyTransform)
+    {
+      auto pos = glfLight.GetPosition();
+      giSetSphereLightPosition(m_giSphereLight, pos.data());
+    }
 
-  if (*dirtyBits & DirtyBits::DirtyParams && glfLight.HasIntensity())
-  {
-    VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
-    float radius = boxedRadius.GetWithDefault<float>(0.5f);
-
-    VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
-    bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float normalizeFactor = normalize ? ((radius > 0.001f ? 4.0 : 1.0f) * M_PI * radius * radius) : 1.0f;
-    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
-
-    giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
-    giSetSphereLightRadius(m_giSphereLight, radius);
+    if (*dirtyBits & DirtyBits::DirtyParams)
+    {
+      GfVec3f baseEmission = CalcBaseEmission(sceneDelegate);
+      giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
+    }
   }
 
   *dirtyBits = HdChangeTracker::Clean;
