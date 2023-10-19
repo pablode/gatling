@@ -92,7 +92,7 @@ struct PushConstants
   SI_UINT  maxBouncesAndRrBounceOffset;
   SI_FLOAT rrInvMinTermProb;
   SI_FLOAT lightIntensityMultiplier;
-  /* 1 float free */
+  SI_UINT  clipRangePacked;
 };
 
 SI_BINDING_INDEX(OUT_PIXELS,     0)

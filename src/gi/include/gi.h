@@ -65,6 +65,8 @@ struct GiCameraDesc
   float fStop;
   float focusDistance;
   float focalLength;
+  float clipStart;
+  float clipEnd;
 };
 
 struct GiVertex

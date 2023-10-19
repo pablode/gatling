@@ -39,6 +39,11 @@ vec3 evaluate_sample(vec3 ray_origin,
     uint bounce = 0;
 #endif
 
+    // Correct clip plane curving by getting the hypothenuse length (our current ray)
+    // from the adjacent edge (the forward vector) the angle between both.
+    float cosConeAngle = dot(ray_dir, PC.cameraForward);
+    vec2 clipRange = unpackHalf2x16(PC.clipRangePacked) / cosConeAngle;
+
     // Path trace
     uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
 
@@ -60,9 +65,9 @@ vec3 evaluate_sample(vec3 ray_origin,
             2,                     // sbtRecordStride
             0,                     // missIndex
             rayPayload.ray_origin, // ray origin
-            0.0,                   // ray min range
+            clipRange.x,           // ray min range
             rayPayload.ray_dir,    // ray direction
-            FLOAT_MAX,             // ray max range
+            clipRange.y,           // ray max range
             PAYLOAD_INDEX_SHADE    // payload
         );
 
@@ -86,9 +91,9 @@ vec3 evaluate_sample(vec3 ray_origin,
             2,                     // sbtRecordStride
             0,                     // missIndex
             rayPayload.ray_origin, // ray origin
-            0.0,                   // ray min range
+            clipRange.x,           // ray min range
             rayPayload.ray_dir,    // ray direction
-            FLOAT_MAX,             // ray max range
+            clipRange.y,           // ray max range
             PAYLOAD_INDEX_SHADE    // payload
         );
 #endif
@@ -136,6 +141,8 @@ vec3 evaluate_sample(vec3 ray_origin,
         }
 #endif
 #endif
+
+        clipRange = vec2(0.0, FLOAT_MAX); // Only clip primary rays
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
         bounce++;

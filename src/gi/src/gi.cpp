@@ -1350,7 +1350,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     .domeLightDiffuseSpecularPacked = glm::packHalf2x16(glm::vec2(scene->domeLightDiffuse, scene->domeLightSpecular)),
     .maxBouncesAndRrBounceOffset    = ((params->maxBounces << 16) | params->rrBounceOffset),
     .rrInvMinTermProb               = params->rrInvMinTermProb,
-    .lightIntensityMultiplier       = params->lightIntensityMultiplier
+    .lightIntensityMultiplier       = params->lightIntensityMultiplier,
+    .clipRangePacked                = glm::packHalf2x16(glm::vec2(params->camera->clipStart, params->camera->clipEnd))
   };
 
   std::vector<CgpuBufferBinding> buffers;
