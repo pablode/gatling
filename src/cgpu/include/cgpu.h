@@ -283,7 +283,7 @@ struct CgpuBuffer        { uint64_t handle = 0; };
 struct CgpuImage         { uint64_t handle = 0; };
 struct CgpuShader        { uint64_t handle = 0; };
 struct CgpuPipeline      { uint64_t handle = 0; };
-struct CgpuFence         { uint64_t handle = 0; };
+struct CgpuSemaphore     { uint64_t handle = 0; };
 struct CgpuCommandBuffer { uint64_t handle = 0; };
 struct CgpuSampler       { uint64_t handle = 0; };
 struct CgpuBlas          { uint64_t handle = 0; };
@@ -549,6 +549,18 @@ struct CgpuPhysicalDeviceProperties
   uint32_t maxRayHitAttributeSize;
 };
 
+struct CgpuWaitSemaphoreInfo
+{
+  CgpuSemaphore semaphore;
+  uint64_t value = 0;
+};
+
+struct CgpuSignalSemaphoreInfo
+{
+  CgpuSemaphore semaphore;
+  uint64_t value = 0;
+};
+
 bool cgpuInitialize(
   const char* appName,
   uint32_t versionMajor,
@@ -788,30 +800,31 @@ bool cgpuDestroyCommandBuffer(
   CgpuCommandBuffer commandBuffer
 );
 
-bool cgpuCreateFence(
+bool cgpuCreateSemaphore(
   CgpuDevice device,
-  CgpuFence* fence
+  CgpuSemaphore* semaphore,
+  uint64_t initialValue = 0
 );
 
-bool cgpuResetFence(
+bool cgpuDestroySemaphore(
   CgpuDevice device,
-  CgpuFence fence
+  CgpuSemaphore semaphore
 );
 
-bool cgpuWaitForFence(
+bool cgpuWaitSemaphores(
   CgpuDevice device,
-  CgpuFence fence
-);
-
-bool cgpuDestroyFence(
-  CgpuDevice device,
-  CgpuFence fence
+  uint32_t semaphoreInfoCount,
+  CgpuWaitSemaphoreInfo* semaphoreInfos,
+  uint64_t timeoutNs = UINT64_MAX
 );
 
 bool cgpuSubmitCommandBuffer(
   CgpuDevice device,
   CgpuCommandBuffer commandBuffer,
-  CgpuFence fence
+  uint32_t signalSemaphoreInfoCount = 0,
+  CgpuSignalSemaphoreInfo* signalSemaphoreInfos = nullptr,
+  uint32_t waitSemaphoreInfoCount = 0,
+  CgpuWaitSemaphoreInfo* waitSemaphoreInfos = nullptr
 );
 
 bool cgpuFlushMappedMemory(

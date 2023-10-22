@@ -1303,8 +1303,10 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     GB_ERROR("{}:{}: stager flush failed!", __FILE__, __LINE__);
   }
 
-  CgpuCommandBuffer command_buffer;
-  CgpuFence fence;
+  CgpuCommandBuffer commandBuffer;
+  CgpuSemaphore semaphore;
+  CgpuSignalSemaphoreInfo signalSemaphoreInfo;
+  CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
   // Set up output buffer.
   int compCount = 4;
@@ -1404,19 +1406,19 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   };
 
   // Set up command buffer.
-  if (!cgpuCreateCommandBuffer(s_device, &command_buffer))
+  if (!cgpuCreateCommandBuffer(s_device, &commandBuffer))
     goto cleanup;
 
-  if (!cgpuBeginCommandBuffer(command_buffer))
+  if (!cgpuBeginCommandBuffer(commandBuffer))
     goto cleanup;
 
-  if (!cgpuCmdTransitionShaderImageLayouts(command_buffer, shader_cache->rgenShader, images.size(), images.data()))
+  if (!cgpuCmdTransitionShaderImageLayouts(commandBuffer, shader_cache->rgenShader, images.size(), images.data()))
     goto cleanup;
 
-  if (!cgpuCmdUpdateBindings(command_buffer, shader_cache->pipeline, &bindings))
+  if (!cgpuCmdUpdateBindings(commandBuffer, shader_cache->pipeline, &bindings))
     goto cleanup;
 
-  if (!cgpuCmdBindPipeline(command_buffer, shader_cache->pipeline))
+  if (!cgpuCmdBindPipeline(commandBuffer, shader_cache->pipeline))
     goto cleanup;
 
   // Trace rays.
@@ -1425,11 +1427,11 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     pushShaderStages |= shader_cache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT : 0;
     pushShaderStages |= shader_cache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_FLAG_ANY_HIT : 0;
 
-    if (!cgpuCmdPushConstants(command_buffer, shader_cache->pipeline, pushShaderStages, sizeof(pushData), &pushData))
+    if (!cgpuCmdPushConstants(commandBuffer, shader_cache->pipeline, pushShaderStages, sizeof(pushData), &pushData))
       goto cleanup;
   }
 
-  if (!cgpuCmdTraceRays(command_buffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
+  if (!cgpuCmdTraceRays(commandBuffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
     goto cleanup;
 
   // Copy output buffer to staging buffer.
@@ -1446,11 +1448,11 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
       .bufferBarriers = &bufferBarrier
     };
 
-    if (!cgpuCmdPipelineBarrier(command_buffer, &barrier))
+    if (!cgpuCmdPipelineBarrier(commandBuffer, &barrier))
       goto cleanup;
   }
 
-  if (!cgpuCmdCopyBuffer(command_buffer, s_framebuffer, 0, s_outputStagingBuffer, 0, framebufferSize))
+  if (!cgpuCmdCopyBuffer(commandBuffer, s_framebuffer, 0, s_outputStagingBuffer, 0, framebufferSize))
     goto cleanup;
 
   {
@@ -1466,27 +1468,23 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
       .bufferBarriers = &bufferBarrier
     };
 
-    if (!cgpuCmdPipelineBarrier(command_buffer, &barrier))
+    if (!cgpuCmdPipelineBarrier(commandBuffer, &barrier))
       goto cleanup;
   }
 
   // Submit command buffer.
-  if (!cgpuEndCommandBuffer(command_buffer))
+  if (!cgpuEndCommandBuffer(commandBuffer))
     goto cleanup;
 
-  if (!cgpuCreateFence(s_device, &fence))
+  if (!cgpuCreateSemaphore(s_device, &semaphore))
     goto cleanup;
 
-  if (!cgpuResetFence(s_device, fence))
+  signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+  if (!cgpuSubmitCommandBuffer(s_device, commandBuffer, 1, &signalSemaphoreInfo))
     goto cleanup;
 
-  if (!cgpuSubmitCommandBuffer(s_device, command_buffer, fence))
-    goto cleanup;
-
-  // Now is a good time to flush buffered messages (on Windows).
-  fflush(stdout);
-
-  if (!cgpuWaitForFence(s_device, fence))
+  waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+  if (!cgpuWaitSemaphores(s_device, 1, &waitSemaphoreInfo))
     goto cleanup;
 
   // Read data from GPU to image.
@@ -1522,8 +1520,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   result = GI_OK;
 
 cleanup:
-  cgpuDestroyFence(s_device, fence);
-  cgpuDestroyCommandBuffer(s_device, command_buffer);
+  cgpuDestroySemaphore(s_device, semaphore);
+  cgpuDestroyCommandBuffer(s_device, commandBuffer);
 
   return result;
 }

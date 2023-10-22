@@ -62,7 +62,7 @@ namespace gtl
         !cgpuCreateCommandBuffer(m_device, &m_commandBuffers[1]))
       goto fail;
 
-    if (!cgpuCreateFence(m_device, &m_fence))
+    if (!cgpuCreateSemaphore(m_device, &m_semaphore))
       goto fail;
 
     if (!cgpuMapBuffer(m_device, m_stagingBuffer, (void**) &m_mappedMem))
@@ -80,13 +80,14 @@ fail:
 
   void GgpuStager::free()
   {
-    cgpuWaitForFence(m_device, m_fence);
+    CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
+    cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo);
     if (m_mappedMem)
     {
       cgpuUnmapBuffer(m_device, m_stagingBuffer);
     }
     cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
-    cgpuDestroyFence(m_device, m_fence);
+    cgpuDestroySemaphore(m_device, m_semaphore);
     cgpuDestroyCommandBuffer(m_device, m_commandBuffers[0]);
     cgpuDestroyCommandBuffer(m_device, m_commandBuffers[1]);
     cgpuDestroyBuffer(m_device, m_stagingBuffer);
@@ -97,11 +98,12 @@ fail:
     if (m_stagedBytes == 0 && !m_commandsPending)
       return true;
 
-    if (!cgpuWaitForFence(m_device, m_fence))
+    // Wait until previous submit is finished.
+    CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
+    if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))
       return false;
 
-    if (!cgpuResetFence(m_device, m_fence))
-      return false;
+    m_semaphoreCounter++;
 
     if (!cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]))
       return false;
@@ -110,7 +112,8 @@ fail:
     if (!cgpuFlushMappedMemory(m_device, m_stagingBuffer, halfOffset, halfOffset + m_stagedBytes))
       return false;
 
-    if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], m_fence))
+    CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
+    if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo))
       return false;
 
     m_stagedBytes = 0;

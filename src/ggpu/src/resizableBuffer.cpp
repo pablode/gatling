@@ -68,7 +68,9 @@ namespace gtl
     bool result = false;
     CgpuCommandBuffer commandBuffer;
     CgpuBuffer buffer;
-    CgpuFence fence;
+    CgpuSemaphore semaphore;
+    CgpuSignalSemaphoreInfo signalSemaphoreInfo;
+    CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
     {
       CgpuBufferCreateInfo createInfo = {
@@ -97,16 +99,15 @@ namespace gtl
       if (!cgpuEndCommandBuffer(commandBuffer))
         goto cleanup;
 
-      if (!cgpuCreateFence(m_device, &fence))
+      if (!cgpuCreateSemaphore(m_device, &semaphore))
         goto cleanup;
 
-      if (!cgpuResetFence(m_device, fence))
+      signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+      if (!cgpuSubmitCommandBuffer(m_device, commandBuffer, 1, &signalSemaphoreInfo))
         goto cleanup;
 
-      if (!cgpuSubmitCommandBuffer(m_device, commandBuffer, fence))
-        goto cleanup;
-
-      if (!cgpuWaitForFence(m_device, fence))
+      waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+      if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))
         goto cleanup;
     }
 
@@ -127,8 +128,8 @@ namespace gtl
       cgpuDestroyBuffer(m_device, buffer);
     if (commandBuffer.handle)
       cgpuDestroyCommandBuffer(m_device, commandBuffer);
-    if (fence.handle)
-      cgpuDestroyFence(m_device, fence);
+    if (semaphore.handle)
+      cgpuDestroySemaphore(m_device, semaphore);
 
     return result;
   }

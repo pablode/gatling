@@ -51,7 +51,8 @@ namespace gtl
     uint32_t m_writeableHalf = 0;
     CgpuBuffer m_stagingBuffer;
     CgpuCommandBuffer m_commandBuffers[2];
-    CgpuFence m_fence;
+    CgpuSemaphore m_semaphore;
+    uint32_t m_semaphoreCounter = 0;
 
     bool m_commandsPending = false;
     uint64_t m_stagedBytes = 0;

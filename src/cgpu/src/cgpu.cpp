@@ -101,9 +101,9 @@ struct CgpuIShader
   VkShaderStageFlagBits stageFlags;
 };
 
-struct CgpuIFence
+struct CgpuISemaphore
 {
-  VkFence fence;
+  VkSemaphore semaphore;
 };
 
 struct CgpuICommandBuffer
@@ -140,7 +140,7 @@ struct CgpuIInstance
   GbLinearDataStore<CgpuIImage, 128> iimageStore;
   GbLinearDataStore<CgpuIShader, 32> ishaderStore;
   GbLinearDataStore<CgpuIPipeline, 8> ipipelineStore;
-  GbLinearDataStore<CgpuIFence, 8> ifenceStore;
+  GbLinearDataStore<CgpuISemaphore, 16> isemaphoreStore;
   GbLinearDataStore<CgpuICommandBuffer, 16> icommandBufferStore;
   GbLinearDataStore<CgpuISampler, 8> isamplerStore;
   GbLinearDataStore<CgpuIBlas, 1024> iblasStore;
@@ -184,16 +184,16 @@ static std::unique_ptr<CgpuIInstance> iinstance = nullptr;
     return iinstance->RESOURCE_STORE.get(handle.handle, idata);                           \
   }
 
-CGPU_RESOLVE_HANDLE(       Device,        CgpuDevice,        CgpuIDevice,         ideviceStore)
-CGPU_RESOLVE_HANDLE(       Buffer,        CgpuBuffer,        CgpuIBuffer,         ibufferStore)
-CGPU_RESOLVE_HANDLE(        Image,         CgpuImage,         CgpuIImage,          iimageStore)
-CGPU_RESOLVE_HANDLE(       Shader,        CgpuShader,        CgpuIShader,         ishaderStore)
-CGPU_RESOLVE_HANDLE(     Pipeline,      CgpuPipeline,      CgpuIPipeline,       ipipelineStore)
-CGPU_RESOLVE_HANDLE(        Fence,         CgpuFence,         CgpuIFence,          ifenceStore)
+CGPU_RESOLVE_HANDLE(       Device,        CgpuDevice,        CgpuIDevice,        ideviceStore)
+CGPU_RESOLVE_HANDLE(       Buffer,        CgpuBuffer,        CgpuIBuffer,        ibufferStore)
+CGPU_RESOLVE_HANDLE(        Image,         CgpuImage,         CgpuIImage,         iimageStore)
+CGPU_RESOLVE_HANDLE(       Shader,        CgpuShader,        CgpuIShader,        ishaderStore)
+CGPU_RESOLVE_HANDLE(     Pipeline,      CgpuPipeline,      CgpuIPipeline,      ipipelineStore)
+CGPU_RESOLVE_HANDLE(    Semaphore,     CgpuSemaphore,     CgpuISemaphore,     isemaphoreStore)
 CGPU_RESOLVE_HANDLE(CommandBuffer, CgpuCommandBuffer, CgpuICommandBuffer, icommandBufferStore)
-CGPU_RESOLVE_HANDLE(      Sampler,       CgpuSampler,       CgpuISampler,        isamplerStore)
-CGPU_RESOLVE_HANDLE(         Blas,          CgpuBlas,          CgpuIBlas,           iblasStore)
-CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,           itlasStore)
+CGPU_RESOLVE_HANDLE(      Sampler,       CgpuSampler,       CgpuISampler,       isamplerStore)
+CGPU_RESOLVE_HANDLE(         Blas,          CgpuBlas,          CgpuIBlas,          iblasStore)
+CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,          itlasStore)
 
 /* Helper methods. */
 
@@ -581,7 +581,8 @@ bool cgpuCreateDevice(CgpuDevice* device)
     VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
     VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME, // required by VK_KHR_spirv_1_4
     VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
-    VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
+    VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+    VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
   };
 
   GbSmallVector<const char*, 32> enabledExtensions;
@@ -704,9 +705,15 @@ bool cgpuCreateDevice(CgpuDevice* device)
     pNext = &invocationReorderFeatures;
   }
 
+  VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timelineSemaphoreFeatures = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
+    .pNext = pNext,
+    .timelineSemaphore = VK_TRUE
+  };
+
   VkPhysicalDeviceSynchronization2FeaturesKHR synchronization2Features = {
     .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR,
-    .pNext = pNext,
+    .pNext = &timelineSemaphoreFeatures,
     .synchronization2 = VK_TRUE
   };
 
@@ -2252,26 +2259,27 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
   idevice->table.vkCmdBuildAccelerationStructuresKHR(icommandBuffer->commandBuffer, 1, &asBuildGeomInfo, &asBuildRangeInfoPtr);
   cgpuEndCommandBuffer(commandBuffer);
 
-  CgpuFence fence;
-  if (!cgpuCreateFence(device, &fence))
+  CgpuSemaphore semaphore;
+  if (!cgpuCreateSemaphore(device, &semaphore))
   {
     cgpuDestroyIBuffer(idevice, iasBuffer);
     cgpuDestroyIBuffer(idevice, &iscratchBuffer);
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, *as, nullptr);
-    CGPU_RETURN_ERROR("failed to create AS build fence");
+    CGPU_RETURN_ERROR("failed to create AS build semaphore");
   }
-  cgpuResetFence(device, fence);
-  cgpuSubmitCommandBuffer(device, commandBuffer, fence);
-  cgpuWaitForFence(device, fence);
+
+  CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
+  cgpuSubmitCommandBuffer(device, commandBuffer, 1, &signalSemaphoreInfo);
+  CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
+  cgpuWaitSemaphores(device, 1, &waitSemaphoreInfo);
 
   // Dispose resources
-  cgpuDestroyFence(device, fence);
+  cgpuDestroySemaphore(device, semaphore);
   cgpuDestroyCommandBuffer(device, commandBuffer);
   cgpuDestroyIBuffer(idevice, &iscratchBuffer);
 
   return true;
 }
-
 
 bool cgpuCreateBlas(CgpuDevice device,
                     const CgpuBlasCreateInfo* createInfo,
@@ -3401,107 +3409,119 @@ bool cgpuEndCommandBuffer(CgpuCommandBuffer commandBuffer)
   return true;
 }
 
-bool cgpuCreateFence(CgpuDevice device, CgpuFence* fence)
+bool cgpuCreateSemaphore(CgpuDevice device, CgpuSemaphore* semaphore, uint64_t initialValue)
 {
   CgpuIDevice* idevice;
   if (!cgpuResolveDevice(device, &idevice)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  fence->handle = iinstance->ifenceStore.allocate();
+  semaphore->handle = iinstance->isemaphoreStore.allocate();
 
-  CgpuIFence* ifence;
-  if (!cgpuResolveFence(*fence, &ifence)) {
+  CgpuISemaphore* isemaphore;
+  if (!cgpuResolveSemaphore(*semaphore, &isemaphore)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  VkFenceCreateInfo createInfo = {
-    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+  VkSemaphoreTypeCreateInfo typeCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
     .pNext = nullptr,
-    .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE_KHR,
+    .initialValue = initialValue
   };
 
-  VkResult result = idevice->table.vkCreateFence(
+  VkSemaphoreCreateInfo createInfo = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+    .pNext = &typeCreateInfo,
+    .flags = 0 // unused
+  };
+
+  VkResult result = idevice->table.vkCreateSemaphore(
     idevice->logicalDevice,
     &createInfo,
     nullptr,
-    &ifence->fence
+    &isemaphore->semaphore
   );
 
   if (result != VK_SUCCESS) {
-    iinstance->ifenceStore.free(fence->handle);
-    CGPU_RETURN_ERROR("failed to create fence");
+    iinstance->isemaphoreStore.free(semaphore->handle);
+    CGPU_RETURN_ERROR("failed to create semaphore");
   }
 
   return true;
 }
 
-bool cgpuDestroyFence(CgpuDevice device, CgpuFence fence)
+bool cgpuDestroySemaphore(CgpuDevice device, CgpuSemaphore semaphore)
 {
   CgpuIDevice* idevice;
   if (!cgpuResolveDevice(device, &idevice)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  CgpuIFence* ifence;
-  if (!cgpuResolveFence(fence, &ifence)) {
+  CgpuISemaphore* isemaphore;
+  if (!cgpuResolveSemaphore(semaphore, &isemaphore)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  idevice->table.vkDestroyFence(
+  idevice->table.vkDestroySemaphore(
     idevice->logicalDevice,
-    ifence->fence,
+    isemaphore->semaphore,
     nullptr
   );
-  iinstance->ifenceStore.free(fence.handle);
+  iinstance->isemaphoreStore.free(semaphore.handle);
   return true;
 }
 
-bool cgpuResetFence(CgpuDevice device, CgpuFence fence)
+bool cgpuWaitSemaphores(CgpuDevice device,
+                        uint32_t semaphoreInfoCount,
+                        CgpuWaitSemaphoreInfo* semaphoreInfos,
+                        uint64_t timeoutNs)
 {
   CgpuIDevice* idevice;
   if (!cgpuResolveDevice(device, &idevice)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  CgpuIFence* ifence;
-  if (!cgpuResolveFence(fence, &ifence)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
-  VkResult result = idevice->table.vkResetFences(
-    idevice->logicalDevice,
-    1,
-    &ifence->fence
-  );
-  if (result != VK_SUCCESS) {
-    CGPU_RETURN_ERROR("failed to reset fence");
-  }
-  return true;
-}
 
-bool cgpuWaitForFence(CgpuDevice device, CgpuFence fence)
-{
-  CgpuIDevice* idevice;
-  if (!cgpuResolveDevice(device, &idevice)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  GbSmallVector<VkSemaphore, 8> semaphores(semaphoreInfoCount);
+  GbSmallVector<uint64_t, 8> semaphoreValues(semaphoreInfoCount);
+
+  for (uint32_t i = 0; i < semaphoreInfoCount; i++)
+  {
+    const CgpuWaitSemaphoreInfo& semaphoreInfo = semaphoreInfos[i];
+
+    CgpuISemaphore* isemaphore;
+    if (!cgpuResolveSemaphore(semaphoreInfo.semaphore, &isemaphore)) {
+      CGPU_RETURN_ERROR_INVALID_HANDLE;
+    }
+
+    semaphores[i] = isemaphore->semaphore;
+    semaphoreValues[i] = semaphoreInfo.value;
   }
-  CgpuIFence* ifence;
-  if (!cgpuResolveFence(fence, &ifence)) {
-    CGPU_RETURN_ERROR_INVALID_HANDLE;
-  }
-  VkResult result = idevice->table.vkWaitForFences(
+  assert(semaphores.size() == semaphoreValues.size());
+
+  VkSemaphoreWaitInfo waitInfo = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO,
+    .pNext = nullptr,
+    .flags = 0, // wait for all semaphores
+    .semaphoreCount = (uint32_t) semaphores.size(),
+    .pSemaphores = semaphores.data(),
+    .pValues = semaphoreValues.data()
+  };
+  VkResult result = idevice->table.vkWaitSemaphoresKHR(
     idevice->logicalDevice,
-    1,
-    &ifence->fence,
-    VK_TRUE,
-    UINT64_MAX
+    &waitInfo,
+    timeoutNs
   );
   if (result != VK_SUCCESS) {
-    CGPU_RETURN_ERROR("failed to wait for fence");
+    CGPU_RETURN_ERROR("failed to wait for semaphores");
   }
   return true;
 }
 
 bool cgpuSubmitCommandBuffer(CgpuDevice device,
                              CgpuCommandBuffer commandBuffer,
-                             CgpuFence fence)
+                             uint32_t signalSemaphoreInfoCount,
+                             CgpuSignalSemaphoreInfo* signalSemaphoreInfos,
+                             uint32_t waitSemaphoreInfoCount,
+                             CgpuWaitSemaphoreInfo* waitSemaphoreInfos)
 {
   CgpuIDevice* idevice;
   if (!cgpuResolveDevice(device, &idevice)) {
@@ -3511,8 +3531,34 @@ bool cgpuSubmitCommandBuffer(CgpuDevice device,
   if (!cgpuResolveCommandBuffer(commandBuffer, &icommandBuffer)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
-  CgpuIFence* ifence;
-  if (!cgpuResolveFence(fence, &ifence)) {
+
+  GbSmallVector<VkSemaphoreSubmitInfo, 8> signalSubmitInfos(signalSemaphoreInfoCount);
+  GbSmallVector<VkSemaphoreSubmitInfo, 8> waitSubmitInfos(waitSemaphoreInfoCount);
+
+  const auto createSubmitInfos = [&](uint32_t infoCount, auto& semaphoreInfos, auto& submitInfos)
+  {
+    for (uint32_t i = 0; i < infoCount; i++)
+    {
+      CgpuISemaphore* isemaphore;
+      if (!cgpuResolveSemaphore(semaphoreInfos[i].semaphore, &isemaphore)) {
+        return false;
+      }
+
+      submitInfos[i] = VkSemaphoreSubmitInfo {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .semaphore = isemaphore->semaphore,
+        .value = semaphoreInfos[i].value,
+        .stageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        .deviceIndex = 0, // only relevant if in device group
+      };
+    }
+    return true;
+  };
+
+  if (!createSubmitInfos(signalSemaphoreInfoCount, signalSemaphoreInfos, signalSubmitInfos) ||
+      !createSubmitInfos(waitSemaphoreInfoCount, waitSemaphoreInfos, waitSubmitInfos))
+  {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
@@ -3526,19 +3572,19 @@ bool cgpuSubmitCommandBuffer(CgpuDevice device,
   VkSubmitInfo2KHR submitInfo = {
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
     .pNext = nullptr,
-    .waitSemaphoreInfoCount = 0,
-    .pWaitSemaphoreInfos = nullptr,
+    .waitSemaphoreInfoCount = (uint32_t) waitSubmitInfos.size(),
+    .pWaitSemaphoreInfos = waitSubmitInfos.data(),
     .commandBufferInfoCount = 1,
     .pCommandBufferInfos = &commandBufferSubmitInfo,
-    .signalSemaphoreInfoCount = 0,
-    .pSignalSemaphoreInfos = nullptr
+    .signalSemaphoreInfoCount = (uint32_t) signalSubmitInfos.size(),
+    .pSignalSemaphoreInfos = signalSubmitInfos.data()
   };
 
   VkResult result = idevice->table.vkQueueSubmit2KHR(
     idevice->computeQueue,
     1,
     &submitInfo,
-    ifence->fence
+    VK_NULL_HANDLE
   );
 
   if (result != VK_SUCCESS) {
