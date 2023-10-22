@@ -15,50 +15,56 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef SI_GTL
-#define SI_GTL
+#ifndef GTL_H
+#define GTL_H
 
 #ifdef __cplusplus
 
 #include <glm/glm.hpp>
 
-#define SI_INT        int32_t
-#define SI_UINT       uint32_t
-#define SI_FLOAT      float
-#define SI_VEC2       glm::vec2
-#define SI_VEC3       glm::vec3
-#define SI_VEC4       glm::vec4
-#define SI_MAT3       glm::mat3
-#define SI_MAT3x4     glm::mat3x4
+namespace gtl
+{
+  namespace shader_interface
+  {
+    using GI_INT    = int32_t;
+    using GI_UINT   = uint32_t;
+    using GI_FLOAT  = float;
+    using GI_VEC2   = glm::vec2;
+    using GI_VEC3   = glm::vec3;
+    using GI_VEC4   = glm::vec4;
+    using GI_MAT3   = glm::mat3;
+    using GI_MAT3x4 = glm::mat3x4;
+  }
+}
 
-#define SI_NAMESPACE_BEGIN(NAME) \
-  namespace gtl {                \
-    namespace shader_interface { \
+#define GI_INTERFACE_BEGIN(NAME)   \
+  namespace gtl {                  \
+    namespace shader_interface {   \
       namespace NAME {
 
-#define SI_NAMESPACE_END()       \
-      }                          \
-    }                            \
+#define GI_INTERFACE_END()   \
+      }                      \
+    }                        \
   }
 
-#define SI_BINDING_INDEX(NAME, IDX) \
+#define GI_BINDING_INDEX(NAME, IDX)   \
   constexpr static uint32_t BINDING_INDEX_##NAME = IDX;
 
 #else
 
-#define SI_INT        int
-#define SI_UINT       uint
-#define SI_FLOAT      float
-#define SI_VEC2       vec2
-#define SI_VEC3       vec3
-#define SI_VEC4       vec4
-#define SI_MAT3       mat3
-#define SI_MAT3x4     mat3x4
+#define GI_INT        int
+#define GI_UINT       uint
+#define GI_FLOAT      float
+#define GI_VEC2       vec2
+#define GI_VEC3       vec3
+#define GI_VEC4       vec4
+#define GI_MAT3       mat3
+#define GI_MAT3x4     mat3x4
 
-#define SI_NAMESPACE_BEGIN(NAME)
-#define SI_NAMESPACE_END()
+#define GI_INTERFACE_BEGIN(NAME)
+#define GI_INTERFACE_END()
 
-#define SI_BINDING_INDEX(NAME,IDX) \
+#define GI_BINDING_INDEX(NAME,IDX) \
   const uint BINDING_INDEX_##NAME = IDX;
 
 #endif

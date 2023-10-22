@@ -15,98 +15,98 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef SI_RP_MAIN
-#define SI_RP_MAIN
+#ifndef RP_MAIN_H
+#define RP_MAIN_H
 
 #include "interface/gtl.h"
 
-SI_NAMESPACE_BEGIN(rp_main)
+GI_INTERFACE_BEGIN(rp_main)
 
 struct FVertex
 {
   /* f32 pos[3], f32 bsign */
-  SI_VEC4 field1;
+  GI_VEC4 field1;
   /* u32 norm, u32 tan, f32 texcoords[2] */
-  SI_VEC4 field2;
+  GI_VEC4 field2;
 };
 
 struct Face
 {
-  SI_UINT v_0;
-  SI_UINT v_1;
-  SI_UINT v_2;
+  GI_UINT v_0;
+  GI_UINT v_1;
+  GI_UINT v_2;
 };
 
 struct SphereLight
 {
-  SI_VEC3  pos;
-  SI_FLOAT radius;
-  SI_VEC3  baseEmission;
-  SI_UINT  diffuseSpecularPacked;
+  GI_VEC3  pos;
+  GI_FLOAT radius;
+  GI_VEC3  baseEmission;
+  GI_UINT  diffuseSpecularPacked;
 };
 
 struct DistantLight
 {
-  SI_VEC3  direction;
-  SI_FLOAT angle;
-  SI_VEC3  baseEmission;
-  SI_UINT  diffuseSpecularPacked;
+  GI_VEC3  direction;
+  GI_FLOAT angle;
+  GI_VEC3  baseEmission;
+  GI_UINT  diffuseSpecularPacked;
 };
 
 struct RectLight
 {
-  SI_VEC3  origin;
-  SI_FLOAT width;
-  SI_VEC3  baseEmission;
-  SI_FLOAT height;
-  SI_VEC3  direction;
-  SI_UINT  diffuseSpecularPacked;
+  GI_VEC3  origin;
+  GI_FLOAT width;
+  GI_VEC3  baseEmission;
+  GI_FLOAT height;
+  GI_VEC3  direction;
+  GI_UINT  diffuseSpecularPacked;
 };
 
 struct DiskLight
 {
-  SI_VEC3  origin;
-  SI_FLOAT radius;
-  SI_VEC3  baseEmission;
-  SI_UINT  diffuseSpecularPacked;
-  SI_VEC3  direction;
-  SI_FLOAT padding;
+  GI_VEC3  origin;
+  GI_FLOAT radius;
+  GI_VEC3  baseEmission;
+  GI_UINT  diffuseSpecularPacked;
+  GI_VEC3  direction;
+  GI_FLOAT padding;
 };
 
 struct PushConstants
 {
-  SI_VEC3  cameraPosition;
-  SI_UINT  imageDims;
-  SI_VEC3  cameraForward;
-  SI_FLOAT focusDistance;
-  SI_VEC3  cameraUp;
-  SI_FLOAT cameraVFoV;
-  SI_VEC4  backgroundColor;
-  SI_UINT  sampleOffset;
-  SI_FLOAT lensRadius;
-  SI_UINT  sampleCount;
-  SI_FLOAT maxSampleValue;
-  SI_VEC4  domeLightRotation;
-  SI_VEC3  domeLightEmissionMultiplier;
-  SI_UINT  domeLightDiffuseSpecularPacked;
-  SI_UINT  maxBouncesAndRrBounceOffset;
-  SI_FLOAT rrInvMinTermProb;
-  SI_FLOAT lightIntensityMultiplier;
-  SI_UINT  clipRangePacked;
+  GI_VEC3  cameraPosition;
+  GI_UINT  imageDims;
+  GI_VEC3  cameraForward;
+  GI_FLOAT focusDistance;
+  GI_VEC3  cameraUp;
+  GI_FLOAT cameraVFoV;
+  GI_VEC4  backgroundColor;
+  GI_UINT  sampleOffset;
+  GI_FLOAT lensRadius;
+  GI_UINT  sampleCount;
+  GI_FLOAT maxSampleValue;
+  GI_VEC4  domeLightRotation;
+  GI_VEC3  domeLightEmissionMultiplier;
+  GI_UINT  domeLightDiffuseSpecularPacked;
+  GI_UINT  maxBouncesAndRrBounceOffset;
+  GI_FLOAT rrInvMinTermProb;
+  GI_FLOAT lightIntensityMultiplier;
+  GI_UINT  clipRangePacked;
 };
 
-SI_BINDING_INDEX(OUT_PIXELS,     0)
-SI_BINDING_INDEX(FACES,          1)
-SI_BINDING_INDEX(SPHERE_LIGHTS,  2)
-SI_BINDING_INDEX(DISTANT_LIGHTS, 3)
-SI_BINDING_INDEX(RECT_LIGHTS,    4)
-SI_BINDING_INDEX(DISK_LIGHTS,    5)
-SI_BINDING_INDEX(VERTICES,       6)
-SI_BINDING_INDEX(SAMPLER,        7)
-SI_BINDING_INDEX(TEXTURES_2D,    8)
-SI_BINDING_INDEX(TEXTURES_3D,    9)
-SI_BINDING_INDEX(SCENE_AS,      10)
+GI_BINDING_INDEX(OUT_PIXELS,     0)
+GI_BINDING_INDEX(FACES,          1)
+GI_BINDING_INDEX(SPHERE_LIGHTS,  2)
+GI_BINDING_INDEX(DISTANT_LIGHTS, 3)
+GI_BINDING_INDEX(RECT_LIGHTS,    4)
+GI_BINDING_INDEX(DISK_LIGHTS,    5)
+GI_BINDING_INDEX(VERTICES,       6)
+GI_BINDING_INDEX(SAMPLER,        7)
+GI_BINDING_INDEX(TEXTURES_2D,    8)
+GI_BINDING_INDEX(TEXTURES_3D,    9)
+GI_BINDING_INDEX(SCENE_AS,      10)
 
-SI_NAMESPACE_END()
+GI_INTERFACE_END()
 
 #endif
