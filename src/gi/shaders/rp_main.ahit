@@ -9,11 +9,11 @@
 #include "colormap.glsl"
 
 #include "mdl_types.glsl"
-#include "rt_descriptors.glsl"
+#include "rp_main_descriptors.glsl"
 
 #include "mdl_interface.glsl"
-#include "rt_payload.glsl"
-#include "rt_shading_state.glsl"
+#include "mdl_shading_state.glsl"
+#include "rp_main_payload.glsl"
 
 float mdl_cutout_opacity(in State state);
 

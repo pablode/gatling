@@ -4,8 +4,8 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 
-#include "rt_payload.glsl"
-#include "rt_descriptors.glsl"
+#include "rp_main_payload.glsl"
+#include "rp_main_descriptors.glsl"
 
 layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayload;
 

@@ -935,7 +935,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       {
         GiGlslShaderGen::ClosestHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
-        hitParams.baseFileName = "rt_main.chit";
+        hitParams.baseFileName = "rp_main.chit";
         hitParams.isOpaque = material->isOpaque;
         hitParams.enableSceneTransforms = material->requiresSceneTransforms;
         hitParams.nextEventEstimation = params->nextEventEstimation;
@@ -962,7 +962,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         GiGlslShaderGen::AnyHitShaderParams hitParams;
         hitParams.aovId = params->aovId;
         hitParams.enableSceneTransforms = material->requiresSceneTransforms;
-        hitParams.baseFileName = "rt_main.ahit";
+        hitParams.baseFileName = "rp_main.ahit";
         hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
         hitParams.sphereLightCount = scene->sphereLights.elementCount();
         hitParams.distantLightCount = scene->distantLights.elementCount();
@@ -1094,7 +1094,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     rgenParams.texCount3d = texCount3d;
 
     std::vector<uint8_t> spv;
-    if (!s_shaderGen->generateRgenSpirv("rt_main.rgen", rgenParams, spv))
+    if (!s_shaderGen->generateRgenSpirv("rp_main.rgen", rgenParams, spv))
     {
       goto cleanup;
     }
@@ -1126,7 +1126,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     // regular miss shader
     {
       std::vector<uint8_t> spv;
-      if (!s_shaderGen->generateMissSpirv("rt_main.miss", missParams, spv))
+      if (!s_shaderGen->generateMissSpirv("rp_main.miss", missParams, spv))
       {
         goto cleanup;
       }
@@ -1149,7 +1149,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     // shadow test miss shader
     {
       std::vector<uint8_t> spv;
-      if (!s_shaderGen->generateMissSpirv("rt_shadow.miss", missParams, spv))
+      if (!s_shaderGen->generateMissSpirv("rp_main_shadow.miss", missParams, spv))
       {
         goto cleanup;
       }
