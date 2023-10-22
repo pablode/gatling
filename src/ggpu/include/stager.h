@@ -38,7 +38,7 @@ namespace gtl
 
     bool stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstOffset);
 
-    bool stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth);
+    bool stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth = 1);
 
   private:
     using CopyFunc = std::function<bool(uint64_t srcOffset, uint64_t dstOffset, uint64_t size)>;

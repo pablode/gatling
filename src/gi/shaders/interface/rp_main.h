@@ -81,7 +81,6 @@ struct PushConstants
   GI_FLOAT focusDistance;
   GI_VEC3  cameraUp;
   GI_FLOAT cameraVFoV;
-  GI_VEC4  backgroundColor;
   GI_UINT  sampleOffset;
   GI_FLOAT lensRadius;
   GI_UINT  sampleCount;
@@ -93,6 +92,7 @@ struct PushConstants
   GI_FLOAT rrInvMinTermProb;
   GI_FLOAT lightIntensityMultiplier;
   GI_UINT  clipRangePacked;
+  /* 4 floats free */
 };
 
 GI_BINDING_INDEX(OUT_PIXELS,     0)

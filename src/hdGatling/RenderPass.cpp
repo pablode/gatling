@@ -273,7 +273,6 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , m_lastSprimIndexVersion(UINT32_MAX)
   , m_lastRenderSettingsVersion(UINT32_MAX)
   , m_lastVisChangeCount(UINT32_MAX)
-  , m_lastBackgroundColor(GfVec4f(0.0f, 0.0f, 0.0f, 0.0f))
   , m_geomCache(nullptr)
   , m_shaderCache(nullptr)
 {
@@ -703,13 +702,11 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   GiAovId aovId = _GetAovId(aovBinding->aovName);
 
   bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
-  bool sprimsChanged = (sprimIndexVersion != m_lastSprimIndexVersion);
   bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
   bool visibilityChanged = (m_lastVisChangeCount != visibilityChangeCount);
-  bool backgroundColorChanged = (backgroundColor != m_lastBackgroundColor);
   bool aovChanged = (aovId != m_lastAovId);
 
-  if (sceneChanged || renderSettingsChanged || visibilityChanged || backgroundColorChanged || aovChanged)
+  if (sceneChanged || renderSettingsChanged || visibilityChanged || aovChanged)
   {
     giInvalidateFramebuffer();
   }
@@ -718,11 +715,10 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   m_lastSprimIndexVersion = sprimIndexVersion;
   m_lastRenderSettingsVersion = renderSettingsStateVersion;
   m_lastVisChangeCount = visibilityChangeCount;
-  m_lastBackgroundColor = backgroundColor;
   m_lastAovId = aovId;
 
-  bool rebuildShaderCache = !m_shaderCache || aovChanged || giShaderCacheNeedsRebuild() ||
-                            renderSettingsChanged || sprimsChanged /*dome light could have been added/removed*/;
+  bool rebuildShaderCache = !m_shaderCache || aovChanged || giShaderCacheNeedsRebuild() || renderSettingsChanged;
+
   bool rebuildGeomCache = !m_geomCache || visibilityChanged;
 
   if (rebuildShaderCache || rebuildGeomCache)
@@ -751,8 +747,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       GiShaderCacheParams shaderParams;
       shaderParams.aovId = aovId;
       shaderParams.depthOfField = m_settings.find(HdGatlingSettingsTokens->depth_of_field)->second.Get<bool>();
-      shaderParams.domeLight = renderParam->ActiveDomeLight();
-      shaderParams.domeLightCameraVisibility = (domeLightCameraVisibilityValueIt == m_settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true);
+      shaderParams.domeLightCameraVisible = (domeLightCameraVisibilityValueIt == m_settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true);
       shaderParams.filterImportanceSampling = m_settings.find(HdGatlingSettingsTokens->filter_importance_sampling)->second.Get<bool>();
       shaderParams.materialCount = materials.size();
       shaderParams.materials = materials.data();
@@ -801,10 +796,11 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   renderParams.lightIntensityMultiplier = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->light_intensity_multiplier)->second).Get<float>();
   renderParams.rrInvMinTermProb = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second).Get<float>();
   renderParams.maxSampleValue = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second).Get<float>();
+  renderParams.domeLight = renderParam->ActiveDomeLight();
   renderParams.scene = m_scene;
   for (uint32_t i = 0; i < 4; i++)
   {
-    renderParams.bgColor[i] = backgroundColor[i];
+    renderParams.backgroundColor[i] = backgroundColor[i];
   }
 
   float* img_data = (float*) renderBuffer->Map();

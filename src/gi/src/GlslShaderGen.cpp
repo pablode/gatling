@@ -142,13 +142,9 @@ namespace gtl
     _sgGenerateCommonDefines(stitcher, params.texCount2d, params.texCount3d, params.sphereLightCount,
                              params.distantLightCount, params.rectLightCount, params.diskLightCount);
 
-    if (params.domeLightEnabled)
+    if (params.domeLightCameraVisible)
     {
-      stitcher.appendDefine("DOMELIGHT_ENABLED");
-    }
-    if (params.domeLightCameraVisibility)
-    {
-      stitcher.appendDefine("DOMELIGHT_CAMERA_VISIBLE");
+      stitcher.appendDefine("DOME_LIGHT_CAMERA_VISIBLE");
     }
 
     fs::path filePath = m_shaderPath / fileName;

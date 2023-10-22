@@ -82,8 +82,7 @@ namespace gtl
 
     struct MissShaderParams
     {
-      bool domeLightEnabled;
-      bool domeLightCameraVisibility;
+      bool domeLightCameraVisible;
       uint32_t distantLightCount;
       uint32_t sphereLightCount;
       uint32_t rectLightCount;

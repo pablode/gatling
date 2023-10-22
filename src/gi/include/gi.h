@@ -103,8 +103,7 @@ struct GiShaderCacheParams
 {
   GiAovId            aovId;
   bool               depthOfField;
-  GiDomeLight*       domeLight;
-  bool               domeLightCameraVisibility;
+  bool               domeLightCameraVisible;
   bool               filterImportanceSampling;
   uint32_t           materialCount;
   const GiMaterial** materials;
@@ -133,7 +132,8 @@ struct GiRenderParams
   uint32_t             rrBounceOffset;
   float                rrInvMinTermProb;
   float                maxSampleValue;
-  float                bgColor[4];
+  float                backgroundColor[4];
+  GiDomeLight*         domeLight;
   GiScene*             scene;
 };
 

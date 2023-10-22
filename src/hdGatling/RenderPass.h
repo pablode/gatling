@@ -75,7 +75,6 @@ private:
   uint32_t m_lastSprimIndexVersion;
   uint32_t m_lastRenderSettingsVersion;
   uint32_t m_lastVisChangeCount;
-  GfVec4f m_lastBackgroundColor;
   GiAovId m_lastAovId;
   GiGeomCache* m_geomCache;
   GiShaderCache* m_shaderCache;

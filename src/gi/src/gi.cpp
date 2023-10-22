@@ -80,6 +80,7 @@ struct GiGeomCache
 struct GiShaderCache
 {
   uint32_t                       aovId = UINT32_MAX;
+  bool                           domeLightCameraVisible;
   std::vector<CgpuShader>        hitShaders;
   std::vector<CgpuImage>         images2d;
   std::vector<CgpuImage>         images3d;
@@ -127,6 +128,16 @@ struct GiDiskLight
   uint64_t gpuHandle;
 };
 
+struct GiDomeLight
+{
+  GiScene* scene;
+  std::string textureFilePath;
+  glm::quat rotation;
+  glm::vec3 baseEmission;
+  float diffuse = 1.0f;
+  float specular = 1.0f;
+};
+
 struct GiScene
 {
   GgpuDenseDataStore sphereLights;
@@ -134,18 +145,9 @@ struct GiScene
   GgpuDenseDataStore rectLights;
   GgpuDenseDataStore diskLights;
   CgpuImage domeLightTexture;
-  glm::quat domeLightRotation;
-  glm::vec3 domeLightBaseEmission;
-  float domeLightDiffuse = 1.0f;
-  float domeLightSpecular = 1.0f;
-  GiDomeLight* domeLight; // weak ptr
-};
-
-struct GiDomeLight
-{
-  GiScene* scene;
-  std::string textureFilePath;
-  glm::quat rotation;
+  GiDomeLight* domeLight = nullptr; // weak ptr
+  glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
+  CgpuImage fallbackDomeLightTexture;
 };
 
 bool s_loggerInitialized = false;
@@ -788,41 +790,10 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   std::vector<CgpuImage> images3d;
   std::vector<CgpuRtHitGroup> hitGroups;
   std::vector<McTextureDescription> textureDescriptions;
-  uint32_t texCount2d = 0;
+  uint32_t texCount2d = 2; // +1 fallback and +1 real dome light
   uint32_t texCount3d = 0;
   bool hasPipelineClosestHitShader = false;
   bool hasPipelineAnyHitShader = false;
-
-  // Upload dome light.
-  if (scene->domeLight != params->domeLight)
-  {
-    if (scene->domeLightTexture.handle)
-    {
-      s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
-      scene->domeLightTexture.handle = 0;
-    }
-    scene->domeLight = nullptr;
-
-    GiDomeLight* domeLight = params->domeLight;
-    if (domeLight)
-    {
-      const char* filePath = domeLight->textureFilePath.c_str();
-
-      bool is3dImage = false;
-      bool flushImmediately = false;
-      if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, flushImmediately))
-      {
-        GB_ERROR("unable to load dome light texture at {}", filePath);
-      }
-      else
-      {
-        scene->domeLightRotation = domeLight->rotation;
-        scene->domeLight = domeLight;
-      }
-    }
-  }
-
-  bool domeLightEnabled = bool(scene->domeLight);
 
   // Create per-material closest-hit shaders.
   //
@@ -890,8 +861,6 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     }
 
     // 2. Sum up texture resources & calculate per-material index offsets.
-    texCount2d += int(domeLightEnabled);
-
     for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
     {
       HitShaderCompInfo& closestHitShaderCompInfo = groupInfo.closestHitInfo;
@@ -1114,8 +1083,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   // Create miss shaders.
   {
     GiGlslShaderGen::MissShaderParams missParams;
-    missParams.domeLightEnabled = domeLightEnabled;
-    missParams.domeLightCameraVisibility = params->domeLightCameraVisibility;
+    missParams.domeLightCameraVisible = params->domeLightCameraVisible;
     missParams.sphereLightCount = scene->sphereLights.elementCount();
     missParams.distantLightCount = scene->distantLights.elementCount();
     missParams.rectLightCount = scene->rectLights.elementCount();
@@ -1175,7 +1143,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
   {
     goto cleanup;
   }
-  assert(images2d.size() == (texCount2d - int(domeLightEnabled)));
+  assert(images2d.size() == (texCount2d - 2));
   assert(images3d.size() == texCount3d);
 
   // Create RT pipeline.
@@ -1199,6 +1167,7 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
 
   cache = new GiShaderCache;
   cache->aovId = params->aovId;
+  cache->domeLightCameraVisible = params->domeLightCameraVisible;
   cache->hitShaders = std::move(hitShaders);
   cache->images2d = std::move(images2d);
   cache->images3d = std::move(images3d);
@@ -1278,6 +1247,50 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   const GiShaderCache* shader_cache = params->shaderCache;
   GiScene* scene = params->scene;
 
+  // Upload dome lights.
+  glm::vec4 backgroundColor = glm::make_vec4(params->backgroundColor);
+  if (backgroundColor != scene->backgroundColor)
+  {
+    glm::u8vec4 u8BgColor(backgroundColor * 255.0f);
+    s_stager->stageToImage(glm::value_ptr(u8BgColor), 4, scene->fallbackDomeLightTexture, 1, 1);
+    scene->backgroundColor = backgroundColor;
+  }
+
+  if (scene->domeLight != params->domeLight)
+  {
+    if (scene->domeLightTexture.handle &&
+        scene->domeLightTexture.handle != scene->fallbackDomeLightTexture.handle)
+    {
+      s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
+      scene->domeLightTexture.handle = 0;
+    }
+    scene->domeLight = nullptr;
+
+    GiDomeLight* domeLight = params->domeLight;
+    if (domeLight)
+    {
+      const char* filePath = domeLight->textureFilePath.c_str();
+
+      bool is3dImage = false;
+      bool flushImmediately = false;
+      if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, flushImmediately))
+      {
+        GB_ERROR("unable to load dome light texture at {}", filePath);
+      }
+      else
+      {
+        scene->domeLight = domeLight;
+      }
+    }
+  }
+  if (!scene->domeLight)
+  {
+    // Use fallback texture in case no dome light is set. We still have an explicit binding
+    // for the fallback texture because we need the background color in case the textured
+    // dome light is not supposed to be seen by the camera ('domeLightCameraVisible' option).
+    scene->domeLightTexture = scene->fallbackDomeLightTexture;
+  }
+
   // Init state for goto error handling.
   int result = GI_ERROR;
 
@@ -1335,6 +1348,10 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     lensRadius = params->camera->focalLength / (2.0f * params->camera->fStop);
   }
 
+  glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
+  glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
+  uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
+
   Rp::PushConstants pushData = {
     .cameraPosition                 = glm::make_vec3(params->camera->position),
     .imageDims                      = ((params->imageHeight << 16) | params->imageWidth),
@@ -1342,14 +1359,13 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     .focusDistance                  = params->camera->focusDistance,
     .cameraUp                       = camUp,
     .cameraVFoV                     = params->camera->vfov,
-    .backgroundColor                = glm::make_vec4(params->bgColor),
     .sampleOffset                   = s_sampleOffset,
     .lensRadius                     = lensRadius,
     .sampleCount                    = params->spp,
     .maxSampleValue                 = params->maxSampleValue,
-    .domeLightRotation              = glm::make_vec4(&scene->domeLightRotation[0]),
-    .domeLightEmissionMultiplier    = scene->domeLightBaseEmission,
-    .domeLightDiffuseSpecularPacked = glm::packHalf2x16(glm::vec2(scene->domeLightDiffuse, scene->domeLightSpecular)),
+    .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
+    .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
+    .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
     .maxBouncesAndRrBounceOffset    = ((params->maxBounces << 16) | params->rrBounceOffset),
     .rrInvMinTermProb               = params->rrInvMinTermProb,
     .lightIntensityMultiplier       = params->lightIntensityMultiplier,
@@ -1369,23 +1385,21 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   buffers.push_back({ .binding = Rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
 
-  bool domeLightEnabled = bool(scene->domeLight);
-  size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + int(domeLightEnabled);
+  size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + 2/* dome lights */;
 
   std::vector<CgpuImageBinding> images;
   images.reserve(imageCount);
 
   CgpuSamplerBinding sampler = { .binding = Rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
 
-  if (domeLightEnabled)
-  {
-    images.push_back({ .binding = Rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture });
-  }
+  images.push_back({ .binding = Rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture, .index = 0 });
+  images.push_back({ .binding = Rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture,         .index = 1 });
+
   for (uint32_t i = 0; i < shader_cache->images2d.size(); i++)
   {
     images.push_back({ .binding = Rp::BINDING_INDEX_TEXTURES_2D,
                        .image = shader_cache->images2d[i],
-                       .index = int(domeLightEnabled) + i });
+                       .index = 2/* dome lights */ + i });
   }
   for (uint32_t i = 0; i < shader_cache->images3d.size(); i++)
   {
@@ -1528,11 +1542,19 @@ cleanup:
 
 GiScene* giCreateScene()
 {
+  CgpuImageCreateInfo imgCreateInfo = { .width = 1, .height = 1 };
+  CgpuImage fallbackDomeLightTexture;
+  if (!cgpuCreateImage(s_device, &imgCreateInfo, &fallbackDomeLightTexture))
+  {
+    return nullptr;
+  }
+
   GiScene* scene = new GiScene{
     .sphereLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::SphereLight), 64),
     .distantLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DistantLight), 64),
     .rectLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::RectLight), 64),
-    .diskLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DiskLight), 64)
+    .diskLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(Rp::DiskLight), 64),
+    .fallbackDomeLightTexture = fallbackDomeLightTexture
   };
   return scene;
 }
@@ -1544,6 +1566,7 @@ void giDestroyScene(GiScene* scene)
     s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
     scene->domeLightTexture.handle = 0;
   }
+  cgpuDestroyImage(s_device, scene->fallbackDomeLightTexture);
   delete scene;
 }
 
@@ -1847,11 +1870,11 @@ void giSetDomeLightRotation(GiDomeLight* light, float* quat)
 
 void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb)
 {
-  light->scene->domeLightBaseEmission = glm::make_vec3(rgb);
+  light->baseEmission = glm::make_vec3(rgb);
 }
 
 void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular)
 {
-  light->scene->domeLightDiffuse = diffuse;
-  light->scene->domeLightSpecular = specular;
+  light->diffuse = diffuse;
+  light->specular = specular;
 }

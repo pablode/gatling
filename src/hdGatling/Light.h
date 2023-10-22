@@ -114,6 +114,8 @@ public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 private:
+  void DestroyDomeLight(HdRenderParam* renderParam);
+
   GiDomeLight* m_giDomeLight = nullptr;
 };
 

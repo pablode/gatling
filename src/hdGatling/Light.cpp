@@ -299,8 +299,6 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
                               HdRenderParam* renderParam,
                               HdDirtyBits* dirtyBits)
 {
-  TF_UNUSED(renderParam);
-
   if (!HdChangeTracker::IsDirty(*dirtyBits))
   {
     return;
@@ -333,9 +331,15 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (m_giDomeLight)
   {
-    // FIXME: don't recreate on transform change
-    giDestroyDomeLight(m_scene, m_giDomeLight);
+    DestroyDomeLight(renderParam);
   }
+
+  if (!sceneDelegate->GetVisible(id))
+  {
+    return;
+  }
+
+  // FIXME: don't recreate on transform change
   m_giDomeLight = giCreateDomeLight(m_scene, path.c_str());
 
   const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
@@ -370,6 +374,16 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingDomeLight::Finalize(HdRenderParam* renderParam)
 {
+  DestroyDomeLight(renderParam);
+}
+
+HdDirtyBits HdGatlingDomeLight::GetInitialDirtyBitsMask() const
+{
+  return DirtyBits::DirtyTransform | DirtyBits::DirtyParams | DirtyBits::DirtyResource;
+}
+
+void HdGatlingDomeLight::DestroyDomeLight(HdRenderParam* renderParam)
+{
   if (!m_giDomeLight)
   {
     return;
@@ -379,11 +393,8 @@ void HdGatlingDomeLight::Finalize(HdRenderParam* renderParam)
   rp->RemoveDomeLight(m_giDomeLight);
 
   giDestroyDomeLight(m_scene, m_giDomeLight);
-}
 
-HdDirtyBits HdGatlingDomeLight::GetInitialDirtyBitsMask() const
-{
-  return DirtyBits::DirtyTransform | DirtyBits::DirtyParams | DirtyBits::DirtyResource;
+  m_giDomeLight = nullptr;
 }
 
 //

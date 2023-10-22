@@ -3,6 +3,7 @@
 #extension GL_EXT_shader_16bit_storage: require
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
+#extension GL_EXT_nonuniform_qualifier: require
 
 #include "rp_main_payload.glsl"
 #include "rp_main_descriptors.glsl"
@@ -18,33 +19,29 @@ vec3 quatRotateDir(vec4 q, vec3 dir)
     return dir + ((a * q.w) + b) * 2.0;
 }
 
-#ifdef DOMELIGHT_ENABLED
-vec3 sampleDomeLight(vec3 rayDir)
+vec3 sampleDomeLight(uint domeLightIndex, vec3 rayDir)
 {
     float u = (atan(rayDir.z, rayDir.x) + 0.5 * PI) / (2.0 * PI);
     float v = acos(rayDir.y) / PI;
 
     const uint lodLevel = 0;
-    const uint domeLightTexIndex = 0;
-    return textureLod(sampler2D(textures_2d[domeLightTexIndex], tex_sampler), vec2(u, v), lodLevel).rgb;
+    return textureLod(sampler2D(textures_2d[nonuniformEXT(domeLightIndex)], tex_sampler), vec2(u, v), lodLevel).rgb;
 }
-#endif
 
 void main()
 {
-    vec3 backgroundColor = PC.backgroundColor.rgb;
+    bool useFallbackDomeLight = false;
 
-#ifdef DOMELIGHT_ENABLED
-#ifndef DOMELIGHT_CAMERA_VISIBLE
+#ifndef DOME_LIGHT_CAMERA_VISIBLE
     bool isPrimaryRay = (rayPayload.bitfield & 0x7FFFu) == 0;
-    if (!isPrimaryRay)
-#endif
-    {
-        vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, gl_WorldRayDirectionEXT));
-        backgroundColor = sampleDomeLight(sampleDir) * PC.domeLightEmissionMultiplier;
-    }
+
+    useFallbackDomeLight = isPrimaryRay;
 #endif
 
-    rayPayload.radiance += rayPayload.throughput * f16vec3(backgroundColor);
+    uint domeLightIndex = useFallbackDomeLight ? 0 : 1;
+    vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, gl_WorldRayDirectionEXT));
+    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * PC.domeLightEmissionMultiplier;
+
+    rayPayload.radiance += rayPayload.throughput * f16vec3(radiance);
     rayPayload.bitfield = uint16_t(0xFFFFu);
 }
