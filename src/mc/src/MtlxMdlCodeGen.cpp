@@ -80,7 +80,7 @@ namespace
     }
 
     if (_IsBxdfWithInputValue(node, "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f))) &&
-        _IsBxdfWithInputValue(node, "standard_surface", "transmission", mx::Value::createValue(1.0f)) &&
+        _IsBxdfWithInputValue(node, "standard_surface", "transmission", mx::Value::createValue(0.0f)) &&
         _IsBxdfWithInputValue(node, "standard_surface", "subsurface", mx::Value::createValue(0.0f)))
     {
       return true;
