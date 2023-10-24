@@ -19,6 +19,8 @@
 
 #include <pxr/base/gf/vec3i.h>
 
+#include <gi.h>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingRenderBuffer::HdGatlingRenderBuffer(const SdfPath& id)
@@ -37,6 +39,12 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
                                      HdFormat format,
                                      bool multiSampled)
 {
+  if (m_renderBuffer)
+  {
+    giDestroyRenderBuffer(m_renderBuffer);
+    m_renderBuffer = nullptr;
+  }
+
   if (dimensions[2] != 1)
   {
     return false;
@@ -56,7 +64,9 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
     return false;
   }
 
-  return true;
+  m_renderBuffer = giCreateRenderBuffer(m_width, m_height);
+
+  return m_renderBuffer != nullptr;
 }
 
 unsigned int HdGatlingRenderBuffer::GetWidth() const
@@ -104,6 +114,11 @@ void* HdGatlingRenderBuffer::Map()
 bool HdGatlingRenderBuffer::IsMapped() const
 {
   return m_isMapped;
+}
+
+GiRenderBuffer* HdGatlingRenderBuffer::GetGiRenderBuffer() const
+{
+  return m_renderBuffer;
 }
 
 void HdGatlingRenderBuffer::Unmap()

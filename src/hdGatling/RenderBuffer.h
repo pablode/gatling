@@ -20,6 +20,8 @@
 #include <pxr/pxr.h>
 #include <pxr/imaging/hd/renderBuffer.h>
 
+struct GiRenderBuffer;
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingRenderBuffer final : public HdRenderBuffer
@@ -44,6 +46,8 @@ public:
   HdFormat GetFormat() const override;
 
   bool IsMultiSampled() const override;
+
+  GiRenderBuffer* GetGiRenderBuffer() const;
 
 public:
   bool IsConverged() const override;
@@ -70,6 +74,7 @@ private:
   bool m_isMultiSampled;
   bool m_isMapped;
   bool m_isConverged;
+  GiRenderBuffer* m_renderBuffer = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

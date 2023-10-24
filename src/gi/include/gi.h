@@ -55,6 +55,7 @@ struct GiDistantLight;
 struct GiRectLight;
 struct GiDiskLight;
 struct GiDomeLight;
+struct GiRenderBuffer;
 
 struct GiCameraDesc
 {
@@ -124,8 +125,7 @@ struct GiRenderParams
   const GiCameraDesc*  camera;
   const GiGeomCache*   geomCache;
   const GiShaderCache* shaderCache;
-  uint32_t             imageWidth;
-  uint32_t             imageHeight;
+  GiRenderBuffer*      renderBuffer;
   float                lightIntensityMultiplier;
   uint32_t             maxBounces;
   uint32_t             spp;
@@ -219,3 +219,6 @@ void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);
 void giSetDomeLightRotation(GiDomeLight* light, float* quat);
 void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb);
 void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular);
+
+GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height);
+void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer);

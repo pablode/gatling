@@ -90,6 +90,7 @@ struct GiShaderCache
   bool                           hasPipelineClosestHitShader = false;
   bool                           hasPipelineAnyHitShader = false;
   CgpuShader                     rgenShader;
+  bool                           resetSampleOffset = true;
 };
 
 struct GiMaterial
@@ -150,6 +151,18 @@ struct GiScene
   CgpuImage fallbackDomeLightTexture;
 };
 
+struct GiRenderBuffer
+{
+  CgpuBuffer buffer;
+  CgpuBuffer stagingBuffer;
+  uint32_t bufferWidth = 0;
+  uint32_t bufferHeight = 0;
+  uint32_t width = 0;
+  uint32_t height = 0;
+  uint32_t size = 0;
+  uint32_t sampleOffset = 0;
+};
+
 bool s_loggerInitialized = false;
 CgpuDevice s_device;
 CgpuPhysicalDeviceFeatures s_deviceFeatures;
@@ -162,13 +175,9 @@ std::unique_ptr<McFrontend> s_mcFrontend;
 std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
 std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
 std::unique_ptr<gtl::GiTextureManager> s_texSys;
-CgpuBuffer s_framebuffer;
-CgpuBuffer s_outputStagingBuffer;
-uint32_t s_framebufferWidth = 0;
-uint32_t s_framebufferHeight = 0;
-uint32_t s_sampleOffset = 0;
 std::atomic_bool s_forceShaderCacheInvalid = false;
 std::atomic_bool s_forceGeomCacheInvalid = false;
+std::atomic_bool s_resetSampleOffset = false;
 
 #ifndef NDEBUG
 class ShaderFileListener : public efsw::FileWatchListener
@@ -183,7 +192,7 @@ public:
     case efsw::Actions::Modified:
     case efsw::Actions::Moved:
       s_forceShaderCacheInvalid = true;
-      s_sampleOffset = 0;
+      s_resetSampleOffset = true;
       break;
     default:
       break;
@@ -195,20 +204,29 @@ std::unique_ptr<efsw::FileWatcher> s_fileWatcher;
 ShaderFileListener s_shaderFileListener;
 #endif
 
-bool _giResizeFramebuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
+bool _giResizeRenderBufferIfNeeded(GiRenderBuffer* renderBuffer, uint32_t pixelStride)
 {
-  s_framebufferWidth = width;
-  s_framebufferHeight = height;
+  uint32_t width = renderBuffer->width;
+  uint32_t height = renderBuffer->height;
+  uint64_t bufferSize = width * height * pixelStride;
 
-  if (s_framebuffer.handle)
+  bool reallocBuffers = (renderBuffer->bufferWidth != width) ||
+                        (renderBuffer->bufferHeight != height);
+
+  if (!reallocBuffers)
   {
-    cgpuDestroyBuffer(s_device, s_framebuffer);
-    s_framebuffer.handle = 0;
+    return true;
   }
-  if (s_outputStagingBuffer.handle)
+
+  if (renderBuffer->buffer.handle)
   {
-    cgpuDestroyBuffer(s_device, s_outputStagingBuffer);
-    s_outputStagingBuffer.handle = 0;
+    cgpuDestroyBuffer(s_device, renderBuffer->buffer);
+    renderBuffer->buffer.handle = 0;
+  }
+  if (renderBuffer->stagingBuffer.handle)
+  {
+    cgpuDestroyBuffer(s_device, renderBuffer->stagingBuffer);
+    renderBuffer->stagingBuffer.handle = 0;
   }
 
   if (width == 0 || height == 0)
@@ -216,15 +234,17 @@ bool _giResizeFramebuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
     return true;
   }
 
+  GB_LOG("recreating output buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
+
   {
     CgpuBufferCreateInfo createInfo = {
       .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
       .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
       .size = bufferSize,
-      .debugName = "Output"
+      .debugName = "RenderBuffer"
     };
 
-    if (!cgpuCreateBuffer(s_device, &createInfo, &s_framebuffer))
+    if (!cgpuCreateBuffer(s_device, &createInfo, &renderBuffer->buffer))
     {
       return false;
     }
@@ -235,14 +255,19 @@ bool _giResizeFramebuffer(uint32_t width, uint32_t height, uint32_t bufferSize)
       .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
       .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
       .size = bufferSize,
-      .debugName = "OutputStaging"
+      .debugName = "RenderBufferStaging"
     };
 
-    if (!cgpuCreateBuffer(s_device, &createInfo, &s_outputStagingBuffer))
+    if (!cgpuCreateBuffer(s_device, &createInfo, &renderBuffer->stagingBuffer))
     {
+      cgpuDestroyBuffer(s_device, renderBuffer->buffer);
       return false;
     }
   }
+
+  renderBuffer->bufferWidth = width;
+  renderBuffer->bufferHeight = height;
+  renderBuffer->size = bufferSize;
 
   return true;
 }
@@ -349,7 +374,6 @@ void giTerminate()
 #endif
   s_aggregateAssetReader.reset();
   s_mmapAssetReader.reset();
-  _giResizeFramebuffer(0, 0, 0);
   if (s_texSys)
   {
     s_texSys->destroy();
@@ -1226,7 +1250,7 @@ void giDestroyShaderCache(GiShaderCache* cache)
 
 void giInvalidateFramebuffer()
 {
-  s_sampleOffset = 0;
+  s_resetSampleOffset = true;
 }
 
 void giInvalidateShaderCache()
@@ -1316,29 +1340,33 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     GB_ERROR("{}:{}: stager flush failed!", __FILE__, __LINE__);
   }
 
+  // Set up output buffer.
+  GiRenderBuffer* renderBuffer = params->renderBuffer;
+  uint32_t imageWidth = renderBuffer->width;
+  uint32_t imageHeight = renderBuffer->height;
+
+  int compCount = 4;
+  int pixelStride = compCount * sizeof(float);
+  int pixelCount = imageWidth * imageHeight;
+
+  if (!_giResizeRenderBufferIfNeeded(renderBuffer, pixelStride))
+  {
+    GB_ERROR("failed to resize render buffer!");
+    return GI_ERROR;
+  }
+
+  if (s_resetSampleOffset)
+  {
+    renderBuffer->sampleOffset = 0;
+    s_resetSampleOffset = false;
+  }
+
+  // Set up GPU data.
   CgpuCommandBuffer commandBuffer;
   CgpuSemaphore semaphore;
   CgpuSignalSemaphoreInfo signalSemaphoreInfo;
   CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
-  // Set up output buffer.
-  int compCount = 4;
-  int pixelStride = compCount * sizeof(float);
-  int pixelCount = params->imageWidth * params->imageHeight;
-  uint64_t framebufferSize = pixelCount * pixelStride;
-
-  bool reallocFramebuffer= s_framebufferWidth != params->imageWidth ||
-                           s_framebufferHeight != params->imageHeight;
-
-  if (reallocFramebuffer)
-  {
-    GB_LOG("recreating output buffer with size {}x{} ({:.2f} MiB)", params->imageWidth,
-      params->imageHeight, framebufferSize * BYTES_TO_MIB);
-
-    _giResizeFramebuffer(params->imageWidth, params->imageHeight, framebufferSize);
-  }
-
-  // Set up GPU data.
   auto camForward = glm::normalize(glm::make_vec3(params->camera->forward));
   auto camUp = glm::normalize(glm::make_vec3(params->camera->up));
 
@@ -1354,12 +1382,12 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   Rp::PushConstants pushData = {
     .cameraPosition                 = glm::make_vec3(params->camera->position),
-    .imageDims                      = ((params->imageHeight << 16) | params->imageWidth),
+    .imageDims                      = ((imageHeight << 16) | imageWidth),
     .cameraForward                  = camForward,
     .focusDistance                  = params->camera->focusDistance,
     .cameraUp                       = camUp,
     .cameraVFoV                     = params->camera->vfov,
-    .sampleOffset                   = s_sampleOffset,
+    .sampleOffset                   = renderBuffer->sampleOffset,
     .lensRadius                     = lensRadius,
     .sampleCount                    = params->spp,
     .maxSampleValue                 = params->maxSampleValue,
@@ -1375,7 +1403,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   std::vector<CgpuBufferBinding> buffers;
   buffers.reserve(16);
 
-  buffers.push_back({ .binding = Rp::BINDING_INDEX_OUT_PIXELS, .buffer = s_framebuffer });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_OUT_PIXELS, .buffer = renderBuffer->buffer });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_FACES, .buffer = geom_cache->buffer,
                       .offset = geom_cache->faceBufferView.offset, .size = geom_cache->faceBufferView.size });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_VERTICES, .buffer = geom_cache->buffer,
@@ -1445,13 +1473,13 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
       goto cleanup;
   }
 
-  if (!cgpuCmdTraceRays(commandBuffer, shader_cache->pipeline, params->imageWidth, params->imageHeight))
+  if (!cgpuCmdTraceRays(commandBuffer, shader_cache->pipeline, imageWidth, imageHeight))
     goto cleanup;
 
   // Copy output buffer to staging buffer.
   {
     CgpuBufferMemoryBarrier bufferBarrier = {
-      .buffer = s_framebuffer,
+      .buffer = renderBuffer->buffer,
       .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
       .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
       .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
@@ -1466,12 +1494,12 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
       goto cleanup;
   }
 
-  if (!cgpuCmdCopyBuffer(commandBuffer, s_framebuffer, 0, s_outputStagingBuffer, 0, framebufferSize))
+  if (!cgpuCmdCopyBuffer(commandBuffer, renderBuffer->buffer, 0, renderBuffer->stagingBuffer))
     goto cleanup;
 
   {
     CgpuBufferMemoryBarrier bufferBarrier = {
-      .buffer = s_framebuffer,
+      .buffer = renderBuffer->stagingBuffer,
       .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
       .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
       .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
@@ -1503,12 +1531,12 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
 
   // Read data from GPU to image.
   uint8_t* mapped_staging_mem;
-  if (!cgpuMapBuffer(s_device, s_outputStagingBuffer, (void**) &mapped_staging_mem))
+  if (!cgpuMapBuffer(s_device, renderBuffer->stagingBuffer, (void**) &mapped_staging_mem))
     goto cleanup;
 
-  memcpy(rgbaImg, mapped_staging_mem, framebufferSize);
+  memcpy(rgbaImg, mapped_staging_mem, renderBuffer->size);
 
-  if (!cgpuUnmapBuffer(s_device, s_outputStagingBuffer))
+  if (!cgpuUnmapBuffer(s_device, renderBuffer->stagingBuffer))
     goto cleanup;
 
   // Normalize debug AOV heatmaps.
@@ -1529,7 +1557,7 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     }
   }
 
-  s_sampleOffset += params->spp;
+  renderBuffer->sampleOffset += params->spp;
 
   result = GI_OK;
 
@@ -1877,4 +1905,24 @@ void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float spec
 {
   light->diffuse = diffuse;
   light->specular = specular;
+}
+
+GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height)
+{
+  return new GiRenderBuffer{
+    .width = width,
+    .height = height
+  };
+}
+
+void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
+{
+  // FIXME: don't destroy resources in use (append them to deletion queue?)
+
+  if (renderBuffer->buffer.handle)
+    cgpuDestroyBuffer(s_device, renderBuffer->buffer);
+  if (renderBuffer->stagingBuffer.handle)
+    cgpuDestroyBuffer(s_device, renderBuffer->stagingBuffer);
+
+  delete renderBuffer;
 }

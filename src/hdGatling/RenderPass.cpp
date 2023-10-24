@@ -788,8 +788,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   renderParams.camera = &giCamera;
   renderParams.geomCache = m_geomCache;
   renderParams.shaderCache = m_shaderCache;
-  renderParams.imageWidth = renderBuffer->GetWidth();
-  renderParams.imageHeight = renderBuffer->GetHeight();
+  renderParams.renderBuffer = renderBuffer->GetGiRenderBuffer();
   renderParams.maxBounces = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->max_bounces)->second).Get<int>();
   renderParams.spp = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->spp)->second).Get<int>();
   renderParams.rrBounceOffset = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second).Get<int>();

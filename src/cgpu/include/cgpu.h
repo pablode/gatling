@@ -723,8 +723,8 @@ bool cgpuCmdCopyBuffer(
   CgpuBuffer srcBuffer,
   uint64_t srcOffset,
   CgpuBuffer dstBuffer,
-  uint64_t dstOffset,
-  uint64_t size
+  uint64_t dstOffset = 0,
+  uint64_t size = CGPU_WHOLE_SIZE
 );
 
 struct CgpuBufferImageCopyDesc
