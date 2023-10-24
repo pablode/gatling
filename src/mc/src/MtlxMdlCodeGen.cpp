@@ -207,6 +207,12 @@ namespace gtl
       McMtlxDocumentPatcher patcher;
       patcher.patch(mtlxDoc);
 
+      if (getenv("GATLING_DUMP_MTLX"))
+      {
+        std::string mtlxSrc = mx::writeToXmlString(mtlxDoc);
+        GB_LOG("MaterialX source: \n{}", mtlxSrc);
+      }
+
       mx::TypedElementPtr element = _FindSurfaceShaderElement(mtlxDoc);
       if (!element)
       {
