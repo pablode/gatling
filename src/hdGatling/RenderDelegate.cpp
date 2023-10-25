@@ -18,7 +18,6 @@
 #include "RenderDelegate.h"
 #include "RenderParam.h"
 #include "RenderPass.h"
-#include "Camera.h"
 #include "Mesh.h"
 #include "Instancer.h"
 #include "RenderBuffer.h"
@@ -27,6 +26,7 @@
 #include "Light.h"
 
 #include <pxr/imaging/hd/resourceRegistry.h>
+#include <pxr/imaging/hd/camera.h>
 #include <pxr/base/gf/vec4f.h>
 
 #include <memory>
@@ -185,7 +185,7 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
 {
   if (typeId == HdPrimTypeTokens->camera)
   {
-    return new HdGatlingCamera(sprimId);
+    return new HdCamera(sprimId);
   }
   else if (typeId == HdPrimTypeTokens->material)
   {

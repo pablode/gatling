@@ -18,7 +18,6 @@
 #include "RenderPass.h"
 #include "RenderBuffer.h"
 #include "RenderParam.h"
-#include "Camera.h"
 #include "Mesh.h"
 #include "Instancer.h"
 #include "Material.h"
@@ -28,7 +27,9 @@
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/rprim.h>
+#include <pxr/imaging/hd/camera.h>
 #include <pxr/base/gf/matrix3d.h>
+#include <pxr/base/gf/camera.h>
 
 #include <gi.h>
 
@@ -568,7 +569,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
   }
 }
 
-void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, GiCameraDesc& giCamera) const
+void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera) const
 {
   // We transform the scene into camera space at the beginning, so for
   // subsequent camera transforms, we need to 'substract' the initial transform.
@@ -582,6 +583,11 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, GiCa
   forward.Normalize();
   up.Normalize();
 
+  // See https://wiki.panotools.org/Field_of_View
+  float aperture = camera.GetVerticalAperture() * GfCamera::APERTURE_UNIT;
+  float focalLength = camera.GetFocalLength() * GfCamera::FOCAL_LENGTH_UNIT;
+  float vfov = 2.0f * std::atan(aperture / (2.0f * focalLength));
+
   giCamera.position[0] = (float) position[0];
   giCamera.position[1] = (float) position[1];
   giCamera.position[2] = (float) position[2];
@@ -591,7 +597,7 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdGatlingCamera& camera, GiCa
   giCamera.up[0] = (float) up[0];
   giCamera.up[1] = (float) up[1];
   giCamera.up[2] = (float) up[2];
-  giCamera.vfov = camera.GetVFov();
+  giCamera.vfov = vfov;
   giCamera.fStop = camera.GetFStop();
   giCamera.focusDistance = camera.GetFocusDistance();
   giCamera.focalLength = camera.GetFocalLength();
@@ -658,7 +664,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   m_isConverged = false;
 
-  const auto* camera = static_cast<const HdGatlingCamera*>(renderPassState->GetCamera());
+  const HdCamera* camera = renderPassState->GetCamera();
   if (!camera)
   {
     return;
