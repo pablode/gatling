@@ -588,6 +588,11 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   float focalLength = camera.GetFocalLength() * GfCamera::FOCAL_LENGTH_UNIT;
   float vfov = 2.0f * std::atan(aperture / (2.0f * focalLength));
 
+  bool focusOn = true;
+#if PXR_VERSION >= 2311
+  focusOn = camera.GetFocusOn();
+#endif
+
   giCamera.position[0] = (float) position[0];
   giCamera.position[1] = (float) position[1];
   giCamera.position[2] = (float) position[2];
@@ -598,7 +603,7 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.up[1] = (float) up[1];
   giCamera.up[2] = (float) up[2];
   giCamera.vfov = vfov;
-  giCamera.fStop = camera.GetFStop();
+  giCamera.fStop = float(focusOn) * camera.GetFStop();
   giCamera.focusDistance = camera.GetFocusDistance();
   giCamera.focalLength = camera.GetFocalLength();
   giCamera.clipStart = clippingEnabled ? camera.GetClippingRange().GetMin() : 0.0f;
