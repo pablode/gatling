@@ -605,7 +605,7 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.vfov = vfov;
   giCamera.fStop = float(focusOn) * camera.GetFStop();
   giCamera.focusDistance = camera.GetFocusDistance();
-  giCamera.focalLength = camera.GetFocalLength();
+  giCamera.focalLength = focalLength;
   giCamera.clipStart = clippingEnabled ? camera.GetClippingRange().GetMin() : 0.0f;
   giCamera.clipEnd = clippingEnabled ? camera.GetClippingRange().GetMax() : FLT_MAX;
 }
