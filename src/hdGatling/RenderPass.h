@@ -61,7 +61,7 @@ private:
                    std::vector<const GiMesh*>& meshes,
                    std::vector<GiMeshInstance>& instances);
 
-  void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera) const;
+  void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const;
 
   void _ClearMaterials();
 

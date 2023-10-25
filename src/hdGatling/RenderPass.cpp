@@ -569,7 +569,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
   }
 }
 
-void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera) const
+void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const
 {
   // We transform the scene into camera space at the beginning, so for
   // subsequent camera transforms, we need to 'substract' the initial transform.
@@ -601,8 +601,8 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.fStop = camera.GetFStop();
   giCamera.focusDistance = camera.GetFocusDistance();
   giCamera.focalLength = camera.GetFocalLength();
-  giCamera.clipStart = camera.GetClippingRange().GetMin();
-  giCamera.clipEnd = camera.GetClippingRange().GetMax();
+  giCamera.clipStart = clippingEnabled ? camera.GetClippingRange().GetMin() : 0.0f;
+  giCamera.clipEnd = clippingEnabled ? camera.GetClippingRange().GetMax() : FLT_MAX;
 }
 
 const std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> s_aovIdMappings {
@@ -788,7 +788,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   }
 
   GiCameraDesc giCamera;
-  _ConstructGiCamera(*camera, giCamera);
+  _ConstructGiCamera(*camera, giCamera, renderPassState->GetClippingEnabled());
 
   GiRenderParams renderParams;
   renderParams.camera = &giCamera;
