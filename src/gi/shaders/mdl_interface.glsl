@@ -56,13 +56,13 @@ vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
     uint array_idx = TEXTURE_INDEX_OFFSET_3D + tex - 1;
 
     int mipmap_level = 0;
-    ivec3 res = textureSize(textures_3d[array_idx], mipmap_level);
+    ivec3 res = textureSize(textures_3d[nonuniformEXT(array_idx)], mipmap_level);
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
     coord.z = apply_wrap_and_crop(coord.z, wrap_w, crop_w, res.z);
 
     ASSERT(array_idx < TEXTURE_COUNT_3D, "Error: invalid texture index\n");
-    return texture(sampler3D(textures_3d[array_idx], tex_sampler), coord);
+    return texture(sampler3D(textures_3d[nonuniformEXT(array_idx)], tex_sampler), coord);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
     return vec4(0, 0, 0, 0);
@@ -100,14 +100,14 @@ vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
     uint array_idx = TEXTURE_INDEX_OFFSET_3D + tex - 1;
 
     int mipmap_level = 0;
-    ivec3 res = textureSize(textures_3d[array_idx], mipmap_level);
+    ivec3 res = textureSize(textures_3d[nonuniformEXT(array_idx)], mipmap_level);
     if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y || coord.z < 0 || coord.z >= res.z)
     {
         return vec4(0, 0, 0, 0);
     }
 
     ASSERT(array_idx < TEXTURE_COUNT_3D, "Error: invalid texture index\n");
-    return texelFetch(sampler3D(textures_3d[array_idx], tex_sampler), coord, mipmap_level);
+    return texelFetch(sampler3D(textures_3d[nonuniformEXT(array_idx)], tex_sampler), coord, mipmap_level);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
     return vec4(0, 0, 0, 0);
@@ -147,12 +147,12 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
     uint array_idx = TEXTURE_INDEX_OFFSET_2D + tex - 1;
 
     int mipmap_level = 0;
-    ivec2 res = textureSize(textures_2d[array_idx], mipmap_level);
+    ivec2 res = textureSize(textures_2d[nonuniformEXT(array_idx)], mipmap_level);
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
     ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
-    return texture(sampler2D(textures_2d[array_idx], tex_sampler), coord);
+    return texture(sampler2D(textures_2d[nonuniformEXT(array_idx)], tex_sampler), coord);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
     return vec4(0, 0, 0, 0);
@@ -190,14 +190,14 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
     uint array_idx = TEXTURE_INDEX_OFFSET_2D + tex - 1;
 
     int mipmap_level = 0;
-    ivec2 res = textureSize(textures_2d[array_idx], mipmap_level);
+    ivec2 res = textureSize(textures_2d[nonuniformEXT(array_idx)], mipmap_level);
     if (coord.x < 0 || coord.x >= res.x || coord.y < 0 || coord.y >= res.y)
     {
         return vec4(0, 0, 0, 0);
     }
 
     ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
-    return texelFetch(sampler2D(textures_2d[array_idx], tex_sampler), coord, mipmap_level);
+    return texelFetch(sampler2D(textures_2d[nonuniformEXT(array_idx)], tex_sampler), coord, mipmap_level);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
     return vec4(0, 0, 0, 0);
@@ -237,7 +237,7 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
     ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
 
     int mipmap_level = 0;
-    return textureSize(textures_2d[array_idx], mipmap_level);
+    return textureSize(textures_2d[nonuniformEXT(array_idx)], mipmap_level);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
     return ivec2(0, 0);
