@@ -61,9 +61,8 @@ vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
     coord.z = apply_wrap_and_crop(coord.z, wrap_w, crop_w, res.z);
 
-    float lod = 0.0;
     ASSERT(array_idx < TEXTURE_COUNT_3D, "Error: invalid texture index\n");
-    return textureLod(sampler3D(textures_3d[array_idx], tex_sampler), coord, lod);
+    return texture(sampler3D(textures_3d[array_idx], tex_sampler), coord);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
     return vec4(0, 0, 0, 0);
@@ -152,9 +151,8 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
-    float lod = 0.0;
     ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
-    return textureLod(sampler2D(textures_2d[array_idx], tex_sampler), coord, lod);
+    return texture(sampler2D(textures_2d[array_idx], tex_sampler), coord);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
     return vec4(0, 0, 0, 0);
