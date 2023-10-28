@@ -27,6 +27,7 @@ namespace mx = MaterialX;
 
 const char* TYPE_COLOR3 = "color3";
 const char* TYPE_VECTOR3 = "vector3";
+const char* ENVVAR_DISABLE_COLOR_SPACE_CORRECTION = "GATLING_DISABLE_MTLX_COLOR_SPACE_CORRECTION";
 
 void _SanitizeFilePath(std::string& path)
 {
@@ -267,8 +268,6 @@ void _PatchUsdUVTextureSourceColorSpaces(mx::DocumentPtr document)
 // delegates that support MaterialX does not copy color spaces: https://github.com/PixarAnimationStudios/USD/issues/1523
 // We work around this issue by setting an <image> node's colorspace attribute to sRGB if the node type
 // is color3. If it isn't (but rather float/vec2/vec3/vec4), we mark it as linear.
-//
-// FIXME: remove this patching step once the issue is resolved
 void _PatchImageSrgbColorSpaces(mx::DocumentPtr document)
 {
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
@@ -412,7 +411,10 @@ namespace gtl
 #if PXR_VERSION <= 2308
     _PatchUsdUVTextureSourceColorSpaces(document);
 
-    _PatchImageSrgbColorSpaces(document);
+    if (!getenv(ENVVAR_DISABLE_COLOR_SPACE_CORRECTION))
+    {
+      _PatchImageSrgbColorSpaces(document);
+    }
 #endif
 
     _PatchGeomprops(document);
