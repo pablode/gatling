@@ -29,7 +29,8 @@ class HdGatlingRenderDelegate final : public HdRenderDelegate
 {
 public:
   HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                          const MaterialNetworkCompiler& translator);
+                          const MaterialNetworkCompiler& translator,
+                          std::string_view resourcePath);
 
   ~HdGatlingRenderDelegate() override;
 
@@ -37,6 +38,10 @@ public:
   HdRenderSettingDescriptorList GetRenderSettingDescriptors() const override;
 
   void SetRenderSetting(TfToken const& key, VtValue const& value) override;
+
+  HdCommandDescriptors GetCommandDescriptors() const override;
+
+  bool InvokeCommand(const TfToken& command, const HdCommandArgs& args = HdCommandArgs()) override;
 
 public:
   HdRenderPassSharedPtr CreateRenderPass(HdRenderIndex* index,
@@ -94,6 +99,7 @@ public:
 
 private:
   const MaterialNetworkCompiler& m_translator;
+  const std::string m_resourcePath;
   HdResourceRegistrySharedPtr m_resourceRegistry;
   HdRenderSettingDescriptorList m_settingDescriptors;
   HdRenderSettingDescriptorList m_debugSettingDescriptors;

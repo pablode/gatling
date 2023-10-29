@@ -25,6 +25,7 @@
 #include "Tokens.h"
 #include "Light.h"
 
+#include <pxr/base/arch/fileSystem.h>
 #include <pxr/imaging/hd/resourceRegistry.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/base/gf/vec4f.h>
@@ -34,8 +35,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                                                 const MaterialNetworkCompiler& translator)
+                                                 const MaterialNetworkCompiler& translator,
+                                                 std::string_view resourcePath)
   : m_translator(translator)
+  , m_resourcePath(resourcePath)
   , m_resourceRegistry(std::make_shared<HdResourceRegistry>())
   , m_renderParam(std::make_unique<HdGatlingRenderParam>())
 {
@@ -93,6 +96,43 @@ void HdGatlingRenderDelegate::SetRenderSetting(TfToken const& key, VtValue const
   }
 #endif
   HdRenderDelegate::SetRenderSetting(key, value);
+}
+
+const HdCommandDescriptors COMMAND_DESCRIPTORS =
+{
+  HdCommandDescriptor{ HdGatlingCommandTokens->print_licenses, "Print Licenses" }
+};
+
+HdCommandDescriptors HdGatlingRenderDelegate::GetCommandDescriptors() const
+{
+  return COMMAND_DESCRIPTORS;
+}
+
+bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, const HdCommandArgs& args)
+{
+  if (command == HdGatlingCommandTokens->print_licenses)
+  {
+    std::string licenseFilePath = TfStringCatPaths(m_resourcePath, LICENSE_FILE_NAME);
+    std::string errorMessage;
+
+    ArchConstFileMapping mapping = ArchMapFileReadOnly(licenseFilePath, &errorMessage);
+    if (!mapping)
+    {
+      TF_RUNTIME_ERROR("Can't execute command: %s", errorMessage.c_str());
+      return false;
+    }
+
+    const char* licenseText = mapping.get();
+
+    printf("%s\n", licenseText);
+    fflush(stdout);
+
+    return true;
+  }
+
+  TF_CODING_ERROR("Unsupported command %s", command.GetText());
+
+  return false;
 }
 
 HdRenderPassSharedPtr HdGatlingRenderDelegate::CreateRenderPass(HdRenderIndex* index,

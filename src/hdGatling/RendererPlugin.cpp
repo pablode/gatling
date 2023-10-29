@@ -147,12 +147,16 @@ HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate()
 {
   HdRenderSettingsMap settingsMap;
 
-  return new HdGatlingRenderDelegate(settingsMap, *m_translator);
+  return CreateRenderDelegate(settingsMap);
 }
 
 HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate(const HdRenderSettingsMap& settingsMap)
 {
-  return new HdGatlingRenderDelegate(settingsMap, *m_translator);
+  PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
+
+  const std::string& resourcePath = plugin->GetResourcePath();
+
+  return new HdGatlingRenderDelegate(settingsMap, *m_translator, resourcePath);
 }
 
 void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDelegate)

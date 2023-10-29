@@ -52,6 +52,7 @@ target_compile_definitions(
     # Required for PLUG_THIS_PLUGIN macro
     MFB_PACKAGE_NAME=hdGatling
   PRIVATE
+    LICENSE_FILE_NAME="LICENSE"
     # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
     "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
 )
@@ -84,6 +85,7 @@ configure_file(plugInfo.json.in "${PLUGINFO_PATH}" @ONLY)
 install(
   FILES
     "${PLUGINFO_PATH}"
+    "${PROJECT_SOURCE_DIR}/LICENSE"
   DESTINATION
     "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
   COMPONENT
