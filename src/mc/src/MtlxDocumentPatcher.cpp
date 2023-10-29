@@ -27,7 +27,12 @@ namespace mx = MaterialX;
 
 const char* TYPE_COLOR3 = "color3";
 const char* TYPE_VECTOR3 = "vector3";
-const char* ENVVAR_DISABLE_COLOR_SPACE_CORRECTION = "GATLING_DISABLE_MTLX_COLOR_SPACE_CORRECTION";
+
+const char* ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING =
+  "GATLING_DISABLE_MTLX_USDUVTEXTURE_COLOR_SPACE_PATCHING";
+
+const char* ENVVAR_DISABLE_IMAGE_COLOR_SPACE_PATCHING =
+  "GATLING_DISABLE_MTLX_IMAGE_COLOR_SPACE_PATCHING";
 
 void _SanitizeFilePath(std::string& path)
 {
@@ -201,15 +206,15 @@ void _PatchGeomprops(mx::DocumentPtr document)
   }
 }
 
-// According to the UsdPreviewSurface spec, the UsdUVTexture node has a sourceColorSpace input,
-// which can take on the values 'raw', 'sRGB' and 'auto':
-// https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html#texture-reader
+// This function serves two purposes: first, for USD versions below 23.11, we
+// translate the 'sourceColorSpace' input to actual MaterialX colorspaces (this
+// input is not part of the NodeDef, but we add it in the render delegate and
+// HdMtlx permissively forwards it).
 //
-// The MaterialX implementation does not provide this input, because color space transformations
-// are supposed to be handled by node _attributes_ instead of inputs. Attributes can not be set
-// dynamically. To work around the incompatibility of both approaches, this function replaces
-// said input with the corresponding 'colorspace' attribute.
-void _PatchUsdUVTextureSourceColorSpaces(mx::DocumentPtr document)
+// The second purpose is to overwrite the 'auto' colorspace (which is the default
+// if none other has been explicitly set) with an appropriate colorspace based on
+// the image's usage.
+void _PatchUsdUVTextureColorSpaces(mx::DocumentPtr document)
 {
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
   {
@@ -289,6 +294,11 @@ void _PatchImageSrgbColorSpaces(mx::DocumentPtr document)
 
     const mx::string& valueType = node->getType();
 
+    // Actually we should also check for TYPE_COLOR4 here, however the UsdUVTexture
+    // node is used for normal maps and it contains an <image> node of type color4 in
+    // its implementation (which is the case because there's no <vector> specialization
+    // of the node in MaterialX). Checking for color4 therefore incorrectly tags all
+    // UsdPreviewSurface normal maps as sRGB.
     node->setColorSpace(valueType == TYPE_COLOR3 ? "srgb_texture" : "lin_rec709");
   }
 }
@@ -408,10 +418,13 @@ namespace gtl
 
     _PatchColor3Vector3Mismatches(document);
 
-#if PXR_VERSION <= 2308
-    _PatchUsdUVTextureSourceColorSpaces(document);
+    if (!getenv(ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING))
+    {
+      _PatchUsdUVTextureColorSpaces(document);
+    }
 
-    if (!getenv(ENVVAR_DISABLE_COLOR_SPACE_CORRECTION))
+#if defined(PXR_VERSION) && PXR_VERSION <= 2308
+    if (!getenv(ENVVAR_DISABLE_IMAGE_COLOR_SPACE_PATCHING))
     {
       _PatchImageSrgbColorSpaces(document);
     }

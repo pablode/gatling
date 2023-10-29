@@ -42,5 +42,13 @@ target_link_libraries(
     MaterialXGenMdl
 )
 
+if(DEFINED PXR_VERSION)
+  target_compile_definitions(
+    mc
+    PRIVATE
+      PXR_VERSION=${PXR_VERSION}
+  )
+endif()
+
 # Required since library is linked into hdGatling DSO
 set_target_properties(mc PROPERTIES POSITION_INDEPENDENT_CODE ON)
