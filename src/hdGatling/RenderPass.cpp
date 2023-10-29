@@ -614,14 +614,14 @@ const std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> s_aovIdMappings
   { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
   { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
 #ifndef NDEBUG
-  { HdGatlingAovTokens->debug_nee,          GI_AOV_ID_DEBUG_NEE          },
-  { HdGatlingAovTokens->debug_barycentrics, GI_AOV_ID_DEBUG_BARYCENTRICS },
-  { HdGatlingAovTokens->debug_texcoords,    GI_AOV_ID_DEBUG_TEXCOORDS    },
-  { HdGatlingAovTokens->debug_bounces,      GI_AOV_ID_DEBUG_BOUNCES      },
-  { HdGatlingAovTokens->debug_clock_cycles, GI_AOV_ID_DEBUG_CLOCK_CYCLES },
-  { HdGatlingAovTokens->debug_opacity,      GI_AOV_ID_DEBUG_OPACITY      },
-  { HdGatlingAovTokens->debug_tangents,     GI_AOV_ID_DEBUG_TANGENTS     },
-  { HdGatlingAovTokens->debug_bitangents,   GI_AOV_ID_DEBUG_BITANGENTS   },
+  { HdGatlingAovTokens->debugNee,           GI_AOV_ID_DEBUG_NEE          },
+  { HdGatlingAovTokens->debugBarycentrics,  GI_AOV_ID_DEBUG_BARYCENTRICS },
+  { HdGatlingAovTokens->debugTexcoords,     GI_AOV_ID_DEBUG_TEXCOORDS    },
+  { HdGatlingAovTokens->debugBounces,       GI_AOV_ID_DEBUG_BOUNCES      },
+  { HdGatlingAovTokens->debugClockCycles,   GI_AOV_ID_DEBUG_CLOCK_CYCLES },
+  { HdGatlingAovTokens->debugOpacity,       GI_AOV_ID_DEBUG_OPACITY      },
+  { HdGatlingAovTokens->debugTangents,      GI_AOV_ID_DEBUG_TANGENTS     },
+  { HdGatlingAovTokens->debugBitangents,    GI_AOV_ID_DEBUG_BITANGENTS   },
 #endif
 };
 
@@ -757,13 +757,13 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
       GiShaderCacheParams shaderParams;
       shaderParams.aovId = aovId;
-      shaderParams.depthOfField = m_settings.find(HdGatlingSettingsTokens->depth_of_field)->second.Get<bool>();
+      shaderParams.depthOfField = m_settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>();
       shaderParams.domeLightCameraVisible = (domeLightCameraVisibilityValueIt == m_settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true);
-      shaderParams.filterImportanceSampling = m_settings.find(HdGatlingSettingsTokens->filter_importance_sampling)->second.Get<bool>();
+      shaderParams.filterImportanceSampling = m_settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>();
       shaderParams.materialCount = materials.size();
       shaderParams.materials = materials.data();
-      shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->next_event_estimation)->second.Get<bool>();
-      shaderParams.progressiveAccumulation = m_settings.find(HdGatlingSettingsTokens->progressive_accumulation)->second.Get<bool>();
+      shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>();
+      shaderParams.progressiveAccumulation = m_settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>();
       shaderParams.scene = m_scene;
 
       m_shaderCache = giCreateShaderCache(&shaderParams);
@@ -800,12 +800,12 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   renderParams.geomCache = m_geomCache;
   renderParams.shaderCache = m_shaderCache;
   renderParams.renderBuffer = renderBuffer->GetGiRenderBuffer();
-  renderParams.maxBounces = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->max_bounces)->second).Get<int>();
+  renderParams.maxBounces = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<int>();
   renderParams.spp = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->spp)->second).Get<int>();
-  renderParams.rrBounceOffset = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->rr_bounce_offset)->second).Get<int>();
-  renderParams.lightIntensityMultiplier = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->light_intensity_multiplier)->second).Get<float>();
-  renderParams.rrInvMinTermProb = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->rr_inv_min_term_prob)->second).Get<float>();
-  renderParams.maxSampleValue = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->max_sample_value)->second).Get<float>();
+  renderParams.rrBounceOffset = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<int>();
+  renderParams.lightIntensityMultiplier = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>();
+  renderParams.rrInvMinTermProb = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>();
+  renderParams.maxSampleValue = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>();
   renderParams.domeLight = renderParam->ActiveDomeLight();
   renderParams.scene = m_scene;
   for (uint32_t i = 0; i < 4; i++)

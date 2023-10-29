@@ -21,17 +21,17 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#define HD_GATLING_SETTINGS_TOKENS                             \
-  ((spp, "spp"))                                               \
-  ((max_bounces, "max-bounces"))                               \
-  ((rr_bounce_offset, "rr-bounce-offset"))                     \
-  ((rr_inv_min_term_prob, "rr-inv-min-term-prob"))             \
-  ((max_sample_value, "max-sample-value"))                     \
-  ((next_event_estimation, "next-event-estimation"))           \
-  ((progressive_accumulation, "progressive-accumulation"))     \
-  ((filter_importance_sampling, "filter-importance-sampling")) \
-  ((depth_of_field, "depth-of-field"))                         \
-  ((light_intensity_multiplier, "light-intensity-multiplier"))
+#define HD_GATLING_SETTINGS_TOKENS                           \
+  ((spp, "spp"))                                             \
+  ((maxBounces, "max-bounces"))                              \
+  ((rrBounceOffset, "rr-bounce-offset"))                     \
+  ((rrInvMinTermProb, "rr-inv-min-term-prob"))               \
+  ((maxSampleValue, "max-sample-value"))                     \
+  ((nextEventEstimation, "next-event-estimation"))           \
+  ((progressiveAccumulation, "progressive-accumulation"))    \
+  ((filterImportanceSampling, "filter-importance-sampling")) \
+  ((depthOfField, "depth-of-field"))                         \
+  ((lightIntensityMultiplier, "light-intensity-multiplier"))
 
 // mtlx node identifier is given by UsdMtlx.
 #define HD_GATLING_NODE_IDENTIFIER_TOKENS            \
@@ -58,14 +58,14 @@ PXR_NAMESPACE_OPEN_SCOPE
   (subIdentifier)
 
 #define HD_GATLING_AOV_TOKENS                        \
-  ((debug_nee, "debug:nee"))                         \
-  ((debug_barycentrics, "debug:barycentrics"))       \
-  ((debug_texcoords, "debug:texcoords"))             \
-  ((debug_bounces, "debug:bounces"))                 \
-  ((debug_clock_cycles, "debug:clock_cycles"))       \
-  ((debug_opacity, "debug:opacity"))                 \
-  ((debug_tangents, "debug:tangents"))               \
-  ((debug_bitangents, "debug:bitangents"))
+  ((debugNee, "debug:nee"))                          \
+  ((debugBarycentrics, "debug:barycentrics"))        \
+  ((debugTexcoords, "debug:texcoords"))              \
+  ((debugBounces, "debug:bounces"))                  \
+  ((debugClockCycles, "debug:clock_cycles"))         \
+  ((debugOpacity, "debug:opacity"))                  \
+  ((debugTangents, "debug:tangents"))                \
+  ((debugBitangents, "debug:bitangents"))
 
 #define HD_GATLING_COMMAND_TOKENS                    \
   (print_licenses)
