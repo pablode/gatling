@@ -792,8 +792,11 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
+  bool clippingEnabled = renderPassState->GetClippingEnabled() &&
+                         m_settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
+
   GiCameraDesc giCamera;
-  _ConstructGiCamera(*camera, giCamera, renderPassState->GetClippingEnabled());
+  _ConstructGiCamera(*camera, giCamera, clippingEnabled);
 
   GiRenderParams renderParams;
   renderParams.camera = &giCamera;

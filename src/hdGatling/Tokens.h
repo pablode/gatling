@@ -31,7 +31,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((progressiveAccumulation, "progressive-accumulation"))    \
   ((filterImportanceSampling, "filter-importance-sampling")) \
   ((depthOfField, "depth-of-field"))                         \
-  ((lightIntensityMultiplier, "light-intensity-multiplier"))
+  ((lightIntensityMultiplier, "light-intensity-multiplier")) \
+  ((clippingPlanes, "clipping-planes"))
 
 // mtlx node identifier is given by UsdMtlx.
 #define HD_GATLING_NODE_IDENTIFIER_TOKENS            \
