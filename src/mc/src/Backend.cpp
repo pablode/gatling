@@ -127,13 +127,17 @@ namespace gtl
         }
 #endif
 
-        McTextureDescription textureResource;
-        textureResource.binding = binding++;
-        textureResource.is3dImage = false;
-        textureResource.width = 1;
-        textureResource.height = 1;
-        textureResource.depth = 1;
-        textureResource.data.resize(4, 0); // fall back to 1x1 black pixel
+        // 1x1 black fallback texture
+        McTextureDescription textureResource = {
+          .binding = binding++,
+          .is3dImage = false,
+          .isFloat = false,
+          .width = 1,
+          .height = 1,
+          .depth = 1,
+          .data = std::vector<uint8_t>(4, 0),
+          .filePath = ""
+        };
 
         switch (targetCode->get_texture_shape(i))
         {
@@ -153,6 +157,7 @@ namespace gtl
           assert(dataPtr);
 
           textureResource.is3dImage = true;
+          textureResource.isFloat = true;
           textureResource.width = (uint32_t) width;
           textureResource.height = (uint32_t) height;
           textureResource.depth = (uint32_t) depth;

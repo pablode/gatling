@@ -29,8 +29,9 @@ namespace gtl
 
   struct McTextureDescription
   {
-    bool is3dImage;
     uint32_t binding;
+    bool is3dImage;
+    bool isFloat;
     uint32_t width;
     uint32_t height;
     uint32_t depth;

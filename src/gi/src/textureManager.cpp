@@ -148,7 +148,7 @@ namespace gtl
 
       CgpuImageCreateInfo createInfo;
       createInfo.is3d = textureResource.is3dImage;
-      createInfo.format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
+      createInfo.format = textureResource.isFloat ? CGPU_IMAGE_FORMAT_R32_SFLOAT : CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
       createInfo.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
       auto& imageVector = createInfo.is3d ? images3d : images2d;
