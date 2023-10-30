@@ -132,6 +132,11 @@ void HdGatlingRenderBuffer::Resolve()
 
 void HdGatlingRenderBuffer::_Deallocate()
 {
+  if (m_renderBuffer)
+  {
+    giDestroyRenderBuffer(m_renderBuffer);
+  }
+
   free(m_bufferMem);
 }
 
