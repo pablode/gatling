@@ -1678,6 +1678,7 @@ GiDistantLight* giCreateDistantLight(GiScene* scene)
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
   data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
+  data->invPdf = 1.0f;
 
   return light;
 }
@@ -1710,10 +1711,14 @@ void giSetDistantLightBaseEmission(GiDistantLight* light, float* rgb)
 
 void giSetDistantLightAngle(GiDistantLight* light, float angle)
 {
+  float halfAngle = 0.5 * angle;
+  float invPdf = (halfAngle > 0.0f) ? (2.0f * M_PI * (1.0f - cosf(halfAngle))) : 1.0f;
+
   auto* data = light->scene->distantLights.write<Rp::DistantLight>(light->gpuHandle);
   assert(data);
 
   data->angle = angle;
+  data->invPdf = invPdf;
 }
 
 void giSetDistantLightDiffuseSpecular(GiDistantLight* light, float diffuse, float specular)

@@ -195,9 +195,9 @@ vec3 sample_hemisphere(vec2 xi)
     );
 }
 
-vec3 sample_sphere(vec2 xi, float radius, out float pdf)
+vec3 sample_sphere(vec2 xi, float radius, out float invPdf)
 {
-    pdf = 1.0 / (4.0 * PI * radius * radius);
+    invPdf = 4.0 * PI * radius * radius;
 
     float a = 1.0 - 2.0 * xi.x;
     float b = sqrt(1.0 - a * a);
@@ -208,9 +208,9 @@ vec3 sample_sphere(vec2 xi, float radius, out float pdf)
 
 // Concentric mapping from Shirley's Sampling Transformations Zoo (16.5.1.2)
 // https://link.springer.com/content/pdf/10.1007/978-1-4842-4427-2_16.pdf
-vec2 sample_disk(vec2 xi, float radius, out float pdf)
+vec2 sample_disk(vec2 xi, float radius, out float invPdf)
 {
-    pdf = 1.0 / (PI * radius * radius);
+    invPdf = PI * radius * radius;
 
     float a = 2.0 * xi.x - 1.0;
     float b = 2.0 * xi.y - 1.0;

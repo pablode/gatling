@@ -45,7 +45,7 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     return false;
 }
 
-void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float pdf, out uint diffuseSpecularPacked)
+void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
 {
     uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT + DISK_LIGHT_COUNT;
 
@@ -56,13 +56,13 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         SphereLight light = sphereLights[lightIndex];
 
-        float samplePdf = 1.0;
+        invPdf = 1.0;
         vec3 samplePos = light.pos;
         if (light.radius > 0.0)
         {
             // TODO: sample solid angle of sphere light
             // https://schuttejoe.github.io/post/arealightsampling/
-            samplePos += sample_sphere(k4.zw, light.radius, samplePdf);
+            samplePos += sample_sphere(k4.zw, light.radius, invPdf);
         }
 
         vec3 dir = samplePos - surfacePos;
@@ -73,7 +73,6 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float geometryTerm = cosTheta / (dist * dist);
 
         power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
-        pdf = samplePdf;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
 #endif
@@ -87,7 +86,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         dist = 100000.0;
         dirToLight = -light.direction;
         power = light.baseEmission * PC.lightIntensityMultiplier;
-        pdf = 1.0;
+        invPdf = light.invPdf;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
 
         if (light.angle > 0.0)
@@ -119,7 +118,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         // https://graphics.cg.uni-saarland.de/courses/ris-2021/slides/03_ProbabilityTheory_MonteCarlo.pdf s.35
         float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
         power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
-        pdf = 1.0 / (light.width * light.height);
+        invPdf = light.width * light.height;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
 #endif
@@ -130,7 +129,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         DiskLight light = diskLights[lightIndex];
 
-        vec2 sampleOnDisk = sample_disk(k4.zw, light.radius, pdf);
+        vec2 sampleOnDisk = sample_disk(k4.zw, light.radius, invPdf);
         vec3 samplePos = light.origin + vec3(sampleOnDisk, 0.0) * light.direction;
         vec3 dir = samplePos - surfacePos;
 
@@ -142,7 +141,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     }
 #endif
 
-    pdf /= float(totalLightCount);
+    invPdf *= float(totalLightCount);
 }
 
 void main()
@@ -249,9 +248,9 @@ void main()
         vec3 dirToLight;
         float lightDist;
         vec3 lightPower;
-        float lightPdf;
+        float invLightPdf;
         uint diffuseSpecularPacked;
-        sampleLight(k4, shading_state.position, dirToLight, lightDist, lightPower, lightPdf, diffuseSpecularPacked);
+        sampleLight(k4, shading_state.position, dirToLight, lightDist, lightPower, invLightPdf, diffuseSpecularPacked);
 
         vec3 neeContrib = vec3(0.0);
         bool neeValid = (lightDist > 0.0) && dot(dirToLight, shading_state.geom_normal) > 0.0;
@@ -272,7 +271,7 @@ void main()
             {
                 vec2 diffuseSpecular = unpackHalf2x16(diffuseSpecularPacked);
 
-                vec3 neeRadiance = lightPower / lightPdf;
+                vec3 neeRadiance = lightPower * invLightPdf;
 
                 vec3 weight = throughput * neeRadiance;
                 neeContrib += weight * bsdf_eval_data.bsdf_diffuse * diffuseSpecular.x;

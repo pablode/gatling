@@ -51,6 +51,8 @@ struct DistantLight
   GI_FLOAT angle;
   GI_VEC3  baseEmission;
   GI_UINT  diffuseSpecularPacked;
+  GI_VEC3  padding;
+  GI_FLOAT invPdf;
 };
 
 struct RectLight
