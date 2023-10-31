@@ -98,9 +98,11 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
+  GfMatrix4d transform = sceneDelegate->GetTransform(id);
+
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto pos = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    auto pos = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
     giSetSphereLightPosition(m_giSphereLight, pos.data());
   }
 
@@ -150,6 +152,8 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
     auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    dir.Normalize();
+
     giSetDistantLightDirection(m_giDistantLight, dir.data());
   }
 
@@ -197,10 +201,13 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
+  GfMatrix4d transform = sceneDelegate->GetTransform(id);
+
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto origin = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    auto origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    auto dir = transform.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    dir.Normalize();
 
     giSetRectLightOrigin(m_giRectLight, origin.data());
     giSetRectLightDirection(m_giRectLight, dir.data());
@@ -252,10 +259,13 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
+  GfMatrix4d transform = sceneDelegate->GetTransform(id);
+
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto origin = sceneDelegate->GetTransform(id).Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    auto origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    auto dir = transform.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    dir.Normalize();
 
     giSetDiskLightOrigin(m_giDiskLight, origin.data());
     giSetDiskLightDirection(m_giDiskLight, dir.data());
