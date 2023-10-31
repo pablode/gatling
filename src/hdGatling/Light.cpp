@@ -160,7 +160,8 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float normalizeFactor = normalize ? float(M_PI / (1.0 - cos(angle))) : 1.0f;
+    float sinHalfAngle = sinf(angle * 0.5f);
+    float normalizeFactor = normalize ? (GfSqr(sinHalfAngle) * M_PI) : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
