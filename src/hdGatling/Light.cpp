@@ -33,6 +33,37 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// Area estimation from the HdEmbree UsdLux reference implementation
+namespace
+{
+  float _AreaRect(const GfMatrix4d& t, float width, float height)
+  {
+    GfVec3f u = t.TransformDir(GfVec3f{ width, 0.0f, 0.0f });
+    GfVec3f v = t.TransformDir(GfVec3f{ 0.0f, height, 0.0f });
+    return GfCross(u, v).GetLength();
+  }
+
+  float _AreaSphere(const GfMatrix4d& t, float radius)
+  {
+    // We have to consider the area of an ellipsoid due to non-uniform scaling
+    float a = t.TransformDir(GfVec3f{ radius, 0.0f, 0.0f }).GetLength();
+    float b = t.TransformDir(GfVec3f{ 0.0f, radius, 0.0f }).GetLength();
+    float c = t.TransformDir(GfVec3f{ 0.0f, 0.0f, radius }).GetLength();
+    float ab = powf(a * b, 1.6f);
+    float ac = powf(a * c, 1.6f);
+    float bc = powf(b * c, 1.6f);
+    return powf((ab + ac + bc) / 3.0f, 1.0f / 1.6f) * 4.0f * M_PI;
+  }
+
+  float _AreaDisk(const GfMatrix4d& t, float radius)
+  {
+    // Same for disk -> ellipse
+    float a = t.TransformDir(GfVec3f{ radius, 0.0f, 0.0f }).GetLength();
+    float b = t.TransformDir(GfVec3f{ 0.0f, radius, 0.0f }).GetLength();
+    return a * b * M_PI;
+  }
+}
+
 //
 // Base Light
 //
@@ -113,7 +144,8 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float normalizeFactor = normalize ? ((radius > 1.0e-6f ? 4.0 : 1.0f) * GfSqr(radius) * M_PI) : 1.0f;
+    float area = _AreaSphere(transform, radius);
+    float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
@@ -222,8 +254,8 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float area = width * height;
-    float normalizeFactor = (area > 0.0f && normalize) ? area : 1.0f;
+    float area = _AreaRect(transform, width, height);
+    float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
@@ -278,7 +310,8 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float normalizeFactor = (radius > 1.0e-6f && normalize) ? (GfSqr(radius) * M_PI) : 1.0f;
+    float area = _AreaDisk(transform, radius);
+    float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
