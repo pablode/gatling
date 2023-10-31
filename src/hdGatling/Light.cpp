@@ -111,7 +111,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float normalizeFactor = normalize ? ((radius > 0.001f ? 4.0 : 1.0f) * M_PI * radius * radius) : 1.0f;
+    float normalizeFactor = normalize ? ((radius > 1.0e-6f ? 4.0 : 1.0f) * GfSqr(radius) * M_PI) : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
@@ -161,7 +161,7 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
     float sinHalfAngle = sinf(angle * 0.5f);
-    float normalizeFactor = normalize ? (GfSqr(sinHalfAngle) * M_PI) : 1.0f;
+    float normalizeFactor = (sinHalfAngle > 1.0e-6f && normalize) ? (GfSqr(sinHalfAngle) * M_PI) : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
@@ -215,7 +215,8 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float normalizeFactor = normalize ? float(width * height) : 1.0f;
+    float area = width * height;
+    float normalizeFactor = (area > 0.0f && normalize) ? area : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
@@ -267,7 +268,7 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float normalizeFactor = normalize ? (M_PI * radius * radius) : 1.0f;
+    float normalizeFactor = (radius > 1.0e-6f && normalize) ? (GfSqr(radius) * M_PI) : 1.0f;
     GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
