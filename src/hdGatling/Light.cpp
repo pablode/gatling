@@ -240,14 +240,14 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
-
     GfVec3f origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    GfVec3f dir = normalMatrix.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
-    dir.Normalize();
+    GfVec3f t0 = transform.TransformDir(GfVec3f(1.0f, 0.0f, 0.0f));
+    t0.Normalize();
+    GfVec3f t1 = transform.TransformDir(GfVec3f(0.0f, 1.0f, 0.0f));
+    t1.Normalize();
 
     giSetRectLightOrigin(m_giRectLight, origin.data());
-    giSetRectLightDirection(m_giRectLight, dir.data());
+    giSetRectLightTangents(m_giRectLight, t0.data(), t1.data());
   }
 
   if (*dirtyBits & DirtyBits::DirtyParams)
@@ -300,14 +300,14 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
-
     GfVec3f origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    GfVec3f dir = normalMatrix.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
-    dir.Normalize();
+    GfVec3f t0 = transform.TransformDir(GfVec3f(1.0f, 0.0f, 0.0f));
+    t0.Normalize();
+    GfVec3f t1 = transform.TransformDir(GfVec3f(0.0f, 1.0f, 0.0f));
+    t1.Normalize();
 
     giSetDiskLightOrigin(m_giDiskLight, origin.data());
-    giSetDiskLightDirection(m_giDiskLight, dir.data());
+    giSetDiskLightTangents(m_giDiskLight, t0.data(), t1.data());
   }
 
   if (*dirtyBits & DirtyBits::DirtyParams)

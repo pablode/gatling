@@ -201,7 +201,7 @@ void giSetDistantLightDiffuseSpecular(GiDistantLight* light, float diffuse, floa
 GiRectLight* giCreateRectLight(GiScene* scene);
 void giDestroyRectLight(GiScene* scene, GiRectLight* light);
 void giSetRectLightOrigin(GiRectLight* light, float* origin);
-void giSetRectLightDirection(GiRectLight* light, float* direction);
+void giSetRectLightTangents(GiRectLight* light, float* t0, float* t1);
 void giSetRectLightBaseEmission(GiRectLight* light, float* rgb);
 void giSetRectLightDimensions(GiRectLight* light, float width, float height);
 void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float specular);
@@ -209,7 +209,7 @@ void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float spec
 GiDiskLight* giCreateDiskLight(GiScene* scene);
 void giDestroyDiskLight(GiScene* scene, GiDiskLight* light);
 void giSetDiskLightOrigin(GiDiskLight* light, float* origin);
-void giSetDiskLightDirection(GiDiskLight* light, float* direction);
+void giSetDiskLightTangents(GiDiskLight* light, float* t0, float* t1);
 void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb);
 void giSetDiskLightRadius(GiDiskLight* light, float radius);
 void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular);

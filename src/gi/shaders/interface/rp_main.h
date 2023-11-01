@@ -61,8 +61,9 @@ struct RectLight
   GI_FLOAT width;
   GI_VEC3  baseEmission;
   GI_FLOAT height;
-  GI_VEC3  direction;
+  GI_UVEC2 tangentFramePacked;
   GI_UINT  diffuseSpecularPacked;
+  GI_FLOAT padding;
 };
 
 struct DiskLight
@@ -71,8 +72,8 @@ struct DiskLight
   GI_FLOAT radius;
   GI_VEC3  baseEmission;
   GI_UINT  diffuseSpecularPacked;
-  GI_VEC3  direction;
-  GI_FLOAT padding;
+  GI_UVEC2 tangentFramePacked;
+  GI_VEC2  padding;
 };
 
 struct PushConstants

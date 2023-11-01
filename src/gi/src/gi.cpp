@@ -204,6 +204,21 @@ std::unique_ptr<efsw::FileWatcher> s_fileWatcher;
 ShaderFileListener s_shaderFileListener;
 #endif
 
+glm::vec2 _EncodeOctahedral(glm::vec3 v)
+{
+  v /= (fabsf(v.x) + fabsf(v.y) + fabsf(v.z));
+  glm::vec2 ps = glm::vec2(v.x >= 0.0f ? +1.0f : -1.0f, v.y >= 0.0f ? +1.0f : -1.0f);
+  return (v.z < 0.0f) ? ((1.0f - glm::abs(glm::vec2(v.y, v.x))) * ps) : glm::vec2(v.x, v.y);
+}
+
+uint32_t _EncodeDirection(glm::vec3 v)
+{
+  v = glm::normalize(v);
+  glm::vec2 e = _EncodeOctahedral(v);
+  e = e * 0.5f + 0.5f;
+  return glm::packUnorm2x16(e);
+}
+
 bool _giResizeRenderBufferIfNeeded(GiRenderBuffer* renderBuffer, uint32_t pixelStride)
 {
   uint32_t width = renderBuffer->width;
@@ -531,24 +546,12 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         vertices[i].y = cpuVert.pos[1];
         vertices[i].z = cpuVert.pos[2];
 
-        const auto encodeOctahedral = [](glm::vec3 v) {
-          v /= (fabsf(v.x) + fabsf(v.y) + fabsf(v.z));
-          glm::vec2 ps = glm::vec2(v.x >= 0.0f ? +1.0f : -1.0f, v.y >= 0.0f ? +1.0f : -1.0f);
-          return (v.z < 0.0f) ? ((1.0f - glm::abs(glm::vec2(v.y, v.x))) * ps) : glm::vec2(v.x, v.y);
-        };
-        const auto encodeDirection = [encodeOctahedral](glm::vec3 v) {
-          v = glm::normalize(v);
-          glm::vec2 e = encodeOctahedral(v);
-          e = e * 0.5f + 0.5f;
-          return glm::uintBitsToFloat(glm::packUnorm2x16(e));
-        };
-
-        float encodedNormal = encodeDirection(glm::make_vec3(cpuVert.norm));
-        float encodedTangent = encodeDirection(glm::make_vec3(cpuVert.tangent));
+        uint32_t encodedNormal = _EncodeDirection(glm::make_vec3(cpuVert.norm));
+        uint32_t encodedTangent = _EncodeDirection(glm::make_vec3(cpuVert.tangent));
 
         allVertices.push_back(Rp::FVertex{
           .field1 = { glm::make_vec3(cpuVert.pos), cpuVert.bitangentSign },
-          .field2 = { encodedNormal, encodedTangent, cpuVert.u, cpuVert.v }
+          .field2 = { *((float*) &encodedNormal), *((float*) &encodedTangent), cpuVert.u, cpuVert.v }
         });
       }
 
@@ -1735,20 +1738,21 @@ GiRectLight* giCreateRectLight(GiScene* scene)
   light->scene = scene;
   light->gpuHandle = scene->rectLights.allocate();
 
+  uint32_t t0packed = _EncodeDirection(glm::vec3(1.0f, 0.0f, 0.0f));
+  uint32_t t1packed = _EncodeDirection(glm::vec3(0.0f, 1.0f, 0.0f));
+
   auto* data = scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
   data->origin[0] = 0.0f;
   data->origin[1] = 0.0f;
   data->origin[2] = 0.0f;
-  data->width = 0.0f;
-  data->direction[0] = 0.0f;
-  data->direction[1] = 0.0f;
-  data->direction[2] = 0.0f;
-  data->height = 0.0f;
+  data->width = 1.0f;
   data->baseEmission[0] = 0.0f;
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
+  data->height = 1.0f;
+  data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
   data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
   return light;
@@ -1770,14 +1774,15 @@ void giSetRectLightOrigin(GiRectLight* light, float* origin)
   data->origin[2] = origin[2];
 }
 
-void giSetRectLightDirection(GiRectLight* light, float* direction)
+void giSetRectLightTangents(GiRectLight* light, float* t0, float* t1)
 {
+  uint32_t t0packed = _EncodeDirection(glm::make_vec3(t0));
+  uint32_t t1packed = _EncodeDirection(glm::make_vec3(t1));
+
   auto* data = light->scene->rectLights.write<Rp::RectLight>(light->gpuHandle);
   assert(data);
 
-  data->direction[0] = direction[0];
-  data->direction[1] = direction[1];
-  data->direction[2] = direction[2];
+  data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
 }
 
 void giSetRectLightBaseEmission(GiRectLight* light, float* rgb)
@@ -1813,6 +1818,9 @@ GiDiskLight* giCreateDiskLight(GiScene* scene)
   light->scene = scene;
   light->gpuHandle = scene->diskLights.allocate();
 
+  uint32_t t0packed = _EncodeDirection(glm::vec3(1.0f, 0.0f, 0.0f));
+  uint32_t t1packed = _EncodeDirection(glm::vec3(0.0f, 1.0f, 0.0f));
+
   auto* data = scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
   assert(data);
 
@@ -1820,13 +1828,11 @@ GiDiskLight* giCreateDiskLight(GiScene* scene)
   data->origin[1] = 0.0f;
   data->origin[2] = 0.0f;
   data->radius = 0.5f;
-  data->direction[0] = 0.0f;
-  data->direction[1] = 0.0f;
-  data->direction[2] = 0.0f;
-  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
   data->baseEmission[0] = 0.0f;
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
+  data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
 
   return light;
 }
@@ -1847,14 +1853,15 @@ void giSetDiskLightOrigin(GiDiskLight* light, float* origin)
   data->origin[2] = origin[2];
 }
 
-void giSetDiskLightDirection(GiDiskLight* light, float* direction)
+void giSetDiskLightTangents(GiDiskLight* light, float* t0, float* t1)
 {
+  uint32_t t0packed = _EncodeDirection(glm::make_vec3(t0));
+  uint32_t t1packed = _EncodeDirection(glm::make_vec3(t1));
+
   auto* data = light->scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
   assert(data);
 
-  data->direction[0] = direction[0];
-  data->direction[1] = direction[1];
-  data->direction[2] = direction[2];
+  data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
 }
 
 void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb)

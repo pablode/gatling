@@ -110,13 +110,18 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         // TODO: solid angle sampling
         vec2 sampleOnRect = (k4.zw - vec2(0.5)) * vec2(light.width, light.height);
-        vec3 samplePos = light.origin + vec3(sampleOnRect, 0.0) * light.direction;
+
+        vec3 t0 = decode_direction(light.tangentFramePacked.x);
+        vec3 t1 = decode_direction(light.tangentFramePacked.y);
+        vec3 samplePos = light.origin + sampleOnRect.x * t0 + sampleOnRect.y * t1;
         vec3 dir = samplePos - surfacePos;
+
+        vec3 lightNormal = cross(t1, t0); // light forward/default dir is -Z (like UsdLux)
 
         dist = length(dir);
         dirToLight = dir / dist;
         // https://graphics.cg.uni-saarland.de/courses/ris-2021/slides/03_ProbabilityTheory_MonteCarlo.pdf s.35
-        float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
+        float geometryTerm = max(0.0, (dot(lightNormal, -dirToLight))) / (dist * dist);
         power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         invPdf = light.width * light.height;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
@@ -130,12 +135,17 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         DiskLight light = diskLights[lightIndex];
 
         vec2 sampleOnDisk = sample_disk(k4.zw, light.radius, invPdf);
-        vec3 samplePos = light.origin + vec3(sampleOnDisk, 0.0) * light.direction;
+
+        vec3 t0 = decode_direction(light.tangentFramePacked.x);
+        vec3 t1 = decode_direction(light.tangentFramePacked.y);
+        vec3 samplePos = light.origin + sampleOnDisk.x * t0 + sampleOnDisk.y * t1;
         vec3 dir = samplePos - surfacePos;
+
+        vec3 lightNormal = cross(t1, t0); // light forward/default dir is -Z (like UsdLux)
 
         dist = length(dir);
         dirToLight = dir / dist;
-        float geometryTerm = max(0.0, (dot(light.direction, -dirToLight))) / (dist * dist);
+        float geometryTerm = max(0.0, (dot(lightNormal, -dirToLight))) / (dist * dist);
         power = light.baseEmission * PC.lightIntensityMultiplier * geometryTerm;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
