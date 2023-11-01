@@ -700,12 +700,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
 
-  GfVec4f backgroundColor(0.0f, 0.0f, 0.0f, 0.0f);
-  if (aovBinding->clearValue.IsHolding<GfVec4f>())
-  {
-    backgroundColor = aovBinding->clearValue.UncheckedGet<GfVec4f>();
-  }
-
   uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
   uint32_t sprimIndexVersion = changeTracker.GetSprimIndexVersion();
   uint32_t visibilityChangeCount = changeTracker.GetVisibilityChangeCount();
@@ -792,6 +786,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
+  GfVec4f backgroundColor = aovBinding->clearValue.GetWithDefault<GfVec4f>(GfVec4f(0.f));
+
   bool clippingEnabled = renderPassState->GetClippingEnabled() &&
                          m_settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
 
@@ -816,9 +812,9 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     renderParams.backgroundColor[i] = backgroundColor[i];
   }
 
-  float* img_data = (float*) renderBuffer->Map();
+  float* imgData = (float*) renderBuffer->Map();
 
-  int32_t result = giRender(&renderParams, img_data);
+  int32_t result = giRender(&renderParams, imgData);
 
   TF_VERIFY(result == GI_OK, "Unable to render scene.");
 

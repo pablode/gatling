@@ -32,6 +32,12 @@ namespace gtl
     using GI_VEC2   = glm::vec2;
     using GI_VEC3   = glm::vec3;
     using GI_VEC4   = glm::vec4;
+    using GI_IVEC2  = glm::ivec2;
+    using GI_IVEC3  = glm::ivec3;
+    using GI_IVEC4  = glm::ivec4;
+    using GI_UVEC2  = glm::uvec2;
+    using GI_UVEC3  = glm::uvec3;
+    using GI_UVEC4  = glm::uvec4;
     using GI_MAT3   = glm::mat3;
     using GI_MAT3x4 = glm::mat3x4;
   }
@@ -58,6 +64,12 @@ namespace gtl
 #define GI_VEC2       vec2
 #define GI_VEC3       vec3
 #define GI_VEC4       vec4
+#define GI_iVEC2      ivec2
+#define GI_iVEC3      ivec3
+#define GI_iVEC4      ivec4
+#define GI_UVEC2      uvec2
+#define GI_UVEC3      uvec3
+#define GI_UVEC4      uvec4
 #define GI_MAT3       mat3
 #define GI_MAT3x4     mat3x4
 
