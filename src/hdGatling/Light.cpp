@@ -129,11 +129,11 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
-  GfMatrix4d transform = sceneDelegate->GetTransform(id);
+  const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto pos = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    GfVec3f pos = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
     giSetSphereLightPosition(m_giSphereLight, pos.data());
   }
 
@@ -183,7 +183,10 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto dir = sceneDelegate->GetTransform(id).TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
+    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
+
+    GfVec3f dir = normalMatrix.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
     dir.Normalize();
 
     giSetDistantLightDirection(m_giDistantLight, dir.data());
@@ -233,12 +236,14 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
-  GfMatrix4d transform = sceneDelegate->GetTransform(id);
+  const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    auto dir = transform.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
+
+    GfVec3f origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    GfVec3f dir = normalMatrix.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
     dir.Normalize();
 
     giSetRectLightOrigin(m_giRectLight, origin.data());
@@ -291,12 +296,14 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
-  GfMatrix4d transform = sceneDelegate->GetTransform(id);
+  const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    auto origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    auto dir = transform.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
+    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
+
+    GfVec3f origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    GfVec3f dir = normalMatrix.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
     dir.Normalize();
 
     giSetDiskLightOrigin(m_giDiskLight, origin.data());
@@ -474,7 +481,7 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
     if (*dirtyBits & DirtyBits::DirtyTransform)
     {
-      auto pos = glfLight.GetPosition();
+      GfVec4f pos = glfLight.GetPosition();
       giSetSphereLightPosition(m_giSphereLight, pos.data());
     }
 
