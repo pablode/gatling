@@ -30,6 +30,8 @@ layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayloa
 
 hitAttributeEXT vec2 baryCoord;
 
+const uint TOTAL_LIGHT_COUNT = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT + DISK_LIGHT_COUNT;
+
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
@@ -47,10 +49,8 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
 
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
 {
-    uint totalLightCount = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT + DISK_LIGHT_COUNT;
-
 #if SPHERE_LIGHT_COUNT > 0
-    if ((k4.x * totalLightCount) <= SPHERE_LIGHT_COUNT)
+    if ((k4.x * TOTAL_LIGHT_COUNT) <= SPHERE_LIGHT_COUNT)
     {
         uint lightIndex = min(uint(k4.y * SPHERE_LIGHT_COUNT), SPHERE_LIGHT_COUNT - 1);
 
@@ -73,7 +73,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     }
 #endif
 #if DISTANT_LIGHT_COUNT > 0
-    else if ((k4.x * totalLightCount) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT))
+    else if ((k4.x * TOTAL_LIGHT_COUNT) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT))
     {
         uint lightIndex = min(uint(k4.y * DISTANT_LIGHT_COUNT), DISTANT_LIGHT_COUNT - 1);
 
@@ -98,7 +98,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     }
 #endif
 #if RECT_LIGHT_COUNT > 0
-    else if ((k4.x * totalLightCount) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT))
+    else if ((k4.x * TOTAL_LIGHT_COUNT) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT))
     {
         uint lightIndex = min(uint(k4.y * RECT_LIGHT_COUNT), RECT_LIGHT_COUNT - 1);
 
@@ -152,7 +152,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     }
 #endif
 
-    invPdf *= float(totalLightCount);
+    invPdf *= float(TOTAL_LIGHT_COUNT);
 }
 
 void main()
@@ -241,8 +241,7 @@ void main()
 
     /* 5. NEE light sampling */
 #ifdef NEXT_EVENT_ESTIMATION
-#if SPHERE_LIGHT_COUNT > 0
-    if (!inside)
+    if (!inside && TOTAL_LIGHT_COUNT > 0)
     {
         // Sample light source
 #ifdef RAND_4D
@@ -293,7 +292,6 @@ void main()
         rayPayload.neeToLight = dirToLight * lightDist;
         rayPayload.neeContrib = neeContrib;
     }
-#endif
 #endif
 
     /* 6. Russian Roulette */
