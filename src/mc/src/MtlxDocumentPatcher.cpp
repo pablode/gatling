@@ -187,21 +187,28 @@ void _PatchGeomprops(mx::DocumentPtr document)
 
     const mx::string& category = node->getCategory();
 
-    if (category == "geompropvalue" || category == "UsdPrimvarReader")
+    if (category != "geompropvalue" && category != "UsdPrimvarReader")
     {
+      continue;
+    }
+
+    const mx::string& nodeDefString = node->getNodeDefString();
+    if (nodeDefString == "ND_geompropvalue_vector2" || nodeDefString == "ND_UsdPrimvarReader_vector2")
+    {
+      // Node most likely reads a texcoord; substitute it with a texcoord node.
+      std::vector<mx::InputPtr> inputs = node->getActiveInputs();
+
+      for (mx::InputPtr input : inputs)
+      {
+        node->removeInput(input->getName());
+      }
+
+      node->setNodeDefString("ND_texcoord_vector2");
+    }
+    else
+    {
+      // Otherwise, we just remove it.
       document->removeNode(node->getName());
-      continue;
-    }
-
-    if (category != "image" && category != "tiledimage")
-    {
-      continue;
-    }
-
-    auto texCoordInput = node->getActiveInput("texcoord");
-    if (texCoordInput)
-    {
-      node->removeInput(texCoordInput->getName());
     }
   }
 }
