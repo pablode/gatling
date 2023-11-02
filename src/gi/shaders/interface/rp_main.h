@@ -40,9 +40,11 @@ struct Face
 struct SphereLight
 {
   GI_VEC3  pos;
-  GI_FLOAT radius;
-  GI_VEC3  baseEmission;
   GI_UINT  diffuseSpecularPacked;
+  GI_VEC3  baseEmission;
+  GI_FLOAT area;
+  GI_VEC3  radiusXYZ;
+  GI_FLOAT padding;
 };
 
 struct DistantLight
@@ -69,11 +71,12 @@ struct RectLight
 struct DiskLight
 {
   GI_VEC3  origin;
-  GI_FLOAT radius;
+  GI_FLOAT radiusX;
   GI_VEC3  baseEmission;
-  GI_UINT  diffuseSpecularPacked;
+  GI_FLOAT radiusY;
   GI_UVEC2 tangentFramePacked;
-  GI_VEC2  padding;
+  GI_UINT  diffuseSpecularPacked;
+  GI_FLOAT padding;
 };
 
 struct PushConstants

@@ -195,10 +195,9 @@ vec3 sample_hemisphere(vec2 xi)
     );
 }
 
-vec3 sample_sphere(vec2 xi, float radius, out float invPdf)
+// FIXME: sampling is nonuniform...
+vec3 sample_sphere(vec2 xi, vec3 radius)
 {
-    invPdf = 4.0 * PI * radius * radius;
-
     float a = 1.0 - 2.0 * xi.x;
     float b = sqrt(1.0 - a * a);
     float phi = 2.0 * PI * xi.y;
@@ -206,16 +205,14 @@ vec3 sample_sphere(vec2 xi, float radius, out float invPdf)
     return vec3(b * cos(phi), b * sin(phi), a) * radius;
 }
 
-// Concentric mapping from Shirley's Sampling Transformations Zoo (16.5.1.2)
-// https://link.springer.com/content/pdf/10.1007/978-1-4842-4427-2_16.pdf
-vec2 sample_disk(vec2 xi, float radius, out float invPdf)
+// FIXME: sampling is nonuniform...
+vec2 sample_disk(vec2 xi, vec2 radius)
 {
-    invPdf = PI * radius * radius;
-
     float a = 2.0 * xi.x - 1.0;
     float b = 2.0 * xi.y - 1.0;
 
-    float r, phi;
+    vec2 r;
+    float phi;
     if ((a * a) > (b * b))
     {
         r = radius * a;

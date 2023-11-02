@@ -188,7 +188,7 @@ GiSphereLight* giCreateSphereLight(GiScene* scene);
 void giDestroySphereLight(GiScene* scene, GiSphereLight* light);
 void giSetSphereLightPosition(GiSphereLight* light, float* position);
 void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb);
-void giSetSphereLightRadius(GiSphereLight* light, float radius);
+void giSetSphereLightRadius(GiSphereLight* light, float radiusX, float radiusY, float radiusZ);
 void giSetSphereLightDiffuseSpecular(GiSphereLight* light, float diffuse, float specular);
 
 GiDistantLight* giCreateDistantLight(GiScene* scene);
@@ -211,7 +211,7 @@ void giDestroyDiskLight(GiScene* scene, GiDiskLight* light);
 void giSetDiskLightOrigin(GiDiskLight* light, float* origin);
 void giSetDiskLightTangents(GiDiskLight* light, float* t0, float* t1);
 void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb);
-void giSetDiskLightRadius(GiDiskLight* light, float radius);
+void giSetDiskLightRadius(GiDiskLight* light, float radiusX, float radiusY);
 void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular);
 
 GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);

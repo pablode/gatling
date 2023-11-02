@@ -1613,11 +1613,14 @@ GiSphereLight* giCreateSphereLight(GiScene* scene)
   data->pos[0] = 0.0f;
   data->pos[1] = 0.0f;
   data->pos[2] = 0.0f;
-  data->radius = 0.0f;
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
   data->baseEmission[0] = 0.0f;
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
-  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
+  data->area = 1.0f;
+  data->radiusXYZ[0] = 0.5f;
+  data->radiusXYZ[1] = 0.5f;
+  data->radiusXYZ[2] = 0.5f;
 
   return light;
 }
@@ -1648,12 +1651,20 @@ void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb)
   data->baseEmission[2] = rgb[2];
 }
 
-void giSetSphereLightRadius(GiSphereLight* light, float radius)
+void giSetSphereLightRadius(GiSphereLight* light, float radiusX, float radiusY, float radiusZ)
 {
+  float ab = powf(radiusX * radiusY, 1.6f);
+  float ac = powf(radiusX * radiusZ, 1.6f);
+  float bc = powf(radiusY * radiusZ, 1.6f);
+  float area = powf((ab + ac + bc) / 3.0f, 1.0f / 1.6f) * 4.0f * M_PI;
+
   auto* data = light->scene->sphereLights.write<Rp::SphereLight>(light->gpuHandle);
   assert(data);
 
-  data->radius = radius;
+  data->radiusXYZ[0] = radiusX;
+  data->radiusXYZ[1] = radiusY;
+  data->radiusXYZ[2] = radiusZ;
+  data->area = area;
 }
 
 void giSetSphereLightDiffuseSpecular(GiSphereLight* light, float diffuse, float specular)
@@ -1827,12 +1838,13 @@ GiDiskLight* giCreateDiskLight(GiScene* scene)
   data->origin[0] = 0.0f;
   data->origin[1] = 0.0f;
   data->origin[2] = 0.0f;
-  data->radius = 0.5f;
+  data->radiusX = 0.5f;
   data->baseEmission[0] = 0.0f;
   data->baseEmission[1] = 0.0f;
   data->baseEmission[2] = 0.0f;
-  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
+  data->radiusY = 0.5f;
   data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
+  data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
   return light;
 }
@@ -1874,12 +1886,13 @@ void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb)
   data->baseEmission[2] = rgb[2];
 }
 
-void giSetDiskLightRadius(GiDiskLight* light, float radius)
+void giSetDiskLightRadius(GiDiskLight* light, float radiusX, float radiusY)
 {
   auto* data = light->scene->diskLights.write<Rp::DiskLight>(light->gpuHandle);
   assert(data);
 
-  data->radius = radius;
+  data->radiusX = radiusX;
+  data->radiusY = radiusY;
 }
 
 void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular)
