@@ -44,7 +44,7 @@ public:
 #endif
 
 private:
-  std::unique_ptr<class MaterialNetworkCompiler> m_translator;
+  std::unique_ptr<class MaterialNetworkCompiler> m_materialNetworkCompiler;
   std::unique_ptr<class UsdzAssetReader> m_usdzAssetReader;
   bool m_isSupported;
 };

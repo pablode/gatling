@@ -29,7 +29,7 @@ class HdGatlingRenderDelegate final : public HdRenderDelegate
 {
 public:
   HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                          const MaterialNetworkCompiler& translator,
+                          const MaterialNetworkCompiler& materialNetworkCompiler,
                           std::string_view resourcePath);
 
   ~HdGatlingRenderDelegate() override;
@@ -98,7 +98,7 @@ public:
   TfTokenVector GetShaderSourceTypes() const override;
 
 private:
-  const MaterialNetworkCompiler& m_translator;
+  const MaterialNetworkCompiler& m_materialNetworkCompiler;
   const std::string m_resourcePath;
   HdResourceRegistrySharedPtr m_resourceRegistry;
   HdRenderSettingDescriptorList m_settingDescriptors;

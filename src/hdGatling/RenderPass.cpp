@@ -263,12 +263,12 @@ namespace
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
                                          const HdRprimCollection& collection,
                                          const HdRenderSettingsMap& settings,
-                                         const MaterialNetworkCompiler& MaterialNetworkCompiler,
+                                         const MaterialNetworkCompiler& materialNetworkCompiler,
                                          GiScene* scene)
   : HdRenderPass(index, collection)
   , m_scene(scene)
   , m_settings(settings)
-  , m_MaterialNetworkCompiler(MaterialNetworkCompiler)
+  , m_materialNetworkCompiler(materialNetworkCompiler)
   , m_isConverged(false)
   , m_lastSceneStateVersion(UINT32_MAX)
   , m_lastSprimIndexVersion(UINT32_MAX)
@@ -495,7 +495,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
         if (network)
         {
-          giMat = m_MaterialNetworkCompiler.CompileNetwork(sprim->GetId(), *network);
+          giMat = m_materialNetworkCompiler.CompileNetwork(sprim->GetId(), *network);
 
           if (giMat)
           {

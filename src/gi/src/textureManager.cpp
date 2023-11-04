@@ -92,7 +92,7 @@ namespace gtl
       return false;
     }
 
-    GB_LOG("image read from path \"{}\" of size {:.2f} MiB", filePath, imageData.size * BYTES_TO_MIB);
+    GB_LOG("read image \"{}\" ({:.2f} MiB)", filePath, imageData.size * BYTES_TO_MIB);
 
     CgpuImageCreateInfo createInfo = {
       .width = imageData.width,

@@ -36,7 +36,7 @@ public:
   HdGatlingRenderPass(HdRenderIndex* index,
                       const HdRprimCollection& collection,
                       const HdRenderSettingsMap& settings,
-                      const MaterialNetworkCompiler& MaterialNetworkCompiler,
+                      const MaterialNetworkCompiler& materialNetworkCompiler,
                       GiScene* scene);
 
   ~HdGatlingRenderPass() override;
@@ -68,7 +68,7 @@ private:
 private:
   GiScene* m_scene;
   const HdRenderSettingsMap& m_settings;
-  const MaterialNetworkCompiler& m_MaterialNetworkCompiler;
+  const MaterialNetworkCompiler& m_materialNetworkCompiler;
   GiMaterial* m_defaultMaterial;
   std::vector<GiMaterial*> m_materials;
   bool m_isConverged;

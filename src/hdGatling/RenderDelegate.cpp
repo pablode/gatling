@@ -35,9 +35,9 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                                                 const MaterialNetworkCompiler& translator,
+                                                 const MaterialNetworkCompiler& materialNetworkCompiler,
                                                  std::string_view resourcePath)
-  : m_translator(translator)
+  : m_materialNetworkCompiler(materialNetworkCompiler)
   , m_resourcePath(resourcePath)
   , m_resourceRegistry(std::make_shared<HdResourceRegistry>())
   , m_renderParam(std::make_unique<HdGatlingRenderParam>())
@@ -139,7 +139,7 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, const HdComm
 HdRenderPassSharedPtr HdGatlingRenderDelegate::CreateRenderPass(HdRenderIndex* index,
                                                                 const HdRprimCollection& collection)
 {
-  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, m_translator, m_giScene));
+  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, m_materialNetworkCompiler, m_giScene));
 }
 
 HdResourceRegistrySharedPtr HdGatlingRenderDelegate::GetResourceRegistry() const

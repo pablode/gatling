@@ -126,7 +126,7 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
     return;
   }
 
-  m_translator = std::make_unique<MaterialNetworkCompiler>(mtlxSearchPaths);
+  m_materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxSearchPaths);
 
   m_usdzAssetReader = std::make_unique<UsdzAssetReader>();
   giRegisterAssetReader(m_usdzAssetReader.get());
@@ -156,7 +156,7 @@ HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate(const HdRenderSe
 
   const std::string& resourcePath = plugin->GetResourcePath();
 
-  return new HdGatlingRenderDelegate(settingsMap, *m_translator, resourcePath);
+  return new HdGatlingRenderDelegate(settingsMap, *m_materialNetworkCompiler, resourcePath);
 }
 
 void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDelegate)
