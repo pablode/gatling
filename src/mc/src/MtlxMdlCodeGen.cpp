@@ -92,7 +92,7 @@ namespace
       return true;
     }
 
-    if (_IsBxdfWithInputValue(node, "open_pbr_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f))) &&
+    if (_IsBxdfWithInputValue(node, "open_pbr_surface", "geometry_opacity", mx::Value::createValue(mx::Color3(1.0f))) &&
         _IsBxdfWithInputValue(node, "open_pbr_surface", "transmission_weight", mx::Value::createValue(0.0f)) &&
         _IsBxdfWithInputValue(node, "open_pbr_surface", "subsurface_weight", mx::Value::createValue(0.0f)))
     {
