@@ -93,7 +93,7 @@ TF_REGISTRY_FUNCTION(TfType)
   HdRendererPluginRegistry::Define<HdGatlingRendererPlugin>();
 }
 
-bool _TryInitGi(const MaterialX::DocumentPtr mtlxStdLib)
+bool _TryInitGi(const mx::DocumentPtr mtlxStdLib)
 {
   PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
 
@@ -121,7 +121,7 @@ bool _TryInitGi(const MaterialX::DocumentPtr mtlxStdLib)
   return giInitialize(&params) == GI_OK;
 }
 
-MaterialX::DocumentPtr _LoadMtlxStdLib()
+mx::DocumentPtr _LoadMtlxStdLib()
 {
   mx::DocumentPtr mtlxStdLib = mx::createDocument();
 
@@ -139,7 +139,7 @@ MaterialX::DocumentPtr _LoadMtlxStdLib()
 
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 {
-  MaterialX::DocumentPtr mtlxStdLib = _LoadMtlxStdLib();
+  mx::DocumentPtr mtlxStdLib = _LoadMtlxStdLib();
 
   m_isSupported = _TryInitGi(mtlxStdLib);
 

@@ -53,6 +53,7 @@
 
 using namespace gtl;
 
+namespace mx = MaterialX;
 namespace Rp = gtl::shader_interface::rp_main;
 
 const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
@@ -350,7 +351,7 @@ GiStatus giInitialize(const GiInitParams* params)
     return GI_ERROR;
   }
 
-  MaterialX::DocumentPtr mtlxStdLib = static_pointer_cast<MaterialX::Document>(params->mtlxStdLib);
+  mx::DocumentPtr mtlxStdLib = static_pointer_cast<mx::Document>(params->mtlxStdLib);
   if (!mtlxStdLib)
   {
     return GI_ERROR;
@@ -424,7 +425,7 @@ GiMaterial* giCreateMaterialFromMtlxStr(const char* str)
 
 GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::Document*/> doc)
 {
-  MaterialX::DocumentPtr resolvedDoc = static_pointer_cast<MaterialX::Document>(doc);
+  mx::DocumentPtr resolvedDoc = static_pointer_cast<mx::Document>(doc);
   if (!doc)
   {
     return nullptr;
