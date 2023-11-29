@@ -19,6 +19,7 @@
 #include "RenderDelegate.h"
 #include "MaterialNetworkCompiler.h"
 
+#include <pxr/imaging/hdMtlx/hdMtlx.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/thisPlugin.h>
@@ -139,7 +140,11 @@ mx::DocumentPtr _LoadMtlxStdLib()
 
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 {
+#if PXR_VERSION > 2311
+  mx::DocumentPtr mtlxStdLib = HdMtlxStdLibraries();
+#else
   mx::DocumentPtr mtlxStdLib = _LoadMtlxStdLib();
+#endif
 
   m_isSupported = _TryInitGi(mtlxStdLib);
 
