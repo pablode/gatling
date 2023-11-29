@@ -145,7 +145,13 @@ namespace gtl
   {
     // Find renderable element.
     std::vector<mx::TypedElementPtr> renderableElements;
+#if (MATERIALX_MAJOR_VERSION > 1) || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 38) || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION > 8)
+    renderableElements = mx::findRenderableElements(doc);
+#else
     mx::findRenderableElements(doc, renderableElements);
+#endif
 
     for (mx::TypedElementPtr elem : renderableElements)
     {
