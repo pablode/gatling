@@ -72,12 +72,12 @@ namespace
 namespace gtl
 {
   McFrontend::McFrontend(const std::vector<std::string>& mdlSearchPaths,
-                         const std::vector<std::string>& mtlxSearchPaths,
+                         const MaterialX::DocumentPtr mtlxStdLib,
                          McRuntime& runtime)
   {
     McMdlRuntime& mdlRuntime = runtime.getMdlRuntime();
     m_mdlMaterialCompiler = std::make_shared<McMdlMaterialCompiler>(mdlRuntime, mdlSearchPaths);
-    m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxSearchPaths);
+    m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib);
   }
 
   McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool isOpaque)

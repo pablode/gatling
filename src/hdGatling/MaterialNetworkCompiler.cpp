@@ -314,18 +314,9 @@ bool _GetMaterialNetworkSurfaceTerminal(const HdMaterialNetwork2& network2, HdMa
   return true;
 }
 
-MaterialNetworkCompiler::MaterialNetworkCompiler(const std::vector<std::string>& mtlxSearchPaths)
+MaterialNetworkCompiler::MaterialNetworkCompiler(const mx::DocumentPtr mtlxStdLib)
+  : m_mtlxStdLib(mtlxStdLib)
 {
-  m_nodeLib = mx::createDocument();
-
-  mx::FileSearchPath fileSearchPath;
-  for (const std::string& s : mtlxSearchPaths)
-  {
-    fileSearchPath.append(mx::FilePath(s));
-  }
-
-  mx::FilePathVec libFolders; // All directories if left empty.
-  mx::loadLibraries(libFolders, fileSearchPath, m_nodeLib);
 }
 
 GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
@@ -414,7 +405,7 @@ mx::DocumentPtr MaterialNetworkCompiler::CreateMaterialXDocumentFromNetwork(cons
     terminalNode,
     terminalPath,
     id,
-    m_nodeLib,
+    m_mtlxStdLib,
 #if PXR_VERSION >= 2211
     &mxHdData
 #else

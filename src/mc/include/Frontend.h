@@ -33,7 +33,7 @@ namespace gtl
   {
   public:
     McFrontend(const std::vector<std::string>& mdlSearchPaths,
-               const std::vector<std::string>& mtlxSearchPaths,
+               const MaterialX::DocumentPtr mtlxStdLib,
                McRuntime& mdlRuntime);
 
   private:

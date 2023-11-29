@@ -142,7 +142,7 @@ struct GiInitParams
   const char* resourcePath;
   const char* shaderPath;
   const std::vector<std::string>& mdlSearchPaths;
-  const std::vector<std::string>& mtlxSearchPaths;
+  const std::shared_ptr<void/*MaterialX::Document*/> mtlxStdLib;
 };
 
 class GiAssetReader

@@ -38,16 +38,7 @@ namespace gtl
   class GiGlslShaderGen
   {
   public:
-    struct InitParams
-    {
-      std::string_view resourcePath;
-      std::string_view shaderPath;
-      const std::vector<std::string>& mdlSearchPaths;
-      const std::vector<std::string>& mtlxSearchPaths;
-    };
-
-  public:
-    bool init(const InitParams& params, McRuntime& runtime);
+    bool init(std::string_view shaderPath, McRuntime& runtime);
 
     ~GiGlslShaderGen();
 

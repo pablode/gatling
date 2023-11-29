@@ -28,7 +28,13 @@
 #include <pxr/usd/ar/packageUtils.h>
 #include <pxr/usd/usdMtlx/utils.h>
 
+#include <MaterialXCore/Document.h>
+#include <MaterialXFormat/File.h>
+#include <MaterialXFormat/Util.h>
+
 #include <gi.h>
+
+namespace mx = MaterialX;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -87,7 +93,7 @@ TF_REGISTRY_FUNCTION(TfType)
   HdRendererPluginRegistry::Define<HdGatlingRendererPlugin>();
 }
 
-bool _TryInitGi(const std::vector<std::string>& mtlxSearchPaths)
+bool _TryInitGi(const MaterialX::DocumentPtr mtlxStdLib)
 {
   PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
 
@@ -109,24 +115,40 @@ bool _TryInitGi(const std::vector<std::string>& mtlxSearchPaths)
     .resourcePath = resourcePath.c_str(),
     .shaderPath = shaderPath.c_str(),
     .mdlSearchPaths = mdlSearchPaths,
-    .mtlxSearchPaths = mtlxSearchPaths
+    .mtlxStdLib = mtlxStdLib
   };
 
   return giInitialize(&params) == GI_OK;
 }
 
+MaterialX::DocumentPtr _LoadMtlxStdLib()
+{
+  mx::DocumentPtr mtlxStdLib = mx::createDocument();
+
+  mx::FileSearchPath fileSearchPaths;
+  for (const std::string& s : UsdMtlxSearchPaths())
+  {
+    fileSearchPaths.append(mx::FilePath(s));
+  }
+
+  mx::FilePathVec libFolders; // All directories if left empty.
+  mx::loadLibraries(libFolders, fileSearchPaths, mtlxStdLib);
+
+  return mtlxStdLib;
+}
+
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 {
-  const std::vector<std::string>& mtlxSearchPaths = UsdMtlxSearchPaths();
+  MaterialX::DocumentPtr mtlxStdLib = _LoadMtlxStdLib();
 
-  m_isSupported = _TryInitGi(mtlxSearchPaths);
+  m_isSupported = _TryInitGi(mtlxStdLib);
 
   if (!m_isSupported)
   {
     return;
   }
 
-  m_materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxSearchPaths);
+  m_materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxStdLib);
 
   m_usdzAssetReader = std::make_unique<UsdzAssetReader>();
   giRegisterAssetReader(m_usdzAssetReader.get());

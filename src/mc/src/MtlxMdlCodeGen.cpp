@@ -106,35 +106,29 @@ namespace
 
 namespace gtl
 {
-  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths)
+  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const mx::DocumentPtr mtlxStdLib)
   {
     // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
     std::string target = m_shaderGen->getTarget();
 
-    // MaterialX libs.
-    for (const std::string& s : mtlxSearchPaths)
-    {
-      m_mtlxSearchPath.append(mx::FilePath(s));
-    }
-
-    m_stdLib = mx::createDocument();
-    mx::FilePathVec libFolders;
-    mx::loadLibraries(libFolders, m_mtlxSearchPath, m_stdLib);
+    // Import stdlib.
+    m_baseDoc = mx::createDocument();
+    m_baseDoc->importLibrary(mtlxStdLib);
 
     // Color management.
     mx::DefaultColorManagementSystemPtr colorSystem = mx::DefaultColorManagementSystem::create(target);
-    colorSystem->loadLibrary(m_stdLib);
+    colorSystem->loadLibrary(m_baseDoc);
     m_shaderGen->setColorManagementSystem(colorSystem);
 
     // Unit management.
     mx::UnitSystemPtr unitSystem = mx::UnitSystem::create(target);
-    unitSystem->loadLibrary(m_stdLib);
+    unitSystem->loadLibrary(m_baseDoc);
 
     mx::UnitConverterRegistryPtr unitRegistry = mx::UnitConverterRegistry::create();
-    mx::UnitTypeDefPtr distanceTypeDef = m_stdLib->getUnitTypeDef("distance");
+    mx::UnitTypeDefPtr distanceTypeDef = m_baseDoc->getUnitTypeDef("distance");
     unitRegistry->addUnitConverter(distanceTypeDef, mx::LinearUnitConverter::create(distanceTypeDef));
-    mx::UnitTypeDefPtr angleTypeDef = m_stdLib->getUnitTypeDef("angle");
+    mx::UnitTypeDefPtr angleTypeDef = m_baseDoc->getUnitTypeDef("angle");
     unitRegistry->addUnitConverter(angleTypeDef, mx::LinearUnitConverter::create(angleTypeDef));
 
     unitSystem->setUnitConverterRegistry(unitRegistry);
@@ -185,7 +179,7 @@ namespace gtl
     try
     {
       mx::DocumentPtr doc = mx::createDocument();
-      doc->importLibrary(m_stdLib);
+      doc->importLibrary(m_baseDoc);
       mx::readFromXmlString(doc, mtlxStr.data());
 
       return translate(doc, mdlSrc, subIdentifier, isOpaque);

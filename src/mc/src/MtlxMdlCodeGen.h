@@ -29,7 +29,7 @@ namespace gtl
   class McMtlxMdlCodeGen
   {
   public:
-    explicit McMtlxMdlCodeGen(const std::vector<std::string>& mtlxSearchPaths);
+    explicit McMtlxMdlCodeGen(const MaterialX::DocumentPtr mtlxStdLib);
 
   public:
     bool translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque);
@@ -37,7 +37,7 @@ namespace gtl
 
   private:
     MaterialX::FileSearchPath m_mtlxSearchPath;
-    MaterialX::DocumentPtr m_stdLib;
     MaterialX::ShaderGeneratorPtr m_shaderGen;
+    MaterialX::DocumentPtr m_baseDoc;
   };
 }

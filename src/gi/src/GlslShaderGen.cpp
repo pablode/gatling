@@ -34,9 +34,9 @@ namespace gtl
 {
   class McRuntime;
 
-  bool GiGlslShaderGen::init(const InitParams& params, McRuntime& mcRuntime)
+  bool GiGlslShaderGen::init(std::string_view shaderPath, McRuntime& mcRuntime)
   {
-    m_shaderPath = fs::path(params.shaderPath);
+    m_shaderPath = fs::path(shaderPath);
 
     m_mcBackend = std::make_shared<McBackend>();
     if (!m_mcBackend->init(mcRuntime))

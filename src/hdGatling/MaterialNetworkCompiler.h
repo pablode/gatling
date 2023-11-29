@@ -30,7 +30,7 @@ struct HdMaterialNetwork2;
 class MaterialNetworkCompiler
 {
 public:
-  MaterialNetworkCompiler(const std::vector<std::string>& mtlxSearchPaths);
+  MaterialNetworkCompiler(const MaterialX::DocumentPtr mtlxStdLib);
 
   GiMaterial* CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
 
@@ -43,7 +43,7 @@ private:
                                                             const HdMaterialNetwork2& network) const;
 
 private:
-  MaterialX::DocumentPtr m_nodeLib;
+  MaterialX::DocumentPtr m_mtlxStdLib;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

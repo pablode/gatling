@@ -294,7 +294,6 @@ void _PrintInitInfo(const GiInitParams* params)
   GB_LOG("> resource path: \"{}\"", params->resourcePath);
   GB_LOG("> shader path: \"{}\"", params->shaderPath);
   GB_LOG("> MDL search paths: {}", params->mdlSearchPaths);
-  GB_LOG("> Mtlx search paths: {}", params->mtlxSearchPaths);
 }
 
 GiStatus giInitialize(const GiInitParams* params)
@@ -351,17 +350,15 @@ GiStatus giInitialize(const GiInitParams* params)
     return GI_ERROR;
   }
 
-  s_mcFrontend = std::make_unique<McFrontend>(params->mdlSearchPaths, params->mtlxSearchPaths, *s_mcRuntime);
-
-  GiGlslShaderGen::InitParams shaderGenParams = {
-    .resourcePath = params->resourcePath,
-    .shaderPath = shaderPath,
-    .mdlSearchPaths = params->mdlSearchPaths,
-    .mtlxSearchPaths = params->mtlxSearchPaths
-  };
+  MaterialX::DocumentPtr mtlxStdLib = static_pointer_cast<MaterialX::Document>(params->mtlxStdLib);
+  if (!mtlxStdLib)
+  {
+    return GI_ERROR;
+  }
+  s_mcFrontend = std::make_unique<McFrontend>(params->mdlSearchPaths, mtlxStdLib, *s_mcRuntime);
 
   s_shaderGen = std::make_unique<GiGlslShaderGen>();
-  if (!s_shaderGen->init(shaderGenParams, *s_mcRuntime))
+  if (!s_shaderGen->init(shaderPath, *s_mcRuntime))
   {
     return GI_ERROR;
   }
