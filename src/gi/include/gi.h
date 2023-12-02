@@ -90,13 +90,13 @@ struct GiMeshDesc
 {
   uint32_t          faceCount;
   GiFace*           faces;
-  const GiMaterial* material;
   uint32_t          vertexCount;
   GiVertex*         vertices;
 };
 
 struct GiMeshInstance
 {
+  const GiMaterial* material;
   const GiMesh* mesh;
   float transform[3][4];
 };
