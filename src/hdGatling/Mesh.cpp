@@ -42,6 +42,338 @@ TF_DEFINE_PRIVATE_TOKENS(
   (bitangentSigns)
 );
 
+namespace
+{
+  template<typename T>
+  struct _VertexAttr
+  {
+    VtArray<T> array;
+    bool indexed;
+  };
+
+  struct _VertexStreams
+  {
+    VtVec3iArray faces;
+    VtVec3fArray points;
+    _VertexAttr<GfVec3f> normals;
+    _VertexAttr<GfVec2f> texCoords;
+    _VertexAttr<GfVec3f> tangents;
+    _VertexAttr<float> bitangentSigns;
+  };
+
+  GiVertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal,
+                         const GfVec2f& texCoords, const GfVec3f& tangent, float bitangentSign)
+  {
+    GfVec3f newPoint = transform.Transform(point);
+
+    GfVec3f newNormal = normalMatrix.TransformDir(normal);
+    newNormal.Normalize();
+
+    GfVec3f newTangent = transform.Transform(tangent);
+    newTangent.Normalize();
+
+    GiVertex vertex;
+    vertex.pos[0] = newPoint[0];
+    vertex.pos[1] = newPoint[1];
+    vertex.pos[2] = newPoint[2];
+    vertex.norm[0] = newNormal[0];
+    vertex.norm[1] = newNormal[1];
+    vertex.norm[2] = newNormal[2];
+    vertex.u = texCoords[0];
+    vertex.v = 1.0f - texCoords[1];
+    vertex.tangent[0] = newTangent[0];
+    vertex.tangent[1] = newTangent[1];
+    vertex.tangent[2] = newTangent[2];
+    vertex.bitangentSign = bitangentSign;
+
+    return vertex;
+  }
+
+  float _CalculateBitangentSign(const GfVec3f& n, const GfVec3f& t, const GfVec3f& b)
+  {
+    return (GfDot(GfCross(t, b), n) > 0.0f) ? 1.0f : -1.0f;
+  }
+
+  // Based on the algorithm proposed by Eric Lengyel in FGED 2 (Listing 7.4)
+  // http://foundationsofgameenginedev.com/FGED2-sample.pdf
+  void _CalculateTextureTangents(const VtVec3iArray& meshFaces,
+                                 const VtVec3fArray& meshPoints,
+                                 const _VertexAttr<GfVec3f>& meshNormals,
+                                 const _VertexAttr<GfVec2f>& meshTexCoords,
+                                 VtVec3fArray& meshTangents,
+                                 VtFloatArray& meshBitangentSigns)
+  {
+    const float EPS = 0.0001f;
+    size_t tangentCount = meshNormals.array.size();
+
+    VtVec3fArray tangents(tangentCount, GfVec3f(0.0f));
+    VtVec3fArray bitangents(tangentCount, GfVec3f(0.0f));
+    VtVec3fArray normals(tangentCount, GfVec3f(0.0f));
+
+    for (int i = 0; i < meshFaces.size(); i++)
+    {
+      const auto& f = meshFaces[i];
+
+      const auto& p0 = meshPoints[f[0]];
+      const auto& p1 = meshPoints[f[1]];
+      const auto& p2 = meshPoints[f[2]];
+      const auto& n0 = meshNormals.array[meshNormals.indexed ? f[0] : (i * 3 + 0)];
+      const auto& n1 = meshNormals.array[meshNormals.indexed ? f[1] : (i * 3 + 1)];
+      const auto& n2 = meshNormals.array[meshNormals.indexed ? f[2] : (i * 3 + 2)];
+      const auto& t0 = meshTexCoords.array[meshTexCoords.indexed ? f[0] : (i * 3 + 0)];
+      const auto& t1 = meshTexCoords.array[meshTexCoords.indexed ? f[1] : (i * 3 + 1)];
+      const auto& t2 = meshTexCoords.array[meshTexCoords.indexed ? f[2] : (i * 3 + 2)];
+
+      GfVec3f e1 = p1 - p0, e2 = p2 - p0;
+      float x1 = t1[0] - t0[0], x2 = t2[0] - t0[0];
+      float y1 = t1[1] - t0[1], y2 = t2[1] - t0[1];
+
+      GfVec3f t, b;
+      float denom = x1 * y2 - x2 * y1;
+
+      // The original algorithm does not handle this special case, causing NaNs!
+      if (fabsf(denom) > EPS)
+      {
+        float r = (1.0f / denom);
+
+        t = (e1 * y2 - e2 * y1) * r;
+        b = (e2 * x1 - e1 * x2) * r;
+      }
+      else
+      {
+        // Fall back to default UV direction
+        t = GfVec3f::YAxis();
+        b = GfVec3f::XAxis();
+      }
+
+      int outIndex0 = meshNormals.indexed ? f[0] : (i * 3 + 0);
+      int outIndex1 = meshNormals.indexed ? f[1] : (i * 3 + 1);
+      int outIndex2 = meshNormals.indexed ? f[2] : (i * 3 + 2);
+
+      // Assets can author out-of-range indices (f.i. Intel's Sponza scene). Skip those.
+      if (outIndex0 >= tangentCount || outIndex1 >= tangentCount || outIndex2 >= tangentCount)
+      {
+        TF_WARN("invalid primvar index; skipping");
+        continue;
+      }
+
+      normals[outIndex0] += n0;
+      normals[outIndex1] += n1;
+      normals[outIndex2] += n2;
+      tangents[outIndex0] += t;
+      tangents[outIndex1] += t;
+      tangents[outIndex2] += t;
+      bitangents[outIndex0] += b;
+      bitangents[outIndex1] += b;
+      bitangents[outIndex2] += b;
+    }
+
+    meshTangents.resize(tangentCount);
+    meshBitangentSigns.resize(tangentCount);
+
+    for (int i = 0; i < tangentCount; i++)
+    {
+      const GfVec3f& n = meshNormals.array[i].GetNormalized();
+
+      // Robust special-case handling based on the logic from DirectXMesh:
+      // https://github.com/microsoft/DirectXMesh/blob/5647700332a2a2504000529902ac3164c058d616/DirectXMesh/DirectXMeshTangentFrame.cpp#L126-L162
+
+      GfVec3f t = tangents[i];
+      t = (t - n * GfDot(n, t)); // Gram-Schmidt re-orthogonalization
+
+      GfVec3f b = bitangents[i];
+      b = (b - n * GfDot(n, b)) - (t * GfDot(t, b));
+
+      float tLen = t.GetLength();
+      float bLen = b.GetLength();
+
+      if (tLen > 0.0f)
+      {
+        t = t.GetNormalized();
+      }
+      if (bLen > 0.0f)
+      {
+        b = b.GetNormalized();
+      }
+
+      if (tLen <= EPS || bLen <= EPS)
+      {
+        if (tLen > 0.5f)
+        {
+          b = GfCross(n, t);
+        }
+        else if (bLen > 0.5f)
+        {
+          t = GfCross(b, n);
+        }
+        else
+        {
+          float d0 = abs(n[0]);
+          float d1 = abs(n[1]);
+          float d2 = abs(n[2]);
+
+          GfVec3f axis;
+          if (d0 < d1)
+          {
+            axis = (d0 < d2) ? GfVec3f::XAxis() : GfVec3f::ZAxis();
+          }
+          else if (d1 < d2)
+          {
+            axis = GfVec3f::YAxis();
+          }
+          else
+          {
+            axis = GfVec3f::ZAxis();
+          }
+
+          t = GfCross(n, axis);
+          b = GfCross(n, t);
+        }
+      }
+
+      meshTangents[i] = t;
+      meshBitangentSigns[i] = _CalculateBitangentSign(n, t, b);
+    }
+  }
+
+  // Duff et al. 2017. Building an Orthonormal Basis, Revisited. JCGT.
+  // Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/
+  void _DuffOrthonormalBasis(const GfVec3f& n, GfVec3f& tangent, GfVec3f& bitangent)
+  {
+    float nSign = (n[2] >= 0.0f) ? 1.0f : -1.0f;
+    float a = -1.0f / (nSign + n[2]);
+    float b = n[0] * n[1] * a;
+    tangent = GfVec3f(1.0f + nSign * n[0] * n[0] * a, nSign * b, -nSign * n[0]);
+    bitangent = GfVec3f(b, nSign + n[1] * n[1] * a, -n[1]);
+  }
+
+  void _CalculateFallbackTangents(const VtVec3iArray& meshFaces,
+                                  const _VertexAttr<GfVec3f>& meshNormals,
+                                  VtVec3fArray& meshTangents,
+                                  VtFloatArray& meshBitangentSigns)
+  {
+    size_t normalCount = meshNormals.array.size();
+
+    meshTangents.resize(normalCount);
+    meshBitangentSigns.resize(normalCount);
+
+    for (int i = 0; i < normalCount; i++)
+    {
+      const GfVec3f normal = meshNormals.array[i];
+
+      GfVec3f tangent, bitangent;
+      _DuffOrthonormalBasis(normal, tangent, bitangent);
+
+      meshTangents[i] = tangent;
+      meshBitangentSigns[i] = _CalculateBitangentSign(normal, tangent, bitangent);
+    }
+  }
+
+  void _CalculateTangents(const VtVec3iArray& meshFaces,
+                          const VtVec3fArray& meshPoints,
+                          const _VertexAttr<GfVec3f>& meshNormals,
+                          const _VertexAttr<GfVec2f>& meshTexCoords,
+                          _VertexAttr<GfVec3f>& meshTangents,
+                          _VertexAttr<float>& meshBitangentSigns)
+  {
+    bool hasTexCoords = meshTexCoords.array.size() > 0;
+
+    if (hasTexCoords)
+    {
+      _CalculateTextureTangents(meshFaces, meshPoints, meshNormals, meshTexCoords, meshTangents.array, meshBitangentSigns.array);
+    }
+    else
+    {
+      _CalculateFallbackTangents(meshFaces, meshNormals, meshTangents.array, meshBitangentSigns.array);
+    }
+
+    meshTangents.indexed = meshNormals.indexed;
+    meshBitangentSigns.indexed = meshNormals.indexed;
+  }
+
+  void _BakeMeshGeometry(_VertexStreams& s,
+                         const GfMatrix4d& transform,
+                         std::vector<GiFace>& faces,
+                         std::vector<GiVertex>& vertices)
+  {
+    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
+
+    bool hasTexCoords = s.texCoords.array.size() > 0;
+    bool calcTangents = s.tangents.array.empty();
+    bool calcBitangentSigns = s.bitangentSigns.array.empty();
+
+    if (!calcTangents && calcBitangentSigns)
+    {
+#if 0
+      // If no bitangent signs have been found, chances are high that none have been authored in the first place.
+      // Handedness may then be assumed to be positive, although force calculating the tangents could yield better results.
+      calcTangents = true;
+#else
+      TF_WARN("tangents have been provided without handedness; assuming positive");
+      size_t signCount = std::max(s.normals.array.size(), s.tangents.array.size());
+      s.bitangentSigns.array = VtFloatArray(signCount, 1.0f);
+      s.bitangentSigns.indexed = s.normals.indexed && s.tangents.indexed;
+#endif
+    }
+    if (calcTangents)
+    {
+      _CalculateTangents(s.faces, s.points, s.normals, s.texCoords, s.tangents, s.bitangentSigns);
+    }
+
+    bool isAnyPrimvarNotIndexed = !s.normals.indexed || !s.texCoords.indexed || !s.tangents.indexed;
+    uint32_t vertexOffset = vertices.size();
+
+    for (size_t i = 0; i < s.faces.size(); i++)
+    {
+      const GfVec3i& vertexIndices = s.faces[i];
+
+      GiFace face;
+      face.v_i[0] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 0) : vertexIndices[0]);
+      face.v_i[1] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 1) : vertexIndices[1]);
+      face.v_i[2] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 2) : vertexIndices[2]);
+
+      // We always need three unique vertices per face.
+      if (isAnyPrimvarNotIndexed)
+      {
+        for (size_t j = 0; j < 3; j++)
+        {
+          const GfVec3f& point = s.points[vertexIndices[j]];
+          const GfVec3f& normal = s.normals.array[s.normals.indexed ? vertexIndices[j] : (i * 3 + j)];
+          GfVec2f texCoords = hasTexCoords ? s.texCoords.array[s.texCoords.indexed ? vertexIndices[j] : (i * 3 + j)] : GfVec2f();
+
+          GfVec3f tangent = s.tangents.array[s.tangents.indexed ? vertexIndices[j] : (i * 3 + j)];
+          float bitangentSign = s.bitangentSigns.array[s.bitangentSigns.indexed ? vertexIndices[j] : (i * 3 + j)];
+
+          GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords, tangent, bitangentSign);
+          vertices.push_back(vertex);
+        }
+      }
+
+      faces.push_back(face);
+    }
+
+    // Early-out if the vertices are not indexed.
+    if (isAnyPrimvarNotIndexed)
+    {
+      return;
+    }
+
+    for (size_t j = 0; j < s.points.size(); j++)
+    {
+      const GfVec3f& point = s.points[j];
+      const GfVec3f& normal = s.normals.array[j];
+      GfVec2f texCoords = hasTexCoords ? s.texCoords.array[j] : GfVec2f();
+
+      GfVec3f tangent = s.tangents.array[j];
+      float bitangentSign = s.bitangentSigns.array[j];
+
+      GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords, tangent, bitangentSign);
+      vertices.push_back(vertex);
+    }
+  }
+
+}
+
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
   : HdMesh(id)
   , m_prototypeTransform(1.0)
@@ -67,11 +399,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
 
   const SdfPath& id = GetId();
-
-  if (*dirtyBits & HdChangeTracker::DirtyDoubleSided)
-  {
-    m_doubleSided = sceneDelegate->GetDoubleSided(id);
-  }
 
   if ((*dirtyBits & HdChangeTracker::DirtyInstancer) |
       (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
@@ -115,24 +442,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     return;
   }
 
-  m_faces = {};
-  m_points = {};
-  m_normals = {};
-  m_texCoords = {};
-
-  _UpdateGeometry(sceneDelegate);
-}
-
-void HdGatlingMesh::_UpdateGeometry(HdSceneDelegate* sceneDelegate)
-{
-  const HdMeshTopology& topology = GetMeshTopology(sceneDelegate);
-  const SdfPath& id = GetId();
-  HdMeshUtil meshUtil(&topology, id);
-
-  VtIntArray primitiveParams;
-  meshUtil.ComputeTriangleIndices(&m_faces, &primitiveParams);
-
-  _PullPrimvars(sceneDelegate, primitiveParams, m_color, m_hasColor);
+  _CreateGiMesh(sceneDelegate);
 }
 
 bool HdGatlingMesh::_FindPrimvarInterpolationByName(HdSceneDelegate* sceneDelegate,
@@ -295,12 +605,18 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
   return true;
 }
 
-void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
-                                  VtIntArray primitiveParams,
-                                  GfVec3f& color,
-                                  bool& hasColor)
+void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 {
   const SdfPath& id = GetId();
+
+  _VertexStreams s;
+
+  // Faces
+  const HdMeshTopology& topology = GetMeshTopology(sceneDelegate);
+  HdMeshUtil meshUtil(&topology, id);
+
+  VtIntArray primitiveParams;
+  meshUtil.ComputeTriangleIndices(&s.faces, &primitiveParams);
 
   // Points: required per vertex.
   HdInterpolation pointInterpolation;
@@ -318,7 +634,7 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
   }
 
   VtValue boxedPoints = sceneDelegate->Get(id, HdTokens->points);
-  m_points = boxedPoints.Get<VtVec3fArray>();
+  s.points = boxedPoints.Get<VtVec3fArray>();
 
   // Colors: only support constant interpolation because we can create a material for it.
   HdInterpolation colorInterpolation;
@@ -328,8 +644,12 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
   {
     VtValue boxedColors = sceneDelegate->Get(id, HdTokens->displayColor);
     const VtVec3fArray& colors = boxedColors.Get<VtVec3fArray>();
-    color = colors[0];
-    hasColor = true;
+    m_color = colors[0];
+    m_hasColor = true;
+  }
+  else
+  {
+    m_hasColor = false;
   }
 
   // Normals: calculate them from the topology if no primvar exists.
@@ -344,17 +664,15 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
 
   if (foundNormals)
   {
-    m_normals.array = boxedNormals.Get<VtVec3fArray>();
-    m_normals.indexed = areNormalsIndexed;
+    s.normals.array = boxedNormals.Get<VtVec3fArray>();
+    s.normals.indexed = areNormalsIndexed;
   }
   else
   {
-    HdMeshTopology topology = GetMeshTopology(sceneDelegate);
-
     Hd_VertexAdjacency adjacency;
     adjacency.BuildAdjacencyTable(&topology);
-    m_normals.array = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, m_points.size(), m_points.cdata());
-    m_normals.indexed = true;
+    s.normals.array = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, s.points.size(), s.points.cdata());
+    s.normals.indexed = true;
   }
 
   // Tex Coords: ideally should be read explicitly from primvars. But since this isn't implemented yet, we use
@@ -398,8 +716,8 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
                                  isIndexed,
                                  boxedTexCoords))
     {
-      m_texCoords.array = boxedTexCoords.Get<VtVec2fArray>();
-      m_texCoords.indexed = isIndexed;
+      s.texCoords.array = boxedTexCoords.Get<VtVec2fArray>();
+      s.texCoords.indexed = isIndexed;
     }
   }
 
@@ -413,11 +731,11 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
                                areTangentsIndexed,
                                boxedTangents))
   {
-    m_tangents.indexed = areTangentsIndexed;
-    m_bitangentSigns.indexed = areTangentsIndexed;
+    s.tangents.indexed = areTangentsIndexed;
+    s.bitangentSigns.indexed = areTangentsIndexed;
 
-    VtVec3fArray& tangents = m_tangents.array;
-    VtFloatArray& bitangentSigns = m_bitangentSigns.array;
+    VtVec3fArray& tangents = s.tangents.array;
+    VtFloatArray& bitangentSigns = s.bitangentSigns.array;
 
     VtVec4fArray vec4Tangents = boxedTangents.Get<VtVec4fArray>();
     tangents.resize(vec4Tangents.size());
@@ -436,8 +754,8 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
            areTangentsIndexed,
            boxedTangents))
   {
-    m_tangents.indexed = areTangentsIndexed;
-    m_tangents.array = boxedTangents.Get<VtVec3fArray>();
+    s.tangents.indexed = areTangentsIndexed;
+    s.tangents.array = boxedTangents.Get<VtVec3fArray>();
 
     const TfToken bitangentSignPrimvarNameHints[] = {
       _tokens->tangentSigns,   // <= guc 0.2
@@ -455,46 +773,28 @@ void HdGatlingMesh::_PullPrimvars(HdSceneDelegate* sceneDelegate,
                                    areBitangentSignsIndexed,
                                    boxedBitangentSigns))
       {
-        m_bitangentSigns.indexed = areBitangentSignsIndexed;
-        m_bitangentSigns.array = boxedBitangentSigns.Get<VtFloatArray>();
+        s.bitangentSigns.indexed = areBitangentSignsIndexed;
+        s.bitangentSigns.array = boxedBitangentSigns.Get<VtFloatArray>();
       }
     }
   }
+
+  std::vector<GiFace> faces;
+  std::vector<GiVertex> vertices;
+  _BakeMeshGeometry(s, GfMatrix4d(1.0), faces, vertices);
+
+   GiMeshDesc desc = {
+    .faceCount = (uint32_t) faces.size(),
+    .faces = faces.data(),
+    .vertexCount = (uint32_t) vertices.size(),
+    .vertices = vertices.data()
+  };
+  m_giMesh = giCreateMesh(&desc);
 }
 
-bool HdGatlingMesh::IsDoubleSided() const
+const GiMesh* HdGatlingMesh::GetGiMesh() const
 {
-  return m_doubleSided;
-}
-
-const VtVec3iArray& HdGatlingMesh::GetFaces() const
-{
-  return m_faces;
-}
-
-const VtVec3fArray& HdGatlingMesh::GetPoints() const
-{
-  return m_points;
-}
-
-const HdGatlingMesh::VertexAttr<GfVec3f>& HdGatlingMesh::GetNormals() const
-{
-  return m_normals;
-}
-
-const HdGatlingMesh::VertexAttr<GfVec2f>& HdGatlingMesh::GetTexCoords() const
-{
-  return m_texCoords;
-}
-
-const HdGatlingMesh::VertexAttr<GfVec3f>& HdGatlingMesh::GetTangents() const
-{
-  return m_tangents;
-}
-
-const HdGatlingMesh::VertexAttr<float>& HdGatlingMesh::GetBitangentSigns() const
-{
-  return m_bitangentSigns;
+  return m_giMesh;
 }
 
 const GfMatrix4d& HdGatlingMesh::GetPrototypeTransform() const

@@ -22,18 +22,12 @@
 
 #include <gi.h>
 
+struct GiMesh;
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingMesh final : public HdMesh
 {
-public:
-  template<typename T>
-  struct VertexAttr
-  {
-    VtArray<T> array;
-    bool indexed;
-  };
-
 public:
   HdGatlingMesh(const SdfPath& id);
 
@@ -47,13 +41,7 @@ public:
 
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
-  bool IsDoubleSided() const;
-  const VtVec3iArray& GetFaces() const;
-  const VtVec3fArray& GetPoints() const;
-  const VertexAttr<GfVec3f>& GetNormals() const;
-  const VertexAttr<GfVec2f>& GetTexCoords() const;
-  const VertexAttr<GfVec3f>& GetTangents() const;
-  const VertexAttr<float>& GetBitangentSigns() const;
+  const GiMesh* GetGiMesh() const;
 
   const GfMatrix4d& GetPrototypeTransform() const;
 
@@ -67,8 +55,6 @@ protected:
                  HdDirtyBits *dirtyBits) override;
 
 private:
-  void _UpdateGeometry(HdSceneDelegate* sceneDelegate);
-
   bool _FindPrimvarInterpolationByName(HdSceneDelegate* sceneDelegate,
                                        TfToken name,
                                        HdInterpolation& interpolation) const;
@@ -83,22 +69,13 @@ private:
                                 bool& sequentiallyIndexed,
                                 VtValue& result) const;
 
-  void _PullPrimvars(HdSceneDelegate* sceneDelegate,
-                     VtIntArray primitiveParams,
-                     GfVec3f& color,
-                     bool& hasColor);
+  void _CreateGiMesh(HdSceneDelegate* sceneDelegate);
 
 private:
+  GiMesh* m_giMesh = nullptr;
   GfMatrix4d m_prototypeTransform;
-  VtVec3iArray m_faces;
-  VtVec3fArray m_points;
-  VertexAttr<GfVec3f> m_normals;
-  VertexAttr<GfVec2f> m_texCoords;
-  VertexAttr<GfVec3f> m_tangents;
-  VertexAttr<float> m_bitangentSigns;
   GfVec3f m_color;
   bool m_hasColor = false;
-  bool m_doubleSided = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
