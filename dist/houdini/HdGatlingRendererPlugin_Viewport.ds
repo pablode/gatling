@@ -1,0 +1,110 @@
+///
+/// UI controls for the Gatling Render Delegate
+///
+
+#include "$HFS/houdini/soho/parameters/CommonMacros.ds"
+
+{
+    name    "Gatling"
+    label   "Gatling"
+    parmtag { spare_opfilter "!!SHOP/PROPERTIES!!" }
+    parmtag { spare_classtags "render" }
+
+    parm {
+        name    "spp"
+        label   "Samples per pixel"
+        type    int
+        default { 1 }
+        range   { 1! 1000 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "maxBounces"
+        label   "Max bounces"
+        type    int
+        default { 7 }
+        range   { 1! 64 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "rrBounceOffset"
+        label   "Russian roulette bounce offset"
+        type    int
+        default { 3 }
+        range   { 0! 64 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "rrInvMinTermProb"
+        label   "Russian roulette inverse minimum terminate probability"
+        type    float
+        default { 0.95 }
+        range   { 0! 1 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "maxSampleValue"
+        label   "Max sample value"
+        type    float
+        default { 10.0 }
+        range   { 0.00001! 10000.0 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "filterImportanceSampling"
+        label   "Filter Importance Sampling"
+        type    toggle
+        default { 1 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "depthOfField"
+        label   "Depth of field"
+        type    toggle
+        default { 1 }
+        parmtag { "spare_category" "Shading" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "lightIntensityMultiplier"
+        label   "Light intensity multiplier"
+        type    float
+        default { 1.0 }
+        range   { 0.001! 10000.0 }
+        parmtag { "spare_category" "Tweaks" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "nextEventEstimation"
+        label   "Next event estimation"
+        type    toggle
+        default { 1 }
+        parmtag { "spare_category" "Shading" }
+        parmtag { "uiscope" "viewport toolbar" }
+        parmtag { "uiicon" "OBJ_light_pxrdome" }
+    }
+
+    parm {
+        name    "clippingPlanes"
+        label   "Clipping planes"
+        type    toggle
+        default { 0 }
+        parmtag { "spare_category" "Tweaks" }
+        parmtag { "uiscope" "viewport toolbar" }
+        parmtag { "uiicon" "BUTTONS_cut" } // BUTTONS_box
+    }
+}
