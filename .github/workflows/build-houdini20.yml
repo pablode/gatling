@@ -1,0 +1,46 @@
+name: Build gatling for Houdini 20
+
+on:
+  workflow_call:
+    outputs:
+      archive-name:
+        description: "Name of the archive containing the build artifacts."
+        value: build-Release-${{ github.sha }}
+    inputs:
+      mdl-sdk-cache-key-prefix:
+        description: "Prefix of the MDL SDK cache key"
+        required: false
+        type: string
+        default: "MDL-SDK"
+
+jobs:
+  build:
+    name: Build Houdini 20 for ${{ matrix.name }}
+
+    strategy:
+      matrix:
+        include:
+        - name: Ubuntu / GCC
+          image: ubuntu-20.04
+          usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Linux_x64.tar.gz"
+          usd-install-path: "/home/runner/work/USD/USD/INSTALL"
+          archive-file-name: "gatling_Houdini20_Linux_x64.tar.gz"
+
+        - name: Windows / MSVC
+          image: windows-2019
+          usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Windows_x64.tar.gz"
+          usd-install-path: "C:/INSTALL"
+          archive-file-name: "gatling_Houdini20_Windows_x64.tar.gz"
+
+    uses: ./.github/workflows/build.yml
+    with:
+      image: ${{ matrix.image }}
+      build-config: Release
+      usd-download-url: ${{ matrix.usd-download-url }}
+      usd-install-path: ${{ matrix.usd-install-path }}
+      upload-archive: true
+      archive-name: build-Release-${{ github.sha }}
+      archive-file-name: ${{ matrix.archive-file-name }}
+      mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}
+      cmake-params: -DPLUGINFO_LIBPATH_PREFIX=../../usd
+      houdini-packaging: true

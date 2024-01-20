@@ -32,6 +32,10 @@ on:
       cmake-params:
         required: false
         type: string
+      houdini-packaging:
+        required: false
+        type: boolean
+        default: false
 
 defaults:
   run:
@@ -102,6 +106,19 @@ jobs:
     - name: Install gatling
       working-directory: BUILD
       run: cmake --install . --config ${{ inputs.build-config }} --component hdGatling
+
+    - name: Package for Houdini
+      if: inputs.houdini-packaging
+      working-directory: INSTALL
+      run: |
+        mkdir -p dso/usd
+        mkdir -p dso/usd_plugins
+        mkdir -p soho/parameters
+        cp ../dist/houdini/UsdRenderers.json .
+        cp ../dist/houdini/HdGatlingRendererPlugin_Viewport.ds soho/parameters/
+        cp ../dist/houdini/plugInfo.json dso/usd_plugins/
+        mv hdGatling dso/usd_plugins
+        mv hdGatling* dso/usd
 
     - name: Create archive
       if: inputs.upload-archive

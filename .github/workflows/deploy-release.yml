@@ -10,8 +10,8 @@ jobs:
     with:
       cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
 
-  build-2211:
-    name: Build gatling for USD v22.11 (Release)
+  build-usd2211:
+    name: Build gatling for USD v22.11
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
@@ -19,8 +19,8 @@ jobs:
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
       upload-archives: true
 
-  build-2311:
-    name: Build gatling for USD v23.11 (Release)
+  build-usd2311:
+    name: Build gatling for USD v23.11
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
@@ -28,21 +28,33 @@ jobs:
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
       upload-archives: true
 
+  build-houdini20:
+    name: Build gatling for Houdini 20.0
+    needs: build-mdl-sdk
+    uses: ./.github/workflows/build-houdini20.yml
+    with:
+      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+
   deploy-release:
     name: Deploy Release
-    needs: [build-2211, build-2311]
+    needs: [build-usd2211, build-usd2311, build-houdini20]
     runs-on: ubuntu-latest
 
     steps:
       - name: Download artifacts for USD v22.11
         uses: actions/download-artifact@v3
         with:
-          name: ${{ needs.build-2211.outputs.archive-name }}
+          name: ${{ needs.build-usd2211.outputs.archive-name }}
 
       - name: Download artifacts for USD v23.11
         uses: actions/download-artifact@v3
         with:
-          name: ${{ needs.build-2311.outputs.archive-name }}
+          name: ${{ needs.build-usd2311.outputs.archive-name }}
+
+      - name: Download artifacts for Houdini 20.0
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ needs.build-houdini20.outputs.archive-name }}
 
       - name: Deploy draft release
         uses: softprops/action-gh-release@d4e8205d7e959a9107da6396278b2f1f07af0f9b
