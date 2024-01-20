@@ -78,8 +78,13 @@ target_link_libraries(
     ${USD_LIBS_PRIVATE}
 )
 
+# Allow custom prefix for houdini directory structure
+if(NOT DEFINED PLUGINFO_LIBPATH_PREFIX)
+  set(PLUGINFO_LIBPATH_PREFIX "..")
+endif()
+
 set(PLUGINFO_PATH "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json")
-set(PLUG_INFO_LIBRARY_PATH "../hdGatling${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set(PLUG_INFO_LIBRARY_PATH "${PLUGINFO_LIBPATH_PREFIX}/hdGatling${CMAKE_SHARED_LIBRARY_SUFFIX}")
 configure_file(plugInfo.json.in "${PLUGINFO_PATH}" @ONLY)
 
 install(
