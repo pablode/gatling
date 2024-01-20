@@ -20,6 +20,7 @@
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/usd/sdr/registry.h>
+#include <pxr/usd/sdr/shaderProperty.h>
 #include <pxr/usd/sdf/schema.h>
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 
@@ -83,6 +84,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_UsdTransform2d)
   (ND_UsdUVTexture)
   (ND_convert_color3_vector3)
+  (ND_convert_vector3_color3)
   (periodic)
   (srgb_texture)
   (lin_rec709)
@@ -104,55 +106,107 @@ static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTy
   { _tokens->UsdPrimvarReader_matrix, _tokens->ND_UsdPrimvarReader_matrix44       }
 };
 
-// Unfortunately the UsdPreviewSurface standard nodes can't be mapped to MaterialX UsdPreviewSurface
-// implementation nodes as-is. This is because the 'normal' input of the UsdPreviewSurface node expects
-// a vector3, while UsdUVTexture nodes only output color3 -- which can't be implicitly converted in MDL:
-// https://github.com/AcademySoftwareFoundation/MaterialX/issues/1038
+// MaterialX shading network errors are not always fatal -- and they may not be even propagated to the user.
+// This leads to networks being authored that work and look fine in one renderer (usually OpenGL-based) but
+// may not in another renderer (an anti-goal of MaterialX!).
 //
-// We implement this patch on the MaterialX document level too, however we replicate it here so that
-// HdMtlx does not throw validation errors due to mismatching NodeDefs.
-void _PatchUsdPreviewSurfaceNormalColor3Vector3Mismatch(HdMaterialNetwork2& network)
+// This function patches the specific case of node connections being authored between inputs of type color3f
+// and outputs of type vector3f (and the other way around). These types of connections work fine in OpenGL-based
+// renderers because colors are aliased as vec3s in GLSL.
+// But this is not the case with MDL - colors are distinct types and implicit conversion is illegal.
+// As a result, the MDL SDK throws compilation errors and we can't render the material.
+// The issue has been reported here: https://github.com/AcademySoftwareFoundation/MaterialX/issues/1038
+//
+// The problem occurs mainly when translating normal-mapped UsdPreviewSurface nodes to their MaterialX equivalents
+// (a common scenario). The 'normal' input of the UsdPreviewSurface node expects a vector3, while the connected
+// UsdUVTexture node output is of type color3.
+// But also external MaterialX-HdShade networks may exhibit this behaviour. An in-the-wild example is the Karma
+// tutorial 'A Beautiful Game': https://www.sidefx.com/tutorials/karma-a-beautiful-game/ rendered within Houdini.
+//
+// We implement this patch on the MaterialX document level too, however we replicate it here so that HdMtlx does not
+// throw validation errors due to mismatching NodeDefs.
+void _PatchMaterialXColor3Vector3Mismatches(HdMaterialNetwork2& network)
 {
+  SdrRegistry& sdrRegistry = SdrRegistry::GetInstance();
+
   for (auto& pathNodePair : network.nodes)
   {
     HdMaterialNode2& node = pathNodePair.second;
-    if (node.nodeTypeId != _tokens->ND_UsdPreviewSurface_surfaceshader)
+
+    SdrShaderNodeConstPtr sdrNode = sdrRegistry.GetShaderNodeByIdentifierAndType(node.nodeTypeId, HdGatlingDiscoveryTypes->mtlx);
+    if (!sdrNode)
     {
       continue;
     }
 
     auto& inputs = node.inputConnections;
 
-    auto inputIt = inputs.find(_tokens->normal);
-    if (inputIt == inputs.end())
+    for (auto& input : inputs)
     {
-      return;
-    }
+      SdrShaderPropertyConstPtr sdrInput = sdrNode->GetShaderInput(input.first);
 
-    auto& connections = inputIt->second;
-    for (HdMaterialConnection2& connection : connections)
-    {
-      if (connection.upstreamOutputName != _tokens->rgb)
+      SdfValueTypeName inputType = sdrInput->GetTypeAsSdfType().first;
+      if (inputType == SdfValueTypeNames->Token)
       {
         continue;
       }
 
-      SdfPath upstreamNodePath = connection.upstreamNode;
+      bool isInputColor3 = (inputType == SdfValueTypeNames->Color3f);
+      bool isInputFloat3 = (inputType == SdfValueTypeNames->Float3) ||
+                           (inputType == SdfValueTypeNames->Vector3f) ||
+                           (inputType == SdfValueTypeNames->Normal3f);
 
-      SdfPath convertNodePath = upstreamNodePath;
-      for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
+      for (HdMaterialConnection2& connection : input.second)
       {
-        std::string convertNodeName = "convert" + std::to_string(i);
-        convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
+        SdfPath upstreamNodePath = connection.upstreamNode;
+        const HdMaterialNode2& upstreamNode = network.nodes[upstreamNodePath];
+
+        SdrShaderNodeConstPtr upstreamSdrNode = sdrRegistry.GetShaderNodeByIdentifierAndType(upstreamNode.nodeTypeId, HdGatlingDiscoveryTypes->mtlx);
+        if (!upstreamSdrNode)
+        {
+          continue;
+        }
+
+        SdrShaderPropertyConstPtr upstreamSdrOutput = upstreamSdrNode->GetShaderOutput(connection.upstreamOutputName);
+        if (!upstreamSdrOutput)
+        {
+          continue;
+        }
+
+        SdfValueTypeName upstreamOutputType = upstreamSdrOutput->GetTypeAsSdfType().first;
+        if (upstreamOutputType == SdfValueTypeNames->Token)
+        {
+          continue;
+        }
+
+        bool isUpstreamColor3 = (upstreamOutputType == SdfValueTypeNames->Color3f);
+        bool isUpstreamFloat3 = (upstreamOutputType == SdfValueTypeNames->Float3) ||
+                                (upstreamOutputType == SdfValueTypeNames->Vector3f) ||
+                                (upstreamOutputType == SdfValueTypeNames->Normal3f);
+
+        bool mismatchCase1 = (isInputColor3 && isUpstreamFloat3);
+        bool mismatchCase2 = (isInputFloat3 && isUpstreamColor3);
+
+        if (!mismatchCase1 && !mismatchCase2)
+        {
+          continue;
+        }
+
+        SdfPath convertNodePath = upstreamNodePath;
+        for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
+        {
+          std::string convertNodeName = "convert" + std::to_string(i);
+          convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
+        }
+
+        HdMaterialNode2 convertNode;
+        convertNode.nodeTypeId = mismatchCase1 ? _tokens->ND_convert_vector3_color3 : _tokens->ND_convert_color3_vector3;
+        convertNode.inputConnections[_tokens->in] = { { upstreamNodePath, connection.upstreamOutputName } };
+        network.nodes[convertNodePath] = convertNode;
+
+        connection.upstreamNode = convertNodePath;
+        connection.upstreamOutputName = _tokens->out;
       }
-
-      HdMaterialNode2 convertNode;
-      convertNode.nodeTypeId = _tokens->ND_convert_color3_vector3;
-      convertNode.inputConnections[_tokens->in] = { { upstreamNodePath, _tokens->rgb } };
-      network.nodes[convertNodePath] = convertNode;
-
-      connection.upstreamNode = convertNodePath;
-      connection.upstreamOutputName = _tokens->out;
     }
   }
 }
@@ -410,7 +464,7 @@ GiMaterial* MaterialNetworkCompiler::TryCompileMtlxNetwork(const SdfPath& id, co
     return nullptr;
   }
 
-  _PatchUsdPreviewSurfaceNormalColor3Vector3Mismatch(mtlxNetwork);
+  _PatchMaterialXColor3Vector3Mismatches(mtlxNetwork);
 
   mx::DocumentPtr doc = CreateMaterialXDocumentFromNetwork(id, mtlxNetwork);
   if (!doc)
