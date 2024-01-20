@@ -41,7 +41,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
-  // USD node type ids
+  // USD tokens
   (UsdPreviewSurface)
   (UsdPrimvarReader_float)
   (UsdPrimvarReader_float2)
@@ -67,9 +67,10 @@ TF_DEFINE_PRIVATE_TOKENS(
   (rgb)
   (sRGB)
   (in)
+  (result)
   (out)
   ((_auto, "auto"))
-  // MaterialX USD node type equivalents
+  // MaterialX tokens
   (ND_UsdPreviewSurface_surfaceshader)
   (ND_UsdPrimvarReader_integer)
   (ND_UsdPrimvarReader_boolean)
@@ -223,7 +224,45 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
     }
   }
 
-  // Second pass: substitute node names and parameters
+  // Second pass: patch certain outputs from 'result' (spec) to 'out' (MaterialX convention)
+  for (auto nodeIt = network.nodes.begin(); nodeIt != network.nodes.end(); nodeIt++)
+  {
+    for (auto& inputConnection : nodeIt->second.inputConnections)
+    {
+      for (auto& connection : inputConnection.second)
+      {
+        auto upstreamNode = network.nodes.find(connection.upstreamNode);
+        if (upstreamNode == network.nodes.end())
+        {
+          continue;
+        }
+
+        TfToken upstreamNodeTypeId = upstreamNode->second.nodeTypeId;
+        if (upstreamNodeTypeId != _tokens->UsdPrimvarReader_float &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_float2 &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_float3 &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_float4 &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_int &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_string &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_normal &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_point &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_vector &&
+            upstreamNodeTypeId != _tokens->UsdPrimvarReader_matrix &&
+            upstreamNodeTypeId != _tokens->UsdTransform2d)
+        {
+          continue;
+        }
+
+        TfToken& upstreamOutputName = connection.upstreamOutputName;
+        if (upstreamOutputName == _tokens->result)
+        {
+          upstreamOutputName = _tokens->out;
+        }
+      }
+    }
+  }
+
+  // Third pass: substitute node names and parameters
   for (auto nodeIt = network.nodes.begin(); nodeIt != network.nodes.end(); nodeIt++)
   {
     TfToken& nodeTypeId = nodeIt->second.nodeTypeId;
