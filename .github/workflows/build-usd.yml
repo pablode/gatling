@@ -4,7 +4,7 @@ on:
   workflow_call:
     outputs:
       archive-name:
-        description: "Name of the archive containing the build artifacts."
+        description: "Name of the archive containing the build artifacts"
         value: build-${{ inputs.build-config }}-${{ github.sha }}
     inputs:
       build-config:
