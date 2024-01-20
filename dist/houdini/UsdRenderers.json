@@ -1,0 +1,11 @@
+{
+    "HdGatlingRendererPlugin": {
+        "valid": true,
+        "menulabel": "Gatling",
+        "menupriority": 100,
+        "needsselection": true,
+        "allowbackgroundupdate": false,
+        "defaultpurposes": ["proxy", "render"],
+        "aovsupport": false
+    }
+}
