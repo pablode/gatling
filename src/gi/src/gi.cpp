@@ -1398,7 +1398,8 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
     .maxBouncesAndRrBounceOffset    = ((params->maxBounces << 16) | params->rrBounceOffset),
     .rrInvMinTermProb               = params->rrInvMinTermProb,
     .lightIntensityMultiplier       = params->lightIntensityMultiplier,
-    .clipRangePacked                = glm::packHalf2x16(glm::vec2(params->camera->clipStart, params->camera->clipEnd))
+    .clipRangePacked                = glm::packHalf2x16(glm::vec2(params->camera->clipStart, params->camera->clipEnd)),
+    .sensorExposure                 = params->camera->exposure
   };
 
   std::vector<CgpuBufferBinding> buffers;

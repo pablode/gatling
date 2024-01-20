@@ -98,7 +98,8 @@ struct PushConstants
   GI_FLOAT rrInvMinTermProb;
   GI_FLOAT lightIntensityMultiplier;
   GI_UINT  clipRangePacked;
-  /* 4 floats free */
+  GI_FLOAT sensorExposure;
+  /* 3 floats free */
 };
 
 GI_BINDING_INDEX(OUT_PIXELS,     0)

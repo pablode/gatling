@@ -68,6 +68,7 @@ struct GiCameraDesc
   float focalLength;
   float clipStart;
   float clipEnd;
+  float exposure;
 };
 
 struct GiVertex

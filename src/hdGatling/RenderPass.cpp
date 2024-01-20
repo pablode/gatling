@@ -608,6 +608,7 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.focalLength = focalLength;
   giCamera.clipStart = clippingEnabled ? camera.GetClippingRange().GetMin() : 0.0f;
   giCamera.clipEnd = clippingEnabled ? camera.GetClippingRange().GetMax() : FLT_MAX;
+  giCamera.exposure = camera.GetExposure();
 }
 
 const std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> s_aovIdMappings {

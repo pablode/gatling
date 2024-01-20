@@ -152,6 +152,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     }
 #endif
 
+    power *= exp2(PC.sensorExposure);
     invPdf *= float(TOTAL_LIGHT_COUNT);
 }
 
@@ -229,6 +230,9 @@ void main()
         if (edf_evaluate_data.pdf > 0.0)
         {
             vec3 emission_intensity = mdl_edf_emission_intensity(shading_state);
+
+            emission_intensity *= exp2(PC.sensorExposure);
+
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }
     }
