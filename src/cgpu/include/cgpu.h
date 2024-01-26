@@ -611,6 +611,11 @@ bool cgpuUnmapBuffer(
   CgpuBuffer buffer
 );
 
+uint64_t cgpuGetBufferAddress(
+  CgpuDevice device,
+  CgpuBuffer buffer
+);
+
 bool cgpuCreateImage(
   CgpuDevice device,
   const CgpuImageCreateInfo* createInfo,

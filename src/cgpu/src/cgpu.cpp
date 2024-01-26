@@ -1274,6 +1274,30 @@ bool cgpuUnmapBuffer(CgpuDevice device, CgpuBuffer buffer)
   return true;
 }
 
+static VkDeviceAddress cgpuGetBufferDeviceAddress(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
+{
+  VkBufferDeviceAddressInfoKHR addressInfo = {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+    .pNext = nullptr,
+    .buffer = ibuffer->buffer,
+  };
+  return idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
+}
+
+uint64_t cgpuGetBufferAddress(CgpuDevice device, CgpuBuffer buffer)
+{
+  CgpuIDevice* idevice;
+  if (!cgpuResolveDevice(device, &idevice)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  CgpuIBuffer* ibuffer;
+  if (!cgpuResolveBuffer(buffer, &ibuffer)) {
+    CGPU_RETURN_ERROR_INVALID_HANDLE;
+  }
+  static_assert(sizeof(uint64_t) == sizeof(VkDeviceAddress));
+  return uint64_t(cgpuGetBufferDeviceAddress(idevice, ibuffer));
+}
+
 bool cgpuCreateImage(CgpuDevice device,
                      const CgpuImageCreateInfo* createInfo,
                      CgpuImage* image)
@@ -1796,16 +1820,6 @@ bool cgpuCreateComputePipeline(CgpuDevice device,
   ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 
   return true;
-}
-
-static VkDeviceAddress cgpuGetBufferDeviceAddress(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
-{
-  VkBufferDeviceAddressInfoKHR addressInfo = {
-    .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-    .pNext = nullptr,
-    .buffer = ibuffer->buffer,
-  };
-  return idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
 }
 
 static uint32_t cgpuAlignSize(uint32_t size, uint32_t alignment)
