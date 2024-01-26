@@ -59,7 +59,7 @@ jobs:
         echo "$HOME/.pyenv/shims" >> $GITHUB_PATH
 
     - name: Check out repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
@@ -79,7 +79,7 @@ jobs:
 
     - name: Restore MDL SDK
       id: restore-mdl-sdk
-      uses: actions/cache/restore@v3
+      uses: actions/cache/restore@v4
       with:
         path: "${{ env.mdl-sdk-dir }}"
         key: ${{ inputs.mdl-sdk-cache-key }}
