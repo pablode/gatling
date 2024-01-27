@@ -60,6 +60,7 @@ add_subdirectory(VulkanMemoryAllocator)
 target_link_libraries(VulkanMemoryAllocator PUBLIC $<BUILD_INTERFACE:Vulkan-Headers>)
 
 # SPIRV-Headers (SPIRV-Tools dependency)
+set(SPIRV_SKIP_TESTS ON)
 set(SPIRV_HEADERS_SKIP_EXAMPLES ON)
 set(SPIRV_HEADERS_SKIP_INSTALL ON)
 add_subdirectory(SPIRV-Headers)
