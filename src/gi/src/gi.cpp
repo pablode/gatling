@@ -69,13 +69,17 @@ struct GiGpuBufferView
   uint64_t size;
 };
 
+struct GiBlas
+{
+  CgpuBlas blas;
+  CgpuBuffer indexVertexBuffer;
+};
+
 struct GiGeomCache
 {
-  std::vector<CgpuBlas> blases;
-  CgpuBuffer            buffer;
-  GiGpuBufferView       faceBufferView = {};
+  std::vector<GiBlas> blases;
   CgpuTlas              tlas;
-  GiGpuBufferView       vertexBufferView = {};
+  CgpuBuffer            blasPayloadAddresses;
 };
 
 struct GiShaderCache
@@ -483,18 +487,13 @@ GiMesh* giCreateMesh(const GiMeshDesc* desc)
 }
 
 bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
-                                std::vector<CgpuBlas>& blases,
+                                std::vector<GiBlas>& blases,
                                 std::vector<CgpuBlasInstance>& blasInstances,
-                                std::vector<Rp::FVertex>& allVertices,
-                                std::vector<Rp::Face>& allFaces)
+                                std::vector<Rp::BlasPayload>& blasPayloads,
+                                uint64_t& totalIndicesSize,
+                                uint64_t& totalVerticesSize)
 {
-  struct ProtoBlasInstance
-  {
-    CgpuBlas blas;
-    uint32_t faceIndexOffset;
-    uint32_t materialIndex;
-  };
-  std::unordered_map<const GiMesh*, ProtoBlasInstance> protoBlasInstances;
+  std::unordered_map<const GiMesh*, CgpuBlasInstance> blasInstanceProtos;
 
   for (uint32_t m = 0; m < params->meshInstanceCount; m++)
   {
@@ -506,8 +505,8 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       continue;
     }
 
-    // Build mesh BLAS if it doesn't exist yet.
-    if (protoBlasInstances.count(mesh) == 0)
+    // Build mesh BLAS & buffers if they don't exist yet.
+    if (blasInstanceProtos.count(mesh) == 0)
     {
       // Find material for SBT index (FIXME: find a better solution)
       uint32_t materialIndex = UINT32_MAX;
@@ -526,115 +525,131 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         continue;
       }
 
-      uint32_t faceIndexOffset = allFaces.size();
-      uint32_t vertexIndexOffset = allVertices.size();
-
       // Vertices
-      std::vector<CgpuVertex> vertices;
-      vertices.resize(mesh->vertices.size());
-      allVertices.reserve(allVertices.size() + mesh->vertices.size());
+      std::vector<Rp::FVertex> vertexData;
+      std::vector<CgpuVertex> positionData;
+      vertexData.resize(mesh->vertices.size());
+      positionData.resize(mesh->vertices.size());
 
-      for (uint32_t i = 0; i < vertices.size(); i++)
+      for (uint32_t i = 0; i < positionData.size(); i++)
       {
         const GiVertex& cpuVert = mesh->vertices[i];
-
-        vertices[i].x = cpuVert.pos[0];
-        vertices[i].y = cpuVert.pos[1];
-        vertices[i].z = cpuVert.pos[2];
-
         uint32_t encodedNormal = _EncodeDirection(glm::make_vec3(cpuVert.norm));
         uint32_t encodedTangent = _EncodeDirection(glm::make_vec3(cpuVert.tangent));
 
-        allVertices.push_back(Rp::FVertex{
+        vertexData[i] = Rp::FVertex{
           .field1 = { glm::make_vec3(cpuVert.pos), cpuVert.bitangentSign },
-          .field2 = { *((float*) &encodedNormal), *((float*) &encodedTangent), cpuVert.u, cpuVert.v }
-        });
+          .field2 = { *((float*)&encodedNormal), *((float*)&encodedTangent), cpuVert.u, cpuVert.v }
+        };
+
+        positionData[i] = CgpuVertex{ .x = cpuVert.pos[0], .y = cpuVert.pos[1], .z = cpuVert.pos[2] };
       }
 
       // Indices
-      std::vector<uint32_t> indices;
-      indices.reserve(mesh->faces.size() * 3);
-      allFaces.reserve(allFaces.size() + mesh->faces.size());
+      std::vector<uint32_t> indexData;
+      indexData.reserve(mesh->faces.size() * 3);
 
       for (uint32_t i = 0; i < mesh->faces.size(); i++)
       {
         const auto* face = &mesh->faces[i];
-        indices.push_back(face->v_i[0]);
-        indices.push_back(face->v_i[1]);
-        indices.push_back(face->v_i[2]);
-
-        allFaces.push_back(Rp::Face{
-          vertexIndexOffset + face->v_i[0],
-          vertexIndexOffset + face->v_i[1],
-          vertexIndexOffset + face->v_i[2]
-        });
+        indexData.push_back(face->v_i[0]);
+        indexData.push_back(face->v_i[1]);
+        indexData.push_back(face->v_i[2]);
       }
 
-      if ((indices.size() % 3) != 0)
+      if ((indexData.size() % 3) != 0)
       {
         GB_ERROR("BLAS indices do not represent triangles");
         continue;
       }
 
       // Buffer upload
-      CgpuBuffer indexBuffer;
-      CgpuBuffer vertexBuffer;
+      CgpuBuffer tmpPositionBuffer;
+      CgpuBuffer tmpIndexBuffer;
+      CgpuBuffer indexVertexBuffer;
 
-      uint64_t indexBufferSize = indices.size() * sizeof(uint32_t);
-      uint64_t vertexBufferSize = vertices.size() * sizeof(CgpuVertex);
+      uint64_t indicesSize = indexData.size() * sizeof(uint32_t);
+      uint64_t verticesSize = vertexData.size() * sizeof(Rp::FVertex);
 
-      CgpuBufferCreateInfo iboCreateInfo = {
-        .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-        .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-        .size = indexBufferSize,
-        .debugName = "BlasIndices"
+      uint64_t indexVertexBufferSize = indicesSize;
+      uint64_t vertexBufferOffset = giAlignBuffer(sizeof(Rp::FVertex), verticesSize, &indexVertexBufferSize);
+
+      uint64_t tmpIndexBufferSize = indicesSize;
+      uint64_t tmpPositionBufferSize = positionData.size() * sizeof(CgpuVertex);
+
+      CgpuBufferCreateInfo indexVertexBufferCreateInfo = {
+        .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+        .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+        .size = indexVertexBufferSize,
+        .debugName = "BlasIndexVertexBuffer"
       };
-
-      if (!cgpuCreateBuffer(s_device, &iboCreateInfo, &indexBuffer))
+      if (!cgpuCreateBuffer(s_device, &indexVertexBufferCreateInfo, &indexVertexBuffer))
       {
-        GB_ERROR("failed to allocate BLAS indices memory");
-        continue;
-      }
-
-      CgpuBufferCreateInfo vboCreateInfo = {
-        .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-        .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-        .size = vertexBufferSize,
-        .debugName = "BlasVertices"
-      };
-
-      if (!cgpuCreateBuffer(s_device, &vboCreateInfo, &vertexBuffer))
-      {
-        cgpuDestroyBuffer(s_device, vertexBuffer);
         GB_ERROR("failed to allocate BLAS vertices memory");
         continue;
       }
 
-      void* mappedMem;
-      cgpuMapBuffer(s_device, indexBuffer, &mappedMem);
-      memcpy(mappedMem, indices.data(), indexBufferSize);
-      cgpuUnmapBuffer(s_device, indexBuffer);
+      CgpuBufferCreateInfo tmpPositionBufferCreateInfo = {
+        .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+        .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+        .size = tmpPositionBufferSize,
+        .debugName = "BlasVertexPositionsTmp"
+      };
+      if (!cgpuCreateBuffer(s_device, &tmpPositionBufferCreateInfo, &tmpPositionBuffer))
+      {
+        cgpuDestroyBuffer(s_device, indexVertexBuffer);
+        GB_ERROR("failed to allocate BLAS vertex position memory");
+        continue;
+      }
 
-      cgpuMapBuffer(s_device, vertexBuffer, &mappedMem);
-      memcpy(mappedMem, vertices.data(), vertexBufferSize);
-      cgpuUnmapBuffer(s_device, vertexBuffer);
+      CgpuBufferCreateInfo tmpIndexBufferCreateInfo = {
+        .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+        .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+        .size = tmpIndexBufferSize,
+        .debugName = "BlasIndicesTmp"
+      };
+      if (!cgpuCreateBuffer(s_device, &tmpIndexBufferCreateInfo, &tmpIndexBuffer))
+      {
+        cgpuDestroyBuffer(s_device, indexVertexBuffer);
+        cgpuDestroyBuffer(s_device, tmpPositionBuffer);
+        GB_ERROR("failed to allocate BLAS temp indices memory");
+        continue;
+      }
+
+      void* mappedMem;
+
+      cgpuMapBuffer(s_device, tmpPositionBuffer, &mappedMem);
+      memcpy(mappedMem, positionData.data(), tmpPositionBufferSize);
+      cgpuUnmapBuffer(s_device, tmpPositionBuffer);
+
+      cgpuMapBuffer(s_device, tmpIndexBuffer, &mappedMem);
+      memcpy(mappedMem, indexData.data(), tmpIndexBufferSize);
+      cgpuUnmapBuffer(s_device, tmpIndexBuffer);
+
+      if (!s_stager->stageToBuffer((uint8_t*) indexData.data(), indicesSize, indexVertexBuffer, 0))
+        continue; // TODO: proper error handling
+
+      if (!s_stager->stageToBuffer((uint8_t*) vertexData.data(), verticesSize, indexVertexBuffer, vertexBufferOffset))
+        continue; // TODO: proper error handling
+
+      s_stager->flush();
 
       // BLAS
       const GiMaterial* material = params->shaderCache->materials[materialIndex];
 
       CgpuBlasCreateInfo blasCreateInfo = {
-        .vertexBuffer = vertexBuffer,
-        .indexBuffer = indexBuffer,
-        .maxVertex = (uint32_t) vertices.size(),
-        .triangleCount = (uint32_t) indices.size() / 3,
+        .vertexBuffer = tmpPositionBuffer,
+        .indexBuffer = tmpIndexBuffer,
+        .maxVertex = (uint32_t) positionData.size(),
+        .triangleCount = (uint32_t) indexData.size() / 3,
         .isOpaque = material->mcMat->isOpaque
       };
 
       CgpuBlas blas;
       bool blasCreated = cgpuCreateBlas(s_device, &blasCreateInfo, &blas);
 
-      cgpuDestroyBuffer(s_device, indexBuffer);
-      cgpuDestroyBuffer(s_device, vertexBuffer);
+      cgpuDestroyBuffer(s_device, tmpPositionBuffer);
+      cgpuDestroyBuffer(s_device, tmpIndexBuffer);
 
       if (!blasCreated)
       {
@@ -642,22 +657,41 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         continue;
       }
 
-      blases.push_back(blas);
+      // TODO: we're updating multiple data structures here. simplify this / clean up the code.
 
-      ProtoBlasInstance proto;
-      proto.blas = blas;
-      proto.faceIndexOffset = faceIndexOffset;
-      proto.materialIndex = materialIndex;
-      protoBlasInstances[mesh] = proto;
+      blases.push_back({
+        .blas = blas,
+        .indexVertexBuffer = indexVertexBuffer
+      });
+
+      assert(blasPayloads.size() < (1 << 25));
+
+      CgpuBlasInstance proto = {
+        .as = blas,
+        .instanceCustomIndex = uint32_t(blasPayloads.size()),
+        .hitGroupIndex = materialIndex * 2 // always two hit groups per material: regular & shadow
+      };
+      blasInstanceProtos[mesh] = proto;
+
+      uint64_t payloadBufferAddress = cgpuGetBufferAddress(s_device, indexVertexBuffer);
+      if (payloadBufferAddress == 0)
+      {
+        GB_ERROR("failed get vertex or index buffer address");
+        continue;
+      }
+
+      blasPayloads.push_back({
+        .indexVertexBuffer = payloadBufferAddress,
+        .vertexOffset = uint32_t(vertexBufferOffset / sizeof(Rp::FVertex))
+      });
+
+      totalVerticesSize += verticesSize;
+      totalIndicesSize += (indexVertexBufferSize - verticesSize); // account for padding
     }
 
-    // Create mesh instance for TLAS.
-    const ProtoBlasInstance& proto = protoBlasInstances[mesh];
+    // Create mesh instance for TLAS. All fields are cached except transform.
+    CgpuBlasInstance blasInstance = blasInstanceProtos[mesh];
 
-    CgpuBlasInstance blasInstance;
-    blasInstance.as = proto.blas;
-    blasInstance.faceIndexOffset = proto.faceIndexOffset;
-    blasInstance.hitGroupIndex = proto.materialIndex * 2; // always two hit groups per material: regular & shadow
     memcpy(blasInstance.transform, instance->transform, sizeof(float) * 12);
 
     blasInstances.push_back(blasInstance);
@@ -667,9 +701,10 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
 
 fail_cleanup:
   assert(false);
-  for (CgpuBlas blas : blases)
+  for (const GiBlas& blas : blases)
   {
-    cgpuDestroyBlas(s_device, blas);
+    cgpuDestroyBlas(s_device, blas.blas);
+    cgpuDestroyBuffer(s_device, blas.indexVertexBuffer);
   }
   return false;
 }
@@ -680,21 +715,28 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 
   GiGeomCache* cache = nullptr;
 
-  GB_LOG("instance count: {}", params->meshInstanceCount);
   GB_LOG("creating geom cache..");
   fflush(stdout);
 
-  // Build HW ASes and vertex, index buffers.
-  CgpuBuffer buffer;
+  // Build BLASes.
   CgpuTlas tlas;
-  std::vector<CgpuBlas> blases;
+  std::vector<GiBlas> blases;
   std::vector<CgpuBlasInstance> blasInstances;
-  std::vector<Rp::FVertex> allVertices;
-  std::vector<Rp::Face> allFaces;
+  std::vector<Rp::BlasPayload> blasPayloads;
+  uint64_t indicesSize = 0;
+  uint64_t verticesSize = 0;
+  CgpuBuffer addressBuffer;
 
-  if (!_giBuildGeometryStructures(params, blases, blasInstances, allVertices, allFaces))
+  if (!_giBuildGeometryStructures(params, blases, blasInstances, blasPayloads, indicesSize, verticesSize))
     goto cleanup;
 
+  GB_LOG("BLAS build finished");
+  GB_LOG("> {} unique BLAS", blases.size());
+  GB_LOG("> {} BLAS instances", blasInstances.size());
+  GB_LOG("> {:.2f} MiB total indices", indicesSize * BYTES_TO_MIB);
+  GB_LOG("> {:.2f} MiB total vertices", verticesSize * BYTES_TO_MIB);
+
+  // Create TLAS.
   {
     CgpuTlasCreateInfo tlasCreateInfo = {
       .instanceCount = (uint32_t) blasInstances.size(),
@@ -703,39 +745,25 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 
     if (!cgpuCreateTlas(s_device, &tlasCreateInfo, &tlas))
       goto cleanup;
+
+    GB_LOG("TLAS build finished");
   }
 
-  // Upload attribute buffer to GPU.
-  GiGpuBufferView faceBufferView;
-  GiGpuBufferView vertexBufferView;
+  // Upload blas buffer addresses to GPU.
   {
-    uint64_t attributeBufferSize = 0;
-    const uint64_t offset_align = s_deviceProperties.minStorageBufferOffsetAlignment;
-
-    faceBufferView.size = allFaces.size() * sizeof(Rp::Face);
-    vertexBufferView.size = allVertices.size() * sizeof(Rp::FVertex);
-
-    faceBufferView.offset = giAlignBuffer(offset_align, faceBufferView.size, &attributeBufferSize);
-    vertexBufferView.offset = giAlignBuffer(offset_align, vertexBufferView.size, &attributeBufferSize);
-
-    GB_LOG("total attribute buffer size: {:.2f} MiB", attributeBufferSize * BYTES_TO_MIB);
-    GB_LOG("> {:.2f} MiB faces", faceBufferView.size * BYTES_TO_MIB);
-    GB_LOG("> {:.2f} MiB vertices", vertexBufferView.size * BYTES_TO_MIB);
-    fflush(stdout);
+    uint64_t payloadBufferSize = blasPayloads.size() * sizeof(Rp::BlasPayload);
 
     CgpuBufferCreateInfo createInfo = {
       .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
       .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-      .size = attributeBufferSize,
-      .debugName = "AsAttributes"
+      .size = payloadBufferSize,
+      .debugName = "BlasPayloads"
     };
 
-    if (!cgpuCreateBuffer(s_device, &createInfo, &buffer))
+    if (!cgpuCreateBuffer(s_device, &createInfo, &addressBuffer))
       goto cleanup;
 
-    if (!s_stager->stageToBuffer((uint8_t*)allFaces.data(), faceBufferView.size, buffer, faceBufferView.offset))
-      goto cleanup;
-    if (!s_stager->stageToBuffer((uint8_t*)allVertices.data(), vertexBufferView.size, buffer, vertexBufferView.offset))
+    if (!s_stager->stageToBuffer((uint8_t*) blasPayloads.data(), payloadBufferSize, addressBuffer))
       goto cleanup;
   }
 
@@ -743,25 +771,24 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   cache = new GiGeomCache;
   cache->tlas = tlas;
   cache->blases = blases;
-  cache->buffer = buffer;
-  cache->faceBufferView = faceBufferView;
-  cache->vertexBufferView = vertexBufferView;
+  cache->blasPayloadAddresses = addressBuffer;
 
 cleanup:
   if (!cache)
   {
     assert(false);
-    if (buffer.handle)
+    if (addressBuffer.handle)
     {
-      cgpuDestroyBuffer(s_device, buffer);
+      cgpuDestroyBuffer(s_device, addressBuffer);
     }
     if (tlas.handle)
     {
       cgpuDestroyTlas(s_device, tlas);
     }
-    for (CgpuBlas blas : blases)
+    for (const GiBlas& blas : blases)
     {
-      cgpuDestroyBlas(s_device, blas);
+      cgpuDestroyBlas(s_device, blas.blas);
+      cgpuDestroyBuffer(s_device, blas.indexVertexBuffer);
     }
   }
   return cache;
@@ -769,12 +796,13 @@ cleanup:
 
 void giDestroyGeomCache(GiGeomCache* cache)
 {
-  for (CgpuBlas blas : cache->blases)
+  for (const GiBlas& blas : cache->blases)
   {
-    cgpuDestroyBlas(s_device, blas);
+    cgpuDestroyBlas(s_device, blas.blas);
+    cgpuDestroyBuffer(s_device, blas.indexVertexBuffer);
   }
   cgpuDestroyTlas(s_device, cache->tlas);
-  cgpuDestroyBuffer(s_device, cache->buffer);
+  cgpuDestroyBuffer(s_device, cache->blasPayloadAddresses);
   delete cache;
 }
 
@@ -1406,14 +1434,11 @@ int giRender(const GiRenderParams* params, float* rgbaImg)
   buffers.reserve(16);
 
   buffers.push_back({ .binding = Rp::BINDING_INDEX_OUT_PIXELS, .buffer = renderBuffer->buffer });
-  buffers.push_back({ .binding = Rp::BINDING_INDEX_FACES, .buffer = geom_cache->buffer,
-                      .offset = geom_cache->faceBufferView.offset, .size = geom_cache->faceBufferView.size });
-  buffers.push_back({ .binding = Rp::BINDING_INDEX_VERTICES, .buffer = geom_cache->buffer,
-                      .offset = geom_cache->vertexBufferView.offset, .size = geom_cache->vertexBufferView.size });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
   buffers.push_back({ .binding = Rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
+  buffers.push_back({ .binding = Rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = geom_cache->blasPayloadAddresses });
 
   size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + 2/* dome lights */;
 

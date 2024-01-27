@@ -28,6 +28,7 @@ namespace gtl
   {
     using GI_INT    = int32_t;
     using GI_UINT   = uint32_t;
+    using GI_UINT64 = uint64_t;
     using GI_FLOAT  = float;
     using GI_VEC2   = glm::vec2;
     using GI_VEC3   = glm::vec3;
@@ -60,6 +61,7 @@ namespace gtl
 
 #define GI_INT        int
 #define GI_UINT       uint
+#define GI_UINT64     uint64_t
 #define GI_FLOAT      float
 #define GI_VEC2       vec2
 #define GI_VEC3       vec3

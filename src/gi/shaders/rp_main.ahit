@@ -6,6 +6,8 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 #extension GL_EXT_nonuniform_qualifier: require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64: require
+#extension GL_EXT_buffer_reference: require
 
 #include "colormap.glsl"
 
@@ -30,8 +32,7 @@ void main()
 {
   State shading_state;
   vec2 hit_bc = baryCoord;
-  uint hit_face_idx = gl_InstanceCustomIndexEXT + gl_PrimitiveID;
-  setup_mdl_shading_state(hit_face_idx, hit_bc, shading_state);
+  setup_mdl_shading_state(hit_bc, shading_state);
 
   float opacity = mdl_cutout_opacity(shading_state);
 

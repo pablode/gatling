@@ -341,7 +341,7 @@ struct CgpuVertex
 struct CgpuBlasInstance
 {
   CgpuBlas as;
-  uint32_t faceIndexOffset;
+  uint32_t instanceCustomIndex;
   uint32_t hitGroupIndex;
   float transform[3][4];
 };

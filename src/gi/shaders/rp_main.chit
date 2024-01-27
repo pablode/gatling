@@ -6,6 +6,8 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 #extension GL_EXT_nonuniform_qualifier: require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64: require
+#extension GL_EXT_buffer_reference: require
 
 #include "mdl_types.glsl"
 #include "rp_main_descriptors.glsl"
@@ -160,12 +162,11 @@ void main()
 {
     /* 1. Get hit info. */
     vec2 hit_bc = baryCoord;
-    uint hit_face_idx = gl_InstanceCustomIndexEXT + gl_PrimitiveID;
     float hit_t = gl_HitTEXT;
 
     /* 2. Set up shading state. */
     State shading_state; // Shading_state_material
-    setup_mdl_shading_state(hit_face_idx, hit_bc, shading_state);
+    setup_mdl_shading_state(hit_bc, shading_state);
 
     // we keep a copy of the normal here since it can be changed within the state by *_init() functions:
     // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
