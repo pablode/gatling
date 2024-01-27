@@ -792,7 +792,12 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   m_giMesh = giCreateMesh(&desc);
 }
 
-const GiMesh* HdGatlingMesh::GetGiMesh() const
+void HdGatlingMesh::Finalize(HdRenderParam* renderParam)
+{
+  giDestroyMesh(m_giMesh);
+}
+
+GiMesh* HdGatlingMesh::GetGiMesh() const
 {
   return m_giMesh;
 }

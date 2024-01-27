@@ -52,7 +52,7 @@ private:
   void _BakeMeshes(HdRenderIndex* renderIndex,
                    GfMatrix4d rootTransform,
                    std::vector<const GiMaterial*>& materials,
-                   std::vector<const GiMesh*>& meshes,
+                   std::vector<GiMesh*>& meshes,
                    std::vector<GiMeshInstance>& instances);
 
   void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const;

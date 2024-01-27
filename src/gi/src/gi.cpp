@@ -69,17 +69,10 @@ struct GiGpuBufferView
   uint64_t size;
 };
 
-struct GiBlas
-{
-  CgpuBlas blas;
-  CgpuBuffer indexVertexBuffer;
-};
-
 struct GiGeomCache
 {
-  std::vector<GiBlas> blases;
-  CgpuTlas              tlas;
-  CgpuBuffer            blasPayloadAddresses;
+  CgpuTlas tlas;
+  CgpuBuffer blasPayloadAddresses;
 };
 
 struct GiShaderCache
@@ -105,8 +98,12 @@ struct GiMaterial
 
 struct GiMesh
 {
+  // CPU
   std::vector<GiFace> faces;
   std::vector<GiVertex> vertices;
+  // GPU
+  CgpuBlas blas;
+  CgpuBuffer indexVertexBuffer;
 };
 
 struct GiSphereLight
@@ -486,44 +483,58 @@ GiMesh* giCreateMesh(const GiMeshDesc* desc)
   return mesh;
 }
 
-bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
-                                std::vector<GiBlas>& blases,
+void giDestroyMesh(GiMesh* mesh)
+{
+  if (mesh->blas.handle)
+  {
+    cgpuDestroyBlas(s_device, mesh->blas);
+  }
+  if (mesh->indexVertexBuffer.handle)
+  {
+    cgpuDestroyBuffer(s_device, mesh->indexVertexBuffer);
+  }
+}
+
+void _giBuildGeometryStructures(GiGeomCacheParams* params,
                                 std::vector<CgpuBlasInstance>& blasInstances,
                                 std::vector<Rp::BlasPayload>& blasPayloads,
+                                uint32_t& totalBlasCount,
                                 uint64_t& totalIndicesSize,
                                 uint64_t& totalVerticesSize)
 {
-  std::unordered_map<const GiMesh*, CgpuBlasInstance> blasInstanceProtos;
+  std::unordered_map<const GiMesh*, uint32_t> blasIndices;
 
   for (uint32_t m = 0; m < params->meshInstanceCount; m++)
   {
-    const GiMeshInstance* instance = &params->meshInstances[m];
-    const GiMesh* mesh = instance->mesh;
+    GiMeshInstance* instance = &params->meshInstances[m];
+    GiMesh* mesh = instance->mesh;
 
     if (mesh->faces.empty())
     {
       continue;
     }
 
-    // Build mesh BLAS & buffers if they don't exist yet.
-    if (blasInstanceProtos.count(mesh) == 0)
+    // Find material for SBT index (FIXME: find a better solution)
+    uint32_t materialIndex = UINT32_MAX;
+    GiShaderCache* shaderCache = params->shaderCache;
+    for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
     {
-      // Find material for SBT index (FIXME: find a better solution)
-      uint32_t materialIndex = UINT32_MAX;
-      GiShaderCache* shaderCache = params->shaderCache;
-      for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
+      if (shaderCache->materials[i] == instance->material)
       {
-        if (shaderCache->materials[i] == instance->material)
-        {
-          materialIndex = i;
-          break;
-        }
+        materialIndex = i;
+        break;
       }
-      if (materialIndex == UINT32_MAX)
-      {
-        GB_ERROR("invalid BLAS material");
-        continue;
-      }
+    }
+    if (materialIndex == UINT32_MAX)
+    {
+      GB_ERROR("invalid BLAS material");
+      continue;
+    }
+
+    // Build mesh BLAS & buffers if they don't exist yet.
+    if (!mesh->blas.handle)
+    {
+      assert(!mesh->indexVertexBuffer.handle);
 
       // Vertices
       std::vector<Rp::FVertex> vertexData;
@@ -566,7 +577,6 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       // Buffer upload
       CgpuBuffer tmpPositionBuffer;
       CgpuBuffer tmpIndexBuffer;
-      CgpuBuffer indexVertexBuffer;
 
       uint64_t indicesSize = indexData.size() * sizeof(uint32_t);
       uint64_t verticesSize = vertexData.size() * sizeof(Rp::FVertex);
@@ -583,7 +593,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         .size = indexVertexBufferSize,
         .debugName = "BlasIndexVertexBuffer"
       };
-      if (!cgpuCreateBuffer(s_device, &indexVertexBufferCreateInfo, &indexVertexBuffer))
+      if (!cgpuCreateBuffer(s_device, &indexVertexBufferCreateInfo, &mesh->indexVertexBuffer))
       {
         GB_ERROR("failed to allocate BLAS vertices memory");
         continue;
@@ -597,7 +607,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       };
       if (!cgpuCreateBuffer(s_device, &tmpPositionBufferCreateInfo, &tmpPositionBuffer))
       {
-        cgpuDestroyBuffer(s_device, indexVertexBuffer);
+        cgpuDestroyBuffer(s_device, mesh->indexVertexBuffer);
         GB_ERROR("failed to allocate BLAS vertex position memory");
         continue;
       }
@@ -610,7 +620,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       };
       if (!cgpuCreateBuffer(s_device, &tmpIndexBufferCreateInfo, &tmpIndexBuffer))
       {
-        cgpuDestroyBuffer(s_device, indexVertexBuffer);
+        cgpuDestroyBuffer(s_device, mesh->indexVertexBuffer);
         cgpuDestroyBuffer(s_device, tmpPositionBuffer);
         GB_ERROR("failed to allocate BLAS temp indices memory");
         continue;
@@ -626,15 +636,15 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
       memcpy(mappedMem, indexData.data(), tmpIndexBufferSize);
       cgpuUnmapBuffer(s_device, tmpIndexBuffer);
 
-      if (!s_stager->stageToBuffer((uint8_t*) indexData.data(), indicesSize, indexVertexBuffer, 0))
+      if (!s_stager->stageToBuffer((uint8_t*) indexData.data(), indicesSize, mesh->indexVertexBuffer, 0))
         continue; // TODO: proper error handling
 
-      if (!s_stager->stageToBuffer((uint8_t*) vertexData.data(), verticesSize, indexVertexBuffer, vertexBufferOffset))
+      if (!s_stager->stageToBuffer((uint8_t*) vertexData.data(), verticesSize, mesh->indexVertexBuffer, vertexBufferOffset))
         continue; // TODO: proper error handling
 
       s_stager->flush();
 
-      // BLAS
+      // BLAS build
       const GiMaterial* material = params->shaderCache->materials[materialIndex];
 
       CgpuBlasCreateInfo blasCreateInfo = {
@@ -645,8 +655,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         .isOpaque = material->mcMat->isOpaque
       };
 
-      CgpuBlas blas;
-      bool blasCreated = cgpuCreateBlas(s_device, &blasCreateInfo, &blas);
+      bool blasCreated = cgpuCreateBlas(s_device, &blasCreateInfo, &mesh->blas);
 
       cgpuDestroyBuffer(s_device, tmpPositionBuffer);
       cgpuDestroyBuffer(s_device, tmpIndexBuffer);
@@ -657,23 +666,7 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         continue;
       }
 
-      // TODO: we're updating multiple data structures here. simplify this / clean up the code.
-
-      blases.push_back({
-        .blas = blas,
-        .indexVertexBuffer = indexVertexBuffer
-      });
-
-      assert(blasPayloads.size() < (1 << 25));
-
-      CgpuBlasInstance proto = {
-        .as = blas,
-        .instanceCustomIndex = uint32_t(blasPayloads.size()),
-        .hitGroupIndex = materialIndex * 2 // always two hit groups per material: regular & shadow
-      };
-      blasInstanceProtos[mesh] = proto;
-
-      uint64_t payloadBufferAddress = cgpuGetBufferAddress(s_device, indexVertexBuffer);
+      uint64_t payloadBufferAddress = cgpuGetBufferAddress(s_device, mesh->indexVertexBuffer);
       if (payloadBufferAddress == 0)
       {
         GB_ERROR("failed get vertex or index buffer address");
@@ -685,31 +678,30 @@ bool _giBuildGeometryStructures(const GiGeomCacheParams* params,
         .vertexOffset = uint32_t(vertexBufferOffset / sizeof(Rp::FVertex))
       });
 
+      if (blasIndices.size() >= (1 << 25))
+      {
+        GB_ERROR("too many BLASes, cutting off leftover");
+        continue;
+      }
+      blasIndices[mesh] = blasIndices.size();
+
+      totalBlasCount++;
       totalVerticesSize += verticesSize;
       totalIndicesSize += (indexVertexBufferSize - verticesSize); // account for padding
     }
 
-    // Create mesh instance for TLAS. All fields are cached except transform.
-    CgpuBlasInstance blasInstance = blasInstanceProtos[mesh];
-
+    // Describe BLAS instance for TLAS
+    CgpuBlasInstance blasInstance;
+    blasInstance.as = mesh->blas;
+    blasInstance.instanceCustomIndex = blasIndices[mesh];
+    blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
     memcpy(blasInstance.transform, instance->transform, sizeof(float) * 12);
 
     blasInstances.push_back(blasInstance);
   }
-
-  return true;
-
-fail_cleanup:
-  assert(false);
-  for (const GiBlas& blas : blases)
-  {
-    cgpuDestroyBlas(s_device, blas.blas);
-    cgpuDestroyBuffer(s_device, blas.indexVertexBuffer);
-  }
-  return false;
 }
 
-GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
+GiGeomCache* giCreateGeomCache(GiGeomCacheParams* params)
 {
   s_forceGeomCacheInvalid = false;
 
@@ -720,18 +712,17 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 
   // Build BLASes.
   CgpuTlas tlas;
-  std::vector<GiBlas> blases;
   std::vector<CgpuBlasInstance> blasInstances;
   std::vector<Rp::BlasPayload> blasPayloads;
+  uint32_t blasCount = 0;
   uint64_t indicesSize = 0;
   uint64_t verticesSize = 0;
   CgpuBuffer addressBuffer;
 
-  if (!_giBuildGeometryStructures(params, blases, blasInstances, blasPayloads, indicesSize, verticesSize))
-    goto cleanup;
+  _giBuildGeometryStructures(params, blasInstances, blasPayloads, blasCount, indicesSize, verticesSize);
 
   GB_LOG("BLAS build finished");
-  GB_LOG("> {} unique BLAS", blases.size());
+  GB_LOG("> {} unique BLAS", blasCount);
   GB_LOG("> {} BLAS instances", blasInstances.size());
   GB_LOG("> {:.2f} MiB total indices", indicesSize * BYTES_TO_MIB);
   GB_LOG("> {:.2f} MiB total vertices", verticesSize * BYTES_TO_MIB);
@@ -770,7 +761,6 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   // Fill cache struct.
   cache = new GiGeomCache;
   cache->tlas = tlas;
-  cache->blases = blases;
   cache->blasPayloadAddresses = addressBuffer;
 
 cleanup:
@@ -785,22 +775,12 @@ cleanup:
     {
       cgpuDestroyTlas(s_device, tlas);
     }
-    for (const GiBlas& blas : blases)
-    {
-      cgpuDestroyBlas(s_device, blas.blas);
-      cgpuDestroyBuffer(s_device, blas.indexVertexBuffer);
-    }
   }
   return cache;
 }
 
 void giDestroyGeomCache(GiGeomCache* cache)
 {
-  for (const GiBlas& blas : cache->blases)
-  {
-    cgpuDestroyBlas(s_device, blas.blas);
-    cgpuDestroyBuffer(s_device, blas.indexVertexBuffer);
-  }
   cgpuDestroyTlas(s_device, cache->tlas);
   cgpuDestroyBuffer(s_device, cache->blasPayloadAddresses);
   delete cache;

@@ -41,7 +41,9 @@ public:
 
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
-  const GiMesh* GetGiMesh() const;
+  void Finalize(HdRenderParam* renderParam) override;
+
+  GiMesh* GetGiMesh() const;
 
   const GfMatrix4d& GetPrototypeTransform() const;
 

@@ -114,7 +114,7 @@ bool HdGatlingRenderPass::IsConverged() const
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
                                       std::vector<const GiMaterial*>& materials,
-                                      std::vector<const GiMesh*>& meshes,
+                                      std::vector<GiMesh*>& meshes,
                                       std::vector<GiMeshInstance>& instances)
 {
   _ClearMaterials();
@@ -139,7 +139,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       continue;
     }
 
-    const GiMesh* giMesh = mesh->GetGiMesh();
+    GiMesh* giMesh = mesh->GetGiMesh();
     if (!giMesh)
     {
       continue;
@@ -412,7 +412,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
     // FIXME: cache results for shader cache rebuild
     std::vector<const GiMaterial*> materials;
-    std::vector<const GiMesh*> meshes;
+    std::vector<GiMesh*> meshes;
     std::vector<GiMeshInstance> instances;
     _BakeMeshes(renderIndex, m_rootMatrix, materials, meshes, instances);
 

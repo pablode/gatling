@@ -97,7 +97,7 @@ struct GiMeshDesc
 struct GiMeshInstance
 {
   const GiMaterial* material;
-  const GiMesh* mesh;
+  GiMesh* mesh;
   float transform[3][4];
 };
 
@@ -116,9 +116,9 @@ struct GiShaderCacheParams
 
 struct GiGeomCacheParams
 {
-  uint32_t              meshInstanceCount;
-  const GiMeshInstance* meshInstances;
-  GiShaderCache*        shaderCache;
+  uint32_t        meshInstanceCount;
+  GiMeshInstance* meshInstances;
+  GiShaderCache*  shaderCache;
 };
 
 struct GiRenderParams
@@ -167,8 +167,9 @@ GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIde
 void giDestroyMaterial(GiMaterial* mat);
 
 GiMesh* giCreateMesh(const GiMeshDesc* desc);
+void giDestroyMesh(GiMesh* mesh);
 
-GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params);
+GiGeomCache* giCreateGeomCache(GiGeomCacheParams* params);
 void giDestroyGeomCache(GiGeomCache* cache);
 
 GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params);
