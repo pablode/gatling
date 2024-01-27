@@ -2416,9 +2416,16 @@ bool cgpuCreateTlas(CgpuDevice device,
         CGPU_RETURN_ERROR_INVALID_HANDLE;
       }
 
+      uint32_t instanceCustomIndex = createInfo->instances[i].instanceCustomIndex;
+      if ((instanceCustomIndex & 0xFF000000u) != 0u)
+      {
+        cgpuDestroyIBuffer(idevice, &itlas->instances);
+        CGPU_RETURN_ERROR("instanceCustomIndex must be smaller than 2^24");
+      }
+
       VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];
       memcpy(&asInstance->transform, &createInfo->instances[i].transform, sizeof(VkTransformMatrixKHR));
-      asInstance->instanceCustomIndex = createInfo->instances[i].faceIndexOffset;
+      asInstance->instanceCustomIndex = instanceCustomIndex;
       asInstance->mask = 0xFF;
       asInstance->instanceShaderBindingTableRecordOffset = createInfo->instances[i].hitGroupIndex;
       asInstance->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;

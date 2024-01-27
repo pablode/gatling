@@ -1,11 +1,26 @@
-void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State state)
-{
-    vec3 bc = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+#ifndef MDL_SHADING_STATE
+#define MDL_SHADING_STATE
 
-    Face f = faces[hit_face_idx];
-    FVertex v_0 = vertices[f.v_0];
-    FVertex v_1 = vertices[f.v_1];
-    FVertex v_2 = vertices[f.v_2];
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer IndexBuffer {
+  Face data[];
+};
+layout(buffer_reference, std430, buffer_reference_align = 32) buffer VertexBuffer {
+  FVertex data[];
+};
+
+void setup_mdl_shading_state(in vec2 hit_bc, out State state)
+{
+    BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
+    IndexBuffer indices = IndexBuffer(payload.indexVertexBuffer);
+    VertexBuffer vertices = VertexBuffer(payload.indexVertexBuffer);
+
+    Face f = indices.data[gl_PrimitiveID];
+    uint vertexOffset = payload.vertexOffset;
+    FVertex v_0 = vertices.data[vertexOffset + f.v_0];
+    FVertex v_1 = vertices.data[vertexOffset + f.v_1];
+    FVertex v_2 = vertices.data[vertexOffset + f.v_2];
+
+    vec3 bc = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
 
     // Position and geometry normal
     vec3 p_0 = v_0.field1.xyz;
@@ -66,3 +81,5 @@ void setup_mdl_shading_state(in uint hit_face_idx, in vec2 hit_bc, out State sta
     state.object_to_world = mat4(gl_ObjectToWorldEXT);
 #endif
 }
+
+#endif

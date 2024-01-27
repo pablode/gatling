@@ -3,8 +3,6 @@
 
 layout(binding = BINDING_INDEX_OUT_PIXELS, std430) buffer Framebuffer { vec4 pixels[]; };
 
-layout(binding = BINDING_INDEX_FACES, std430) readonly buffer FacesBuffer { Face faces[]; };
-
 #if SPHERE_LIGHT_COUNT > 0
 layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLightBuffer { SphereLight sphereLights[]; };
 #endif
@@ -21,8 +19,6 @@ layout(binding = BINDING_INDEX_RECT_LIGHTS, std430) readonly buffer RectLightBuf
 layout(binding = BINDING_INDEX_DISK_LIGHTS, std430) readonly buffer DiskLightBuffer { DiskLight diskLights[]; };
 #endif
 
-layout(binding = BINDING_INDEX_VERTICES, std430) readonly buffer VerticesBuffer { FVertex vertices[]; };
-
 #if (TEXTURE_COUNT_2D > 0) || (TEXTURE_COUNT_3D > 0)
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 #endif
@@ -36,5 +32,9 @@ layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[TEXTUR
 #endif
 
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
+
+layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) buffer BlasPayloadBuffer {
+  BlasPayload blas_payloads[];
+};
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
