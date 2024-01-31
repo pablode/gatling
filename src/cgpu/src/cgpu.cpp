@@ -1048,7 +1048,7 @@ bool cgpuDestroyDevice(CgpuDevice device)
 }
 
 bool cgpuCreateShader(CgpuDevice device,
-                      const CgpuShaderCreateInfo* createInfo,
+                      CgpuShaderCreateInfo createInfo,
                       CgpuShader* shader)
 {
   CgpuIDevice* idevice;
@@ -1067,8 +1067,8 @@ bool cgpuCreateShader(CgpuDevice device,
     .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
     .pNext = nullptr,
     .flags = 0,
-    .codeSize = createInfo->size,
-    .pCode = (uint32_t*) createInfo->source,
+    .codeSize = createInfo.size,
+    .pCode = (uint32_t*) createInfo.source,
   };
 
   VkResult result = idevice->table.vkCreateShaderModule(
@@ -1082,7 +1082,7 @@ bool cgpuCreateShader(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to create shader module");
   }
 
-  if (!cgpuReflectShader((uint32_t*) createInfo->source, createInfo->size, &ishader->reflection))
+  if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
   {
     idevice->table.vkDestroyShaderModule(
       idevice->logicalDevice,
@@ -1093,12 +1093,12 @@ bool cgpuCreateShader(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to reflect shader");
   }
 
-  if (iinstance->debugUtilsEnabled && createInfo->debugName)
+  if (iinstance->debugUtilsEnabled && createInfo.debugName)
   {
-    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t) ishader->module, createInfo->debugName);
+    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t) ishader->module, createInfo.debugName);
   }
 
-  ishader->stageFlags = (VkShaderStageFlagBits) createInfo->stageFlags;
+  ishader->stageFlags = (VkShaderStageFlagBits) createInfo.stageFlags;
 
   return true;
 }
@@ -1182,7 +1182,7 @@ static bool cgpuCreateIBufferAligned(CgpuIDevice* idevice,
 }
 
 static bool cgpuCreateBufferAligned(CgpuDevice device,
-                                    const CgpuBufferCreateInfo* createInfo,
+                                    CgpuBufferCreateInfo createInfo,
                                     uint64_t alignment,
                                     CgpuBuffer* buffer)
 {
@@ -1198,22 +1198,22 @@ static bool cgpuCreateBufferAligned(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
-  if (!cgpuCreateIBufferAligned(idevice, createInfo->usage, createInfo->memoryProperties, createInfo->size, alignment, ibuffer))
+  if (!cgpuCreateIBufferAligned(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size, alignment, ibuffer))
   {
     iinstance->ibufferStore.free(buffer->handle);
     CGPU_RETURN_ERROR("failed to create buffer");
   }
 
-  if (iinstance->debugUtilsEnabled && createInfo->debugName)
+  if (iinstance->debugUtilsEnabled && createInfo.debugName)
   {
-    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t) ibuffer->buffer, createInfo->debugName);
+    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t) ibuffer->buffer, createInfo.debugName);
   }
 
   return true;
 }
 
 bool cgpuCreateBuffer(CgpuDevice device,
-                      const CgpuBufferCreateInfo* createInfo,
+                      CgpuBufferCreateInfo createInfo,
                       CgpuBuffer* buffer)
 {
   uint64_t alignment = 0;
@@ -1299,7 +1299,7 @@ uint64_t cgpuGetBufferAddress(CgpuDevice device, CgpuBuffer buffer)
 }
 
 bool cgpuCreateImage(CgpuDevice device,
-                     const CgpuImageCreateInfo* createInfo,
+                     CgpuImageCreateInfo createInfo,
                      CgpuImage* image)
 {
   CgpuIDevice* idevice;
@@ -1316,7 +1316,7 @@ bool cgpuCreateImage(CgpuDevice device,
 
   // FIXME: check device support
   VkImageTiling vkImageTiling = VK_IMAGE_TILING_OPTIMAL;
-  if (!createInfo->is3d && ((createInfo->usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) | (createInfo->usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST)))
+  if (!createInfo.is3d && ((createInfo.usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) | (createInfo.usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST)))
   {
     vkImageTiling = VK_IMAGE_TILING_LINEAR;
   }
@@ -1325,18 +1325,18 @@ bool cgpuCreateImage(CgpuDevice device,
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .pNext = nullptr,
     .flags = 0,
-    .imageType = createInfo->is3d ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D,
-    .format = (VkFormat) createInfo->format,
+    .imageType = createInfo.is3d ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D,
+    .format = (VkFormat) createInfo.format,
     .extent = {
-      .width = createInfo->width,
-      .height = createInfo->height,
-      .depth = createInfo->is3d ? createInfo->depth : 1,
+      .width = createInfo.width,
+      .height = createInfo.height,
+      .depth = createInfo.is3d ? createInfo.depth : 1,
     },
     .mipLevels = 1,
     .arrayLayers = 1,
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .tiling = vkImageTiling,
-    .usage = (VkImageUsageFlags) createInfo->usage,
+    .usage = (VkImageUsageFlags) createInfo.usage,
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .queueFamilyIndexCount = 0,
     .pQueueFamilyIndices = nullptr,
@@ -1370,8 +1370,8 @@ bool cgpuCreateImage(CgpuDevice device,
     .pNext = nullptr,
     .flags = 0,
     .image = iimage->image,
-    .viewType = createInfo->is3d ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D,
-    .format = (VkFormat) createInfo->format,
+    .viewType = createInfo.is3d ? VK_IMAGE_VIEW_TYPE_3D : VK_IMAGE_VIEW_TYPE_2D,
+    .format = (VkFormat) createInfo.format,
     .components = {
       .r = VK_COMPONENT_SWIZZLE_IDENTITY,
       .g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -1400,14 +1400,14 @@ bool cgpuCreateImage(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to create image view");
   }
 
-  if (iinstance->debugUtilsEnabled && createInfo->debugName)
+  if (iinstance->debugUtilsEnabled && createInfo.debugName)
   {
-    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_IMAGE, (uint64_t) iimage->image, createInfo->debugName);
+    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_IMAGE, (uint64_t) iimage->image, createInfo.debugName);
   }
 
-  iimage->width = createInfo->width;
-  iimage->height = createInfo->height;
-  iimage->depth = createInfo->is3d ? createInfo->depth : 1;
+  iimage->width = createInfo.width;
+  iimage->height = createInfo.height;
+  iimage->depth = createInfo.is3d ? createInfo.depth : 1;
   iimage->layout = imageCreateInfo.initialLayout;
   iimage->accessMask = 0;
 
@@ -1469,7 +1469,7 @@ bool cgpuUnmapImage(CgpuDevice device, CgpuImage image)
 }
 
 bool cgpuCreateSampler(CgpuDevice device,
-                       const CgpuSamplerCreateInfo* createInfo,
+                       CgpuSamplerCreateInfo createInfo,
                        CgpuSampler* sampler)
 {
   CgpuIDevice* idevice;
@@ -1485,9 +1485,9 @@ bool cgpuCreateSampler(CgpuDevice device,
   }
 
   // Emulate MDL's clip wrap mode if necessary; use optimal mode (according to ARM) if not.
-  bool clampToBlack = (createInfo->addressModeU == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
-                      (createInfo->addressModeV == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
-                      (createInfo->addressModeW == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK);
+  bool clampToBlack = (createInfo.addressModeU == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
+                      (createInfo.addressModeV == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
+                      (createInfo.addressModeW == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK);
 
   VkSamplerCreateInfo samplerCreateInfo = {
     .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -1496,9 +1496,9 @@ bool cgpuCreateSampler(CgpuDevice device,
     .magFilter = VK_FILTER_LINEAR,
     .minFilter = VK_FILTER_LINEAR,
     .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-    .addressModeU = cgpuTranslateAddressMode(createInfo->addressModeU),
-    .addressModeV = cgpuTranslateAddressMode(createInfo->addressModeV),
-    .addressModeW = cgpuTranslateAddressMode(createInfo->addressModeW),
+    .addressModeU = cgpuTranslateAddressMode(createInfo.addressModeU),
+    .addressModeV = cgpuTranslateAddressMode(createInfo.addressModeV),
+    .addressModeW = cgpuTranslateAddressMode(createInfo.addressModeW),
     .mipLodBias = 0.0f,
     .anisotropyEnable = VK_FALSE,
     .maxAnisotropy = 1.0f,
@@ -1722,7 +1722,7 @@ static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice, CgpuIPipeline* i
 }
 
 bool cgpuCreateComputePipeline(CgpuDevice device,
-                               const CgpuComputePipelineCreateInfo* createInfo,
+                               CgpuComputePipelineCreateInfo createInfo,
                                CgpuPipeline* pipeline)
 {
   CgpuIDevice* idevice;
@@ -1730,7 +1730,7 @@ bool cgpuCreateComputePipeline(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   CgpuIShader* ishader;
-  if (!cgpuResolveShader(createInfo->shader, &ishader)) {
+  if (!cgpuResolveShader(createInfo.shader, &ishader)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
@@ -1812,9 +1812,9 @@ bool cgpuCreateComputePipeline(CgpuDevice device,
     CGPU_RETURN_ERROR("failed to create compute pipeline");
   }
 
-  if (iinstance->debugUtilsEnabled && createInfo->debugName)
+  if (iinstance->debugUtilsEnabled && createInfo.debugName)
   {
-    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline,createInfo->debugName);
+    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline, createInfo.debugName);
   }
 
   ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
@@ -1899,7 +1899,7 @@ static bool cgpuCreateRtPipelineSbt(CgpuIDevice* idevice,
 }
 
 bool cgpuCreateRtPipeline(CgpuDevice device,
-                          const CgpuRtPipelineCreateInfo* createInfo,
+                          CgpuRtPipelineCreateInfo createInfo,
                           CgpuPipeline* pipeline)
 {
   CgpuIDevice* idevice;
@@ -1919,7 +1919,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
   // In a ray tracing pipeline, all shaders are expected to have the same descriptor set layouts. Here, we
   // construct the descriptor set layouts and the pipeline layout from only the ray generation shader.
   CgpuIShader* irgenShader;
-  if (!cgpuResolveShader(createInfo->rgenShader, &irgenShader)) {
+  if (!cgpuResolveShader(createInfo.rgenShader, &irgenShader)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
@@ -1944,14 +1944,14 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
   pushStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR, irgenShader->module);
 
   // Miss
-  if (createInfo->missShaderCount > 0)
+  if (createInfo.missShaderCount > 0)
   {
     shaderStageFlags |= VK_SHADER_STAGE_MISS_BIT_KHR;
   }
-  for (uint32_t i = 0; i < createInfo->missShaderCount; i++)
+  for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
   {
     CgpuIShader* imiss_shader;
-    if (!cgpuResolveShader(createInfo->missShaders[i], &imiss_shader)) {
+    if (!cgpuResolveShader(createInfo.missShaders[i], &imiss_shader)) {
       CGPU_RETURN_ERROR_INVALID_HANDLE;
     }
     assert(imiss_shader->module);
@@ -1960,9 +1960,9 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
   }
 
   // Hit
-  for (uint32_t i = 0; i < createInfo->hitGroupCount; i++)
+  for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
   {
-    const CgpuRtHitGroup* hitGroup = &createInfo->hitGroups[i];
+    const CgpuRtHitGroup* hitGroup = &createInfo.hitGroups[i];
 
     // Closest hit (optional)
     if (hitGroup->closestHitShader.handle)
@@ -1993,7 +1993,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
 
   // Set up groups
   GbSmallVector<VkRayTracingShaderGroupCreateInfoKHR, 128> groups;
-  groups.resize(1/*rgen*/ + createInfo->missShaderCount + createInfo->hitGroupCount);
+  groups.resize(1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount);
 
   for (uint32_t i = 0; i < groups.size(); i++)
   {
@@ -2013,11 +2013,11 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
   bool anyNullClosestHitShader = false;
   bool anyNullAnyHitShader = false;
 
-  uint32_t hitStageAndGroupOffset = 1/*rgen*/ + createInfo->missShaderCount;
+  uint32_t hitStageAndGroupOffset = 1/*rgen*/ + createInfo.missShaderCount;
   uint32_t hitShaderStageIndex = hitStageAndGroupOffset;
-  for (uint32_t i = 0; i < createInfo->hitGroupCount; i++)
+  for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
   {
-    const CgpuRtHitGroup* hit_group = &createInfo->hitGroups[i];
+    const CgpuRtHitGroup* hit_group = &createInfo.hitGroups[i];
 
     uint32_t groupIndex = hitStageAndGroupOffset + i;
     groups[groupIndex].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
@@ -2054,7 +2054,7 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
 
   // Create pipeline.
   {
-    uint32_t groupCount = hitStageAndGroupOffset + createInfo->hitGroupCount;
+    uint32_t groupCount = hitStageAndGroupOffset + createInfo.hitGroupCount;
 
     VkPipelineCreateFlags flags = 0;
     if (!anyNullClosestHitShader)
@@ -2097,14 +2097,14 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
     ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
     // Create the SBT.
-    if (!cgpuCreateRtPipelineSbt(idevice, ipipeline, groupCount, createInfo->missShaderCount, createInfo->hitGroupCount))
+    if (!cgpuCreateRtPipelineSbt(idevice, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount))
     {
       goto cleanup_fail;
     }
 
-    if (iinstance->debugUtilsEnabled && createInfo->debugName)
+    if (iinstance->debugUtilsEnabled && createInfo.debugName)
     {
-      cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline, createInfo->debugName);
+      cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline, createInfo.debugName);
     }
 
     return true;
@@ -2296,7 +2296,7 @@ static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
 }
 
 bool cgpuCreateBlas(CgpuDevice device,
-                    const CgpuBlasCreateInfo* createInfo,
+                    CgpuBlasCreateInfo createInfo,
                     CgpuBlas* blas)
 {
   CgpuIDevice* idevice;
@@ -2311,11 +2311,11 @@ bool cgpuCreateBlas(CgpuDevice device,
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   CgpuIBuffer* ivertexBuffer;
-  if (!cgpuResolveBuffer(createInfo->vertexBuffer, &ivertexBuffer)) {
+  if (!cgpuResolveBuffer(createInfo.vertexBuffer, &ivertexBuffer)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
   CgpuIBuffer* iindexBuffer;
-  if (!cgpuResolveBuffer(createInfo->indexBuffer, &iindexBuffer)) {
+  if (!cgpuResolveBuffer(createInfo.indexBuffer, &iindexBuffer)) {
     CGPU_RETURN_ERROR_INVALID_HANDLE;
   }
 
@@ -2327,7 +2327,7 @@ bool cgpuCreateBlas(CgpuDevice device,
       .deviceAddress = cgpuGetBufferDeviceAddress(idevice, ivertexBuffer),
     },
     .vertexStride = sizeof(CgpuVertex),
-    .maxVertex = createInfo->maxVertex,
+    .maxVertex = createInfo.maxVertex,
     .indexType = VK_INDEX_TYPE_UINT32,
     .indexData = {
       .deviceAddress = cgpuGetBufferDeviceAddress(idevice, iindexBuffer),
@@ -2346,19 +2346,19 @@ bool cgpuCreateBlas(CgpuDevice device,
     .pNext = nullptr,
     .geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
     .geometry = asGeomData,
-    .flags = createInfo->isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
+    .flags = createInfo.isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
   };
 
-  bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, createInfo->triangleCount, &iblas->buffer, &iblas->as);
+  bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR, &asGeom, createInfo.triangleCount, &iblas->buffer, &iblas->as);
 
   if (!creationSuccessul)
   {
     CGPU_RETURN_ERROR("failed to build BLAS");
   }
 
-  if (iinstance->debugUtilsEnabled && createInfo->debugName)
+  if (iinstance->debugUtilsEnabled && createInfo.debugName)
   {
-    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) iblas->as, createInfo->debugName);
+    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) iblas->as, createInfo.debugName);
   }
 
   VkAccelerationStructureDeviceAddressInfoKHR asAddressInfo = {
@@ -2368,13 +2368,13 @@ bool cgpuCreateBlas(CgpuDevice device,
   };
   iblas->address = idevice->table.vkGetAccelerationStructureDeviceAddressKHR(idevice->logicalDevice, &asAddressInfo);
 
-  iblas->isOpaque = createInfo->isOpaque;
+  iblas->isOpaque = createInfo.isOpaque;
 
   return true;
 }
 
 bool cgpuCreateTlas(CgpuDevice device,
-                    const CgpuTlasCreateInfo* createInfo,
+                    CgpuTlasCreateInfo createInfo,
                     CgpuTlas* tlas)
 {
   CgpuIDevice* idevice;
@@ -2393,7 +2393,7 @@ bool cgpuCreateTlas(CgpuDevice device,
   if (!cgpuCreateIBufferAligned(idevice,
                                 CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                                 CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                                createInfo->instanceCount * sizeof(VkAccelerationStructureInstanceKHR), 0,
+                                createInfo.instanceCount * sizeof(VkAccelerationStructureInstanceKHR), 0,
                                 &itlas->instances))
   {
     CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
@@ -2408,15 +2408,15 @@ bool cgpuCreateTlas(CgpuDevice device,
       CGPU_RETURN_ERROR("failed to map buffer memory");
     }
 
-    for (uint32_t i = 0; i < createInfo->instanceCount; i++)
+    for (uint32_t i = 0; i < createInfo.instanceCount; i++)
     {
       CgpuIBlas* iblas;
-      if (!cgpuResolveBlas(createInfo->instances[i].as, &iblas)) {
+      if (!cgpuResolveBlas(createInfo.instances[i].as, &iblas)) {
         cgpuDestroyIBuffer(idevice, &itlas->instances);
         CGPU_RETURN_ERROR_INVALID_HANDLE;
       }
 
-      uint32_t instanceCustomIndex = createInfo->instances[i].instanceCustomIndex;
+      uint32_t instanceCustomIndex = createInfo.instances[i].instanceCustomIndex;
       if ((instanceCustomIndex & 0xFF000000u) != 0u)
       {
         cgpuDestroyIBuffer(idevice, &itlas->instances);
@@ -2424,10 +2424,10 @@ bool cgpuCreateTlas(CgpuDevice device,
       }
 
       VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];
-      memcpy(&asInstance->transform, &createInfo->instances[i].transform, sizeof(VkTransformMatrixKHR));
+      memcpy(&asInstance->transform, &createInfo.instances[i].transform, sizeof(VkTransformMatrixKHR));
       asInstance->instanceCustomIndex = instanceCustomIndex;
       asInstance->mask = 0xFF;
-      asInstance->instanceShaderBindingTableRecordOffset = createInfo->instances[i].hitGroupIndex;
+      asInstance->instanceShaderBindingTableRecordOffset = createInfo.instances[i].hitGroupIndex;
       asInstance->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
       asInstance->accelerationStructureReference = iblas->address;
 
@@ -2455,15 +2455,15 @@ bool cgpuCreateTlas(CgpuDevice device,
     .flags = areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
   };
 
-  if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo->instanceCount, &itlas->buffer, &itlas->as))
+  if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as))
   {
     cgpuDestroyIBuffer(idevice, &itlas->instances);
     CGPU_RETURN_ERROR("failed to build TLAS");
   }
 
-  if (iinstance->debugUtilsEnabled && createInfo->debugName)
+  if (iinstance->debugUtilsEnabled && createInfo.debugName)
   {
-    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) itlas->as, createInfo->debugName);
+    cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) itlas->as, createInfo.debugName);
   }
 
   return true;

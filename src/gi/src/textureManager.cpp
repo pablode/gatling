@@ -100,7 +100,7 @@ namespace gtl
       .is3d = is3dImage,
       .debugName = filePath
     };
-    bool creationSuccessful = cgpuCreateImage(m_device, &createInfo, &image) &&
+    bool creationSuccessful = cgpuCreateImage(m_device, createInfo, &image) &&
                               m_stager.stageToImage(imageData.data, imageData.size, image, imageData.width, imageData.height, 1);
 
     imgio_free_img(&imageData);
@@ -171,7 +171,7 @@ namespace gtl
         createInfo.height = textureResource.height;
         createInfo.depth = textureResource.depth;
 
-        if (!cgpuCreateImage(m_device, &createInfo, &image))
+        if (!cgpuCreateImage(m_device, createInfo, &image))
           return false;
 
         result = m_stager.stageToImage(payload.data(), payloadSize, image, createInfo.width, createInfo.height, createInfo.depth);
@@ -192,7 +192,7 @@ namespace gtl
       createInfo.height = 1;
       createInfo.depth = 1;
 
-      if (!cgpuCreateImage(m_device, &createInfo, &image))
+      if (!cgpuCreateImage(m_device, createInfo, &image))
         return false;
 
       uint8_t black[4] = { 0, 0, 0, 0 };

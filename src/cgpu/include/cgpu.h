@@ -580,7 +580,7 @@ bool cgpuDestroyDevice(
 
 bool cgpuCreateShader(
   CgpuDevice device,
-  const CgpuShaderCreateInfo* createInfo,
+  CgpuShaderCreateInfo createInfo,
   CgpuShader* shader
 );
 
@@ -591,7 +591,7 @@ bool cgpuDestroyShader(
 
 bool cgpuCreateBuffer(
   CgpuDevice device,
-  const CgpuBufferCreateInfo* createInfo,
+  CgpuBufferCreateInfo createInfo,
   CgpuBuffer* buffer
 );
 
@@ -618,7 +618,7 @@ uint64_t cgpuGetBufferAddress(
 
 bool cgpuCreateImage(
   CgpuDevice device,
-  const CgpuImageCreateInfo* createInfo,
+  CgpuImageCreateInfo createInfo,
   CgpuImage* image
 );
 
@@ -640,7 +640,7 @@ bool cgpuUnmapImage(
 
 bool cgpuCreateSampler(
   CgpuDevice device,
-  const CgpuSamplerCreateInfo* createInfo,
+  CgpuSamplerCreateInfo createInfo,
   CgpuSampler* sampler
 );
 
@@ -651,13 +651,13 @@ bool cgpuDestroySampler(
 
 bool cgpuCreateComputePipeline(
   CgpuDevice device,
-  const CgpuComputePipelineCreateInfo* createInfo,
+  CgpuComputePipelineCreateInfo createInfo,
   CgpuPipeline* pipeline
 );
 
 bool cgpuCreateRtPipeline(
   CgpuDevice device,
-  const CgpuRtPipelineCreateInfo* createInfo,
+  CgpuRtPipelineCreateInfo createInfo,
   CgpuPipeline* pipeline
 );
 
@@ -668,13 +668,13 @@ bool cgpuDestroyPipeline(
 
 bool cgpuCreateBlas(
   CgpuDevice device,
-  const CgpuBlasCreateInfo* createInfo,
+  CgpuBlasCreateInfo createInfo,
   CgpuBlas* blas
 );
 
 bool cgpuCreateTlas(
   CgpuDevice device,
-  const CgpuTlasCreateInfo* createInfo,
+  CgpuTlasCreateInfo createInfo,
   CgpuTlas* tlas
 );
 

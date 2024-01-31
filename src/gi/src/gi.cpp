@@ -255,33 +255,25 @@ bool _giResizeRenderBufferIfNeeded(GiRenderBuffer* renderBuffer, uint32_t pixelS
 
   GB_LOG("recreating output buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
 
+  if (!cgpuCreateBuffer(s_device, {
+                          .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                          .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                          .size = bufferSize,
+                          .debugName = "RenderBuffer"
+                        }, &renderBuffer->buffer))
   {
-    CgpuBufferCreateInfo createInfo = {
-      .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-      .size = bufferSize,
-      .debugName = "RenderBuffer"
-    };
-
-    if (!cgpuCreateBuffer(s_device, &createInfo, &renderBuffer->buffer))
-    {
-      return false;
-    }
+    return false;
   }
 
+  if (!cgpuCreateBuffer(s_device, {
+                          .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                          .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                          .size = bufferSize,
+                          .debugName = "RenderBufferStaging"
+                        }, &renderBuffer->stagingBuffer))
   {
-    CgpuBufferCreateInfo createInfo = {
-      .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-      .size = bufferSize,
-      .debugName = "RenderBufferStaging"
-    };
-
-    if (!cgpuCreateBuffer(s_device, &createInfo, &renderBuffer->stagingBuffer))
-    {
-      cgpuDestroyBuffer(s_device, renderBuffer->buffer);
-      return false;
-    }
+    cgpuDestroyBuffer(s_device, renderBuffer->buffer);
+    return false;
   }
 
   renderBuffer->bufferWidth = width;
@@ -322,17 +314,13 @@ GiStatus giInitialize(const GiInitParams* params)
   if (!cgpuGetPhysicalDeviceProperties(s_device, &s_deviceProperties))
     return GI_ERROR;
 
+  if (!cgpuCreateSampler(s_device, {
+                          .addressModeU = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+                          .addressModeV = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
+                          .addressModeW = CGPU_SAMPLER_ADDRESS_MODE_REPEAT
+                        }, &s_texSampler))
   {
-    CgpuSamplerCreateInfo createInfo = {
-      .addressModeU = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-      .addressModeV = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-      .addressModeW = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-    };
-
-    if (!cgpuCreateSampler(s_device, &createInfo , &s_texSampler))
-    {
-      return GI_ERROR;
-    }
+    return GI_ERROR;
   }
 
   s_stager = std::make_unique<gtl::GgpuStager>(s_device);
@@ -573,42 +561,37 @@ void _giBuildGeometryStructures(const GiGeomCacheParams* params,
       uint64_t tmpPositionBufferSize = positionData.size() * sizeof(CgpuVertex);
 
       // Create data buffers
+      if (!cgpuCreateBuffer(s_device, {
+                              .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                              .size = indexVertexBufferSize,
+                              .debugName = "BlasIndexVertexBuffer"
+                            }, &indexVertexBuffer))
       {
-        CgpuBufferCreateInfo indexVertexBufferCreateInfo = {
-          .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-          .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-          .size = indexVertexBufferSize,
-          .debugName = "BlasIndexVertexBuffer"
-        };
-        if (!cgpuCreateBuffer(s_device, &indexVertexBufferCreateInfo, &indexVertexBuffer))
-        {
-          GB_ERROR("failed to allocate BLAS vertices memory");
-          goto fail_cleanup;
-        }
+        GB_ERROR("failed to allocate BLAS vertices memory");
+        goto fail_cleanup;
+      }
 
-        CgpuBufferCreateInfo tmpPositionBufferCreateInfo = {
-          .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-          .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-          .size = tmpPositionBufferSize,
-          .debugName = "BlasVertexPositionsTmp"
-        };
-        if (!cgpuCreateBuffer(s_device, &tmpPositionBufferCreateInfo, &tmpPositionBuffer))
-        {
-          GB_ERROR("failed to allocate BLAS temp vertex position memory");
-          goto fail_cleanup;
-        }
+      if (!cgpuCreateBuffer(s_device, {
+                              .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                              .size = tmpPositionBufferSize,
+                              .debugName = "BlasVertexPositionsTmp"
+                            }, &tmpPositionBuffer))
+      {
+        GB_ERROR("failed to allocate BLAS temp vertex position memory");
+        goto fail_cleanup;
+      }
 
-        CgpuBufferCreateInfo tmpIndexBufferCreateInfo = {
-          .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-          .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-          .size = tmpIndexBufferSize,
-          .debugName = "BlasIndicesTmp"
-        };
-        if (!cgpuCreateBuffer(s_device, &tmpIndexBufferCreateInfo, &tmpIndexBuffer))
-        {
-          GB_ERROR("failed to allocate BLAS temp indices memory");
-          goto fail_cleanup;
-        }
+      if (!cgpuCreateBuffer(s_device, {
+                              .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                              .size = tmpIndexBufferSize,
+                              .debugName = "BlasIndicesTmp"
+                            }, &tmpIndexBuffer))
+      {
+        GB_ERROR("failed to allocate BLAS temp indices memory");
+        goto fail_cleanup;
       }
 
       // Copy data to GPU
@@ -637,15 +620,13 @@ void _giBuildGeometryStructures(const GiGeomCacheParams* params,
       {
         const GiMaterial* material = shaderCache->materials[materialIndex];
 
-        CgpuBlasCreateInfo blasCreateInfo = {
-          .vertexBuffer = tmpPositionBuffer,
-          .indexBuffer = tmpIndexBuffer,
-          .maxVertex = (uint32_t)positionData.size(),
-          .triangleCount = (uint32_t)indexData.size() / 3,
-          .isOpaque = material->mcMat->isOpaque
-        };
-
-        bool blasCreated = cgpuCreateBlas(s_device, &blasCreateInfo, &blas);
+        bool blasCreated = cgpuCreateBlas(s_device, {
+                                            .vertexBuffer = tmpPositionBuffer,
+                                            .indexBuffer = tmpIndexBuffer,
+                                            .maxVertex = (uint32_t)positionData.size(),
+                                            .triangleCount = (uint32_t)indexData.size() / 3,
+                                            .isOpaque = material->mcMat->isOpaque
+                                          }, &blas);
 
         if (!blasCreated)
         {
@@ -748,12 +729,10 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 
   // Create TLAS.
   {
-    CgpuTlasCreateInfo tlasCreateInfo = {
-      .instanceCount = (uint32_t) blasInstances.size(),
-      .instances = blasInstances.data()
-    };
-
-    if (!cgpuCreateTlas(s_device, &tlasCreateInfo, &tlas))
+    if (!cgpuCreateTlas(s_device, {
+                          .instanceCount = (uint32_t)blasInstances.size(),
+                          .instances = blasInstances.data()
+                        }, &tlas))
     {
       GB_ERROR("failed to create TLAS");
       goto cleanup;
@@ -766,14 +745,13 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
   {
     uint64_t bufferSize = blasPayloads.size() * sizeof(Rp::BlasPayload);
 
-    CgpuBufferCreateInfo createInfo = {
-      .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-      .size = bufferSize,
-      .debugName = "BlasPayloadAddresses"
-    };
 
-    if (!cgpuCreateBuffer(s_device, &createInfo, &blasPayloadsBuffer))
+    if (!cgpuCreateBuffer(s_device, {
+                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                            .size = bufferSize,
+                            .debugName = "BlasPayloadAddresses"
+                          }, &blasPayloadsBuffer))
     {
       GB_ERROR("failed to create BLAS payloads buffer");
       goto cleanup;
@@ -1047,13 +1025,11 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
 
-          CgpuShaderCreateInfo createInfo = {
-            .size = spv.size(),
-            .source = spv.data(),
-            .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT
-          };
-
-          if (!cgpuCreateShader(s_device, &createInfo, &closestHitShader))
+          if (!cgpuCreateShader(s_device, {
+                                  .size = spv.size(),
+                                  .source = spv.data(),
+                                  .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT
+                                }, &closestHitShader))
           {
             goto cleanup;
           }
@@ -1066,13 +1042,11 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
 
-          CgpuShaderCreateInfo createInfo = {
-            .size = spv.size(),
-            .source = spv.data(),
-            .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
-          };
-
-          if (!cgpuCreateShader(s_device, &createInfo, &anyHitShader))
+          if (!cgpuCreateShader(s_device, {
+                                  .size = spv.size(),
+                                  .source = spv.data(),
+                                  .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
+                                }, &anyHitShader))
           {
             goto cleanup;
           }
@@ -1094,13 +1068,11 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         {
           const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
 
-          CgpuShaderCreateInfo createInfo = {
-            .size = spv.size(),
-            .source = spv.data(),
-            .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
-          };
-
-          if (!cgpuCreateShader(s_device, &createInfo, &anyHitShader))
+          if (!cgpuCreateShader(s_device, {
+                                  .size = spv.size(),
+                                  .source = spv.data(),
+                                  .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
+                                }, &anyHitShader))
           {
             goto cleanup;
           }
@@ -1139,13 +1111,11 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
       goto cleanup;
     }
 
-    CgpuShaderCreateInfo createInfo = {
-      .size = spv.size(),
-      .source = spv.data(),
-      .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN
-    };
-
-    if (!cgpuCreateShader(s_device, &createInfo, &rgenShader))
+    if (!cgpuCreateShader(s_device, {
+                            .size = spv.size(),
+                            .source = spv.data(),
+                            .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN
+                          }, &rgenShader))
     {
       goto cleanup;
     }
@@ -1170,14 +1140,12 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         goto cleanup;
       }
 
-      CgpuShaderCreateInfo createInfo = {
-        .size = spv.size(),
-        .source = spv.data(),
-        .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
-      };
-
       CgpuShader missShader;
-      if (!cgpuCreateShader(s_device, &createInfo, &missShader))
+      if (!cgpuCreateShader(s_device, {
+                              .size = spv.size(),
+                              .source = spv.data(),
+                              .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
+                            }, &missShader))
       {
         goto cleanup;
       }
@@ -1193,14 +1161,12 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
         goto cleanup;
       }
 
-      CgpuShaderCreateInfo createInfo = {
-        .size = spv.size(),
-        .source = spv.data(),
-        .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
-      };
-
       CgpuShader missShader;
-      if (!cgpuCreateShader(s_device, &createInfo, &missShader))
+      if (!cgpuCreateShader(s_device, {
+                              .size = spv.size(),
+                              .source = spv.data(),
+                              .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
+                            }, &missShader))
       {
         goto cleanup;
       }
@@ -1222,15 +1188,13 @@ GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
     GB_LOG("creating RT pipeline..");
     fflush(stdout);
 
-    CgpuRtPipelineCreateInfo pipelineDesc = {
-      .rgenShader = rgenShader,
-      .missShaderCount = (uint32_t) missShaders.size(),
-      .missShaders = missShaders.data(),
-      .hitGroupCount = (uint32_t) hitGroups.size(),
-      .hitGroups = hitGroups.data(),
-    };
-
-    if (!cgpuCreateRtPipeline(s_device, &pipelineDesc, &pipeline))
+    if (!cgpuCreateRtPipeline(s_device, {
+                                .rgenShader = rgenShader,
+                                .missShaderCount = (uint32_t)missShaders.size(),
+                                .missShaders = missShaders.data(),
+                                .hitGroupCount = (uint32_t)hitGroups.size(),
+                                .hitGroups = hitGroups.data(),
+                              }, &pipeline))
     {
       goto cleanup;
     }
@@ -1615,9 +1579,8 @@ cleanup:
 
 GiScene* giCreateScene()
 {
-  CgpuImageCreateInfo imgCreateInfo = { .width = 1, .height = 1 };
   CgpuImage fallbackDomeLightTexture;
-  if (!cgpuCreateImage(s_device, &imgCreateInfo, &fallbackDomeLightTexture))
+  if (!cgpuCreateImage(s_device, { .width = 1, .height = 1 }, &fallbackDomeLightTexture))
   {
     return nullptr;
   }

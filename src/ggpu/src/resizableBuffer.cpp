@@ -72,15 +72,13 @@ namespace gtl
     CgpuSignalSemaphoreInfo signalSemaphoreInfo;
     CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
+    if (!cgpuCreateBuffer(m_device, {
+                            .usage = m_usageFlags,
+                            .memoryProperties = m_memoryProperties,
+                            .size = newSize
+                          }, &buffer))
     {
-      CgpuBufferCreateInfo createInfo = {
-        .usage = m_usageFlags,
-        .memoryProperties = m_memoryProperties,
-        .size = newSize,
-      };
-
-      if (!cgpuCreateBuffer(m_device, &createInfo, &buffer))
-        goto cleanup;
+      goto cleanup;
     }
 
     // Copy old buffer data if needed.

@@ -46,13 +46,13 @@ namespace gtl
       .debugName = "Staging"
     };
 
-    bool bufferCreated = cgpuCreateBuffer(m_device, &createInfo, &m_stagingBuffer);
+    bool bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
 
     if (!bufferCreated)
     {
       createInfo.memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
 
-      bufferCreated = cgpuCreateBuffer(m_device, &createInfo, &m_stagingBuffer);
+      bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
     }
 
     if (!bufferCreated)
