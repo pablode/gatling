@@ -69,7 +69,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((debugBitangents, "debug:bitangents"))
 
 #define HD_GATLING_COMMAND_TOKENS                    \
-  (print_licenses)
+  (printLicenses)
 
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingSettingsTokens, HD_GATLING_SETTINGS_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingNodeIdentifiers, HD_GATLING_NODE_IDENTIFIER_TOKENS);

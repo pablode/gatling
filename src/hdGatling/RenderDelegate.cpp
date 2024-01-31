@@ -101,7 +101,7 @@ void HdGatlingRenderDelegate::SetRenderSetting(TfToken const& key, VtValue const
 
 const HdCommandDescriptors COMMAND_DESCRIPTORS =
 {
-  HdCommandDescriptor{ HdGatlingCommandTokens->print_licenses, "Print Licenses" }
+  HdCommandDescriptor{ HdGatlingCommandTokens->printLicenses, "Print Licenses" }
 };
 
 HdCommandDescriptors HdGatlingRenderDelegate::GetCommandDescriptors() const
@@ -111,7 +111,7 @@ HdCommandDescriptors HdGatlingRenderDelegate::GetCommandDescriptors() const
 
 bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, const HdCommandArgs& args)
 {
-  if (command == HdGatlingCommandTokens->print_licenses)
+  if (command == HdGatlingCommandTokens->printLicenses)
   {
     std::string licenseFilePath = TfStringCatPaths(m_resourcePath, LICENSE_FILE_NAME);
     std::string errorMessage;
