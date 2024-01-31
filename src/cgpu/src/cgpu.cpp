@@ -899,10 +899,7 @@ bool cgpuCreateDevice(CgpuDevice* device)
     CGPU_RETURN_ERROR("failed to create device");
   }
 
-  volkLoadDeviceTable(
-    &idevice->table,
-    idevice->logicalDevice
-  );
+  volkLoadDeviceTable(&idevice->table, idevice->logicalDevice);
 
   idevice->table.vkGetDeviceQueue(
     idevice->logicalDevice,
@@ -929,10 +926,7 @@ bool cgpuCreateDevice(CgpuDevice* device)
   {
     iinstance->ideviceStore.free(device->handle);
 
-    idevice->table.vkDestroyDevice(
-      idevice->logicalDevice,
-      nullptr
-    );
+    idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
     CGPU_RETURN_ERROR("failed to create command pool");
   }
@@ -957,15 +951,8 @@ bool cgpuCreateDevice(CgpuDevice* device)
   {
     iinstance->ideviceStore.free(device->handle);
 
-    idevice->table.vkDestroyCommandPool(
-      idevice->logicalDevice,
-      idevice->commandPool,
-      nullptr
-    );
-    idevice->table.vkDestroyDevice(
-      idevice->logicalDevice,
-      nullptr
-    );
+    idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
+    idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
     CGPU_RETURN_ERROR("failed to create query pool");
   }
@@ -1013,20 +1000,10 @@ bool cgpuCreateDevice(CgpuDevice* device)
   {
     iinstance->ideviceStore.free(device->handle);
 
-    idevice->table.vkDestroyQueryPool(
-      idevice->logicalDevice,
-      idevice->timestamp_pool,
-      nullptr
-    );
-    idevice->table.vkDestroyCommandPool(
-      idevice->logicalDevice,
-      idevice->commandPool,
-      nullptr
-    );
-    idevice->table.vkDestroyDevice(
-      idevice->logicalDevice,
-      nullptr
-    );
+    idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestamp_pool, nullptr);
+    idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
+    idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
+
     CGPU_RETURN_ERROR("failed to create vma allocator");
   }
 
@@ -1039,20 +1016,9 @@ bool cgpuDestroyDevice(CgpuDevice device)
 
   vmaDestroyAllocator(idevice->allocator);
 
-  idevice->table.vkDestroyQueryPool(
-    idevice->logicalDevice,
-    idevice->timestamp_pool,
-    nullptr
-  );
-  idevice->table.vkDestroyCommandPool(
-    idevice->logicalDevice,
-    idevice->commandPool,
-    nullptr
-  );
-  idevice->table.vkDestroyDevice(
-    idevice->logicalDevice,
-    nullptr
-  );
+  idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestamp_pool, nullptr);
+  idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
+  idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
   iinstance->ideviceStore.free(device.handle);
   return true;
@@ -1642,17 +1608,10 @@ static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice, CgpuIPipeline* i
     &descriptorSetAllocateInfo,
     &ipipeline->descriptorSet
   );
+
   if (result != VK_SUCCESS) {
-    idevice->table.vkDestroyDescriptorPool(
-      idevice->logicalDevice,
-      ipipeline->descriptorPool,
-      nullptr
-    );
-    idevice->table.vkDestroyDescriptorSetLayout(
-      idevice->logicalDevice,
-      ipipeline->descriptorSetLayout,
-      nullptr
-    );
+    idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
+    idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayout, nullptr);
     CGPU_RETURN_ERROR("failed to allocate descriptor set");
   }
 
@@ -1679,16 +1638,8 @@ bool cgpuCreateComputePipeline(CgpuDevice device,
   if (!cgpuCreatePipelineLayout(idevice, ipipeline, ishader, VK_SHADER_STAGE_COMPUTE_BIT))
   {
     iinstance->ipipelineStore.free(pipeline->handle);
-    idevice->table.vkDestroyDescriptorSetLayout(
-      idevice->logicalDevice,
-      ipipeline->descriptorSetLayout,
-      nullptr
-    );
-    idevice->table.vkDestroyDescriptorPool(
-      idevice->logicalDevice,
-      ipipeline->descriptorPool,
-      nullptr
-    );
+    idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayout, nullptr);
+    idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
     CGPU_RETURN_ERROR("failed to create pipeline layout");
   }
 
@@ -2043,26 +1994,10 @@ bool cgpuDestroyPipeline(CgpuDevice device, CgpuPipeline pipeline)
     cgpuDestroyIBuffer(idevice, &ipipeline->sbt);
   }
 
-  idevice->table.vkDestroyDescriptorPool(
-    idevice->logicalDevice,
-    ipipeline->descriptorPool,
-    nullptr
-  );
-  idevice->table.vkDestroyPipeline(
-    idevice->logicalDevice,
-    ipipeline->pipeline,
-    nullptr
-  );
-  idevice->table.vkDestroyPipelineLayout(
-    idevice->logicalDevice,
-    ipipeline->layout,
-    nullptr
-  );
-  idevice->table.vkDestroyDescriptorSetLayout(
-    idevice->logicalDevice,
-    ipipeline->descriptorSetLayout,
-    nullptr
-  );
+  idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
+  idevice->table.vkDestroyPipeline(idevice->logicalDevice, ipipeline->pipeline, nullptr);
+  idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, ipipeline->layout, nullptr);
+  idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayout, nullptr);
 
   iinstance->ipipelineStore.free(pipeline.handle);
 
@@ -2465,15 +2400,21 @@ bool cgpuCmdBindPipeline(CgpuCommandBuffer commandBuffer, CgpuPipeline pipeline)
     ipipeline->bindPoint,
     ipipeline->pipeline
   );
+
+  uint32_t firstDescriptorSet = 0;
+  uint32_t descriptorSetCount = 1;
+  uint32_t dynamicOffsetCount = 0;
+  const uint32_t* dynamicOffsets = nullptr;
+
   idevice->table.vkCmdBindDescriptorSets(
     icommandBuffer->commandBuffer,
     ipipeline->bindPoint,
     ipipeline->layout,
-    0,
-    1,
+    firstDescriptorSet,
+    descriptorSetCount,
     &ipipeline->descriptorSet,
-    0,
-    0
+    dynamicOffsetCount,
+    dynamicOffsets
   );
 
   return true;
@@ -3196,6 +3137,7 @@ bool cgpuDestroySemaphore(CgpuDevice device, CgpuSemaphore semaphore)
     isemaphore->semaphore,
     nullptr
   );
+
   iinstance->isemaphoreStore.free(semaphore.handle);
   return true;
 }
