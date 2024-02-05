@@ -51,8 +51,14 @@ namespace gtl
     m_neuray = mi::base::Handle<mi::neuraylib::INeuray>(m_loader->getNeuray());
 
     m_config = mi::base::Handle<mi::neuraylib::IMdl_configuration>(m_neuray->get_api_component<mi::neuraylib::IMdl_configuration>());
+
     m_logger = mi::base::Handle<McMdlLogger>(new McMdlLogger());
+#if MI_NEURAYLIB_API_VERSION < 52
     m_config->set_logger(m_logger.get());
+#else
+    mi::base::Handle<mi::neuraylib::ILogging_configuration> loggingConfig(m_neuray->get_api_component<mi::neuraylib::ILogging_configuration>());
+    loggingConfig->set_receiving_logger(m_logger.get());
+#endif
 
     if (m_neuray->start() != 0)
     {

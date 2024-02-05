@@ -6,7 +6,7 @@ on:
 jobs:
   build-mdl-sdk:
     name: Build MDL SDK
-    uses: pablode/MDL-SDK/.github/workflows/main.yml@GA-2023.0.4
+    uses: pablode/MDL-SDK/.github/workflows/main.yml@GA-2023.1.2
     with:
       cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
 

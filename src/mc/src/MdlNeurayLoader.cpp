@@ -28,7 +28,7 @@
 #include <string>
 #include <log.h>
 
-#define MI_NEURAYLIB_LATEST_VERSION 51
+#define MI_NEURAYLIB_LATEST_VERSION 52
 
 static_assert(MI_NEURAYLIB_API_VERSION >= 48, "MDL SDK version is too old!");
 static_assert(MI_NEURAYLIB_API_VERSION <= MI_NEURAYLIB_LATEST_VERSION, "Untested MDL SDK version!");
