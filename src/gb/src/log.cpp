@@ -33,4 +33,9 @@ namespace gtl
 
     quill::start();
   }
+
+  void gbLogFlush()
+  {
+    quill::flush();
+  }
 }

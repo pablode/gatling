@@ -26,4 +26,6 @@
 namespace gtl
 {
   void gbLogInit();
+
+  void gbLogFlush();
 }
