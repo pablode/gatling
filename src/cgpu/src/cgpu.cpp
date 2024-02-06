@@ -1157,6 +1157,8 @@ static bool cgpuCreateBufferAligned(CgpuDevice device,
 
   CGPU_RESOLVE_OR_RETURN_BUFFER(*buffer, ibuffer);
 
+  assert(createInfo.size > 0);
+
   if (!cgpuCreateIBufferAligned(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size, alignment, ibuffer))
   {
     iinstance->ibufferStore.free(buffer->handle);
@@ -2245,7 +2247,7 @@ bool cgpuCreateTlas(CgpuDevice device,
       if ((instanceCustomIndex & 0xFF000000u) != 0u)
       {
         cgpuDestroyIBuffer(idevice, &itlas->instances);
-        CGPU_RETURN_ERROR("instanceCustomIndex must be smaller than 2^24");
+        CGPU_RETURN_ERROR("instanceCustomIndex must be equal to or smaller than 2^24");
       }
 
       VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];

@@ -37,5 +37,5 @@ namespace gtl
     McMdlRuntime* m_mdlRuntime = nullptr;
   };
 
-  McRuntime* McLoadRuntime(std::string_view resourcePath);
+  McRuntime* McLoadRuntime(std::string_view libDir);
 }

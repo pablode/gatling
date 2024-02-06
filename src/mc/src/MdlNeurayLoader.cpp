@@ -35,9 +35,9 @@ static_assert(MI_NEURAYLIB_API_VERSION <= MI_NEURAYLIB_LATEST_VERSION, "Untested
 
 namespace
 {
-  void* _LoadDso(std::string_view resourcePath)
+  void* _LoadDso(std::string_view libDir)
   {
-    std::string dsoFilename = std::string(resourcePath) + std::string("/libmdl_sdk" MI_BASE_DLL_FILE_EXT);
+    std::string dsoFilename = std::string(libDir) + std::string("/libmdl_sdk" MI_BASE_DLL_FILE_EXT);
 
 #ifdef MI_PLATFORM_WINDOWS
     HMODULE handle = LoadLibraryA(dsoFilename.c_str());
@@ -169,7 +169,7 @@ namespace
 
     if (MI_NEURAYLIB_API_VERSION != MI_NEURAYLIB_LATEST_VERSION)
     {
-      GB_WARN("not using the latest MDL SDK - update for bugfixes");
+      GB_WARN("not using the latest MDL SDK; update for bugfixes");
     }
 
     return neuray;
@@ -193,9 +193,9 @@ namespace gtl
     }
   }
 
-  bool McMdlNeurayLoader::init(std::string_view resourcePath)
+  bool McMdlNeurayLoader::init(std::string_view libDir)
   {
-    m_dsoHandle = _LoadDso(resourcePath);
+    m_dsoHandle = _LoadDso(libDir);
     if (!m_dsoHandle)
     {
       return false;

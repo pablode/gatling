@@ -31,16 +31,16 @@ enum GiStatus
 
 enum GiAovId
 {
-  GI_AOV_ID_COLOR              = 0,
-  GI_AOV_ID_NORMAL             = 1,
-  GI_AOV_ID_DEBUG_NEE          = 2,
-  GI_AOV_ID_DEBUG_BARYCENTRICS = 3,
-  GI_AOV_ID_DEBUG_TEXCOORDS    = 4,
-  GI_AOV_ID_DEBUG_BOUNCES      = 5,
-  GI_AOV_ID_DEBUG_CLOCK_CYCLES = 6,
-  GI_AOV_ID_DEBUG_OPACITY      = 7,
-  GI_AOV_ID_DEBUG_TANGENTS     = 8,
-  GI_AOV_ID_DEBUG_BITANGENTS   = 9
+  GI_AOV_ID_COLOR,
+  GI_AOV_ID_NORMAL,
+  GI_AOV_ID_DEBUG_NEE,
+  GI_AOV_ID_DEBUG_BARYCENTRICS,
+  GI_AOV_ID_DEBUG_TEXCOORDS,
+  GI_AOV_ID_DEBUG_BOUNCES,
+  GI_AOV_ID_DEBUG_CLOCK_CYCLES,
+  GI_AOV_ID_DEBUG_OPACITY,
+  GI_AOV_ID_DEBUG_TANGENTS,
+  GI_AOV_ID_DEBUG_BITANGENTS
 };
 
 struct GiAsset;
@@ -140,8 +140,8 @@ struct GiRenderParams
 
 struct GiInitParams
 {
-  const char* resourcePath;
-  const char* shaderPath;
+  std::string_view shaderPath;
+  std::string_view mdlRuntimePath;
   const std::vector<std::string>& mdlSearchPaths;
   const std::shared_ptr<void/*MaterialX::Document*/> mtlxStdLib;
 };

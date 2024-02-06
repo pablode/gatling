@@ -113,7 +113,7 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, const HdComm
 {
   if (command == HdGatlingCommandTokens->printLicenses)
   {
-    std::string licenseFilePath = TfStringCatPaths(m_resourcePath, LICENSE_FILE_NAME);
+    std::string licenseFilePath = TfStringCatPaths(m_resourcePath, GI_LICENSE_FILE_NAME);
     std::string errorMessage;
 
     ArchConstFileMapping mapping = ArchMapFileReadOnly(licenseFilePath, &errorMessage);

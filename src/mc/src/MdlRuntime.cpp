@@ -40,10 +40,10 @@ namespace gtl
     }
   }
 
-  bool McMdlRuntime::init(std::string_view resourcePath)
+  bool McMdlRuntime::init(std::string_view libDir)
   {
     m_loader = std::make_shared<McMdlNeurayLoader>();
-    if (!m_loader->init(resourcePath))
+    if (!m_loader->init(libDir))
     {
       return false;
     }

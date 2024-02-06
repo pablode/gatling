@@ -285,10 +285,10 @@ bool _giResizeRenderBufferIfNeeded(GiRenderBuffer* renderBuffer, uint32_t pixelS
 
 void _PrintInitInfo(const GiInitParams* params)
 {
-  GB_LOG("gatling {}.{}.{} built against MaterialX {}.{}.{}", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH,
+  GB_LOG("gatling {}.{}.{} built against MaterialX {}.{}.{}", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH,
                                                               MATERIALX_MAJOR_VERSION, MATERIALX_MINOR_VERSION, MATERIALX_BUILD_VERSION);
-  GB_LOG("> resource path: \"{}\"", params->resourcePath);
   GB_LOG("> shader path: \"{}\"", params->shaderPath);
+  GB_LOG("> MDL runtime path: \"{}\"", params->mdlRuntimePath);
   GB_LOG("> MDL search paths: {}", params->mdlSearchPaths);
 }
 
@@ -302,7 +302,7 @@ GiStatus giInitialize(const GiInitParams* params)
 
   _PrintInitInfo(params);
 
-  if (!cgpuInitialize("gatling", GATLING_VERSION_MAJOR, GATLING_VERSION_MINOR, GATLING_VERSION_PATCH))
+  if (!cgpuInitialize("gatling", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH))
     return GI_ERROR;
 
   if (!cgpuCreateDevice(&s_device))
@@ -330,13 +330,13 @@ GiStatus giInitialize(const GiInitParams* params)
   }
 
 #ifdef NDEBUG
-  const char* shaderPath = params->shaderPath;
+  std::string_view shaderPath = params->shaderPath;
 #else
   // Use shaders dir in source tree for auto-reloading
-  const char* shaderPath = GATLING_SHADER_SOURCE_DIR;
+  std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
 #endif
 
-  s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params->resourcePath));
+  s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params->mdlRuntimePath));
   if (!s_mcRuntime)
   {
     return GI_ERROR;
@@ -363,7 +363,7 @@ GiStatus giInitialize(const GiInitParams* params)
 
 #ifndef NDEBUG
   s_fileWatcher = std::make_unique<efsw::FileWatcher>();
-  s_fileWatcher->addWatch(shaderPath, &s_shaderFileListener, true);
+  s_fileWatcher->addWatch(shaderPath.data(), &s_shaderFileListener, true);
   s_fileWatcher->watch();
 #endif
 

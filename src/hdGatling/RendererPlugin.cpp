@@ -113,8 +113,8 @@ bool _TryInitGi(const mx::DocumentPtr mtlxStdLib)
   }
 
   GiInitParams params = {
-    .resourcePath = resourcePath.c_str(),
     .shaderPath = shaderPath.c_str(),
+    .mdlRuntimePath = resourcePath.c_str(),
     .mdlSearchPaths = mdlSearchPaths,
     .mtlxStdLib = mtlxStdLib
   };

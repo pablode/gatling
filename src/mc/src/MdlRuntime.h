@@ -43,7 +43,7 @@ namespace gtl
     ~McMdlRuntime();
 
   public:
-    bool init(std::string_view resourcePath);
+    bool init(std::string_view libDir);
 
     mi::base::Handle<McMdlLogger> getLogger();
     mi::base::Handle<mi::neuraylib::IDatabase> getDatabase();
