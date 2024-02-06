@@ -743,8 +743,7 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
 
   // Upload blas buffer addresses to GPU.
   {
-    uint64_t bufferSize = blasPayloads.size() * sizeof(Rp::BlasPayload);
-
+    uint64_t bufferSize = (blasPayloads.empty() ? 1 : blasPayloads.size()) * sizeof(Rp::BlasPayload);
 
     if (!cgpuCreateBuffer(s_device, {
                             .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
@@ -756,7 +755,8 @@ GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
       GB_ERROR("failed to create BLAS payloads buffer");
       goto cleanup;
     }
-    if (!s_stager->stageToBuffer((uint8_t*) blasPayloads.data(), bufferSize, blasPayloadsBuffer))
+
+    if (!blasPayloads.empty() && !s_stager->stageToBuffer((uint8_t*) blasPayloads.data(), bufferSize, blasPayloadsBuffer))
     {
       GB_ERROR("failed to upload addresses to BLAS payload buffer");
       goto cleanup;

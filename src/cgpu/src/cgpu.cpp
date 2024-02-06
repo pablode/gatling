@@ -1924,11 +1924,11 @@ bool cgpuCreateRtPipeline(CgpuDevice device,
     uint32_t groupCount = hitStageAndGroupOffset + createInfo.hitGroupCount;
 
     VkPipelineCreateFlags flags = 0;
-    if (!anyNullClosestHitShader)
+    if (!anyNullClosestHitShader && createInfo.hitGroupCount > 0)
     {
       flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
     }
-    if (!anyNullAnyHitShader)
+    if (!anyNullAnyHitShader && createInfo.hitGroupCount > 0)
     {
       flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
     }
@@ -2220,7 +2220,7 @@ bool cgpuCreateTlas(CgpuDevice device,
   if (!cgpuCreateIBufferAligned(idevice,
                                 CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                                 CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                                createInfo.instanceCount * sizeof(VkAccelerationStructureInstanceKHR), 0,
+                                (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR), 0,
                                 &itlas->instances))
   {
     CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
