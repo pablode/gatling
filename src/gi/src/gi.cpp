@@ -17,6 +17,10 @@
 
 #include "gi.h"
 
+#if !defined(NDEBUG) && !defined(GI_TEST_EXECUTABLE)
+#define GI_SHADER_HOTLOADING
+#endif
+
 #include "textureManager.h"
 #include "turbo.h"
 #include "assetReader.h"
@@ -39,7 +43,7 @@
 #include <cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#ifndef NDEBUG
+#ifdef GI_SHADER_HOTLOADING
 #include <efsw/efsw.hpp>
 #endif
 #include "GlslShaderGen.h"
@@ -183,7 +187,7 @@ std::atomic_bool s_forceShaderCacheInvalid = false;
 std::atomic_bool s_forceGeomCacheInvalid = false;
 std::atomic_bool s_resetSampleOffset = false;
 
-#ifndef NDEBUG
+#ifdef GI_SHADER_HOTLOADING
 class ShaderFileListener : public efsw::FileWatchListener
 {
 public:
@@ -361,7 +365,7 @@ GiStatus giInitialize(const GiInitParams* params)
 
   s_texSys = std::make_unique<gtl::GiTextureManager>(s_device, *s_aggregateAssetReader, *s_stager);
 
-#ifndef NDEBUG
+#ifdef GI_SHADER_HOTLOADING
   s_fileWatcher = std::make_unique<efsw::FileWatcher>();
   s_fileWatcher->addWatch(shaderPath.data(), &s_shaderFileListener, true);
   s_fileWatcher->watch();
@@ -373,7 +377,7 @@ GiStatus giInitialize(const GiInitParams* params)
 void giTerminate()
 {
   GB_LOG("terminating...");
-#ifndef NDEBUG
+#ifdef GI_SHADER_HOTLOADING
   s_fileWatcher.reset();
 #endif
   s_aggregateAssetReader.reset();
