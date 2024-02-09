@@ -57,6 +57,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (no)
   (sRGB)
   (raw)
+  (RAW)
   (metallic)
   (roughness)
   (clearcoat)
@@ -517,6 +518,34 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
   }
 }
 
+// According to Blender, there are assets which have been authored with uppercase RAW tokens:
+// https://projects.blender.org/blender/blender/src/commit/67e3704a450b4c5a01159b80801cc7fdf9e657cb/source/blender/io/usd/intern/usd_reader_material.cc#L1193-L1198
+void _PatchUsdUVTextureColorSpaceParam(HdMaterialNetwork2& network)
+{
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+    if (node.nodeTypeId != _tokens->UsdUVTexture)
+    {
+      continue;
+    }
+
+    auto& parameters = node.parameters;
+
+    auto param = parameters.find(_tokens->sourceColorSpace);
+    if (param == parameters.end())
+    {
+      continue;
+    }
+
+    auto& value = param->second;
+    if (value == _tokens->RAW)
+    {
+      value = _tokens->raw;
+    }
+  }
+}
+
 void _PatchUsdTypes(HdMaterialNetwork2& network)
 {
   for (auto& pathNodePair : network.nodes)
@@ -567,6 +596,8 @@ void PreviewSurfaceNetworkPatcher::Patch(HdMaterialNetwork2& network)
   _PatchUsdPreviewSurfaceFloatInputTypeMismatches(network);
 
   _PatchUsdUVTextureIsSrgbParam(network);
+
+  _PatchUsdUVTextureColorSpaceParam(network);
 
   _PatchUsdTypes(network);
 }
