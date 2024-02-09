@@ -79,10 +79,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 // https://usdzshare.com/?ug-gallery=photo-detail&photo_id=490
 void _PatchDefaultParam(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
-
     if (node.nodeTypeId != _tokens->UsdUVTexture &&
         node.nodeTypeId != _tokens->UsdPrimvarReader_float &&
         node.nodeTypeId != _tokens->UsdPrimvarReader_float2 &&
@@ -100,14 +98,14 @@ void _PatchDefaultParam(HdMaterialNetwork2& network)
 
     auto& params = node.parameters;
 
-    auto defaultParam = params.find(_tokens->_default);
-    if (defaultParam == params.end())
+    auto paramIt = params.find(_tokens->_default);
+    if (paramIt == params.end())
     {
       continue;
     }
 
-    params[_tokens->fallback] = defaultParam->second;
-    params.erase(defaultParam);
+    params[_tokens->fallback] = paramIt->second;
+    params.erase(paramIt);
   }
 }
 
@@ -150,13 +148,13 @@ void _PatchUsdPreviewSurfaceGlossinessInput(HdMaterialNetwork2& network, std::ma
 
 bool _PatchUsdPreviewSurfaceGlossinessParam(std::map<TfToken, VtValue>& params)
 {
-  auto glossinessParam = params.find(_tokens->glossiness);
-  if (glossinessParam == params.end())
+  auto paramIt = params.find(_tokens->glossiness);
+  if (paramIt == params.end())
   {
     return false;
   }
 
-  VtValue value = glossinessParam->second;
+  VtValue value = paramIt->second;
   if (!value.IsHolding<float>())
   {
     return true;
@@ -166,7 +164,7 @@ bool _PatchUsdPreviewSurfaceGlossinessParam(std::map<TfToken, VtValue>& params)
   float roughness = 1.0f - glossiness;
 
   params[_tokens->roughness] = roughness;
-  params.erase(glossinessParam);
+  params.erase(paramIt);
   return true;
 }
 
@@ -175,10 +173,8 @@ bool _PatchUsdPreviewSurfaceGlossinessParam(std::map<TfToken, VtValue>& params)
 // https://sketchfab.com/3d-models/screen-space-reflection-demo-follmann-2og-6164eed28c464c94be8f5268240dc864
 void _PatchUsdPreviewSurfaceGlossiness(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
-
     if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
@@ -199,10 +195,8 @@ void _PatchUsdPreviewSurfaceGlossiness(HdMaterialNetwork2& network)
 // https://github.com/blender/blender/blob/e1b3d9112730bc3b569ffff732a1558752ded146/source/blender/io/usd/intern/usd_writer_material.cc#L234
 void _PatchUsdPreviewSurfaceSpecular(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
-
     if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
@@ -211,14 +205,14 @@ void _PatchUsdPreviewSurfaceSpecular(HdMaterialNetwork2& network)
     auto& params = node.parameters;
 
     // Rename params and change type to Color3
-    auto specularParam = params.find(_tokens->specular);
-    if (specularParam != params.end())
+    auto specularParamIt = params.find(_tokens->specular);
+    if (specularParamIt != params.end())
     {
-      if (specularParam->second.IsHolding<float>())
+      if (specularParamIt->second.IsHolding<float>())
       {
-        float specular = specularParam->second.UncheckedGet<float>();
+        float specular = specularParamIt->second.UncheckedGet<float>();
         params[_tokens->specularColor] = GfVec3f(specular);
-        params.erase(specularParam);
+        params.erase(specularParamIt);
       }
       continue;
     }
@@ -324,9 +318,8 @@ void _PatchUsdPreviewSurfaceNormalParamValue(VtValue& value)
 
 void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
     if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
@@ -376,9 +369,8 @@ void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network
 
 void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
     if (node.nodeTypeId != _tokens->UsdPreviewSurface)
     {
       continue;
@@ -422,19 +414,19 @@ void _PatchUsdPrimvarReaderUVmapVarname(HdMaterialNetwork2& network)
 
     auto& params = node.parameters;
 
-    auto varnameParam = params.find(_tokens->varname);
-    if (varnameParam == params.end())
+    auto varnameParamIt = params.find(_tokens->varname);
+    if (varnameParamIt == params.end())
     {
       return;
     }
 
-    VtValue& varnameValue = varnameParam->second;
-    if (varnameValue != _tokens->UVmap)
+    VtValue& value = varnameParamIt->second;
+    if (value != _tokens->UVmap)
     {
       return;
     }
 
-    varnameValue = _tokens->st;
+    value = _tokens->st;
   };
 
   auto handleUsdPreviewSurfaceConnection = [&](HdMaterialConnection2& connection)
@@ -485,9 +477,8 @@ void _PatchUsdPrimvarReaderUVmapVarname(HdMaterialNetwork2& network)
 // Let's assume that this is part of an older specification version and rename it to "sourceColorSpace".
 void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
     if (node.nodeTypeId != _tokens->UsdUVTexture)
     {
       continue;
@@ -495,13 +486,13 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
 
     auto& parameters = node.parameters;
 
-    auto isSrgbParam = parameters.find(_tokens->isSRGB);
-    if (isSrgbParam == parameters.end())
+    auto paramIt = parameters.find(_tokens->isSRGB);
+    if (paramIt == parameters.end())
     {
       continue;
     }
 
-    auto value = isSrgbParam->second;
+    auto value = paramIt->second;
     TfToken newValue = _tokens->_auto;
     // https://github.com/Unity-Technologies/usd-unity-sdk/blob/307303b25f5fd83e5275a2607b356e43799c38b4/package/com.unity.formats.usd/Dependencies/USD.NET.Unity/Shading/UsdPreviewSurface/TextureReaderSample.cs#L52-L57
     if (value == _tokens->yes)
@@ -513,7 +504,7 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
       newValue = _tokens->raw;
     }
 
-    parameters.erase(isSrgbParam);
+    parameters.erase(paramIt);
     parameters[_tokens->sourceColorSpace] = newValue;
   }
 }
@@ -522,9 +513,8 @@ void _PatchUsdUVTextureIsSrgbParam(HdMaterialNetwork2& network)
 // https://projects.blender.org/blender/blender/src/commit/67e3704a450b4c5a01159b80801cc7fdf9e657cb/source/blender/io/usd/intern/usd_reader_material.cc#L1193-L1198
 void _PatchUsdUVTextureColorSpaceParam(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
     if (node.nodeTypeId != _tokens->UsdUVTexture)
     {
       continue;
@@ -532,13 +522,13 @@ void _PatchUsdUVTextureColorSpaceParam(HdMaterialNetwork2& network)
 
     auto& parameters = node.parameters;
 
-    auto param = parameters.find(_tokens->sourceColorSpace);
-    if (param == parameters.end())
+    auto paramIt = parameters.find(_tokens->sourceColorSpace);
+    if (paramIt == parameters.end())
     {
       continue;
     }
 
-    auto& value = param->second;
+    auto& value = paramIt->second;
     if (value == _tokens->RAW)
     {
       value = _tokens->raw;
@@ -548,10 +538,8 @@ void _PatchUsdUVTextureColorSpaceParam(HdMaterialNetwork2& network)
 
 void _PatchUsdTypes(HdMaterialNetwork2& network)
 {
-  for (auto& pathNodePair : network.nodes)
+  for (auto& [path, node] : network.nodes)
   {
-    HdMaterialNode2& node = pathNodePair.second;
-
     auto& parameters = node.parameters;
 
     for (auto& tokenValuePair : parameters)
