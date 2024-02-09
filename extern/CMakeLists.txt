@@ -154,3 +154,4 @@ add_subdirectory(quill)
 #
 set(DOCTEST_NO_INSTALL ON)
 add_subdirectory(doctest)
+set(DOCTEST_SCRIPT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/doctest/scripts/cmake/doctest.cmake" PARENT_SCOPE)

@@ -74,6 +74,18 @@ jobs:
     - name: Unpack USD binaries
       run: mkdir -p ${{ inputs.usd-install-path }} && tar -xvf USD.tar.gz -C ${{ inputs.usd-install-path }}
 
+    # We need to put the USD libs in the PATH because we build against USD's MaterialX
+    # distribution. The libs are shared and loaded for gi_test's ctest discovery.
+    - name: Set up USD environment variables (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        echo "${{ inputs.usd-install-path }}/lib" >> $GITHUB_PATH
+        echo "${{ inputs.usd-install-path }}/bin" >> $GITHUB_PATH
+
+    - name: Set up USD environment variables (Linux)
+      if: runner.os == 'Linux'
+      run: echo "LD_LIBRARY_PATH=${{ inputs.usd-install-path }}/lib" >> $GITHUB_ENV
+
     - name: Create temporary folders
       run: mkdir BUILD INSTALL
 
