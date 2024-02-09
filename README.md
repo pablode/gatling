@@ -31,7 +31,8 @@ Alternatively, for a full source build you need to
 
 - download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK</a> (2022.0+) binaries
 - download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v23.11">USD</a> (22.08+) with MaterialX support
-- have NASM 2.13+ or YASM 1.2.0+ in your PATH
+
+> Note: it is recommended to have NASM 2.13+ or YASM 1.2.0+ in your PATH to speed up image decoding.
 
 Do a recursive clone of the repository and set up a build folder:
 ```
