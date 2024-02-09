@@ -2425,7 +2425,7 @@ distribution.
 
 ============================================================
     MDL SDK
-    MDL Core Definitions,
+    MDL Core, Aux, Support Definitions,
     Omniverse MDL files
 ============================================================
 
@@ -2458,6 +2458,8 @@ distribution.
   Copyright (c) 2018-2023, NVIDIA CORPORATION. All rights reserved.
 * For the Omniverse MDL files, see also this required NOTICE:
   Copyright 2020 NVIDIA Corporation. All rights reserved.
+* For the Omniverse MDL files, see also this required NOTICE:
+  Copyright 2022 NVIDIA Corporation. All rights reserved.
 * For the MDL core definitions, see also this required NOTICE:
   Copyright 2022 NVIDIA Corporation. All rights reserved.
 

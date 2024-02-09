@@ -90,7 +90,7 @@ export material OmniGlass(
 		anno::description("The roughness texture"),
 		anno::display_name("Roughness Texture"),
 		anno::in_group("Roughness"),
-		anno::usage("")
+		anno::usage("roughness")
 	]],
 	uniform texture_2d reflection_color_texture = texture_2d() [[
 		anno::description("The reflection color texture"),
@@ -105,7 +105,7 @@ export material OmniGlass(
 		anno::description("The normal map texture"),
 		anno::display_name("Normal Map Texture"),
 		anno::in_group("Normal"),
-		anno::usage("")
+		anno::usage("normal")
 	]],
 	uniform float normal_map_strength = 1.0 [[
 		anno::description("Determines the degree of bumpiness"),
@@ -118,7 +118,7 @@ export material OmniGlass(
         anno::display_name("Normal Map Flip U Tangent"),
         anno::in_group("Normal")
     ]],
-	uniform bool flip_tangent_v = false [[
+	uniform bool flip_tangent_v = true [[
         anno::display_name("Normal Map Flip V Tangent"),
         anno::in_group("Normal")
     ]],
@@ -139,7 +139,8 @@ export material OmniGlass(
 	uniform texture_2d cutout_opacity_texture = texture_2d() [[
 		anno::description("The opacity map"),
 		anno::display_name("Opacity Map"),
-		anno::in_group("Opacity")
+		anno::in_group("Opacity"),
+		anno::usage("opacity")
 	]],
 	uniform base::mono_mode cutout_opacity_mono_source = base::mono_alpha [[
 		anno::description("Determines how to lookup opacity from the supplied texture. mono_alpha, mono_average, mono_luminance, mono_maximum"),
@@ -195,14 +196,15 @@ export material OmniGlass(
 	]],
 	uniform float2 texture_scale =  float2(1.0f)
 	[[
-		anno::display_name("Texture Scale"),
-		anno::description("Larger numbers increase the size."),
+		anno::display_name("Texture Tiling"),
+		anno::description("Controls repetition of the texture."),
 		anno::in_group("UV")
 	]])
 [[ 
 	anno::author("NVIDIA CORPORATION"),
 	anno::display_name("Omni Glass"),
 	anno::version( 1, 0, 0),
+ 	anno::in_group("Base"),
 	anno::description("Omni Glass Material V2"),
 	anno::key_words(string[]("omni", "omniverse", "glass", "transparent", "window", "transparency", "workflow")),
 	distill_off()

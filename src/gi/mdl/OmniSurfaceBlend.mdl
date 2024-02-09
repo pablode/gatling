@@ -1,0 +1,258 @@
+/***************************************************************************************************
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **************************************************************************************************/
+ 
+// Wrapper for OmniSurfaceBlendBase material
+
+mdl 1.7;
+
+import ::anno::*;
+import ::base::*;
+import ::df::*;
+import ::limits::*;
+import ::math::*;
+import ::state::*;
+import ::tex::*;
+
+import ::OmniSurface::OmniImage::*;
+import ::OmniSurface::OmniSurfaceBlendBase::*;
+
+export material OmniSurfaceBlend(
+
+    //Materials
+    //
+    material base_material = material() [[
+        anno::display_name("Base Material"),
+        anno::in_group("Materials")
+    ]],
+
+    material blend_material =  material() [[
+        anno::display_name("Blend Material"),
+        anno::in_group("Materials")
+    ]],
+
+    float blend_weight = float(1.0) [[ 
+        anno::display_name("Weight"),
+        anno::in_group("Blending"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform texture_2d blend_weight_image = texture_2d() [[ 
+        anno::display_name("Weight Image"),
+        anno::in_group("Blending"),
+        anno::usage("occlusion") // Don't have usage type for scalar maps. Substituting for now.        
+    ]],
+
+    uniform ::OmniSurface::OmniImage::alpha_mode blend_weight_image_alpha_mode = 
+        ::OmniSurface::OmniImage::alpha_default [[
+        anno::display_name("Weight Image Alpha Mode"),
+        anno::in_group("Blending")
+    ]],
+
+    //Geometry
+    //
+    uniform bool enable_opacity = false [[
+        anno::display_name("Enable Opacity"),
+        anno::description("Enables the use of cutout opacity"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform float geometry_opacity_threshold = float(0.0) [[
+        anno::display_name("Opacity Threshold"),
+        anno::description("If > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
+        anno::in_group("Geometry"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    //UVW
+    //
+    uniform base::texture_coordinate_system uvw_texture_coordinate_system = 
+        base::texture_coordinate_uvw [[
+        anno::display_name("Texture Coordinate"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform int uvw_uv_set = 0 [[
+        anno::display_name("UV Set"),
+        anno::in_group("UVW Coordinates"),
+        anno::hard_range(0, 4)
+    ]],
+
+    uniform bool uvw_ignore_missing_textures = false [[
+        anno::display_name("Ignore Missing Images"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    color uvw_missing_texture_color = color(0.0, 0.0, 0.0) [[
+        anno::display_name("Missing Image Color"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform bool uvw_use_uv_coords = false [[
+        anno::display_name("Use UV Coords"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    float2 uvw_uv_coords = float2(0.0) [[
+        anno::display_name("UV Coords"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float uvw_s_offset = 0.0f [[
+        anno::display_name("Offset U"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(-1.0f, 1.0f)
+    ]],
+
+    uniform float uvw_t_offset = 0.0f [[
+        anno::display_name("Offset V"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(-1.0f, 1.0f)
+    ]],
+
+    uniform ::OmniSurface::OmniImage::wrap_mode uvw_s_wrap = 
+        ::OmniSurface::OmniImage::wrap_periodic [[
+        anno::display_name("Wrap U"),
+        anno::in_group("UVW Coordinates")
+    ]],
+    
+    uniform ::OmniSurface::OmniImage::wrap_mode uvw_t_wrap = 
+        ::OmniSurface::OmniImage::wrap_periodic [[
+        anno::display_name("Wrap V"),
+        anno::in_group("UVW Coordinates")
+    ]],
+    
+    uniform float uvw_s_scale = 1.0f [[
+        anno::display_name("Scale U"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(0.0f, 100.0f)
+    ]],
+
+    uniform float uvw_t_scale = 1.0f [[
+        anno::display_name("Scale V"),
+        anno::in_group("UVW Coordinates"),
+        anno::soft_range(0.0f, 100.0f)
+    ]],
+
+    uniform bool uvw_s_flip = false [[
+        anno::display_name("Flip U"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform bool uvw_t_flip = false [[
+        anno::display_name("Flip V"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform bool uvw_swap_st = false [[
+        anno::display_name("Swap UV"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    //Projection Coordinates (Local / World)
+    uniform ::OmniSurface::OmniImage::projection_mode uvw_projection_mode = 
+        ::OmniSurface::OmniImage::projection_cubic [[
+        anno::display_name("Projection Mode"),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float3 uvw_projection_translate = float3(0.0) [[
+        anno::display_name("Translate"),
+        anno::description("Translate the projected texture."),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float3 uvw_projection_rotate = float3(0.0) [[
+        anno::display_name("Rotate"),
+        anno::description("Rotate the projected texture."),
+        anno::in_group("UVW Coordinates")
+    ]],
+
+    uniform float3 uvw_projection_scale = float3(1.0) [[
+        anno::display_name("Scale"),
+        anno::description("Scale the projected texture."),
+        anno::in_group("UVW Coordinates")
+    ]]
+) 
+[[
+    anno::display_name("OmniSurfaceBlend"),
+    anno::description("Blend two materials."),
+    anno::author("NVIDIA Corporation"),
+    anno::key_words(string[]("generic", "utilities")),
+    anno::version(1, 0, 0, ""),
+ 	anno::in_group("Advanced")
+]] = let {
+    
+    base::texture_coordinate_info texture_coordinate_info = ::OmniSurface::OmniImage::compute_texture_coordinate_2(
+        uvw_texture_coordinate_system,
+        uvw_uv_set,
+        uvw_s_offset,
+        uvw_t_offset,
+        uvw_s_scale,
+        uvw_t_scale,
+        uvw_s_flip,
+        uvw_t_flip,
+        uvw_swap_st,
+        uvw_projection_mode,
+        uvw_projection_translate,
+        uvw_projection_rotate,
+        uvw_projection_scale);
+
+    material base = ::OmniSurface::OmniSurfaceBlendBase::OmniSurfaceBlendBase (
+    
+        base_material: base_material,
+        
+        blend_material: blend_material,
+
+        blend_weight: tex::texture_isvalid(blend_weight_image) ?
+            ::OmniSurface::OmniImage::texture_alpha_channel_remap_2(
+                ::OmniSurface::OmniImage::texture_lookup_2(
+                    blend_weight_image,
+                    uvw_ignore_missing_textures,
+                    uvw_missing_texture_color,
+                    uvw_use_uv_coords,
+                    uvw_uv_coords,
+                    uvw_s_wrap,
+                    uvw_t_wrap,
+                    texture_coordinate_info
+                ),
+                blend_weight_image_alpha_mode
+            ).mono :
+            blend_weight,
+
+        enable_opacity: enable_opacity,
+        geometry_opacity_threshold: geometry_opacity_threshold
+    );
+
+} in material(
+    thin_walled: base.thin_walled,
+    ior: base.ior,
+    surface: base.surface,
+    backface: base.backface,
+    volume: base.volume,
+    geometry: base.geometry
+);

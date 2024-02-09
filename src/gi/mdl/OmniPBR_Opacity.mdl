@@ -357,6 +357,7 @@ export material OmniPBR_Opacity(
 [[
 	anno::display_name("OmniPBR Opacity"),
 	anno::description("OmniPBR supports opacity and ORM textures"),
+ 	anno::in_group("Base"),
 	anno::version( 2, 1, 0),
 	anno::author("NVIDIA CORPORATION"), 
 	anno::key_words(string[]("omni", "PBR", "opacity", "omniverse", "generic"))

@@ -1,0 +1,727 @@
+/***************************************************************************************************
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **************************************************************************************************/
+
+// OmniSurface shared utilities
+
+mdl 1.7;
+
+import ::anno::*;
+import ::math::*;
+import ::state::*;
+
+export struct metal_complex_ior
+{
+    color n; //refractive index
+    color k; //extinction coefficient
+};
+
+
+//[Gulbrandsen2014] Ole Gulbrandsen, 2014. Artist friendly metallic fresnel.
+export metal_complex_ior compute_artistic_to_conductor_fresnel(
+    color reflectivity,
+    color edge_tint)
+{
+    float epsilon = 1.e-2;
+    color r = math::lerp(color(epsilon), color(1.0 - epsilon), reflectivity);
+    color g = edge_tint;
+
+    color r_sqrt = math::sqrt(r);
+    color n_min = (1.0f - r) / (1.0f + r);
+    color n_max = (1.0f + r_sqrt) / (1.0f - r_sqrt);
+
+    color n = math::lerp(n_max, n_min, g);
+
+    color k2 = ((n + 1.0f) * (n + 1.0f) * r - (n - 1.0f) * (n - 1.0f)) / (1.0f - r);
+    k2 = math::max(k2, 0.0f);
+    color k = math::sqrt(k2);
+
+    return metal_complex_ior(n, k);
+}
+
+
+export float2 compute_anisotropy(float roughness, float anisotropy)
+{
+    float r = math::sqrt(1.0f - math::clamp(anisotropy, 0.0f, 0.98f));
+    return float2(math::min(roughness / r, 1.0f), roughness * r);
+}
+
+
+export float compute_reflection_from_ior(float ior)
+{
+    return ((1.0f - ior) * (1.0f - ior)) / ((1.0f + ior) * (1.0f + ior));
+}
+
+
+export struct fresnel_reflectivity
+{
+    float nr; //normal reflectivity
+    float gr; //grazing reflectivity
+};
+
+
+export fresnel_reflectivity approximate_fresnel(float ior, float roughness)
+{
+    float r = (ior - 1.0f) / (ior + 1.0f);
+    float nr = r * r;
+    float gr = math::max((1.0 - roughness), 0.0);
+
+    return fresnel_reflectivity(nr, gr);
+}
+
+
+export float3 rotate_tangent(float3 tangent, float rotation)
+{
+    float rot_angle = 2.0f * math::PI * rotation;
+    float3 bitangent = math::normalize(math::cross(state::normal(), tangent));
+    float cos_rot_angle = math::cos(rot_angle);
+    float sin_rot_angle = math::sin(rot_angle);
+    return cos_rot_angle * tangent - sin_rot_angle * bitangent;
+}
+
+
+//https://blog.selfshadow.com/publications/s2017-shading-course/imageworks/s2017_pbs_imageworks_slides_v2.pdf
+//Phase function eccentricity 'g' has been omitted here since we pass that directly 
+//to anisotropic_vdf(directional_bias: g).
+export color compute_albedo(color transmission_color)
+{
+    return color(4.09712) +
+           (4.20863f * transmission_color) -
+           math::sqrt(
+               9.59217f +
+               41.6808f * transmission_color +
+               17.7126f * transmission_color * transmission_color);
+}
+
+
+export struct volume_coefficients
+{
+    color scattering;
+    color absorption;
+};
+
+
+export volume_coefficients compute_subsurface_volume_coefficients(
+    color transmission_color,
+    color scattering_color,
+    float g,
+    float scale)
+{
+    color albedo = compute_albedo(transmission_color);
+    color alpha = 
+        (color(1.0) - albedo * albedo) / (color(1.0) - g * (albedo * albedo));
+
+    color sigma_s = alpha / (scale * scattering_color);
+    color sigma_a =
+        (color(1.0) / (scale * scattering_color)) - sigma_s;
+
+    return volume_coefficients(sigma_s, sigma_a);
+}
+
+
+export volume_coefficients compute_transmission_volume_coefficients(
+    color transmission_color,
+    color scattering_color,
+    float depth)
+{
+    if (depth == 0.0f)
+        return volume_coefficients(color(0.0), color(0.0));
+
+    color sigma_t = 
+        math::log(transmission_color / (1.0f + math::max_value(scattering_color))) / 
+        (-1.0f * depth);
+
+    color albedo = compute_albedo(transmission_color * scattering_color);
+    color albedo_2 = albedo * albedo;
+    color albedo_4 = albedo_2 * albedo_2;
+    color sigma_a = sigma_t * albedo_4;
+    color sigma_s = sigma_t - sigma_a;
+    return volume_coefficients(sigma_s, sigma_a);
+}
+
+
+export struct scattering_colors
+{
+    color scattering_transmission_color;
+    color scattering_scattering_color; //radius, not a typo here.
+};
+
+
+export enum scattering_colors_presets
+[[ 
+    anno::description("Scattering transmission color and radius presets")
+]]
+{
+    scattering_colors_apple = 0 [[ 
+        anno::display_name("Apple") 
+    ]],
+
+    scattering_colors_chicken = 1 [[ 
+        anno::display_name("Chicken") 
+    ]],
+
+    scattering_colors_cream = 2 [[ 
+        anno::display_name("Cream") 
+    ]],
+
+    scattering_colors_ketchup = 3 [[ 
+        anno::display_name("Ketchup") 
+    ]],
+
+    scattering_colors_marble = 4 [[ 
+        anno::display_name("Marble") 
+    ]],
+
+    scattering_colors_potato = 5 [[ 
+        anno::display_name("Potato") 
+    ]],
+
+    scattering_colors_skim_milk = 6 [[ 
+        anno::display_name("Skim Milk") 
+    ]],
+
+    scattering_colors_whole_milk = 7 [[ 
+        anno::display_name("Whole Milk") 
+    ]],
+
+    scattering_colors_skin_1 = 8 [[ 
+        anno::display_name("Skin 1") 
+    ]],
+
+    scattering_colors_skin_2 = 9 [[ 
+        anno::display_name("Skin 2") 
+    ]],
+
+    scattering_colors_skin_3 = 10 [[ 
+        anno::display_name("Skin 3") 
+    ]],
+
+    scattering_colors_skin_4 = 11 [[ 
+        anno::display_name("Skin 4") 
+    ]],
+
+    scattering_colors_custom = 12 [[ 
+        anno::display_name("Custom") 
+    ]]
+};
+
+
+// Values are from Henrik Wann Jensen, Stephen R. Marschner, Marc Levoy, and 
+// Pat Hanrahan. A Practical Model for Subsurface Light Transport. Proceedings 
+// of SIGGRAPH 2001, pages 511-518.
+export scattering_colors scattering_colors_preset_to_value(
+    scattering_colors_presets preset, 
+    color scattering_transmission_color = color(1.0),
+    color scattering_scattering_color = color(1.0))
+[[
+    anno::description("Return scattering colors based on preset.")
+]]
+{
+    if (preset == scattering_colors_apple)
+        return scattering_colors(
+            color(0.430, 0.210, 0.170), 
+            color(11.610, 3.880, 1.750));
+
+    if (preset == scattering_colors_chicken)
+        return scattering_colors(
+            color(0.440, 0.220, 0.140), 
+            color(9.440, 3.350, 1.790));
+
+     if (preset == scattering_colors_cream)
+         return scattering_colors(
+             color(0.990, 0.940, 0.830), 
+             color(15.030, 4.660, 2.540));
+
+    if (preset == scattering_colors_ketchup)
+        return scattering_colors(
+            color(0.220, 0.010, 0.001), 
+            color(4.760, 0.570, 0.390));
+
+    if (preset == scattering_colors_marble)
+        return scattering_colors(
+            color(0.930, 0.910, 0.880), 
+            color(8.510, 5.570, 3.950));
+
+    if (preset == scattering_colors_potato)
+        return scattering_colors(
+            color(0.860, 0.740, 0.290), 
+            color(14.270, 7.230, 2.040));
+
+    if (preset == scattering_colors_skim_milk)
+        return scattering_colors(
+            color(0.890, 0.890, 0.800), 
+            color(18.420, 10.440, 3.500));
+
+    if (preset == scattering_colors_whole_milk)
+        return scattering_colors(
+            color(0.950, 0.930, 0.850), 
+            color(10.900, 6.580, 2.510));
+
+    if (preset == scattering_colors_skin_1)
+        return scattering_colors(
+            color(0.570, 0.310, 0.170), 
+            color(3.670, 1.370, 0.680));
+
+    if (preset == scattering_colors_skin_2)
+        return scattering_colors(
+            color(0.750, 0.570, 0.470), 
+            color(4.820, 1.690, 1.090));
+
+    if (preset == scattering_colors_skin_3)
+        return scattering_colors(
+            color(0.999, 0.615, 0.521), 
+            color(1.000, 0.300, 0.100));
+
+    if (preset == scattering_colors_skin_4)
+        return scattering_colors(
+            color(0.078, 0.043, 0.025), 
+            color(0.723, 0.264, 0.127));
+
+    return scattering_colors(
+        scattering_transmission_color,
+        scattering_scattering_color);
+}
+
+
+export enum ior_presets
+[[ 
+    anno::description("Index of refraction preset")
+]]
+{
+    ior_acrylic_glass = 0 [[ 
+        anno::display_name("Acrylic Glass")
+    ]],
+
+    ior_air = 1 [[ 
+        anno::display_name("Air")
+    ]],
+
+    ior_crystal = 2 [[ 
+        anno::display_name("Crystal")
+    ]],
+
+    ior_diamond = 3 [[ 
+        anno::display_name("Diamond")
+    ]],
+
+    ior_emerald = 4 [[ 
+        anno::display_name("Emerald")
+    ]],
+
+    ior_ethanol = 5 [[ 
+        anno::display_name("Ethanol")
+    ]],
+
+    ior_flint_glass = 6 [[ 
+        anno::display_name("Flint Glass")
+    ]],
+
+    ior_glass = 7 [[ 
+        anno::display_name("Glass")
+    ]],
+
+    ior_honey_21p_water = 8 [[ 
+        anno::display_name("Honey 21% Water")
+    ]],
+
+    ior_human_eye_aqueous_humor = 9 [[ 
+        anno::display_name("Human Eye Aqueous Humor")
+    ]],
+
+    ior_human_eye_cornea = 10 [[ 
+        anno::display_name("Human Eye Cornea")
+    ]],
+
+    ior_human_eye_lens = 11 [[ 
+        anno::display_name("Human Eye Lens")
+    ]],
+
+    ior_human_eye_vitreous_humor = 12 [[ 
+        anno::display_name("Human Eye Vitreous Humor")
+    ]],
+
+    ior_human_skin = 13 [[ 
+        anno::display_name("Human Skin")
+    ]],
+
+    ior_human_hair = 14 [[ 
+        anno::display_name("Human Hair")
+    ]],
+
+    ior_human_wet_hair = 15 [[ 
+        anno::display_name("Human Wet Hair")
+    ]],
+
+    ior_ice = 16 [[ 
+        anno::display_name("Ice")
+    ]],
+
+    ior_milk = 17 [[ 
+        anno::display_name("Milk")
+    ]],
+
+    ior_olive_oil = 18 [[ 
+        anno::display_name("Olive Oil")
+    ]],
+
+    ior_pearl = 19 [[ 
+        anno::display_name("Pearl")
+    ]],
+
+    ior_plastic = 20 [[ 
+        anno::display_name("Plastic")
+    ]],
+
+    ior_sapphire = 21 [[ 
+        anno::display_name("Sapphire")
+    ]],
+
+    ior_soap_bubble = 22 [[ 
+        anno::display_name("Soap Bubble")
+    ]],
+
+    ior_vacuum = 23 [[ 
+        anno::display_name("Vacuum")
+    ]],
+
+    ior_water_0c = 24 [[ 
+        anno::display_name("Water 0C")
+    ]],
+
+    ior_water_35c = 25 [[ 
+        anno::display_name("Water 35C")
+    ]],
+
+    ior_water_100c = 26 [[ 
+        anno::display_name("Water 100C")
+    ]],
+
+    ior_custom = 99 [[ 
+        anno::display_name("Custom") 
+    ]]
+};
+
+
+export float ior_preset_to_value(
+    ior_presets preset, 
+    uniform float custom = 1.0f) uniform
+[[
+    anno::description("Return ior value based on preset.")
+]]
+{
+    if (preset == ior_acrylic_glass)
+        return 1.49f;
+
+    if (preset == ior_air)
+        return 1.0f;
+
+    if (preset == ior_crystal)
+        return 2.0f;
+
+    if (preset == ior_diamond)
+        return 2.42f;
+
+    if (preset == ior_emerald)
+        return 1.56f;
+
+    if (preset == ior_ethanol)
+        return 1.36f;
+
+    if (preset == ior_flint_glass)
+        return 1.66f;
+
+    if (preset == ior_glass)
+        return 1.5f;
+
+    if (preset == ior_honey_21p_water)
+        return 1.484f;
+
+    if (preset == ior_human_eye_aqueous_humor)
+        return 1.33f;
+
+    if (preset == ior_human_eye_cornea)
+        return 1.37f;
+
+    if (preset == ior_human_eye_lens)
+        return 1.41f;
+
+    if (preset == ior_human_eye_vitreous_humor)
+        return 1.34f;
+
+    if (preset == ior_human_skin)
+        return 1.4f;
+
+    if (preset == ior_human_hair)
+        return 1.55f;
+
+    if (preset == ior_human_wet_hair)
+        return 1.85f;
+
+    if (preset == ior_ice)
+        return 1.31f;
+
+    if (preset == ior_milk)
+        return 1.35f;
+
+    if (preset == ior_olive_oil)
+        return 1.47f;
+
+    if (preset == ior_pearl)
+        return 1.53f;
+
+    if (preset == ior_plastic)
+        return 1.55f;
+
+    if (preset == ior_sapphire)
+        return 1.77f;
+
+    if (preset == ior_soap_bubble)
+        return 1.4f;
+
+    if (preset == ior_vacuum)
+        return 1.0f;
+
+    if (preset == ior_water_0c)
+        return 1.333f;
+
+    if (preset == ior_water_35c)
+        return 1.325f;
+
+    if (preset == ior_water_100c)
+        return 1.318f;
+
+    return custom;
+}
+
+
+float3 transform_internal_to_tangent(float3 n)
+{
+    return
+        n.x * float3(
+            state::texture_tangent_u(0).x,
+            state::texture_tangent_v(0).x, 
+            state::normal().x) +
+
+        n.y * float3(
+            state::texture_tangent_u(0).y, 
+            state::texture_tangent_v(0).y,
+            state::normal().y) +
+
+        n.z * float3(
+            state::texture_tangent_u(0).z,
+            state::texture_tangent_v(0).z,
+            state::normal().z);
+}
+
+
+float3 transform_tangent_to_internal(float3 n)
+{
+    return
+        state::texture_tangent_u(0) * n.x +
+        state::texture_tangent_v(0) * n.y +
+        state::normal() * n.z ;
+}
+
+
+export float3 add_detail_normal(
+    float3 nd = state::normal(), 
+    float3 n = state::normal())
+{
+    float3 n_t = transform_internal_to_tangent(n);
+    float3 nd_t = transform_internal_to_tangent(nd);
+
+    n_t = n_t + float3(0.0, 0.0, 1.0);
+    nd_t = nd_t *  float3(-1.0, -1.0, 1.0);
+
+    n = n_t * math::dot(n_t, nd_t) / n_t.z - nd_t;
+    return math::normalize(transform_tangent_to_internal(n));
+}
+
+
+export enum normal_mode
+[[ 
+    anno::description("Normal Mode")
+]]
+{
+    normal_tangent_space = 0 [[ 
+        anno::display_name("Tangent Space") 
+    ]],
+
+    normal_object_space = 1 [[ 
+        anno::display_name("Object Space") 
+    ]]
+};
+
+
+export enum displacement_mode
+[[ 
+    anno::description("Displacement Mode")
+]]
+{
+    displacement_height = 0 [[ 
+        anno::display_name("Height") 
+    ]],
+
+    displacement_vector_tangent_space = 1 [[ 
+        anno::display_name("Vector, Tangent Space") 
+    ]],
+
+    displacement_vector_object_space = 2 [[ 
+        anno::display_name("Vector, Object Space") 
+    ]],
+
+    displacement_vector_world_space = 3 [[ 
+        anno::display_name("Vector, World Space") 
+    ]]
+};
+
+
+export float3 displacement_adjustment(
+    float3 displacement = float3(0.0),
+    uniform displacement_mode mode = displacement_height,
+    float scale = 1.0f)
+{
+    float3 result;
+    switch (mode) 
+    {
+        case displacement_height:
+            result = state::normal() * displacement * scale;
+            break;
+
+        case displacement_vector_tangent_space:
+            result = 
+                state::texture_tangent_u(0) * displacement[0] * scale +
+                state::texture_tangent_v(0) * displacement[2] * scale +
+                state::normal() * displacement[1] * scale;
+            break;
+
+        case displacement_vector_object_space:
+            result = state::transform_point(
+                state::coordinate_internal,
+                state::coordinate_object,
+                displacement * scale);
+            break;
+
+        case displacement_vector_world_space:
+            result = state::transform_point(
+                state::coordinate_internal,
+                state::coordinate_world,
+                displacement * scale);
+            break;
+
+        default:
+            result = state::position();
+            break;
+    }
+
+    return result;
+}
+
+
+export enum emission_mode
+[[ 
+    anno::description("Emission Mode")
+]]
+{
+    emission_lx = 0 [[ 
+        anno::display_name("Lux - lx (lm/m2)") 
+    ]],
+
+    emission_nt = 1 [[ 
+        anno::display_name("Nit - nt (cd/m2)") 
+    ]]
+};
+
+
+export enum melanin_concentration_presets
+[[ 
+    anno::description("Melanin concentration presets")
+]]
+{
+    melanin_concentration_white = 0 [[ 
+        anno::display_name("White") 
+    ]],
+
+    melanin_concentration_platinum_blonde = 1 [[ 
+        anno::display_name("Platinum Blonde") 
+    ]],
+
+    melanin_concentration_light_blonde = 2 [[ 
+        anno::display_name("Light Blonde") 
+    ]],
+
+    melanin_concentration_blonde = 3 [[ 
+        anno::display_name("Blonde") 
+    ]],
+
+    melanin_concentration_dark_blonde = 4 [[ 
+        anno::display_name("Dark Blonde") 
+    ]],
+
+    melanin_concentration_dark_brown = 5 [[ 
+        anno::display_name("Dark Brown") 
+    ]],
+
+    melanin_concentration_black = 6 [[ 
+        anno::display_name("Black") 
+    ]],
+
+    melanin_concentration_custom = 7 [[ 
+        anno::display_name("Custom") 
+    ]]
+};
+
+export float melanin_concentration_preset_to_value(
+    melanin_concentration_presets preset, 
+    float melanin_concentration_value = 1.0f)
+[[
+    anno::description("Return melanin concentration value based on a preset.")
+]]
+{
+    if (preset == melanin_concentration_white)
+        return 0.0f;
+
+    if (preset == melanin_concentration_platinum_blonde)
+        return 0.0025f;
+
+    if (preset == melanin_concentration_light_blonde)
+        return 0.10f;
+
+    if (preset == melanin_concentration_blonde)
+        return 0.175f;
+
+    if (preset == melanin_concentration_dark_blonde)
+        return 0.30f;
+
+    if (preset == melanin_concentration_dark_brown)
+        return 0.65f;
+
+    if (preset == melanin_concentration_black)
+        return 1.0f;
+
+    return melanin_concentration_value;
+}

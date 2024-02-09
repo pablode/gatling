@@ -1,0 +1,461 @@
+/***************************************************************************************************
+ * Copyright 2022 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **************************************************************************************************/
+
+mdl 1.7;
+
+import ::df::*;
+import ::state::*;
+import ::math::*;
+import ::base::*;
+import ::tex::*;
+import ::anno::*;
+import ::anno::*;
+
+export float3 HemiOctahedronToUnitVector( float2 Oct )
+{
+    Oct = float2( Oct.x + Oct.y, Oct.x - Oct.y ) * 0.5;
+    float3 N = float3( Oct.x, Oct.y, 1.0 - math::dot( float2(1.0), math::abs(Oct) ) );
+    return math::normalize(N);
+}
+
+export struct NormalData {
+	float3 normal;
+	float2 roughness;
+};
+
+export NormalData tangent_space_normal_roughness_texture(
+    uniform texture_2d texture
+        [[
+            anno::description("The input texture"),
+            anno::usage("normal")
+        ]],
+    uniform float factor = 1.0f
+        [[ anno::description("Determines the degree of bumpiness") ]],
+    uniform bool flip_tangent_u = false
+        [[ anno::description("Can be used to fix mismatches between the object's tangent space and the normal map's tangent space") ]],
+    uniform bool flip_tangent_v = false
+        [[ anno::description("Can be used to fix mismatches between the object's tangent space and the normal map's tangent space") ]],
+    base::texture_coordinate_info uvw = base::texture_coordinate_info()
+        [[ anno::description("Parameterization to be used for texture mapping. Defaults to texture channel 0.") ]],
+    uniform float2 crop_u = float2( 0.0, 1.0)
+        [[ anno::description("Restricts the texture access to sub-domain of the texture in the u direction") ]],
+    uniform float2 crop_v = float2( 0.0, 1.0)
+        [[ anno::description("Restricts the texture access to sub-domain of the texture in the v direction") ]],
+    uniform tex::wrap_mode wrap_u = tex::wrap_repeat
+        [[ anno::description("Wrapping mode in the u direction") ]],
+    uniform tex::wrap_mode wrap_v = tex::wrap_repeat
+        [[ anno::description("Wrapping mode in the v direction") ]],
+    uniform bool clip = false
+        [[
+            anno::description("deprecated, usewrap_mode=tex::wrap_clip. Defines wrap_clamp behavior. If true, lookup outside [0,1] results in no bump"),
+            anno::hidden()
+        ]],
+    uniform float scale = 1.
+        [[
+            anno::description("Scales the value red from the texture file. Can be used to adapt to different normal map formats"),
+            anno::unused()
+        ]],
+    uniform float offset = 0.
+        [[
+            anno::description("Offset applied to the value red from the texture file. Can be used to adapt to different normal map formats"),
+            anno::unused()
+        ]],
+    uniform float animation_start_time = 0.
+        [[ anno::description("When to start playing first frame of the animation ") ]],
+    uniform int2 animation_crop  = int2(0, 0)
+        [[ anno::description("If the texture is an animation, the range of frames to be played can be specified.") ]],
+    uniform tex::wrap_mode animation_wrap = tex::wrap_repeat
+        [[ anno::description("Defines what to do outside of regular animation time") ]],
+    uniform float animation_fps = 30
+        [[ anno::description("Framerate to use for animation playback") ]]
+)
+[[
+    anno::description("Interprets the color values of a bitmap as a vector in tangent space"),
+    anno::noinline()
+]]
+{
+	NormalData normalData;
+	normalData.roughness = float2(0);
+	normalData.normal = state::normal();
+
+    float frame = 0.0;
+    if(animation_crop != int2(0,0)) //only if we have an animation
+    {
+        frame = (::state::animation_time()-animation_start_time) * animation_fps ; //start playing at first frame of the animation
+        switch ( animation_wrap) {
+            case tex::wrap_repeat:
+                frame=frame>0?  math::fmod(frame,animation_crop.y-animation_crop.x)+animation_crop.x:
+                                math::fmod(frame,animation_crop.y-animation_crop.x)+animation_crop.y;
+                break;
+            case tex::wrap_mirrored_repeat:
+                float animation_crop_2y = 2.0*animation_crop.y;
+                frame=frame>0?  math::fmod(frame,(animation_crop.y-animation_crop.x)*2.0)+animation_crop.x:
+                                math::fmod(frame,(animation_crop.y-animation_crop.x)*2.0)+animation_crop_2y-animation_crop.x;
+                if(frame>animation_crop.y)
+                    frame = animation_crop_2y-frame;
+                break;
+            case tex::wrap_clamp:
+                frame = math::clamp( frame+animation_crop.x, animation_crop.x, animation_crop.y);
+                break;
+            case tex::wrap_clip:
+                frame += animation_crop.x;
+                if(frame < animation_crop.x || frame > animation_crop.y) return normalData;
+                break;
+        }
+    }
+
+    if (tex::width(texture) == 0 || tex::height(texture) == 0 || // avoid division by zero in texremapu for invalid resource
+        factor == 0.0f)
+        return normalData;
+    {
+        if (clip) {
+            if (wrap_u == tex::wrap_clamp && (uvw.position.x < 0. || uvw.position.x > 1.)) {
+                return normalData;
+            }
+            if (wrap_v == tex::wrap_clamp && (uvw.position.y < 0. || uvw.position.y > 1.)) {
+                return normalData;
+            }
+        }
+        if (wrap_u == tex::wrap_clip && (uvw.position.x < 0. || uvw.position.x > 1.)) {
+            return normalData;
+        }
+        if (wrap_v == tex::wrap_clip && (uvw.position.y < 0. || uvw.position.y > 1.)) {
+            return normalData;
+        }
+    }
+    bool pixel_flip_u = flip_tangent_u;
+    bool pixel_flip_v = flip_tangent_v;
+    //if we mirror repeat a tangent space texture, tangent space needs to be flipped for every other tile
+    if (wrap_u == tex::wrap_mirrored_repeat) {
+        if( uvw.position.x > 0. && int(uvw.position.x) % 2 == 1)
+            pixel_flip_u = ! pixel_flip_u;
+        else if( uvw.position.x < 0. && int(uvw.position.x) % 2 == 0)
+            pixel_flip_u = ! pixel_flip_u;
+    }
+    if (wrap_v == tex::wrap_mirrored_repeat) {
+        if( uvw.position.y > 0. && int(uvw.position.y) % 2 == 1)
+            pixel_flip_v = ! pixel_flip_v;
+        else if( uvw.position.y < 0. && int(uvw.position.y) % 2 == 0)
+            pixel_flip_v = ! pixel_flip_v;
+    }
+
+    float3 transformed_tangent_u = uvw.tangent_u;
+    float3 transformed_tangent_v = uvw.tangent_v;
+
+    if (pixel_flip_u)
+        transformed_tangent_u=-transformed_tangent_u;
+    if (pixel_flip_v)
+        transformed_tangent_v=-transformed_tangent_v;
+
+    float3 tangent_space_normal;
+	float4 normal_raw = tex::lookup_float4(texture,float2(uvw.position.x,uvw.position.y), wrap_u, wrap_v, crop_u, crop_v, frame);
+	if(normal_raw.x > 1.5)
+	{
+		// octahedron packed by OV
+		normal_raw.x -= 2.0;
+		normal_raw.x -= 0.5;
+		normal_raw.y -= 0.5;
+		tangent_space_normal = HemiOctahedronToUnitVector(float2(normal_raw.x, normal_raw.y) * 2.0);
+		normalData.roughness = float2(normal_raw.z, normal_raw.w);
+	}
+	else
+	{
+		// regular
+		tangent_space_normal = (float3(normal_raw.x, normal_raw.y, normal_raw.z) - float3(0.5)) * 2.0;
+		normalData.roughness = float2(0);
+	}
+
+	normalData.normal =  math::normalize(
+        transformed_tangent_u * tangent_space_normal.x * factor +
+        transformed_tangent_v * tangent_space_normal.y * factor +
+        state::normal() * tangent_space_normal.z);
+
+	return normalData;
+}
+
+
+export material OmniPBRBase(
+
+	
+    //  Albdeo  //
+
+	color diffuse_reflection_color = color(0.2) [[
+		anno::display_name("Albedo Color"),
+		anno::description("This is the albedo base color"),
+		anno::in_group("Albedo")
+	]],
+	color diffuse_tint = color(1.0) [[
+		anno::display_name("Albedo Tint"),
+		anno::description("When enabled, this color value is multiplied over the final albedo color"),
+		anno::in_group("Albedo")
+	]],
+
+	
+	//  Reflecitivity //
+	
+	float specular_reflection_roughness = float(0.0) [[
+		anno::display_name("Roughness"),
+		anno::description("Higher roughness values lead to more blurry reflections"),
+		anno::in_group("Reflectivity")
+	]],
+	float2 specular_reflection_aniso_roughness = float2(0.0, 0.0) [[
+		anno::display_name("Aniso roughness"),
+		anno::description("Higher roughness values lead to more blurry reflections"),
+		anno::in_group("Reflectivity"),
+		anno::hidden()
+	]],
+	float metalness = float(0.0) [[
+		anno::display_name("Metalness"),
+		anno::description("Bias towards pure specular reflection"),
+		anno::in_group("Reflectivity"),
+		anno::hard_range(float(0.0), float(1.0))
+	]],	
+	float specular_level = float(0.5) [[
+		anno::display_name("Specular"),
+		anno::description("The specular level (intensity) of the material"),
+		anno::in_group("Reflectivity"),
+		anno::soft_range(float(0.0), float(1.0))
+	]],
+
+
+	//  Emission  //
+	
+	uniform bool enable_emission = false [[
+        	anno::display_name("Enable Emission"),
+		anno::description("Enables the emission of light from the material"),
+		anno::in_group("Emissive")
+	]],
+	color emission_color = color(1.0,0.1,0.1) [[
+		anno::display_name("Emissive Color"),
+		anno::description("The emission color"),
+		anno::in_group("Emissive"),
+		anno::enable_if("enable_emission == true")
+	]],
+	float emission_intensity = float(40.0) [[
+		anno::display_name("Emissive Intensity"),    
+		anno::description("Intensity of the emission"),
+		anno::in_group("Emissive"),
+		anno::enable_if("enable_emission == true")
+	]],
+
+	
+    //  Geometry Opacity  //
+	
+    uniform bool enable_opacity = false [[
+		anno::display_name("Enable Opacity"),
+		anno::description("Enables the use of cutout opacity"),
+		anno::in_group("Opacity")
+	]],
+	float geometry_opacity = float(1.0) [[
+		anno::display_name("Opacity Amount"),    
+		anno::description("Opacity value between 0 and 1, when Opacity Map is not valid"),
+		anno::in_group("Opacity"),
+		anno::hard_range(float(0.0), float(1.0))
+	]],
+	uniform float geometry_opacity_threshold = 0.f
+	[[
+		anno::hard_range(0.0, 1.0),
+		anno::display_name("Opacity Threshold"),
+		anno::description("If 0, use fractional opacity values 'as is'; if > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
+		anno::in_group("Opacity")
+	]],
+
+	
+	//  Clearcoat // 
+	
+    uniform bool enable_coat = false [[
+		anno::display_name("Enable Clearcoat Layer"),
+		anno::description("Adds a coat layer on top of the material when enabled"),
+		anno::in_group("Clearcoat")
+	]],
+	float coat_weight = float(1.0) [[
+		anno::display_name("Clearcoat Weight"),
+		anno::description("Sets the weight for coat layer"),
+		anno::in_group("Clearcoat"),
+		anno::hard_range(float(0.0), float(1.0))
+	]],
+	color coat_color = color(1.0) [[
+		anno::display_name("Clearcoat Tint"),
+		anno::description("Clearcoat is tinted and affects the underlying material"),
+		anno::in_group("Clearcoat")
+	]],
+	float coat_transparency = float(1.0) [[
+		anno::display_name("Clearcoat Transparency"),
+		anno::description("Adjusts the transparency of the coat. Can be turned into a fully opaque coat covering the underlying layer"),
+		anno::in_group("Clearcoat"),
+		anno::hard_range(float(0.0), float(1.0))
+	]],
+	float coat_roughness = float(0.0) [[
+		anno::display_name("Clearcoat Roughness"),
+		anno::description("Higher roughness values lead to more blurry reflections"),
+		anno::in_group("Clearcoat")
+	]],
+	float2 coat_aniso_roughness = float2(0.0, 0.0) [[
+		anno::display_name("Clearcoat aniso roughness"),
+		anno::description("Higher roughness values lead to more blurry reflections"),
+		anno::in_group("Clearcoat"),
+		anno::hidden()
+	]],
+	float coat_ior = float(1.56) [[
+		anno::display_name("Clearcoat IOR"),
+		anno::description("Sets the Index of refraction for the coat layer"),
+		anno::in_group("Clearcoat"),
+		anno::soft_range(float(0.0), float(4.0))
+	]],
+    float3 clearcoat_geometry_normal = state::normal() [[
+        anno::display_name("Clearcoat Normal"),
+        anno::in_group("Clearcoat"),
+        anno::usage("normal")
+    ]],
+
+
+	//  Geometry  //
+
+    float3 geometry_normal = state::normal() [[
+        anno::display_name("Geometry Normal"),
+        anno::in_group("Geometry"),
+        anno::usage("normal")
+    ]]
+
+) 
+[[
+	anno::display_name("OmniPBR Base"),
+	anno::description("OmniPBR Base with support for clear coat, opacity and ORM textures."),
+ 	anno::in_group("Base"),
+	anno::version( 2, 1, 1),
+	anno::author("NVIDIA CORPORATION"), 
+	anno::key_words(string[]("omni", "PBR", "opacity", "omniverse", "generic"))
+]]
+ = let{
+
+    //  Diffuse Bsdf  //	
+    
+    color tinted_diffuse_color = diffuse_reflection_color * diffuse_tint;
+
+    color base_color = tinted_diffuse_color;
+
+    bsdf diffuse_bsdf = df::weighted_layer(
+		weight: 1.0,
+		layer:  df::diffuse_reflection_bsdf(
+			        tint:       base_color,
+			        roughness:  float(0.0)
+                ),
+		base:   bsdf(),
+		normal: enable_coat ? geometry_normal : state::normal()
+	);
+
+	//  Glossy Reflection Bsdf  //
+
+	float roughness_u = math::clamp(specular_reflection_roughness * specular_reflection_roughness
+		+ specular_reflection_aniso_roughness.x * specular_reflection_aniso_roughness.x, 0, 1);
+	float roughness_v = math::clamp(specular_reflection_roughness * specular_reflection_roughness
+		+ specular_reflection_aniso_roughness.y * specular_reflection_aniso_roughness.y, 0, 1);
+	bsdf ggx_smith_bsdf = df::microfacet_ggx_smith_bsdf(
+		roughness_u:    roughness_u,
+		roughness_v:    roughness_v,
+		tint:           color(1.0),
+		mode:           df::scatter_reflect
+	);
+	
+	bsdf custom_curve_layer_bsdf = df::custom_curve_layer(
+		normal_reflectivity:  0.08,		
+		grazing_reflectivity: 1.0,
+		exponent:	          5.0,
+		weight:	              specular_level,
+		layer:                ggx_smith_bsdf,
+		base:	              diffuse_bsdf,
+		normal:               enable_coat ? geometry_normal : state::normal()
+	);
+	
+	bsdf directional_factor_bsdf = df::tint(base_color, ggx_smith_bsdf);
+	
+	bsdf omni_PBR_bsdf = df::weighted_layer(
+        weight:     metalness,
+        layer:	    directional_factor_bsdf,
+		base:	    custom_curve_layer_bsdf,
+		normal:     enable_coat ? geometry_normal : state::normal() 
+	);
+	
+	//  Clear Coat  // 
+
+	float coat_roughness_u = math::clamp(coat_roughness * coat_roughness
+		+ coat_aniso_roughness.x * coat_aniso_roughness.x, 0, 1);
+	float coat_roughness_v = math::clamp(coat_roughness * coat_roughness
+		+ coat_aniso_roughness.y * coat_aniso_roughness.y, 0, 1);
+	bsdf coat_bsdf = df::microfacet_ggx_smith_bsdf(
+		roughness_u: coat_roughness_u,
+		roughness_v: coat_roughness_v,
+		tint:        color(1.0),
+		mode:        df::scatter_reflect
+	);
+	
+	bsdf opaque_coat = df::weighted_layer(
+        weight:     coat_transparency,
+		layer:	    ::df::tint( 
+					    tint: coat_color,
+					    base: omni_PBR_bsdf
+                    ),
+		base:	    ::df::diffuse_reflection_bsdf(
+					    tint: coat_color
+                    )
+	);
+	
+	bsdf omni_PBR_coated_bsdf = df::fresnel_layer(
+		ior:     coat_ior,
+		weight:  coat_weight,
+		layer:   coat_bsdf,
+		base:    opaque_coat,
+		normal:  clearcoat_geometry_normal 
+	);
+	
+    bsdf final_bsdf = enable_coat ? omni_PBR_coated_bsdf : omni_PBR_bsdf;
+                                    
+    color emission_value = enable_emission ? emission_color * color(emission_intensity) : color(0.0);
+	
+	float opacity_value = geometry_opacity;
+    float cutout_opacity = enable_opacity ? ((geometry_opacity_threshold == 0.0) ? opacity_value : ((opacity_value >= geometry_opacity_threshold) ? 1.0 : 0)) : 1.0;
+ 
+    material_emission emission = material_emission(
+                                    df::diffuse_edf(),
+                                    intensity: emission_value 
+                                    );
+
+    material_surface surface =  material_surface(
+		                            scattering: final_bsdf,
+		                            emission:   emission
+		                            );
+
+    material_geometry geometry = material_geometry(
+                                    normal: enable_coat ? state::normal(): geometry_normal,
+                                    cutout_opacity: cutout_opacity
+                                    );
+
+} in material(
+	surface: surface,
+	geometry: geometry
+);

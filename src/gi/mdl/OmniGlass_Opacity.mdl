@@ -329,6 +329,7 @@ export material OmniGlass_Opacity(
 	anno::display_name("Omni Glass Opacity"),
 	anno::version( 1, 0, 0),
 	anno::description("Omni Glass Opacity Material"),
+ 	anno::in_group("Base"),
 	anno::key_words(string[]("omni", "omniverse", "glass", "transparent", "window", "transparency", "workflow")),
 	distill_off()
 ]]

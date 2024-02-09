@@ -1,0 +1,238 @@
+/***************************************************************************************************
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ **************************************************************************************************/
+
+// Implementation of OmniSurfaceBlendBase material
+
+mdl 1.7;
+
+import ::anno::*;
+import ::base::*;
+import ::df::*;
+import ::limits::*;
+import ::math::*;
+import ::state::*;
+import ::tex::*;
+
+import ::OmniSurface::OmniShared::*;
+import ::OmniSurface::OmniImage::*;
+
+export material OmniSurfaceBlendBase(
+
+    //Materials
+    //
+    material base_material = material() [[
+        anno::display_name("Base Material"),
+        anno::in_group("Materials")
+    ]],
+
+    material blend_material =  material() [[
+        anno::display_name("Blend Material"),
+        anno::in_group("Materials")
+    ]],
+
+    float blend_weight = float(1.0) [[ 
+        anno::display_name("Weight"),
+        anno::in_group("Blending"),
+        anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    //Geometry
+    //
+    uniform bool enable_opacity = false [[
+        anno::display_name("Enable Opacity"),
+        anno::description("Enables the use of cutout opacity"),
+        anno::in_group("Geometry")
+    ]],
+
+    uniform float geometry_opacity_threshold = float(0.0) [[
+        anno::display_name("Opacity Threshold"),
+        anno::description("If > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
+        anno::in_group("Geometry"),
+        anno::hard_range(0.0f, 1.0f)
+    ]]
+)
+[[
+    anno::display_name("OmniSurfaceBlendBase"),
+    anno::description("Blend two materials."),
+    anno::author("NVIDIA Corporation"),
+    anno::key_words(string[]("generic", "utilities")),
+    anno::version(1, 0, 0, "")
+
+]] = let {
+
+    //Emission
+    //
+    edf emission_edf_mix = df::normalized_mix(
+        components: df::edf_component[](
+            df::edf_component(
+                weight: (1.0 - blend_weight),
+                component: base_material.surface.emission.emission
+            ),
+            df::edf_component(
+                weight: blend_weight,
+                component: blend_material.surface.emission.emission
+            )
+        )
+    );
+
+    material_emission emission_mix = material_emission(
+        emission: emission_edf_mix,
+        intensity: base::blend_color_layers(
+            base: base_material.surface.emission.intensity,
+            layers: base::color_layer[](
+                base::color_layer(
+                    layer_color: blend_material.surface.emission.intensity,
+                    weight: blend_weight,
+                    mode: base::color_layer_blend
+                )
+            )
+        ).tint,
+        mode: intensity_radiant_exitance
+    );
+
+    //Surface
+    //
+    bsdf surface_bsdf_mix = df::weighted_layer(
+        weight: blend_weight,
+        base: base_material.surface.scattering,
+        layer: blend_material.surface.scattering
+    );
+
+    material_surface surface = material_surface(
+        scattering: surface_bsdf_mix,
+        emission: emission_mix
+    );
+
+    //Back Surface
+    material_surface back_surface = material_surface(
+        scattering: bsdf(), 
+        emission: material_emission(
+            emission: edf(), 
+            intensity: color(0.0), 
+            mode: intensity_radiant_exitance
+        )
+    );
+
+    //Volume
+    //
+    vdf volume_vdf_mix = df::normalized_mix(
+        components: df::vdf_component[](
+            df::vdf_component(
+                weight: (1.0 - blend_weight),
+                component: base_material.volume.scattering
+            ),
+
+            df::vdf_component(
+                weight: blend_weight,
+                component: blend_material.volume.scattering
+            )
+        )
+    );
+    
+    color volume_scattering_coefficient_mix = base::blend_color_layers(
+        base: base_material.volume.scattering_coefficient,
+        layers: base::color_layer[](
+            base::color_layer(
+                layer_color: blend_material.volume.scattering_coefficient,
+                weight: blend_weight,
+                mode: base::color_layer_blend
+            )
+        )
+    ).tint;
+
+    color volume_absorption_coefficient_mix = base::blend_color_layers(
+        base: base_material.volume.absorption_coefficient,
+        layers: base::color_layer[](
+            base::color_layer(
+                layer_color: blend_material.volume.absorption_coefficient,
+                weight: blend_weight,
+                mode: base::color_layer_blend
+            )
+        )
+    ).tint;
+
+    material_volume volume = (base_material.thin_walled || blend_material.thin_walled) ? 
+        material_volume() :
+        material_volume(
+            scattering: volume_vdf_mix,
+            scattering_coefficient: volume_scattering_coefficient_mix,
+            absorption_coefficient: volume_absorption_coefficient_mix
+        );
+
+    //Geometry
+    //
+    color base_material_displacement(base_material.geometry.displacement);
+    color blend_material_displacement(blend_material.geometry.displacement);
+    color displacement_blend_as_color = base::blend_color_layers(
+        base: base_material_displacement,
+        layers: base::color_layer[](
+            base::color_layer(
+                layer_color: blend_material_displacement,
+                weight: blend_weight,
+                mode: base::color_layer_blend
+            )
+        )
+    ).tint;
+    float3 displacement_blend(displacement_blend_as_color);
+
+    color base_material_cutout_opacity(base_material.geometry.cutout_opacity);
+    color blend_material_cutout_opacity(blend_material.geometry.cutout_opacity);
+    float cutout_opacity_blend = base::blend_color_layers(
+        base: base_material_cutout_opacity,
+        layers: base::color_layer[](
+            base::color_layer(
+                layer_color: blend_material_cutout_opacity,
+                weight: blend_weight,
+                mode: base::color_layer_blend
+            )
+        )
+    ).mono;
+
+    float3 normal_blend = ::OmniSurface::OmniShared::add_detail_normal(
+        base_material.geometry.normal, 
+        blend_material.geometry.normal
+    );
+
+    material_geometry geometry = material_geometry(
+        displacement: displacement_blend,
+        cutout_opacity: enable_opacity ? 
+            geometry_opacity_threshold == 0.0f ? 
+                cutout_opacity_blend : 
+                (cutout_opacity_blend  >= geometry_opacity_threshold ? 1.0f : 0.0f) : 
+            1.0f,
+        normal: normal_blend
+    );
+
+} in material(
+    thin_walled: (base_material.thin_walled || blend_material.thin_walled),
+    ior: base_material.ior,
+    surface: surface,
+    backface: back_surface,
+    volume: volume,
+    geometry: geometry
+);

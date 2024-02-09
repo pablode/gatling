@@ -27,7 +27,7 @@
  **************************************************************************************************/
 
 
-mdl 1.4;
+mdl 1.7;
 import ::df::*;
 import ::state::*;
 import ::math::*;
@@ -37,6 +37,8 @@ import ::anno::*;
 
 import ::nvidia::core_definitions::file_texture;
 import ::nvidia::core_definitions::normalmap_texture;
+
+import OmniPBRBase::*;
 
 
 uniform float4x4 rotation_translation_scale(
@@ -435,6 +437,13 @@ export material OmniPBR_ClearCoat_Opacity(
 	
 	
 	
+	uniform float geometry_normal_roughness_strength = 1.f
+	[[
+		anno::hard_range(0.0, 1.0),
+		anno::display_name("Normal map to roughness weight"),
+		anno::description("Enables and weights roughness induced by normal maps"),
+		anno::in_group("Normal")
+	]],
 	/*
 	uniform bool enable_normalmap_texture = false
 	[[
@@ -580,6 +589,7 @@ export material OmniPBR_ClearCoat_Opacity(
 [[
 	anno::display_name("OmniPBR ClearCoat Opacity"),
 	anno::description("OmniPBR with ClearCoat. Supports opacity and ORM textures."),
+ 	anno::in_group("Base"),
 	anno::version( 2, 1, 0),
 	anno::author("NVIDIA CORPORATION"), 
 	anno::key_words(string[]("omni", "PBR", "opacity", "omniverse", "generic"))
@@ -630,36 +640,39 @@ export material OmniPBR_ClearCoat_Opacity(
 	);
 	
 	// Normal calculations
-	float3 the_normal =  tex::texture_isvalid(normalmap_texture) ?
-							base::tangent_space_normal_texture(
+	OmniPBRBase::NormalData defaultData = OmniPBRBase::NormalData(state::normal(), float2(0));
+
+	OmniPBRBase::NormalData normal_data = tex::texture_isvalid(normalmap_texture) ?
+		OmniPBRBase::tangent_space_normal_roughness_texture(
 							texture:        normalmap_texture,
 							factor:         bump_factor,
 							uvw:            transformed_uvw,
 							flip_tangent_u: flip_tangent_u,
 							flip_tangent_v: flip_tangent_v	// true for dx, false for opengl
 							//flip_tangent_v: true
-							): state::normal() ;				
-	
 
-	float3 detail_normal = tex::texture_isvalid(detail_normalmap_texture) ?
-							base::tangent_space_normal_texture(
+		) : defaultData;
+	float3 the_normal = normal_data.normal;
+
+	OmniPBRBase::NormalData detail_normal_data = tex::texture_isvalid(detail_normalmap_texture) ?
+		OmniPBRBase::tangent_space_normal_roughness_texture(
 							texture:        detail_normalmap_texture,
 							factor:         detail_bump_factor,
 							uvw:            detail_transformed_uvw,
 							flip_tangent_u: flip_tangent_u,
 							flip_tangent_v: flip_tangent_v	// true for dx, false for opengl
-							): state::normal() ;
+							) : defaultData;
+	float3 detail_normal = detail_normal_data.normal;
 
-							
-	float3 clearcoat_normal = tex::texture_isvalid(clearcoat_normalmap_texture) ?
-								base::tangent_space_normal_texture(
+	OmniPBRBase::NormalData clearcoat_normal_data = tex::texture_isvalid(clearcoat_normalmap_texture) ?
+		OmniPBRBase::tangent_space_normal_roughness_texture(
 								texture:        clearcoat_normalmap_texture,
 								factor:         clearcoat_bump_factor,
 								uvw:            clearcoat_transformed_uvw,
 								flip_tangent_u: flip_tangent_u,
 								flip_tangent_v: flip_tangent_v	// true for dx, false for opengl
-							) : state::normal();
-
+							) : defaultData;
+	float3 clearcoat_normal = clearcoat_normal_data.normal;
 
 	float3 diffuse_gloss_normal = tex::texture_isvalid(detail_normalmap_texture) ?	add_detail_normal(detail_normal, the_normal) : the_normal;
 	
@@ -743,9 +756,10 @@ export material OmniPBR_ClearCoat_Opacity(
 	);
 
 	// The glossy reflection BSDF
+	// TODO: Clearcoat's induced roughness from normal map should also apply here, but right now avoiding it due to confusing relationship in the normals
 	bsdf ggx_smith_bsdf = df::microfacet_ggx_smith_bsdf(
-		roughness_u:reflection_roughness_1 * reflection_roughness_1,
-		roughness_v:reflection_roughness_1 * reflection_roughness_1,
+		roughness_u:reflection_roughness_1 * reflection_roughness_1 + (geometry_normal_roughness_strength * normal_data.roughness.x * normal_data.roughness.x),
+		roughness_v:reflection_roughness_1 * reflection_roughness_1 + (geometry_normal_roughness_strength * normal_data.roughness.y * normal_data.roughness.y),
 		tint: color(1.0, 1.0, 1.0),
 		mode: df::scatter_reflect
 	);
@@ -783,8 +797,8 @@ export material OmniPBR_ClearCoat_Opacity(
 	);
 	
 	bsdf clearcoat_bsdf = df::microfacet_ggx_smith_bsdf(
-		roughness_u: clearcoat_reflection_roughness * clearcoat_reflection_roughness,
-		roughness_v: clearcoat_reflection_roughness * clearcoat_reflection_roughness,
+		roughness_u: clearcoat_reflection_roughness * clearcoat_reflection_roughness + (geometry_normal_roughness_strength * clearcoat_normal_data.roughness.x * clearcoat_normal_data.roughness.x),
+		roughness_v: clearcoat_reflection_roughness * clearcoat_reflection_roughness + (geometry_normal_roughness_strength * clearcoat_normal_data.roughness.y * clearcoat_normal_data.roughness.y),
 		tint:        color(1.0f),
 		mode:        df::scatter_reflect
 	);
