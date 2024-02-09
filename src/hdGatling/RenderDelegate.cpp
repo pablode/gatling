@@ -34,33 +34,58 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace
+{
+  const static TfTokenVector _supportedRprimTypes =
+  {
+    HdPrimTypeTokens->mesh
+  };
+
+  const static TfTokenVector _supportedSprimTypes =
+  {
+    HdPrimTypeTokens->camera,
+    HdPrimTypeTokens->material,
+    HdPrimTypeTokens->sphereLight,
+    HdPrimTypeTokens->distantLight,
+    HdPrimTypeTokens->rectLight,
+    HdPrimTypeTokens->diskLight,
+    HdPrimTypeTokens->domeLight,
+    HdPrimTypeTokens->simpleLight // Required for usdview domeLight creation
+  };
+
+  const static TfTokenVector _supportedBprimTypes =
+  {
+    HdPrimTypeTokens->renderBuffer
+  };
+}
+
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
                                                  const MaterialNetworkCompiler& materialNetworkCompiler,
                                                  std::string_view resourcePath)
-  : m_materialNetworkCompiler(materialNetworkCompiler)
-  , m_resourcePath(resourcePath)
-  , m_resourceRegistry(std::make_shared<HdResourceRegistry>())
-  , m_renderParam(std::make_unique<HdGatlingRenderParam>())
+  : _materialNetworkCompiler(materialNetworkCompiler)
+  , _resourcePath(resourcePath)
+  , _resourceRegistry(std::make_shared<HdResourceRegistry>())
+  , _renderParam(std::make_unique<HdGatlingRenderParam>())
 {
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Samples per pixel", HdGatlingSettingsTokens->spp, VtValue{1} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max bounces", HdGatlingSettingsTokens->maxBounces, VtValue{7} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette bounce offset", HdGatlingSettingsTokens->rrBounceOffset, VtValue{3} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette inverse minimum terminate probability", HdGatlingSettingsTokens->rrInvMinTermProb, VtValue{0.95f} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max sample value", HdGatlingSettingsTokens->maxSampleValue, VtValue{10.0f} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Filter Importance Sampling", HdGatlingSettingsTokens->filterImportanceSampling, VtValue{true} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Depth of field", HdGatlingSettingsTokens->depthOfField, VtValue{false} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Light intensity multiplier", HdGatlingSettingsTokens->lightIntensityMultiplier, VtValue{1.0f} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->nextEventEstimation, VtValue{false} });
-  m_settingDescriptors.push_back(HdRenderSettingDescriptor{ "Clipping planes", HdGatlingSettingsTokens->clippingPlanes, VtValue{false} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Samples per pixel", HdGatlingSettingsTokens->spp, VtValue{1} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max bounces", HdGatlingSettingsTokens->maxBounces, VtValue{7} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette bounce offset", HdGatlingSettingsTokens->rrBounceOffset, VtValue{3} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette inverse minimum terminate probability", HdGatlingSettingsTokens->rrInvMinTermProb, VtValue{0.95f} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max sample value", HdGatlingSettingsTokens->maxSampleValue, VtValue{10.0f} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Filter Importance Sampling", HdGatlingSettingsTokens->filterImportanceSampling, VtValue{true} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Depth of field", HdGatlingSettingsTokens->depthOfField, VtValue{false} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Light intensity multiplier", HdGatlingSettingsTokens->lightIntensityMultiplier, VtValue{1.0f} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->nextEventEstimation, VtValue{false} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Clipping planes", HdGatlingSettingsTokens->clippingPlanes, VtValue{false} });
 
-  m_debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressiveAccumulation, VtValue{true} });
+  _debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressiveAccumulation, VtValue{true} });
 
 #ifndef NDEBUG
-  m_settingDescriptors.insert(m_settingDescriptors.end(), m_debugSettingDescriptors.begin(), m_debugSettingDescriptors.end());
+  _settingDescriptors.insert(_settingDescriptors.end(), _debugSettingDescriptors.begin(), _debugSettingDescriptors.end());
 #endif
-  _PopulateDefaultSettings(m_settingDescriptors);
+  _PopulateDefaultSettings(_settingDescriptors);
 #ifdef NDEBUG
-  _PopulateDefaultSettings(m_debugSettingDescriptors);
+  _PopulateDefaultSettings(_debugSettingDescriptors);
 #endif
 
   for (const auto& setting : settingsMap)
@@ -71,24 +96,24 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
     _settingsMap[key] = value;
   }
 
-  m_giScene = giCreateScene();
+  _giScene = giCreateScene();
 }
 
 HdGatlingRenderDelegate::~HdGatlingRenderDelegate()
 {
-  giDestroyScene(m_giScene);
+  giDestroyScene(_giScene);
 }
 
 HdRenderSettingDescriptorList HdGatlingRenderDelegate::GetRenderSettingDescriptors() const
 {
-  return m_settingDescriptors;
+  return _settingDescriptors;
 }
 
 void HdGatlingRenderDelegate::SetRenderSetting(TfToken const& key, VtValue const& value)
 {
 #ifdef NDEBUG
   // Disallow changing debug render settings in release config.
-  for (const HdRenderSettingDescriptor& descriptor : m_debugSettingDescriptors)
+  for (const HdRenderSettingDescriptor& descriptor : _debugSettingDescriptors)
   {
     if (key == descriptor.key)
     {
@@ -113,7 +138,7 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, const HdComm
 {
   if (command == HdGatlingCommandTokens->printLicenses)
   {
-    std::string licenseFilePath = TfStringCatPaths(m_resourcePath, GI_LICENSE_FILE_NAME);
+    std::string licenseFilePath = TfStringCatPaths(_resourcePath, GI_LICENSE_FILE_NAME);
     std::string errorMessage;
 
     ArchConstFileMapping mapping = ArchMapFileReadOnly(licenseFilePath, &errorMessage);
@@ -139,12 +164,12 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, const HdComm
 HdRenderPassSharedPtr HdGatlingRenderDelegate::CreateRenderPass(HdRenderIndex* index,
                                                                 const HdRprimCollection& collection)
 {
-  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, m_materialNetworkCompiler, m_giScene));
+  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, _materialNetworkCompiler, _giScene));
 }
 
 HdResourceRegistrySharedPtr HdGatlingRenderDelegate::GetResourceRegistry() const
 {
-  return m_resourceRegistry;
+  return _resourceRegistry;
 }
 
 void HdGatlingRenderDelegate::CommitResources(HdChangeTracker* tracker)
@@ -177,17 +202,12 @@ HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& 
 
 HdRenderParam* HdGatlingRenderDelegate::GetRenderParam() const
 {
-  return m_renderParam.get();
+  return _renderParam.get();
 }
-
-const TfTokenVector SUPPORTED_RPRIM_TYPES =
-{
-  HdPrimTypeTokens->mesh
-};
 
 const TfTokenVector& HdGatlingRenderDelegate::GetSupportedRprimTypes() const
 {
-  return SUPPORTED_RPRIM_TYPES;
+  return _supportedRprimTypes;
 }
 
 HdRprim* HdGatlingRenderDelegate::CreateRprim(const TfToken& typeId, const SdfPath& rprimId)
@@ -205,21 +225,9 @@ void HdGatlingRenderDelegate::DestroyRprim(HdRprim* rprim)
   delete rprim;
 }
 
-const TfTokenVector SUPPORTED_SPRIM_TYPES =
-{
-  HdPrimTypeTokens->camera,
-  HdPrimTypeTokens->material,
-  HdPrimTypeTokens->sphereLight,
-  HdPrimTypeTokens->distantLight,
-  HdPrimTypeTokens->rectLight,
-  HdPrimTypeTokens->diskLight,
-  HdPrimTypeTokens->domeLight,
-  HdPrimTypeTokens->simpleLight // Required for usdview domeLight creation
-};
-
 const TfTokenVector& HdGatlingRenderDelegate::GetSupportedSprimTypes() const
 {
-  return SUPPORTED_SPRIM_TYPES;
+  return _supportedSprimTypes;
 }
 
 HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPath& sprimId)
@@ -234,27 +242,27 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   }
   else if (typeId == HdPrimTypeTokens->sphereLight)
   {
-    return new HdGatlingSphereLight(sprimId, m_giScene);
+    return new HdGatlingSphereLight(sprimId, _giScene);
   }
   else if (typeId == HdPrimTypeTokens->distantLight)
   {
-    return new HdGatlingDistantLight(sprimId, m_giScene);
+    return new HdGatlingDistantLight(sprimId, _giScene);
   }
   else if (typeId == HdPrimTypeTokens->rectLight)
   {
-    return new HdGatlingRectLight(sprimId, m_giScene);
+    return new HdGatlingRectLight(sprimId, _giScene);
   }
   else if (typeId == HdPrimTypeTokens->diskLight)
   {
-    return new HdGatlingDiskLight(sprimId, m_giScene);
+    return new HdGatlingDiskLight(sprimId, _giScene);
   }
   else if (typeId == HdPrimTypeTokens->domeLight)
   {
-    return new HdGatlingDomeLight(sprimId, m_giScene);
+    return new HdGatlingDomeLight(sprimId, _giScene);
   }
   else if (typeId == HdPrimTypeTokens->simpleLight)
   {
-    return new HdGatlingSimpleLight(sprimId, m_giScene);
+    return new HdGatlingSimpleLight(sprimId, _giScene);
   }
 
   return nullptr;
@@ -272,14 +280,9 @@ void HdGatlingRenderDelegate::DestroySprim(HdSprim* sprim)
   delete sprim;
 }
 
-const TfTokenVector SUPPORTED_BPRIM_TYPES =
-{
-  HdPrimTypeTokens->renderBuffer
-};
-
 const TfTokenVector& HdGatlingRenderDelegate::GetSupportedBprimTypes() const
 {
-  return SUPPORTED_BPRIM_TYPES;
+  return _supportedBprimTypes;
 }
 
 HdBprim* HdGatlingRenderDelegate::CreateBprim(const TfToken& typeId, const SdfPath& bprimId)

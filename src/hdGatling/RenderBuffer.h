@@ -67,14 +67,14 @@ protected:
   void _Deallocate() override;
 
 private:
-  void* m_bufferMem;
-  uint32_t m_width;
-  uint32_t m_height;
-  HdFormat m_format;
-  bool m_isMultiSampled;
-  bool m_isMapped;
-  bool m_isConverged;
-  GiRenderBuffer* m_renderBuffer = nullptr;
+  void* _bufferMem;
+  uint32_t _width;
+  uint32_t _height;
+  HdFormat _format;
+  bool _isMultiSampled;
+  bool _isMapped;
+  bool _isConverged;
+  GiRenderBuffer* _renderBuffer = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

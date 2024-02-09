@@ -44,9 +44,9 @@ public:
 #endif
 
 private:
-  std::unique_ptr<class MaterialNetworkCompiler> m_materialNetworkCompiler;
-  std::unique_ptr<class UsdzAssetReader> m_usdzAssetReader;
-  bool m_isSupported;
+  std::unique_ptr<class MaterialNetworkCompiler> _materialNetworkCompiler;
+  std::unique_ptr<class UsdzAssetReader> _usdzAssetReader;
+  bool _isSupported;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

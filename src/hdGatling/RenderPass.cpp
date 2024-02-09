@@ -37,6 +37,21 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace
 {
+  const static std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> _aovIdMappings {
+    { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
+    { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
+#ifndef NDEBUG
+    { HdGatlingAovTokens->debugNee,           GI_AOV_ID_DEBUG_NEE          },
+    { HdGatlingAovTokens->debugBarycentrics,  GI_AOV_ID_DEBUG_BARYCENTRICS },
+    { HdGatlingAovTokens->debugTexcoords,     GI_AOV_ID_DEBUG_TEXCOORDS    },
+    { HdGatlingAovTokens->debugBounces,       GI_AOV_ID_DEBUG_BOUNCES      },
+    { HdGatlingAovTokens->debugClockCycles,   GI_AOV_ID_DEBUG_CLOCK_CYCLES },
+    { HdGatlingAovTokens->debugOpacity,       GI_AOV_ID_DEBUG_OPACITY      },
+    { HdGatlingAovTokens->debugTangents,      GI_AOV_ID_DEBUG_TANGENTS     },
+    { HdGatlingAovTokens->debugBitangents,    GI_AOV_ID_DEBUG_BITANGENTS   },
+#endif
+  };
+
   std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* name)
   {
     // Prefer UsdPreviewSurface over MDL diffuse or unlit because we want to give a good first
@@ -56,6 +71,43 @@ namespace
 
     return TfStringPrintf(USDPREVIEWSURFACE_MTLX_DOC, name, color[0], color[1], color[2], name, name);
   }
+
+  const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVector& aovBindings)
+  {
+    for (const HdRenderPassAovBinding& aovBinding : aovBindings)
+    {
+      bool aovSupported = _aovIdMappings.count(aovBinding.aovName) > 0;
+
+      if (aovSupported)
+      {
+        return &aovBinding;
+      }
+
+      HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
+      renderBuffer->SetConverged(true);
+      continue;
+    }
+
+    return nullptr;
+  }
+
+  GiAovId _GetAovId(const TfToken& aovName)
+  {
+    GiAovId id = GI_AOV_ID_COLOR;
+
+    auto iter = _aovIdMappings.find(aovName);
+
+    if (iter != _aovIdMappings.end())
+    {
+      id = iter->second;
+    }
+    else
+    {
+      TF_CODING_ERROR(TfStringPrintf("Invalid AOV id %s", aovName.GetText()));
+    }
+
+    return id;
+  }
 }
 
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
@@ -64,51 +116,51 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
                                          const MaterialNetworkCompiler& materialNetworkCompiler,
                                          GiScene* scene)
   : HdRenderPass(index, collection)
-  , m_scene(scene)
-  , m_settings(settings)
-  , m_materialNetworkCompiler(materialNetworkCompiler)
-  , m_isConverged(false)
-  , m_lastSceneStateVersion(UINT32_MAX)
-  , m_lastSprimIndexVersion(UINT32_MAX)
-  , m_lastRenderSettingsVersion(UINT32_MAX)
-  , m_lastVisChangeCount(UINT32_MAX)
-  , m_geomCache(nullptr)
-  , m_shaderCache(nullptr)
+  , _scene(scene)
+  , _settings(settings)
+  , _materialNetworkCompiler(materialNetworkCompiler)
+  , _isConverged(false)
+  , _lastSceneStateVersion(UINT32_MAX)
+  , _lastSprimIndexVersion(UINT32_MAX)
+  , _lastRenderSettingsVersion(UINT32_MAX)
+  , _lastVisChangeCount(UINT32_MAX)
+  , _geomCache(nullptr)
+  , _shaderCache(nullptr)
 {
   auto defaultDiffuseColor = GfVec3f(0.18f); // UsdPreviewSurface spec
   std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(defaultDiffuseColor, "invalid");
 
-  m_defaultMaterial = giCreateMaterialFromMtlxStr(defaultMatSrc.c_str());
-  TF_AXIOM(m_defaultMaterial);
+  _defaultMaterial = giCreateMaterialFromMtlxStr(defaultMatSrc.c_str());
+  TF_AXIOM(_defaultMaterial);
 }
 
 void HdGatlingRenderPass::_ClearMaterials()
 {
-  for (GiMaterial* mat : m_materials)
+  for (GiMaterial* mat : _materials)
   {
     giDestroyMaterial(mat);
   }
-  m_materials.clear();
+  _materials.clear();
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
 {
-  if (m_geomCache)
+  if (_geomCache)
   {
-    giDestroyGeomCache(m_geomCache);
+    giDestroyGeomCache(_geomCache);
   }
-  if (m_shaderCache)
+  if (_shaderCache)
   {
-    giDestroyShaderCache(m_shaderCache);
+    giDestroyShaderCache(_shaderCache);
   }
 
-  giDestroyMaterial(m_defaultMaterial);
+  giDestroyMaterial(_defaultMaterial);
   _ClearMaterials();
 }
 
 bool HdGatlingRenderPass::IsConverged() const
 {
-  return m_isConverged;
+  return _isConverged;
 }
 
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
@@ -122,7 +174,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
   TfHashMap<std::string, uint32_t, TfHash> materialMap;
   materialMap[""] = 0;
 
-  materials.push_back(m_defaultMaterial);
+  materials.push_back(_defaultMaterial);
 
   for (const auto& rprimId : renderIndex->GetRprimIds())
   {
@@ -182,11 +234,11 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
         if (network)
         {
-          giMat = m_materialNetworkCompiler.CompileNetwork(sprim->GetId(), *network);
+          giMat = _materialNetworkCompiler.CompileNetwork(sprim->GetId(), *network);
 
           if (giMat)
           {
-            m_materials.push_back(giMat);
+            _materials.push_back(giMat);
           }
         }
       }
@@ -208,7 +260,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
           GiMaterial* giColorMat = giCreateMaterialFromMtlxStr(colorMatSrc.c_str());
           if (giColorMat)
           {
-            m_materials.push_back(giColorMat);
+            _materials.push_back(giColorMat);
             giMat = giColorMat;
           }
         }
@@ -249,7 +301,7 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   // We transform the scene into camera space at the beginning, so for
   // subsequent camera transforms, we need to 'substract' the initial transform.
   GfMatrix4d absInvViewMatrix = camera.GetTransform();
-  GfMatrix4d relViewMatrix = absInvViewMatrix * m_rootMatrix;
+  GfMatrix4d relViewMatrix = absInvViewMatrix * _rootMatrix;
 
   GfVec3d position = relViewMatrix.Transform(GfVec3d(0.0, 0.0, 0.0));
   GfVec3d forward = relViewMatrix.TransformDir(GfVec3d(0.0, 0.0, -1.0));
@@ -286,64 +338,12 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.exposure = camera.GetExposure();
 }
 
-const std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> s_aovIdMappings {
-  { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
-  { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
-#ifndef NDEBUG
-  { HdGatlingAovTokens->debugNee,           GI_AOV_ID_DEBUG_NEE          },
-  { HdGatlingAovTokens->debugBarycentrics,  GI_AOV_ID_DEBUG_BARYCENTRICS },
-  { HdGatlingAovTokens->debugTexcoords,     GI_AOV_ID_DEBUG_TEXCOORDS    },
-  { HdGatlingAovTokens->debugBounces,       GI_AOV_ID_DEBUG_BOUNCES      },
-  { HdGatlingAovTokens->debugClockCycles,   GI_AOV_ID_DEBUG_CLOCK_CYCLES },
-  { HdGatlingAovTokens->debugOpacity,       GI_AOV_ID_DEBUG_OPACITY      },
-  { HdGatlingAovTokens->debugTangents,      GI_AOV_ID_DEBUG_TANGENTS     },
-  { HdGatlingAovTokens->debugBitangents,    GI_AOV_ID_DEBUG_BITANGENTS   },
-#endif
-};
-
-const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVector& aovBindings)
-{
-  for (const HdRenderPassAovBinding& aovBinding : aovBindings)
-  {
-    bool aovSupported = s_aovIdMappings.count(aovBinding.aovName) > 0;
-
-    if (aovSupported)
-    {
-      return &aovBinding;
-    }
-
-    HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
-    renderBuffer->SetConverged(true);
-    continue;
-  }
-
-  return nullptr;
-}
-
-GiAovId _GetAovId(const TfToken& aovName)
-{
-  GiAovId id = GI_AOV_ID_COLOR;
-
-  auto iter = s_aovIdMappings.find(aovName);
-
-  if (iter != s_aovIdMappings.end())
-  {
-    id = iter->second;
-  }
-  else
-  {
-    TF_CODING_ERROR(TfStringPrintf("Invalid AOV id %s", aovName.GetText()));
-  }
-
-  return id;
-}
-
 void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassState,
                                    const TfTokenVector& renderTags)
 {
   TF_UNUSED(renderTags);
 
-  m_isConverged = false;
+  _isConverged = false;
 
   const HdCamera* camera = renderPassState->GetCamera();
   if (!camera)
@@ -382,25 +382,25 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
   GiAovId aovId = _GetAovId(aovBinding->aovName);
 
-  bool sceneChanged = (sceneStateVersion != m_lastSceneStateVersion);
-  bool renderSettingsChanged = (renderSettingsStateVersion != m_lastRenderSettingsVersion);
-  bool visibilityChanged = (m_lastVisChangeCount != visibilityChangeCount);
-  bool aovChanged = (aovId != m_lastAovId);
+  bool sceneChanged = (sceneStateVersion != _lastSceneStateVersion);
+  bool renderSettingsChanged = (renderSettingsStateVersion != _lastRenderSettingsVersion);
+  bool visibilityChanged = (_lastVisChangeCount != visibilityChangeCount);
+  bool aovChanged = (aovId != _lastAovId);
 
   if (sceneChanged || renderSettingsChanged || visibilityChanged || aovChanged)
   {
     giInvalidateFramebuffer();
   }
 
-  m_lastSceneStateVersion = sceneStateVersion;
-  m_lastSprimIndexVersion = sprimIndexVersion;
-  m_lastRenderSettingsVersion = renderSettingsStateVersion;
-  m_lastVisChangeCount = visibilityChangeCount;
-  m_lastAovId = aovId;
+  _lastSceneStateVersion = sceneStateVersion;
+  _lastSprimIndexVersion = sprimIndexVersion;
+  _lastRenderSettingsVersion = renderSettingsStateVersion;
+  _lastVisChangeCount = visibilityChangeCount;
+  _lastAovId = aovId;
 
-  bool rebuildShaderCache = !m_shaderCache || aovChanged || giShaderCacheNeedsRebuild() || renderSettingsChanged;
+  bool rebuildShaderCache = !_shaderCache || aovChanged || giShaderCacheNeedsRebuild() || renderSettingsChanged;
 
-  bool rebuildGeomCache = !m_geomCache || visibilityChanged;
+  bool rebuildGeomCache = !_geomCache || visibilityChanged;
 
   if (rebuildShaderCache || rebuildGeomCache)
   {
@@ -408,56 +408,56 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     // FIXME: reintroduce and don't apply rotation
     // https://pharr.org/matt/blog/2018/03/02/rendering-in-camera-space
     //GfMatrix4d viewMatrix = camera->GetTransform().GetInverse();
-    m_rootMatrix = GfMatrix4d(1.0);// viewMatrix;
+    _rootMatrix = GfMatrix4d(1.0);// viewMatrix;
 
     // FIXME: cache results for shader cache rebuild
     std::vector<const GiMaterial*> materials;
     std::vector<const GiMesh*> meshes;
     std::vector<GiMeshInstance> instances;
-    _BakeMeshes(renderIndex, m_rootMatrix, materials, meshes, instances);
+    _BakeMeshes(renderIndex, _rootMatrix, materials, meshes, instances);
 
     if (rebuildShaderCache)
     {
-      if (m_shaderCache)
+      if (_shaderCache)
       {
-        giDestroyShaderCache(m_shaderCache);
+        giDestroyShaderCache(_shaderCache);
       }
 
-      auto domeLightCameraVisibilityValueIt = m_settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
+      auto domeLightCameraVisibilityValueIt = _settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
 
       GiShaderCacheParams shaderParams;
       shaderParams.aovId = aovId;
-      shaderParams.depthOfField = m_settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>();
-      shaderParams.domeLightCameraVisible = (domeLightCameraVisibilityValueIt == m_settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true);
-      shaderParams.filterImportanceSampling = m_settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>();
+      shaderParams.depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>();
+      shaderParams.domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true);
+      shaderParams.filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>();
       shaderParams.materialCount = materials.size();
       shaderParams.materials = materials.data();
-      shaderParams.nextEventEstimation = m_settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>();
-      shaderParams.progressiveAccumulation = m_settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>();
-      shaderParams.scene = m_scene;
+      shaderParams.nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>();
+      shaderParams.progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>();
+      shaderParams.scene = _scene;
 
-      m_shaderCache = giCreateShaderCache(&shaderParams);
-      TF_VERIFY(m_shaderCache, "Unable to create shader cache");
+      _shaderCache = giCreateShaderCache(&shaderParams);
+      TF_VERIFY(_shaderCache, "Unable to create shader cache");
     }
 
-    if (m_shaderCache && (rebuildGeomCache || giGeomCacheNeedsRebuild()))
+    if (_shaderCache && (rebuildGeomCache || giGeomCacheNeedsRebuild()))
     {
-      if (m_geomCache)
+      if (_geomCache)
       {
-        giDestroyGeomCache(m_geomCache);
+        giDestroyGeomCache(_geomCache);
       }
 
       GiGeomCacheParams geomParams;
       geomParams.meshInstanceCount = instances.size();
       geomParams.meshInstances = instances.data();
-      geomParams.shaderCache = m_shaderCache;
+      geomParams.shaderCache = _shaderCache;
 
-      m_geomCache = giCreateGeomCache(&geomParams);
-      TF_VERIFY(m_geomCache, "Unable to create geom cache");
+      _geomCache = giCreateGeomCache(&geomParams);
+      TF_VERIFY(_geomCache, "Unable to create geom cache");
     }
   }
 
-  if (!m_geomCache || !m_shaderCache)
+  if (!_geomCache || !_shaderCache)
   {
     return;
   }
@@ -465,24 +465,24 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   GfVec4f backgroundColor = aovBinding->clearValue.GetWithDefault<GfVec4f>(GfVec4f(0.f));
 
   bool clippingEnabled = renderPassState->GetClippingEnabled() &&
-                         m_settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
+                         _settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
 
   GiCameraDesc giCamera;
   _ConstructGiCamera(*camera, giCamera, clippingEnabled);
 
   GiRenderParams renderParams;
   renderParams.camera = &giCamera;
-  renderParams.geomCache = m_geomCache;
-  renderParams.shaderCache = m_shaderCache;
+  renderParams.geomCache = _geomCache;
+  renderParams.shaderCache = _shaderCache;
   renderParams.renderBuffer = renderBuffer->GetGiRenderBuffer();
-  renderParams.maxBounces = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<int>();
-  renderParams.spp = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->spp)->second).Get<int>();
-  renderParams.rrBounceOffset = VtValue::Cast<int>(m_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<int>();
-  renderParams.lightIntensityMultiplier = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>();
-  renderParams.rrInvMinTermProb = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>();
-  renderParams.maxSampleValue = VtValue::Cast<float>(m_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>();
+  renderParams.maxBounces = VtValue::Cast<int>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<int>();
+  renderParams.spp = VtValue::Cast<int>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<int>();
+  renderParams.rrBounceOffset = VtValue::Cast<int>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<int>();
+  renderParams.lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>();
+  renderParams.rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>();
+  renderParams.maxSampleValue = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>();
   renderParams.domeLight = renderParam->ActiveDomeLight();
-  renderParams.scene = m_scene;
+  renderParams.scene = _scene;
   for (uint32_t i = 0; i < 4; i++)
   {
     renderParams.backgroundColor[i] = backgroundColor[i];
@@ -496,7 +496,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   renderBuffer->Unmap();
 
-  m_isConverged = true;
+  _isConverged = true;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -37,7 +37,7 @@ public:
             HdDirtyBits* dirtyBits) override;
 
 private:
-  TfHashMap<TfToken, VtValue, TfToken::HashFunctor> m_primvarMap;
+  TfHashMap<TfToken, VtValue, TfToken::HashFunctor> _primvarMap;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

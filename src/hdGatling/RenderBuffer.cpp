@@ -26,9 +26,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdGatlingRenderBuffer::HdGatlingRenderBuffer(const SdfPath& id)
   : HdRenderBuffer(id)
 {
-  m_isMapped = false;
-  m_isConverged = false;
-  m_bufferMem = nullptr;
+  _isMapped = false;
+  _isConverged = false;
+  _bufferMem = nullptr;
 }
 
 HdGatlingRenderBuffer::~HdGatlingRenderBuffer()
@@ -39,10 +39,10 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
                                      HdFormat format,
                                      bool multiSampled)
 {
-  if (m_renderBuffer)
+  if (_renderBuffer)
   {
-    giDestroyRenderBuffer(m_renderBuffer);
-    m_renderBuffer = nullptr;
+    giDestroyRenderBuffer(_renderBuffer);
+    _renderBuffer = nullptr;
   }
 
   if (dimensions[2] != 1)
@@ -50,33 +50,33 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
     return false;
   }
 
-  m_width = dimensions[0];
-  m_height = dimensions[1];
-  m_format = format;
-  m_isMultiSampled = multiSampled;
+  _width = dimensions[0];
+  _height = dimensions[1];
+  _format = format;
+  _isMultiSampled = multiSampled;
 
-  size_t size = m_width * m_height * HdDataSizeOfFormat(m_format);
+  size_t size = _width * _height * HdDataSizeOfFormat(_format);
 
-  m_bufferMem = realloc(m_bufferMem, size);
+  _bufferMem = realloc(_bufferMem, size);
 
-  if (!m_bufferMem)
+  if (!_bufferMem)
   {
     return false;
   }
 
-  m_renderBuffer = giCreateRenderBuffer(m_width, m_height);
+  _renderBuffer = giCreateRenderBuffer(_width, _height);
 
-  return m_renderBuffer != nullptr;
+  return _renderBuffer != nullptr;
 }
 
 unsigned int HdGatlingRenderBuffer::GetWidth() const
 {
-  return m_width;
+  return _width;
 }
 
 unsigned int HdGatlingRenderBuffer::GetHeight() const
 {
-  return m_height;
+  return _height;
 }
 
 unsigned int HdGatlingRenderBuffer::GetDepth() const
@@ -86,44 +86,44 @@ unsigned int HdGatlingRenderBuffer::GetDepth() const
 
 HdFormat HdGatlingRenderBuffer::GetFormat() const
 {
-  return m_format;
+  return _format;
 }
 
 bool HdGatlingRenderBuffer::IsMultiSampled() const
 {
-  return m_isMultiSampled;
+  return _isMultiSampled;
 }
 
 bool HdGatlingRenderBuffer::IsConverged() const
 {
-  return m_isConverged;
+  return _isConverged;
 }
 
 void HdGatlingRenderBuffer::SetConverged(bool converged)
 {
-  m_isConverged = converged;
+  _isConverged = converged;
 }
 
 void* HdGatlingRenderBuffer::Map()
 {
-  m_isMapped = true;
+  _isMapped = true;
 
-  return m_bufferMem;
+  return _bufferMem;
 }
 
 bool HdGatlingRenderBuffer::IsMapped() const
 {
-  return m_isMapped;
+  return _isMapped;
 }
 
 GiRenderBuffer* HdGatlingRenderBuffer::GetGiRenderBuffer() const
 {
-  return m_renderBuffer;
+  return _renderBuffer;
 }
 
 void HdGatlingRenderBuffer::Unmap()
 {
-  m_isMapped = false;
+  _isMapped = false;
 }
 
 void HdGatlingRenderBuffer::Resolve()
@@ -132,12 +132,12 @@ void HdGatlingRenderBuffer::Resolve()
 
 void HdGatlingRenderBuffer::_Deallocate()
 {
-  if (m_renderBuffer)
+  if (_renderBuffer)
   {
-    giDestroyRenderBuffer(m_renderBuffer);
+    giDestroyRenderBuffer(_renderBuffer);
   }
 
-  free(m_bufferMem);
+  free(_bufferMem);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

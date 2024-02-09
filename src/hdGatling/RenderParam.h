@@ -35,8 +35,8 @@ public:
   GiDomeLight* ActiveDomeLight() const;
 
 private:
-  std::vector<GiDomeLight*> m_domeLights;
-  GiDomeLight* m_domeLightOverride = nullptr;
+  std::vector<GiDomeLight*> _domeLights;
+  GiDomeLight* _domeLightOverride = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

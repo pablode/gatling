@@ -98,13 +98,13 @@ public:
   TfTokenVector GetShaderSourceTypes() const override;
 
 private:
-  const MaterialNetworkCompiler& m_materialNetworkCompiler;
-  const std::string m_resourcePath;
-  HdResourceRegistrySharedPtr m_resourceRegistry;
-  HdRenderSettingDescriptorList m_settingDescriptors;
-  HdRenderSettingDescriptorList m_debugSettingDescriptors;
-  std::unique_ptr<HdRenderParam> m_renderParam;
-  GiScene* m_giScene = nullptr;
+  const MaterialNetworkCompiler& _materialNetworkCompiler;
+  const std::string _resourcePath;
+  HdResourceRegistrySharedPtr _resourceRegistry;
+  HdRenderSettingDescriptorList _settingDescriptors;
+  HdRenderSettingDescriptorList _debugSettingDescriptors;
+  std::unique_ptr<HdRenderParam> _renderParam;
+  GiScene* _giScene = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

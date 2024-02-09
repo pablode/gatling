@@ -40,7 +40,7 @@ public:
   const HdMaterialNetwork2* GetNetwork() const;
 
 private:
-  std::unique_ptr<HdMaterialNetwork2> m_network;
+  std::unique_ptr<HdMaterialNetwork2> _network;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -39,10 +39,58 @@ namespace mx = MaterialX;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace
+{
+  bool _TryInitGi(const mx::DocumentPtr mtlxStdLib)
+  {
+    PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
+
+    const std::string& resourcePath = plugin->GetResourcePath();
+    std::string shaderPath = resourcePath + "/shaders";
+
+    // USD installs the 'source/MaterialXGenMdl/mdl' folder to the MaterialX 'libraries' dir
+    std::vector<std::string> mdlSearchPaths = UsdMtlxStandardLibraryPaths();
+    // In addition, we also install Omni* MDL files to support TurboSquid files
+    mdlSearchPaths.push_back(resourcePath);
+
+    // The 'mdl' folder is not part of the MDL package paths
+    for (std::string& s : mdlSearchPaths)
+    {
+      s += "/mdl";
+    }
+
+    GiInitParams params = {
+      .shaderPath = shaderPath.c_str(),
+      .mdlRuntimePath = resourcePath.c_str(),
+      .mdlSearchPaths = mdlSearchPaths,
+      .mtlxStdLib = mtlxStdLib
+    };
+
+    return giInitialize(&params) == GI_OK;
+  }
+
+  mx::DocumentPtr _LoadMtlxStdLib()
+  {
+    mx::DocumentPtr mtlxStdLib = mx::createDocument();
+
+    mx::FileSearchPath fileSearchPaths;
+    for (const std::string& s : UsdMtlxSearchPaths())
+    {
+      fileSearchPaths.append(mx::FilePath(s));
+    }
+
+    mx::FilePathVec libFolders; // All directories if left empty.
+    mx::loadLibraries(libFolders, fileSearchPaths, mtlxStdLib);
+
+    return mtlxStdLib;
+  }
+}
+
+// Needs to be defined in pxr namespace due to being publicly declared in header
 class UsdzAssetReader : public GiAssetReader
 {
 private:
-  struct UsdzAsset
+  struct _UsdzAsset
   {
     size_t size;
     std::shared_ptr<const char> buffer;
@@ -64,7 +112,7 @@ public:
       return nullptr;
     }
 
-    auto iasset = new UsdzAsset;
+    auto iasset = new _UsdzAsset;
     iasset->size = asset->GetSize();
     iasset->buffer = asset->GetBuffer();
     return (GiAsset*) iasset;
@@ -72,19 +120,19 @@ public:
 
   size_t size(const GiAsset* asset) const override
   {
-    auto iasset = (UsdzAsset*) asset;
+    auto iasset = (_UsdzAsset*) asset;
     return iasset->size;
   }
 
   void* data(const GiAsset* asset) const override
   {
-    auto iasset = (UsdzAsset*) asset;
+    auto iasset = (_UsdzAsset*) asset;
     return (void*) iasset->buffer.get();
   }
 
   void close(GiAsset* asset) override
   {
-    auto iasset = (UsdzAsset*) asset;
+    auto iasset = (_UsdzAsset*) asset;
     delete iasset;
   }
 };
@@ -92,50 +140,6 @@ public:
 TF_REGISTRY_FUNCTION(TfType)
 {
   HdRendererPluginRegistry::Define<HdGatlingRendererPlugin>();
-}
-
-bool _TryInitGi(const mx::DocumentPtr mtlxStdLib)
-{
-  PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
-
-  const std::string& resourcePath = plugin->GetResourcePath();
-  std::string shaderPath = resourcePath + "/shaders";
-
-  // USD installs the 'source/MaterialXGenMdl/mdl' folder to the MaterialX 'libraries' dir
-  std::vector<std::string> mdlSearchPaths = UsdMtlxStandardLibraryPaths();
-  // In addition, we also install Omni* MDL files to support TurboSquid files
-  mdlSearchPaths.push_back(resourcePath);
-
-  // The 'mdl' folder is not part of the MDL package paths
-  for (std::string& s : mdlSearchPaths)
-  {
-    s += "/mdl";
-  }
-
-  GiInitParams params = {
-    .shaderPath = shaderPath.c_str(),
-    .mdlRuntimePath = resourcePath.c_str(),
-    .mdlSearchPaths = mdlSearchPaths,
-    .mtlxStdLib = mtlxStdLib
-  };
-
-  return giInitialize(&params) == GI_OK;
-}
-
-mx::DocumentPtr _LoadMtlxStdLib()
-{
-  mx::DocumentPtr mtlxStdLib = mx::createDocument();
-
-  mx::FileSearchPath fileSearchPaths;
-  for (const std::string& s : UsdMtlxSearchPaths())
-  {
-    fileSearchPaths.append(mx::FilePath(s));
-  }
-
-  mx::FilePathVec libFolders; // All directories if left empty.
-  mx::loadLibraries(libFolders, fileSearchPaths, mtlxStdLib);
-
-  return mtlxStdLib;
 }
 
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
@@ -146,27 +150,27 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
   mx::DocumentPtr mtlxStdLib = _LoadMtlxStdLib();
 #endif
 
-  m_isSupported = _TryInitGi(mtlxStdLib);
+  _isSupported = _TryInitGi(mtlxStdLib);
 
-  if (!m_isSupported)
+  if (!_isSupported)
   {
     return;
   }
 
-  m_materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxStdLib);
+  _materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxStdLib);
 
-  m_usdzAssetReader = std::make_unique<UsdzAssetReader>();
-  giRegisterAssetReader(m_usdzAssetReader.get());
+  _usdzAssetReader = std::make_unique<UsdzAssetReader>();
+  giRegisterAssetReader(_usdzAssetReader.get());
 }
 
 HdGatlingRendererPlugin::~HdGatlingRendererPlugin()
 {
-  if (!m_isSupported)
+  if (!_isSupported)
   {
     return;
   }
 
-  m_usdzAssetReader.reset();
+  _usdzAssetReader.reset();
   giTerminate();
 }
 
@@ -183,7 +187,7 @@ HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate(const HdRenderSe
 
   const std::string& resourcePath = plugin->GetResourcePath();
 
-  return new HdGatlingRenderDelegate(settingsMap, *m_materialNetworkCompiler, resourcePath);
+  return new HdGatlingRenderDelegate(settingsMap, *_materialNetworkCompiler, resourcePath);
 }
 
 void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDelegate)
@@ -197,7 +201,7 @@ bool HdGatlingRendererPlugin::IsSupported(bool gpuEnabled) const
 bool HdGatlingRendererPlugin::IsSupported() const
 #endif
 {
-  return m_isSupported;
+  return _isSupported;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -408,13 +408,13 @@ bool _GetMaterialNetworkSurfaceTerminal(const HdMaterialNetwork2& network2, HdMa
 }
 
 MaterialNetworkCompiler::MaterialNetworkCompiler(const mx::DocumentPtr mtlxStdLib)
-  : m_mtlxStdLib(mtlxStdLib)
+  : _mtlxStdLib(mtlxStdLib)
 {
 }
 
 GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
-  GiMaterial* result = TryCompileMdlNetwork(network);
+  GiMaterial* result = _TryCompileMdlNetwork(network);
 
   if (!result)
   {
@@ -423,13 +423,13 @@ GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdM
     PreviewSurfaceNetworkPatcher patcher;
     patcher.Patch(patchedNetwork);
 
-    result = TryCompileMtlxNetwork(id, patchedNetwork);
+    result = _TryCompileMtlxNetwork(id, patchedNetwork);
   }
 
   return result;
 }
 
-GiMaterial* MaterialNetworkCompiler::TryCompileMdlNetwork(const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(const HdMaterialNetwork2& network) const
 {
   if (network.nodes.size() != 1)
   {
@@ -456,7 +456,7 @@ GiMaterial* MaterialNetworkCompiler::TryCompileMdlNetwork(const HdMaterialNetwor
   return giCreateMaterialFromMdlFile(fileUri.c_str(), subIdentifier.c_str());
 }
 
-GiMaterial* MaterialNetworkCompiler::TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   HdMaterialNetwork2 mtlxNetwork = network;
   if (!_ConvertUsdNodesToMtlxNodes(mtlxNetwork))
@@ -466,7 +466,7 @@ GiMaterial* MaterialNetworkCompiler::TryCompileMtlxNetwork(const SdfPath& id, co
 
   _PatchMaterialXColor3Vector3Mismatches(mtlxNetwork);
 
-  mx::DocumentPtr doc = CreateMaterialXDocumentFromNetwork(id, mtlxNetwork);
+  mx::DocumentPtr doc = _CreateMaterialXDocumentFromNetwork(id, mtlxNetwork);
   if (!doc)
   {
     return nullptr;
@@ -475,8 +475,8 @@ GiMaterial* MaterialNetworkCompiler::TryCompileMtlxNetwork(const SdfPath& id, co
   return giCreateMaterialFromMtlxDoc(doc);
 }
 
-mx::DocumentPtr MaterialNetworkCompiler::CreateMaterialXDocumentFromNetwork(const SdfPath& id,
-                                                                            const HdMaterialNetwork2& network) const
+mx::DocumentPtr MaterialNetworkCompiler::_CreateMaterialXDocumentFromNetwork(const SdfPath& id,
+                                                                             const HdMaterialNetwork2& network) const
 {
   HdMaterialNode2 terminalNode;
   SdfPath terminalPath;
@@ -498,7 +498,7 @@ mx::DocumentPtr MaterialNetworkCompiler::CreateMaterialXDocumentFromNetwork(cons
     terminalNode,
     terminalPath,
     id,
-    m_mtlxStdLib,
+    _mtlxStdLib,
 #if PXR_VERSION >= 2211
     &mxHdData
 #else

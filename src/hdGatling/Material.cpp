@@ -55,7 +55,7 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
 
   if (!resource.IsHolding<HdMaterialNetworkMap>())
   {
-    m_network.reset();
+    _network.reset();
     return;
   }
 
@@ -66,19 +66,19 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   if (isVolume)
   {
     TF_WARN("Volume %s unsupported", id.GetText());
-    m_network.reset();
+    _network.reset();
     return;
   }
 
-  m_network = std::make_unique<HdMaterialNetwork2>();
-  *m_network = network;
+  _network = std::make_unique<HdMaterialNetwork2>();
+  *_network = network;
 
   giInvalidateShaderCache(); // FIXME: track dirty state in RenderParam
 }
 
 const HdMaterialNetwork2* HdGatlingMaterial::GetNetwork() const
 {
-  return m_network.get();
+  return _network.get();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

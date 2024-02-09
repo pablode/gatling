@@ -35,15 +35,15 @@ public:
   GiMaterial* CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
 
 private:
-  GiMaterial* TryCompileMdlNetwork(const HdMaterialNetwork2& network) const;
+  GiMaterial* _TryCompileMdlNetwork(const HdMaterialNetwork2& network) const;
 
-  GiMaterial* TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
+  GiMaterial* _TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
 
-  MaterialX::DocumentPtr CreateMaterialXDocumentFromNetwork(const SdfPath& id,
-                                                            const HdMaterialNetwork2& network) const;
+  MaterialX::DocumentPtr _CreateMaterialXDocumentFromNetwork(const SdfPath& id,
+                                                             const HdMaterialNetwork2& network) const;
 
 private:
-  MaterialX::DocumentPtr m_mtlxStdLib;
+  MaterialX::DocumentPtr _mtlxStdLib;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

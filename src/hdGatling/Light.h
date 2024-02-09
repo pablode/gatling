@@ -30,15 +30,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingLight : public HdLight
 {
-protected:
+public:
   HdGatlingLight(const SdfPath& id, GiScene* scene);
-
-  GfVec3f CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor);
 
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
 protected:
-  GiScene* m_scene;
+  GfVec3f _CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor);
+
+protected:
+  GiScene* _scene;
 };
 
 class HdGatlingSphereLight final : public HdGatlingLight
@@ -52,7 +53,7 @@ public:
   void Finalize(HdRenderParam* renderParam) override;
 
 private:
-  GiSphereLight* m_giSphereLight;
+  GiSphereLight* _giSphereLight;
 };
 
 
@@ -67,7 +68,7 @@ public:
   void Finalize(HdRenderParam* renderParam) override;
 
 private:
-  GiDistantLight* m_giDistantLight;
+  GiDistantLight* _giDistantLight;
 };
 
 
@@ -82,7 +83,7 @@ public:
   void Finalize(HdRenderParam* renderParam) override;
 
 private:
-  GiRectLight* m_giRectLight;
+  GiRectLight* _giRectLight;
 };
 
 
@@ -97,7 +98,7 @@ public:
   void Finalize(HdRenderParam* renderParam) override;
 
 private:
-  GiDiskLight* m_giDiskLight;
+  GiDiskLight* _giDiskLight;
 };
 
 
@@ -116,7 +117,7 @@ public:
 private:
   void DestroyDomeLight(HdRenderParam* renderParam);
 
-  GiDomeLight* m_giDomeLight = nullptr;
+  GiDomeLight* _giDomeLight = nullptr;
 };
 
 
@@ -131,8 +132,8 @@ public:
   void Finalize(HdRenderParam* renderParam) override;
 
 private:
-  GiSphereLight* m_giSphereLight = nullptr;
-  GiDomeLight* m_giDomeLight = nullptr;
+  GiSphereLight* _giSphereLight = nullptr;
+  GiDomeLight* _giDomeLight = nullptr;
 };
 
 

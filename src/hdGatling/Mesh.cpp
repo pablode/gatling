@@ -376,9 +376,9 @@ namespace
 
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
   : HdMesh(id)
-  , m_prototypeTransform(1.0)
-  , m_color(0.0, 0.0, 0.0)
-  , m_hasColor(false)
+  , _prototypeTransform(1.0)
+  , _color(0.0, 0.0, 0.0)
+  , _hasColor(false)
 {
 }
 
@@ -427,7 +427,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform)
   {
-    m_prototypeTransform = sceneDelegate->GetTransform(id);
+    _prototypeTransform = sceneDelegate->GetTransform(id);
   }
 
   bool updateGeometry =
@@ -644,12 +644,12 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   {
     VtValue boxedColors = sceneDelegate->Get(id, HdTokens->displayColor);
     const VtVec3fArray& colors = boxedColors.Get<VtVec3fArray>();
-    m_color = colors[0];
-    m_hasColor = true;
+    _color = colors[0];
+    _hasColor = true;
   }
   else
   {
-    m_hasColor = false;
+    _hasColor = false;
   }
 
   // Normals: calculate them from the topology if no primvar exists.
@@ -789,27 +789,27 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     .vertexCount = (uint32_t) vertices.size(),
     .vertices = vertices.data()
   };
-  m_giMesh = giCreateMesh(&desc);
+  _giMesh = giCreateMesh(&desc);
 }
 
 const GiMesh* HdGatlingMesh::GetGiMesh() const
 {
-  return m_giMesh;
+  return _giMesh;
 }
 
 const GfMatrix4d& HdGatlingMesh::GetPrototypeTransform() const
 {
-  return m_prototypeTransform;
+  return _prototypeTransform;
 }
 
 const GfVec3f& HdGatlingMesh::GetColor() const
 {
-  return m_color;
+  return _color;
 }
 
 bool HdGatlingMesh::HasColor() const
 {
-  return m_hasColor;
+  return _hasColor;
 }
 
 HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const

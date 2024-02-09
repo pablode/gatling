@@ -46,6 +46,7 @@ public:
   const GfMatrix4d& GetPrototypeTransform() const;
 
   const GfVec3f& GetColor() const;
+
   bool HasColor() const;
 
 protected:
@@ -72,10 +73,10 @@ private:
   void _CreateGiMesh(HdSceneDelegate* sceneDelegate);
 
 private:
-  GiMesh* m_giMesh = nullptr;
-  GfMatrix4d m_prototypeTransform;
-  GfVec3f m_color;
-  bool m_hasColor = false;
+  GiMesh* _giMesh = nullptr;
+  GfMatrix4d _prototypeTransform;
+  GfVec3f _color;
+  bool _hasColor = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

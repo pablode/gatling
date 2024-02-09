@@ -60,20 +60,20 @@ private:
   void _ClearMaterials();
 
 private:
-  GiScene* m_scene;
-  const HdRenderSettingsMap& m_settings;
-  const MaterialNetworkCompiler& m_materialNetworkCompiler;
-  GiMaterial* m_defaultMaterial;
-  std::vector<GiMaterial*> m_materials;
-  bool m_isConverged;
-  uint32_t m_lastSceneStateVersion;
-  uint32_t m_lastSprimIndexVersion;
-  uint32_t m_lastRenderSettingsVersion;
-  uint32_t m_lastVisChangeCount;
-  GiAovId m_lastAovId;
-  GiGeomCache* m_geomCache;
-  GiShaderCache* m_shaderCache;
-  GfMatrix4d m_rootMatrix;
+  GiScene* _scene;
+  const HdRenderSettingsMap& _settings;
+  const MaterialNetworkCompiler& _materialNetworkCompiler;
+  GiMaterial* _defaultMaterial;
+  std::vector<GiMaterial*> _materials;
+  bool _isConverged;
+  uint32_t _lastSceneStateVersion;
+  uint32_t _lastSprimIndexVersion;
+  uint32_t _lastRenderSettingsVersion;
+  uint32_t _lastVisChangeCount;
+  GiAovId _lastAovId;
+  GiGeomCache* _geomCache;
+  GiShaderCache* _shaderCache;
+  GfMatrix4d _rootMatrix;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -21,32 +21,32 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 void HdGatlingRenderParam::AddDomeLight(GiDomeLight* domeLight)
 {
-  m_domeLights.push_back(domeLight);
+  _domeLights.push_back(domeLight);
 }
 
 void HdGatlingRenderParam::SetDomeLightOverride(GiDomeLight* domeLight)
 {
-  m_domeLightOverride = domeLight;
+  _domeLightOverride = domeLight;
 }
 
 void HdGatlingRenderParam::RemoveDomeLight(GiDomeLight* domeLight)
 {
-  m_domeLights.erase(std::remove(m_domeLights.begin(), m_domeLights.end(), domeLight), m_domeLights.end());
+  _domeLights.erase(std::remove(_domeLights.begin(), _domeLights.end(), domeLight), _domeLights.end());
 
-  if (m_domeLightOverride == domeLight)
+  if (_domeLightOverride == domeLight)
   {
-    m_domeLightOverride = nullptr;
+    _domeLightOverride = nullptr;
   }
 }
 
 GiDomeLight* HdGatlingRenderParam::ActiveDomeLight() const
 {
-  if (m_domeLightOverride)
+  if (_domeLightOverride)
   {
-    return m_domeLightOverride;
+    return _domeLightOverride;
   }
 
-  return m_domeLights.size() > 0 ? m_domeLights.back() : nullptr;
+  return _domeLights.size() > 0 ? _domeLights.back() : nullptr;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

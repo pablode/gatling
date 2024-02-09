@@ -24,9 +24,10 @@
 
 #include <memory>
 
-const char* ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP = "HDGATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_NORMALMAP";
-
 PXR_NAMESPACE_OPEN_SCOPE
+
+constexpr static const char* _envvarDisablePatchUsdPreviewSurfaceNormalMap
+  = "HDGATLING_MATPATCH_DISABLE_USDPREVIEWSURFACE_NORMALMAP";
 
 TF_DEFINE_PRIVATE_TOKENS(
   _tokens,
@@ -288,7 +289,7 @@ void _PatchUsdPreviewSurfaceNormalInputConnection(HdMaterialNetwork2& network, H
   }
 
   TF_WARN("patching UsdPreviewSurface:normal to have scaled and biased reader (set %s to disable)",
-    ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP);
+    _envvarDisablePatchUsdPreviewSurfaceNormalMap);
 
   upstreamNodeParams[_tokens->scale] = GfVec4f(2.0f, 2.0f, 2.0f, 1.0f);
   upstreamNodeParams[_tokens->bias] = GfVec4f(-1.0f, -1.0f, -1.0f, 0.0f);
@@ -311,7 +312,7 @@ void _PatchUsdPreviewSurfaceNormalParamValue(VtValue& value)
   }
 
   TF_WARN("patching UsdPreviewSurface:normal param value from (1,1,1) to default (0,0,1) (set %s to disable)",
-    ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP);
+    _envvarDisablePatchUsdPreviewSurfaceNormalMap);
 
   value = GfVec3f(0, 0, 1);
 }
@@ -576,7 +577,7 @@ void PreviewSurfaceNetworkPatcher::Patch(HdMaterialNetwork2& network)
 
   _PatchUsdPreviewSurfaceSpecular(network);
 
-  if (!getenv(ENVVAR_DISABLE_PATCH_USDPREVIEWSURFACE_NORMALMAP))
+  if (!getenv(_envvarDisablePatchUsdPreviewSurfaceNormalMap))
   {
     _PatchUsdPreviewSurfaceNormalMap(network);
   }

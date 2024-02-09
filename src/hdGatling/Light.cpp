@@ -50,13 +50,13 @@ namespace
 
 HdGatlingLight::HdGatlingLight(const SdfPath& id, GiScene* scene)
   : HdLight(id)
-  , m_scene(scene)
+  , _scene(scene)
 {
 }
 
 // We strive to conform to following UsdLux-enhancing specification:
 // https://github.com/anderslanglands/light_comparison/blob/777ccc7afd1c174a5dcbbde964ced950eb3af11b/specification/specification.md
-GfVec3f HdGatlingLight::CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor = 1.0f)
+GfVec3f HdGatlingLight::_CalcBaseEmission(HdSceneDelegate* sceneDelegate, float normalizeFactor = 1.0f)
 {
   const SdfPath& id = GetId();
 
@@ -100,7 +100,7 @@ HdDirtyBits HdGatlingLight::GetInitialDirtyBitsMask() const
 HdGatlingSphereLight::HdGatlingSphereLight(const SdfPath& id, GiScene* scene)
   : HdGatlingLight(id, scene)
 {
-  m_giSphereLight = giCreateSphereLight(scene);
+  _giSphereLight = giCreateSphereLight(scene);
 }
 
 void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
@@ -114,7 +114,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
     GfVec3f pos = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
-    giSetSphereLightPosition(m_giSphereLight, pos.data());
+    giSetSphereLightPosition(_giSphereLight, pos.data());
   }
 
   if (*dirtyBits & DirtyBits::DirtyParams)
@@ -129,16 +129,16 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
     float area = _AreaEllipsoid(transform, radiusX, radiusY, radiusZ);
     float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
-    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+    GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
     float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
     VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
     float specular = boxedSpecular.GetWithDefault<float>(1.0f);
 
-    giSetSphereLightRadius(m_giSphereLight, radiusX, radiusY, radiusZ);
-    giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
-    giSetSphereLightDiffuseSpecular(m_giSphereLight, diffuse, specular);
+    giSetSphereLightRadius(_giSphereLight, radiusX, radiusY, radiusZ);
+    giSetSphereLightBaseEmission(_giSphereLight, baseEmission.data());
+    giSetSphereLightDiffuseSpecular(_giSphereLight, diffuse, specular);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -146,7 +146,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingSphereLight::Finalize(HdRenderParam* renderParam)
 {
-  giDestroySphereLight(m_scene, m_giSphereLight);
+  giDestroySphereLight(_scene, _giSphereLight);
 }
 
 //
@@ -155,7 +155,7 @@ void HdGatlingSphereLight::Finalize(HdRenderParam* renderParam)
 HdGatlingDistantLight::HdGatlingDistantLight(const SdfPath& id, GiScene* scene)
   : HdGatlingLight(id, scene)
 {
-  m_giDistantLight = giCreateDistantLight(scene);
+  _giDistantLight = giCreateDistantLight(scene);
 }
 
 void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
@@ -172,7 +172,7 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
     GfVec3f dir = normalMatrix.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
     dir.Normalize();
 
-    giSetDistantLightDirection(m_giDistantLight, dir.data());
+    giSetDistantLightDirection(_giDistantLight, dir.data());
   }
 
   if (*dirtyBits & DirtyBits::DirtyParams)
@@ -184,16 +184,16 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
     float sinHalfAngle = sinf(angle * 0.5f);
     float normalizeFactor = (sinHalfAngle > 1.0e-6f && normalize) ? (GfSqr(sinHalfAngle) * M_PI) : 1.0f;
-    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+    GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
     float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
     VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
     float specular = boxedSpecular.GetWithDefault<float>(1.0f);
 
-    giSetDistantLightAngle(m_giDistantLight, angle);
-    giSetDistantLightBaseEmission(m_giDistantLight, baseEmission.data());
-    giSetDistantLightDiffuseSpecular(m_giDistantLight, diffuse, specular);
+    giSetDistantLightAngle(_giDistantLight, angle);
+    giSetDistantLightBaseEmission(_giDistantLight, baseEmission.data());
+    giSetDistantLightDiffuseSpecular(_giDistantLight, diffuse, specular);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -201,7 +201,7 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingDistantLight::Finalize(HdRenderParam* renderParam)
 {
-  giDestroyDistantLight(m_scene, m_giDistantLight);
+  giDestroyDistantLight(_scene, _giDistantLight);
 }
 
 //
@@ -210,7 +210,7 @@ void HdGatlingDistantLight::Finalize(HdRenderParam* renderParam)
 HdGatlingRectLight::HdGatlingRectLight(const SdfPath& id, GiScene* scene)
   : HdGatlingLight(id, scene)
 {
-  m_giRectLight = giCreateRectLight(scene);
+  _giRectLight = giCreateRectLight(scene);
 }
 
 void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
@@ -229,8 +229,8 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
     GfVec3f t1 = transform.TransformDir(GfVec3f(0.0f, 1.0f, 0.0f));
     t1.Normalize();
 
-    giSetRectLightOrigin(m_giRectLight, origin.data());
-    giSetRectLightTangents(m_giRectLight, t0.data(), t1.data());
+    giSetRectLightOrigin(_giRectLight, origin.data());
+    giSetRectLightTangents(_giRectLight, t0.data(), t1.data());
   }
 
   if (*dirtyBits & DirtyBits::DirtyParams)
@@ -247,16 +247,16 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
     float area = width * height;
     float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
-    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+    GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
     float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
     VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
     float specular = boxedSpecular.GetWithDefault<float>(1.0f);
 
-    giSetRectLightDimensions(m_giRectLight, width, height);
-    giSetRectLightBaseEmission(m_giRectLight, baseEmission.data());
-    giSetRectLightDiffuseSpecular(m_giRectLight, diffuse, specular);
+    giSetRectLightDimensions(_giRectLight, width, height);
+    giSetRectLightBaseEmission(_giRectLight, baseEmission.data());
+    giSetRectLightDiffuseSpecular(_giRectLight, diffuse, specular);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -264,7 +264,7 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingRectLight::Finalize(HdRenderParam* renderParam)
 {
-  giDestroyRectLight(m_scene, m_giRectLight);
+  giDestroyRectLight(_scene, _giRectLight);
 }
 
 //
@@ -273,7 +273,7 @@ void HdGatlingRectLight::Finalize(HdRenderParam* renderParam)
 HdGatlingDiskLight::HdGatlingDiskLight(const SdfPath& id, GiScene* scene)
   : HdGatlingLight(id, scene)
 {
-  m_giDiskLight = giCreateDiskLight(scene);
+  _giDiskLight = giCreateDiskLight(scene);
 }
 
 void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
@@ -292,8 +292,8 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
     GfVec3f t1 = transform.TransformDir(GfVec3f(0.0f, 1.0f, 0.0f));
     t1.Normalize();
 
-    giSetDiskLightOrigin(m_giDiskLight, origin.data());
-    giSetDiskLightTangents(m_giDiskLight, t0.data(), t1.data());
+    giSetDiskLightOrigin(_giDiskLight, origin.data());
+    giSetDiskLightTangents(_giDiskLight, t0.data(), t1.data());
   }
 
   if (*dirtyBits & DirtyBits::DirtyParams)
@@ -307,16 +307,16 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
     float area = radiusX * radiusY * M_PI;
     float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
-    GfVec3f baseEmission = CalcBaseEmission(sceneDelegate, normalizeFactor);
+    GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate, normalizeFactor);
 
     VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
     float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
     VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
     float specular = boxedSpecular.GetWithDefault<float>(1.0f);
 
-    giSetDiskLightRadius(m_giDiskLight, radiusX, radiusY);
-    giSetDiskLightBaseEmission(m_giDiskLight, baseEmission.data());
-    giSetDiskLightDiffuseSpecular(m_giDiskLight, diffuse, specular);
+    giSetDiskLightRadius(_giDiskLight, radiusX, radiusY);
+    giSetDiskLightBaseEmission(_giDiskLight, baseEmission.data());
+    giSetDiskLightDiffuseSpecular(_giDiskLight, diffuse, specular);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -324,7 +324,7 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingDiskLight::Finalize(HdRenderParam* renderParam)
 {
-  giDestroyDiskLight(m_scene, m_giDiskLight);
+  giDestroyDiskLight(_scene, _giDiskLight);
 }
 
 //
@@ -369,7 +369,7 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
     return;
   }
 
-  if (m_giDomeLight)
+  if (_giDomeLight)
   {
     DestroyDomeLight(renderParam);
   }
@@ -380,21 +380,21 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   // FIXME: don't recreate on transform change
-  m_giDomeLight = giCreateDomeLight(m_scene, path.c_str());
+  _giDomeLight = giCreateDomeLight(_scene, path.c_str());
 
   const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
   auto rotateQuat = GfMatrix4f(transform.GetOrthonormalized()).ExtractRotationQuat();
   float rawQuatData[4] = { rotateQuat.GetImaginary()[0], rotateQuat.GetImaginary()[1], rotateQuat.GetImaginary()[2], -/*flip handedness*/rotateQuat.GetReal() };
-  giSetDomeLightRotation(m_giDomeLight, rawQuatData);
+  giSetDomeLightRotation(_giDomeLight, rawQuatData);
 
-  GfVec3f baseEmission = CalcBaseEmission(sceneDelegate);
-  giSetDomeLightBaseEmission(m_giDomeLight, baseEmission.data());
+  GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate);
+  giSetDomeLightBaseEmission(_giDomeLight, baseEmission.data());
 
   VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
   float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
   VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
   float specular = boxedSpecular.GetWithDefault<float>(1.0f);
-  giSetDomeLightDiffuseSpecular(m_giDomeLight, diffuse, specular);
+  giSetDomeLightDiffuseSpecular(_giDomeLight, diffuse, specular);
 
   // We need to ensure that the correct dome light is displayed when usdview's additional
   // one has been enabled. Although the type isn't 'simpleLight' (which may be a bug), we
@@ -404,11 +404,11 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   auto rp = static_cast<HdGatlingRenderParam*>(renderParam);
   if (isOverrideDomeLight)
   {
-    rp->SetDomeLightOverride(m_giDomeLight);
+    rp->SetDomeLightOverride(_giDomeLight);
   }
   else
   {
-    rp->AddDomeLight(m_giDomeLight);
+    rp->AddDomeLight(_giDomeLight);
   }
 }
 
@@ -424,17 +424,17 @@ HdDirtyBits HdGatlingDomeLight::GetInitialDirtyBitsMask() const
 
 void HdGatlingDomeLight::DestroyDomeLight(HdRenderParam* renderParam)
 {
-  if (!m_giDomeLight)
+  if (!_giDomeLight)
   {
     return;
   }
 
   auto rp = static_cast<HdGatlingRenderParam*>(renderParam);
-  rp->RemoveDomeLight(m_giDomeLight);
+  rp->RemoveDomeLight(_giDomeLight);
 
-  giDestroyDomeLight(m_scene, m_giDomeLight);
+  giDestroyDomeLight(_scene, _giDomeLight);
 
-  m_giDomeLight = nullptr;
+  _giDomeLight = nullptr;
 }
 
 //
@@ -462,21 +462,21 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (!glfLight.IsDomeLight())
   {
-    if (!m_giSphereLight)
+    if (!_giSphereLight)
     {
-      m_giSphereLight = giCreateSphereLight(m_scene);
+      _giSphereLight = giCreateSphereLight(_scene);
     }
 
     if (*dirtyBits & DirtyBits::DirtyTransform)
     {
       GfVec4f pos = glfLight.GetPosition();
-      giSetSphereLightPosition(m_giSphereLight, pos.data());
+      giSetSphereLightPosition(_giSphereLight, pos.data());
     }
 
     if (*dirtyBits & DirtyBits::DirtyParams)
     {
-      GfVec3f baseEmission = CalcBaseEmission(sceneDelegate);
-      giSetSphereLightBaseEmission(m_giSphereLight, baseEmission.data());
+      GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate);
+      giSetSphereLightBaseEmission(_giSphereLight, baseEmission.data());
     }
   }
 
@@ -485,9 +485,9 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
 void HdGatlingSimpleLight::Finalize(HdRenderParam* renderParam)
 {
-  if (m_giSphereLight)
+  if (_giSphereLight)
   {
-    giDestroySphereLight(m_scene, m_giSphereLight);
+    giDestroySphereLight(_scene, _giSphereLight);
   }
 }
 

@@ -76,7 +76,7 @@ void HdGatlingInstancer::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue value = sceneDelegate->Get(id, primName);
 
-    m_primvarMap[primName] = value;
+    _primvarMap[primName] = value;
   }
 }
 
@@ -97,15 +97,15 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
 
   // Calculate instance transforms for this instancer.
 #if PXR_VERSION <= 2308
-  VtValue boxedTranslations = m_primvarMap[HdInstancerTokens->translate];
-  VtValue boxedRotations = m_primvarMap[HdInstancerTokens->rotate];
-  VtValue boxedScales = m_primvarMap[HdInstancerTokens->scale];
-  VtValue boxedInstanceTransforms = m_primvarMap[HdInstancerTokens->instanceTransform];
+  VtValue boxedTranslations = _primvarMap[HdInstancerTokens->translate];
+  VtValue boxedRotations = _primvarMap[HdInstancerTokens->rotate];
+  VtValue boxedScales = _primvarMap[HdInstancerTokens->scale];
+  VtValue boxedInstanceTransforms = _primvarMap[HdInstancerTokens->instanceTransform];
 #else
-  VtValue boxedTranslations = m_primvarMap[HdInstancerTokens->instanceTranslations];
-  VtValue boxedRotations = m_primvarMap[HdInstancerTokens->instanceRotations];
-  VtValue boxedScales = m_primvarMap[HdInstancerTokens->instanceScales];
-  VtValue boxedInstanceTransforms = m_primvarMap[HdInstancerTokens->instanceTransforms];
+  VtValue boxedTranslations = _primvarMap[HdInstancerTokens->instanceTranslations];
+  VtValue boxedRotations = _primvarMap[HdInstancerTokens->instanceRotations];
+  VtValue boxedScales = _primvarMap[HdInstancerTokens->instanceScales];
+  VtValue boxedInstanceTransforms = _primvarMap[HdInstancerTokens->instanceTransforms];
 #endif
 
   VtVec3dArray translations;
