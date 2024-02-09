@@ -15,8 +15,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "Light.h"
-#include "RenderParam.h"
+#include "light.h"
+#include "renderParam.h"
 
 #include <pxr/base/gf/matrix4d.h>
 #include <pxr/base/gf/matrix3d.h>

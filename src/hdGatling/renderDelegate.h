@@ -19,7 +19,7 @@
 
 #include <pxr/imaging/hd/renderDelegate.h>
 
-#include "MaterialNetworkCompiler.h"
+#include "materialNetworkCompiler.h"
 
 struct GiScene;
 

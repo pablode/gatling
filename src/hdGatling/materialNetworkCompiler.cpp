@@ -15,7 +15,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MaterialNetworkCompiler.h"
+#include "materialNetworkCompiler.h"
+#include "previewSurfaceNetworkPatcher.h"
+#include "tokens.h"
 
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/tokens.h>
@@ -32,9 +34,6 @@
 #include <MaterialXFormat/Util.h>
 
 #include <gi.h>
-
-#include "PreviewSurfaceNetworkPatcher.h"
-#include "Tokens.h"
 
 namespace mx = MaterialX;
 

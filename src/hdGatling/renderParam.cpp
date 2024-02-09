@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "RenderParam.h"
+#include "renderParam.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

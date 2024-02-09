@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "Material.h"
+#include "material.h"
 
 #include <gi.h>
 

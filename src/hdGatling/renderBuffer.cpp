@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "RenderBuffer.h"
+#include "renderBuffer.h"
 
 #include <pxr/base/gf/vec3i.h>
 

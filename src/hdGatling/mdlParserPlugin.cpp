@@ -15,15 +15,14 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MdlParserPlugin.h"
+#include "mdlParserPlugin.h"
+#include "tokens.h"
 
 #include <pxr/usd/sdr/shaderNode.h>
 #include <pxr/usd/ar/resolver.h>
-#include "pxr/usd/ar/resolvedPath.h"
-#include "pxr/usd/ar/asset.h"
+#include <pxr/usd/ar/resolvedPath.h>
+#include <pxr/usd/ar/asset.h>
 #include <pxr/usd/ar/ar.h>
-
-#include "Tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

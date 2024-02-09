@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <pxr/pxr.h>
 #include <pxr/imaging/hd/renderPass.h>
 #include <pxr/imaging/hd/renderDelegate.h>
 

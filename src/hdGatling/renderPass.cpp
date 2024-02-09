@@ -15,14 +15,14 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "RenderPass.h"
-#include "RenderBuffer.h"
-#include "RenderParam.h"
-#include "Mesh.h"
-#include "Instancer.h"
-#include "Material.h"
-#include "Tokens.h"
-#include "MaterialNetworkCompiler.h"
+#include "renderPass.h"
+#include "renderBuffer.h"
+#include "renderParam.h"
+#include "mesh.h"
+#include "instancer.h"
+#include "material.h"
+#include "tokens.h"
+#include "materialNetworkCompiler.h"
 
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>

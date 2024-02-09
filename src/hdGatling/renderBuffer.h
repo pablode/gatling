@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <pxr/pxr.h>
 #include <pxr/imaging/hd/renderBuffer.h>
 
 struct GiRenderBuffer;

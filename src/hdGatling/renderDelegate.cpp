@@ -15,15 +15,15 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "RenderDelegate.h"
-#include "RenderParam.h"
-#include "RenderPass.h"
-#include "Mesh.h"
-#include "Instancer.h"
-#include "RenderBuffer.h"
-#include "Material.h"
-#include "Tokens.h"
-#include "Light.h"
+#include "renderDelegate.h"
+#include "renderParam.h"
+#include "renderPass.h"
+#include "mesh.h"
+#include "instancer.h"
+#include "renderBuffer.h"
+#include "material.h"
+#include "tokens.h"
+#include "light.h"
 
 #include <pxr/base/arch/fileSystem.h>
 #include <pxr/imaging/hd/resourceRegistry.h>

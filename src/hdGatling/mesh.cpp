@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "Mesh.h"
+#include "mesh.h"
 
 #include <pxr/imaging/hd/meshUtil.h>
 #include <pxr/imaging/hd/vertexAdjacency.h>
@@ -24,7 +24,7 @@
 #include <pxr/imaging/hd/vtBufferSource.h>
 #include <pxr/usd/usdUtils/pipeline.h>
 
-#include "gi.h"
+#include <gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

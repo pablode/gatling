@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "Instancer.h"
+#include "instancer.h"
 
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/base/gf/quath.h>

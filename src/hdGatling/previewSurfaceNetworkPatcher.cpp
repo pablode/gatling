@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "PreviewSurfaceNetworkPatcher.h"
+#include "previewSurfaceNetworkPatcher.h"
 
 #include <pxr/base/gf/vec3f.h>
 #include <pxr/base/gf/vec4f.h>

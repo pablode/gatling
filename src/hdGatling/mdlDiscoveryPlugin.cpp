@@ -15,11 +15,10 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MdlDiscoveryPlugin.h"
+#include "mdlDiscoveryPlugin.h"
+#include "tokens.h"
 
 #include <pxr/base/tf/staticTokens.h>
-
-#include "Tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

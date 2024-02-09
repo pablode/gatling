@@ -15,9 +15,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "RendererPlugin.h"
-#include "RenderDelegate.h"
-#include "MaterialNetworkCompiler.h"
+#include "rendererPlugin.h"
+#include "renderDelegate.h"
+#include "materialNetworkCompiler.h"
 
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
