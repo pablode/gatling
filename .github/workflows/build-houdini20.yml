@@ -31,6 +31,7 @@ jobs:
           usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
           archive-file-name: "gatling_Houdini20_Windows_x64.tar.gz"
+          cmake-params: -G"Visual Studio 16 2019" -Ax64
 
     uses: ./.github/workflows/build.yml
     with:
@@ -42,5 +43,5 @@ jobs:
       archive-name: build-Release-${{ github.sha }}
       archive-file-name: ${{ matrix.archive-file-name }}
       mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}
-      cmake-params: -DPLUGINFO_LIBPATH_PREFIX=../../usd
+      cmake-params: ${{ matrix.cmake-params }} -DPLUGINFO_LIBPATH_PREFIX=../../usd
       houdini-packaging: true

@@ -56,7 +56,7 @@ jobs:
           usd-install-path: "C:/INSTALL"
           upload-archive: ${{ inputs.upload-archives }}
           archive-file-name: "gatling_USD${{ inputs.usd-version }}_Windows_x64_Python3.7.tar.gz"
-          cmake-params:
+          cmake-params: -G"Visual Studio 16 2019" -Ax64
 
     uses: ./.github/workflows/build.yml
     with:
