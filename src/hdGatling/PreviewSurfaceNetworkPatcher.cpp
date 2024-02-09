@@ -43,6 +43,9 @@ TF_DEFINE_PRIVATE_TOKENS(
   (UsdPrimvarReader_vector)
   (UsdPrimvarReader_matrix)
   ((_default, "default"))
+  (Principled_BSDF)
+  (varname)
+  (UVmap)
   (glossiness)
   (normal)
   (bias)
@@ -68,6 +71,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (fallback)
   (rgb)
   (r)
+  (st)
 );
 
 // Following file has 'default' parameters that should be called 'fallback':
@@ -400,6 +404,81 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
   }
 }
 
+// Early versions of Blender's USD exporter had a bug where texcoords were written
+// to 'st' primvars but UsdUVTexture nodes depended upon 'UVmap' primvars:
+// https://projects.blender.org/blender/blender/issues/112407
+// To avoid false positives, we only patch primvar readers that are connected to
+// texcoord nodes which are connected to preview surfaces of name "Principled_BSDF".
+void _PatchUsdPrimvarReaderUVmapVarname(HdMaterialNetwork2& network)
+{
+  auto handleUsdUVTextureConnection = [&](HdMaterialConnection2& connection)
+  {
+    HdMaterialNode2& node = network.nodes[connection.upstreamNode];
+    if (node.nodeTypeId != _tokens->UsdPrimvarReader_float2)
+    {
+      return;
+    }
+
+    auto& params = node.parameters;
+
+    auto varnameParam = params.find(_tokens->varname);
+    if (varnameParam == params.end())
+    {
+      return;
+    }
+
+    VtValue& varnameValue = varnameParam->second;
+    if (varnameValue != _tokens->UVmap)
+    {
+      return;
+    }
+
+    varnameValue = _tokens->st;
+  };
+
+  auto handleUsdPreviewSurfaceConnection = [&](HdMaterialConnection2& connection)
+  {
+    HdMaterialNode2& node = network.nodes[connection.upstreamNode];
+    if (node.nodeTypeId != _tokens->UsdUVTexture)
+    {
+      return;
+    }
+
+    for (auto& input : node.inputConnections)
+    {
+      auto& connections = input.second;
+
+      for (HdMaterialConnection2& connection : connections)
+      {
+        handleUsdUVTextureConnection(connection);
+      }
+    }
+  };
+
+  for (auto& [path, node] : network.nodes)
+  {
+    if (node.nodeTypeId != _tokens->UsdPreviewSurface)
+    {
+      continue;
+    }
+
+    if (path.GetNameToken() != _tokens->Principled_BSDF)
+    {
+      continue;
+    }
+
+    for (auto& input : node.inputConnections)
+    {
+      auto& connections = input.second;
+
+      for (HdMaterialConnection2& connection : connections)
+      {
+        handleUsdPreviewSurfaceConnection(connection);
+      }
+    }
+  }
+}
+
 // Apparently the Unity USD exporter emits (or used to emit) UsdUVTexture nodes with an isSRGB parameter. Found in the wild:
 // https://github.com/usd-wg/assets/blob/4c5355bc9bffa96e084961fb5004c829b1c82501/test_assets/AlphaBlendModeTest/AlphaBlendModeTest.usd#L59
 // Let's assume that this is part of an older specification version and rename it to "sourceColorSpace".
@@ -473,6 +552,8 @@ void _PatchUsdTypes(HdMaterialNetwork2& network)
 void PreviewSurfaceNetworkPatcher::Patch(HdMaterialNetwork2& network)
 {
   _PatchDefaultParam(network);
+
+  _PatchUsdPrimvarReaderUVmapVarname(network);
 
   _PatchUsdPreviewSurfaceGlossiness(network);
 
