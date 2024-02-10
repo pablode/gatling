@@ -70,18 +70,18 @@ private:
     std::string testName = doctest::detail::g_cs->currentTest->m_name;
     auto imgPath = std::string(GI_REF_IMAGE_DIR) + "/" + testName + REF_IMAGE_EXT;
 
-    gi_file* file;
-    REQUIRE(gi_file_open(imgPath.c_str(), GI_FILE_USAGE_READ, &file));
+    GiFile* file;
+    REQUIRE(giFileOpen(imgPath.c_str(), GiFileUsage::Read, &file));
 
-    size_t size = gi_file_size(file);
-    void* data = gi_mmap(file, 0, size);
+    size_t size = giFileSize(file);
+    void* data = giMmap(file, 0, size);
     REQUIRE(data);
 
     ImgioImage img;
     REQUIRE_EQ(ImgioLoadImage(data, size, &img), ImgioError::None);
 
-    gi_munmap(file, data);
-    gi_file_close(file);
+    giMunmap(file, data);
+    giFileClose(file);
 
     REQUIRE_EQ(img.width, REF_IMAGE_WIDTH);
     REQUIRE_EQ(img.height, REF_IMAGE_HEIGHT);

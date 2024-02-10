@@ -5,24 +5,24 @@ namespace gtl
 {
   struct GiMmapAsset
   {
-    gi_file* file;
+    GiFile* file;
     size_t size;
     void* data;
   };
 
   GiAsset* GiMmapAssetReader::open(const char* path)
   {
-    gi_file* file;
-    if (!gi_file_open(path, GI_FILE_USAGE_READ, &file))
+    GiFile* file;
+    if (!giFileOpen(path, GiFileUsage::Read, &file))
     {
       return nullptr;
     }
 
-    size_t size = gi_file_size(file);
-    void* data = gi_mmap(file, 0, size);
+    size_t size = giFileSize(file);
+    void* data = giMmap(file, 0, size);
     if (!data)
     {
-      gi_file_close(file);
+      giFileClose(file);
       return nullptr;
     }
 
@@ -48,8 +48,8 @@ namespace gtl
   void GiMmapAssetReader::close(GiAsset* asset)
   {
     auto iasset = (GiMmapAsset*)asset;
-    gi_munmap(iasset->file, iasset->data);
-    gi_file_close(iasset->file);
+    giMunmap(iasset->file, iasset->data);
+    giFileClose(iasset->file);
     delete iasset;
   }
 
