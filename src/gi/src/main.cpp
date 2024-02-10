@@ -9,7 +9,7 @@
 
 #include "mmap.h"
 #include "gi.h"
-#include <imgio.h>
+#include <Imgio.h>
 #include <logFlushListener.h>
 
 namespace mx = MaterialX;
@@ -53,7 +53,6 @@ public:
 
   ~GraphicalTestFixture()
   {
-    imgio_free_img(&m_refImage);
     giDestroyScene(m_scene);
     giDestroyRenderBuffer(m_renderBuffer);
     giTerminate();
@@ -63,7 +62,7 @@ protected:
   GiRenderBuffer* m_renderBuffer = nullptr;
   GiScene* m_scene = nullptr;
 
-  imgio_img m_refImage;
+  ImgioImage m_refImage;
 
 private:
   void loadRefImage()
@@ -78,8 +77,8 @@ private:
     void* data = gi_mmap(file, 0, size);
     REQUIRE(data);
 
-    imgio_img img;
-    REQUIRE_EQ(imgio_load_img(data, size, &img), IMGIO_OK);
+    ImgioImage img;
+    REQUIRE_EQ(ImgioLoadImage(data, size, &img), ImgioError::None);
 
     gi_munmap(file, data);
     gi_file_close(file);

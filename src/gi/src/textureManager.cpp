@@ -23,7 +23,7 @@
 #include <GlslShaderGen.h> // TODO: remove this dependency
 #include <Backend.h>
 #include <stager.h>
-#include <imgio.h>
+#include <Imgio.h>
 
 #include <assert.h>
 #include <string.h>
@@ -36,7 +36,7 @@ const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
 namespace
 {
-  bool _ReadImage(const char* filePath, ::GiAssetReader& assetReader, imgio_img* img)
+  bool _ReadImage(const char* filePath, ::GiAssetReader& assetReader, ImgioImage* img)
   {
     GiAsset* asset = assetReader.open(filePath);
     if (!asset)
@@ -47,7 +47,7 @@ namespace
     size_t size = assetReader.size(asset);
     void* data = assetReader.data(asset);
 
-    bool loadResult = data && imgio_load_img(data, size, img) == IMGIO_OK;
+    bool loadResult = data && ImgioLoadImage(data, size, img) == ImgioError::None;
 
     assetReader.close(asset);
     return loadResult;
@@ -86,7 +86,7 @@ namespace gtl
       return true;
     }
 
-    imgio_img imageData;
+    ImgioImage imageData;
     if (!_ReadImage(filePath, m_assetReader, &imageData))
     {
       return false;
@@ -101,9 +101,7 @@ namespace gtl
       .debugName = filePath
     };
     bool creationSuccessful = cgpuCreateImage(m_device, createInfo, &image) &&
-                              m_stager.stageToImage(imageData.data, imageData.size, image, imageData.width, imageData.height, 1);
-
-    imgio_free_img(&imageData);
+                              m_stager.stageToImage(&imageData.data[0], imageData.size, image, imageData.width, imageData.height, 1);
 
     if (!creationSuccessful)
     {

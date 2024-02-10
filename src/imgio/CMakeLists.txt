@@ -1,17 +1,17 @@
 add_library(
   imgio STATIC
-  include/imgio.h
-  include/img.h
-  include/error_codes.h
-  src/imgio.cpp
-  src/exr.h
-  src/exr.cpp
-  src/hdr.h
-  src/hdr.cpp
-  src/jpeg.h
-  src/jpeg.cpp
-  src/png.h
-  src/png.cpp
+  include/ErrorCodes.h
+  include/Image.h
+  include/Imgio.h
+  src/Imgio.cpp
+  src/ExrDecoder.h
+  src/ExrDecoder.cpp
+  src/HdrDecoder.h
+  src/HdrDecoder.cpp
+  src/JpegDecoder.h
+  src/JpegDecoder.cpp
+  src/PngDecoder.h
+  src/PngDecoder.cpp
 )
 
 set_target_properties(
