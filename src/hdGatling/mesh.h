@@ -20,9 +20,12 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/base/gf/vec2f.h>
 
-#include <Gi.h>
+namespace gtl
+{
+  struct GiMesh;
+}
 
-struct GiMesh;
+using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

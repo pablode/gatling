@@ -21,7 +21,12 @@
 
 #include "materialNetworkCompiler.h"
 
-struct GiScene;
+namespace gtl
+{
+  struct GiScene;
+}
+
+using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

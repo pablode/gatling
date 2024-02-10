@@ -19,7 +19,12 @@
 
 #include <pxr/imaging/hd/renderDelegate.h>
 
-struct GiDomeLight;
+namespace gtl
+{
+  struct GiDomeLight;
+}
+
+using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

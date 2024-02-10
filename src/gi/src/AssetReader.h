@@ -7,7 +7,7 @@
 
 namespace gtl
 {
-  class GiMmapAssetReader : public ::GiAssetReader
+  class GiMmapAssetReader : public GiAssetReader
   {
   public:
     GiAsset* open(const char* path) override;
@@ -19,7 +19,7 @@ namespace gtl
     void close(GiAsset* asset) override;
   };
 
-  class GiAggregateAssetReader : public ::GiAssetReader
+  class GiAggregateAssetReader : public GiAssetReader
   {
   public:
     void addAssetReader(GiAssetReader* reader);

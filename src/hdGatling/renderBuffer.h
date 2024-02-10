@@ -19,7 +19,12 @@
 
 #include <pxr/imaging/hd/renderBuffer.h>
 
-struct GiRenderBuffer;
+namespace gtl
+{
+  struct GiRenderBuffer;
+}
+
+using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

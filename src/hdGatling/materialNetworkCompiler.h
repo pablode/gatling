@@ -21,7 +21,12 @@
 
 #include <MaterialXCore/Document.h>
 
-struct GiMaterial;
+namespace gtl
+{
+  struct GiMaterial;
+}
+
+using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

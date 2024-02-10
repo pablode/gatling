@@ -38,17 +38,17 @@ PXR_NAMESPACE_OPEN_SCOPE
 namespace
 {
   const static std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> _aovIdMappings {
-    { HdAovTokens->color,                     GI_AOV_ID_COLOR              },
-    { HdAovTokens->normal,                    GI_AOV_ID_NORMAL             },
+    { HdAovTokens->color,                    GiAovId::Color        },
+    { HdAovTokens->normal,                   GiAovId::Normal       },
 #ifndef NDEBUG
-    { HdGatlingAovTokens->debugNee,           GI_AOV_ID_DEBUG_NEE          },
-    { HdGatlingAovTokens->debugBarycentrics,  GI_AOV_ID_DEBUG_BARYCENTRICS },
-    { HdGatlingAovTokens->debugTexcoords,     GI_AOV_ID_DEBUG_TEXCOORDS    },
-    { HdGatlingAovTokens->debugBounces,       GI_AOV_ID_DEBUG_BOUNCES      },
-    { HdGatlingAovTokens->debugClockCycles,   GI_AOV_ID_DEBUG_CLOCK_CYCLES },
-    { HdGatlingAovTokens->debugOpacity,       GI_AOV_ID_DEBUG_OPACITY      },
-    { HdGatlingAovTokens->debugTangents,      GI_AOV_ID_DEBUG_TANGENTS     },
-    { HdGatlingAovTokens->debugBitangents,    GI_AOV_ID_DEBUG_BITANGENTS   },
+    { HdGatlingAovTokens->debugNee,          GiAovId::NEE          },
+    { HdGatlingAovTokens->debugBarycentrics, GiAovId::Barycentrics },
+    { HdGatlingAovTokens->debugTexcoords,    GiAovId::Texcoords    },
+    { HdGatlingAovTokens->debugBounces,      GiAovId::Bounces      },
+    { HdGatlingAovTokens->debugClockCycles,  GiAovId::ClockCycles  },
+    { HdGatlingAovTokens->debugOpacity,      GiAovId::Opacity      },
+    { HdGatlingAovTokens->debugTangents,     GiAovId::Tangents     },
+    { HdGatlingAovTokens->debugBitangents,   GiAovId::Bitangents   },
 #endif
   };
 
@@ -93,7 +93,7 @@ namespace
 
   GiAovId _GetAovId(const TfToken& aovName)
   {
-    GiAovId id = GI_AOV_ID_COLOR;
+    GiAovId id = GiAovId::Color;
 
     auto iter = _aovIdMappings.find(aovName);
 
@@ -490,9 +490,9 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   float* imgData = (float*) renderBuffer->Map();
 
-  int32_t result = giRender(&renderParams, imgData);
+  GiStatus result = giRender(&renderParams, imgData);
 
-  TF_VERIFY(result == GI_OK, "Unable to render scene.");
+  TF_VERIFY(result == GiStatus::Ok, "Unable to render scene.");
 
   renderBuffer->Unmap();
 

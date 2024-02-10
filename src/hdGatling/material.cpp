@@ -19,6 +19,8 @@
 
 #include <Gi.h>
 
+using namespace gtl;
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id)

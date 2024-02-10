@@ -28,13 +28,13 @@
 #include <string.h>
 #include <inttypes.h>
 
-using namespace gtl;
-
-const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
-
 namespace
 {
-  bool _ReadImage(const char* filePath, ::GiAssetReader& assetReader, ImgioImage* img)
+  using namespace gtl;
+
+  constexpr static const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
+
+  bool _ReadImage(const char* filePath, GiAssetReader& assetReader, ImgioImage* img)
   {
     GiAsset* asset = assetReader.open(filePath);
     if (!asset)

@@ -24,11 +24,10 @@
 #include <Cgpu.h>
 #include <Backend.h>
 
-class GiAssetReader;
-
 namespace gtl
 {
   class GgpuStager;
+  class GiAssetReader;
 
   class GiTextureManager
   {

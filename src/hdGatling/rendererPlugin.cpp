@@ -35,6 +35,7 @@
 
 #include <Gi.h>
 
+using namespace gtl;
 namespace mx = MaterialX;
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -66,7 +67,7 @@ namespace
       .mtlxStdLib = mtlxStdLib
     };
 
-    return giInitialize(&params) == GI_OK;
+    return giInitialize(&params) == GiStatus::Ok;
   }
 
   mx::DocumentPtr _LoadMtlxStdLib()

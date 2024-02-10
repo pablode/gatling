@@ -19,12 +19,17 @@
 
 #include <pxr/imaging/hd/light.h>
 
-struct GiScene;
-struct GiSphereLight;
-struct GiDistantLight;
-struct GiRectLight;
-struct GiDiskLight;
-struct GiDomeLight;
+namespace gtl
+{
+  struct GiScene;
+  struct GiSphereLight;
+  struct GiDistantLight;
+  struct GiRectLight;
+  struct GiDiskLight;
+  struct GiDomeLight;
+}
+
+using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

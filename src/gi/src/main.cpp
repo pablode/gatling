@@ -40,7 +40,7 @@ public:
       .mtlxStdLib = mtlxStdLib
     };
 
-    REQUIRE_EQ(giInitialize(&params), GI_OK);
+    REQUIRE_EQ(giInitialize(&params), GiStatus::Ok);
 
     m_renderBuffer = giCreateRenderBuffer(REF_IMAGE_WIDTH, REF_IMAGE_HEIGHT);
     REQUIRE(m_renderBuffer);
@@ -112,7 +112,7 @@ public:
 TEST_CASE_FIXTURE(GraphicalTestFixture, "NoGeo")
 {
   GiShaderCacheParams shaderCacheParams = {
-    .aovId = GI_AOV_ID_COLOR,
+    .aovId = GiAovId::Color,
     .depthOfField = false,
     .domeLightCameraVisible = false,
     .filterImportanceSampling = false,
@@ -165,7 +165,7 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "NoGeo")
   };
 
   std::vector<float> outputImg(REF_IMAGE_WIDTH * REF_IMAGE_HEIGHT * 4);
-  REQUIRE_EQ(giRender(&renderParams, outputImg.data()), GI_OK);
+  REQUIRE_EQ(giRender(&renderParams, outputImg.data()), GiStatus::Ok);
 
   CHECK(compareWithRef(outputImg.data()));
 
