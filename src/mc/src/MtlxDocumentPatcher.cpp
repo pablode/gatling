@@ -23,6 +23,8 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include <Log.h>
+
 namespace mx = MaterialX;
 
 const char* TYPE_COLOR3 = "color3";
@@ -417,6 +419,41 @@ void _PatchNodeNames(mx::DocumentPtr document)
   }
 }
 
+void _PatchSecondaryTexcoordIndices(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node || node->getCategory() != "texcoord")
+    {
+      continue;
+    }
+
+    mx::InputPtr input = node->getActiveInput("index");
+    if( !input)
+    {
+      continue;
+    }
+
+    mx::ValuePtr value = input->getValue();
+    if (!value || !value->isA<int>())
+    {
+      continue;
+    }
+
+    int index = value->asA<int>();
+    if (index == 0)
+    {
+      continue;
+    }
+
+    GB_WARN("texcoord node \"{}\" has unsupported index {}; falling back to index 0", node->getNamePath(), index);
+    input->setValueString("0");
+  }
+}
+
 namespace gtl
 {
   void McMtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
@@ -440,5 +477,7 @@ namespace gtl
     _PatchGeomprops(document);
 
     _PatchNodeNames(document);
+
+    _PatchSecondaryTexcoordIndices(document);
   }
 }
