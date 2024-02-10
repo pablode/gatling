@@ -164,10 +164,18 @@ int main(int argc, const char* argv[])
   framing.displayWindow = GfRange2f(GfVec2f(0.0f, 0.0f), GfVec2f((float) settings.imageWidth, (float) settings.imageHeight));
   framing.pixelAspectRatio = 1.0f;
 
-  std::pair<bool, CameraUtilConformWindowPolicy> overrideWindowPolicy(false, CameraUtilFit);
-
   auto renderPassState = std::make_shared<HdRenderPassState>();
+
+#if PXR_VERSION <= 2311
+  std::pair<bool, CameraUtilConformWindowPolicy> overrideWindowPolicy(false, CameraUtilFit);
   renderPassState->SetCameraAndFraming(camera, framing, overrideWindowPolicy);
+#else
+  std::optional<CameraUtilConformWindowPolicy> overrideWindowPolicy(CameraUtilFit);
+  renderPassState->SetCamera(camera);
+  renderPassState->SetFraming(framing);
+  renderPassState->SetOverrideWindowPolicy(overrideWindowPolicy);
+#endif
+
   renderPassState->SetAovBindings(aovBindings);
 
   HdRprimCollection renderCollection(HdTokens->geometry, HdReprSelector(HdReprTokens->refined));
