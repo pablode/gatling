@@ -23,17 +23,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <memory>
 
 #include <volk.h>
 
+#ifdef __clang__
 #pragma clang diagnostic push
 // Silence nullability log spam on AppleClang
 #pragma clang diagnostic ignored "-Wnullability-completeness"
+#endif
+
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
-#pragma clang diagnostic pop
 
-#include <memory>
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 // TODO: should be in 'gtl/gb' subfolder
 #include <SmallVector.h>
@@ -361,9 +366,9 @@ namespace gtl
 
   /* API method implementation. */
 
-  static bool cgpuFindLayer(const char* name, uint32_t layerCount, VkLayerProperties* layers)
+  static bool cgpuFindLayer(const char* name, size_t layerCount, VkLayerProperties* layers)
   {
-    for (uint32_t i = 0; i < layerCount; i++)
+    for (size_t i = 0; i < layerCount; i++)
     {
       if (!strcmp(layers[i].layerName, name))
       {
@@ -373,9 +378,9 @@ namespace gtl
     return false;
   }
 
-  static bool cgpuFindExtension(const char* name, uint32_t extensionCount, VkExtensionProperties* extensions)
+  static bool cgpuFindExtension(const char* name, size_t extensionCount, VkExtensionProperties* extensions)
   {
-    for (uint32_t i = 0; i < extensionCount; ++i)
+    for (size_t i = 0; i < extensionCount; ++i)
     {
       if (!strcmp(extensions[i].extensionName, name))
       {

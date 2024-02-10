@@ -228,7 +228,7 @@ namespace gtl
   {
     uint32_t width = renderBuffer->width;
     uint32_t height = renderBuffer->height;
-    uint64_t bufferSize = width * height * pixelStride;
+    uint32_t bufferSize = width * height * pixelStride;
 
     bool reallocBuffers = (renderBuffer->bufferWidth != width) ||
                           (renderBuffer->bufferHeight != height);
@@ -1208,7 +1208,7 @@ cleanup:
     cache->images2d = std::move(images2d);
     cache->images3d = std::move(images3d);
     cache->materials.resize(params->materialCount);
-    for (int i = 0; i < params->materialCount; i++)
+    for (uint32_t i = 0; i < params->materialCount; i++)
     {
       cache->materials[i] = params->materials[i];
     }
@@ -1464,7 +1464,7 @@ cleanup:
     if (!cgpuBeginCommandBuffer(commandBuffer))
       goto cleanup;
 
-    if (!cgpuCmdTransitionShaderImageLayouts(commandBuffer, shader_cache->rgenShader, images.size(), images.data()))
+    if (!cgpuCmdTransitionShaderImageLayouts(commandBuffer, shader_cache->rgenShader, (uint32_t) images.size(), images.data()))
       goto cleanup;
 
     if (!cgpuCmdUpdateBindings(commandBuffer, shader_cache->pipeline, &bindings))
@@ -1662,7 +1662,7 @@ cleanup:
     float ab = powf(radiusX * radiusY, 1.6f);
     float ac = powf(radiusX * radiusZ, 1.6f);
     float bc = powf(radiusY * radiusZ, 1.6f);
-    float area = powf((ab + ac + bc) / 3.0f, 1.0f / 1.6f) * 4.0f * M_PI;
+    float area = float(powf((ab + ac + bc) / 3.0f, 1.0f / 1.6f) * 4.0f * M_PI);
 
     auto* data = light->scene->sphereLights.write<rp::SphereLight>(light->gpuHandle);
     assert(data);
@@ -1731,8 +1731,8 @@ cleanup:
 
   void giSetDistantLightAngle(GiDistantLight* light, float angle)
   {
-    float halfAngle = 0.5 * angle;
-    float invPdf = (halfAngle > 0.0f) ? (2.0f * M_PI * (1.0f - cosf(halfAngle))) : 1.0f;
+    float halfAngle = 0.5f * angle;
+    float invPdf = (halfAngle > 0.0f) ? float(2.0f * M_PI * (1.0f - cosf(halfAngle))) : 1.0f;
 
     auto* data = light->scene->distantLights.write<rp::DistantLight>(light->gpuHandle);
     assert(data);
