@@ -1,19 +1,19 @@
 set(GI_SRCS
-  include/gi.h
-  src/gi.cpp
-  src/assetReader.h
-  src/assetReader.cpp
-  src/mmap.h
-  src/mmap.cpp
-  src/textureManager.h
-  src/textureManager.cpp
-  src/turbo.h
+  include/Gi.h
+  src/Gi.cpp
+  src/AssetReader.h
+  src/AssetReader.cpp
   src/GlslShaderCompiler.h
   src/GlslShaderCompiler.cpp
   src/GlslShaderGen.h
   src/GlslShaderGen.cpp
   src/GlslStitcher.h
   src/GlslStitcher.cpp
+  src/Mmap.h
+  src/Mmap.cpp
+  src/TextureManager.h
+  src/TextureManager.cpp
+  src/Turbo.h
 )
 
 function(configure_target TARGET)

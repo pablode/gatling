@@ -15,20 +15,18 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "textureManager.h"
-
-#include "mmap.h"
-#include "gi.h"
+#include "TextureManager.h"
+#include "Gi.h"
 
 #include <GlslShaderGen.h> // TODO: remove this dependency
 #include <Backend.h>
-#include <stager.h>
+#include <Stager.h>
 #include <Imgio.h>
+#include <Log.h>
 
 #include <assert.h>
 #include <string.h>
 #include <inttypes.h>
-#include <log.h>
 
 using namespace gtl;
 

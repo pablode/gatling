@@ -1,6 +1,5 @@
-#include "assetReader.h"
-
-#include "mmap.h"
+#include "AssetReader.h"
+#include "Mmap.h"
 
 namespace gtl
 {

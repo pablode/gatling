@@ -1,6 +1,6 @@
-#include "logFlushListener.h"
+#include "LogFlushListener.h"
 
-#include <log.h>
+#include <Log.h>
 
 using namespace doctest;
 

@@ -22,7 +22,7 @@
 #include <assert.h>
 #include <unordered_map>
 
-#include "linearDataStore.h"
+#include "LinearDataStore.h"
 
 namespace gtl
 {

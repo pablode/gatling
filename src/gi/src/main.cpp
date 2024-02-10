@@ -7,10 +7,10 @@
 
 #include <vector>
 
-#include "mmap.h"
-#include "gi.h"
+#include "Mmap.h"
+#include "Gi.h"
 #include <Imgio.h>
-#include <logFlushListener.h>
+#include <LogFlushListener.h>
 
 namespace mx = MaterialX;
 using namespace gtl;

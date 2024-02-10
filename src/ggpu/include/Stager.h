@@ -17,10 +17,10 @@
 
 #pragma once
 
-#include <cgpu.h>
-
 #include <stdint.h>
 #include <functional>
+
+#include <Cgpu.h>
 
 namespace gtl
 {

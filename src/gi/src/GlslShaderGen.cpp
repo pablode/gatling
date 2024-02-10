@@ -16,12 +16,12 @@
 //
 
 #include "GlslShaderGen.h"
+#include "GlslShaderCompiler.h"
+#include "GlslStitcher.h"
 
 #include <Material.h>
 #include <Runtime.h>
 #include <Backend.h>
-#include <GlslShaderCompiler.h>
-#include <GlslStitcher.h>
 
 #include <string>
 #include <sstream>

@@ -1,9 +1,9 @@
 add_library(
   cgpu STATIC
-  include/cgpu.h
-  src/cgpu.cpp
-  src/shaderReflection.cpp
-  src/shaderReflection.h
+  include/Cgpu.h
+  src/Cgpu.cpp
+  src/ShaderReflection.cpp
+  src/ShaderReflection.h
 )
 
 target_include_directories(

@@ -20,7 +20,7 @@
 #include <mi/mdl_sdk.h>
 
 #include <stdio.h>
-#include <log.h>
+#include <Log.h>
 
 namespace
 {

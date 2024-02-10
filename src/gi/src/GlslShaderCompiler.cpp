@@ -22,7 +22,7 @@
 #include <SPIRV/GlslangToSpv.h>
 
 #include <fstream>
-#include <log.h>
+#include <Log.h>
 
 namespace
 {

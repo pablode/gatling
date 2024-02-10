@@ -1,7 +1,7 @@
 add_library(
   gt STATIC
-  include/logFlushListener.h
-  src/logFlushListener.cpp
+  include/LogFlushListener.h
+  src/LogFlushListener.cpp
 )
 
 target_include_directories(

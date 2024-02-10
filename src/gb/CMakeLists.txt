@@ -1,13 +1,13 @@
 add_library(
   gb STATIC
-  include/handleStore.h
-  include/linearDataStore.h
-  include/log.h
-  include/smallVector.h
-  src/handleStore.cpp
-  src/linearDataStore.cpp
-  src/log.cpp
-  src/smallVector.cpp
+  include/HandleStore.h
+  include/LinearDataStore.h
+  include/Log.h
+  include/SmallVector.h
+  src/HandleStore.cpp
+  src/LinearDataStore.cpp
+  src/Log.cpp
+  src/SmallVector.cpp
 )
 
 target_include_directories(

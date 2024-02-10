@@ -15,15 +15,16 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "gi.h"
-
 #if !defined(NDEBUG) && !defined(GI_TEST_EXECUTABLE)
 #define GI_SHADER_HOTLOADING
 #endif
 
-#include "textureManager.h"
-#include "turbo.h"
-#include "assetReader.h"
+#include "Gi.h"
+#include "TextureManager.h"
+#include "Turbo.h"
+#include "AssetReader.h"
+#include "GlslShaderGen.h"
+#include "interface/rp_main.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -38,20 +39,18 @@
 #include <mutex>
 #include <assert.h>
 
-#include <stager.h>
-#include <denseDataStore.h>
-#include <cgpu.h>
+#include <Stager.h>
+#include <DenseDataStore.h>
+#include <Cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #ifdef GI_SHADER_HOTLOADING
 #include <efsw/efsw.hpp>
 #endif
-#include "GlslShaderGen.h"
 #include <Material.h>
 #include <Frontend.h>
 #include <Runtime.h>
-#include <log.h>
-#include "interface/rp_main.h"
+#include <Log.h>
 
 #include <MaterialXCore/Document.h>
 

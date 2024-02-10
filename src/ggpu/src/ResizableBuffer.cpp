@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "resizableBuffer.h"
+#include "ResizableBuffer.h"
 
 namespace gtl
 {

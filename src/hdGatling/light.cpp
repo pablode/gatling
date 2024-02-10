@@ -29,7 +29,7 @@
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/usdLux/blackbody.h>
 
-#include <gi.h>
+#include <Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

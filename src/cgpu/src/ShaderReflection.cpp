@@ -15,9 +15,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "shaderReflection.h"
+#include "ShaderReflection.h"
 
-#include <smallVector.h>
+#include <SmallVector.h>
 #include <volk.h>
 #include <spirv_reflect.h>
 #include <stdlib.h>

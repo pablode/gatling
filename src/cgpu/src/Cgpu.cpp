@@ -15,8 +15,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "cgpu.h"
-#include "shaderReflection.h"
+#include "Cgpu.h"
+#include "ShaderReflection.h"
 
 #include <stdint.h>
 #include <stddef.h>
@@ -36,9 +36,9 @@
 #include <memory>
 
 // TODO: should be in 'gtl/gb' subfolder
-#include <smallVector.h>
-#include <linearDataStore.h>
-#include <log.h>
+#include <SmallVector.h>
+#include <LinearDataStore.h>
+#include <Log.h>
 
 using namespace gtl;
 

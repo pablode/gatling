@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "handleStore.h"
+#include "HandleStore.h"
 
 #include <assert.h>
 

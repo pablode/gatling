@@ -15,9 +15,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "syncBuffer.h"
-
-#include "stager.h"
+#include "SyncBuffer.h"
+#include "Stager.h"
 
 #include <algorithm>
 

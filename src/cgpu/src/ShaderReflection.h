@@ -15,4 +15,24 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "linearDataStore.h"
+#pragma once
+
+#include <stdint.h>
+#include <SmallVector.h>
+
+struct CgpuShaderReflectionBinding
+{
+  uint32_t binding;
+  uint32_t count;
+  int descriptorType;
+  bool readAccess;
+  bool writeAccess;
+};
+
+struct CgpuShaderReflection
+{
+  uint32_t pushConstantsSize;
+  gtl::GbSmallVector<CgpuShaderReflectionBinding, 32> bindings;
+};
+
+bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);

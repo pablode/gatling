@@ -17,7 +17,7 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "mmap.h"
+#include "Mmap.h"
 
 #include <assert.h>
 #include <string.h>

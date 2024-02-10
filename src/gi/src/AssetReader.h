@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <vector>
 
-#include "gi.h"
+#include "Gi.h"
 
 namespace gtl
 {

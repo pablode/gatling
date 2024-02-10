@@ -20,7 +20,7 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/base/gf/vec2f.h>
 
-#include <gi.h>
+#include <Gi.h>
 
 struct GiMesh;
 

@@ -17,26 +17,49 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <assert.h>
 
-#include <smallVector.h>
+#include <SmallVector.h>
+#include <HandleStore.h>
 
 namespace gtl
 {
-  class GbHandleStore
+  template<typename T, uint32_t C>
+  class GbLinearDataStore
   {
   public:
-    uint64_t allocateHandle();
+    uint64_t allocate()
+    {
+      return m_handleStore.allocateHandle();
+    }
 
-    bool isHandleValid(uint64_t handle) const;
+    void free(uint64_t handle)
+    {
+      m_handleStore.freeHandle(handle);
+    }
 
-    void freeHandle(uint64_t handle);
+    bool get(uint64_t handle, T** object)
+    {
+      if (!m_handleStore.isHandleValid(handle))
+      {
+        assert(false);
+        return false;
+      }
+
+      uint32_t index = uint32_t(handle);
+      if (index >= m_objects.size())
+      {
+        m_objects.resize(index + 1);
+      }
+
+      *object = &m_objects[index];
+      return true;
+    }
 
   private:
-    uint32_t m_maxIndex = 0;
-    GbSmallVector<uint32_t, 1024> m_versions;
-    GbSmallVector<uint32_t, 64> m_freeList;
+    GbHandleStore m_handleStore;
+    GbSmallVector<T, C> m_objects;
   };
 }

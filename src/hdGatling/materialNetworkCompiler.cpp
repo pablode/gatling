@@ -33,7 +33,7 @@
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/Util.h>
 
-#include <gi.h>
+#include <Gi.h>
 
 namespace mx = MaterialX;
 

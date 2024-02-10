@@ -21,8 +21,7 @@
 #include <string>
 #include <vector>
 
-#include <cgpu.h>
-
+#include <Cgpu.h>
 #include <Backend.h>
 
 class GiAssetReader;

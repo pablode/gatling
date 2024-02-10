@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2023 Pablo Delgado Kr√§mer
+// Copyright (C) 2023 Pablo Delgado Kr‰mer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,23 +17,34 @@
 
 #pragma once
 
-#include "cgpu.h"
+#include <stdint.h>
 
-#include <smallVector.h>
+#include <Cgpu.h>
 
-struct CgpuShaderReflectionBinding
+namespace gtl
 {
-  uint32_t binding;
-  uint32_t count;
-  int descriptorType;
-  bool readAccess;
-  bool writeAccess;
-};
+  class GgpuResizableBuffer
+  {
+  public:
+    GgpuResizableBuffer(CgpuDevice device,
+                        CgpuBufferUsageFlags usageFlags,
+                        CgpuMemoryPropertyFlags memoryProperties);
 
-struct CgpuShaderReflection
-{
-  uint32_t pushConstantsSize;
-  gtl::GbSmallVector<CgpuShaderReflectionBinding, 32> bindings;
-};
+    ~GgpuResizableBuffer();
 
-bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);
+  public:
+    CgpuBuffer buffer() const;
+
+    uint64_t size() const;
+
+    bool resize(uint64_t newSize);
+
+  private:
+    CgpuDevice m_device;
+    CgpuBufferUsageFlags m_usageFlags;
+    CgpuMemoryPropertyFlags m_memoryProperties;
+
+    CgpuBuffer m_buffer;
+    uint64_t m_size = 0;
+  };
+}

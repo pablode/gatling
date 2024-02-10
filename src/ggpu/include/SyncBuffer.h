@@ -21,9 +21,9 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <cgpu.h>
+#include <Cgpu.h>
 
-#include "resizableBuffer.h"
+#include "ResizableBuffer.h"
 
 namespace gtl
 {

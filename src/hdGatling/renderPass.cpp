@@ -31,7 +31,7 @@
 #include <pxr/base/gf/matrix3d.h>
 #include <pxr/base/gf/camera.h>
 
-#include <gi.h>
+#include <Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

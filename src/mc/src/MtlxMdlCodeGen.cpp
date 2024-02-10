@@ -32,7 +32,7 @@
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/Util.h>
 #include <MaterialXGenMdl/MdlShaderGenerator.h>
-#include <log.h>
+#include <Log.h>
 
 namespace mx = MaterialX;
 

@@ -21,10 +21,10 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <cgpu.h>
-#include <handleStore.h>
+#include <Cgpu.h>
+#include <HandleStore.h>
 
-#include "syncBuffer.h"
+#include "SyncBuffer.h"
 
 namespace gtl
 {

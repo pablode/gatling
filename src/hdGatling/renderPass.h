@@ -20,7 +20,7 @@
 #include <pxr/imaging/hd/renderPass.h>
 #include <pxr/imaging/hd/renderDelegate.h>
 
-#include <gi.h>
+#include <Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
