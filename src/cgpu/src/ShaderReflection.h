@@ -20,19 +20,22 @@
 #include <stdint.h>
 #include <SmallVector.h>
 
-struct CgpuShaderReflectionBinding
+namespace gtl
 {
-  uint32_t binding;
-  uint32_t count;
-  int descriptorType;
-  bool readAccess;
-  bool writeAccess;
-};
+  struct CgpuShaderReflectionBinding
+  {
+    uint32_t binding;
+    uint32_t count;
+    int descriptorType;
+    bool readAccess;
+    bool writeAccess;
+  };
 
-struct CgpuShaderReflection
-{
-  uint32_t pushConstantsSize;
-  gtl::GbSmallVector<CgpuShaderReflectionBinding, 32> bindings;
-};
+  struct CgpuShaderReflection
+  {
+    uint32_t pushConstantsSize;
+    GbSmallVector<CgpuShaderReflectionBinding, 32> bindings;
+  };
 
-bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);
+  bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);
+}
