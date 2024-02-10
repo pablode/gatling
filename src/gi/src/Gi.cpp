@@ -284,16 +284,16 @@ namespace gtl
     return true;
   }
 
-  void _PrintInitInfo(const GiInitParams* params)
+  void _PrintInitInfo(const GiInitParams& params)
   {
     GB_LOG("gatling {}.{}.{} built against MaterialX {}.{}.{}", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH,
                                                                 MATERIALX_MAJOR_VERSION, MATERIALX_MINOR_VERSION, MATERIALX_BUILD_VERSION);
-    GB_LOG("> shader path: \"{}\"", params->shaderPath);
-    GB_LOG("> MDL runtime path: \"{}\"", params->mdlRuntimePath);
-    GB_LOG("> MDL search paths: {}", params->mdlSearchPaths);
+    GB_LOG("> shader path: \"{}\"", params.shaderPath);
+    GB_LOG("> MDL runtime path: \"{}\"", params.mdlRuntimePath);
+    GB_LOG("> MDL search paths: {}", params.mdlSearchPaths);
   }
 
-  GiStatus giInitialize(const GiInitParams* params)
+  GiStatus giInitialize(const GiInitParams& params)
   {
     if (!s_loggerInitialized)
     {
@@ -331,24 +331,24 @@ namespace gtl
     }
 
 #ifdef NDEBUG
-    std::string_view shaderPath = params->shaderPath;
+    std::string_view shaderPath = params.shaderPath;
 #else
     // Use shaders dir in source tree for auto-reloading
     std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
 #endif
 
-    s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params->mdlRuntimePath));
+    s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath));
     if (!s_mcRuntime)
     {
       return GiStatus::Error;
     }
 
-    mx::DocumentPtr mtlxStdLib = static_pointer_cast<mx::Document>(params->mtlxStdLib);
+    mx::DocumentPtr mtlxStdLib = static_pointer_cast<mx::Document>(params.mtlxStdLib);
     if (!mtlxStdLib)
     {
       return GiStatus::Error;
     }
-    s_mcFrontend = std::make_unique<McFrontend>(params->mdlSearchPaths, mtlxStdLib, *s_mcRuntime);
+    s_mcFrontend = std::make_unique<McFrontend>(params.mdlSearchPaths, mtlxStdLib, *s_mcRuntime);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))
@@ -467,15 +467,15 @@ namespace gtl
     return offset;
   }
 
-  GiMesh* giCreateMesh(const GiMeshDesc* desc)
+  GiMesh* giCreateMesh(const GiMeshDesc& desc)
   {
     GiMesh* mesh = new GiMesh;
-    mesh->faces = std::vector<GiFace>(&desc->faces[0], &desc->faces[desc->faceCount]);
-    mesh->vertices = std::vector<GiVertex>(&desc->vertices[0], &desc->vertices[desc->vertexCount]);
+    mesh->faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]);
+    mesh->vertices = std::vector<GiVertex>(&desc.vertices[0], &desc.vertices[desc.vertexCount]);
     return mesh;
   }
 
-  void _giBuildGeometryStructures(const GiGeomCacheParams* params,
+  void _giBuildGeometryStructures(const GiGeomCacheParams& params,
                                   std::vector<GiBlas>& blases,
                                   std::vector<CgpuBlasInstance>& blasInstances,
                                   std::vector<rp::BlasPayload>& blasPayloads,
@@ -484,9 +484,9 @@ namespace gtl
   {
     std::unordered_map<const GiMesh*, CgpuBlasInstance> blasInstanceProtos;
 
-    for (uint32_t m = 0; m < params->meshInstanceCount; m++)
+    for (uint32_t m = 0; m < params.meshInstanceCount; m++)
     {
-      const GiMeshInstance* instance = &params->meshInstances[m];
+      const GiMeshInstance* instance = &params.meshInstances[m];
       const GiMesh* mesh = instance->mesh;
 
       if (mesh->faces.empty())
@@ -499,7 +499,7 @@ namespace gtl
       {
         // Find material for SBT index (FIXME: find a better solution)
         uint32_t materialIndex = UINT32_MAX;
-        GiShaderCache* shaderCache = params->shaderCache;
+        GiShaderCache* shaderCache = params.shaderCache;
         for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
         {
           if (shaderCache->materials[i] == instance->material)
@@ -702,7 +702,7 @@ fail_cleanup:
     }
   }
 
-  GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params)
+  GiGeomCache* giCreateGeomCache(const GiGeomCacheParams& params)
   {
     s_forceGeomCacheInvalid = false;
 
@@ -813,11 +813,11 @@ cleanup:
     return s_forceGeomCacheInvalid;
   }
 
-  GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params)
+  GiShaderCache* giCreateShaderCache(const GiShaderCacheParams& params)
   {
     s_forceShaderCacheInvalid = false;
 
-    bool clockCyclesAov = params->aovId == GiAovId::ClockCycles;
+    bool clockCyclesAov = params.aovId == GiAovId::ClockCycles;
 
     if (clockCyclesAov && !s_deviceFeatures.shaderClock)
     {
@@ -825,9 +825,9 @@ cleanup:
       return nullptr;
     }
 
-    GiScene* scene = params->scene;
+    GiScene* scene = params.scene;
 
-    GB_LOG("material count: {}", params->materialCount);
+    GB_LOG("material count: {}", params.materialCount);
     GB_LOG("creating shader cache..");
     fflush(stdout);
 
@@ -868,13 +868,13 @@ cleanup:
       };
 
       std::vector<HitGroupCompInfo> hitGroupCompInfos;
-      hitGroupCompInfos.resize(params->materialCount);
+      hitGroupCompInfos.resize(params.materialCount);
 
       std::atomic_bool threadWorkFailed = false;
 #pragma omp parallel for
       for (int i = 0; i < hitGroupCompInfos.size(); i++)
       {
-        const McMaterial* material = params->materials[i]->mcMat;
+        const McMaterial* material = params.materials[i]->mcMat;
 
         HitGroupCompInfo groupInfo;
         {
@@ -946,18 +946,18 @@ cleanup:
 #pragma omp parallel for
       for (int i = 0; i < hitGroupCompInfos.size(); i++)
       {
-        const McMaterial* material = params->materials[i]->mcMat;
+        const McMaterial* material = params.materials[i]->mcMat;
 
         HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
         // Closest hit
         {
           GiGlslShaderGen::ClosestHitShaderParams hitParams;
-          hitParams.aovId = (int) params->aovId;
+          hitParams.aovId = (int) params.aovId;
           hitParams.baseFileName = "rp_main.chit";
           hitParams.isOpaque = material->isOpaque;
           hitParams.enableSceneTransforms = material->requiresSceneTransforms;
-          hitParams.nextEventEstimation = params->nextEventEstimation;
+          hitParams.nextEventEstimation = params.nextEventEstimation;
           hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
           hitParams.sphereLightCount = scene->sphereLights.elementCount();
           hitParams.distantLightCount = scene->distantLights.elementCount();
@@ -979,7 +979,7 @@ cleanup:
         if (compInfo.anyHitInfo)
         {
           GiGlslShaderGen::AnyHitShaderParams hitParams;
-          hitParams.aovId = (int) params->aovId;
+          hitParams.aovId = (int) params.aovId;
           hitParams.enableSceneTransforms = material->requiresSceneTransforms;
           hitParams.baseFileName = "rp_main.ahit";
           hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
@@ -1091,12 +1091,12 @@ cleanup:
     // Create ray generation shader.
     {
       GiGlslShaderGen::RaygenShaderParams rgenParams;
-      rgenParams.aovId = (int) params->aovId;
-      rgenParams.depthOfField = params->depthOfField;
-      rgenParams.filterImportanceSampling = params->filterImportanceSampling;
-      rgenParams.materialCount = params->materialCount;
-      rgenParams.nextEventEstimation = params->nextEventEstimation;
-      rgenParams.progressiveAccumulation = params->progressiveAccumulation;
+      rgenParams.aovId = (int) params.aovId;
+      rgenParams.depthOfField = params.depthOfField;
+      rgenParams.filterImportanceSampling = params.filterImportanceSampling;
+      rgenParams.materialCount = params.materialCount;
+      rgenParams.nextEventEstimation = params.nextEventEstimation;
+      rgenParams.progressiveAccumulation = params.progressiveAccumulation;
       rgenParams.reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder;
       rgenParams.sphereLightCount = scene->sphereLights.elementCount();
       rgenParams.distantLightCount = scene->distantLights.elementCount();
@@ -1125,7 +1125,7 @@ cleanup:
     // Create miss shaders.
     {
       GiGlslShaderGen::MissShaderParams missParams;
-      missParams.domeLightCameraVisible = params->domeLightCameraVisible;
+      missParams.domeLightCameraVisible = params.domeLightCameraVisible;
       missParams.sphereLightCount = scene->sphereLights.elementCount();
       missParams.distantLightCount = scene->distantLights.elementCount();
       missParams.rectLightCount = scene->rectLights.elementCount();
@@ -1202,15 +1202,15 @@ cleanup:
     }
 
     cache = new GiShaderCache;
-    cache->aovId = (int) params->aovId;
-    cache->domeLightCameraVisible = params->domeLightCameraVisible;
+    cache->aovId = (int) params.aovId;
+    cache->domeLightCameraVisible = params.domeLightCameraVisible;
     cache->hitShaders = std::move(hitShaders);
     cache->images2d = std::move(images2d);
     cache->images3d = std::move(images3d);
-    cache->materials.resize(params->materialCount);
-    for (uint32_t i = 0; i < params->materialCount; i++)
+    cache->materials.resize(params.materialCount);
+    for (uint32_t i = 0; i < params.materialCount; i++)
     {
-      cache->materials[i] = params->materials[i];
+      cache->materials[i] = params.materials[i];
     }
     cache->missShaders = missShaders;
     cache->pipeline = pipeline;
@@ -1275,16 +1275,16 @@ cleanup:
     s_forceGeomCacheInvalid = true;
   }
 
-  GiStatus giRender(const GiRenderParams* params, float* rgbaImg)
+  GiStatus giRender(const GiRenderParams& params, float* rgbaImg)
   {
     s_stager->flush();
 
-    const GiGeomCache* geom_cache = params->geomCache;
-    const GiShaderCache* shader_cache = params->shaderCache;
-    GiScene* scene = params->scene;
+    const GiGeomCache* geom_cache = params.geomCache;
+    const GiShaderCache* shader_cache = params.shaderCache;
+    GiScene* scene = params.scene;
 
     // Upload dome lights.
-    glm::vec4 backgroundColor = glm::make_vec4(params->backgroundColor);
+    glm::vec4 backgroundColor = glm::make_vec4(params.backgroundColor);
     if (backgroundColor != scene->backgroundColor)
     {
       glm::u8vec4 u8BgColor(backgroundColor * 255.0f);
@@ -1292,7 +1292,7 @@ cleanup:
       scene->backgroundColor = backgroundColor;
     }
 
-    if (scene->domeLight != params->domeLight)
+    if (scene->domeLight != params.domeLight)
     {
       if (scene->domeLightTexture.handle &&
           scene->domeLightTexture.handle != scene->fallbackDomeLightTexture.handle)
@@ -1302,7 +1302,7 @@ cleanup:
       }
       scene->domeLight = nullptr;
 
-      GiDomeLight* domeLight = params->domeLight;
+      GiDomeLight* domeLight = params.domeLight;
       if (domeLight)
       {
         const char* filePath = domeLight->textureFilePath.c_str();
@@ -1353,7 +1353,7 @@ cleanup:
     }
 
     // Set up output buffer.
-    GiRenderBuffer* renderBuffer = params->renderBuffer;
+    GiRenderBuffer* renderBuffer = params.renderBuffer;
     uint32_t imageWidth = renderBuffer->width;
     uint32_t imageHeight = renderBuffer->height;
 
@@ -1379,13 +1379,13 @@ cleanup:
     CgpuSignalSemaphoreInfo signalSemaphoreInfo;
     CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
-    auto camForward = glm::normalize(glm::make_vec3(params->camera->forward));
-    auto camUp = glm::normalize(glm::make_vec3(params->camera->up));
+    auto camForward = glm::normalize(glm::make_vec3(params.camera.forward));
+    auto camUp = glm::normalize(glm::make_vec3(params.camera.up));
 
     float lensRadius = 0.0f;
-    if (params->camera->fStop > 0.0f)
+    if (params.camera.fStop > 0.0f)
     {
-      lensRadius = params->camera->focalLength / (2.0f * params->camera->fStop);
+      lensRadius = params.camera.focalLength / (2.0f * params.camera.fStop);
     }
 
     glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
@@ -1393,24 +1393,24 @@ cleanup:
     uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
 
     rp::PushConstants pushData = {
-      .cameraPosition                 = glm::make_vec3(params->camera->position),
+      .cameraPosition                 = glm::make_vec3(params.camera.position),
       .imageDims                      = ((imageHeight << 16) | imageWidth),
       .cameraForward                  = camForward,
-      .focusDistance                  = params->camera->focusDistance,
+      .focusDistance                  = params.camera.focusDistance,
       .cameraUp                       = camUp,
-      .cameraVFoV                     = params->camera->vfov,
+      .cameraVFoV                     = params.camera.vfov,
       .sampleOffset                   = renderBuffer->sampleOffset,
       .lensRadius                     = lensRadius,
-      .sampleCount                    = params->spp,
-      .maxSampleValue                 = params->maxSampleValue,
+      .sampleCount                    = params.spp,
+      .maxSampleValue                 = params.maxSampleValue,
       .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
       .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
       .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
-      .maxBouncesAndRrBounceOffset    = ((params->maxBounces << 16) | params->rrBounceOffset),
-      .rrInvMinTermProb               = params->rrInvMinTermProb,
-      .lightIntensityMultiplier       = params->lightIntensityMultiplier,
-      .clipRangePacked                = glm::packHalf2x16(glm::vec2(params->camera->clipStart, params->camera->clipEnd)),
-      .sensorExposure                 = params->camera->exposure
+      .maxBouncesAndRrBounceOffset    = ((params.maxBounces << 16) | params.rrBounceOffset),
+      .rrInvMinTermProb               = params.rrInvMinTermProb,
+      .lightIntensityMultiplier       = params.lightIntensityMultiplier,
+      .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
+      .sensorExposure                 = params.camera.exposure
     };
 
     std::vector<CgpuBufferBinding> buffers;
@@ -1567,7 +1567,7 @@ cleanup:
       }
     }
 
-    renderBuffer->sampleOffset += params->spp;
+    renderBuffer->sampleOffset += params.spp;
 
     result = GiStatus::Ok;
 

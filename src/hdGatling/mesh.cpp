@@ -789,7 +789,7 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     .vertexCount = (uint32_t) vertices.size(),
     .vertices = vertices.data()
   };
-  _giMesh = giCreateMesh(&desc);
+  _giMesh = giCreateMesh(desc);
 }
 
 const GiMesh* HdGatlingMesh::GetGiMesh() const

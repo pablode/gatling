@@ -425,18 +425,19 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
       auto domeLightCameraVisibilityValueIt = _settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
 
-      GiShaderCacheParams shaderParams;
-      shaderParams.aovId = aovId;
-      shaderParams.depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>();
-      shaderParams.domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true);
-      shaderParams.filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>();
-      shaderParams.materialCount = materials.size();
-      shaderParams.materials = materials.data();
-      shaderParams.nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>();
-      shaderParams.progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>();
-      shaderParams.scene = _scene;
+      GiShaderCacheParams shaderParams = {
+        .aovId = aovId,
+        .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
+        .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
+        .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
+        .materialCount = (uint32_t) materials.size(),
+        .materials = materials.data(),
+        .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
+        .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
+        .scene = _scene
+      };
+      _shaderCache = giCreateShaderCache(shaderParams);
 
-      _shaderCache = giCreateShaderCache(&shaderParams);
       TF_VERIFY(_shaderCache, "Unable to create shader cache");
     }
 
@@ -447,12 +448,13 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
         giDestroyGeomCache(_geomCache);
       }
 
-      GiGeomCacheParams geomParams;
-      geomParams.meshInstanceCount = instances.size();
-      geomParams.meshInstances = instances.data();
-      geomParams.shaderCache = _shaderCache;
+      GiGeomCacheParams geomParams = {
+        .meshInstanceCount = (uint32_t) instances.size(),
+        .meshInstances = instances.data(),
+        .shaderCache = _shaderCache
+      };
+      _geomCache = giCreateGeomCache(geomParams);
 
-      _geomCache = giCreateGeomCache(&geomParams);
       TF_VERIFY(_geomCache, "Unable to create geom cache");
     }
   }
@@ -470,27 +472,25 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   GiCameraDesc giCamera;
   _ConstructGiCamera(*camera, giCamera, clippingEnabled);
 
-  GiRenderParams renderParams;
-  renderParams.camera = &giCamera;
-  renderParams.geomCache = _geomCache;
-  renderParams.shaderCache = _shaderCache;
-  renderParams.renderBuffer = renderBuffer->GetGiRenderBuffer();
-  renderParams.maxBounces = VtValue::Cast<int>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<int>();
-  renderParams.spp = VtValue::Cast<int>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<int>();
-  renderParams.rrBounceOffset = VtValue::Cast<int>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<int>();
-  renderParams.lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>();
-  renderParams.rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>();
-  renderParams.maxSampleValue = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>();
-  renderParams.domeLight = renderParam->ActiveDomeLight();
-  renderParams.scene = _scene;
-  for (uint32_t i = 0; i < 4; i++)
-  {
-    renderParams.backgroundColor[i] = backgroundColor[i];
-  }
+  GiRenderParams renderParams = {
+    .camera = giCamera,
+    .geomCache = _geomCache,
+    .shaderCache = _shaderCache,
+    .renderBuffer = renderBuffer->GetGiRenderBuffer(),
+    .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),
+    .maxBounces = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<uint32_t>(),
+    .spp = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<uint32_t>(),
+    .rrBounceOffset = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<uint32_t>(),
+    .rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>(),
+    .maxSampleValue = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>(),
+    .backgroundColor = { backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] },
+    .domeLight = renderParam->ActiveDomeLight(),
+    .scene = _scene
+  };
 
   float* imgData = (float*) renderBuffer->Map();
 
-  GiStatus result = giRender(&renderParams, imgData);
+  GiStatus result = giRender(renderParams, imgData);
 
   TF_VERIFY(result == GiStatus::Ok, "Unable to render scene.");
 

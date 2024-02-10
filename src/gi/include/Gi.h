@@ -121,7 +121,7 @@ namespace gtl
 
   struct GiRenderParams
   {
-    const GiCameraDesc*  camera;
+    GiCameraDesc         camera;
     const GiGeomCache*   geomCache;
     const GiShaderCache* shaderCache;
     GiRenderBuffer*      renderBuffer;
@@ -154,7 +154,7 @@ namespace gtl
     virtual ~GiAssetReader() = default;
   };
 
-  GiStatus giInitialize(const GiInitParams* params);
+  GiStatus giInitialize(const GiInitParams& params);
   void giTerminate();
 
   void giRegisterAssetReader(GiAssetReader* reader);
@@ -164,12 +164,12 @@ namespace gtl
   GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier);
   void giDestroyMaterial(GiMaterial* mat);
 
-  GiMesh* giCreateMesh(const GiMeshDesc* desc);
+  GiMesh* giCreateMesh(const GiMeshDesc& desc);
 
-  GiGeomCache* giCreateGeomCache(const GiGeomCacheParams* params);
+  GiGeomCache* giCreateGeomCache(const GiGeomCacheParams& params);
   void giDestroyGeomCache(GiGeomCache* cache);
 
-  GiShaderCache* giCreateShaderCache(const GiShaderCacheParams* params);
+  GiShaderCache* giCreateShaderCache(const GiShaderCacheParams& params);
   void giDestroyShaderCache(GiShaderCache* cache);
   bool giShaderCacheNeedsRebuild();
   bool giGeomCacheNeedsRebuild();
@@ -178,7 +178,7 @@ namespace gtl
   void giInvalidateShaderCache();
   void giInvalidateGeomCache();
 
-  GiStatus giRender(const GiRenderParams* params, float* rgbaImg);
+  GiStatus giRender(const GiRenderParams& params, float* rgbaImg);
 
   GiScene* giCreateScene();
   void giDestroyScene(GiScene* scene);

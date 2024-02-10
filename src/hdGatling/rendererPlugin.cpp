@@ -66,8 +66,7 @@ namespace
       .mdlSearchPaths = mdlSearchPaths,
       .mtlxStdLib = mtlxStdLib
     };
-
-    return giInitialize(&params) == GiStatus::Ok;
+    return giInitialize(params) == GiStatus::Ok;
   }
 
   mx::DocumentPtr _LoadMtlxStdLib()

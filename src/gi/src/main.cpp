@@ -40,7 +40,7 @@ public:
       .mtlxStdLib = mtlxStdLib
     };
 
-    REQUIRE_EQ(giInitialize(&params), GiStatus::Ok);
+    REQUIRE_EQ(giInitialize(params), GiStatus::Ok);
 
     m_renderBuffer = giCreateRenderBuffer(REF_IMAGE_WIDTH, REF_IMAGE_HEIGHT);
     REQUIRE(m_renderBuffer);
@@ -123,7 +123,7 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "NoGeo")
     .scene = m_scene
   };
 
-  GiShaderCache* shaderCache = giCreateShaderCache(&shaderCacheParams);
+  GiShaderCache* shaderCache = giCreateShaderCache(shaderCacheParams);
   REQUIRE(shaderCache);
 
   GiGeomCacheParams geomCacheParams = {
@@ -132,7 +132,7 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "NoGeo")
     .shaderCache = shaderCache
   };
 
-  GiGeomCache* geomCache = giCreateGeomCache(&geomCacheParams);
+  GiGeomCache* geomCache = giCreateGeomCache(geomCacheParams);
   REQUIRE(geomCache);
 
   GiCameraDesc camDesc = {
@@ -149,7 +149,7 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "NoGeo")
   };
 
   GiRenderParams renderParams =  {
-    .camera = &camDesc,
+    .camera = camDesc,
     .geomCache = geomCache,
     .shaderCache = shaderCache,
     .renderBuffer = m_renderBuffer,
@@ -165,7 +165,7 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "NoGeo")
   };
 
   std::vector<float> outputImg(REF_IMAGE_WIDTH * REF_IMAGE_HEIGHT * 4);
-  REQUIRE_EQ(giRender(&renderParams, outputImg.data()), GiStatus::Ok);
+  REQUIRE_EQ(giRender(renderParams, outputImg.data()), GiStatus::Ok);
 
   CHECK(compareWithRef(outputImg.data()));
 
