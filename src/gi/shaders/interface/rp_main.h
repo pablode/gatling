@@ -106,9 +106,14 @@ const GI_UINT BLAS_PAYLOAD_BITFLAG_IS_DOUBLE_SIDED = (1 << 0);
 
 struct BlasPayload
 {
-  GI_UINT64 indexVertexBuffer;
+  GI_UINT64 bufferAddress;
   GI_UINT   vertexOffset;
   GI_UINT   bitfield;
+};
+
+struct BlasPayloadBufferPreamble
+{
+  GI_INT unused[8];
 };
 
 GI_BINDING_INDEX(OUT_PIXELS,     0)
