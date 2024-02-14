@@ -184,31 +184,31 @@ void main()
 
 #if AOV_ID == AOV_ID_DEBUG_OPACITY
 #ifdef IS_OPAQUE
-    rayPayload.radiance = f16vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap
-    rayPayload.bitfield = uint16_t(0xFFFFu);
+    rayPayload.radiance = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap
+    rayPayload.bitfield = 0xFFFFu;
 #else
     // Payload fields have been set in any-hit shader.
 #endif
     return;
 #elif AOV_ID == AOV_ID_NORMAL
-    rayPayload.radiance = f16vec3((normal + vec3(1.0, 1.0, 1.0)) * 0.5);
-    rayPayload.bitfield = uint16_t(0xFFFFu);
+    rayPayload.radiance = (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
+    rayPayload.bitfield = 0xFFFFu;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_TANGENTS
-    rayPayload.radiance = f16vec3((shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5);
-    rayPayload.bitfield = uint16_t(0xFFFFu);
+    rayPayload.radiance = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+    rayPayload.bitfield = 0xFFFFu;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_BITANGENTS
-    rayPayload.radiance = f16vec3((shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5);
-    rayPayload.bitfield = uint16_t(0xFFFFu);
+    rayPayload.radiance = (shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+    rayPayload.bitfield = 0xFFFFu;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
-    rayPayload.radiance = f16vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
-    rayPayload.bitfield = uint16_t(0xFFFFu);
+    rayPayload.radiance = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+    rayPayload.bitfield = 0xFFFFu;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_TEXCOORDS
-    rayPayload.radiance = f16vec3(shading_state.text_coords[0]);
-    rayPayload.bitfield = uint16_t(0xFFFFu);
+    rayPayload.radiance = vec3(shading_state.text_coords[0]);
+    rayPayload.bitfield = 0xFFFFu;
     return;
 #endif
 
@@ -216,9 +216,9 @@ void main()
     if (inside && !thin_walled)
     {
         vec3 abs_coeff = mdl_absorption_coefficient(shading_state);
-        throughput.x *= float16_t(abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0);
-        throughput.y *= float16_t(abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0);
-        throughput.z *= float16_t(abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0);
+        throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
+        throughput.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0;
+        throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
     }
 
     /* 4. Add Emission */
@@ -354,7 +354,7 @@ void main()
     }
 
     uint bitfield = (uint(inside) << 15) | (bounce + 1);
-    rayPayload.bitfield = uint16_t(terminatePath ? 0xFFFFu : bitfield);
-    rayPayload.throughput = f16vec3(throughput);
-    rayPayload.radiance = f16vec3(radiance);
+    rayPayload.bitfield = terminatePath ? 0xFFFFu : bitfield;
+    rayPayload.throughput = throughput;
+    rayPayload.radiance = radiance;
 }

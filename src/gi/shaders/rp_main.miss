@@ -43,6 +43,6 @@ void main()
     vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, gl_WorldRayDirectionEXT));
     vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * PC.domeLightEmissionMultiplier;
 
-    rayPayload.radiance += rayPayload.throughput * f16vec3(radiance);
-    rayPayload.bitfield = uint16_t(0xFFFFu);
+    rayPayload.radiance += rayPayload.throughput * radiance;
+    rayPayload.bitfield = 0xFFFFu;
 }
