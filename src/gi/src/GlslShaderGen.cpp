@@ -231,7 +231,7 @@ namespace gtl
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
     if (params.isOpaque)
     {
-      stitcher.appendDefine("IS_OPAQUE", params.aovId);
+      stitcher.appendDefine("IS_OPAQUE");
     }
     if (params.nextEventEstimation)
     {
