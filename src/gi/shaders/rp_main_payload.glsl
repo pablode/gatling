@@ -2,12 +2,11 @@
 
 struct ShadeRayPayload
 {
-    /* inout */ f16vec3 throughput;
-    /* inout */ uint16_t bitfield; // Bitfield values:
-                                   // 1xxxxxxxxxxxxxxx bool inside
-                                   // x111111111111111 uint bounce
-    /* inout */ f16vec3 radiance;
-    /* - */     uint16_t padding;
+    /* inout */ vec3 throughput;
+    /* inout */ uint bitfield;   // Bitfield values:
+                                 // 1xxxxxxxxxxxxxxx bool inside
+                                 // x111111111111111 uint bounce
+    /* inout */ vec3 radiance;
 #ifdef RAND_4D
     /* inout */ uvec4 rng_state;
 #else

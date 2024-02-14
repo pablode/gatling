@@ -33,9 +33,9 @@ vec3 evaluate_sample(vec3 ray_origin,
                      uint rng_state)
 #endif
 {
-    rayPayload.throughput = f16vec3(vec3(1.0));
-    rayPayload.bitfield   = uint16_t(0);
-    rayPayload.radiance   = f16vec3(vec3(0.0));
+    rayPayload.throughput = vec3(1.0);
+    rayPayload.bitfield   = 0;
+    rayPayload.radiance   = vec3(0.0);
     rayPayload.rng_state  = rng_state;
     rayPayload.ray_origin = ray_origin;
     rayPayload.ray_dir    = ray_dir;
@@ -137,11 +137,11 @@ vec3 evaluate_sample(vec3 ray_origin,
             bool addContrib = traceRay && !shadowRayPayload.shadowed;
 
             rayPayload.rng_state = shadowRayPayload.rng_state;
-            rayPayload.radiance += f16vec3(rayPayload.neeContrib * float(addContrib));
+            rayPayload.radiance += rayPayload.neeContrib * float(addContrib);
 
 #if AOV_ID == AOV_ID_DEBUG_NEE
-            rayPayload.radiance = f16vec3(shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0));
-            rayPayload.bitfield = uint16_t(0xFFFFu);
+            rayPayload.radiance = shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+            rayPayload.bitfield = 0xFFFFu;
 #endif
         }
 #endif
