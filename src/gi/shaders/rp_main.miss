@@ -31,6 +31,12 @@ vec3 sampleDomeLight(uint domeLightIndex, vec3 rayDir)
 
 void main()
 {
+    rayPayload.bitfield = 0xFFFFu;
+
+#if AOV_ID != AOV_ID_COLOR
+    return;
+#endif
+
     bool useFallbackDomeLight = false;
 
 #ifndef DOME_LIGHT_CAMERA_VISIBLE
@@ -44,5 +50,4 @@ void main()
     vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * PC.domeLightEmissionMultiplier;
 
     rayPayload.radiance += rayPayload.throughput * radiance;
-    rayPayload.bitfield = 0xFFFFu;
 }
