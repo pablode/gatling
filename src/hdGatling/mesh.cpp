@@ -786,6 +786,7 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
    GiMeshDesc desc = {
     .faceCount = (uint32_t) faces.size(),
     .faces = faces.data(),
+    .id = GetPrimId(),
     .isDoubleSided = IsDoubleSided(sceneDelegate),
     .vertexCount = (uint32_t) vertices.size(),
     .vertices = vertices.data()

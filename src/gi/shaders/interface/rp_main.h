@@ -113,7 +113,8 @@ struct BlasPayload
 
 struct BlasPayloadBufferPreamble
 {
-  GI_INT unused[8];
+  GI_INT objectId;
+  GI_INT padding[7];
 };
 
 GI_BINDING_INDEX(OUT_PIXELS,     0)
