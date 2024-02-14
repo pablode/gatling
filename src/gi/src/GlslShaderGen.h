@@ -73,6 +73,7 @@ namespace gtl
 
     struct MissShaderParams
     {
+      int32_t aovId;
       bool domeLightCameraVisible;
       uint32_t distantLightCount;
       uint32_t sphereLightCount;

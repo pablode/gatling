@@ -1163,6 +1163,7 @@ cleanup:
     // Create miss shaders.
     {
       GiGlslShaderGen::MissShaderParams missParams;
+      missParams.aovId = (int) params.aovId;
       missParams.domeLightCameraVisible = params.domeLightCameraVisible;
       missParams.sphereLightCount = scene->sphereLights.elementCount();
       missParams.distantLightCount = scene->distantLights.elementCount();

@@ -147,6 +147,8 @@ namespace gtl
       stitcher.appendDefine("DOME_LIGHT_CAMERA_VISIBLE");
     }
 
+    stitcher.appendDefine("AOV_ID", params.aovId);
+
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))
     {
