@@ -39,7 +39,8 @@ namespace gtl
     Opacity,
     Tangents,
     Bitangents,
-    DoubleSided
+    DoubleSided,
+    ObjectId
   };
 
   struct GiAsset;
@@ -89,6 +90,7 @@ namespace gtl
   {
     uint32_t  faceCount;
     GiFace*   faces;
+    int       id;
     bool      isDoubleSided;
     uint32_t  vertexCount;
     GiVertex* vertices;

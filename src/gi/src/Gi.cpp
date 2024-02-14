@@ -106,6 +106,7 @@ namespace gtl
 
   struct GiMesh
   {
+    int id;
     bool isDoubleSided;
     std::vector<GiFace> faces;
     std::vector<GiVertex> vertices;
@@ -491,10 +492,12 @@ fail:
 
   GiMesh* giCreateMesh(const GiMeshDesc& desc)
   {
-    GiMesh* mesh = new GiMesh;
-    mesh->isDoubleSided = desc.isDoubleSided;
-    mesh->faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]);
-    mesh->vertices = std::vector<GiVertex>(&desc.vertices[0], &desc.vertices[desc.vertexCount]);
+    GiMesh* mesh = new GiMesh{
+      .id = desc.id,
+      .isDoubleSided = desc.isDoubleSided,
+      .faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]),
+      .vertices = std::vector<GiVertex>(&desc.vertices[0], &desc.vertices[desc.vertexCount])
+    };
     return mesh;
   }
 
@@ -538,7 +541,9 @@ fail:
         }
 
         // Payload buffer preamble
-        rp::BlasPayloadBufferPreamble preamble;
+        rp::BlasPayloadBufferPreamble preamble = {
+          .objectId = mesh->id
+        };
         uint32_t preambleSize = sizeof(rp::BlasPayloadBufferPreamble);
 
         // Collect vertices

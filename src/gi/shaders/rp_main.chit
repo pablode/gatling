@@ -219,6 +219,19 @@ void main()
     rayPayload.radiance = doubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     rayPayload.bitfield = 0xFFFFu;
     return;
+#elif AOV_ID == AOV_ID_OBJECTID
+    BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
+    IndexBuffer indices = IndexBuffer(payload.bufferAddress);
+    int objectId = indices.preamble.objectId;
+
+    rayPayload.radiance = vec3(
+      ((objectId >>  0) & 0xFF) / 255.0,
+      ((objectId >>  8) & 0xFF) / 255.0,
+      ((objectId >> 16) & 0xFF) / 255.0
+      // we don't support the alpha component (16M combinations is enough)
+    );
+    rayPayload.bitfield = 0xFFFFu;
+    return;
 #endif
 
     /* 3. Apply volume attenuation */
