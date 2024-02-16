@@ -80,20 +80,22 @@ include(CTest)
 include("${DOCTEST_SCRIPT_PATH}")
 doctest_discover_tests(gi_test WORKING_DIRECTORY "${OUTPUT_DIR}")
 
-install(
-  FILES "${MDL_SHARED_LIB}"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
-  COMPONENT hdGatling
-)
+if(${GATLING_BUILD_HDGATLING})
+  install(
+    FILES "${MDL_SHARED_LIB}"
+    DESTINATION "./hdGatling/resources"
+    COMPONENT hdGatling
+  )
 
-install(
-  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
-  COMPONENT hdGatling
-)
+  install(
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+    DESTINATION "./hdGatling/resources"
+    COMPONENT hdGatling
+  )
 
-install(
-  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/hdGatling/resources/mdl"
-  COMPONENT hdGatling
-)
+  install(
+    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
+    DESTINATION "./hdGatling/resources/mdl"
+    COMPONENT hdGatling
+  )
+endif()

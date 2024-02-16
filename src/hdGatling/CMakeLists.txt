@@ -92,7 +92,7 @@ install(
     "${PLUGINFO_PATH}"
     "${PROJECT_SOURCE_DIR}/LICENSE"
   DESTINATION
-    "${CMAKE_INSTALL_PREFIX}/hdGatling/resources"
+    "./hdGatling/resources"
   COMPONENT
     hdGatling
 )
@@ -101,12 +101,12 @@ install(
   TARGETS
     hdGatling
   LIBRARY
-    DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    DESTINATION .
     COMPONENT hdGatling
   RUNTIME
-    DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    DESTINATION .
     COMPONENT hdGatling
   ARCHIVE
-    DESTINATION "${CMAKE_INSTALL_PREFIX}"
+    DESTINATION .
     COMPONENT hdGatling
 )
