@@ -126,7 +126,7 @@ public:
   }
 };
 
-TEST_CASE_FIXTURE(GraphicalTestFixture, "NoGeo")
+TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
 {
   GiShaderCacheParams shaderCacheParams = {
     .aovId = GiAovId::Color,
