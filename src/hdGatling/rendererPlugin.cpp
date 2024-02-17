@@ -183,6 +183,11 @@ HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate()
 
 HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate(const HdRenderSettingsMap& settingsMap)
 {
+  if (!_isSupported)
+  {
+    return nullptr;
+  }
+
   PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
 
   const std::string& resourcePath = plugin->GetResourcePath();
