@@ -110,3 +110,21 @@ install(
     DESTINATION .
     COMPONENT hdGatling
 )
+
+add_executable(hdGatling_test main.cpp)
+target_link_libraries(hdGatling_test gt hd)
+add_dependencies(hdGatling_test hdGatling)
+
+# Test executable operates on hdGatling installed to a local directory
+set(HDGATLING_INSTALL_DIR "${CMAKE_CURRENT_BINARY_DIR}/INSTALL")
+add_custom_command(
+  TARGET hdGatling_test
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}" --prefix "${HDGATLING_INSTALL_DIR}" --component hdGatling
+)
+
+target_compile_definitions(
+  hdGatling_test
+  PRIVATE
+    HDGATLING_INSTALL_DIR="${HDGATLING_INSTALL_DIR}"
+)
