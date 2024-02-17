@@ -113,7 +113,7 @@ jobs:
 
     - name: Build gatling
       working-directory: BUILD
-      run: cmake --build . --config ${{ inputs.build-config }} -j 2 --target hdGatling gatling gi_test
+      run: cmake --build . --config ${{ inputs.build-config }} -j 2 --target hdGatling gatling gi_test hdGatling_test
 
     - name: Install gatling
       working-directory: BUILD
