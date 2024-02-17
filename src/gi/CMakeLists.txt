@@ -75,11 +75,6 @@ target_compile_definitions(
     GI_REF_IMAGE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/testenv"
 )
 
-# Expose tests using ctest for IDE integration
-include(CTest)
-include("${DOCTEST_SCRIPT_PATH}")
-doctest_discover_tests(gi_test WORKING_DIRECTORY "${OUTPUT_DIR}")
-
 if(${GATLING_BUILD_HDGATLING})
   install(
     FILES "${MDL_SHARED_LIB}"
