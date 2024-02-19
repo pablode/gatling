@@ -37,103 +37,108 @@ TF_DEFINE_PRIVATE_TOKENS(
   ((help, "help"))
 );
 
-static void PrintCorrectUsage(const HdRenderSettingDescriptorList& renderSettingDescs)
+namespace
 {
-  printf("Usage: gatling <scene.usd> <render.png> [options]\n");
-  printf("\n");
-
-  // Calculate column sizes.
-  size_t keyColumnSize = 0;
-  size_t nameColumnSize = 0;
-  for (const HdRenderSettingDescriptor& desc : renderSettingDescs)
+  void _PrintCorrectUsage(const HdRenderSettingDescriptorList& renderSettingDescs)
   {
-    const std::string& key = desc.key.GetString();
-    const std::string& name = desc.name;
-    keyColumnSize = std::max(keyColumnSize, key.length());
-    nameColumnSize = std::max(nameColumnSize, name.length());
+    fflush(stdout);
+    printf("Usage: gatling <scene.usd> <render.png> [options]\n");
+    printf("\n");
+
+    // Calculate column sizes.
+    size_t keyColumnSize = 0;
+    size_t nameColumnSize = 0;
+    for (const HdRenderSettingDescriptor& desc : renderSettingDescs)
+    {
+      const std::string& key = desc.key.GetString();
+      const std::string& name = desc.name;
+      keyColumnSize = std::max(keyColumnSize, key.length());
+      nameColumnSize = std::max(nameColumnSize, name.length());
+    }
+    keyColumnSize += 2;
+    nameColumnSize += 2;
+
+    // Table header.
+    printf("%-*s%-*s%s\n", (int) keyColumnSize, "Option", (int) nameColumnSize, "Description", "Default value");
+
+    // Print each setting as one row.
+    for (const HdRenderSettingDescriptor& desc : renderSettingDescs)
+    {
+      const char* keyCStr = desc.key.GetText();
+      const char* nameCStr = desc.name.c_str();
+
+      bool isValueEmpty = desc.defaultValue.IsEmpty();
+      bool isValueBool = desc.defaultValue.IsHolding<bool>();
+      bool isValueFloat = desc.defaultValue.IsHolding<double>() || desc.defaultValue.IsHolding<float>() ||
+                          desc.defaultValue.IsHolding<pxr_half::half>();
+      bool canCastToInt = desc.defaultValue.CanCast<int>();
+      bool canCastToString = desc.defaultValue.CanCast<std::string>();
+
+      if (isValueEmpty)
+      {
+        printf("%-*s%-*s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr);
+      }
+      else if (isValueBool)
+      {
+        auto defaultValue = desc.defaultValue.UncheckedGet<bool>();
+        printf("%-*s%-*s%s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue ? "true" : "false");
+      }
+      else if (isValueFloat)
+      {
+        auto defaultValue = VtValue::Cast<float>(desc.defaultValue).UncheckedGet<float>();
+        printf("%-*s%-*s%.5f\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
+      }
+      else if (canCastToInt)
+      {
+        auto defaultValue = VtValue::Cast<int>(desc.defaultValue).UncheckedGet<int>();
+        printf("%-*s%-*s%i\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
+      }
+      else if (canCastToString)
+      {
+        auto defaultValue = VtValue::Cast<std::string>(desc.defaultValue).UncheckedGet<std::string>();
+        printf("%-*s%-*s\"%s\"\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue.c_str());
+      }
+      else
+      {
+        TF_FATAL_CODING_ERROR("Value for render setting %s can not be displayed!", keyCStr);
+      }
+    }
+    fflush(stdout);
   }
-  keyColumnSize += 2;
-  nameColumnSize += 2;
 
-  // Table header.
-  printf("%-*s%-*s%s\n", (int) keyColumnSize, "Option", (int) nameColumnSize, "Description", "Default value");
-
-  // Print each setting as one row.
-  for (const HdRenderSettingDescriptor& desc : renderSettingDescs)
+  bool _ParseInt(int* out, const char* in)
   {
-    const char* keyCStr = desc.key.GetText();
-    const char* nameCStr = desc.name.c_str();
-
-    bool isValueEmpty = desc.defaultValue.IsEmpty();
-    bool isValueBool = desc.defaultValue.IsHolding<bool>();
-    bool isValueFloat = desc.defaultValue.IsHolding<double>() || desc.defaultValue.IsHolding<float>() ||
-                        desc.defaultValue.IsHolding<pxr_half::half>();
-    bool canCastToInt = desc.defaultValue.CanCast<int>();
-    bool canCastToString = desc.defaultValue.CanCast<std::string>();
-
-    if (isValueEmpty)
+    char* end;
+    long l = std::strtol(in, &end, 10);
+    if (in == end || l < INT_MIN || l > INT_MAX)
     {
-      printf("%-*s%-*s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr);
+      return false;
     }
-    else if (isValueBool)
-    {
-      auto defaultValue = desc.defaultValue.UncheckedGet<bool>();
-      printf("%-*s%-*s%s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue ? "true" : "false");
-    }
-    else if (isValueFloat)
-    {
-      auto defaultValue = VtValue::Cast<float>(desc.defaultValue).UncheckedGet<float>();
-      printf("%-*s%-*s%.5f\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
-    }
-    else if (canCastToInt)
-    {
-      auto defaultValue = VtValue::Cast<int>(desc.defaultValue).UncheckedGet<int>();
-      printf("%-*s%-*s%i\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
-    }
-    else if (canCastToString)
-    {
-      auto defaultValue = VtValue::Cast<std::string>(desc.defaultValue).UncheckedGet<std::string>();
-      printf("%-*s%-*s\"%s\"\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue.c_str());
-    }
-    else
-    {
-      TF_FATAL_CODING_ERROR("Value for render setting %s can not be displayed!", keyCStr);
-    }
+    *out = (int) l;
+    return true;
   }
-}
 
-static bool ParseInt(int* out, const char* in)
-{
-  char* end;
-  long l = std::strtol(in, &end, 10);
-  if (in == end || l < INT_MIN || l > INT_MAX)
+  bool _ParseFloat(float* out, const char* in)
   {
+    char* end;
+    *out = std::strtof(in, &end);
+    return in != end;
+  }
+
+  bool _ParseBool(bool* out, const char* in)
+  {
+    if (std::strcmp(in, "true") == 0)
+    {
+      *out = true;
+      return true;
+    }
+    if (std::strcmp(in, "false") == 0)
+    {
+      *out = false;
+      return true;
+    }
     return false;
   }
-  *out = (int) l;
-  return true;
-}
-
-static bool ParseFloat(float* out, const char* in)
-{
-  char* end;
-  *out = std::strtof(in, &end);
-  return in != end;
-}
-
-static bool ParseBool(bool* out, const char* in)
-{
-  if (std::strcmp(in, "true") == 0)
-  {
-    *out = true;
-    return true;
-  }
-  if (std::strcmp(in, "false") == 0)
-  {
-    *out = false;
-    return true;
-  }
-  return false;
 }
 
 bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, AppSettings& settings)
@@ -158,7 +163,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
 
   if (argc < 3)
   {
-    PrintCorrectUsage(renderSettingDescs);
+    _PrintCorrectUsage(renderSettingDescs);
     return false;
   }
 
@@ -178,7 +183,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     // Is "--" missing?
     if (strlen(arg) <= 2)
     {
-      PrintCorrectUsage(renderSettingDescs);
+      _PrintCorrectUsage(renderSettingDescs);
       return false;
     }
 
@@ -187,7 +192,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     // Handle application settings.
     if (arg == _AppSettingsTokens->help)
     {
-      PrintCorrectUsage(renderSettingDescs);
+      _PrintCorrectUsage(renderSettingDescs);
       settings.help = true;
       return true;
     }
@@ -195,24 +200,24 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     {
       if (i + 1 >= argc)
       {
-        PrintCorrectUsage(renderSettingDescs);
+        _PrintCorrectUsage(renderSettingDescs);
         return false;
       }
       settings.aov = std::string(argv[++i]);
     }
     else if (arg == _AppSettingsTokens->image_width)
     {
-      if (i + 1 >= argc || !ParseInt(&settings.imageWidth, argv[++i]))
+      if (i + 1 >= argc || !_ParseInt(&settings.imageWidth, argv[++i]))
       {
-        PrintCorrectUsage(renderSettingDescs);
+        _PrintCorrectUsage(renderSettingDescs);
         return false;
       }
     }
     else if (arg == _AppSettingsTokens->image_height)
     {
-      if (i + 1 >= argc || !ParseInt(&settings.imageHeight, argv[++i]))
+      if (i + 1 >= argc || !_ParseInt(&settings.imageHeight, argv[++i]))
       {
-        PrintCorrectUsage(renderSettingDescs);
+        _PrintCorrectUsage(renderSettingDescs);
         return false;
       }
     }
@@ -220,16 +225,16 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     {
       if (i + 1 >= argc)
       {
-        PrintCorrectUsage(renderSettingDescs);
+        _PrintCorrectUsage(renderSettingDescs);
         return false;
       }
       settings.cameraPath = std::string(argv[++i]);
     }
     else if (arg == _AppSettingsTokens->gamma_correction)
     {
-      if (i + 1 >= argc || !ParseBool(&settings.gammaCorrection, argv[++i]))
+      if (i + 1 >= argc || !_ParseBool(&settings.gammaCorrection, argv[++i]))
       {
-        PrintCorrectUsage(renderSettingDescs);
+        _PrintCorrectUsage(renderSettingDescs);
         return false;
       }
     }
@@ -242,7 +247,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
       // If there is no default value, the setting does not exist.
       if (settingValue.IsEmpty())
       {
-        PrintCorrectUsage(renderSettingDescs);
+        _PrintCorrectUsage(renderSettingDescs);
         return false;
       }
 
@@ -256,7 +261,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
       // If not, we require a value.
       if (i + 1 >= argc)
       {
-        PrintCorrectUsage(renderSettingDescs);
+        _PrintCorrectUsage(renderSettingDescs);
         return false;
       }
 
@@ -269,7 +274,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
         bool resultOk = PARSE_FN(&t, cStr);                        \
         if (!resultOk)                                             \
         {                                                          \
-          PrintCorrectUsage(renderSettingDescs);                   \
+          _PrintCorrectUsage(renderSettingDescs);                  \
           return false;                                            \
         }                                                          \
         VtValue newValue((TYPE) t);                                \
@@ -277,18 +282,18 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
         continue;                                                  \
       }
 
-      PARSE_VT_VALUE(double,             float, ParseFloat)
-      PARSE_VT_VALUE(float,              float, ParseFloat)
-      PARSE_VT_VALUE(pxr_half::half,     float, ParseFloat)
-      PARSE_VT_VALUE(int,                int,   ParseInt)
-      PARSE_VT_VALUE(long,               int,   ParseInt)
-      PARSE_VT_VALUE(unsigned long,      int,   ParseInt)
-      PARSE_VT_VALUE(long long,          int,   ParseInt)
-      PARSE_VT_VALUE(unsigned long long, int,   ParseInt)
-      PARSE_VT_VALUE(int32_t,            int,   ParseInt)
-      PARSE_VT_VALUE(int64_t,            int,   ParseInt)
-      PARSE_VT_VALUE(uint32_t,           int,   ParseInt)
-      PARSE_VT_VALUE(uint64_t,           int,   ParseInt)
+      PARSE_VT_VALUE(double,             float, _ParseFloat)
+      PARSE_VT_VALUE(float,              float, _ParseFloat)
+      PARSE_VT_VALUE(pxr_half::half,     float, _ParseFloat)
+      PARSE_VT_VALUE(int,                int,   _ParseInt)
+      PARSE_VT_VALUE(long,               int,   _ParseInt)
+      PARSE_VT_VALUE(unsigned long,      int,   _ParseInt)
+      PARSE_VT_VALUE(long long,          int,   _ParseInt)
+      PARSE_VT_VALUE(unsigned long long, int,   _ParseInt)
+      PARSE_VT_VALUE(int32_t,            int,   _ParseInt)
+      PARSE_VT_VALUE(int64_t,            int,   _ParseInt)
+      PARSE_VT_VALUE(uint32_t,           int,   _ParseInt)
+      PARSE_VT_VALUE(uint64_t,           int,   _ParseInt)
 
       if (settingValue.IsHolding<std::string>())
       {

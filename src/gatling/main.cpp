@@ -51,40 +51,43 @@ TF_DEFINE_PRIVATE_TOKENS(
   (HdGatlingRendererPlugin)
 );
 
-HdCamera* FindCamera(UsdStageRefPtr& stage, HdRenderIndex* renderIndex, std::string& settingsCameraPath)
+namespace
 {
-  SdfPath cameraPath;
+  HdCamera* _FindCamera(UsdStageRefPtr& stage, HdRenderIndex* renderIndex, std::string& settingsCameraPath)
+  {
+    SdfPath cameraPath;
 
-  if (!settingsCameraPath.empty())
-  {
-    cameraPath = SdfPath(settingsCameraPath);
-  }
-  else
-  {
-    UsdPrimRange primRange = stage->TraverseAll();
-    for (auto prim = primRange.cbegin(); prim != primRange.cend(); prim++)
+    if (!settingsCameraPath.empty())
     {
-      if (!prim->IsA<UsdGeomCamera>())
-      {
-        continue;
-      }
-      cameraPath = prim->GetPath();
-      break;
+      cameraPath = SdfPath(settingsCameraPath);
     }
+    else
+    {
+      UsdPrimRange primRange = stage->TraverseAll();
+      for (auto prim = primRange.cbegin(); prim != primRange.cend(); prim++)
+      {
+        if (!prim->IsA<UsdGeomCamera>())
+        {
+          continue;
+        }
+        cameraPath = prim->GetPath();
+        break;
+      }
+    }
+
+    HdCamera* camera = static_cast<HdCamera*>(renderIndex->GetSprim(HdTokens->camera, cameraPath));
+
+    return camera;
   }
 
-  HdCamera* camera = static_cast<HdCamera*>(renderIndex->GetSprim(HdTokens->camera, cameraPath));
-
-  return camera;
-}
-
-float AccurateLinearToSrgb(float linearValue)
-{
-  // Moving Frostbite to Physically Based Rendering 3.0, Section 5.1.5:
-  // https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
-  float sRgbLo = linearValue * 12.92f;
-  float sRgbHi = (std::pow(std::abs(linearValue), 1.0f / 2.4f) * 1.055f) - 0.055f;
-  return (linearValue <= 0.0031308f) ? sRgbLo : sRgbHi;
+  float _AccurateLinearToSrgb(float linearValue)
+  {
+    // Moving Frostbite to Physically Based Rendering 3.0, Section 5.1.5:
+    // https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf
+    float sRgbLo = linearValue * 12.92f;
+    float sRgbHi = (std::pow(std::abs(linearValue), 1.0f / 2.4f) * 1.055f) - 0.055f;
+    return (linearValue <= 0.0031308f) ? sRgbLo : sRgbHi;
+  }
 }
 
 int main(int argc, const char* argv[])
@@ -120,12 +123,12 @@ int main(int argc, const char* argv[])
   }
 
   // Load scene.
-  TfStopwatch timerLoad;
-  timerLoad.Start();
+  TfStopwatch loadTimer;
+  loadTimer.Start();
 
   UsdStageRefPtr stage = UsdStage::Open(settings.sceneFilePath);
 
-  timerLoad.Stop();
+  loadTimer.Stop();
 
   if (!stage)
   {
@@ -133,7 +136,7 @@ int main(int argc, const char* argv[])
     return EXIT_FAILURE;
   }
 
-  printf("USD scene loaded (%.3fs)\n", timerLoad.GetSeconds());
+  printf("USD scene loaded (%.3fs)\n", loadTimer.GetSeconds());
   fflush(stdout);
 
   HdRenderIndex* renderIndex = HdRenderIndex::New(renderDelegate, HdDriverVector());
@@ -144,7 +147,7 @@ int main(int argc, const char* argv[])
   sceneDelegate.SetTime(0);
   sceneDelegate.SetRefineLevelFallback(4);
 
-  HdCamera* camera = FindCamera(stage, renderIndex, settings.cameraPath);
+  HdCamera* camera = _FindCamera(stage, renderIndex, settings.cameraPath);
   if (!camera)
   {
     fprintf(stderr, "Camera not found!\n");
@@ -188,16 +191,16 @@ int main(int argc, const char* argv[])
   tasks.push_back(renderTask);
 
   // Perform rendering.
-  TfStopwatch timerRender;
-  timerRender.Start();
+  TfStopwatch renderTimer;
+  renderTimer.Start();
 
   HdEngine engine;
   engine.Execute(renderIndex, &tasks);
   renderBuffer->Resolve();
 
-  timerRender.Stop();
+  renderTimer.Stop();
 
-  printf("Rendering finished (%.3fs)\n", timerRender.GetSeconds());
+  printf("Rendering finished (%.3fs)\n", renderTimer.GetSeconds());
   fflush(stdout);
 
   // Gamma correction.
@@ -209,15 +212,15 @@ int main(int argc, const char* argv[])
     int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
     for (int i = 0; i < pixelCount; i++)
     {
-      mappedMem[i * 4 + 0] = AccurateLinearToSrgb(mappedMem[i * 4 + 0]);
-      mappedMem[i * 4 + 1] = AccurateLinearToSrgb(mappedMem[i * 4 + 1]);
-      mappedMem[i * 4 + 2] = AccurateLinearToSrgb(mappedMem[i * 4 + 2]);
+      mappedMem[i * 4 + 0] = _AccurateLinearToSrgb(mappedMem[i * 4 + 0]);
+      mappedMem[i * 4 + 1] = _AccurateLinearToSrgb(mappedMem[i * 4 + 1]);
+      mappedMem[i * 4 + 2] = _AccurateLinearToSrgb(mappedMem[i * 4 + 2]);
     }
   }
 
   // Write image to file.
-  TfStopwatch timerWrite;
-  timerWrite.Start();
+  TfStopwatch writeTimer;
+  writeTimer.Start();
 
   HioImageSharedPtr image = HioImage::OpenForWriting(settings.outputFilePath);
 
@@ -239,9 +242,9 @@ int main(int argc, const char* argv[])
   image->Write(storage, metadata);
 
   renderBuffer->Unmap();
-  timerWrite.Stop();
+  writeTimer.Stop();
 
-  printf("Wrote image (%.3fs)\n", timerWrite.GetSeconds());
+  printf("Wrote image (%.3fs)\n", writeTimer.GetSeconds());
   fflush(stdout);
 
   renderDelegate->DestroyBprim(renderBuffer);
