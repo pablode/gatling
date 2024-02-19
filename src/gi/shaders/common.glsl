@@ -116,7 +116,15 @@ vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
 {
     const float origin = 1.0 / 32.0;
     const float floatScale = 1.0 / 65536.0;
-    const float intScale = 256.0;
+    // NOTE: the original RT gems algorithm seems to be faulty -- it is prone to self-intersection. Some
+    //       projects noticed this and use a modified version. For instance, Falcor changes the origin
+    //       to 1/16, floatScale to 3*65536 and intScale to 3*64:
+    //       https://github.com/NVIDIAGameWorks/Falcor/blob/58ce2d1eafce67b4cb9d304029068c7fb31bd831/Source/Tools/FalcorTest/Tests/Utils/GeometryHelpersTests.cpp#L40-L55
+    //       Unfortunately, this parametrization did not solve the self-intersection problem for the
+    //       standard shader ball (USD WG assets). I emperirically determined that reducing intScale from
+    //       256 to 64 solves the problem, but it needs to be monitored whether this parametrization causes
+    //       problems in other scenes.
+    const float intScale = 64.0;
 
     ivec3 intOffset = ivec3(geom_normal * intScale);
     vec3 intPos = intBitsToFloat(floatBitsToInt(p) + mix(-intOffset, intOffset, greaterThanEqual(p, vec3(0.0))));
@@ -127,7 +135,7 @@ vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
 #else
 vec3 offset_ray_origin(vec3 p, vec3 geom_normal)
 {
-    const float EPS = 0.0001;
+    const float EPS = 0.00001;
     return p + geom_normal * EPS;
 }
 #endif
