@@ -39,11 +39,11 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 namespace
 {
-  void _PrintCorrectUsage(const HdRenderSettingDescriptorList& renderSettingDescs)
+  void _PrintCorrectUsage(const HdRenderSettingDescriptorList& renderSettingDescs, FILE* s = stdout)
   {
     fflush(stdout);
-    printf("Usage: gatling <scene.usd> <render.png> [options]\n");
-    printf("\n");
+    fprintf(s, "Usage: gatling <scene.usd> <render.png> [options]\n");
+    fprintf(s, "\n");
 
     // Calculate column sizes.
     size_t keyColumnSize = 0;
@@ -59,7 +59,7 @@ namespace
     nameColumnSize += 2;
 
     // Table header.
-    printf("%-*s%-*s%s\n", (int) keyColumnSize, "Option", (int) nameColumnSize, "Description", "Default value");
+    fprintf(s, "%-*s%-*s%s\n", (int) keyColumnSize, "Option", (int) nameColumnSize, "Description", "Default value");
 
     // Print each setting as one row.
     for (const HdRenderSettingDescriptor& desc : renderSettingDescs)
@@ -76,34 +76,40 @@ namespace
 
       if (isValueEmpty)
       {
-        printf("%-*s%-*s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr);
+        fprintf(s, "%-*s%-*s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr);
       }
       else if (isValueBool)
       {
         auto defaultValue = desc.defaultValue.UncheckedGet<bool>();
-        printf("%-*s%-*s%s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue ? "true" : "false");
+        fprintf(s, "%-*s%-*s%s\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue ? "true" : "false");
       }
       else if (isValueFloat)
       {
         auto defaultValue = VtValue::Cast<float>(desc.defaultValue).UncheckedGet<float>();
-        printf("%-*s%-*s%.5f\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
+        fprintf(s, "%-*s%-*s%.5f\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
       }
       else if (canCastToInt)
       {
         auto defaultValue = VtValue::Cast<int>(desc.defaultValue).UncheckedGet<int>();
-        printf("%-*s%-*s%i\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
+        fprintf(s, "%-*s%-*s%i\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue);
       }
       else if (canCastToString)
       {
         auto defaultValue = VtValue::Cast<std::string>(desc.defaultValue).UncheckedGet<std::string>();
-        printf("%-*s%-*s\"%s\"\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue.c_str());
+        fprintf(s, "%-*s%-*s\"%s\"\n", (int) keyColumnSize, keyCStr, (int) nameColumnSize, nameCStr, defaultValue.c_str());
       }
       else
       {
-        TF_FATAL_CODING_ERROR("Value for render setting %s can not be displayed!", keyCStr);
+        TF_CODING_ERROR("Value for render setting %s can not be displayed!", keyCStr);
       }
     }
     fflush(stdout);
+  }
+
+  void _PrintValueParseFailed(const char* arg, const HdRenderSettingDescriptorList& renderSettingDescs)
+  {
+    fprintf(stderr, "Invalid value for option '%s'\n", arg);
+    _PrintCorrectUsage(renderSettingDescs, stderr);
   }
 
   bool _ParseInt(int* out, const char* in)
@@ -181,9 +187,10 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     const char* arg = argv[i];
 
     // Is "--" missing?
-    if (strlen(arg) <= 2)
+    if (strlen(arg) <= 2 || !strstr(arg, "--"))
     {
-      _PrintCorrectUsage(renderSettingDescs);
+      fprintf(stderr, "Invalid flag '%s' (missing '--' prefix)\n", arg);
+      _PrintCorrectUsage(renderSettingDescs, stderr);
       return false;
     }
 
@@ -192,7 +199,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     // Handle application settings.
     if (arg == _AppSettingsTokens->help)
     {
-      _PrintCorrectUsage(renderSettingDescs);
+      _PrintValueParseFailed(arg, renderSettingDescs);
       settings.help = true;
       return true;
     }
@@ -200,7 +207,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     {
       if (i + 1 >= argc)
       {
-        _PrintCorrectUsage(renderSettingDescs);
+        _PrintValueParseFailed(arg, renderSettingDescs);
         return false;
       }
       settings.aov = std::string(argv[++i]);
@@ -209,7 +216,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     {
       if (i + 1 >= argc || !_ParseInt(&settings.imageWidth, argv[++i]))
       {
-        _PrintCorrectUsage(renderSettingDescs);
+        _PrintValueParseFailed(arg, renderSettingDescs);
         return false;
       }
     }
@@ -217,7 +224,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     {
       if (i + 1 >= argc || !_ParseInt(&settings.imageHeight, argv[++i]))
       {
-        _PrintCorrectUsage(renderSettingDescs);
+        _PrintValueParseFailed(arg, renderSettingDescs);
         return false;
       }
     }
@@ -225,7 +232,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     {
       if (i + 1 >= argc)
       {
-        _PrintCorrectUsage(renderSettingDescs);
+        _PrintValueParseFailed(arg, renderSettingDescs);
         return false;
       }
       settings.cameraPath = std::string(argv[++i]);
@@ -234,7 +241,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
     {
       if (i + 1 >= argc || !_ParseBool(&settings.gammaCorrection, argv[++i]))
       {
-        _PrintCorrectUsage(renderSettingDescs);
+        _PrintValueParseFailed(arg, renderSettingDescs);
         return false;
       }
     }
@@ -247,14 +254,15 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
       // If there is no default value, the setting does not exist.
       if (settingValue.IsEmpty())
       {
-        _PrintCorrectUsage(renderSettingDescs);
+        fprintf(stderr, "Invalid option '%s'\n", arg);
+        _PrintCorrectUsage(renderSettingDescs, stderr);
         return false;
       }
 
       // If not, we require a value.
       if (i + 1 >= argc)
       {
-        _PrintCorrectUsage(renderSettingDescs);
+        _PrintValueParseFailed(arg, renderSettingDescs);
         return false;
       }
 
@@ -267,7 +275,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
         bool resultOk = PARSE_FN(&t, cStr);                        \
         if (!resultOk)                                             \
         {                                                          \
-          _PrintCorrectUsage(renderSettingDescs);                  \
+          _PrintValueParseFailed(arg, renderSettingDescs);         \
           return false;                                            \
         }                                                          \
         VtValue newValue((TYPE) t);                                \

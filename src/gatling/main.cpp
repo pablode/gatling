@@ -98,13 +98,13 @@ int main(int argc, const char* argv[])
 
   if (!pluginHandle)
   {
-    fprintf(stderr, "HdGatling plugin not found!\n");
+    fprintf(stderr, "HdGatling plugin not found\n");
     return EXIT_FAILURE;
   }
 
   if (!pluginHandle->IsSupported())
   {
-    fprintf(stderr, "HdGatling plugin is not supported!\n");
+    fprintf(stderr, "HdGatling plugin not supported\n");
     return EXIT_FAILURE;
   }
 
@@ -132,7 +132,7 @@ int main(int argc, const char* argv[])
 
   if (!stage)
   {
-    fprintf(stderr, "Unable to open USD stage file.\n");
+    fprintf(stderr, "Unable to open USD stage file\n");
     return EXIT_FAILURE;
   }
 
@@ -150,7 +150,7 @@ int main(int argc, const char* argv[])
   HdCamera* camera = _FindCamera(stage, renderIndex, settings.cameraPath);
   if (!camera)
   {
-    fprintf(stderr, "Camera not found!\n");
+    fprintf(stderr, "Camera not found\n");
     return EXIT_FAILURE;
   }
 
@@ -226,7 +226,7 @@ int main(int argc, const char* argv[])
 
   if (!image)
   {
-    fprintf(stderr, "Unable to open output file for writing!\n");
+    fprintf(stderr, "Unable to open output file for writing\n");
     return EXIT_FAILURE;
   }
 
