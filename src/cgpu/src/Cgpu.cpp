@@ -2191,6 +2191,7 @@ cleanup_fail:
 
     if (!creationSuccessul)
     {
+      iinstance->iblasStore.free(blas->handle);
       CGPU_RETURN_ERROR("failed to build BLAS");
     }
 
@@ -2228,6 +2229,7 @@ cleanup_fail:
                                   (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR), 0,
                                   &itlas->instances))
     {
+      iinstance->itlasStore.free(tlas->handle);
       CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
     }
 
@@ -2236,6 +2238,7 @@ cleanup_fail:
       uint8_t* mapped_mem;
       if (vmaMapMemory(idevice->allocator, itlas->instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
       {
+        iinstance->itlasStore.free(tlas->handle);
         cgpuDestroyIBuffer(idevice, &itlas->instances);
         CGPU_RETURN_ERROR("failed to map buffer memory");
       }
@@ -2244,6 +2247,7 @@ cleanup_fail:
       {
         CgpuIBlas* iblas;
         if (!cgpuResolveBlas(createInfo.instances[i].as, &iblas)) {
+          iinstance->itlasStore.free(tlas->handle);
           cgpuDestroyIBuffer(idevice, &itlas->instances);
           CGPU_RETURN_ERROR_INVALID_HANDLE;
         }
@@ -2251,6 +2255,7 @@ cleanup_fail:
         uint32_t instanceCustomIndex = createInfo.instances[i].instanceCustomIndex;
         if ((instanceCustomIndex & 0xFF000000u) != 0u)
         {
+          iinstance->itlasStore.free(tlas->handle);
           cgpuDestroyIBuffer(idevice, &itlas->instances);
           CGPU_RETURN_ERROR("instanceCustomIndex must be equal to or smaller than 2^24");
         }
@@ -2289,6 +2294,7 @@ cleanup_fail:
 
     if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as))
     {
+      iinstance->itlasStore.free(tlas->handle);
       cgpuDestroyIBuffer(idevice, &itlas->instances);
       CGPU_RETURN_ERROR("failed to build TLAS");
     }
