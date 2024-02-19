@@ -251,13 +251,6 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
         return false;
       }
 
-      // Booleans retrieve special handling; if defined, the setting evaluates to true.
-      if (settingValue.IsHolding<bool>())
-      {
-        renderDelegate.SetRenderSetting(settingKey, VtValue(true));
-        continue;
-      }
-
       // If not, we require a value.
       if (i + 1 >= argc)
       {
@@ -282,6 +275,7 @@ bool ParseArgs(int argc, const char* argv[], HdRenderDelegate& renderDelegate, A
         continue;                                                  \
       }
 
+      PARSE_VT_VALUE(bool,               bool,  _ParseBool)
       PARSE_VT_VALUE(double,             float, _ParseFloat)
       PARSE_VT_VALUE(float,              float, _ParseFloat)
       PARSE_VT_VALUE(pxr_half::half,     float, _ParseFloat)
