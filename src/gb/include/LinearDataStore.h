@@ -37,6 +37,8 @@ namespace gtl
 
     void free(uint64_t handle)
     {
+      assert(m_handleStore.isHandleValid(handle));
+
       m_handleStore.freeHandle(handle);
     }
 
