@@ -168,6 +168,7 @@ namespace gtl
     uint32_t sampleOffset = 0;
   };
 
+  bool s_cgpuInitialized = false;
   bool s_loggerInitialized = false;
   CgpuDevice s_device;
   CgpuPhysicalDeviceFeatures s_deviceFeatures;
@@ -295,6 +296,19 @@ namespace gtl
 
   GiStatus giInitialize(const GiInitParams& params)
   {
+#ifdef NDEBUG
+    std::string_view shaderPath = params.shaderPath;
+#else
+    // Use shaders dir in source tree for auto-reloading
+    std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
+#endif
+
+    mx::DocumentPtr mtlxStdLib = static_pointer_cast<mx::Document>(params.mtlxStdLib);
+    if (!mtlxStdLib)
+    {
+      return GiStatus::Error;
+    }
+
     if (!s_loggerInitialized)
     {
       gbLogInit();
@@ -304,16 +318,18 @@ namespace gtl
     _PrintInitInfo(params);
 
     if (!cgpuInitialize("gatling", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH))
-      return GiStatus::Error;
+      goto fail;
+
+    s_cgpuInitialized = true;
 
     if (!cgpuCreateDevice(&s_device))
-      return GiStatus::Error;
+      goto fail;
 
     if (!cgpuGetPhysicalDeviceFeatures(s_device, &s_deviceFeatures))
-      return GiStatus::Error;
+      goto fail;
 
     if (!cgpuGetPhysicalDeviceProperties(s_device, &s_deviceProperties))
-      return GiStatus::Error;
+      goto fail;
 
     if (!cgpuCreateSampler(s_device, {
                             .addressModeU = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -321,39 +337,27 @@ namespace gtl
                             .addressModeW = CGPU_SAMPLER_ADDRESS_MODE_REPEAT
                           }, &s_texSampler))
     {
-      return GiStatus::Error;
+      goto fail;
     }
 
     s_stager = std::make_unique<GgpuStager>(s_device);
     if (!s_stager->allocate())
     {
-      return GiStatus::Error;
+      goto fail;
     }
-
-#ifdef NDEBUG
-    std::string_view shaderPath = params.shaderPath;
-#else
-    // Use shaders dir in source tree for auto-reloading
-    std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
-#endif
 
     s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath));
     if (!s_mcRuntime)
     {
-      return GiStatus::Error;
+      goto fail;
     }
 
-    mx::DocumentPtr mtlxStdLib = static_pointer_cast<mx::Document>(params.mtlxStdLib);
-    if (!mtlxStdLib)
-    {
-      return GiStatus::Error;
-    }
     s_mcFrontend = std::make_unique<McFrontend>(params.mdlSearchPaths, mtlxStdLib, *s_mcRuntime);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))
     {
-      return GiStatus::Error;
+      goto fail;
     }
 
     s_mmapAssetReader = std::make_unique<GiMmapAssetReader>();
@@ -369,6 +373,11 @@ namespace gtl
 #endif
 
     return GiStatus::Ok;
+
+fail:
+    giTerminate();
+
+    return GiStatus::Error;
   }
 
   void giTerminate()
@@ -390,9 +399,21 @@ namespace gtl
       s_stager->free();
       s_stager.reset();
     }
-    cgpuDestroySampler(s_device, s_texSampler);
-    cgpuDestroyDevice(s_device);
-    cgpuTerminate();
+    if (s_texSampler.handle)
+    {
+      cgpuDestroySampler(s_device, s_texSampler);
+      s_texSampler = {};
+    }
+    if (s_device.handle)
+    {
+      cgpuDestroyDevice(s_device);
+      s_device = {};
+    }
+    if (s_cgpuInitialized)
+    {
+      cgpuTerminate();
+      s_cgpuInitialized = false;
+    }
     s_mcFrontend.reset();
     s_mcRuntime.reset();
   }
