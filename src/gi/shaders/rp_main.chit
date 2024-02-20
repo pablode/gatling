@@ -18,11 +18,13 @@
 
 vec3 mdl_absorption_coefficient(in State state);
 bool mdl_thin_walled(in State state);
+#ifdef IS_EMISSIVE
 vec3 mdl_edf_emission_intensity(in State state);
 void mdl_edf_emission_init(inout State state);
 void mdl_edf_emission_sample(inout Edf_sample_data sret_ptr, in State state);
 void mdl_edf_emission_pdf(inout Edf_pdf_data sret_ptr, in State state);
 void mdl_edf_emission_evaluate(inout Edf_evaluate_data sret_ptr, in State state);
+#endif
 void mdl_bsdf_scattering_init(inout State state);
 void mdl_bsdf_scattering_sample(inout Bsdf_sample_data sret_ptr, in State state);
 void mdl_bsdf_scattering_pdf(inout Bsdf_pdf_data sret_ptr, in State state);
@@ -228,6 +230,7 @@ void main()
         throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
     }
 
+#ifdef IS_EMISSIVE
     /* 4. Add Emission */
     {
         Edf_evaluate_data edf_evaluate_data;
@@ -244,6 +247,7 @@ void main()
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }
     }
+#endif
 
     // reassign normal, see declaration of variable.
     shading_state.normal = normal;
