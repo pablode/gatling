@@ -192,14 +192,15 @@ namespace gtl
 
   bool GiGlslShaderGen::generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    auto dfFlags = McDfFlags(MC_DF_FLAG_SCATTERING |
-                             MC_DF_FLAG_EMISSION |
-                             MC_DF_FLAG_EMISSION_INTENSITY |
-                             MC_DF_FLAG_THIN_WALLED |
-                             MC_DF_FLAG_VOLUME_ABSORPTION);
+    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_THIN_WALLED;
+
+    if (material.isEmissive)
+    {
+      dfFlags |= MC_DF_FLAG_EMISSION | MC_DF_FLAG_EMISSION_INTENSITY;
+    }
 
     McGlslGenResult genResult;
-    if (!m_mcBackend->genGlsl(*material.mdlMaterial, dfFlags, genResult))
+    if (!m_mcBackend->genGlsl(*material.mdlMaterial, McDfFlags(dfFlags), genResult))
     {
       return false;
     }
@@ -231,6 +232,10 @@ namespace gtl
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
+    if (params.isEmissive)
+    {
+      stitcher.appendDefine("IS_EMISSIVE");
+    }
     if (params.isOpaque)
     {
       stitcher.appendDefine("IS_OPAQUE");

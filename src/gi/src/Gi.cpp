@@ -993,6 +993,7 @@ cleanup:
           GiGlslShaderGen::ClosestHitShaderParams hitParams;
           hitParams.aovId = (int) params.aovId;
           hitParams.baseFileName = "rp_main.chit";
+          hitParams.isEmissive = material->isEmissive;
           hitParams.isOpaque = material->isOpaque;
           hitParams.enableSceneTransforms = material->requiresSceneTransforms;
           hitParams.nextEventEstimation = params.nextEventEstimation;
