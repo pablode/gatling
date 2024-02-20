@@ -1,15 +1,6 @@
 #ifndef MDL_SHADING_STATE
 #define MDL_SHADING_STATE
 
-layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
-  BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
-  Face data[];
-};
-layout(buffer_reference, std430, buffer_reference_align = 32/* largest type: vertex */) buffer VertexBuffer {
-  BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
-  FVertex data[];
-};
-
 void setup_mdl_shading_state(in vec2 hit_bc, out State state)
 {
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];

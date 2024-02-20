@@ -37,4 +37,14 @@ layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) buffer BlasPayloadBuffer {
   BlasPayload blas_payloads[];
 };
 
+layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
+  BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
+  Face data[];
+};
+
+layout(buffer_reference, std430, buffer_reference_align = 32/* largest type: vertex */) buffer VertexBuffer {
+  BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
+  FVertex data[];
+};
+
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
