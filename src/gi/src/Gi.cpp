@@ -106,6 +106,7 @@ namespace gtl
 
   struct GiMesh
   {
+    bool isDoubleSided;
     std::vector<GiFace> faces;
     std::vector<GiVertex> vertices;
   };
@@ -491,6 +492,7 @@ fail:
   GiMesh* giCreateMesh(const GiMeshDesc& desc)
   {
     GiMesh* mesh = new GiMesh;
+    mesh->isDoubleSided = desc.isDoubleSided;
     mesh->faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]);
     mesh->vertices = std::vector<GiVertex>(&desc.vertices[0], &desc.vertices[desc.vertexCount]);
     return mesh;
@@ -689,9 +691,16 @@ fail:
             goto fail_cleanup;
           }
 
+          uint32_t bitfield = 0;
+          if (mesh->isDoubleSided)
+          {
+            bitfield |= rp::BLAS_PAYLOAD_BITFLAG_IS_DOUBLE_SIDED;
+          }
+
           blasPayloads.push_back({
             .indexVertexBuffer = indexVertexBufferAddress,
-            .vertexOffset = uint32_t(vertexBufferOffset / sizeof(rp::FVertex))
+            .vertexOffset = uint32_t(vertexBufferOffset / sizeof(rp::FVertex)),
+            .bitfield = bitfield
           });
         }
 
