@@ -66,7 +66,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((debugClockCycles, "debug:clock_cycles"))         \
   ((debugOpacity, "debug:opacity"))                  \
   ((debugTangents, "debug:tangents"))                \
-  ((debugBitangents, "debug:bitangents"))
+  ((debugBitangents, "debug:bitangents"))            \
+  ((debugDoubleSided, "debug:doubleSided"))
 
 #define HD_GATLING_COMMAND_TOKENS                    \
   (printLicenses)

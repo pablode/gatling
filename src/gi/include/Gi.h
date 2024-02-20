@@ -38,7 +38,8 @@ namespace gtl
     ClockCycles,
     Opacity,
     Tangents,
-    Bitangents
+    Bitangents,
+    DoubleSided
   };
 
   struct GiAsset;
