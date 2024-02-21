@@ -87,8 +87,10 @@ namespace gtl
     {
       int32_t aovId;
       std::string_view baseFileName;
+      bool hasVolumeAbsorptionCoeff;
       bool isEmissive;
       bool isOpaque;
+      bool isThinWalled;
       bool enableSceneTransforms;
       bool nextEventEstimation;
       std::string_view shadingGlsl;

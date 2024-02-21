@@ -16,8 +16,14 @@
 #include "mdl_shading_state.glsl"
 #include "rp_main_payload.glsl"
 
+#ifdef HAS_VOLUME_ABSORPTION_COEFF
 vec3 mdl_absorption_coefficient(in State state);
+#endif
+
+#ifdef IS_THIN_WALLED
 bool mdl_thin_walled(in State state);
+#endif
+
 #ifdef IS_EMISSIVE
 vec3 mdl_edf_emission_intensity(in State state);
 void mdl_edf_emission_init(inout State state);
@@ -180,9 +186,12 @@ void main()
     uint bounce = (rayPayload.bitfield & 0x7FFFu);
     bool inside = bool(rayPayload.bitfield & 0x8000u);
 
-    const bool thin_walled = mdl_thin_walled(shading_state);
-    const float ior1 = (inside && !thin_walled) ? BSDF_USE_MATERIAL_IOR : 1.0;
-    const float ior2 = (inside && !thin_walled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
+    const bool thinWalled = false;
+#ifdef IS_THIN_WALLED
+    thinWalled = mdl_thin_walled(shading_state);
+#endif
+    const float ior1 = (inside && !thinWalled) ? BSDF_USE_MATERIAL_IOR : 1.0;
+    const float ior2 = (inside && !thinWalled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
 #if AOV_ID == AOV_ID_DEBUG_OPACITY
 #ifdef IS_OPAQUE
@@ -235,16 +244,18 @@ void main()
 #endif
 
     /* 3. Apply volume attenuation */
-    if (inside && !thin_walled)
+#ifdef HAS_VOLUME_ABSORPTION_COEFF
+    if (inside && !thinWalled)
     {
         vec3 abs_coeff = mdl_absorption_coefficient(shading_state);
         throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
         throughput.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0;
         throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
     }
+#endif
 
-#ifdef IS_EMISSIVE
     /* 4. Add Emission */
+#ifdef IS_EMISSIVE
     {
         Edf_evaluate_data edf_evaluate_data;
         edf_evaluate_data.k1 = -gl_WorldRayDirectionEXT;
