@@ -232,6 +232,10 @@ namespace gtl
     stitcher.appendDefine("AOV_ID", params.aovId);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
+    if (params.hasVolumeAbsorptionCoeff)
+    {
+      stitcher.appendDefine("HAS_VOLUME_ABSORPTION_COEFF");
+    }
     if (params.isEmissive)
     {
       stitcher.appendDefine("IS_EMISSIVE");
@@ -239,6 +243,10 @@ namespace gtl
     if (params.isOpaque)
     {
       stitcher.appendDefine("IS_OPAQUE");
+    }
+    if (params.isThinWalled)
+    {
+      stitcher.appendDefine("IS_THIN_WALLED");
     }
     if (params.nextEventEstimation)
     {

@@ -998,8 +998,10 @@ cleanup:
           GiGlslShaderGen::ClosestHitShaderParams hitParams;
           hitParams.aovId = (int) params.aovId;
           hitParams.baseFileName = "rp_main.chit";
+          hitParams.hasVolumeAbsorptionCoeff = material->hasVolumeAbsorptionCoeff;
           hitParams.isEmissive = material->isEmissive;
           hitParams.isOpaque = material->isOpaque;
+          hitParams.isThinWalled = material->isThinWalled;
           hitParams.enableSceneTransforms = material->requiresSceneTransforms;
           hitParams.nextEventEstimation = params.nextEventEstimation;
           hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
