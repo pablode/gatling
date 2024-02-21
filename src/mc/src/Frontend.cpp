@@ -29,43 +29,92 @@
 
 namespace
 {
-  bool _IsCompiledMaterialEmissive(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  bool _IsExpressionBlackColor(mi::base::Handle<const mi::neuraylib::IExpression> expr)
   {
-    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("surface.emission.intensity"));
-
     if (expr->get_kind() != mi::neuraylib::IExpression::Kind::EK_CONSTANT)
     {
-      return true;
+      return false;
+    }
+
+    mi::base::Handle<const mi::neuraylib::IExpression_constant> constExpr(expr.get_interface<const mi::neuraylib::IExpression_constant>());
+    mi::base::Handle<const mi::neuraylib::IValue_color> value(constExpr->get_value<mi::neuraylib::IValue_color>());
+
+    if (!value)
+    {
+      return false;
+    }
+
+    for (mi::Size i = 0; i < value->get_size(); i++)
+    {
+      mi::base::Handle<const mi::neuraylib::IValue_float> c(value->get_value(i));
+
+      const float eps = 1e-7f;
+
+      if (c->get_value() > eps)
+      {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  bool _IsExpressionInvalidDf(mi::base::Handle<const mi::neuraylib::IExpression> expr)
+  {
+    if (expr->get_kind() != mi::neuraylib::IExpression::Kind::EK_CONSTANT)
+    {
+      return false;
     }
 
     mi::base::Handle<const mi::neuraylib::IExpression_constant> constExpr(expr.get_interface<const mi::neuraylib::IExpression_constant>());
     mi::base::Handle<const mi::neuraylib::IValue> value(constExpr->get_value());
 
-    if (value->get_kind() != mi::neuraylib::IValue::Kind::VK_COLOR)
+    return value->get_kind() == mi::neuraylib::IValue::VK_INVALID_DF;
+  }
+
+  bool _IsCompiledMaterialEmissive(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    mi::base::Handle<const mi::neuraylib::IExpression> emissionExpr(compiledMaterial->lookup_sub_expression("surface.emission.emission"));
+    mi::base::Handle<const mi::neuraylib::IExpression> emissionIntensityExpr(compiledMaterial->lookup_sub_expression("surface.emission.intensity"));
+
+    return !_IsExpressionInvalidDf(emissionExpr) && !_IsExpressionBlackColor(emissionIntensityExpr);
+  }
+
+  bool _IsCompiledMaterialThinWalled(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("thin_walled"));
+
+    if (expr->get_kind() != mi::neuraylib::IExpression::EK_CONSTANT)
     {
-      assert(false);
       return true;
     }
 
-    mi::base::Handle<const mi::neuraylib::IValue_color> color(value.get_interface<const mi::neuraylib::IValue_color>());
+    mi::base::Handle<const mi::neuraylib::IExpression_constant> constExpr(expr->get_interface<const mi::neuraylib::IExpression_constant>());
+    mi::base::Handle<const mi::neuraylib::IValue_bool> value(constExpr->get_value<mi::neuraylib::IValue_bool>());
 
-    if (color->get_size() != 3)
-    {
-      assert(false);
-      return true;
-    }
-
-    mi::base::Handle<const mi::neuraylib::IValue_float> v0(color->get_value(0));
-    mi::base::Handle<const mi::neuraylib::IValue_float> v1(color->get_value(1));
-    mi::base::Handle<const mi::neuraylib::IValue_float> v2(color->get_value(2));
-
-    const float eps = 1e-7f;
-    return v0->get_value() > eps || v1->get_value() > eps || v2->get_value() > eps;
+    return !value || value->get_value();
   }
 
   bool _IsCompiledMaterialOpaque(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
   {
     return compiledMaterial->get_opacity() == mi::neuraylib::OPACITY_OPAQUE;
+  }
+
+  bool _HasCompiledMaterialBackfaceBsdf(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    return compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_SURFACE_SCATTERING) != compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_SCATTERING);
+  }
+
+  bool _HasCompiledMaterialBackfaceEdf(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    return compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_SURFACE_EMISSION_EDF_EMISSION) != compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_EMISSION_EDF_EMISSION);
+  }
+
+  bool _HasCompiledMaterialVolumeAbsorptionCoefficient(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("volume.absorption_coefficient"));
+
+    return !_IsExpressionBlackColor(expr);
   }
 }
 
@@ -92,8 +141,12 @@ namespace gtl
     mdlMaterial->compiledMaterial = compiledMaterial;
 
     return new McMaterial{
+      .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),
+      .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
+      .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isOpaque = isOpaque,
+      .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
       .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()
@@ -140,9 +193,13 @@ namespace gtl
     auto mdlMaterial = std::make_shared<McMdlMaterial>();
     mdlMaterial->compiledMaterial = compiledMaterial;
 
-    return new McMaterial {
+    return new McMaterial{
+      .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),
+      .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
+      .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isOpaque = _IsCompiledMaterialOpaque(compiledMaterial),
+      .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
       .resourcePathPrefix = resourcePathPrefix,
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()

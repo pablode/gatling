@@ -26,8 +26,12 @@ namespace gtl
 
   struct McMaterial
   {
+    bool hasBackfaceBsdf;
+    bool hasBackfaceEdf;
+    bool hasVolumeAbsorptionCoeff;
     bool isEmissive;
     bool isOpaque;
+    bool isThinWalled;
     std::string resourcePathPrefix;
     std::shared_ptr<McMdlMaterial> mdlMaterial;
     bool requiresSceneTransforms;
