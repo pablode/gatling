@@ -16,6 +16,10 @@ on:
       usd-install-path:
         required: true
         type: string
+      python-version:
+        required: false
+        type: string
+        default:
       upload-archive:
         required: false
         type: boolean
@@ -51,12 +55,18 @@ jobs:
 
     steps:
     - name: Set up Python (MacOS)
-      if: runner.os == 'macOS'
+      if: runner.os == 'macOS' && inputs.python-version != ''
       run: |
         brew install pyenv
-        env PYTHON_CONFIGURE_OPTS="--enable-framework" pyenv install 3.7.13
-        pyenv global 3.7.13
+        env PYTHON_CONFIGURE_OPTS="--enable-framework" pyenv install ${{ inputs.python-version }}
+        pyenv global ${{ inputs.python-version }}
         echo "$HOME/.pyenv/shims" >> $GITHUB_PATH
+
+    - name: Set up Python (Linux & Windows)
+      if: matrix.name != 'MacOS' && inputs.python-version != ''
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
 
     - name: Check out repository
       uses: actions/checkout@v4

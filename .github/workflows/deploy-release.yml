@@ -10,21 +10,13 @@ jobs:
     with:
       cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
 
-  build-usd2211:
-    name: Build gatling for USD v22.11
+  build-usd2403:
+    name: Build gatling for USD v24.03
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
-      usd-version: "22.11"
-      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
-      upload-archives: true
-
-  build-usd2311:
-    name: Build gatling for USD v23.11
-    needs: build-mdl-sdk
-    uses: ./.github/workflows/build-usd.yml
-    with:
-      usd-version: "23.11"
+      usd-version: 24.03
+      usd-python-version: 3.9
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
       upload-archives: true
 
@@ -37,19 +29,14 @@ jobs:
 
   deploy-release:
     name: Deploy Release
-    needs: [build-usd2211, build-usd2311, build-houdini20]
+    needs: [build-usd2403, build-houdini20]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download artifacts for USD v22.11
+      - name: Download artifacts for USD v24.03
         uses: actions/download-artifact@v3
         with:
-          name: ${{ needs.build-usd2211.outputs.archive-name }}
-
-      - name: Download artifacts for USD v23.11
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ needs.build-usd2311.outputs.archive-name }}
+          name: ${{ needs.build-usd2403.outputs.archive-name }}
 
       - name: Download artifacts for Houdini 20.0
         uses: actions/download-artifact@v3
