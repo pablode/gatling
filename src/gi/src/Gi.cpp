@@ -305,7 +305,7 @@ namespace gtl
     std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
 #endif
 
-    mx::DocumentPtr mtlxStdLib = static_pointer_cast<mx::Document>(params.mtlxStdLib);
+    mx::DocumentPtr mtlxStdLib = std::static_pointer_cast<mx::Document>(params.mtlxStdLib);
     if (!mtlxStdLib)
     {
       return GiStatus::Error;
@@ -440,7 +440,7 @@ fail:
 
   GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::Document*/> doc)
   {
-    mx::DocumentPtr resolvedDoc = static_pointer_cast<mx::Document>(doc);
+    mx::DocumentPtr resolvedDoc = std::static_pointer_cast<mx::Document>(doc);
     if (!doc)
     {
       return nullptr;
