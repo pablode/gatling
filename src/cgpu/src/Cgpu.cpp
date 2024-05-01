@@ -460,13 +460,14 @@ namespace gtl
     }
 #endif
 
+    uint32_t versionVariant = 0;
     VkApplicationInfo appInfo = {
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pNext = nullptr,
       .pApplicationName = appName,
-      .applicationVersion = VK_MAKE_VERSION(versionMajor, versionMinor, versionPatch),
+      .applicationVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
       .pEngineName = appName,
-      .engineVersion = VK_MAKE_VERSION(versionMajor, versionMinor, versionPatch),
+      .engineVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
       .apiVersion = CGPU_MIN_VK_API_VERSION,
     };
 
