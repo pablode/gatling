@@ -482,6 +482,7 @@ namespace gtl
     bool sparseResidencyImage3D;
     bool sparseResidencyAliased;
     bool rayTracingInvocationReorder;
+    bool rayTracingValidation;
   };
 
   struct CgpuPhysicalDeviceProperties

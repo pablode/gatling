@@ -647,6 +647,14 @@ namespace gtl
       GB_LOG("extension {} enabled", VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
     }
 #endif
+
+    if (iinstance->debugUtilsEnabled && cgpuFindExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME, extensions.size(), extensions.data()))
+    {
+      idevice->features.rayTracingValidation = true;
+      enabledExtensions.push_back(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME);
+
+      GB_LOG("extension {} enabled", VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME);
+    }
 #endif
     if (cgpuFindExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, extensions.size(), extensions.data()) &&
         cgpuFindExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, extensions.size(), extensions.data()))
@@ -712,6 +720,17 @@ namespace gtl
     if (idevice->features.shaderClock)
     {
       pNext = &shaderClockFeatures;
+    }
+
+    VkPhysicalDeviceRayTracingValidationFeaturesNV rayTracingValidationFeatures = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV,
+      .pNext = pNext,
+      .rayTracingValidation = VK_TRUE
+    };
+
+    if (idevice->features.rayTracingValidation)
+    {
+      pNext = &rayTracingValidationFeatures;
     }
 
     VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV invocationReorderFeatures = {
