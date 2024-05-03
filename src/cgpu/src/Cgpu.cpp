@@ -621,59 +621,53 @@ namespace gtl
       enabledExtensions.push_back(extension);
     }
 
-    const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
-    if (cgpuFindExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME, extensions.size(), extensions.data()))
+    const auto enableOptionalExtension = [&](const char* extName)
     {
-      enabledExtensions.push_back(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+      if (!cgpuFindExtension(extName, extensions.size(), extensions.data()))
+      {
+        return false;
+      }
 
-      GB_LOG("extension {} enabled", VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+      enabledExtensions.push_back(extName);
+
+      GB_LOG("extension {} enabled", extName);
+      return true;
+    };
+
+    if (enableOptionalExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) &&
+        enableOptionalExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME))
+    {
+      idevice->features.pageableDeviceLocalMemory = true;
     }
 
+    const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
+    enableOptionalExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+
 #ifndef NDEBUG
-    if (cgpuFindExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME, extensions.size(), extensions.data()) && features.shaderInt64)
+    if (features.shaderInt64 && enableOptionalExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME))
     {
       idevice->features.shaderClock = true;
-      enabledExtensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
-
-      GB_LOG("extension {} enabled", VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
     }
 
 #ifndef __APPLE__
-    if (cgpuFindExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME, extensions.size(), extensions.data()))
+    if (enableOptionalExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME))
     {
       idevice->features.debugPrintf = true;
-      enabledExtensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
-
-      GB_LOG("extension {} enabled", VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
     }
 #endif
-
-    if (iinstance->debugUtilsEnabled && cgpuFindExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME, extensions.size(), extensions.data()))
-    {
-      idevice->features.rayTracingValidation = true;
-      enabledExtensions.push_back(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME);
-
-      GB_LOG("extension {} enabled", VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME);
-    }
 #endif
-    if (cgpuFindExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME, extensions.size(), extensions.data()) &&
-        cgpuFindExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME, extensions.size(), extensions.data()))
-    {
-      idevice->features.pageableDeviceLocalMemory = true;
-      enabledExtensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
-      enabledExtensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
 
-      GB_LOG("extension {} enabled", VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
-      GB_LOG("extension {} enabled", VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
-    }
-
-    if (cgpuFindExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME, extensions.size(), extensions.data()))
+    if (enableOptionalExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME))
     {
       idevice->features.rayTracingInvocationReorder = true;
-      enabledExtensions.push_back(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
-
-      GB_LOG("extension {} enabled", VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
     }
+
+#ifndef NDEBUG
+    if (iinstance->debugUtilsEnabled && enableOptionalExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
+    {
+      idevice->features.rayTracingValidation = true;
+    }
+#endif
 
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, nullptr);
