@@ -41,7 +41,7 @@ jobs:
         include:
         - name: Ubuntu / GCC
           image: ubuntu-20.04
-          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           upload-archive: ${{ inputs.upload-archives }}
           archive-file-name: "gatling_USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
@@ -49,7 +49,7 @@ jobs:
 
         - name: Ubuntu / clang
           image: ubuntu-20.04
-          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           # Don't upload clang build results -- we already have GCC's
           upload-archive: false
@@ -57,7 +57,7 @@ jobs:
 
         - name: Windows / MSVC
           image: windows-2019
-          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Windows_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Windows_x64_Python${{ inputs.usd-python-version }}.tar.gz"
           usd-install-path: "C:/INSTALL"
           upload-archive: ${{ inputs.upload-archives }}
           archive-file-name: "gatling_USD${{ inputs.usd-version }}_Windows_x64_Python${{ inputs.usd-python-version }}.tar.gz"
