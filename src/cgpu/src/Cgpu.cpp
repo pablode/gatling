@@ -443,6 +443,8 @@ namespace gtl
         GB_LOG("> enabled layer {}", VK_LAYER_KHRONOS_VALIDATION_NAME);
       }
     }
+#endif
+
     {
       uint32_t extensionCount;
       vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -450,6 +452,7 @@ namespace gtl
       GbSmallVector<VkExtensionProperties, 512> availableExtensions(extensionCount);
       vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
 
+#ifndef NDEBUG
       if (cgpuFindExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
       {
         enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -457,8 +460,14 @@ namespace gtl
 
         debugUtilsEnabled = true;
       }
-    }
 #endif
+
+      if (cgpuFindExtension(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
+      {
+        enabledExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        GB_LOG("> enabled instance extension {}", VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+      }
+    }
 
     uint32_t versionVariant = 0;
     VkApplicationInfo appInfo = {
@@ -474,7 +483,7 @@ namespace gtl
     VkInstanceCreateInfo createInfo = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
-      .flags = 0,
+      .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
       .pApplicationInfo = &appInfo,
       .enabledLayerCount = (uint32_t) enabledLayers.size(),
       .ppEnabledLayerNames = enabledLayers.data(),
