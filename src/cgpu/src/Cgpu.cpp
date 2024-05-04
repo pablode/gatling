@@ -483,9 +483,14 @@ namespace gtl
     };
 
     VkInstance instance;
-    if (vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS)
     {
-      CGPU_RETURN_ERROR("failed to create vulkan instance");
+      VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
+
+      if (result != VK_SUCCESS)
+      {
+        GB_ERROR("{}:{}: failed to create Vulkan instance (code: {})", __FILE__, __LINE__, int(result));
+        return false;
+      }
     }
 
     volkLoadInstanceOnly(instance);
