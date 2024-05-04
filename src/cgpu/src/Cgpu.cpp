@@ -677,6 +677,7 @@ namespace gtl
     }
 
 #ifndef NDEBUG
+    // This feature requires env var NV_ALLOW_RAYTRACING_VALIDATION=1 to be set.
     if (iinstance->debugUtilsEnabled && enableOptionalExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
     {
       idevice->features.rayTracingValidation = true;
