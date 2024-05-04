@@ -16,11 +16,6 @@ on:
         description: "Name of the USD release, in the form 'XX.XX'"
         required: true
         type: string
-      usd-python-version:
-        description: "Version of Python USD has been built against"
-        required: false
-        type: string
-        default:
       mdl-sdk-cache-key-prefix:
         description: "Prefix of the MDL SDK cache key"
         required: false
@@ -34,22 +29,22 @@ on:
 
 jobs:
   build:
-    name: Build USD v${{ inputs.usd-version }} for ${{ matrix.name }} (${{ inputs.build-config }}, Python ${{ inputs.usd-python-version }})
+    name: Build USD v${{ inputs.usd-version }} for ${{ matrix.name }} (${{ inputs.build-config }})
 
     strategy:
       matrix:
         include:
         - name: Ubuntu / GCC
           image: ubuntu-20.04
-          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           upload-archive: ${{ inputs.upload-archives }}
-          archive-file-name: "gatling_USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          archive-file-name: "gatling_USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           cmake-params:
 
         - name: Ubuntu / clang
           image: ubuntu-20.04
-          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Linux_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           # Don't upload clang build results -- we already have GCC's
           upload-archive: false
@@ -57,10 +52,10 @@ jobs:
 
         - name: Windows / MSVC
           image: windows-2019
-          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Windows_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release3/USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
           upload-archive: ${{ inputs.upload-archives }}
-          archive-file-name: "gatling_USD${{ inputs.usd-version }}_Windows_x64_Python${{ inputs.usd-python-version }}.tar.gz"
+          archive-file-name: "gatling_USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           cmake-params: -G"Visual Studio 16 2019" -Ax64
 
     uses: ./.github/workflows/build.yml
@@ -74,4 +69,3 @@ jobs:
       archive-file-name: ${{ matrix.archive-file-name }}
       mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}
       cmake-params: ${{ matrix.cmake-params }}
-      python-version: ${{ inputs.usd-python-version }}
