@@ -18,7 +18,7 @@
 #include "mdl_shading_state.glsl"
 #include "rp_main_payload.glsl"
 
-float mdl_cutout_opacity(in State state);
+#pragma mdl_generated_code
 
 #ifndef SHADOW_TEST
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;

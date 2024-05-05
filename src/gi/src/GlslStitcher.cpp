@@ -89,6 +89,22 @@ namespace gtl
     return true;
   }
 
+  bool GiGlslStitcher::replaceFirst(std::string_view substring, std::string_view replacement)
+  {
+    std::string tmp = m_source.str();
+
+    size_t location = tmp.find(substring);
+    if (location == std::string::npos)
+    {
+      return false;
+    }
+
+    tmp.replace(location, substring.length(), replacement);
+
+    m_source = std::stringstream(tmp);
+    return true;
+  }
+
   std::string GiGlslStitcher::source()
   {
     return m_source.str();

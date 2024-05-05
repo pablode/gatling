@@ -16,25 +16,7 @@
 #include "mdl_shading_state.glsl"
 #include "rp_main_payload.glsl"
 
-#ifdef HAS_VOLUME_ABSORPTION_COEFF
-vec3 mdl_absorption_coefficient(in State state);
-#endif
-
-#ifdef IS_THIN_WALLED
-bool mdl_thin_walled(in State state);
-#endif
-
-#ifdef IS_EMISSIVE
-vec3 mdl_edf_emission_intensity(in State state);
-void mdl_edf_emission_init(inout State state);
-void mdl_edf_emission_sample(inout Edf_sample_data sret_ptr, in State state);
-void mdl_edf_emission_pdf(inout Edf_pdf_data sret_ptr, in State state);
-void mdl_edf_emission_evaluate(inout Edf_evaluate_data sret_ptr, in State state);
-#endif
-void mdl_bsdf_scattering_init(inout State state);
-void mdl_bsdf_scattering_sample(inout Bsdf_sample_data sret_ptr, in State state);
-void mdl_bsdf_scattering_pdf(inout Bsdf_pdf_data sret_ptr, in State state);
-void mdl_bsdf_scattering_evaluate(inout Bsdf_evaluate_data sret_ptr, in State state);
+#pragma mdl_generated_code
 
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 

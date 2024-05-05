@@ -263,7 +263,7 @@ namespace gtl
       return false;
     }
 
-    stitcher.appendString(params.shadingGlsl);
+    stitcher.replaceFirst("#pragma mdl_generated_code", params.shadingGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::ClosestHit, source, spv);
@@ -295,7 +295,7 @@ namespace gtl
       return false;
     }
 
-    stitcher.appendString(params.opacityEvalGlsl);
+    stitcher.replaceFirst("#pragma mdl_generated_code", params.opacityEvalGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::AnyHit, source, spv);
