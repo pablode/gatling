@@ -26,7 +26,6 @@
 #include <pxr/usd/ar/asset.h>
 #include <pxr/usd/ar/resolver.h>
 #include <pxr/usd/ar/resolvedPath.h>
-#include <pxr/usd/ar/packageUtils.h>
 #include <pxr/usd/usdMtlx/utils.h>
 
 #include <MaterialXCore/Document.h>
@@ -87,10 +86,10 @@ namespace
 }
 
 // Needs to be defined in pxr namespace due to being publicly declared in header
-class UsdzAssetReader : public GiAssetReader
+class ArAssetReader : public GiAssetReader
 {
 private:
-  struct _UsdzAsset
+  struct _ArAsset
   {
     size_t size;
     std::shared_ptr<const char> buffer;
@@ -100,11 +99,6 @@ public:
   GiAsset* open(const char* path) override
   {
     auto resolvedPath = ArResolvedPath(path);
-    if (!ArIsPackageRelativePath(resolvedPath)) {
-      // Only read USDZ files with this reader, fall back
-      // to memory-mapping default for everything else.
-      return nullptr;
-    }
 
     ArResolver& resolver = ArGetResolver();
     auto asset = resolver.OpenAsset(resolvedPath);
@@ -112,7 +106,7 @@ public:
       return nullptr;
     }
 
-    auto iasset = new _UsdzAsset;
+    auto iasset = new _ArAsset;
     iasset->size = asset->GetSize();
     iasset->buffer = asset->GetBuffer();
     return (GiAsset*) iasset;
@@ -120,19 +114,19 @@ public:
 
   size_t size(const GiAsset* asset) const override
   {
-    auto iasset = (_UsdzAsset*) asset;
+    auto iasset = (_ArAsset*) asset;
     return iasset->size;
   }
 
   void* data(const GiAsset* asset) const override
   {
-    auto iasset = (_UsdzAsset*) asset;
+    auto iasset = (_ArAsset*) asset;
     return (void*) iasset->buffer.get();
   }
 
   void close(GiAsset* asset) override
   {
-    auto iasset = (_UsdzAsset*) asset;
+    auto iasset = (_ArAsset*) asset;
     delete iasset;
   }
 };
@@ -159,8 +153,8 @@ HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 
   _materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxStdLib);
 
-  _usdzAssetReader = std::make_unique<UsdzAssetReader>();
-  giRegisterAssetReader(_usdzAssetReader.get());
+  _arAssetReader = std::make_unique<ArAssetReader>();
+  giRegisterAssetReader(_arAssetReader.get());
 }
 
 HdGatlingRendererPlugin::~HdGatlingRendererPlugin()
@@ -170,7 +164,7 @@ HdGatlingRendererPlugin::~HdGatlingRendererPlugin()
     return;
   }
 
-  _usdzAssetReader.reset();
+  _arAssetReader.reset();
   giTerminate();
 }
 

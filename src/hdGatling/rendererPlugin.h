@@ -45,7 +45,7 @@ public:
 
 private:
   std::unique_ptr<class MaterialNetworkCompiler> _materialNetworkCompiler;
-  std::unique_ptr<class UsdzAssetReader> _usdzAssetReader;
+  std::unique_ptr<class ArAssetReader> _arAssetReader;
   bool _isSupported;
 };
 
