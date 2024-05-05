@@ -98,9 +98,14 @@ private:
 public:
   GiAsset* open(const char* path) override
   {
-    auto resolvedPath = ArResolvedPath(path);
-
     ArResolver& resolver = ArGetResolver();
+
+    ArResolvedPath resolvedPath = resolver.Resolve(path);
+    if (!resolvedPath)
+    {
+      return nullptr;
+    }
+
     auto asset = resolver.OpenAsset(resolvedPath);
     if (!asset) {
       return nullptr;
