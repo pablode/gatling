@@ -288,3 +288,60 @@ vec3 mdl_adapt_normal(State state, vec3 normal)
 }
 
 #endif
+
+// TODO: implement scene data support
+
+bool scene_data_isvalid(inout State state, int scene_data_id)
+{
+    return false;
+}
+
+vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+vec3 scene_data_lookup_color(inout State state, int scene_data_id, vec3 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+float scene_data_lookup_float(inout State state, int scene_data_id, float default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+ivec4 scene_data_lookup_int4(inout State state, int scene_data_id, ivec4 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+ivec3 scene_data_lookup_int3(inout State state, int scene_data_id, ivec3 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+ivec2 scene_data_lookup_int2(inout State state, int scene_data_id, ivec2 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+int scene_data_lookup_int(inout State state, int scene_data_id, int default_value, bool uniform_lookup)
+{
+    return default_value;
+}
+
+mat4 scene_data_lookup_float4x4(inout State state, int scene_data_id, mat4 default_value, bool uniform_lookup)
+{
+    return default_value;
+}
