@@ -56,6 +56,8 @@ namespace gtl
                                                 std::string_view identifier,
                                                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
+    std::lock_guard<std::mutex> guard(m_mutex); // Serialize since the search path is global...
+
     std::string moduleName = _MakeModuleName(identifier);
 
     addStandardSearchPaths();
@@ -76,6 +78,8 @@ namespace gtl
                                               std::string_view identifier,
                                               mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
+    std::lock_guard<std::mutex> guard(m_mutex); // Serialize since the search path is global...
+
     std::string fileDir = fs::path(filePath).parent_path().string();
     std::string moduleName = "::" + fs::path(filePath).stem().string();
 
@@ -106,7 +110,6 @@ namespace gtl
   {
     for (const std::string s : m_mdlSearchPaths)
     {
-      // TODO: is this thread-safe?
       if (m_config->add_mdl_path(s.c_str()))
       {
         auto logMsg = std::string("MDL search path could not be added: \"") + s + "\"";

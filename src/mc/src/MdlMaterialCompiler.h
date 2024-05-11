@@ -20,6 +20,7 @@
 #include <string_view>
 #include <functional>
 #include <vector>
+#include <mutex>
 
 #include <mi/base/handle.h>
 #include <mi/neuraylib/icompiled_material.h>
@@ -66,6 +67,8 @@ namespace gtl
 
   private:
     const std::vector<std::string> m_mdlSearchPaths;
+
+    std::mutex m_mutex;
 
     mi::base::Handle<McMdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
