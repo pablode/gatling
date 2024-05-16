@@ -39,7 +39,7 @@ void main()
 #ifndef SHADOW_TEST
 #if AOV_ID == AOV_ID_DEBUG_OPACITY
   rayPayload.radiance = (opacity == 0.0) ? vec3(1.0) : colormap_viridis(opacity);
-  rayPayload.bitfield = 0xFFFFu;
+  rayPayload.bitfield = 0xFFFFFFFFu;
   return;
 #endif
 #endif
