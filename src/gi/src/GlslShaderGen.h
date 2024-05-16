@@ -69,6 +69,7 @@ namespace gtl
       uint32_t diskLightCount;
       uint32_t texCount2d;
       uint32_t texCount3d;
+      uint32_t mediumStackSize;
     };
 
     struct MissShaderParams
@@ -81,6 +82,7 @@ namespace gtl
       uint32_t diskLightCount;
       uint32_t texCount2d;
       uint32_t texCount3d;
+      uint32_t mediumStackSize;
     };
 
     struct ClosestHitShaderParams
@@ -103,6 +105,7 @@ namespace gtl
       uint32_t textureIndexOffset3d;
       uint32_t texCount2d;
       uint32_t texCount3d;
+      uint32_t mediumStackSize;
     };
 
     struct AnyHitShaderParams
@@ -120,6 +123,7 @@ namespace gtl
       uint32_t textureIndexOffset3d;
       uint32_t texCount2d;
       uint32_t texCount3d;
+      uint32_t mediumStackSize;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);

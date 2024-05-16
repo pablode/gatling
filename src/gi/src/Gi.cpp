@@ -995,25 +995,27 @@ cleanup:
 
         // Closest hit
         {
-          GiGlslShaderGen::ClosestHitShaderParams hitParams;
-          hitParams.aovId = (int) params.aovId;
-          hitParams.baseFileName = "rp_main.chit";
-          hitParams.hasVolumeAbsorptionCoeff = material->hasVolumeAbsorptionCoeff;
-          hitParams.hasVolumeScatteringCoeff = material->hasVolumeScatteringCoeff;
-          hitParams.isEmissive = material->isEmissive;
-          hitParams.isOpaque = material->isOpaque;
-          hitParams.isThinWalled = material->isThinWalled;
-          hitParams.enableSceneTransforms = material->requiresSceneTransforms;
-          hitParams.nextEventEstimation = params.nextEventEstimation;
-          hitParams.shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource;
-          hitParams.sphereLightCount = scene->sphereLights.elementCount();
-          hitParams.distantLightCount = scene->distantLights.elementCount();
-          hitParams.rectLightCount = scene->rectLights.elementCount();
-          hitParams.diskLightCount = scene->diskLights.elementCount();
-          hitParams.textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d;
-          hitParams.textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d;
-          hitParams.texCount2d = texCount2d;
-          hitParams.texCount3d = texCount3d;
+          GiGlslShaderGen::ClosestHitShaderParams hitParams = {
+            .aovId = (int) params.aovId,
+            .baseFileName = "rp_main.chit",
+            .hasVolumeAbsorptionCoeff = material->hasVolumeAbsorptionCoeff,
+            .hasVolumeScatteringCoeff = material->hasVolumeScatteringCoeff,
+            .isEmissive = material->isEmissive,
+            .isOpaque = material->isOpaque,
+            .isThinWalled = material->isThinWalled,
+            .enableSceneTransforms = material->requiresSceneTransforms,
+            .nextEventEstimation = params.nextEventEstimation,
+            .shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource,
+            .distantLightCount = scene->distantLights.elementCount(),
+            .sphereLightCount = scene->sphereLights.elementCount(),
+            .rectLightCount = scene->rectLights.elementCount(),
+            .diskLightCount = scene->diskLights.elementCount(),
+            .textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d,
+            .textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d,
+            .texCount2d = texCount2d,
+            .texCount3d = texCount3d,
+            .mediumStackSize = params.mediumStackSize
+          };
 
           if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
           {
@@ -1025,19 +1027,21 @@ cleanup:
         // Any hit
         if (compInfo.anyHitInfo)
         {
-          GiGlslShaderGen::AnyHitShaderParams hitParams;
-          hitParams.aovId = (int) params.aovId;
-          hitParams.enableSceneTransforms = material->requiresSceneTransforms;
-          hitParams.baseFileName = "rp_main.ahit";
-          hitParams.opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource;
-          hitParams.sphereLightCount = scene->sphereLights.elementCount();
-          hitParams.distantLightCount = scene->distantLights.elementCount();
-          hitParams.rectLightCount = scene->rectLights.elementCount();
-          hitParams.diskLightCount = scene->diskLights.elementCount();
-          hitParams.textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d;
-          hitParams.textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d;
-          hitParams.texCount2d = texCount2d;
-          hitParams.texCount3d = texCount3d;
+          GiGlslShaderGen::AnyHitShaderParams hitParams = {
+            .aovId = (int) params.aovId,
+            .enableSceneTransforms = material->requiresSceneTransforms,
+            .baseFileName = "rp_main.ahit",
+            .opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource,
+            .distantLightCount = scene->distantLights.elementCount(),
+            .sphereLightCount = scene->sphereLights.elementCount(),
+            .rectLightCount = scene->rectLights.elementCount(),
+            .diskLightCount = scene->diskLights.elementCount(),
+            .textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d,
+            .textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d,
+            .texCount2d = texCount2d,
+            .texCount3d = texCount3d,
+            .mediumStackSize = params.mediumStackSize
+          };
 
           hitParams.shadowTest = false;
           if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
@@ -1137,21 +1141,23 @@ cleanup:
 
     // Create ray generation shader.
     {
-      GiGlslShaderGen::RaygenShaderParams rgenParams;
-      rgenParams.aovId = (int) params.aovId;
-      rgenParams.depthOfField = params.depthOfField;
-      rgenParams.filterImportanceSampling = params.filterImportanceSampling;
-      rgenParams.materialCount = params.materialCount;
-      rgenParams.nextEventEstimation = params.nextEventEstimation;
-      rgenParams.progressiveAccumulation = params.progressiveAccumulation;
-      rgenParams.reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder;
-      rgenParams.sphereLightCount = scene->sphereLights.elementCount();
-      rgenParams.distantLightCount = scene->distantLights.elementCount();
-      rgenParams.rectLightCount = scene->rectLights.elementCount();
-      rgenParams.diskLightCount = scene->diskLights.elementCount();
-      rgenParams.shaderClockExts = clockCyclesAov;
-      rgenParams.texCount2d = texCount2d;
-      rgenParams.texCount3d = texCount3d;
+      GiGlslShaderGen::RaygenShaderParams rgenParams = {
+        .aovId = (int) params.aovId,
+        .depthOfField = params.depthOfField,
+        .filterImportanceSampling = params.filterImportanceSampling,
+        .materialCount = params.materialCount,
+        .nextEventEstimation = params.nextEventEstimation,
+        .progressiveAccumulation = params.progressiveAccumulation,
+        .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
+        .shaderClockExts = clockCyclesAov,
+        .distantLightCount = scene->distantLights.elementCount(),
+        .sphereLightCount = scene->sphereLights.elementCount(),
+        .rectLightCount = scene->rectLights.elementCount(),
+        .diskLightCount = scene->diskLights.elementCount(),
+        .texCount2d = texCount2d,
+        .texCount3d = texCount3d,
+        .mediumStackSize = params.mediumStackSize
+      };
 
       std::vector<uint8_t> spv;
       if (!s_shaderGen->generateRgenSpirv("rp_main.rgen", rgenParams, spv))
@@ -1171,15 +1177,17 @@ cleanup:
 
     // Create miss shaders.
     {
-      GiGlslShaderGen::MissShaderParams missParams;
-      missParams.aovId = (int) params.aovId;
-      missParams.domeLightCameraVisible = params.domeLightCameraVisible;
-      missParams.sphereLightCount = scene->sphereLights.elementCount();
-      missParams.distantLightCount = scene->distantLights.elementCount();
-      missParams.rectLightCount = scene->rectLights.elementCount();
-      missParams.diskLightCount = scene->diskLights.elementCount();
-      missParams.texCount2d = texCount2d;
-      missParams.texCount3d = texCount3d;
+      GiGlslShaderGen::MissShaderParams missParams = {
+        .aovId = (int) params.aovId,
+        .domeLightCameraVisible = params.domeLightCameraVisible,
+        .distantLightCount = scene->distantLights.elementCount(),
+        .sphereLightCount = scene->sphereLights.elementCount(),
+        .rectLightCount = scene->rectLights.elementCount(),
+        .diskLightCount = scene->diskLights.elementCount(),
+        .texCount2d = texCount2d,
+        .texCount3d = texCount3d,
+        .mediumStackSize = params.mediumStackSize
+      };
 
       // regular miss shader
       {

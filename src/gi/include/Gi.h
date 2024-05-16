@@ -114,6 +114,7 @@ namespace gtl
     bool               nextEventEstimation;
     bool               progressiveAccumulation;
     GiScene*           scene;
+    uint32_t           mediumStackSize;
   };
 
   struct GiGeomCacheParams

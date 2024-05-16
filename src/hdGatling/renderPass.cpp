@@ -436,7 +436,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
         .materials = materials.data(),
         .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
         .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
-        .scene = _scene
+        .scene = _scene,
+        .mediumStackSize = (uint32_t) _settings.find(HdGatlingSettingsTokens->mediumStackSize)->second.Get<int>()
       };
       _shaderCache = giCreateShaderCache(shaderParams);
 
