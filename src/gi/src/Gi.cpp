@@ -999,6 +999,7 @@ cleanup:
           hitParams.aovId = (int) params.aovId;
           hitParams.baseFileName = "rp_main.chit";
           hitParams.hasVolumeAbsorptionCoeff = material->hasVolumeAbsorptionCoeff;
+          hitParams.hasVolumeScatteringCoeff = material->hasVolumeScatteringCoeff;
           hitParams.isEmissive = material->isEmissive;
           hitParams.isOpaque = material->isOpaque;
           hitParams.isThinWalled = material->isThinWalled;

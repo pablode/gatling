@@ -52,8 +52,9 @@ namespace gtl
     MC_DF_FLAG_EMISSION_INTENSITY = (1 << 2),
     MC_DF_FLAG_THIN_WALLED        = (1 << 3),
     MC_DF_FLAG_VOLUME_ABSORPTION  = (1 << 4),
-    MC_DF_FLAG_CUTOUT_OPACITY     = (1 << 5),
-    MC_DF_FLAG_COUNT              = 6
+    MC_DF_FLAG_VOLUME_SCATTERING  = (1 << 5),
+    MC_DF_FLAG_CUTOUT_OPACITY     = (1 << 6),
+    MC_DF_FLAG_COUNT              = 7
   };
 
   class McBackend

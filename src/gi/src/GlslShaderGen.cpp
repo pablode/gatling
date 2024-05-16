@@ -192,7 +192,7 @@ namespace gtl
 
   bool GiGlslShaderGen::generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_THIN_WALLED;
+    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_VOLUME_SCATTERING | MC_DF_FLAG_THIN_WALLED;
 
     if (material.isEmissive)
     {
@@ -235,6 +235,10 @@ namespace gtl
     if (params.hasVolumeAbsorptionCoeff)
     {
       stitcher.appendDefine("HAS_VOLUME_ABSORPTION_COEFF");
+    }
+    if (params.hasVolumeScatteringCoeff)
+    {
+      stitcher.appendDefine("HAS_VOLUME_SCATTERING_COEFF");
     }
     if (params.isEmissive)
     {

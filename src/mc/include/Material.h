@@ -29,6 +29,7 @@ namespace gtl
     bool hasBackfaceBsdf;
     bool hasBackfaceEdf;
     bool hasVolumeAbsorptionCoeff;
+    bool hasVolumeScatteringCoeff;
     bool isEmissive;
     bool isOpaque;
     bool isThinWalled;

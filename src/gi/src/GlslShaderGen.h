@@ -88,6 +88,7 @@ namespace gtl
       int32_t aovId;
       std::string_view baseFileName;
       bool hasVolumeAbsorptionCoeff;
+      bool hasVolumeScatteringCoeff;
       bool isEmissive;
       bool isOpaque;
       bool isThinWalled;

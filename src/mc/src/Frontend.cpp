@@ -116,6 +116,13 @@ namespace
 
     return !_IsExpressionBlackColor(expr);
   }
+
+  bool _HasCompiledMaterialVolumeScatteringCoefficient(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("volume.scattering_coefficient"));
+
+    return !_IsExpressionBlackColor(expr);
+  }
 }
 
 namespace gtl
@@ -144,6 +151,7 @@ namespace gtl
       .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),
       .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
+      .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isOpaque = isOpaque,
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
@@ -197,6 +205,7 @@ namespace gtl
       .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),
       .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
+      .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isOpaque = _IsCompiledMaterialOpaque(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),

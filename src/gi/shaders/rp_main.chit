@@ -229,7 +229,7 @@ void main()
 #ifdef HAS_VOLUME_ABSORPTION_COEFF
     if (inside && !thinWalled)
     {
-        vec3 abs_coeff = mdl_absorption_coefficient(shading_state);
+        vec3 abs_coeff = mdl_volume_absorption_coefficient(shading_state);
         throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
         throughput.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0;
         throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
