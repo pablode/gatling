@@ -170,8 +170,8 @@ void main()
 #ifdef IS_THIN_WALLED
     thinWalled = mdl_thin_walled(shading_state);
 #endif
-    const float ior1 = (inside && !thinWalled) ? BSDF_USE_MATERIAL_IOR : 1.0;
-    const float ior2 = (inside && !thinWalled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
+    const float iorCurrent = (inside && !thinWalled) ? BSDF_USE_MATERIAL_IOR : 1.0;
+    const float iorOther = (inside && !thinWalled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
 #if AOV_ID == AOV_ID_DEBUG_OPACITY
 #ifdef IS_OPAQUE
@@ -228,9 +228,7 @@ void main()
     if (inside && !thinWalled)
     {
         vec3 abs_coeff = mdl_volume_absorption_coefficient(shading_state);
-        throughput.x *= abs_coeff.x > 0.0 ? exp(-abs_coeff.x * hit_t) : 1.0;
-        throughput.y *= abs_coeff.y > 0.0 ? exp(-abs_coeff.y * hit_t) : 1.0;
-        throughput.z *= abs_coeff.z > 0.0 ? exp(-abs_coeff.z * hit_t) : 1.0;
+        throughput *= exp(-abs_coeff * hit_t);
     }
 #endif
 
@@ -284,8 +282,8 @@ void main()
         if (neeValid)
         {
             Bsdf_evaluate_data bsdf_eval_data;
-            bsdf_eval_data.ior1 = vec3(ior1);
-            bsdf_eval_data.ior2 = vec3(ior2);
+            bsdf_eval_data.ior1 = vec3(iorCurrent);
+            bsdf_eval_data.ior2 = vec3(iorOther);
             bsdf_eval_data.k1 = -gl_WorldRayDirectionEXT;
             bsdf_eval_data.k2 = dirToLight;
             mdl_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);
@@ -336,8 +334,8 @@ void main()
         shading_state.normal = normal;
 
         Bsdf_sample_data bsdf_sample_data;
-        bsdf_sample_data.ior1 = vec3(ior1);
-        bsdf_sample_data.ior2 = vec3(ior2);
+        bsdf_sample_data.ior1 = vec3(iorCurrent);
+        bsdf_sample_data.ior2 = vec3(iorOther);
         bsdf_sample_data.k1 = -gl_WorldRayDirectionEXT;
 #ifdef RAND_4D
         bsdf_sample_data.xi = rng4d_next4f(rayPayload.rng_state);
