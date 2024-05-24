@@ -27,11 +27,7 @@ layout(buffer_reference, hitobjectshaderrecordnv) buffer ShaderRecordBuffer
 
 vec3 evaluate_sample(vec3 ray_origin,
                      vec3 ray_dir,
-#ifdef RAND_4D
-                     uvec4 rng_state)
-#else
-                     uint rng_state)
-#endif
+                     RNG_STATE_TYPE rng_state)
 {
     rayPayload.throughput = vec3(1.0);
     rayPayload.bitfield   = 0;
@@ -220,11 +216,11 @@ void main()
         uint sampleIndex = PC.sampleOffset + s;
 #ifdef RAND_4D
         uvec4 rng_state = rng4d_init(pixel_pos.xy, sampleIndex);
-        vec4 rand4 = rng4d_next(rng_state);
+        vec4 rand4 = rng4d_next4f(rng_state);
         vec2 rand2_xy = rand4.xy;
 #else
-        uint rng_state = rng_init(pixel_index, sampleIndex);
-        vec2 rand2_xy = vec2(rng_next(rng_state), rng_next(rng_state));
+        uint rng_state = rng1d_init(pixel_index, sampleIndex);
+        vec2 rand2_xy = rng1d_next2f(rng_state);
 #endif
 
         // Uniform pixel area sampling
@@ -252,7 +248,7 @@ void main()
 #ifdef RAND_4D
             vec2 rand2_zw = rand4.zw;
 #else
-            vec2 rand2_zw = vec2(rng_next(rng_state), rng_next(rng_state));
+            vec2 rand2_zw = rng1d_next2f(rng_state);
 #endif
 
             vec3 focalPoint = rayOrigin + rayDir * PC.focusDistance;

@@ -45,9 +45,9 @@ void main()
 #endif
 
 #ifdef RAND_4D
-  float k = rng4d_next(rayPayload.rng_state).x;
+  float k = rng4d_next4f(rayPayload.rng_state).x;
 #else
-  float k = rng_next(rayPayload.rng_state);
+  float k = rng1d_next1f(rayPayload.rng_state);
 #endif
   if (k > opacity)
   {

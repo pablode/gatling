@@ -267,14 +267,9 @@ void main()
     {
         // Sample light source
 #ifdef RAND_4D
-        vec4 k4 = rng4d_next(rayPayload.rng_state);
+        vec4 k4 = rng4d_next4f(rayPayload.rng_state);
 #else
-        vec4 k4 = vec3(
-            rng_next(rayPayload.rng_state),
-            rng_next(rayPayload.rng_state),
-            rng_next(rayPayload.rng_state),
-            rng_next(rayPayload.rng_state)
-        );
+        vec4 k4 = rng1d_next4f(rayPayload.rng_state);
 #endif
 
         vec3 dirToLight;
@@ -318,9 +313,9 @@ void main()
 
     /* 6. Russian Roulette */
 #ifdef RAND_4D
-    float k1 = rng4d_next(rayPayload.rng_state).x;
+    float k1 = rng4d_next4f(rayPayload.rng_state).x;
 #else
-    float k1 = rng_next(rayPayload.rng_state);
+    float k1 = rng1d_next1f(rayPayload.rng_state);
 #endif
 
     uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
@@ -347,12 +342,9 @@ void main()
         bsdf_sample_data.ior2 = vec3(ior2);
         bsdf_sample_data.k1 = -gl_WorldRayDirectionEXT;
 #ifdef RAND_4D
-        bsdf_sample_data.xi = rng4d_next(rayPayload.rng_state);
+        bsdf_sample_data.xi = rng4d_next4f(rayPayload.rng_state);
 #else
-        bsdf_sample_data.xi[0] = rng_next(rayPayload.rng_state);
-        bsdf_sample_data.xi[1] = rng_next(rayPayload.rng_state);
-        bsdf_sample_data.xi[2] = rng_next(rayPayload.rng_state);
-        bsdf_sample_data.xi[3] = rng_next(rayPayload.rng_state);
+        bsdf_sample_data.xi = rng1d_next4f(rayPayload.rng_state);
 #endif
         mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
 

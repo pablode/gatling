@@ -43,6 +43,8 @@ float uintAsFloat(uint v)
 #define RAND_4D
 
 #ifdef RAND_4D
+#define RNG_STATE_TYPE uvec4
+
 // RNG producing on a four-element vector.
 // From: "Hash Functions for GPU Rendering" by Jarzynski and Olano.
 // Licensed under CC BY-ND 3.0: https://creativecommons.org/licenses/by-nd/3.0/
@@ -55,7 +57,7 @@ uvec4 hash_pcg4d(uvec4 v)
     return v;
 }
 
-vec4 rng4d_next(inout uvec4 rng_state)
+vec4 rng4d_next4f(inout uvec4 rng_state)
 {
     rng_state.w++;
     return uvec4AsVec4(hash_pcg4d(rng_state));
@@ -66,6 +68,8 @@ uvec4 rng4d_init(uvec2 pixel_coords, uint frame_num)
     return uvec4(pixel_coords.xy, frame_num, 0);
 }
 #else
+#define RNG_STATE_TYPE uint
+
 // Hash prospector parametrization found by GH user TheIronBorn:
 // https://github.com/skeeto/hash-prospector#discovered-hash-functions
 uint hash_theironborn(uint x)
@@ -86,13 +90,28 @@ uint hash_pcg32(inout uint state)
     return (word >> 22u) ^ word;
 }
 
-float rng_next(inout uint rng_state)
+float rng1d_next1f(inout uint rng_state)
 {
     rng_state = hash_pcg32(rng_state);
     return uintAsFloat(rng_state);
 }
 
-uint rng_init(uint pixel_index, uint sampleIndex)
+vec2 rng1d_next2f(inout uint rng_state)
+{
+    return vec2(rng1d_next1f(rng_state), rng1d_next1f(rng_state));
+}
+
+vec4 rng1d_next4f(inout uint rng_state)
+{
+    return vec4(
+        rng1d_next1f(rng_state),
+        rng1d_next1f(rng_state),
+        rng1d_next1f(rng_state),
+        rng1d_next1f(rng_state)
+    );
+}
+
+uint rng1d_init(uint pixel_index, uint sampleIndex)
 {
     return hash_theironborn(pixel_index * (sampleIndex + 1));
 }

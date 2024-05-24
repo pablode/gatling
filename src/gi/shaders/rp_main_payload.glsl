@@ -5,11 +5,7 @@ struct ShadeRayPayload
     /* inout */ vec3 throughput;
     /* inout */ uint bitfield; // MSB: inside/outside. rest: bounce count
     /* inout */ vec3 radiance;
-#ifdef RAND_4D
-    /* inout */ uvec4 rng_state;
-#else
-    /* inout */ uint rng_state;
-#endif
+    /* inout */ RNG_STATE_TYPE rng_state;
     /* out */   vec3 ray_origin;
     /* out */   vec3 ray_dir;
     /* out */   vec3 neeToLight;
