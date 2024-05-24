@@ -32,7 +32,7 @@ vec3 sampleDomeLight(uint domeLightIndex, vec3 rayDir)
 
 void main()
 {
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
 
 #if AOV_ID != AOV_ID_COLOR
     return;
@@ -41,7 +41,7 @@ void main()
     bool useFallbackDomeLight = false;
 
 #ifndef DOME_LIGHT_CAMERA_VISIBLE
-    bool isPrimaryRay = (rayPayload.bitfield & 0x7FFFFFFFu) == 0;
+    bool isPrimaryRay = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK) == 0;
 
     useFallbackDomeLight = isPrimaryRay;
 #endif

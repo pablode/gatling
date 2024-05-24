@@ -163,8 +163,8 @@ void main()
     vec3 throughput = vec3(rayPayload.throughput);
     vec3 radiance = vec3(rayPayload.radiance);
 
-    uint bounce = (rayPayload.bitfield & 0x7FFFFFFFu);
-    bool inside = bool(rayPayload.bitfield & 0x80000000u);
+    uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
+    bool inside = bool(rayPayload.bitfield & SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK);
 
     const bool thinWalled = false;
 #ifdef IS_THIN_WALLED
@@ -176,37 +176,37 @@ void main()
 #if AOV_ID == AOV_ID_DEBUG_OPACITY
 #ifdef IS_OPAQUE
     rayPayload.radiance = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
 #else
     // Payload fields have been set in any-hit shader.
 #endif
     return;
 #elif AOV_ID == AOV_ID_NORMAL
     rayPayload.radiance = (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_TANGENTS
     rayPayload.radiance = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_BITANGENTS
     rayPayload.radiance = (shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_BARYCENTRICS
     rayPayload.radiance = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_TEXCOORDS
     rayPayload.radiance = vec3(shading_state.text_coords[0]);
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_DEBUG_DOUBLE_SIDED
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
     bool doubleSided = bool(payload.bitfield & BLAS_PAYLOAD_BITFLAG_IS_DOUBLE_SIDED);
 
     rayPayload.radiance = doubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_OBJECTID
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
@@ -219,7 +219,7 @@ void main()
       ((objectId >> 16) & 0xFF) / 255.0
       // we don't support the alpha component (16M combinations is enough)
     );
-    rayPayload.bitfield = 0xFFFFFFFFu;
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #endif
 
@@ -358,8 +358,15 @@ void main()
         rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (isTransmission ? -1.0 : 1.0));
     }
 
-    uint bitfield = (uint(inside) << 31) | (bounce + 1);
-    rayPayload.bitfield = terminatePath ? 0xFFFFFFFFu : bitfield;
+    rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK;
+    rayPayload.bitfield |= (uint(inside) << SHADE_RAY_PAYLOAD_MEDIUM_IDX_OFFSET);
+    rayPayload.bitfield++; // inc bounce
+
+    if (terminatePath)
+    {
+        rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+    }
+
     rayPayload.throughput = throughput;
     rayPayload.radiance = radiance;
 }

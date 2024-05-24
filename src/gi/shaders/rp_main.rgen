@@ -36,10 +36,6 @@ vec3 evaluate_sample(vec3 ray_origin,
     rayPayload.ray_origin = ray_origin;
     rayPayload.ray_dir    = ray_dir;
 
-#if AOV_ID == AOV_ID_DEBUG_BOUNCES
-    uint bounce = 0;
-#endif
-
     // Correct clip plane curving by getting the hypothenuse length (our current ray)
     // from the adjacent edge (the forward vector) the angle between both.
     float cosConeAngle = dot(ray_dir, PC.cameraForward);
@@ -49,8 +45,17 @@ vec3 evaluate_sample(vec3 ray_origin,
     uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
 
     [[loop]]
-    while ((rayPayload.bitfield & 0x7FFFFFFFu) <= maxBounces)
+    while (true)
     {
+        // Loop exit.
+        uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
+        bool terminate = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_TERMINATE_FLAG) != 0;
+
+        if (bounce > maxBounces || terminate)
+        {
+             break;
+        }
+
         // Closest hit shading
         rayPayload.neeContrib = vec3(0.0);
 
@@ -136,19 +141,17 @@ vec3 evaluate_sample(vec3 ray_origin,
 
 #if AOV_ID == AOV_ID_DEBUG_NEE
             rayPayload.radiance = shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-            rayPayload.bitfield = 0xFFFFFFFFu;
+            rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+            return;
 #endif
         }
 #endif
 
         clipRange = vec2(0.0, FLOAT_MAX); // Only clip primary rays
-
-#if AOV_ID == AOV_ID_DEBUG_BOUNCES
-        bounce++;
-#endif
     }
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
+    uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
     return colormap_inferno(float(bounce) / float(maxBounces));
 #endif
 
