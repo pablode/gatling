@@ -101,7 +101,6 @@ vec3 evaluate_sample(vec3 ray_origin,
 
         // NEE shadow query
 #ifdef NEXT_EVENT_ESTIMATION
-#if SPHERE_LIGHT_COUNT > 0
         {
             shadowRayPayload.rng_state = rayPayload.rng_state;
             shadowRayPayload.shadowed = true; // Gets set to false by miss shader
@@ -140,7 +139,6 @@ vec3 evaluate_sample(vec3 ray_origin,
             rayPayload.bitfield = 0xFFFFFFFFu;
 #endif
         }
-#endif
 #endif
 
         clipRange = vec2(0.0, FLOAT_MAX); // Only clip primary rays

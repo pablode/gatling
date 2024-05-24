@@ -66,12 +66,15 @@ namespace gtl
     stitcher.appendDefine("NDEBUG");
 #endif
 
+    uint32_t totalLightCount = sphereLightCount + distantLightCount + rectLightCount + diskLightCount;
+
     stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) texCount2d);
     stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) texCount3d);
     stitcher.appendDefine("SPHERE_LIGHT_COUNT", (int32_t) sphereLightCount);
     stitcher.appendDefine("DISTANT_LIGHT_COUNT", (int32_t) distantLightCount);
     stitcher.appendDefine("RECT_LIGHT_COUNT", (int32_t) rectLightCount);
     stitcher.appendDefine("DISK_LIGHT_COUNT", (int32_t) diskLightCount);
+    stitcher.appendDefine("TOTAL_LIGHT_COUNT", (int32_t) totalLightCount);
     stitcher.appendDefine("MEDIUM_STACK_SIZE", (int32_t) mediumStackSize);
     stitcher.appendDefine("MAX_VOLUME_WALK_LENGTH", (int32_t) maxVolumeWalkLength);
   }

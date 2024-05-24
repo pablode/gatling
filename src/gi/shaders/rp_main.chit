@@ -22,8 +22,6 @@ layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayloa
 
 hitAttributeEXT vec2 baryCoord;
 
-const uint TOTAL_LIGHT_COUNT = SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT + DISK_LIGHT_COUNT;
-
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
@@ -263,7 +261,7 @@ void main()
 
     /* 5. NEE light sampling */
 #ifdef NEXT_EVENT_ESTIMATION
-    if (!inside && TOTAL_LIGHT_COUNT > 0)
+    if (!inside)
     {
         // Sample light source
 #ifdef RAND_4D

@@ -888,6 +888,14 @@ cleanup:
     bool hasPipelineClosestHitShader = false;
     bool hasPipelineAnyHitShader = false;
 
+    uint32_t distantLightCount = scene->distantLights.elementCount();
+    uint32_t sphereLightCount = scene->sphereLights.elementCount();
+    uint32_t rectLightCount = scene->rectLights.elementCount();
+    uint32_t diskLightCount = scene->diskLights.elementCount();
+    uint32_t totalLightCount = sphereLightCount + distantLightCount + rectLightCount + diskLightCount;
+
+    bool nextEventEstimation = (params.nextEventEstimation && totalLightCount > 0);
+
     // Create per-material closest-hit shaders.
     //
     // This is done in multiple phases: first, GLSL is generated from MDL, and
@@ -1004,12 +1012,12 @@ cleanup:
             .isOpaque = material->isOpaque,
             .isThinWalled = material->isThinWalled,
             .enableSceneTransforms = material->requiresSceneTransforms,
-            .nextEventEstimation = params.nextEventEstimation,
+            .nextEventEstimation = nextEventEstimation,
             .shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource,
-            .distantLightCount = scene->distantLights.elementCount(),
-            .sphereLightCount = scene->sphereLights.elementCount(),
-            .rectLightCount = scene->rectLights.elementCount(),
-            .diskLightCount = scene->diskLights.elementCount(),
+            .distantLightCount = distantLightCount,
+            .sphereLightCount = sphereLightCount,
+            .rectLightCount = rectLightCount,
+            .diskLightCount = diskLightCount,
             .textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d,
             .textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d,
             .texCount2d = texCount2d,
@@ -1033,10 +1041,10 @@ cleanup:
             .enableSceneTransforms = material->requiresSceneTransforms,
             .baseFileName = "rp_main.ahit",
             .opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource,
-            .distantLightCount = scene->distantLights.elementCount(),
-            .sphereLightCount = scene->sphereLights.elementCount(),
-            .rectLightCount = scene->rectLights.elementCount(),
-            .diskLightCount = scene->diskLights.elementCount(),
+            .distantLightCount = distantLightCount,
+            .sphereLightCount = sphereLightCount,
+            .rectLightCount = rectLightCount,
+            .diskLightCount = diskLightCount,
             .textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d,
             .textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d,
             .texCount2d = texCount2d,
@@ -1148,14 +1156,14 @@ cleanup:
         .depthOfField = params.depthOfField,
         .filterImportanceSampling = params.filterImportanceSampling,
         .materialCount = params.materialCount,
-        .nextEventEstimation = params.nextEventEstimation,
+        .nextEventEstimation = nextEventEstimation,
         .progressiveAccumulation = params.progressiveAccumulation,
         .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
         .shaderClockExts = clockCyclesAov,
-        .distantLightCount = scene->distantLights.elementCount(),
-        .sphereLightCount = scene->sphereLights.elementCount(),
-        .rectLightCount = scene->rectLights.elementCount(),
-        .diskLightCount = scene->diskLights.elementCount(),
+        .distantLightCount = distantLightCount,
+        .sphereLightCount = sphereLightCount,
+        .rectLightCount = rectLightCount,
+        .diskLightCount = diskLightCount,
         .texCount2d = texCount2d,
         .texCount3d = texCount3d,
         .mediumStackSize = params.mediumStackSize,
@@ -1183,10 +1191,10 @@ cleanup:
       GiGlslShaderGen::MissShaderParams missParams = {
         .aovId = (int) params.aovId,
         .domeLightCameraVisible = params.domeLightCameraVisible,
-        .distantLightCount = scene->distantLights.elementCount(),
-        .sphereLightCount = scene->sphereLights.elementCount(),
-        .rectLightCount = scene->rectLights.elementCount(),
-        .diskLightCount = scene->diskLights.elementCount(),
+        .distantLightCount = distantLightCount,
+        .sphereLightCount = sphereLightCount,
+        .rectLightCount = rectLightCount,
+        .diskLightCount = diskLightCount,
         .texCount2d = texCount2d,
         .texCount3d = texCount3d,
         .mediumStackSize = params.mediumStackSize,
