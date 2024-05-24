@@ -138,7 +138,8 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
     .nextEventEstimation = false,
     .progressiveAccumulation = true,
     .scene = m_scene,
-    .mediumStackSize = 1
+    .mediumStackSize = 1,
+    .maxVolumeWalkLength = 7
   };
 
   GiShaderCache* shaderCache = giCreateShaderCache(shaderCacheParams);

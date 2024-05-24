@@ -1014,7 +1014,8 @@ cleanup:
             .textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d,
             .texCount2d = texCount2d,
             .texCount3d = texCount3d,
-            .mediumStackSize = params.mediumStackSize
+            .mediumStackSize = params.mediumStackSize,
+            .maxVolumeWalkLength = params.maxVolumeWalkLength
           };
 
           if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
@@ -1040,7 +1041,8 @@ cleanup:
             .textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d,
             .texCount2d = texCount2d,
             .texCount3d = texCount3d,
-            .mediumStackSize = params.mediumStackSize
+            .mediumStackSize = params.mediumStackSize,
+            .maxVolumeWalkLength = params.maxVolumeWalkLength
           };
 
           hitParams.shadowTest = false;
@@ -1156,7 +1158,8 @@ cleanup:
         .diskLightCount = scene->diskLights.elementCount(),
         .texCount2d = texCount2d,
         .texCount3d = texCount3d,
-        .mediumStackSize = params.mediumStackSize
+        .mediumStackSize = params.mediumStackSize,
+        .maxVolumeWalkLength = params.maxVolumeWalkLength
       };
 
       std::vector<uint8_t> spv;
@@ -1186,7 +1189,8 @@ cleanup:
         .diskLightCount = scene->diskLights.elementCount(),
         .texCount2d = texCount2d,
         .texCount3d = texCount3d,
-        .mediumStackSize = params.mediumStackSize
+        .mediumStackSize = params.mediumStackSize,
+        .maxVolumeWalkLength = params.maxVolumeWalkLength
       };
 
       // regular miss shader

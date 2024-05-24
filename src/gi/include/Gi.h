@@ -115,6 +115,7 @@ namespace gtl
     bool               progressiveAccumulation;
     GiScene*           scene;
     uint32_t           mediumStackSize;
+    uint32_t           maxVolumeWalkLength;
   };
 
   struct GiGeomCacheParams

@@ -33,6 +33,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((depthOfField, "depth-of-field"))                         \
   ((lightIntensityMultiplier, "light-intensity-multiplier")) \
   ((mediumStackSize, "medium-stack-size"))                   \
+  ((maxVolumeWalkLength, "max-volume-walk-length"))          \
   ((clippingPlanes, "clipping-planes"))
 
 // mtlx node identifier is given by UsdMtlx.
