@@ -40,7 +40,7 @@ float uintAsFloat(uint v)
 }
 
 // Enable for higher quality random numbers at the cost of performance
-#define RAND_4D
+//#define RAND_4D
 
 #ifdef RAND_4D
 #define RNG_STATE_TYPE uvec4
