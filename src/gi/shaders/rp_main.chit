@@ -164,7 +164,7 @@ void main()
     vec3 radiance = vec3(rayPayload.radiance);
 
     uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
-    bool inside = bool(rayPayload.bitfield & SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK);
+    bool inside = shadeRayPayloadGetMediumIdx(rayPayload) > 0;
 
     const bool thinWalled = false;
 #ifdef IS_THIN_WALLED
@@ -358,8 +358,7 @@ void main()
         rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (isTransmission ? -1.0 : 1.0));
     }
 
-    rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK;
-    rayPayload.bitfield |= (uint(inside) << SHADE_RAY_PAYLOAD_MEDIUM_IDX_OFFSET);
+    shadeRayPayloadSetMediumIdx(rayPayload, inside ? 1 : 0);
     rayPayload.bitfield++; // inc bounce
 
     if (terminatePath)
@@ -369,4 +368,9 @@ void main()
 
     rayPayload.throughput = throughput;
     rayPayload.radiance = radiance;
+
+    if (terminatePath)
+    {
+        rayPayload.bitfield = SHADE_RAY_PAYLOAD_BOUNCES_MASK;
+    }
 }

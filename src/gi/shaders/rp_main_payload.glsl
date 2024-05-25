@@ -36,5 +36,26 @@ struct ShadowRayPayload
     /* out */   bool shadowed;
 };
 
+uint shadeRayPayloadGetMediumIdx(in ShadeRayPayload payload)
+{
+    uint bitfield = payload.bitfield;
+    bitfield &= SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK;
+    bitfield >>= SHADE_RAY_PAYLOAD_MEDIUM_IDX_OFFSET;
+
+    // The medium index can exceed the max stack size. This is used to ensure an
+    // equal number of stack pushes/pops when the number of nested media exceeds
+    // the max stack size. The case is only relevant when we push to the stack;
+    // for common use we want to choose the uppermost/current medium.
+    uint maxMediumIdx = max(1, MEDIUM_STACK_SIZE);
+
+    return min(bitfield, maxMediumIdx);
+}
+
+void shadeRayPayloadSetMediumIdx(inout ShadeRayPayload payload, uint idx)
+{
+    payload.bitfield &= ~SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK;
+    payload.bitfield |= min(idx << SHADE_RAY_PAYLOAD_MEDIUM_IDX_OFFSET, SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK);
+}
+
 const int PAYLOAD_INDEX_SHADE = 0;
 const int PAYLOAD_INDEX_SHADOW = 1;
