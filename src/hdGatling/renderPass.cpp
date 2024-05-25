@@ -49,7 +49,7 @@ namespace
     { HdGatlingAovTokens->debugOpacity,      GiAovId::Opacity      },
     { HdGatlingAovTokens->debugTangents,     GiAovId::Tangents     },
     { HdGatlingAovTokens->debugBitangents,   GiAovId::Bitangents   },
-    { HdGatlingAovTokens->debugDoubleSided,  GiAovId::DoubleSided  },
+    { HdGatlingAovTokens->debugThinWalled,   GiAovId::ThinWalled   },
 #endif
     { HdAovTokens->primId,                   GiAovId::ObjectId     },
   };

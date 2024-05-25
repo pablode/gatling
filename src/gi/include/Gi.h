@@ -39,7 +39,7 @@ namespace gtl
     Opacity,
     Tangents,
     Bitangents,
-    DoubleSided,
+    ThinWalled,
     ObjectId
   };
 

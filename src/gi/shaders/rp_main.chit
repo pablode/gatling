@@ -166,10 +166,11 @@ void main()
     uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
     bool inside = shadeRayPayloadGetMediumIdx(rayPayload) > 0;
 
-    const bool thinWalled = false;
+    bool thinWalled = false;
 #ifdef IS_THIN_WALLED
     thinWalled = mdl_thin_walled(shading_state);
 #endif
+
     const float iorCurrent = (inside && !thinWalled) ? BSDF_USE_MATERIAL_IOR : 1.0;
     const float iorOther = (inside && !thinWalled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
@@ -201,11 +202,8 @@ void main()
     rayPayload.radiance = vec3(shading_state.text_coords[0]);
     rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
-#elif AOV_ID == AOV_ID_DEBUG_DOUBLE_SIDED
-    BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
-    bool doubleSided = bool(payload.bitfield & BLAS_PAYLOAD_BITFLAG_IS_DOUBLE_SIDED);
-
-    rayPayload.radiance = doubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+#elif AOV_ID == AOV_ID_DEBUG_THIN_WALLED
+    rayPayload.radiance = thinWalled ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
     rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_OBJECTID
