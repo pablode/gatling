@@ -253,9 +253,9 @@ namespace gtl
     {
       stitcher.appendDefine("IS_EMISSIVE");
     }
-    if (params.isOpaque)
+    if (params.hasCutoutTransparency)
     {
-      stitcher.appendDefine("IS_OPAQUE");
+      stitcher.appendDefine("HAS_CUTOUT_TRANSPARENCY");
     }
     if (params.isThinWalled)
     {

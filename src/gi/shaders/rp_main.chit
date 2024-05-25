@@ -174,7 +174,7 @@ void main()
     const float iorOther = (inside && !thinWalled) ? 1.0 : BSDF_USE_MATERIAL_IOR;
 
 #if AOV_ID == AOV_ID_DEBUG_OPACITY
-#ifdef IS_OPAQUE
+#ifndef HAS_CUTOUT_TRANSPARENCY
     rayPayload.radiance = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap
     rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
 #else

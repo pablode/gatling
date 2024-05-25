@@ -94,7 +94,7 @@ namespace gtl
       bool hasVolumeAbsorptionCoeff;
       bool hasVolumeScatteringCoeff;
       bool isEmissive;
-      bool isOpaque;
+      bool hasCutoutTransparency;
       bool isThinWalled;
       bool enableSceneTransforms;
       bool nextEventEstimation;

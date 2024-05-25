@@ -660,7 +660,7 @@ fail:
                                               .indexBuffer = tmpIndexBuffer,
                                               .maxVertex = (uint32_t)positionData.size(),
                                               .triangleCount = (uint32_t)indexData.size() / 3,
-                                              .isOpaque = material->mcMat->isOpaque
+                                              .isOpaque = !material->mcMat->hasCutoutTransparency
                                             }, &blas);
 
           if (!blasCreated)
@@ -940,7 +940,7 @@ cleanup:
           hitInfo.genInfo = genInfo;
           groupInfo.closestHitInfo = hitInfo;
         }
-        if (!material->isOpaque)
+        if (material->hasCutoutTransparency)
         {
           GiGlslShaderGen::MaterialGenInfo genInfo;
           if (!s_shaderGen->generateMaterialOpacityGenInfo(*material, genInfo))
@@ -1009,7 +1009,7 @@ cleanup:
             .hasVolumeAbsorptionCoeff = material->hasVolumeAbsorptionCoeff,
             .hasVolumeScatteringCoeff = material->hasVolumeScatteringCoeff,
             .isEmissive = material->isEmissive,
-            .isOpaque = material->isOpaque,
+            .hasCutoutTransparency = material->hasCutoutTransparency,
             .isThinWalled = material->isThinWalled,
             .enableSceneTransforms = material->requiresSceneTransforms,
             .nextEventEstimation = nextEventEstimation,

@@ -95,9 +95,10 @@ namespace
     return !value || value->get_value();
   }
 
-  bool _IsCompiledMaterialOpaque(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  bool _HasCompiledMaterialCutoutTransparency(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
   {
-    return compiledMaterial->get_opacity() == mi::neuraylib::OPACITY_OPAQUE;
+    float opacity = -1.0;
+    return !compiledMaterial->get_cutout_opacity(&opacity) || opacity < 1.0f;
   }
 
   bool _HasCompiledMaterialBackfaceBsdf(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
@@ -136,7 +137,7 @@ namespace gtl
     m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib);
   }
 
-  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool isOpaque)
+  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
     if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
@@ -152,8 +153,8 @@ namespace gtl
       .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
+      .hasCutoutTransparency = hasCutoutTransparency,
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
-      .isOpaque = isOpaque,
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
       .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
@@ -165,26 +166,26 @@ namespace gtl
   {
     std::string mdlSrc;
     std::string subIdentifier;
-    bool isOpaque;
-    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier, isOpaque))
+    bool hasCutoutTransparency;
+    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier, hasCutoutTransparency))
     {
       return nullptr;
     }
 
-    return createFromMdlStr(mdlSrc, subIdentifier, isOpaque);
+    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
   }
 
   McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc)
   {
     std::string mdlSrc;
     std::string subIdentifier;
-    bool isOpaque;
-    if (!m_mtlxMdlCodeGen->translate(doc, mdlSrc, subIdentifier, isOpaque))
+    bool hasCutoutTransparency;
+    if (!m_mtlxMdlCodeGen->translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency))
     {
       return nullptr;
     }
 
-    return createFromMdlStr(mdlSrc, subIdentifier, isOpaque);
+    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
   }
 
   McMaterial* McFrontend::createFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
@@ -206,8 +207,8 @@ namespace gtl
       .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
+      .hasCutoutTransparency = _HasCompiledMaterialCutoutTransparency(compiledMaterial),
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
-      .isOpaque = _IsCompiledMaterialOpaque(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
       .resourcePathPrefix = resourcePathPrefix,
       .mdlMaterial = mdlMaterial,

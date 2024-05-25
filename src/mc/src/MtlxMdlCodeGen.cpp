@@ -70,7 +70,7 @@ namespace
     return false;
   }
 
-  bool _IsSurfaceShaderOpaque(mx::TypedElementPtr element)
+  bool _HasSurfaceShaderNoCutoutTransparency(mx::TypedElementPtr element)
   {
     mx::NodePtr node = element->asA<mx::Node>();
 
@@ -79,22 +79,18 @@ namespace
       return true;
     }
 
-    if (_IsBxdfWithInputValue(node, "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f))) &&
-        _IsBxdfWithInputValue(node, "standard_surface", "transmission", mx::Value::createValue(0.0f)) &&
-        _IsBxdfWithInputValue(node, "standard_surface", "subsurface", mx::Value::createValue(0.0f)))
+    if (_IsBxdfWithInputValue(node, "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f))))
     {
       return true;
     }
 
-    if (_IsBxdfWithInputValue(node, "gltf_pbr", "alpha_mode", mx::Value::createValue(0)) &&
-        _IsBxdfWithInputValue(node, "gltf_pbr", "transmission", mx::Value::createValue(0.0f)))
+    if (_IsBxdfWithInputValue(node, "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* OPAQUE */)) ||
+        _IsBxdfWithInputValue(node, "gltf_pbr", "alpha_mode", mx::Value::createValue(2 /* BLEND */)))
     {
       return true;
     }
 
-    if (_IsBxdfWithInputValue(node, "open_pbr_surface", "geometry_opacity", mx::Value::createValue(mx::Color3(1.0f))) &&
-        _IsBxdfWithInputValue(node, "open_pbr_surface", "transmission_weight", mx::Value::createValue(0.0f)) &&
-        _IsBxdfWithInputValue(node, "open_pbr_surface", "subsurface_weight", mx::Value::createValue(0.0f)))
+    if (_IsBxdfWithInputValue(node, "open_pbr_surface", "geometry_opacity", mx::Value::createValue(mx::Color3(1.0f))))
     {
       return true;
     }
@@ -174,7 +170,7 @@ namespace gtl
     m_shaderGen->setUnitSystem(unitSystem);
   }
 
-  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
+  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
   {
     try
     {
@@ -182,7 +178,7 @@ namespace gtl
       doc->importLibrary(m_baseDoc);
       mx::readFromXmlString(doc, mtlxStr.data());
 
-      return translate(doc, mdlSrc, subIdentifier, isOpaque);
+      return translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency);
     }
     catch (const std::exception& ex)
     {
@@ -191,7 +187,7 @@ namespace gtl
     }
   }
 
-  bool McMtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& isOpaque)
+  bool McMtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -221,7 +217,7 @@ namespace gtl
       }
 
       subIdentifier = element->getName();
-      isOpaque = _IsSurfaceShaderOpaque(element);
+      hasCutoutTransparency = !_HasSurfaceShaderNoCutoutTransparency(element);
       shader = m_shaderGen->generate(subIdentifier, element, context);
     }
     catch (const std::exception& ex)

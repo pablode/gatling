@@ -30,8 +30,8 @@ namespace gtl
     bool hasBackfaceEdf;
     bool hasVolumeAbsorptionCoeff;
     bool hasVolumeScatteringCoeff;
+    bool hasCutoutTransparency;
     bool isEmissive;
-    bool isOpaque;
     bool isThinWalled;
     std::string resourcePathPrefix;
     std::shared_ptr<McMdlMaterial> mdlMaterial;
