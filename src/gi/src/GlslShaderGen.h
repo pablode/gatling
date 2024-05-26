@@ -53,82 +53,63 @@ namespace gtl
     bool generateMaterialOpacityGenInfo(const McMaterial& material, MaterialGenInfo& genInfo);
 
   public:
-    struct RaygenShaderParams
+    struct CommonShaderParams
     {
       int32_t aovId;
+      uint32_t diskLightCount;
+      uint32_t distantLightCount;
+      uint32_t mediumStackSize;
+      uint32_t rectLightCount;
+      uint32_t sphereLightCount;
+      uint32_t texCount2d;
+      uint32_t texCount3d;
+    };
+
+    struct RaygenShaderParams
+    {
+      CommonShaderParams commonParams;
       bool depthOfField;
       bool filterImportanceSampling;
       uint32_t materialCount;
+      uint32_t maxVolumeWalkLength;
       bool nextEventEstimation;
       bool progressiveAccumulation;
       bool reorderInvocations;
       bool shaderClockExts;
-      uint32_t distantLightCount;
-      uint32_t sphereLightCount;
-      uint32_t rectLightCount;
-      uint32_t diskLightCount;
-      uint32_t texCount2d;
-      uint32_t texCount3d;
-      uint32_t mediumStackSize;
-      uint32_t maxVolumeWalkLength;
     };
 
     struct MissShaderParams
     {
-      int32_t aovId;
+      CommonShaderParams commonParams;
       bool domeLightCameraVisible;
-      uint32_t distantLightCount;
-      uint32_t sphereLightCount;
-      uint32_t rectLightCount;
-      uint32_t diskLightCount;
-      uint32_t texCount2d;
-      uint32_t texCount3d;
-      uint32_t mediumStackSize;
-      uint32_t maxVolumeWalkLength;
     };
 
     struct ClosestHitShaderParams
     {
-      int32_t aovId;
       std::string_view baseFileName;
+      CommonShaderParams commonParams;
+      float directionalBias;
+      bool enableSceneTransforms;
+      bool hasCutoutTransparency;
       bool hasVolumeAbsorptionCoeff;
       bool hasVolumeScatteringCoeff;
       bool isEmissive;
-      bool hasCutoutTransparency;
       bool isThinWalled;
-      bool enableSceneTransforms;
       bool nextEventEstimation;
       std::string_view shadingGlsl;
-      uint32_t distantLightCount;
-      uint32_t sphereLightCount;
-      uint32_t rectLightCount;
-      uint32_t diskLightCount;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
-      uint32_t texCount2d;
-      uint32_t texCount3d;
-      uint32_t mediumStackSize;
-      uint32_t maxVolumeWalkLength;
-      float directionalBias;
     };
 
     struct AnyHitShaderParams
     {
-      int32_t aovId;
-      bool enableSceneTransforms;
       std::string_view baseFileName;
+      CommonShaderParams commonParams;
+      bool enableSceneTransforms;
       std::string_view opacityEvalGlsl;
       bool shadowTest;
-      uint32_t distantLightCount;
-      uint32_t sphereLightCount;
-      uint32_t rectLightCount;
-      uint32_t diskLightCount;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
-      uint32_t texCount2d;
-      uint32_t texCount3d;
-      uint32_t mediumStackSize;
-      uint32_t maxVolumeWalkLength;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);
