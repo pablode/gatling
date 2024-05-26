@@ -33,6 +33,7 @@ namespace gtl
     bool hasCutoutTransparency;
     bool isEmissive;
     bool isThinWalled;
+    float directionalBias;
     std::string resourcePathPrefix;
     std::shared_ptr<McMdlMaterial> mdlMaterial;
     bool requiresSceneTransforms;

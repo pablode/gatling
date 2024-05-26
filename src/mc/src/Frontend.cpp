@@ -124,6 +124,29 @@ namespace
 
     return !_IsExpressionBlackColor(expr);
   }
+
+  // The MDL SDK can't generate code for the volume.scattering expression - in order to support anisotropy, we assume the common case.
+  float _GetCompiledMaterialDirectionalBias(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    const float DEFAULT_BIAS = 0.0f; // isotropic
+
+    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("volume.scattering.directional_bias"));
+
+    if (!expr || expr->get_kind() != mi::neuraylib::IExpression::EK_CONSTANT)
+    {
+      return DEFAULT_BIAS;
+    }
+
+    mi::base::Handle<const mi::neuraylib::IExpression_constant> constExpr(expr->get_interface<const mi::neuraylib::IExpression_constant>());
+    mi::base::Handle<const mi::neuraylib::IValue_float> value(constExpr->get_value<mi::neuraylib::IValue_float>());
+
+    if (!value)
+    {
+      return DEFAULT_BIAS;
+    }
+
+    return value->get_value();
+  }
 }
 
 namespace gtl
@@ -156,6 +179,7 @@ namespace gtl
       .hasCutoutTransparency = hasCutoutTransparency,
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
+      .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
       .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()
@@ -210,6 +234,7 @@ namespace gtl
       .hasCutoutTransparency = _HasCompiledMaterialCutoutTransparency(compiledMaterial),
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
+      .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
       .resourcePathPrefix = resourcePathPrefix,
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()

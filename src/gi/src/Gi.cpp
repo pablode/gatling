@@ -1023,7 +1023,8 @@ cleanup:
             .texCount2d = texCount2d,
             .texCount3d = texCount3d,
             .mediumStackSize = params.mediumStackSize,
-            .maxVolumeWalkLength = params.maxVolumeWalkLength
+            .maxVolumeWalkLength = params.maxVolumeWalkLength,
+            .directionalBias = material->directionalBias
           };
 
           if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))

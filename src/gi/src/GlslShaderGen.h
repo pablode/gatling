@@ -109,6 +109,7 @@ namespace gtl
       uint32_t texCount3d;
       uint32_t mediumStackSize;
       uint32_t maxVolumeWalkLength;
+      float directionalBias;
     };
 
     struct AnyHitShaderParams
