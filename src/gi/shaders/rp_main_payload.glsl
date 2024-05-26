@@ -7,6 +7,14 @@
 #define SHADE_RAY_PAYLOAD_BOUNCES_MASK 0x00000fffu
 #define SHADE_RAY_PAYLOAD_TERMINATE_FLAG 0x80000000u
 
+struct Medium
+{
+    vec3 ior;
+    vec3 sigma_s;
+    vec3 sigma_t; // sigma_a + sigma_s
+    float bias;
+};
+
 struct ShadeRayPayload
 {
     /* inout */ vec3 throughput;
@@ -19,7 +27,13 @@ struct ShadeRayPayload
     /* inout */ uint bitfield;
 
     /* inout */ vec3 radiance;
+
     /* inout */ RNG_STATE_TYPE rng_state;
+
+#if MEDIUM_STACK_SIZE > 0
+    /* inout */ Medium media[MEDIUM_STACK_SIZE];
+#endif
+
     /* out */   vec3 ray_origin;
     /* out */   vec3 ray_dir;
     /* out */   vec3 neeToLight;
