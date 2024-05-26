@@ -22,21 +22,6 @@ layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayloa
 
 hitAttributeEXT vec2 baryCoord;
 
-bool russian_roulette(in float random_float, inout vec3 throughput)
-{
-    float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
-    float p = min(max_throughput, PC.rrInvMinTermProb);
-
-    if (random_float > p)
-    {
-        return true;
-    }
-
-    throughput /= p;
-
-    return false;
-}
-
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
 {
 #if SPHERE_LIGHT_COUNT > 0
@@ -305,28 +290,7 @@ void main()
     }
 #endif
 
-    /* 6. Russian Roulette */
-#ifdef RAND_4D
-    float k1 = rng4d_next4f(rayPayload.rng_state).x;
-#else
-    float k1 = rng1d_next1f(rayPayload.rng_state);
-#endif
-
-    uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
-    uint rrBounceOffset = PC.maxBouncesAndRrBounceOffset & 0xFFFFu;
-
-    bool terminatePath = false;
-    if (bounce == maxBounces - 1)
-    {
-        terminatePath = true;
-    }
-    else if (bounce > rrBounceOffset)
-    {
-        terminatePath = russian_roulette(k1, throughput);
-    }
-
-    /* 7. BSDF (importance) sampling. */
-    if (!terminatePath)
+    /* 6. BSDF (importance) sampling. */
     {
         // reassign normal, see declaration of variable.
         shading_state.normal = normal;
@@ -342,7 +306,10 @@ void main()
 #endif
         mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
 
-        terminatePath = (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB);
+        if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
+        {
+            rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+        }
 
         bool isTransmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;
         if (isTransmission)
@@ -359,16 +326,6 @@ void main()
     shadeRayPayloadSetMediumIdx(rayPayload, inside ? 1 : 0);
     rayPayload.bitfield++; // inc bounce
 
-    if (terminatePath)
-    {
-        rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
-    }
-
     rayPayload.throughput = throughput;
     rayPayload.radiance = radiance;
-
-    if (terminatePath)
-    {
-        rayPayload.bitfield = SHADE_RAY_PAYLOAD_BOUNCES_MASK;
-    }
 }

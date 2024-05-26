@@ -25,6 +25,21 @@ layout(buffer_reference, hitobjectshaderrecordnv) buffer ShaderRecordBuffer
 };
 #endif
 
+bool russian_roulette(in float random_float, inout vec3 throughput)
+{
+    float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
+    float p = min(max_throughput, PC.rrInvMinTermProb);
+
+    if (random_float > p)
+    {
+        return true;
+    }
+
+    throughput /= p;
+
+    return false;
+}
+
 vec3 evaluate_sample(vec3 ray_origin,
                      vec3 ray_dir,
                      RNG_STATE_TYPE rng_state)
@@ -42,6 +57,7 @@ vec3 evaluate_sample(vec3 ray_origin,
     vec2 clipRange = unpackHalf2x16(PC.clipRangePacked) / cosConeAngle;
 
     // Path trace
+    uint rrBounceOffset = PC.maxBouncesAndRrBounceOffset & 0xFFFFu;
     uint maxBounces = min(SHADE_RAY_PAYLOAD_BOUNCES_MASK, PC.maxBouncesAndRrBounceOffset >> 16);
 
     [[loop]]
@@ -104,7 +120,7 @@ vec3 evaluate_sample(vec3 ray_origin,
         );
 #endif
 
-        // NEE shadow query
+        // NEE contribution
 #ifdef NEXT_EVENT_ESTIMATION
         {
             shadowRayPayload.rng_state = rayPayload.rng_state;
@@ -147,12 +163,30 @@ vec3 evaluate_sample(vec3 ray_origin,
         }
 #endif
 
+        // Russian roulette
+        if (bounce > rrBounceOffset)
+        {
+#ifdef RAND_4D
+            float k1 = rng4d_next4f(rayPayload.rng_state).x;
+#else
+            float k1 = rng1d_next1f(rayPayload.rng_state);
+#endif
+
+            if (russian_roulette(k1, rayPayload.throughput))
+            {
+                rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+            }
+        }
+
+        // Update bounce count
+        rayPayload.bitfield++;
+
         clipRange = vec2(0.0, FLOAT_MAX); // Only clip primary rays
     }
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES
-    uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
-    return colormap_inferno(float(bounce) / float(maxBounces));
+    uint bounces = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
+    return colormap_inferno(float(bounces) / float(maxBounces));
 #endif
 
     // Radiance clamping
