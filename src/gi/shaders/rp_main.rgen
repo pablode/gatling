@@ -42,7 +42,7 @@ vec3 evaluate_sample(vec3 ray_origin,
     vec2 clipRange = unpackHalf2x16(PC.clipRangePacked) / cosConeAngle;
 
     // Path trace
-    uint maxBounces = PC.maxBouncesAndRrBounceOffset >> 16;
+    uint maxBounces = min(SHADE_RAY_PAYLOAD_BOUNCES_MASK, PC.maxBouncesAndRrBounceOffset >> 16);
 
     [[loop]]
     while (true)
@@ -51,7 +51,7 @@ vec3 evaluate_sample(vec3 ray_origin,
         uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
         bool terminate = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_TERMINATE_FLAG) != 0;
 
-        if (bounce > maxBounces || terminate)
+        if (bounce >= maxBounces || terminate)
         {
              break;
         }
