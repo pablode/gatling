@@ -42,7 +42,8 @@ namespace gtl
     mi::neuraylib::Target_function_description("thin_walled", "mdl_thin_walled"),
     mi::neuraylib::Target_function_description("volume.absorption_coefficient", "mdl_volume_absorption_coefficient"),
     mi::neuraylib::Target_function_description("volume.scattering_coefficient", "mdl_volume_scattering_coefficient"),
-    mi::neuraylib::Target_function_description("geometry.cutout_opacity", "mdl_cutout_opacity")
+    mi::neuraylib::Target_function_description("geometry.cutout_opacity", "mdl_cutout_opacity"),
+    mi::neuraylib::Target_function_description("ior", "mdl_ior")
   };
   const static char* MATERIAL_STATE_NAME = "State";
 

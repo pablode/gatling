@@ -193,7 +193,8 @@ namespace gtl
 
   bool GiGlslShaderGen::generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_VOLUME_SCATTERING | MC_DF_FLAG_THIN_WALLED;
+    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_VOLUME_SCATTERING |
+                   MC_DF_FLAG_THIN_WALLED | MC_DF_FLAG_IOR;
 
     if (material.isEmissive)
     {
