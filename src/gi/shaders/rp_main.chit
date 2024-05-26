@@ -240,10 +240,34 @@ void main()
     // init once and share between *_evaluate and *_sample calls
     mdl_bsdf_scattering_init(shading_state);
 
-    /* 5. NEE light sampling */
-#ifdef NEXT_EVENT_ESTIMATION
-    if (!inside)
+    /* 5. BSDF importance sampling. */
+    uint eventType;
     {
+        Bsdf_sample_data bsdf_sample_data;
+        bsdf_sample_data.ior1 = vec3(iorCurrent);
+        bsdf_sample_data.ior2 = vec3(iorOther);
+        bsdf_sample_data.k1 = -gl_WorldRayDirectionEXT;
+#ifdef RAND_4D
+        bsdf_sample_data.xi = rng4d_next4f(rayPayload.rng_state);
+#else
+        bsdf_sample_data.xi = rng1d_next4f(rayPayload.rng_state);
+#endif
+        mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
+
+        eventType = bsdf_sample_data.event_type;
+
+        throughput *= bsdf_sample_data.bsdf_over_pdf;
+
+        rayPayload.ray_dir = bsdf_sample_data.k2;
+    }
+
+    /* 6. NEE light sampling */
+#ifdef NEXT_EVENT_ESTIMATION
+    if ((eventType & (BSDF_EVENT_DIFFUSE | BSDF_EVENT_GLOSSY)) != 0)
+    {
+        // reassign normal, see declaration of variable.
+        shading_state.normal = normal;
+
         // Sample light source
 #ifdef RAND_4D
         vec4 k4 = rng4d_next4f(rayPayload.rng_state);
@@ -290,38 +314,20 @@ void main()
     }
 #endif
 
-    /* 6. BSDF (importance) sampling. */
+    // Update rest of path state
+    if (eventType == BSDF_EVENT_ABSORB)
     {
-        // reassign normal, see declaration of variable.
-        shading_state.normal = normal;
-
-        Bsdf_sample_data bsdf_sample_data;
-        bsdf_sample_data.ior1 = vec3(iorCurrent);
-        bsdf_sample_data.ior2 = vec3(iorOther);
-        bsdf_sample_data.k1 = -gl_WorldRayDirectionEXT;
-#ifdef RAND_4D
-        bsdf_sample_data.xi = rng4d_next4f(rayPayload.rng_state);
-#else
-        bsdf_sample_data.xi = rng1d_next4f(rayPayload.rng_state);
-#endif
-        mdl_bsdf_scattering_sample(bsdf_sample_data, shading_state);
-
-        if (bsdf_sample_data.event_type == BSDF_EVENT_ABSORB)
-        {
-            rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
-        }
-
-        bool isTransmission = (bsdf_sample_data.event_type & BSDF_EVENT_TRANSMISSION) != 0;
-        if (isTransmission)
-        {
-            inside = !inside;
-        }
-
-        throughput *= bsdf_sample_data.bsdf_over_pdf;
-
-        rayPayload.ray_dir = bsdf_sample_data.k2;
-        rayPayload.ray_origin = offset_ray_origin(shading_state.position, shading_state.geom_normal * (isTransmission ? -1.0 : 1.0));
+        rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     }
+
+    bool isTransmissionEvent = (eventType & BSDF_EVENT_TRANSMISSION) != 0;
+    if (isTransmissionEvent)
+    {
+        inside = !inside;
+    }
+
+    vec3 geomNormal = shading_state.geom_normal * (isTransmissionEvent ? -1.0 : 1.0);
+    rayPayload.ray_origin = offset_ray_origin(shading_state.position, geomNormal);
 
     shadeRayPayloadSetMediumIdx(rayPayload, inside ? 1 : 0);
     rayPayload.bitfield++; // inc bounce

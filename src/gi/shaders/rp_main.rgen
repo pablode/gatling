@@ -131,10 +131,10 @@ vec3 evaluate_sample(vec3 ray_origin,
             vec3 shadowRayDir = rayPayload.neeToLight / lightDist;
 
             // NV best practices recommends unconditional dispatch with tMin = tMax = 0.0
-            bool traceRay = luminance(rayPayload.neeContrib) > 0.0001 && lightDist > 0.0;
+            bool traceRay = luminance(rayPayload.neeContrib) > 1e-6 && lightDist > 0.0;
             uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
             float tMin = traceRay ? 0.01 : 0.0; // FIXME: investigate resulting artifacts
-            float tMax = traceRay ? lightDist : tMin;
+            float tMax = traceRay ? lightDist : 0.0;
 
             traceRayEXT(
                 sceneAS,             // top-level acceleration structure
