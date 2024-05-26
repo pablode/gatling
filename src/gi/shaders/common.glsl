@@ -27,6 +27,25 @@ const float PI = 3.1415926535897932384626433832795;
 #define AOV_ID_DEBUG_THIN_WALLED 10
 #define AOV_ID_OBJECTID 11
 
+float safe_div(float f1, float f2)
+{
+    return (f2 == 0.0) ? 0.0 : (f1 / f2);
+}
+
+vec3 safe_div(vec3 v, float f)
+{
+    return (f == 0.0) ? vec3(0.0) : (v / f);
+}
+
+vec3 safe_div(vec3 v1, vec3 v2)
+{
+    return vec3(
+        (v2.x == 0.0) ? 0.0 : (v1.x / v2.x),
+        (v2.y == 0.0) ? 0.0 : (v1.y / v2.y),
+        (v2.z == 0.0) ? 0.0 : (v1.z / v2.z)
+    );
+}
+
 vec4 uvec4AsVec4(uvec4 v)
 {
     v >>= 9;
@@ -238,7 +257,7 @@ vec2 sample_disk(vec2 xi, vec2 radius)
     else
     {
         r = radius * b;
-        phi = (PI / 2) - (PI / 4) * (a / b);
+        phi = (PI / 2) - (PI / 4) * safe_div(a, b);
     }
 
     return r * vec2(cos(phi), sin(phi));

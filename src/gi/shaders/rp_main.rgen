@@ -53,7 +53,7 @@ vec3 evaluate_sample(vec3 ray_origin,
 
     // Correct clip plane curving by getting the hypothenuse length (our current ray)
     // from the adjacent edge (the forward vector) the angle between both.
-    float cosConeAngle = dot(ray_dir, PC.cameraForward);
+    float cosConeAngle = max(1e-5, dot(ray_dir, PC.cameraForward));
     vec2 clipRange = unpackHalf2x16(PC.clipRangePacked) / cosConeAngle;
 
     // Path trace
@@ -128,10 +128,10 @@ vec3 evaluate_sample(vec3 ray_origin,
 
             vec3 shadowRayOrigin = rayPayload.ray_origin; // actually not correct, but we compensate with tMin
             float lightDist = length(rayPayload.neeToLight);
-            vec3 shadowRayDir = rayPayload.neeToLight / lightDist;
+            vec3 shadowRayDir = safe_div(rayPayload.neeToLight, lightDist); // according to spec, must not contain NaNs
 
             // NV best practices recommends unconditional dispatch with tMin = tMax = 0.0
-            bool traceRay = luminance(rayPayload.neeContrib) > 1e-6 && lightDist > 0.0;
+            bool traceRay = luminance(rayPayload.neeContrib) > 1e-6 && lightDist > 1e-9;
             uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
             float tMin = traceRay ? 0.01 : 0.0; // FIXME: investigate resulting artifacts
             float tMax = traceRay ? lightDist : 0.0;

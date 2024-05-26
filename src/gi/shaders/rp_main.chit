@@ -36,12 +36,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         vec3 samplePos = light.pos + sample_sphere(k4.zw, light.radiusXYZ);
         vec3 dir = samplePos - surfacePos;
         dist = length(dir);
-        dirToLight = dir / dist;
+        dirToLight = safe_div(dir, dist);
 
         // https://graphics.cg.uni-saarland.de/courses/ris-2021/slides/03_ProbabilityTheory_MonteCarlo.pdf s.35
         vec3 lightNormal = normalize(samplePos - light.pos);
         float cosTheta = max(0.0, dot(-dirToLight, lightNormal));
-        invPdf = ((light.area > 0.0) ? (light.area * cosTheta) : 1.0) / (dist * dist);
+        invPdf = safe_div((light.area > 0.0) ? (light.area * cosTheta) : 1.0, dist * dist);
 
         power = light.baseEmission * PC.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
@@ -88,12 +88,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         vec3 dir = samplePos - surfacePos;
         dist = length(dir);
-        dirToLight = dir / dist;
+        dirToLight = safe_div(dir, dist);
 
         vec3 lightNormal = cross(t1, t0); // light forward/default dir is -Z (like UsdLux)
         float cosTheta = max(0.0, dot(-dirToLight, lightNormal));
         float area = light.width * light.height;
-        invPdf = ((area > 0.0) ? (area * cosTheta) : 1.0) / (dist * dist);
+        invPdf = safe_div((area > 0.0) ? (area * cosTheta) : 1.0, dist * dist);
 
         power = light.baseEmission * PC.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
@@ -115,12 +115,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         vec3 dir = samplePos - surfacePos;
         dist = length(dir);
-        dirToLight = dir / dist;
+        dirToLight = safe_div(dir, dist);
 
         vec3 lightNormal = cross(t1, t0); // light forward/default dir is -Z (like UsdLux)
         float cosTheta = max(0.0, dot(-dirToLight, lightNormal));
         float area = radiusXY.x * radiusXY.y * PI;
-        invPdf = ((area > 0.0) ? (area * cosTheta) : 1.0) / (dist * dist);
+        invPdf = safe_div((area > 0.0) ? (area * cosTheta) : 1.0, dist * dist);
 
         power = light.baseEmission * PC.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
