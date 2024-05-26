@@ -163,6 +163,12 @@ vec3 evaluate_sample(vec3 ray_origin,
         }
 #endif
 
+        // Terminate path if throughput is too small
+        if (length(rayPayload.throughput) < 1e-9)
+        {
+            rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+        }
+
         // Russian roulette
         if (bounce > rrBounceOffset)
         {
