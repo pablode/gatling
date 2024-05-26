@@ -32,7 +32,8 @@ void main()
 {
   State shading_state;
   vec2 hit_bc = baryCoord;
-  setup_mdl_shading_state(hit_bc, shading_state);
+  bool isFrontFace;
+  setup_mdl_shading_state(hit_bc, shading_state, isFrontFace);
 
   float opacity = mdl_cutout_opacity(shading_state);
 

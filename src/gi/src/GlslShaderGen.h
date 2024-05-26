@@ -90,6 +90,8 @@ namespace gtl
       CommonShaderParams commonParams;
       float directionalBias;
       bool enableSceneTransforms;
+      bool hasBackfaceBsdf;
+      bool hasBackfaceEdf;
       bool hasCutoutTransparency;
       bool hasVolumeAbsorptionCoeff;
       bool hasVolumeScatteringCoeff;

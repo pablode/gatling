@@ -1020,6 +1020,8 @@ cleanup:
             .commonParams = commonParams,
             .directionalBias = material->directionalBias,
             .enableSceneTransforms = material->requiresSceneTransforms,
+            .hasBackfaceBsdf = material->hasBackfaceBsdf,
+            .hasBackfaceEdf = material->hasBackfaceEdf,
             .hasCutoutTransparency = material->hasCutoutTransparency,
             .hasVolumeAbsorptionCoeff = material->hasVolumeAbsorptionCoeff,
             .hasVolumeScatteringCoeff = material->hasVolumeScatteringCoeff,

@@ -47,15 +47,18 @@ namespace gtl
 
   enum McDfFlags
   {
-    MC_DF_FLAG_SCATTERING         = (1 << 0),
-    MC_DF_FLAG_EMISSION           = (1 << 1),
-    MC_DF_FLAG_EMISSION_INTENSITY = (1 << 2),
-    MC_DF_FLAG_THIN_WALLED        = (1 << 3),
-    MC_DF_FLAG_VOLUME_ABSORPTION  = (1 << 4),
-    MC_DF_FLAG_VOLUME_SCATTERING  = (1 << 5),
-    MC_DF_FLAG_CUTOUT_OPACITY     = (1 << 6),
-    MC_DF_FLAG_IOR                = (1 << 7),
-    MC_DF_FLAG_COUNT              = 8
+    MC_DF_FLAG_SCATTERING                  = (1 <<  0),
+    MC_DF_FLAG_EMISSION                    = (1 <<  1),
+    MC_DF_FLAG_EMISSION_INTENSITY          = (1 <<  2),
+    MC_DF_FLAG_THIN_WALLED                 = (1 <<  3),
+    MC_DF_FLAG_VOLUME_ABSORPTION           = (1 <<  4),
+    MC_DF_FLAG_VOLUME_SCATTERING           = (1 <<  5),
+    MC_DF_FLAG_CUTOUT_OPACITY              = (1 <<  6),
+    MC_DF_FLAG_IOR                         = (1 <<  7),
+    MC_DF_FLAG_BACKFACE_SCATTERING         = (1 <<  8),
+    MC_DF_FLAG_BACKFACE_EMISSION           = (1 <<  9),
+    MC_DF_FLAG_BACKFACE_EMISSION_INTENSITY = (1 << 10),
+    MC_DF_FLAG_COUNT                       = 11
   };
 
   class McBackend

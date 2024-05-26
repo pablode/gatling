@@ -1,7 +1,7 @@
 #ifndef MDL_SHADING_STATE
 #define MDL_SHADING_STATE
 
-void setup_mdl_shading_state(in vec2 hit_bc, out State state)
+void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFace)
 {
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
     IndexBuffer indices = IndexBuffer(payload.bufferAddress);
@@ -35,7 +35,9 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state)
     vec3 normal = normalize(vec3(localNormal * gl_WorldToObjectEXT));
 
     // Flip normals to side of the incident ray
-    if (dot(geomNormal, gl_WorldRayDirectionEXT) > 0.0)
+    isFrontFace = dot(geomNormal, -gl_WorldRayDirectionEXT) >= 0.0;
+
+    if (!isFrontFace)
     {
         geomNormal = -geomNormal;
         normal = -normal;

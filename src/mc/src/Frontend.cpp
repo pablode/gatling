@@ -103,12 +103,20 @@ namespace
 
   bool _HasCompiledMaterialBackfaceBsdf(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
   {
-    return compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_SURFACE_SCATTERING) != compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_SCATTERING);
+    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("backface.scattering"));
+
+    bool dfsDiffer = compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_SURFACE_SCATTERING) != compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_SCATTERING);
+
+    return dfsDiffer && !_IsExpressionInvalidDf(expr);
   }
 
   bool _HasCompiledMaterialBackfaceEdf(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
   {
-    return compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_SURFACE_EMISSION_EDF_EMISSION) != compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_EMISSION_EDF_EMISSION);
+    mi::base::Handle<const mi::neuraylib::IExpression> expr(compiledMaterial->lookup_sub_expression("backface.emission.emission"));
+
+    bool dfsDiffer = compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_SURFACE_EMISSION_EDF_EMISSION) != compiledMaterial->get_slot_hash(mi::neuraylib::SLOT_BACKFACE_EMISSION_EDF_EMISSION);
+
+    return dfsDiffer && !_IsExpressionInvalidDf(expr);
   }
 
   bool _HasCompiledMaterialVolumeAbsorptionCoefficient(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)

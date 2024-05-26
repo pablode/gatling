@@ -193,12 +193,21 @@ namespace gtl
 
   bool GiGlslShaderGen::generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_VOLUME_SCATTERING |
-                   MC_DF_FLAG_THIN_WALLED | MC_DF_FLAG_IOR;
+    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_VOLUME_SCATTERING | MC_DF_FLAG_IOR;
 
     if (material.isEmissive)
     {
       dfFlags |= MC_DF_FLAG_EMISSION | MC_DF_FLAG_EMISSION_INTENSITY;
+    }
+
+    if (material.isThinWalled)
+    {
+      dfFlags |= MC_DF_FLAG_THIN_WALLED | MC_DF_FLAG_BACKFACE_SCATTERING;
+
+      if (material.isEmissive)
+      {
+        dfFlags |= MC_DF_FLAG_BACKFACE_EMISSION | MC_DF_FLAG_BACKFACE_EMISSION_INTENSITY;
+      }
     }
 
     McGlslGenResult genResult;
@@ -234,6 +243,14 @@ namespace gtl
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
     stitcher.appendDefine("MEDIUM_DIRECTIONAL_BIAS", params.directionalBias);
 
+    if (params.hasBackfaceBsdf)
+    {
+      stitcher.appendDefine("HAS_BACKFACE_BSDF");
+    }
+    if (params.hasBackfaceEdf)
+    {
+      stitcher.appendDefine("HAS_BACKFACE_EDF");
+    }
     if (params.hasVolumeAbsorptionCoeff)
     {
       stitcher.appendDefine("HAS_VOLUME_ABSORPTION_COEFF");
