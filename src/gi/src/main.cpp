@@ -138,8 +138,7 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
     .nextEventEstimation = false,
     .progressiveAccumulation = true,
     .scene = m_scene,
-    .mediumStackSize = 1,
-    .maxVolumeWalkLength = 7
+    .mediumStackSize = 1
   };
 
   GiShaderCache* shaderCache = giCreateShaderCache(shaderCacheParams);
@@ -178,6 +177,7 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
     .rrBounceOffset = 255,
     .rrInvMinTermProb = 0.0f,
     .maxSampleValue = 100.0f,
+    .maxVolumeWalkLength = 7,
     .backgroundColor = { 0.5f, 0.5f, 0.5f, 1.0f },
     .domeLight = nullptr,
     .scene = m_scene

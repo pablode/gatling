@@ -71,7 +71,6 @@ namespace gtl
       bool depthOfField;
       bool filterImportanceSampling;
       uint32_t materialCount;
-      uint32_t maxVolumeWalkLength;
       bool nextEventEstimation;
       bool progressiveAccumulation;
       bool reorderInvocations;

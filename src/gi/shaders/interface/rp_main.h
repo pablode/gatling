@@ -99,7 +99,8 @@ struct PushConstants
   GI_FLOAT lightIntensityMultiplier;
   GI_UINT  clipRangePacked;
   GI_FLOAT sensorExposure;
-  /* 3 floats free */
+  GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
+  /* 2 floats free */
 };
 
 const GI_UINT BLAS_PAYLOAD_BITFLAG_IS_DOUBLE_SIDED = (1 << 0);

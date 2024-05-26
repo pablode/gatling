@@ -437,8 +437,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
         .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
         .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
         .scene = _scene,
-        .mediumStackSize = (uint32_t) _settings.find(HdGatlingSettingsTokens->mediumStackSize)->second.Get<int>(),
-        .maxVolumeWalkLength = (uint32_t) _settings.find(HdGatlingSettingsTokens->maxVolumeWalkLength)->second.Get<int>()
+        .mediumStackSize = (uint32_t) _settings.find(HdGatlingSettingsTokens->mediumStackSize)->second.Get<int>()
       };
       _shaderCache = giCreateShaderCache(shaderParams);
 
@@ -487,6 +486,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     .rrBounceOffset = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<uint32_t>(),
     .rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>(),
     .maxSampleValue = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>(),
+    .maxVolumeWalkLength = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxVolumeWalkLength)->second).Get<uint32_t>(),
     .backgroundColor = { backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] },
     .domeLight = renderParam->ActiveDomeLight(),
     .scene = _scene

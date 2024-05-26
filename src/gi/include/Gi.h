@@ -115,7 +115,6 @@ namespace gtl
     bool               progressiveAccumulation;
     GiScene*           scene;
     uint32_t           mediumStackSize;
-    uint32_t           maxVolumeWalkLength;
   };
 
   struct GiGeomCacheParams
@@ -137,6 +136,7 @@ namespace gtl
     uint32_t             rrBounceOffset;
     float                rrInvMinTermProb;
     float                maxSampleValue;
+    uint32_t             maxVolumeWalkLength;
     float                backgroundColor[4];
     GiDomeLight*         domeLight;
     GiScene*             scene;

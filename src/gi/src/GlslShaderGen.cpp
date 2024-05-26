@@ -126,8 +126,6 @@ namespace gtl
       stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
     }
 
-    stitcher.appendDefine("MAX_VOLUME_WALK_LENGTH", (int32_t) params.maxVolumeWalkLength);
-
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))
     {

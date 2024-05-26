@@ -1155,7 +1155,6 @@ cleanup:
         .depthOfField = params.depthOfField,
         .filterImportanceSampling = params.filterImportanceSampling,
         .materialCount = params.materialCount,
-        .maxVolumeWalkLength = params.maxVolumeWalkLength,
         .nextEventEstimation = nextEventEstimation,
         .progressiveAccumulation = params.progressiveAccumulation,
         .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
@@ -1462,7 +1461,8 @@ cleanup:
       .rrInvMinTermProb               = params.rrInvMinTermProb,
       .lightIntensityMultiplier       = params.lightIntensityMultiplier,
       .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
-      .sensorExposure                 = params.camera.exposure
+      .sensorExposure                 = params.camera.exposure,
+      .maxVolumeWalkLength            = params.maxVolumeWalkLength
     };
 
     std::vector<CgpuBufferBinding> buffers;
