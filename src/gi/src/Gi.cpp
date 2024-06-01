@@ -658,8 +658,8 @@ fail:
           bool blasCreated = cgpuCreateBlas(s_device, {
                                               .vertexBuffer = tmpPositionBuffer,
                                               .indexBuffer = tmpIndexBuffer,
-                                              .maxVertex = (uint32_t)positionData.size(),
-                                              .triangleCount = (uint32_t)indexData.size() / 3,
+                                              .maxVertex = (uint32_t) positionData.size(),
+                                              .triangleCount = (uint32_t) indexData.size() / 3,
                                               .isOpaque = !material->mcMat->hasCutoutTransparency
                                             }, &blas);
 
@@ -687,8 +687,8 @@ fail:
 
           CgpuBlasInstance proto = {
             .as = blas,
-            .instanceCustomIndex = uint32_t(blasPayloads.size()),
-            .hitGroupIndex = materialIndex * 2 // always two hit groups per material: regular & shadow
+            .hitGroupIndex = materialIndex * 2, // always two hit groups per material: regular & shadow
+            .instanceCustomIndex = uint32_t(blasPayloads.size())
           };
           blasInstanceProtos[mesh] = proto;
         }
@@ -774,7 +774,7 @@ fail_cleanup:
     // Create TLAS.
     {
       if (!cgpuCreateTlas(s_device, {
-                            .instanceCount = (uint32_t)blasInstances.size(),
+                            .instanceCount = (uint32_t) blasInstances.size(),
                             .instances = blasInstances.data()
                           }, &tlas))
       {

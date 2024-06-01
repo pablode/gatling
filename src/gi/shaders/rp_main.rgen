@@ -81,11 +81,11 @@ vec3 evaluate_sample(vec3 ray_origin,
         hitObjectTraceRayNV(
             hitObject,             // hit object
             sceneAS,               // top-level AS
-            0,                     // rayFlags
-            0xFF,                  // cullMask
-            0,                     // sbtRecordOffset
-            2,                     // sbtRecordStride
-            0,                     // missIndex
+            0,                     // ray flags
+            0xFF,                  // cull mask
+            0,                     // sbt record offset
+            2,                     // sbt record stride
+            0,                     // miss index
             rayPayload.ray_origin, // ray origin
             clipRange.x,           // ray min range
             rayPayload.ray_dir,    // ray direction
@@ -107,11 +107,11 @@ vec3 evaluate_sample(vec3 ray_origin,
 #else
         traceRayEXT(
             sceneAS,               // top-level AS
-            0,                     // rayFlags
-            0xFF,                  // cullMask
-            0,                     // sbtRecordOffset
-            2,                     // sbtRecordStride
-            0,                     // missIndex
+            0,                     // ray flags
+            0xFF,                  // cull mask
+            0,                     // sbt record offset
+            2,                     // sbt record stride
+            0,                     // miss index
             rayPayload.ray_origin, // ray origin
             clipRange.x,           // ray min range
             rayPayload.ray_dir,    // ray direction

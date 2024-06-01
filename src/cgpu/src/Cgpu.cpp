@@ -2283,14 +2283,16 @@ cleanup_fail:
 
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
       {
+        const CgpuBlasInstance& instanceDesc = createInfo.instances[i];
+
         CgpuIBlas* iblas;
-        if (!cgpuResolveBlas(createInfo.instances[i].as, &iblas)) {
+        if (!cgpuResolveBlas(instanceDesc.as, &iblas)) {
           iinstance->itlasStore.free(handle);
           cgpuDestroyIBuffer(idevice, &itlas->instances);
           CGPU_RETURN_ERROR_INVALID_HANDLE;
         }
 
-        uint32_t instanceCustomIndex = createInfo.instances[i].instanceCustomIndex;
+        uint32_t instanceCustomIndex = instanceDesc.instanceCustomIndex;
         if ((instanceCustomIndex & 0xFF000000u) != 0u)
         {
           iinstance->itlasStore.free(handle);
@@ -2299,10 +2301,10 @@ cleanup_fail:
         }
 
         VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];
-        memcpy(&asInstance->transform, &createInfo.instances[i].transform, sizeof(VkTransformMatrixKHR));
+        memcpy(&asInstance->transform, &instanceDesc.transform, sizeof(VkTransformMatrixKHR));
         asInstance->instanceCustomIndex = instanceCustomIndex;
         asInstance->mask = 0xFF;
-        asInstance->instanceShaderBindingTableRecordOffset = createInfo.instances[i].hitGroupIndex;
+        asInstance->instanceShaderBindingTableRecordOffset = instanceDesc.hitGroupIndex;
         asInstance->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
         asInstance->accelerationStructureReference = iblas->address;
 
