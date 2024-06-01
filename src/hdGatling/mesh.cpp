@@ -40,6 +40,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (tangents)
   (tangentSigns)
   (bitangentSigns)
+  (leftHanded)
 );
 
 namespace
@@ -783,11 +784,14 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   std::vector<GiVertex> vertices;
   _BakeMeshGeometry(s, GfMatrix4d(1.0), faces, vertices);
 
-   GiMeshDesc desc = {
+  TfToken orientation = topology.GetOrientation();
+  bool isLeftHanded = (orientation == _tokens->leftHanded);
+
+  GiMeshDesc desc = {
     .faceCount = (uint32_t) faces.size(),
     .faces = faces.data(),
     .id = GetPrimId(),
-    .isDoubleSided = IsDoubleSided(sceneDelegate),
+    .isLeftHanded = isLeftHanded,
     .vertexCount = (uint32_t) vertices.size(),
     .vertices = vertices.data()
   };

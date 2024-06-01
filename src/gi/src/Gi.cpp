@@ -106,9 +106,9 @@ namespace gtl
 
   struct GiMesh
   {
-    int id;
-    bool isDoubleSided;
     std::vector<GiFace> faces;
+    bool flipFacing;
+    int id;
     std::vector<GiVertex> vertices;
   };
 
@@ -493,9 +493,9 @@ fail:
   GiMesh* giCreateMesh(const GiMeshDesc& desc)
   {
     GiMesh* mesh = new GiMesh{
-      .id = desc.id,
-      .isDoubleSided = desc.isDoubleSided,
       .faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]),
+      .flipFacing = desc.isLeftHanded,
+      .id = desc.id,
       .vertices = std::vector<GiVertex>(&desc.vertices[0], &desc.vertices[desc.vertexCount])
     };
     return mesh;
@@ -703,9 +703,9 @@ fail:
           }
 
           uint32_t bitfield = 0;
-          if (mesh->isDoubleSided)
+          if (mesh->flipFacing)
           {
-            bitfield |= rp::BLAS_PAYLOAD_BITFLAG_IS_DOUBLE_SIDED;
+            bitfield |= rp::BLAS_PAYLOAD_BITFLAG_FLIP_FACING;
           }
 
           uint64_t vertexBufferSize = (vertexBufferOffset/* account for align */ - indexBufferOffset/* account for preamble */);

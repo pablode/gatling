@@ -91,7 +91,7 @@ namespace gtl
     uint32_t  faceCount;
     GiFace*   faces;
     int       id;
-    bool      isDoubleSided;
+    bool      isLeftHanded;
     uint32_t  vertexCount;
     GiVertex* vertices;
   };

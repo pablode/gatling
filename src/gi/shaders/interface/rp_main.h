@@ -103,7 +103,7 @@ struct PushConstants
   /* 2 floats free */
 };
 
-const GI_UINT BLAS_PAYLOAD_BITFLAG_IS_DOUBLE_SIDED = (1 << 0);
+const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);
 
 struct BlasPayload
 {

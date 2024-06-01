@@ -135,6 +135,8 @@ void main()
 {
     /* 1. Get hit info. */
     vec2 hit_bc = baryCoord;
+    BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
+    bool isLeftHanded = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_FLIP_FACING) != 0);
 
     /* 2. Set up shading state. */
     State shading_state; // Shading_state_material
@@ -189,7 +191,6 @@ void main()
     rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     return;
 #elif AOV_ID == AOV_ID_OBJECTID
-    BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
     IndexBuffer indices = IndexBuffer(payload.bufferAddress);
     int objectId = indices.preamble.objectId;
 
@@ -231,6 +232,8 @@ void main()
     /* 4. Add Emission */
 #ifdef IS_EMISSIVE
     {
+        shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0); // account for geometry flip
+
         Edf_evaluate_data edf_evaluate_data;
         edf_evaluate_data.k1 = -gl_WorldRayDirectionEXT;
         edf_evaluate_data.pdf = 0.0;
@@ -268,6 +271,8 @@ void main()
 
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }
+
+        shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0);
     }
 #endif
 
