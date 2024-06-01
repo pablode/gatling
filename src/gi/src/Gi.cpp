@@ -32,6 +32,7 @@
 #include <math.h>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
 #include <fstream>
 #include <atomic>
@@ -70,17 +71,27 @@ namespace gtl
     uint64_t size;
   };
 
-  struct GiBlas
+  struct GiMeshCpuData
+  {
+    std::vector<GiFace> faces;
+    std::vector<GiVertex> vertices;
+  };
+
+  struct GiMeshGpuData
   {
     CgpuBlas blas;
     CgpuBuffer payloadBuffer;
   };
 
-  struct GiGeomCache
+  // We cache the mesh CPU data first and defer the GPU upload / BLAS build
+  // to the next render call, where we update the variant.
+  using GiMeshDataVariant = std::variant<GiMeshCpuData, GiMeshGpuData>;
+
+  struct GiBvh
   {
-    std::vector<GiBlas> blases;
-    CgpuTlas            tlas;
     CgpuBuffer          blasPayloadsBuffer;
+    GiScene*            scene;
+    CgpuTlas            tlas;
   };
 
   struct GiShaderCache
@@ -106,10 +117,9 @@ namespace gtl
 
   struct GiMesh
   {
-    std::vector<GiFace> faces;
+    GiMeshDataVariant data;
     bool flipFacing;
     int id;
-    std::vector<GiVertex> vertices;
   };
 
   struct GiSphereLight
@@ -156,6 +166,7 @@ namespace gtl
     GiDomeLight* domeLight = nullptr; // weak ptr
     glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
     CgpuImage fallbackDomeLightTexture;
+    std::unordered_set<GiBvh*> bvhs;
   };
 
   struct GiRenderBuffer
@@ -184,7 +195,7 @@ namespace gtl
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
   std::unique_ptr<GiTextureManager> s_texSys;
   std::atomic_bool s_forceShaderCacheInvalid = false;
-  std::atomic_bool s_forceGeomCacheInvalid = false;
+  std::atomic_bool s_forceGeomCacheInvalid = false; // TODO: remove
   std::atomic_bool s_resetSampleOffset = false;
 
 #ifdef GI_SHADER_HOTLOADING
@@ -492,17 +503,29 @@ fail:
 
   GiMesh* giCreateMesh(const GiMeshDesc& desc)
   {
-    GiMesh* mesh = new GiMesh{
+    GiMeshCpuData cpuData = {
       .faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]),
-      .flipFacing = desc.isLeftHanded,
-      .id = desc.id,
       .vertices = std::vector<GiVertex>(&desc.vertices[0], &desc.vertices[desc.vertexCount])
+    };
+
+    GiMesh* mesh = new GiMesh {
+      .data = std::move(cpuData),
+      .flipFacing = desc.isLeftHanded,
+      .id = desc.id
     };
     return mesh;
   }
 
-  void _giBuildGeometryStructures(const GiGeomCacheParams& params,
-                                  std::vector<GiBlas>& blases,
+  void giDestroyMesh(GiMesh* mesh)
+  {
+    if (GiMeshGpuData* data = std::get_if<GiMeshGpuData>(&mesh->data); data)
+    {
+      cgpuDestroyBlas(s_device, data->blas);
+      cgpuDestroyBuffer(s_device, data->payloadBuffer);
+    }
+  }
+
+  void _giBuildGeometryStructures(const GiBvhParams& params,
                                   std::vector<CgpuBlasInstance>& blasInstances,
                                   std::vector<rp::BlasPayload>& blasPayloads,
                                   uint64_t& totalIndicesSize,
@@ -513,16 +536,18 @@ fail:
     for (uint32_t m = 0; m < params.meshInstanceCount; m++)
     {
       const GiMeshInstance* instance = &params.meshInstances[m];
-      const GiMesh* mesh = instance->mesh;
-
-      if (mesh->faces.empty())
-      {
-        continue;
-      }
+      GiMesh* mesh = instance->mesh;
 
       // Build mesh BLAS & buffers if they don't exist yet
-      if (blasInstanceProtos.count(mesh) == 0)
+      if (GiMeshCpuData* data = std::get_if<GiMeshCpuData>(&mesh->data); data)
       {
+        if (data->faces.empty())
+        {
+          continue;
+        }
+
+        assert(blasInstanceProtos.count(mesh) == 0);
+
         // Find material for SBT index (FIXME: find a better solution)
         uint32_t materialIndex = UINT32_MAX;
         GiShaderCache* shaderCache = params.shaderCache;
@@ -549,12 +574,12 @@ fail:
         // Collect vertices
         std::vector<rp::FVertex> vertexData;
         std::vector<CgpuVertex> positionData;
-        vertexData.resize(mesh->vertices.size());
-        positionData.resize(mesh->vertices.size());
+        vertexData.resize(data->vertices.size());
+        positionData.resize(data->vertices.size());
 
         for (uint32_t i = 0; i < positionData.size(); i++)
         {
-          const GiVertex& cpuVert = mesh->vertices[i];
+          const GiVertex& cpuVert = data->vertices[i];
           uint32_t encodedNormal = _EncodeDirection(glm::make_vec3(cpuVert.norm));
           uint32_t encodedTangent = _EncodeDirection(glm::make_vec3(cpuVert.tangent));
 
@@ -568,11 +593,11 @@ fail:
 
         // Collect indices
         std::vector<uint32_t> indexData;
-        indexData.reserve(mesh->faces.size() * 3);
+        indexData.reserve(data->faces.size() * 3);
 
-        for (uint32_t i = 0; i < mesh->faces.size(); i++)
+        for (uint32_t i = 0; i < data->faces.size(); i++)
         {
-          const auto* face = &mesh->faces[i];
+          const auto* face = &data->faces[i];
           indexData.push_back(face->v_i[0]);
           indexData.push_back(face->v_i[1]);
           indexData.push_back(face->v_i[2]);
@@ -676,10 +701,13 @@ fail:
         tmpIndexBuffer.handle = 0;
 
         // Append BLAS for lifetime management
-        blases.push_back({
-          .blas = blas,
-          .payloadBuffer = payloadBuffer
-        });
+        {
+          GiMeshGpuData newData = {
+            .blas = blas,
+            .payloadBuffer = payloadBuffer
+          };
+          mesh->data = newData;
+        }
 
         // Set proto entry
         {
@@ -736,6 +764,11 @@ fail_cleanup:
         }
       }
 
+      if (GiMeshGpuData* data = std::get_if<GiMeshGpuData>(&mesh->data); !data)
+      {
+        continue; // invalid geometry; GPU data was not created
+      }
+
       // Create mesh instance for TLAS. All fields are cached except transform.
       CgpuBlasInstance blasInstance = blasInstanceProtos[mesh];
 
@@ -745,28 +778,27 @@ fail_cleanup:
     }
   }
 
-  GiGeomCache* giCreateGeomCache(const GiGeomCacheParams& params)
+  GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params)
   {
-    s_forceGeomCacheInvalid = false;
+    s_forceGeomCacheInvalid = false; // TODO: remove
 
-    GiGeomCache* cache = nullptr;
+    GiBvh* bvh = nullptr;
 
-    GB_LOG("creating geom cache..");
+    GB_LOG("creating bvh..");
     fflush(stdout);
 
     // Build BLASes.
     CgpuTlas tlas;
-    std::vector<GiBlas> blases;
     std::vector<CgpuBlasInstance> blasInstances;
     std::vector<rp::BlasPayload> blasPayloads;
     uint64_t indicesSize = 0;
     uint64_t verticesSize = 0;
     CgpuBuffer blasPayloadsBuffer;
 
-    _giBuildGeometryStructures(params, blases, blasInstances, blasPayloads, indicesSize, verticesSize);
+    _giBuildGeometryStructures(params, blasInstances, blasPayloads, indicesSize, verticesSize);
 
     GB_LOG("BLAS build finished");
-    GB_LOG("> {} unique BLAS", blases.size());
+    GB_LOG("> {} unique BLAS", blasPayloads.size());
     GB_LOG("> {} BLAS instances", blasInstances.size());
     GB_LOG("> {:.2f} MiB total indices", indicesSize * BYTES_TO_MIB);
     GB_LOG("> {:.2f} MiB total vertices", verticesSize * BYTES_TO_MIB);
@@ -808,13 +840,15 @@ fail_cleanup:
     }
 
     // Fill cache struct.
-    cache = new GiGeomCache;
-    cache->tlas = tlas;
-    cache->blases = blases;
-    cache->blasPayloadsBuffer = blasPayloadsBuffer;
+    bvh = new GiBvh;
+    bvh->blasPayloadsBuffer = blasPayloadsBuffer;
+    bvh->scene = scene;
+    bvh->tlas = tlas;
+
+    scene->bvhs.insert(bvh);
 
 cleanup:
-    if (!cache)
+    if (!bvh)
     {
       assert(false);
       if (blasPayloadsBuffer.handle)
@@ -825,25 +859,17 @@ cleanup:
       {
         cgpuDestroyTlas(s_device, tlas);
       }
-      for (const GiBlas& blas : blases)
-      {
-        cgpuDestroyBlas(s_device, blas.blas);
-        cgpuDestroyBuffer(s_device, blas.payloadBuffer);
-      }
     }
-    return cache;
+    return bvh;
   }
 
-  void giDestroyGeomCache(GiGeomCache* cache)
+  void giDestroyBvh(GiBvh* bvh)
   {
-    for (const GiBlas& blas : cache->blases)
-    {
-      cgpuDestroyBlas(s_device, blas.blas);
-      cgpuDestroyBuffer(s_device, blas.payloadBuffer);
-    }
-    cgpuDestroyTlas(s_device, cache->tlas);
-    cgpuDestroyBuffer(s_device, cache->blasPayloadsBuffer);
-    delete cache;
+    bvh->scene->bvhs.erase(bvh);
+
+    cgpuDestroyTlas(s_device, bvh->tlas);
+    cgpuDestroyBuffer(s_device, bvh->blasPayloadsBuffer);
+    delete bvh;
   }
 
   // FIXME: move this into the GiScene struct - also, want to rebuild with cached data at shader granularity
@@ -851,6 +877,7 @@ cleanup:
   {
     return s_forceShaderCacheInvalid;
   }
+  // TODO: remove
   bool giGeomCacheNeedsRebuild()
   {
     return s_forceGeomCacheInvalid;
@@ -1330,7 +1357,7 @@ cleanup:
   {
     s_stager->flush();
 
-    const GiGeomCache* geom_cache = params.geomCache;
+    const GiBvh* bvh = params.bvh;
     const GiShaderCache* shader_cache = params.shaderCache;
     GiScene* scene = params.scene;
 
@@ -1473,7 +1500,7 @@ cleanup:
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = geom_cache->blasPayloadsBuffer });
+    buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
 
     size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + 2/* dome lights */;
 
@@ -1496,7 +1523,7 @@ cleanup:
       images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = shader_cache->images3d[i], .index = i });
     }
 
-    CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = geom_cache->tlas };
+    CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
 
     CgpuBindings bindings = {
       .bufferCount = (uint32_t) buffers.size(),

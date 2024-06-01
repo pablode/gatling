@@ -385,6 +385,10 @@ HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
 
 HdGatlingMesh::~HdGatlingMesh()
 {
+  if (_giMesh)
+  {
+    giDestroyMesh(_giMesh);
+  }
 }
 
 void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
@@ -798,7 +802,7 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   _giMesh = giCreateMesh(desc);
 }
 
-const GiMesh* HdGatlingMesh::GetGiMesh() const
+GiMesh* HdGatlingMesh::GetGiMesh() const
 {
   return _giMesh;
 }

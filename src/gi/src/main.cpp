@@ -144,14 +144,14 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
   GiShaderCache* shaderCache = giCreateShaderCache(shaderCacheParams);
   REQUIRE(shaderCache);
 
-  GiGeomCacheParams geomCacheParams = {
+  GiBvhParams bvhParams = {
     .meshInstanceCount = 0,
     .meshInstances = nullptr,
     .shaderCache = shaderCache
   };
 
-  GiGeomCache* geomCache = giCreateGeomCache(geomCacheParams);
-  REQUIRE(geomCache);
+  GiBvh* bvh = giCreateBvh(m_scene, bvhParams);
+  REQUIRE(bvh);
 
   GiCameraDesc camDesc = {
     .position = { 0.0f, 0.0f, 0.0f },
@@ -167,8 +167,8 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
   };
 
   GiRenderParams renderParams =  {
+    .bvh = bvh,
     .camera = camDesc,
-    .geomCache = geomCache,
     .shaderCache = shaderCache,
     .renderBuffer = m_renderBuffer,
     .lightIntensityMultiplier = 1.0f,
@@ -189,5 +189,5 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
   CHECK(compareWithRef(outputImg.data()));
 
   giDestroyShaderCache(shaderCache);
-  giDestroyGeomCache(geomCache);
+  giDestroyBvh(bvh);
 }

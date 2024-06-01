@@ -72,7 +72,7 @@ private:
   uint32_t _lastRenderSettingsVersion;
   uint32_t _lastVisChangeCount;
   GiAovId _lastAovId;
-  GiGeomCache* _geomCache;
+  GiBvh* _bvh;
   GiShaderCache* _shaderCache;
   GfMatrix4d _rootMatrix;
 };

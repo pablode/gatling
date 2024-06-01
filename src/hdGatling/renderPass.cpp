@@ -126,7 +126,7 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , _lastSprimIndexVersion(UINT32_MAX)
   , _lastRenderSettingsVersion(UINT32_MAX)
   , _lastVisChangeCount(UINT32_MAX)
-  , _geomCache(nullptr)
+  , _bvh(nullptr)
   , _shaderCache(nullptr)
 {
   auto defaultDiffuseColor = GfVec3f(0.18f); // UsdPreviewSurface spec
@@ -147,9 +147,9 @@ void HdGatlingRenderPass::_ClearMaterials()
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
 {
-  if (_geomCache)
+  if (_bvh)
   {
-    giDestroyGeomCache(_geomCache);
+    giDestroyBvh(_bvh);
   }
   if (_shaderCache)
   {
@@ -193,7 +193,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       continue;
     }
 
-    const GiMesh* giMesh = mesh->GetGiMesh();
+    GiMesh* giMesh = mesh->GetGiMesh();
     if (!giMesh)
     {
       continue;
@@ -402,9 +402,9 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   bool rebuildShaderCache = !_shaderCache || aovChanged || giShaderCacheNeedsRebuild() || renderSettingsChanged;
 
-  bool rebuildGeomCache = !_geomCache || visibilityChanged;
+  bool rebuildBvh = !_bvh || visibilityChanged;
 
-  if (rebuildShaderCache || rebuildGeomCache)
+  if (rebuildShaderCache || rebuildBvh)
   {
     // Transform scene into camera space to increase floating point precision.
     // FIXME: reintroduce and don't apply rotation
@@ -444,25 +444,25 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       TF_VERIFY(_shaderCache, "Unable to create shader cache");
     }
 
-    if (_shaderCache && (rebuildGeomCache || giGeomCacheNeedsRebuild()))
+    if (_shaderCache && (rebuildBvh || giGeomCacheNeedsRebuild()))
     {
-      if (_geomCache)
+      if (_bvh)
       {
-        giDestroyGeomCache(_geomCache);
+        giDestroyBvh(_bvh);
       }
 
-      GiGeomCacheParams geomParams = {
+      GiBvhParams bvhParams = {
         .meshInstanceCount = (uint32_t) instances.size(),
         .meshInstances = instances.data(),
         .shaderCache = _shaderCache
       };
-      _geomCache = giCreateGeomCache(geomParams);
+      _bvh = giCreateBvh(_scene, bvhParams);
 
-      TF_VERIFY(_geomCache, "Unable to create geom cache");
+      TF_VERIFY(_bvh, "Unable to create bvh");
     }
   }
 
-  if (!_geomCache || !_shaderCache)
+  if (!_bvh || !_shaderCache)
   {
     return;
   }
@@ -476,8 +476,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   _ConstructGiCamera(*camera, giCamera, clippingEnabled);
 
   GiRenderParams renderParams = {
+    .bvh = _bvh,
     .camera = giCamera,
-    .geomCache = _geomCache,
     .shaderCache = _shaderCache,
     .renderBuffer = renderBuffer->GetGiRenderBuffer(),
     .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),

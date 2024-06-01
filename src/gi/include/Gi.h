@@ -44,7 +44,7 @@ namespace gtl
   };
 
   struct GiAsset;
-  struct GiGeomCache;
+  struct GiBvh;
   struct GiMaterial;
   struct GiMesh;
   struct GiMeshInstance;
@@ -99,7 +99,7 @@ namespace gtl
   struct GiMeshInstance
   {
     const GiMaterial* material;
-    const GiMesh* mesh;
+    GiMesh* mesh;
     float transform[3][4];
   };
 
@@ -117,7 +117,7 @@ namespace gtl
     uint32_t           mediumStackSize;
   };
 
-  struct GiGeomCacheParams
+  struct GiBvhParams
   {
     uint32_t              meshInstanceCount;
     const GiMeshInstance* meshInstances;
@@ -126,8 +126,8 @@ namespace gtl
 
   struct GiRenderParams
   {
+    const GiBvh*         bvh;
     GiCameraDesc         camera;
-    const GiGeomCache*   geomCache;
     const GiShaderCache* shaderCache;
     GiRenderBuffer*      renderBuffer;
     float                lightIntensityMultiplier;
@@ -171,9 +171,10 @@ namespace gtl
   void giDestroyMaterial(GiMaterial* mat);
 
   GiMesh* giCreateMesh(const GiMeshDesc& desc);
+  void giDestroyMesh(GiMesh* mesh);
 
-  GiGeomCache* giCreateGeomCache(const GiGeomCacheParams& params);
-  void giDestroyGeomCache(GiGeomCache* cache);
+  GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params);
+  void giDestroyBvh(GiBvh* bvh);
 
   GiShaderCache* giCreateShaderCache(const GiShaderCacheParams& params);
   void giDestroyShaderCache(GiShaderCache* cache);
