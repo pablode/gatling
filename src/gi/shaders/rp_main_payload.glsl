@@ -1,5 +1,6 @@
 #include "common.glsl"
 
+#define SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG 0x40000000u
 #define SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK 0x0f000000u
 #define SHADE_RAY_PAYLOAD_MEDIUM_IDX_OFFSET 24
 #define SHADE_RAY_PAYLOAD_WALK_MASK 0x00fff000u
@@ -20,7 +21,8 @@ struct ShadeRayPayload
     /* inout */ vec3 throughput;
 
     /*               1000 0000 0000 0000 0000 0000 0000 0000 terminate
-     *               0111 0000 0000 0000 0000 0000 0000 0000 unused
+     *               0100 0000 0000 0000 0000 0000 0000 0000 volume walk miss
+     *               0011 0000 0000 0000 0000 0000 0000 0000 unused
      *               0000 1111 0000 0000 0000 0000 0000 0000 medium index [0, 256)
      *               0000 0000 1111 1111 1111 0000 0000 0000 walk length [0, 4096)
      *               0000 0000 0000 0000 0000 1111 1111 1111 bounces [0, 4096) */
@@ -32,6 +34,7 @@ struct ShadeRayPayload
 
 #if MEDIUM_STACK_SIZE > 0
     /* inout */ Medium media[MEDIUM_STACK_SIZE];
+    /* inout */ vec3 walkSegmentPdf;
 #endif
 
     /* out */   vec3 ray_origin;
@@ -49,6 +52,23 @@ struct ShadowRayPayload
 #endif
     /* out */   bool shadowed;
 };
+
+#if MEDIUM_STACK_SIZE > 0
+void shadeRayPayloadIncrementWalk(inout ShadeRayPayload payload)
+{
+    uint bitfield = payload.bitfield;
+    bitfield &= SHADE_RAY_PAYLOAD_WALK_MASK;
+    bitfield = min(bitfield + 1, SHADE_RAY_PAYLOAD_WALK_MASK);
+
+    payload.bitfield &= ~SHADE_RAY_PAYLOAD_WALK_MASK;
+    payload.bitfield |= bitfield;
+}
+
+uint shadeRayPayloadGetWalk(in ShadeRayPayload payload)
+{
+    return (payload.bitfield & SHADE_RAY_PAYLOAD_WALK_MASK) >> SHADE_RAY_PAYLOAD_WALK_OFFSET;
+}
+#endif
 
 uint shadeRayPayloadGetMediumIdx(in ShadeRayPayload payload)
 {

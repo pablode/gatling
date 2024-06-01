@@ -25,6 +25,66 @@ layout(buffer_reference, hitobjectshaderrecordnv) buffer ShaderRecordBuffer
 };
 #endif
 
+//
+// This path tracing implementation was initially based on the MDL SDK DXR sample:
+// https://github.com/NVIDIA/MDL-SDK/tree/master/examples/mdl_sdk/dxr
+// but has since then received many changes such as flattened ray tracing calls.
+//
+// The volume path tracing part is partly based on the Optix 7 example renderer:
+// https://github.com/NVIDIA/OptiX_Apps/tree/master/apps/MDL_renderer
+//
+
+#if MEDIUM_STACK_SIZE > 0
+float sampleDistance(vec3 albedo, vec3 throughput, vec3 sigma_t, float xi, out vec3 pdf)
+{
+    vec3 weights = throughput * albedo;
+
+    float sum = weights.x + weights.y + weights.z;
+
+    pdf = (sum > 1e-9) ? (weights / sum) : vec3(1.0 / 3.0);
+
+    if (xi < pdf.x)
+    {
+        return sigma_t.x;
+    }
+    else if (xi < (pdf.x + pdf.y))
+    {
+        return sigma_t.y;
+    }
+    else
+    {
+        return sigma_t.z;
+    }
+}
+
+// cmp. d'Eon: "A Hitchhiker's Guide to Multiple Scattering"
+float sampleHenyeyGreensteinCos(float r, float g)
+{
+    if (abs(g) < 1e-3f)
+    {
+        return 1.0 - 2.0 * r; // isotropic medium
+    }
+
+    float s = (1.0 - g * g) / (1.0 - g + 2.0 * g * r);
+
+    return (1.0 + g * g - s * s) / (2.0 * g);
+}
+
+void sampleVolumeScatteringDirection(vec2 xi, float bias, inout vec3 dir)
+{
+    float cos_theta = sampleHenyeyGreensteinCos(xi.x, bias);
+
+    float sin_theta = sqrt(max(0.0, 1.0 - cos_theta * cos_theta));
+
+    float phi = 2.0 * PI * xi.y;
+
+    vec3 t, b;
+    orthonormal_basis(dir, t, b);
+
+    dir = t * sin_theta * cos(phi) + b * sin_theta * sin(phi) + dir * cos_theta;
+}
+#endif
+
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
@@ -44,12 +104,15 @@ vec3 evaluate_sample(vec3 ray_origin,
                      vec3 ray_dir,
                      RNG_STATE_TYPE rng_state)
 {
-    rayPayload.throughput = vec3(1.0);
-    rayPayload.bitfield   = 0;
-    rayPayload.radiance   = vec3(0.0);
-    rayPayload.rng_state  = rng_state;
-    rayPayload.ray_origin = ray_origin;
-    rayPayload.ray_dir    = ray_dir;
+    rayPayload.throughput     = vec3(1.0);
+    rayPayload.bitfield       = 0;
+    rayPayload.radiance       = vec3(0.0);
+    rayPayload.rng_state      = rng_state;
+    rayPayload.ray_origin     = ray_origin;
+    rayPayload.ray_dir        = ray_dir;
+#if MEDIUM_STACK_SIZE > 0
+    rayPayload.walkSegmentPdf = vec3(1.0);
+#endif
 
     // Correct clip plane curving by getting the hypothenuse length (our current ray)
     // from the adjacent edge (the forward vector) the angle between both.
@@ -72,6 +135,39 @@ vec3 evaluate_sample(vec3 ray_origin,
              break;
         }
 
+        float tMin = (bounce == 0) ? clipRange.x : 0.0;
+        float tMax = (bounce == 0) ? clipRange.y : FLOAT_MAX;
+
+        // Calculate distance for volume sampling
+#if MEDIUM_STACK_SIZE > 0
+        uint mediumIdx = shadeRayPayloadGetMediumIdx(rayPayload);
+
+        if (mediumIdx > 0)
+        {
+            Medium m = rayPayload.media[mediumIdx - 1];
+
+            rayPayload.walkSegmentPdf = vec3(1.0);
+
+            uint walkLength = shadeRayPayloadGetWalk(rayPayload);
+            bool hasScattering = any(greaterThan(m.sigma_s, vec3(0.0)));
+
+            if (hasScattering && walkLength <= PC.maxVolumeWalkLength)
+            {
+                vec3 albedo = safe_div(m.sigma_s, m.sigma_t);
+
+#ifdef RAND_4D
+                vec2 xi = rng4d_next4f(rayPayload.rng_state).xy;
+#else
+                vec2 xi = rng1d_next2f(rayPayload.rng_state);
+#endif
+
+                float s = sampleDistance(albedo, rayPayload.throughput, m.sigma_t, xi.x, rayPayload.walkSegmentPdf);
+
+                tMax = -log(1.0 - xi.y) / s; // collision free distance (mean free path)
+            }
+        }
+#endif
+
         // Closest hit shading
         rayPayload.neeContrib = vec3(0.0);
 
@@ -87,9 +183,9 @@ vec3 evaluate_sample(vec3 ray_origin,
             2,                     // sbt record stride
             0,                     // miss index
             rayPayload.ray_origin, // ray origin
-            clipRange.x,           // ray min range
+            tMin,                  // ray min range
             rayPayload.ray_dir,    // ray direction
-            clipRange.y,           // ray max range
+            tMax,                  // ray max range
             PAYLOAD_INDEX_SHADE    // payload
         );
 
@@ -113,9 +209,9 @@ vec3 evaluate_sample(vec3 ray_origin,
             2,                     // sbt record stride
             0,                     // miss index
             rayPayload.ray_origin, // ray origin
-            clipRange.x,           // ray min range
+            tMin,                  // ray min range
             rayPayload.ray_dir,    // ray direction
-            clipRange.y,           // ray max range
+            tMax,                  // ray max range
             PAYLOAD_INDEX_SHADE    // payload
         );
 #endif
@@ -184,10 +280,26 @@ vec3 evaluate_sample(vec3 ray_origin,
             }
         }
 
+        // Handle volume miss
+#if MEDIUM_STACK_SIZE > 0
+        if ((rayPayload.bitfield & SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG) != 0)
+        {
+#ifdef RAND_4D
+            vec2 xi = rng4d_next4f(rayPayload.rng_state).xy;
+#else
+            vec2 xi = rng1d_next2f(rayPayload.rng_state);
+#endif
+
+            float bias = rayPayload.media[mediumIdx - 1].bias;
+
+            sampleVolumeScatteringDirection(xi, bias, rayPayload.ray_dir);
+
+            rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG;
+        }
+#endif
+
         // Update bounce count
         rayPayload.bitfield++;
-
-        clipRange = vec2(0.0, FLOAT_MAX); // Only clip primary rays
     }
 
 #if AOV_ID == AOV_ID_DEBUG_BOUNCES

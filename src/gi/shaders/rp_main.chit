@@ -210,20 +210,26 @@ void main()
 
     if (mediumIdx > 0)
     {
+        vec3 transmittance;
+        float distance = gl_HitTEXT;
+
 #if MEDIUM_STACK_SIZE == 0
         vec3 sigma_a = mdl_volume_absorption_coefficient(shading_state);
+
+        transmittance = exp(-sigma_a * distance);
 #else
         Medium m = rayPayload.media[mediumIdx - 1];
-        vec3 sigma_a = m.sigma_t - m.sigma_s;
 
         prevMediumIor = m.ior;
         if (mediumIdx > 1)
         {
             nextMediumIor = rayPayload.media[mediumIdx - 2].ior;
         }
+
+        transmittance = exp(-m.sigma_t * distance);
 #endif
 
-        throughput *= exp(-sigma_a * gl_HitTEXT);
+        throughput *= transmittance;
     }
 
     const vec3 iorCurrent = (isFrontFace || thinWalled) ? prevMediumIor : vec3(BSDF_USE_MATERIAL_IOR);
@@ -406,6 +412,9 @@ void main()
 #else
         mediumIdx = (1 - mediumIdx); // toggle between inside and outside
 #endif
+
+        // medium changed -> reset walk
+        rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_WALK_MASK;
 
         shadeRayPayloadSetMediumIdx(rayPayload, mediumIdx);
     }

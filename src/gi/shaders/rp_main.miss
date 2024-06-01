@@ -12,6 +12,28 @@
 
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 
+#if MEDIUM_STACK_SIZE > 0
+void stepVolume(uint mediumIdx)
+{
+    float distance = gl_RayTmaxEXT;
+
+    Medium m = rayPayload.media[mediumIdx - 1];
+
+    vec3 transmittance = exp(m.sigma_t * -distance);
+
+    vec3 density = m.sigma_t * transmittance;
+
+    float pdf = dot(rayPayload.walkSegmentPdf, density);
+
+    rayPayload.throughput *= (m.sigma_s * transmittance) / pdf;
+
+    rayPayload.ray_origin += gl_WorldRayDirectionEXT * distance;
+
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG;
+    shadeRayPayloadIncrementWalk(rayPayload);
+}
+#endif
+
 // Optimized implementation from GLM with only cross products:
 // https://github.com/g-truc/glm/blob/47585fde0c49fa77a2bf2fb1d2ead06999fd4b6e/glm/detail/type_quat.inl#L356-L363
 vec3 quatRotateDir(vec4 q, vec3 dir)
@@ -32,6 +54,17 @@ vec3 sampleDomeLight(uint domeLightIndex, vec3 rayDir)
 
 void main()
 {
+#if MEDIUM_STACK_SIZE > 0
+    uint mediumIdx = shadeRayPayloadGetMediumIdx(rayPayload);
+
+    if (mediumIdx > 0)
+    {
+        stepVolume(mediumIdx);
+
+        return;
+    }
+#endif
+
     rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
 
 #if AOV_ID != AOV_ID_COLOR
