@@ -105,7 +105,7 @@ namespace
     std::vector<mx::TypedElementPtr> renderableElements;
 #if (MATERIALX_MAJOR_VERSION > 1) || \
     (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 38) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION > 8)
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION > 7)
     renderableElements = mx::findRenderableElements(doc);
 #else
     mx::findRenderableElements(doc, renderableElements);
