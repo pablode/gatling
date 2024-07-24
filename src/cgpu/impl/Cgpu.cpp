@@ -47,10 +47,9 @@
 #pragma clang diagnostic pop
 #endif
 
-// TODO: should be in 'gtl/gb' subfolder
-#include <SmallVector.h>
-#include <LinearDataStore.h>
-#include <Log.h>
+#include <gtl/gb/LinearDataStore.h>
+#include <gtl/gb/SmallVector.h>
+#include <gtl/gb/Log.h>
 
 namespace gtl
 {

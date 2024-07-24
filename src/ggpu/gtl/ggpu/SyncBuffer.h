@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <Cgpu.h>
+#include <gtl/cgpu/Cgpu.h>
 
 #include "ResizableBuffer.h"
 

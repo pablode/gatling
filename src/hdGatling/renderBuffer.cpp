@@ -19,7 +19,7 @@
 
 #include <pxr/base/gf/vec3i.h>
 
-#include <Gi.h>
+#include <gtl/gi/Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

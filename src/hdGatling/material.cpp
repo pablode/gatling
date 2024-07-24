@@ -17,7 +17,7 @@
 
 #include "material.h"
 
-#include <Gi.h>
+#include <gtl/gi/Gi.h>
 
 using namespace gtl;
 

@@ -29,7 +29,7 @@
 #include <pxr/usd/sdf/assetPath.h>
 #include <pxr/usd/usdLux/blackbody.h>
 
-#include <Gi.h>
+#include <gtl/gi/Gi.h>
 
 #include <assert.h>
 

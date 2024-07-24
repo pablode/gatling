@@ -1,23 +1,24 @@
 add_library(
   ggpu STATIC
-  include/DenseDataStore.h
-  include/LinearDataStore.h
-  include/ResizableBuffer.h
-  include/Stager.h
-  include/SyncBuffer.h
-  src/DenseDataStore.cpp
-  src/LinearDataStore.cpp
-  src/ResizableBuffer.cpp
-  src/Stager.cpp
-  src/SyncBuffer.cpp
+  gtl/ggpu/DenseDataStore.h
+  gtl/ggpu/LinearDataStore.h
+  gtl/ggpu/ResizableBuffer.h
+  gtl/ggpu/Stager.h
+  gtl/ggpu/SyncBuffer.h
+  impl/DenseDataStore.cpp
+  impl/LinearDataStore.cpp
+  impl/ResizableBuffer.cpp
+  impl/Stager.cpp
+  impl/SyncBuffer.cpp
 )
 
 target_include_directories(
   ggpu
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE
-    src
+    gtl/ggpu
+    impl
 )
 
 target_link_libraries(

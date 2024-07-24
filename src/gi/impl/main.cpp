@@ -26,8 +26,8 @@
 
 #include "Mmap.h"
 #include "Gi.h"
-#include <Imgio.h>
-#include <LogFlushListener.h>
+#include <gtl/imgio/Imgio.h>
+#include <gtl/gt/LogFlushListener.h>
 
 namespace mx = MaterialX;
 using namespace gtl;

@@ -1,15 +1,16 @@
 add_library(
   gt STATIC
-  include/LogFlushListener.h
-  src/LogFlushListener.cpp
+  gtl/gt/LogFlushListener.h
+  impl/LogFlushListener.cpp
 )
 
 target_include_directories(
   gt
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE
-    src
+    gtl/gt
+    _impl
 )
 
 target_link_libraries(

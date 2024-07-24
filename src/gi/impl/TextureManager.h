@@ -21,8 +21,8 @@
 #include <string>
 #include <vector>
 
-#include <Cgpu.h>
-#include <Backend.h>
+#include <gtl/cgpu/Cgpu.h>
+#include <gtl/mc/Backend.h>
 
 namespace gtl
 {

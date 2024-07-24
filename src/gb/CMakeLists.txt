@@ -1,21 +1,22 @@
 add_library(
   gb STATIC
-  include/HandleStore.h
-  include/LinearDataStore.h
-  include/Log.h
-  include/SmallVector.h
-  src/HandleStore.cpp
-  src/LinearDataStore.cpp
-  src/Log.cpp
-  src/SmallVector.cpp
+  gtl/gb/HandleStore.h
+  gtl/gb/LinearDataStore.h
+  gtl/gb/Log.h
+  gtl/gb/SmallVector.h
+  impl/HandleStore.cpp
+  impl/LinearDataStore.cpp
+  impl/Log.cpp
+  impl/SmallVector.cpp
 )
 
 target_include_directories(
   gb
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE
-    src
+    gtl/gb
+    impl
 )
 
 target_link_libraries(

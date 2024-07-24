@@ -1,17 +1,17 @@
 add_library(
   imgio STATIC
-  include/ErrorCodes.h
-  include/Image.h
-  include/Imgio.h
-  src/Imgio.cpp
-  src/ExrDecoder.h
-  src/ExrDecoder.cpp
-  src/HdrDecoder.h
-  src/HdrDecoder.cpp
-  src/JpegDecoder.h
-  src/JpegDecoder.cpp
-  src/PngDecoder.h
-  src/PngDecoder.cpp
+  gtl/imgio/ErrorCodes.h
+  gtl/imgio/Image.h
+  gtl/imgio/Imgio.h
+  impl/Imgio.cpp
+  impl/ExrDecoder.h
+  impl/ExrDecoder.cpp
+  impl/HdrDecoder.h
+  impl/HdrDecoder.cpp
+  impl/JpegDecoder.h
+  impl/JpegDecoder.cpp
+  impl/PngDecoder.h
+  impl/PngDecoder.cpp
 )
 
 set_target_properties(
@@ -24,9 +24,10 @@ set_target_properties(
 target_include_directories(
   imgio
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE
-    src
+    gtl/imgio
+    impl
 )
 
 target_link_libraries(

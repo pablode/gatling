@@ -24,7 +24,7 @@
 #include <array>
 #include <filesystem>
 
-#include <SmallVector.h>
+#include <gtl/gb/SmallVector.h>
 
 #include "MdlMaterial.h"
 #include "MdlLogger.h"

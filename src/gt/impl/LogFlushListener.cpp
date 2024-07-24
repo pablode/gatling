@@ -17,7 +17,7 @@
 
 #include "LogFlushListener.h"
 
-#include <Log.h>
+#include <gtl/gb/Log.h>
 
 using namespace doctest;
 

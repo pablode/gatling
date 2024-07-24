@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2023 Pablo Delgado Kr√§mer
+// Copyright (C) 2023 Pablo Delgado Kr‰mer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,25 +18,33 @@
 #pragma once
 
 #include <stdint.h>
-#include <stdbool.h>
-#include <stdlib.h>
 
-#include <SmallVector.h>
+#include <gtl/cgpu/Cgpu.h>
 
 namespace gtl
 {
-  class GbHandleStore
+  class GgpuResizableBuffer
   {
   public:
-    uint64_t allocateHandle();
+    GgpuResizableBuffer(CgpuDevice device,
+                        CgpuBufferUsageFlags usageFlags,
+                        CgpuMemoryPropertyFlags memoryProperties);
 
-    bool isHandleValid(uint64_t handle) const;
+    ~GgpuResizableBuffer();
 
-    void freeHandle(uint64_t handle);
+  public:
+    CgpuBuffer buffer() const;
+
+    uint64_t size() const;
+
+    bool resize(uint64_t newSize);
 
   private:
-    uint32_t m_maxIndex = 0;
-    GbSmallVector<uint32_t, 1024> m_versions;
-    GbSmallVector<uint32_t, 64> m_freeList;
+    CgpuDevice m_device;
+    CgpuBufferUsageFlags m_usageFlags;
+    CgpuMemoryPropertyFlags m_memoryProperties;
+
+    CgpuBuffer m_buffer;
+    uint64_t m_size = 0;
   };
 }

@@ -24,7 +24,7 @@
 #include <pxr/imaging/hd/vtBufferSource.h>
 #include <pxr/usd/usdUtils/pipeline.h>
 
-#include <Gi.h>
+#include <gtl/gi/Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

@@ -18,7 +18,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <SmallVector.h>
+#include <gtl/gb/SmallVector.h>
 
 namespace gtl
 {

@@ -19,9 +19,9 @@
 #include "GlslShaderCompiler.h"
 #include "GlslStitcher.h"
 
-#include <Material.h>
-#include <Runtime.h>
-#include <Backend.h>
+#include <gtl/mc/Material.h>
+#include <gtl/mc/Runtime.h>
+#include <gtl/mc/Backend.h>
 
 #include <string>
 #include <sstream>

@@ -21,8 +21,8 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <Cgpu.h>
-#include <HandleStore.h>
+#include <gtl/gb/HandleStore.h>
+#include <gtl/cgpu/Cgpu.h>
 
 #include "SyncBuffer.h"
 

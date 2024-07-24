@@ -23,7 +23,7 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include <Log.h>
+#include <gtl/gb/Log.h>
 
 namespace mx = MaterialX;
 

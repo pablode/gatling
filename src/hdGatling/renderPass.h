@@ -20,7 +20,7 @@
 #include <pxr/imaging/hd/renderPass.h>
 #include <pxr/imaging/hd/renderDelegate.h>
 
-#include <Gi.h>
+#include <gtl/gi/Gi.h>
 
 using namespace gtl;
 

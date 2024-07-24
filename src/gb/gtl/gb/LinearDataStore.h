@@ -21,8 +21,8 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include <SmallVector.h>
-#include <HandleStore.h>
+#include "SmallVector.h"
+#include "HandleStore.h"
 
 namespace gtl
 {

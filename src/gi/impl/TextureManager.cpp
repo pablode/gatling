@@ -18,11 +18,10 @@
 #include "TextureManager.h"
 #include "Gi.h"
 
-#include <GlslShaderGen.h> // TODO: remove this dependency
-#include <Backend.h>
-#include <Stager.h>
-#include <Imgio.h>
-#include <Log.h>
+#include <gtl/mc/Backend.h>
+#include <gtl/gb/Log.h>
+#include <gtl/ggpu/Stager.h>
+#include <gtl/imgio/Imgio.h>
 
 #include <assert.h>
 #include <string.h>

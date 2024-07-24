@@ -1,17 +1,18 @@
 add_library(
   cgpu STATIC
-  include/Cgpu.h
-  src/Cgpu.cpp
-  src/ShaderReflection.cpp
-  src/ShaderReflection.h
+  gtl/cgpu/Cgpu.h
+  impl/Cgpu.cpp
+  impl/ShaderReflection.cpp
+  impl/ShaderReflection.h
 )
 
 target_include_directories(
   cgpu
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE
-    src
+    gtl/cgpu
+    impl
 )
 
 target_link_libraries(

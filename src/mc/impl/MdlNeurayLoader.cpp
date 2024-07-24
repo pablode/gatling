@@ -26,7 +26,7 @@
 #endif
 
 #include <string>
-#include <Log.h>
+#include <gtl/gb/Log.h>
 
 #define MI_NEURAYLIB_LATEST_VERSION 52
 

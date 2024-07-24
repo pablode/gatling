@@ -1,35 +1,36 @@
 add_library(
   mc STATIC
-  include/Backend.h
-  include/Frontend.h
-  include/Material.h
-  include/Runtime.h
-  src/Backend.cpp
-  src/Frontend.cpp
-  src/Material.cpp
-  src/MdlLogger.cpp
-  src/MdlLogger.h
-  src/MdlMaterial.cpp
-  src/MdlMaterial.h
-  src/MdlMaterialCompiler.cpp
-  src/MdlMaterialCompiler.h
-  src/MdlNeurayLoader.cpp
-  src/MdlNeurayLoader.h
-  src/MdlRuntime.cpp
-  src/MdlRuntime.h
-  src/MtlxDocumentPatcher.cpp
-  src/MtlxDocumentPatcher.h
-  src/MtlxMdlCodeGen.cpp
-  src/MtlxMdlCodeGen.h
-  src/Runtime.cpp
+  gtl/mc/Backend.h
+  gtl/mc/Frontend.h
+  gtl/mc/Material.h
+  gtl/mc/Runtime.h
+  impl/Backend.cpp
+  impl/Frontend.cpp
+  impl/Material.cpp
+  impl/MdlLogger.cpp
+  impl/MdlLogger.h
+  impl/MdlMaterial.cpp
+  impl/MdlMaterial.h
+  impl/MdlMaterialCompiler.cpp
+  impl/MdlMaterialCompiler.h
+  impl/MdlNeurayLoader.cpp
+  impl/MdlNeurayLoader.h
+  impl/MdlRuntime.cpp
+  impl/MdlRuntime.h
+  impl/MtlxDocumentPatcher.cpp
+  impl/MtlxDocumentPatcher.h
+  impl/MtlxMdlCodeGen.cpp
+  impl/MtlxMdlCodeGen.h
+  impl/Runtime.cpp
 )
 
 target_include_directories(
   mc
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}
   PRIVATE
-    src
+    gtl/mc
+    impl
     ${MDL_INCLUDE_DIR}
 )
 

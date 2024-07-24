@@ -1,28 +1,29 @@
 set(GI_SRCS
-  include/Gi.h
-  src/Gi.cpp
-  src/AssetReader.h
-  src/AssetReader.cpp
-  src/GlslShaderCompiler.h
-  src/GlslShaderCompiler.cpp
-  src/GlslShaderGen.h
-  src/GlslShaderGen.cpp
-  src/GlslStitcher.h
-  src/GlslStitcher.cpp
-  src/Mmap.h
-  src/Mmap.cpp
-  src/TextureManager.h
-  src/TextureManager.cpp
-  src/Turbo.h
+  gtl/gi/Gi.h
+  impl/Gi.cpp
+  impl/AssetReader.h
+  impl/AssetReader.cpp
+  impl/GlslShaderCompiler.h
+  impl/GlslShaderCompiler.cpp
+  impl/GlslShaderGen.h
+  impl/GlslShaderGen.cpp
+  impl/GlslStitcher.h
+  impl/GlslStitcher.cpp
+  impl/Mmap.h
+  impl/Mmap.cpp
+  impl/TextureManager.h
+  impl/TextureManager.cpp
+  impl/Turbo.h
 )
 
 function(configure_target TARGET)
   target_include_directories(
     ${TARGET}
     PUBLIC
-      "${CMAKE_CURRENT_SOURCE_DIR}/include"
+      ${CMAKE_CURRENT_SOURCE_DIR}
     PRIVATE
-      src
+      gtl/gi
+      impl
       shaders
   )
 
@@ -62,7 +63,7 @@ target_link_libraries(gi PRIVATE efsw-static)
 set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 configure_target(gi)
 
-add_executable(gi_test ${GI_SRCS} src/main.cpp)
+add_executable(gi_test ${GI_SRCS} impl/main.cpp)
 target_link_libraries(gi_test PRIVATE gt doctest)
 configure_target(gi_test)
 

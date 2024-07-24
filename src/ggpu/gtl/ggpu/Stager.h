@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <functional>
 
-#include <Cgpu.h>
+#include <gtl/cgpu/Cgpu.h>
 
 namespace gtl
 {

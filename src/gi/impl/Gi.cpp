@@ -40,18 +40,18 @@
 #include <mutex>
 #include <assert.h>
 
-#include <Stager.h>
-#include <DenseDataStore.h>
-#include <Cgpu.h>
+#include <gtl/ggpu/Stager.h>
+#include <gtl/ggpu/DenseDataStore.h>
+#include <gtl/cgpu/Cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #ifdef GI_SHADER_HOTLOADING
 #include <efsw/efsw.hpp>
 #endif
-#include <Material.h>
-#include <Frontend.h>
-#include <Runtime.h>
-#include <Log.h>
+#include <gtl/mc/Material.h>
+#include <gtl/mc/Frontend.h>
+#include <gtl/mc/Runtime.h>
+#include <gtl/gb/Log.h>
 
 #include <MaterialXCore/Document.h>
 

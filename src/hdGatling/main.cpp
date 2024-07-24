@@ -18,7 +18,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
 
-#include <LogFlushListener.h>
+#include <gtl/gt/LogFlushListener.h>
 
 #include <pxr/base/tf/getenv.h>
 #include <pxr/base/tf/setenv.h>
