@@ -90,7 +90,7 @@ namespace
       return true;
     }
 
-    if (_IsBxdfWithInputValue(node, "open_pbr_surface", "geometry_opacity", mx::Value::createValue(mx::Color3(1.0f))))
+    if (_IsBxdfWithInputValue(node, "open_pbr_surface", "geometry_opacity", mx::Value::createValue(1.0f)))
     {
       return true;
     }
