@@ -1739,7 +1739,7 @@ namespace gtl
       .stage = pipelineShaderStageCreateInfo,
       .layout = ipipeline->layout,
       .basePipelineHandle = VK_NULL_HANDLE,
-      .basePipelineIndex = 0,
+      .basePipelineIndex = -1
     };
 
     VkResult result = idevice->table.vkCreateComputePipelines(
@@ -2025,7 +2025,7 @@ namespace gtl
         .pDynamicState = nullptr,
         .layout = ipipeline->layout,
         .basePipelineHandle = VK_NULL_HANDLE,
-        .basePipelineIndex = 0,
+        .basePipelineIndex = -1
       };
 
       if (idevice->table.vkCreateRayTracingPipelinesKHR(idevice->logicalDevice,
