@@ -1788,7 +1788,7 @@ namespace gtl
     CgpuBufferUsageFlags bufferUsageFlags = CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR;
     CgpuMemoryPropertyFlags bufferMemPropFlags = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
 
-    if (!cgpuCreateIBufferAligned(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize, 0, &ipipeline->sbt))
+    if (!cgpuCreateIBufferAligned(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize, 0, &ipipeline->sbt, "[SBT]"))
     {
       CGPU_RETURN_ERROR("failed to create sbt buffer");
     }
@@ -2103,7 +2103,7 @@ cleanup_fail:
                                   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE,
                                   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                                   asBuildSizesInfo.accelerationStructureSize, 0,
-                                  iasBuffer))
+                                  iasBuffer, "[AS buffer]"))
     {
       CGPU_RETURN_ERROR("failed to create AS buffer");
     }
@@ -2132,7 +2132,7 @@ cleanup_fail:
                                   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                                   asBuildSizesInfo.buildScratchSize,
                                   idevice->properties.minAccelerationStructureScratchOffsetAlignment,
-                                  &iscratchBuffer))
+                                  &iscratchBuffer, "[AS scratch buffer]"))
     {
       cgpuDestroyIBuffer(idevice, iasBuffer);
       idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, *as, nullptr);

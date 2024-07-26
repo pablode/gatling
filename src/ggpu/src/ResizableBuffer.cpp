@@ -75,7 +75,8 @@ namespace gtl
     if (!cgpuCreateBuffer(m_device, {
                             .usage = m_usageFlags,
                             .memoryProperties = m_memoryProperties,
-                            .size = newSize
+                            .size = newSize,
+                            .debugName = "[resizable buffer]"
                           }, &buffer))
     {
       goto cleanup;
