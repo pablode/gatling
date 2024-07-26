@@ -1130,7 +1130,8 @@ namespace gtl
                                        CgpuMemoryPropertyFlags memoryProperties,
                                        uint64_t size,
                                        uint64_t alignment,
-                                       CgpuIBuffer* ibuffer)
+                                       CgpuIBuffer* ibuffer,
+                                       const char* debugName)
   {
     VkBufferCreateInfo bufferInfo = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -1171,6 +1172,11 @@ namespace gtl
       );
     }
 
+    if (debugName)
+    {
+      vmaSetAllocationName(idevice->allocator, ibuffer->allocation, debugName);
+    }
+
     if (result != VK_SUCCESS)
     {
       CGPU_RETURN_ERROR("failed to create buffer");
@@ -1194,7 +1200,7 @@ namespace gtl
 
     assert(createInfo.size > 0);
 
-    if (!cgpuCreateIBufferAligned(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size, alignment, ibuffer))
+    if (!cgpuCreateIBufferAligned(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size, alignment, ibuffer, createInfo.debugName))
     {
       iinstance->ibufferStore.free(handle);
       CGPU_RETURN_ERROR("failed to create buffer");
@@ -1328,6 +1334,11 @@ namespace gtl
     if (result != VK_SUCCESS) {
       iinstance->iimageStore.free(handle);
       CGPU_RETURN_ERROR("failed to create image");
+    }
+
+    if (createInfo.debugName)
+    {
+      vmaSetAllocationName(idevice->allocator, iimage->allocation, createInfo.debugName);
     }
 
     VmaAllocationInfo allocationInfo;
@@ -2264,7 +2275,7 @@ cleanup_fail:
                                   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                                   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
                                   (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR), 0,
-                                  &itlas->instances))
+                                  &itlas->instances, createInfo.debugName))
     {
       iinstance->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
