@@ -33,6 +33,13 @@
 #pragma clang diagnostic ignored "-Wnullability-completeness"
 #endif
 
+// Uncomment for VMA debug logging
+//#define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
+//    fprintf(stderr, (format), __VA_ARGS__);    \
+//    fprintf(stderr, "\n");                     \
+//    GB_LOG((format), __VA_ARGS__);             \
+//  } while (false)
+
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
