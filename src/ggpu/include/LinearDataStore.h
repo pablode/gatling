@@ -38,7 +38,7 @@ namespace gtl
                         uint64_t elementSize,
                         uint32_t minCapacity);
 
-    ~GgpuLinearDataStore();
+    virtual ~GgpuLinearDataStore();
 
   public:
     virtual uint64_t allocate();
