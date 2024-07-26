@@ -589,14 +589,6 @@ namespace gtl
       return false;
     }
 
-    if ((subgroupProperties.supportedStages & VK_QUEUE_COMPUTE_BIT) != VK_QUEUE_COMPUTE_BIT ||
-        (subgroupProperties.supportedOperations & VK_SUBGROUP_FEATURE_BASIC_BIT) != VK_SUBGROUP_FEATURE_BASIC_BIT ||
-        (subgroupProperties.supportedOperations & VK_SUBGROUP_FEATURE_BALLOT_BIT) != VK_SUBGROUP_FEATURE_BALLOT_BIT)
-    {
-      iinstance->ideviceStore.free(handle);
-      CGPU_RETURN_ERROR("subgroup features not supported");
-    }
-
     const VkPhysicalDeviceLimits* limits = &deviceProperties.properties.limits;
     idevice->properties = cgpuTranslatePhysicalDeviceProperties(limits, &subgroupProperties, &asProperties, &rtPipelineProperties);
 
