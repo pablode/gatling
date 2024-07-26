@@ -71,6 +71,7 @@ namespace gtl
     CgpuPhysicalDeviceFeatures   features;
     CgpuPhysicalDeviceProperties properties;
     VmaAllocator                 allocator;
+    VkPipelineCache              pipelineCache;
   };
 
   struct CgpuIBuffer
@@ -1040,6 +1041,28 @@ namespace gtl
       CGPU_RETURN_ERROR("failed to create vma allocator");
     }
 
+    VkPipelineCacheCreateInfo cacheCreateInfo = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .initialDataSize = 0,
+      .pInitialData = nullptr
+    };
+
+    result = idevice->table.vkCreatePipelineCache(
+      idevice->logicalDevice,
+      &cacheCreateInfo,
+      nullptr,
+      &idevice->pipelineCache
+    );
+
+    if (result != VK_SUCCESS)
+    {
+      CGPU_RETURN_ERROR("failed to create pipeline cache");
+
+      idevice->pipelineCache = VK_NULL_HANDLE;
+    }
+
     device->handle = handle;
     return true;
   }
@@ -1048,11 +1071,16 @@ namespace gtl
   {
     CGPU_RESOLVE_OR_RETURN_DEVICE(device, idevice);
 
-    vmaDestroyAllocator(idevice->allocator);
+    if (idevice->pipelineCache != VK_NULL_HANDLE)
+    {
+      idevice->table.vkDestroyPipelineCache(idevice->logicalDevice, idevice->pipelineCache, nullptr);
+    }
 
     idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestamp_pool, nullptr);
     idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
     idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
+
+    vmaDestroyAllocator(idevice->allocator);
 
     iinstance->ideviceStore.free(device.handle);
     return true;
@@ -1716,7 +1744,7 @@ namespace gtl
 
     VkResult result = idevice->table.vkCreateComputePipelines(
       idevice->logicalDevice,
-      VK_NULL_HANDLE,
+      idevice->pipelineCache,
       1,
       &pipelineCreateInfo,
       nullptr,
@@ -2002,7 +2030,7 @@ namespace gtl
 
       if (idevice->table.vkCreateRayTracingPipelinesKHR(idevice->logicalDevice,
                                                         VK_NULL_HANDLE,
-                                                        VK_NULL_HANDLE,
+                                                        idevice->pipelineCache,
                                                         1,
                                                         &rtPipelineCreateInfo,
                                                         nullptr,
