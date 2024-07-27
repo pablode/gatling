@@ -104,17 +104,48 @@ namespace gtl
   {
     uint64_t byteOffset = index * m_elementSize;
 
+    // A resize is very unlikely and can be expensive
     if (byteOffset >= m_buffer.byteSize())
     {
       uint32_t minSize = m_elementSize * m_minCapacity;
       uint32_t newSize = std::max(_NextPowerOfTwo(byteOffset), minSize);
 
-      CgpuCommandBuffer commandBuffer; // TODO
+      bool result = false;
+
+      CgpuCommandBuffer commandBuffer;
+      CgpuSemaphore semaphore;
+      CgpuSignalSemaphoreInfo signalSemaphoreInfo;
+      CgpuWaitSemaphoreInfo waitSemaphoreInfo;
+      if (!cgpuCreateCommandBuffer(m_device, &commandBuffer))
+        goto cleanup;
+
+      if (!cgpuBeginCommandBuffer(commandBuffer))
+        goto cleanup;
+
       if (!m_buffer.resize(m_device, commandBuffer, newSize))
-      {
-        assert(false);
-        return UINT32_MAX;
-      }
+        goto cleanup;
+
+      if (!cgpuEndCommandBuffer(commandBuffer))
+        goto cleanup;
+
+      if (!cgpuCreateSemaphore(m_device, &semaphore))
+        goto cleanup;
+
+      signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+      if (!cgpuSubmitCommandBuffer(m_device, commandBuffer, 1, &signalSemaphoreInfo))
+        goto cleanup;
+
+      waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+      if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))
+        goto cleanup;
+
+      result = true;
+
+cleanup:
+      if (commandBuffer.handle)
+        cgpuDestroyCommandBuffer(m_device, commandBuffer);
+      if (semaphore.handle)
+        cgpuDestroySemaphore(m_device, semaphore);
     }
 
     return byteOffset;

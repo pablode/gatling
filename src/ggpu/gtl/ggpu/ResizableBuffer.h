@@ -40,7 +40,7 @@ namespace gtl
 
     uint64_t size() const;
 
-    bool resize(uint64_t newSize);
+    bool resize(uint64_t newSize, CgpuCommandBuffer commandBuffer);
 
   private:
     CgpuDevice m_device;

@@ -100,18 +100,18 @@ namespace gtl
     // Reset buffers if new size is 0.
     if (newSize == 0)
     {
-      m_hostBuffer.resize(0);
-      m_deviceBuffer.resize(0);
+      m_hostBuffer.resize(0, commandBuffer);
+      m_deviceBuffer.resize(0, commandBuffer);
       return true;
     }
 
     // Resize buffers.
     if (m_updateStrategy == UpdateStrategy::OptimalStaging)
     {
-      m_deviceBuffer.resize(/*m_device, commandBuffer,*/ newSize);
+      m_deviceBuffer.resize(newSize, commandBuffer);
     }
 
-    m_hostBuffer.resize(/*m_device, commandBuffer,*/ newSize);
+    m_hostBuffer.resize(newSize, commandBuffer);
 
     return cgpuMapBuffer(device, m_hostBuffer.buffer(), (void**) &m_mappedHostMem);
   }

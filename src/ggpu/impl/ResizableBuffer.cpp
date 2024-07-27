@@ -50,7 +50,7 @@ namespace gtl
     return m_size;
   }
 
-  bool GgpuResizableBuffer::resize(uint64_t newSize)
+  bool GgpuResizableBuffer::resize(uint64_t newSize, CgpuCommandBuffer commandBuffer)
   {
     if (newSize == m_size)
     {
@@ -71,12 +71,8 @@ namespace gtl
 
     // Create new, larger buffer.
     bool result = false;
-    CgpuCommandBuffer commandBuffer;
-    CgpuBuffer buffer;
-    CgpuSemaphore semaphore;
-    CgpuSignalSemaphoreInfo signalSemaphoreInfo;
-    CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
+    CgpuBuffer buffer;
     if (!cgpuCreateBuffer(m_device, {
                             .usage = m_usageFlags,
                             .memoryProperties = m_memoryProperties,
@@ -90,28 +86,7 @@ namespace gtl
     // Copy old buffer data if needed.
     if (m_size > 0)
     {
-      // TODO: pass command buffer from the outside & remove semaphore
-      if (!cgpuCreateCommandBuffer(m_device, &commandBuffer))
-        goto cleanup;
-
-      if (!cgpuBeginCommandBuffer(commandBuffer))
-        goto cleanup;
-
       if (!cgpuCmdCopyBuffer(commandBuffer, m_buffer, 0, buffer, 0, m_size))
-        goto cleanup;
-
-      if (!cgpuEndCommandBuffer(commandBuffer))
-        goto cleanup;
-
-      if (!cgpuCreateSemaphore(m_device, &semaphore))
-        goto cleanup;
-
-      signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-      if (!cgpuSubmitCommandBuffer(m_device, commandBuffer, 1, &signalSemaphoreInfo))
-        goto cleanup;
-
-      waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-      if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))
         goto cleanup;
     }
 
@@ -131,11 +106,6 @@ namespace gtl
     {
       m_delayedResourceDestroyer.enqueueDestruction(buffer);
     }
-
-    if (commandBuffer.handle)
-      cgpuDestroyCommandBuffer(m_device, commandBuffer);
-    if (semaphore.handle)
-      cgpuDestroySemaphore(m_device, semaphore);
 
     return result;
   }
