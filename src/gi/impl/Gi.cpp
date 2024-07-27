@@ -41,6 +41,7 @@
 #include <assert.h>
 
 #include <gtl/ggpu/Stager.h>
+#include <gtl/ggpu/DelayedResourceDestroyer.h>
 #include <gtl/ggpu/DenseDataStore.h>
 #include <gtl/cgpu/Cgpu.h>
 #include <glm/glm.hpp>
@@ -188,6 +189,7 @@ namespace gtl
   CgpuPhysicalDeviceProperties s_deviceProperties;
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
+  std::unique_ptr<GgpuDelayedResourceDestroyer> s_delayedResourceDestroyer;
   std::unique_ptr<GiGlslShaderGen> s_shaderGen;
   std::unique_ptr<McRuntime> s_mcRuntime;
   std::unique_ptr<McFrontend> s_mcFrontend;
@@ -359,6 +361,8 @@ namespace gtl
       goto fail;
     }
 
+    s_delayedResourceDestroyer = std::make_unique<GgpuDelayedResourceDestroyer>(s_device);
+
     s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath));
     if (!s_mcRuntime)
     {
@@ -407,6 +411,11 @@ fail:
       s_texSys.reset();
     }
     s_shaderGen.reset();
+    if (s_delayedResourceDestroyer)
+    {
+      s_delayedResourceDestroyer->destroyAll();
+      s_delayedResourceDestroyer.reset();
+    }
     if (s_stager)
     {
       s_stager->free();
@@ -1618,6 +1627,8 @@ cleanup:
     if (!cgpuWaitSemaphores(s_device, 1, &waitSemaphoreInfo))
       goto cleanup;
 
+    s_delayedResourceDestroyer->nextFrame();
+
     // Read data from GPU to image.
     uint8_t* mapped_staging_mem;
     if (!cgpuMapBuffer(s_device, renderBuffer->stagingBuffer, (void**) &mapped_staging_mem))
@@ -1666,10 +1677,10 @@ cleanup:
     }
 
     GiScene* scene = new GiScene{
-      .sphereLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(rp::SphereLight), 64),
-      .distantLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(rp::DistantLight), 64),
-      .rectLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(rp::RectLight), 64),
-      .diskLights = GgpuDenseDataStore(s_device, *s_stager, sizeof(rp::DiskLight), 64),
+      .sphereLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::SphereLight), 64),
+      .distantLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DistantLight), 64),
+      .rectLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::RectLight), 64),
+      .diskLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DiskLight), 64),
       .fallbackDomeLightTexture = fallbackDomeLightTexture
     };
     return scene;

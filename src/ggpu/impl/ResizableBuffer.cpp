@@ -17,12 +17,16 @@
 
 #include "ResizableBuffer.h"
 
+#include "DelayedResourceDestroyer.h"
+
 namespace gtl
 {
   GgpuResizableBuffer::GgpuResizableBuffer(CgpuDevice device,
+                                           GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                                            CgpuBufferUsageFlags usageFlags,
                                            CgpuMemoryPropertyFlags memoryProperties)
     : m_device(device)
+    , m_delayedResourceDestroyer(delayedResourceDestroyer)
     , m_usageFlags(usageFlags)
     , m_memoryProperties(memoryProperties)
   {
@@ -30,9 +34,10 @@ namespace gtl
 
   GgpuResizableBuffer::~GgpuResizableBuffer()
   {
-    // TODO: add to deletion queue instead
     if (m_buffer.handle)
-      cgpuDestroyBuffer(m_device, m_buffer);
+    {
+      m_delayedResourceDestroyer.enqueueDestruction(m_buffer);
+    }
   }
 
   CgpuBuffer GgpuResizableBuffer::buffer() const
@@ -56,7 +61,7 @@ namespace gtl
     {
       if (m_buffer.handle)
       {
-        cgpuDestroyBuffer(m_device, m_buffer);
+        m_delayedResourceDestroyer.enqueueDestruction(m_buffer);
         m_buffer.handle = 0;
       }
 
@@ -85,7 +90,7 @@ namespace gtl
     // Copy old buffer data if needed.
     if (m_size > 0)
     {
-      // TODO: pass command buffer from the outside
+      // TODO: pass command buffer from the outside & remove semaphore
       if (!cgpuCreateCommandBuffer(m_device, &commandBuffer))
         goto cleanup;
 
@@ -122,9 +127,11 @@ namespace gtl
     result = true;
 
   cleanup:
-    // TODO: add to deletion queue instead (freed on fence signal)
     if (buffer.handle)
-      cgpuDestroyBuffer(m_device, buffer);
+    {
+      m_delayedResourceDestroyer.enqueueDestruction(buffer);
+    }
+
     if (commandBuffer.handle)
       cgpuDestroyCommandBuffer(m_device, commandBuffer);
     if (semaphore.handle)

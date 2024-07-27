@@ -28,6 +28,7 @@
 namespace gtl
 {
   class GgpuStager;
+  class GgpuDelayedResourceDestroyer;
 
   class GgpuSyncBuffer
   {
@@ -41,6 +42,7 @@ namespace gtl
   public:
     GgpuSyncBuffer(CgpuDevice device,
                    GgpuStager& stager,
+                   GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                    uint64_t elementSize,
                    UpdateStrategy updateStrategy = UpdateStrategy::OptimalStaging,
                    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER);
@@ -64,9 +66,7 @@ namespace gtl
       return (T*) write(offset * m_elementSize, range * m_elementSize);
     }
 
-    bool resize(CgpuDevice device,
-                CgpuCommandBuffer commandBuffer,
-                uint64_t newSize);
+    bool resize(CgpuDevice device, CgpuCommandBuffer commandBuffer, uint64_t newSize);
 
     CgpuBuffer buffer() const;
 
@@ -77,6 +77,7 @@ namespace gtl
   private:
     CgpuDevice m_device;
     GgpuStager& m_stager;
+    GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
     uint64_t m_elementSize;
     UpdateStrategy m_updateStrategy;
 

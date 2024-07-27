@@ -37,23 +37,19 @@ namespace gtl
 {
   GgpuLinearDataStore::GgpuLinearDataStore(CgpuDevice device,
                                            GgpuStager& stager,
+                                           GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                                            uint64_t elementSize, 
                                            uint32_t minCapacity)
     : m_device(device)
     , m_elementSize(elementSize)
     , m_minCapacity(minCapacity)
     , m_elementCount(0)
-    , m_buffer(device, stager, elementSize)
+    , m_buffer(device, stager, delayedResourceDestroyer, elementSize)
   {
   }
 
   GgpuLinearDataStore::~GgpuLinearDataStore()
   {
-    if (m_buffer.byteSize() > 0)
-    {
-      CgpuCommandBuffer commandBuffer; // TODO
-      m_buffer.resize(m_device, commandBuffer, 0);
-    }
   }
 
   uint64_t GgpuLinearDataStore::allocate()
