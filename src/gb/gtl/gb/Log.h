@@ -17,15 +17,24 @@
 
 #pragma once
 
-#include <quill/Quill.h>
+#include <quill/Logger.h>
+#include <quill/LogMacros.h>
 
-#define GB_LOG(fmt, ...) QUILL_LOG_INFO(quill::get_root_logger(), fmt, ##__VA_ARGS__)
-#define GB_WARN(fmt, ...) QUILL_LOG_WARNING(quill::get_root_logger(), fmt, ##__VA_ARGS__)
-#define GB_ERROR(fmt, ...) QUILL_LOG_ERROR(quill::get_root_logger(), fmt, ##__VA_ARGS__)
+#include <quill/std/Array.h>
+#include <quill/std/FilesystemPath.h>
+#include <quill/std/UnorderedMap.h>
+#include <quill/std/UnorderedSet.h>
+#include <quill/std/Vector.h>
+
+#define GB_LOG(fmt, ...) QUILL_LOG_INFO(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
+#define GB_WARN(fmt, ...) QUILL_LOG_WARNING(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
+#define GB_ERROR(fmt, ...) QUILL_LOG_ERROR(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 
 namespace gtl
 {
   void gbLogInit();
+
+  quill::Logger* gbGetLogger();
 
   void gbLogFlush();
 }

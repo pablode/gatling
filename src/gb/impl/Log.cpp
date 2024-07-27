@@ -17,25 +17,42 @@
 
 #include "Log.h"
 
+#include <quill/Backend.h>
+#include <quill/Frontend.h>
+#include <quill/sinks/ConsoleSink.h>
+
+#include <assert.h>
+
 namespace gtl
 {
+  static quill::Logger* s_logger = nullptr;
+
   void gbLogInit()
   {
-    std::shared_ptr<quill::Handler> consoleHandler = quill::stdout_handler();
+    assert(!s_logger);
 
-    const char* logPattern = "[%(ascii_time)] (%(level_name)) %(message)";
+    quill::ConsoleColours consoleColors;
+    consoleColors.set_default_colours();
+    consoleColors.set_colour(quill::LogLevel::Info, quill::ConsoleColours::white);
+    auto sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("console", consoleColors);
+
+    const char* logPattern = "[%(time)] (%(log_level)) %(message)";
     const char* timestampFormat = "%H:%M:%S.%Qms";
-    consoleHandler->set_pattern(logPattern, timestampFormat);
+    s_logger = quill::Frontend::create_or_get_logger("root", std::move(sink), logPattern, timestampFormat);
 
-    quill::Config cfg;
-    cfg.default_handlers.emplace_back(consoleHandler);
-    quill::configure(cfg);
+    quill::BackendOptions options;
+    options.thread_name = "GbLog";
+    quill::Backend::start(options);
+  }
 
-    quill::start();
+  quill::Logger* gbGetLogger()
+  {
+    return s_logger;
   }
 
   void gbLogFlush()
   {
-    quill::flush();
+    assert(s_logger);
+    s_logger->flush_log();
   }
 }
