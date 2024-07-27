@@ -28,11 +28,13 @@
 #include <string>
 #include <gtl/gb/Log.h>
 
-#define MI_NEURAYLIB_LATEST_VERSION 52
+#define GTL_RECOMMENDED_NEURAYLIB_VERSION 51
+#define GTL_RECOMMENDED_NEURAYLIB_VERSION_STRING "2023.0.4"
+#define GTL_LATEST_TESTED_NEURAYLIB_VERSION 52
 
 static_assert(MI_NEURAYLIB_API_VERSION >= 48, "MDL SDK version is too old!");
 static_assert(MI_NEURAYLIB_API_VERSION < 52, "2023.1.X MDL SDK has crash issues - use 2023.0.4 instead!");
-static_assert(MI_NEURAYLIB_API_VERSION <= MI_NEURAYLIB_LATEST_VERSION, "Untested MDL SDK version!");
+static_assert(MI_NEURAYLIB_API_VERSION <= GTL_LATEST_TESTED_NEURAYLIB_VERSION, "Untested MDL SDK version!");
 
 namespace
 {
@@ -168,9 +170,9 @@ namespace
       return {};
     }
 
-    if (MI_NEURAYLIB_API_VERSION != MI_NEURAYLIB_LATEST_VERSION)
+    if (MI_NEURAYLIB_API_VERSION != GTL_RECOMMENDED_NEURAYLIB_VERSION)
     {
-      GB_WARN("not using the latest MDL SDK; update for bugfixes");
+      GB_WARN("not using recommended MDL SDK version {}", GTL_RECOMMENDED_NEURAYLIB_VERSION_STRING);
     }
 
     return neuray;
