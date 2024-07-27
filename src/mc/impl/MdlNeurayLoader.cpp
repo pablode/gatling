@@ -26,6 +26,7 @@
 #endif
 
 #include <string>
+#include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 
 #define GTL_RECOMMENDED_NEURAYLIB_VERSION 51
@@ -40,7 +41,7 @@ namespace
 {
   void* _LoadDso(std::string_view libDir)
   {
-    std::string dsoFilename = std::string(libDir) + std::string("/libmdl_sdk" MI_BASE_DLL_FILE_EXT);
+    std::string dsoFilename = GB_FMT("{}/libmdl_sdk{}", libDir, MI_BASE_DLL_FILE_EXT);
 
 #ifdef MI_PLATFORM_WINDOWS
     HMODULE handle = LoadLibraryA(dsoFilename.c_str());

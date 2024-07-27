@@ -26,8 +26,10 @@
 
 #include "Mmap.h"
 #include "Gi.h"
+
 #include <gtl/imgio/Imgio.h>
 #include <gtl/gt/LogFlushListener.h>
+#include <gtl/gb/Fmt.h>
 
 namespace mx = MaterialX;
 using namespace gtl;
@@ -48,7 +50,7 @@ public:
     mx::FilePathVec libFolders; // All directories if left empty.
     mx::loadLibraries(libFolders, { GI_MTLX_STDLIB_DIR }, mtlxStdLib);
 
-    std::string mdlSearchPath = std::string(GI_MTLX_STDLIB_DIR) + "/mdl";
+    std::string mdlSearchPath = GB_FMT("{}/mdl", GI_MTLX_STDLIB_DIR);
 
     GiInitParams params = {
       .shaderPath = GI_SHADER_SOURCE_DIR,
@@ -85,7 +87,7 @@ private:
   void loadRefImage()
   {
     std::string testName = doctest::detail::g_cs->currentTest->m_name;
-    auto imgPath = std::string(GI_REF_IMAGE_DIR) + "/" + testName + REF_IMAGE_EXT;
+    auto imgPath = GB_FMT("{}/{}{}", GI_REF_IMAGE_DIR, testName, REF_IMAGE_EXT);
 
     GiFile* file;
     REQUIRE(giFileOpen(imgPath.c_str(), GiFileUsage::Read, &file));

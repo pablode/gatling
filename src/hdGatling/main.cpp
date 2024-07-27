@@ -18,6 +18,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
 
+#include <gtl/gb/Fmt.h>
 #include <gtl/gt/LogFlushListener.h>
 
 #include <pxr/base/tf/getenv.h>
@@ -46,16 +47,13 @@ int main(int argc, char** argv)
 #if defined(ARCH_OS_WINDOWS)
   {
     const char* PATH_NAME = "PATH";
-    std::string path = TfGetenv(PATH_NAME);
-    path += ';';
-    path += HDGATLING_INSTALL_DIR;
-    TfSetenv(PATH_NAME, path.c_str());
+    std::string newPath = GB_FMT("{};{}", TfGetenv(PATH_NAME), HDGATLING_INSTALL_DIR);
+    TfSetenv(PATH_NAME, newPath.c_str());
   }
 #endif
 
   // Register plugin
-  std::string plugInfoDir = HDGATLING_INSTALL_DIR;
-  plugInfoDir += "/hdGatling/resources";
+  std::string plugInfoDir = GB_FMT("{}/hdGatling/resources", HDGATLING_INSTALL_DIR);
 
   PlugRegistry& plugRegistry = PlugRegistry::GetInstance();
   plugRegistry.RegisterPlugins(plugInfoDir);

@@ -19,6 +19,8 @@
 
 #include "MdlRuntime.h"
 
+#include <gtl/gb/Fmt.h>
+
 #include <mi/mdl_sdk.h>
 
 #include <atomic>
@@ -29,13 +31,12 @@ namespace fs = std::filesystem;
 
 namespace
 {
-  static const char* MODULE_PREFIX = "::gatling::";
   std::atomic_uint32_t s_idCounter(0);
 
   std::string _MakeModuleName(std::string_view identifier)
   {
     uint32_t uniqueId = ++s_idCounter;
-    return std::string(MODULE_PREFIX) + std::to_string(uniqueId) + "_" + std::string(identifier);
+    return GB_FMT("::gatling::{}_{}", uniqueId, identifier);
   }
 }
 
@@ -81,7 +82,7 @@ namespace gtl
     std::lock_guard<std::mutex> guard(m_mutex); // Serialize since the search path is global...
 
     std::string fileDir = fs::path(filePath).parent_path().string();
-    std::string moduleName = "::" + fs::path(filePath).stem().string();
+    std::string moduleName = GB_FMT("::{}", fs::path(filePath).stem().string());
 
     if (m_config->add_mdl_path(fileDir.c_str()))
     {
@@ -112,7 +113,7 @@ namespace gtl
     {
       if (m_config->add_mdl_path(s.c_str()))
       {
-        auto logMsg = std::string("MDL search path could not be added: \"") + s + "\"";
+        auto logMsg = GB_FMT("MDL search path could not be added: \"{}\"", s);
         m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, logMsg.c_str());
       }
     }
@@ -146,17 +147,17 @@ namespace gtl
     mi::base::Handle<const mi::neuraylib::IModule> module(m_transaction->access<mi::neuraylib::IModule>(moduleDbName->get_c_str()));
     assert(module);
 
-    std::string materialDbName = std::string(moduleDbName->get_c_str()) + "::" + std::string(identifier);
+    std::string materialDbName = GB_FMT("{}::{}", moduleDbName->get_c_str(), identifier);
     mi::base::Handle<const mi::IArray> funcs(module->get_function_overloads(materialDbName.c_str(), (const mi::neuraylib::IExpression_list*)nullptr));
     if (funcs->get_length() == 0)
     {
-      std::string errorMsg = std::string("material with identifier ") + std::string(identifier) + " not found in MDL module";
+      std::string errorMsg = GB_FMT("material with identifier {} not found in MDL module", identifier);
       m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, errorMsg.c_str());
       return false;
     }
     if (funcs->get_length() > 1)
     {
-      std::string errorMsg = std::string("ambigious material identifier ") + std::string(identifier) + " for MDL module";
+      std::string errorMsg = GB_FMT("ambigious material identifier {} for MDL module", identifier);
       m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, errorMsg.c_str());
       return false;
     }

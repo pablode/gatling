@@ -74,7 +74,7 @@ target_link_libraries(
   PUBLIC
     ${USD_LIBS_PUBLIC}
   PRIVATE
-    gi
+    gi gb
     ${USD_LIBS_PRIVATE}
 )
 
@@ -112,7 +112,7 @@ install(
 )
 
 add_executable(hdGatling_test main.cpp)
-target_link_libraries(hdGatling_test gt hd)
+target_link_libraries(hdGatling_test gt gb hd)
 add_dependencies(hdGatling_test hdGatling)
 
 # Test executable operates on hdGatling installed to a local directory

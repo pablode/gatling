@@ -32,6 +32,7 @@
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/Util.h>
 
+#include <gtl/gb/Fmt.h>
 #include <gtl/gi/Gi.h>
 
 using namespace gtl;
@@ -46,7 +47,7 @@ namespace
     PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
 
     const std::string& resourcePath = plugin->GetResourcePath();
-    std::string shaderPath = resourcePath + "/shaders";
+    std::string shaderPath = GB_FMT("{}/shaders", resourcePath);
 
     // USD installs the 'source/MaterialXGenMdl/mdl' folder to the MaterialX 'libraries' dir
     std::vector<std::string> mdlSearchPaths = UsdMtlxStandardLibraryPaths();
@@ -56,7 +57,7 @@ namespace
     // The 'mdl' folder is not part of the MDL package paths
     for (std::string& s : mdlSearchPaths)
     {
-      s += "/mdl";
+      s = GB_FMT("{}/mdl", s);
     }
 
     GiInitParams params = {

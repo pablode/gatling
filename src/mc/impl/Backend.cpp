@@ -19,12 +19,12 @@
 
 #include <mi/mdl_sdk.h>
 
-#include <sstream>
 #include <cassert>
 #include <array>
 #include <filesystem>
 
 #include <gtl/gb/SmallVector.h>
+#include <gtl/gb/Fmt.h>
 
 #include "MdlMaterial.h"
 #include "MdlLogger.h"
@@ -208,7 +208,7 @@ namespace gtl
       const char* ownerModule = targetCode->get_texture_owner_module(i);
       if (ownerModule && strlen(ownerModule) > 0)
       {
-        auto moduleDbName = std::string("mdl") + ownerModule;
+        auto moduleDbName = GB_FMT("mdl{}", ownerModule);
 
         mi::base::Handle<const mi::neuraylib::IModule> module(m_transaction->access<const mi::neuraylib::IModule>(moduleDbName.c_str()));
 

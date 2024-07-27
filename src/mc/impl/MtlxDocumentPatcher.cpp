@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 
 namespace mx = MaterialX;
@@ -367,7 +368,7 @@ bool _MakeValidMDLIdentifier(std::string& str)
   bool usePrefix = invalidFirstChar || isReservedKeyword;
   if (usePrefix)
   {
-    str = std::string("GAT" + str);
+    str = GB_FMT("GAT{}", str);
     strChanged |= true;
   }
 

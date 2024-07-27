@@ -33,6 +33,7 @@
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/Util.h>
 
+#include <gtl/gb/Fmt.h>
 #include <gtl/gi/Gi.h>
 
 namespace mx = MaterialX;
@@ -194,7 +195,7 @@ void _PatchMaterialXColor3Vector3Mismatches(HdMaterialNetwork2& network)
         SdfPath convertNodePath = upstreamNodePath;
         for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
         {
-          std::string convertNodeName = "convert" + std::to_string(i);
+          std::string convertNodeName = GB_FMT("convert{}", i);
           convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
         }
 
