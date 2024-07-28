@@ -36,6 +36,8 @@ set_target_properties(
     INSTALL_RPATH_USE_LINK_PATH ON
     # The other libs in the plugin dir have no "lib" prefix, so let's match this
     PREFIX ""
+    # Remove _d postfix because of plugInfo.json mismatch on macOS
+    DEBUG_POSTFIX ""
 )
 
 target_include_directories(
@@ -84,7 +86,7 @@ if(NOT DEFINED PLUGINFO_LIBPATH_PREFIX)
 endif()
 
 set(PLUGINFO_PATH "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json")
-set(PLUG_INFO_LIBRARY_PATH "${PLUGINFO_LIBPATH_PREFIX}/hdGatling${CMAKE_DEBUG_POSTFIX}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+set(PLUG_INFO_LIBRARY_PATH "${PLUGINFO_LIBPATH_PREFIX}/hdGatling${CMAKE_SHARED_LIBRARY_SUFFIX}")
 configure_file(plugInfo.json.in "${PLUGINFO_PATH}" @ONLY)
 
 install(
