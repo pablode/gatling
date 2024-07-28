@@ -17,9 +17,15 @@
 
 #pragma once
 
+#pragma clang diagnostic push
+//#pragma clang diagnostic ignored "-Wdeprecated-copy"
+//#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
 #include <mi/base/interface_implement.h>
 #include <mi/base/ilogger.h>
 #include <mi/neuraylib/imdl_execution_context.h>
+#pragma clang diagnostic pop
 
 namespace gtl
 {

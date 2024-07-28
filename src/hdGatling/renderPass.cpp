@@ -166,7 +166,7 @@ bool HdGatlingRenderPass::IsConverged() const
 }
 
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
-                                      GfMatrix4d rootTransform,
+                                      [[maybe_unused]] GfMatrix4d rootTransform, // TODO: remove
                                       std::vector<const GiMaterial*>& materials,
                                       std::vector<const GiMesh*>& meshes,
                                       std::vector<GiMeshInstance>& instances)

@@ -26,6 +26,12 @@ target_link_libraries(
     quill
 )
 
+target_compile_options(
+  gb
+  PRIVATE
+    ${GTL_COMPILE_OPTIONS}
+)
+
 if(GTL_VERBOSE)
   target_compile_definitions(gb PUBLIC GTL_VERBOSE=1)
 endif()

@@ -20,7 +20,10 @@
 #include "MdlLogger.h"
 #include "MdlNeurayLoader.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
 #include <mi/mdl_sdk.h>
+#pragma clang diagnostic pop
 
 namespace gtl
 {

@@ -17,7 +17,12 @@
 
 #include "MdlNeurayLoader.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
 #include <mi/mdl_sdk.h>
+#pragma clang diagnostic pop
 
 #ifdef MI_PLATFORM_WINDOWS
 #include <mi/base/miwindows.h>

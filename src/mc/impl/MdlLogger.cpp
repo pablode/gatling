@@ -17,7 +17,13 @@
 
 #include "MdlLogger.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
 #include <mi/mdl_sdk.h>
+#pragma clang diagnostic pop
 
 #include <stdio.h>
 #include <gtl/gb/Log.h>

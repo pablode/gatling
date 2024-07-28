@@ -116,6 +116,7 @@ set(OPENEXR_INSTALL OFF)
 set(OPENEXR_INSTALL_TOOLS OFF)
 set(OPENEXR_INSTALL_EXAMPLES OFF)
 add_subdirectory(openexr)
+target_compile_options(OpenEXR PRIVATE "-Wno-#warnings")
 
 #
 # stb

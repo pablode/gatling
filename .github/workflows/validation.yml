@@ -2,9 +2,9 @@ name: Validation Build
 
 on:
   push:
-    branches:
-      - 'master'
-      - 'dev'
+#   branches:
+#     - 'master'
+#     - 'dev'
     paths-ignore:
       - '**.md'
       - '**.glsl'

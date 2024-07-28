@@ -38,3 +38,9 @@ target_link_libraries(
     OpenEXR::OpenEXR
     stb
 )
+
+target_compile_options(
+  imgio
+  PRIVATE
+    ${GTL_COMPILE_OPTIONS}
+)

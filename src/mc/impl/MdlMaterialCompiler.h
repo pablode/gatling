@@ -22,6 +22,10 @@
 #include <vector>
 #include <mutex>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
 #include <mi/base/handle.h>
 #include <mi/neuraylib/icompiled_material.h>
 #include <mi/neuraylib/idatabase.h>
@@ -31,6 +35,7 @@
 #include <mi/neuraylib/imdl_execution_context.h>
 #include <mi/neuraylib/imdl_factory.h>
 #include <mi/neuraylib/imdl_impexp_api.h>
+#pragma clang diagnostic pop
 
 #include "MdlLogger.h"
 

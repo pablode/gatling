@@ -37,7 +37,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace
 {
-  float _AreaEllipsoid(const GfMatrix4d& t, float radiusX, float radiusY, float radiusZ)
+//TODO: use transform or remove
+  float _AreaEllipsoid([[maybe_unused]] const GfMatrix4d& t, float radiusX, float radiusY, float radiusZ)
   {
     float ab = powf(radiusX * radiusY, 1.6f);
     float ac = powf(radiusX * radiusZ, 1.6f);

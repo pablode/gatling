@@ -2008,7 +2008,7 @@ cleanup:
     return light;
   }
 
-  void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
+  void giDestroyDomeLight([[maybe_unused]]/*TODO:use?*/ GiScene* scene, GiDomeLight* light)
   {
     delete light;
   }

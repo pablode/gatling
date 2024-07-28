@@ -59,6 +59,12 @@ target_compile_definitions(
     "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
 )
 
+target_compile_options(
+  hdGatling
+  PRIVATE
+    ${GTL_COMPILE_OPTIONS}
+)
+
 # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
 if(MSVC_VERSION GREATER_EQUAL 1920)
   target_compile_options(hdGatling PRIVATE "/Zc:inline-")

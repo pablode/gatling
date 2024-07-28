@@ -19,10 +19,14 @@
 #include "ErrorCodes.h"
 #include "Image.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_FAILURE_USERMSG
 #define STBI_ONLY_HDR
 #include <stb_image.h>
+#pragma clang diagnostic pop
 
 #include <algorithm>
 #include <float.h>

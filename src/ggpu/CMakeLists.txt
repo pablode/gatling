@@ -30,6 +30,12 @@ target_link_libraries(
     cgpu
 )
 
+target_compile_options(
+  ggpu
+  PRIVATE
+    ${GTL_COMPILE_OPTIONS}
+)
+
 set_target_properties(
   ggpu
   PROPERTIES

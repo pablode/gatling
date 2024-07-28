@@ -17,8 +17,12 @@
 
 #pragma once
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
 #include <mi/base/handle.h>
 #include <mi/neuraylib/ineuray.h>
+#pragma clang diagnostic pop
 
 #include <string_view>
 

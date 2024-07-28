@@ -248,7 +248,7 @@ namespace
     bitangent = GfVec3f(b, nSign + n[1] * n[1] * a, -n[1]);
   }
 
-  void _CalculateFallbackTangents(const VtVec3iArray& meshFaces,
+  void _CalculateFallbackTangents([[maybe_unused]] const VtVec3iArray& meshFaces, // TODO: remove
                                   const _VertexAttr<GfVec3f>& meshNormals,
                                   VtVec3fArray& meshTangents,
                                   VtFloatArray& meshBitangentSigns)

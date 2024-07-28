@@ -20,3 +20,9 @@ target_link_libraries(
   PRIVATE
     gb
 )
+
+target_compile_options(
+  gt
+  PRIVATE
+    ${GTL_COMPILE_OPTIONS}
+)

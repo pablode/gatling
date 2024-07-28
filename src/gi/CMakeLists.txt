@@ -52,6 +52,12 @@ function(configure_target TARGET)
       SPIRV
   )
 
+  target_compile_options(
+    ${TARGET}
+    PRIVATE
+      ${GTL_COMPILE_OPTIONS}
+  )
+
   if(OpenMP_CXX_FOUND)
     target_link_libraries(${TARGET} PRIVATE OpenMP::OpenMP_CXX)
   endif()

@@ -19,10 +19,13 @@
 #include "ErrorCodes.h"
 #include "Image.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #include <ImfRgbaFile.h>
 #include <ImfIO.h>
 #include <ImfArray.h>
 #include <ImfRgba.h>
+#pragma clang diagnostic pop
 
 #include <algorithm>
 #include <assert.h>

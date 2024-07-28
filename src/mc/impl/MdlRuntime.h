@@ -17,6 +17,10 @@
 
 #pragma once
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
 #include <mi/base/handle.h>
 #include <mi/neuraylib/ineuray.h>
 #include <mi/neuraylib/idatabase.h>
@@ -25,6 +29,7 @@
 #include <mi/neuraylib/imdl_backend_api.h>
 #include <mi/neuraylib/imdl_impexp_api.h>
 #include <mi/neuraylib/imdl_factory.h>
+#pragma clang diagnostic pop
 
 #include <memory>
 #include <string_view>

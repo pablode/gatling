@@ -24,6 +24,12 @@ target_link_libraries(
     spirv-reflect-static
 )
 
+target_compile_options(
+  cgpu
+  PRIVATE
+    ${GTL_COMPILE_OPTIONS}
+)
+
 set_target_properties(
   cgpu
   PROPERTIES

@@ -53,7 +53,7 @@ namespace gtl
     assert(m_updateStrategy == UpdateStrategy::PersistentMapping || m_deviceBuffer.size() == 0);
   }
 
-  uint8_t* GgpuSyncBuffer::read(uint64_t byteOffset, uint64_t byteSize)
+  uint8_t* GgpuSyncBuffer::read(uint64_t byteOffset, [[maybe_unused]] uint64_t byteSize) // TODO: remove byteSize?
   {
     assert((byteOffset + byteSize) <= m_size);
     return &m_mappedHostMem[byteOffset];

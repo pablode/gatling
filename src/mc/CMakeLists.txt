@@ -43,6 +43,12 @@ target_link_libraries(
     MaterialXGenMdl
 )
 
+target_compile_options(
+  mc
+  PRIVATE
+    ${GTL_COMPILE_OPTIONS}
+)
+
 if(DEFINED PXR_VERSION)
   target_compile_definitions(
     mc

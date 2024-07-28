@@ -17,7 +17,14 @@
 
 #include "Backend.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-copy"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wsign-compare"
 #include <mi/mdl_sdk.h>
+#pragma clang diagnostic pop
 
 #include <cassert>
 #include <array>

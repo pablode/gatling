@@ -160,7 +160,7 @@ namespace gtl
 
   bool _MakeMaterialGenInfo(const McGlslGenResult& codeGenResult,
                             const std::string& resourcePathPrefix,
-                            fs::path shaderPath,
+                            [[maybe_unused]] fs::path shaderPath, // TODO: remove?
                             GiGlslShaderGen::MaterialGenInfo& genInfo)
   {
     // Append resource path prefix for file-backed MDL modules.
