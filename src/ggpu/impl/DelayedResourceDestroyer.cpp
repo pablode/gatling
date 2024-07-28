@@ -57,36 +57,43 @@ namespace gtl
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuBuffer handle)
   {
+    assert(handle.handle);
     enqueueDestroyFunc([=]() { cgpuDestroyBuffer(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuImage handle)
   {
+    assert(handle.handle);
     enqueueDestroyFunc([=]() { cgpuDestroyImage(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuPipeline handle)
   {
+    assert(handle.handle);
     enqueueDestroyFunc([=]() { cgpuDestroyPipeline(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuSemaphore handle)
   {
+    assert(handle.handle);
     enqueueDestroyFunc([=]() { cgpuDestroySemaphore(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuCommandBuffer handle)
   {
+    assert(handle.handle);
     enqueueDestroyFunc([=]() { cgpuDestroyCommandBuffer(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuBlas handle)
   {
+    assert(handle.handle);
     enqueueDestroyFunc([=]() { cgpuDestroyBlas(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuTlas handle)
   {
+    assert(handle.handle);
     enqueueDestroyFunc([=]() { cgpuDestroyTlas(m_device, handle); });
   }
 
