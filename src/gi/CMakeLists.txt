@@ -76,7 +76,7 @@ target_compile_definitions(
     GI_REF_IMAGE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/testenv"
 )
 
-if(${GATLING_BUILD_HDGATLING})
+if(${GTL_BUILD_HDGATLING})
   install(
     FILES "${MDL_SHARED_LIB}"
     DESTINATION "./hdGatling/resources"

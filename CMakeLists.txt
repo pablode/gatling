@@ -22,9 +22,9 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CONFIG_TYPE} ${OUTPUT_DIR})
 endforeach()
 
-option(GATLING_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
+option(GTL_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
 
-if(${GATLING_BUILD_HDGATLING})
+if(${GTL_BUILD_HDGATLING})
   find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
   find_package(MaterialX REQUIRED HINTS ${USD_ROOT})
 endif()
