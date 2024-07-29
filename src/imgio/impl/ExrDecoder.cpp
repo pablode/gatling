@@ -32,9 +32,9 @@ namespace
   class _MemStream : public Imf::IStream
   {
   private:
-    uint64_t m_pos;
-    uint64_t m_size;
     char* m_data;
+    uint64_t m_size;
+    uint64_t m_pos;
 
   public:
     _MemStream(char* data, size_t size)

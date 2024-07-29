@@ -20,7 +20,7 @@
 namespace
 {
   // https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
-  uint32_t _NextPowerOfTwo(uint32_t v)
+  uint64_t _NextPowerOfTwo(uint64_t v)
   {
     v--;
     v |= v >> 1;
@@ -28,6 +28,7 @@ namespace
     v |= v >> 4;
     v |= v >> 8;
     v |= v >> 16;
+    v |= v >> 32;
     v++;
     return v;
   }
@@ -107,8 +108,8 @@ namespace gtl
     // A resize is very unlikely and can be expensive
     if (byteOffset >= m_buffer.byteSize())
     {
-      uint32_t minSize = m_elementSize * m_minCapacity;
-      uint32_t newSize = std::max(_NextPowerOfTwo(byteOffset), minSize);
+      uint64_t minSize = m_elementSize * m_minCapacity;
+      uint64_t newSize = std::max(_NextPowerOfTwo(byteOffset), minSize);
 
       bool result = false;
 
@@ -146,6 +147,9 @@ cleanup:
         cgpuDestroyCommandBuffer(m_device, commandBuffer);
       if (semaphore.handle)
         cgpuDestroySemaphore(m_device, semaphore);
+
+      if (!result)
+        byteOffset = UINT64_MAX;
     }
 
     return byteOffset;

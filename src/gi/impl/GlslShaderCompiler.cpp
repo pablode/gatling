@@ -57,17 +57,17 @@ namespace gtl
     {
     }
 
-    IncludeResult* includeSystem(const char* headerName,
-                                 const char* includerName,
-                                 size_t inclusionDepth) override
+    IncludeResult* includeSystem([[maybe_unused]] const char* headerName,
+                                 [[maybe_unused]] const char* includerName,
+                                 [[maybe_unused]] size_t inclusionDepth) override
     {
       // There's no reason to support this right now.
       return nullptr;
     }
 
     IncludeResult* includeLocal(const char* headerName,
-                                const char* includerName,
-                                size_t inclusionDepth) override
+                                [[maybe_unused]] const char* includerName,
+                                [[maybe_unused]] size_t inclusionDepth) override
     {
       fs::path filePath = m_rootPath / headerName;
 

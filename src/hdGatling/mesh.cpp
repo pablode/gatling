@@ -111,7 +111,7 @@ namespace
     VtVec3fArray bitangents(tangentCount, GfVec3f(0.0f));
     VtVec3fArray normals(tangentCount, GfVec3f(0.0f));
 
-    for (int i = 0; i < meshFaces.size(); i++)
+    for (size_t i = 0; i < meshFaces.size(); i++)
     {
       const auto& f = meshFaces[i];
 
@@ -147,9 +147,9 @@ namespace
         b = GfVec3f::XAxis();
       }
 
-      int outIndex0 = meshNormals.indexed ? f[0] : (i * 3 + 0);
-      int outIndex1 = meshNormals.indexed ? f[1] : (i * 3 + 1);
-      int outIndex2 = meshNormals.indexed ? f[2] : (i * 3 + 2);
+      size_t outIndex0 = meshNormals.indexed ? f[0] : (i * 3 + 0);
+      size_t outIndex1 = meshNormals.indexed ? f[1] : (i * 3 + 1);
+      size_t outIndex2 = meshNormals.indexed ? f[2] : (i * 3 + 2);
 
       // Assets can author out-of-range indices (f.i. Intel's Sponza scene). Skip those.
       if (outIndex0 >= tangentCount || outIndex1 >= tangentCount || outIndex2 >= tangentCount)
@@ -172,7 +172,7 @@ namespace
     meshTangents.resize(tangentCount);
     meshBitangentSigns.resize(tangentCount);
 
-    for (int i = 0; i < tangentCount; i++)
+    for (size_t i = 0; i < tangentCount; i++)
     {
       const GfVec3f& n = meshNormals.array[i].GetNormalized();
 
@@ -258,7 +258,7 @@ namespace
     meshTangents.resize(normalCount);
     meshBitangentSigns.resize(normalCount);
 
-    for (int i = 0; i < normalCount; i++)
+    for (size_t i = 0; i < normalCount; i++)
     {
       const GfVec3f normal = meshNormals.array[i];
 
@@ -492,13 +492,13 @@ TfToken HdGatlingMesh::_FindPrimvarByRole(HdSceneDelegate* sceneDelegate,
 }
 
 template<typename T>
-VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, int elementExpansion)
+VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, size_t elementExpansion)
 {
   VtArray<T> result(buffer.GetNumElements() * elementExpansion);
 
-  for (int i = 0; i < buffer.GetNumElements(); i++)
+  for (size_t i = 0; i < buffer.GetNumElements(); i++)
   {
-    for (int j = 0; j < elementExpansion; j++)
+    for (size_t j = 0; j < elementExpansion; j++)
     {
       result[i * elementExpansion + j] = ((T*) buffer.GetData())[i];
     }
@@ -507,7 +507,7 @@ VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, int elementExpansi
   return VtValue(std::move(result));
 }
 
-VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, HdType type, int elementExpansion)
+VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, HdType type, size_t elementExpansion)
 {
   if (type == HdTypeFloatVec4)
   {
@@ -586,7 +586,7 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
     uint8_t* srcPtr = (uint8_t*) HdGetValueData(boxedValues);
     size_t elementSize = HdDataSizeOfType(type);
 
-    for (int faceIndex = 0; faceIndex < primitiveParams.size(); faceIndex++)
+    for (size_t faceIndex = 0; faceIndex < primitiveParams.size(); faceIndex++)
     {
       int oldFaceIndex = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[faceIndex]);
 

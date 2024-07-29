@@ -48,7 +48,6 @@ namespace gtl
     mi::neuraylib::Target_function_description("backface.emission.emission", "mdl_backface_edf_emission"),
     mi::neuraylib::Target_function_description("backface.emission.intensity", "mdl_backface_edf_emission_intensity")
   };
-  const static char* MATERIAL_STATE_NAME = "State";
 
   class McBackend::_Impl
   {
@@ -123,7 +122,7 @@ namespace gtl
       uint32_t binding = 0;
 
       // We start at 1 because index 0 is the invalid texture.
-      for (int i = 1; i < texCount; i++)
+      for (size_t i = 1; i < texCount; i++)
       {
 #if MI_NEURAYLIB_API_VERSION >= 51
         if (!targetCode->get_texture_is_body_resource(i))
@@ -194,7 +193,7 @@ namespace gtl
       }
     }
 
-    std::string extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, int i)
+    std::string extractTargetCodeTextureFilePath(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode, size_t i)
     {
       const char* url = targetCode->get_texture_url(i);
       if (!url)
@@ -263,7 +262,7 @@ namespace gtl
   {
     GbSmallVector<mi::neuraylib::Target_function_description, MC_DF_FLAG_COUNT> fDescs;
 
-    for (int i = 0; i < MC_DF_FLAG_COUNT; i++)
+    for (size_t i = 0; i < MC_DF_FLAG_COUNT; i++)
     {
       if (dfFlags & (1 << i))
       {

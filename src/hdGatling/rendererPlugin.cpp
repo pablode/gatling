@@ -69,6 +69,7 @@ namespace
     return giInitialize(params) == GiStatus::Ok;
   }
 
+#if PXR_VERSION <= 2311
   mx::DocumentPtr _LoadMtlxStdLib()
   {
     mx::DocumentPtr mtlxStdLib = mx::createDocument();
@@ -84,6 +85,7 @@ namespace
 
     return mtlxStdLib;
   }
+#endif
 }
 
 // Needs to be defined in pxr namespace due to being publicly declared in header
@@ -201,7 +203,7 @@ void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDeleg
 }
 
 #if PXR_VERSION >= 2302
-bool HdGatlingRendererPlugin::IsSupported(bool gpuEnabled) const
+bool HdGatlingRendererPlugin::IsSupported([[maybe_unused]] bool gpuEnabled) const
 #else
 bool HdGatlingRendererPlugin::IsSupported() const
 #endif

@@ -284,9 +284,9 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       GfMatrix4d T = prototypeTransform * transforms[i];
 
       float instanceTransform[3][4] = {
-        (float) T[0][0], (float) T[1][0], (float) T[2][0], (float) T[3][0],
-        (float) T[0][1], (float) T[1][1], (float) T[2][1], (float) T[3][1],
-        (float) T[0][2], (float) T[1][2], (float) T[2][2], (float) T[3][2]
+        { (float) T[0][0], (float) T[1][0], (float) T[2][0], (float) T[3][0] },
+        { (float) T[0][1], (float) T[1][1], (float) T[2][1], (float) T[3][1] },
+        { (float) T[0][2], (float) T[1][2], (float) T[2][2], (float) T[3][2] }
       };
 
       GiMeshInstance instance;

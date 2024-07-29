@@ -133,7 +133,7 @@ namespace gtl
 
     bool result;
 
-    for (int i = 0; i < texCount; i++)
+    for (size_t i = 0; i < texCount; i++)
     {
       fflush(stdout);
       CgpuImage image;
@@ -147,8 +147,6 @@ namespace gtl
       createInfo.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
 
       auto& imageVector = createInfo.is3d ? images3d : images2d;
-
-      int binding = textureResource.binding;
 
       const char* filePath = textureResource.filePath.c_str();
       if (strcmp(filePath, "") == 0)

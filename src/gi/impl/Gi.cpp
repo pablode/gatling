@@ -204,8 +204,9 @@ namespace gtl
   class ShaderFileListener : public efsw::FileWatchListener
   {
   public:
-    void handleFileAction(efsw::WatchID watchId, const std::string& dir, const std::string& filename,
-                          efsw::Action action, std::string oldFilename) override
+    void handleFileAction([[maybe_unused]] efsw::WatchID watchId, [[maybe_unused]] const std::string& dir,
+                          [[maybe_unused]] const std::string& filename, efsw::Action action,
+                          [[maybe_unused]] std::string oldFilename) override
     {
       switch (action)
       {
@@ -971,7 +972,7 @@ cleanup:
 
       std::atomic_bool threadWorkFailed = false;
 #pragma omp parallel for
-      for (int i = 0; i < hitGroupCompInfos.size(); i++)
+      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
       {
         const McMaterial* material = params.materials[i]->mcMat;
 
@@ -1043,7 +1044,7 @@ cleanup:
       // 3. Generate final hit shader GLSL sources.
       threadWorkFailed = false;
 #pragma omp parallel for
-      for (int i = 0; i < hitGroupCompInfos.size(); i++)
+      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
       {
         const McMaterial* material = params.materials[i]->mcMat;
 
@@ -1112,7 +1113,7 @@ cleanup:
       hitShaders.reserve(hitGroupCompInfos.size());
       hitGroups.reserve(hitGroupCompInfos.size() * 2);
 
-      for (int i = 0; i < hitGroupCompInfos.size(); i++)
+      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
       {
         const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 

@@ -109,7 +109,7 @@ namespace gtl
 
   void McMdlMaterialCompiler::addStandardSearchPaths()
   {
-    for (const std::string s : m_mdlSearchPaths)
+    for (const std::string& s : m_mdlSearchPaths)
     {
       if (m_config->add_mdl_path(s.c_str()))
       {

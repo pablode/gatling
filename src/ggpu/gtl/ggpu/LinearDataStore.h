@@ -85,6 +85,5 @@ namespace gtl
 
     GbHandleStore m_handleStore;
     GgpuSyncBuffer m_buffer;
-    uint8_t* m_mappedMem = nullptr;
   };
 }

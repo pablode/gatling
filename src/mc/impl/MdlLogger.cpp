@@ -24,28 +24,6 @@
 
 namespace
 {
-  const char* _MiMessageSeverityToCStr(mi::base::Message_severity severity)
-  {
-    switch (severity)
-    {
-    case mi::base::MESSAGE_SEVERITY_FATAL:
-      return "fatal";
-    case mi::base::MESSAGE_SEVERITY_ERROR:
-      return "error";
-    case mi::base::MESSAGE_SEVERITY_WARNING:
-      return "warning";
-    case mi::base::MESSAGE_SEVERITY_INFO:
-      return "info";
-    case mi::base::MESSAGE_SEVERITY_VERBOSE:
-      return "verbose";
-    case mi::base::MESSAGE_SEVERITY_DEBUG:
-      return "debug";
-    default:
-      break;
-    }
-    return "";
-  }
-
   const char* _MiMessageKindToCStr(mi::neuraylib::IMessage::Kind kind)
   {
     switch (kind)
@@ -72,8 +50,8 @@ namespace
 namespace gtl
 {
   void McMdlLogger::message(mi::base::Message_severity level,
-                            const char* moduleCategory,
-                            const mi::base::Message_details& details,
+                            [[maybe_unused]] const char* moduleCategory,
+                            [[maybe_unused]] const mi::base::Message_details& details,
                             const char* message)
   {
 #ifdef NDEBUG

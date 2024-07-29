@@ -22,7 +22,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-NdrNodeDiscoveryResultVec HdGatlingMdlDiscoveryPlugin::DiscoverNodes(const Context& ctx)
+NdrNodeDiscoveryResultVec HdGatlingMdlDiscoveryPlugin::DiscoverNodes([[maybe_unused]] const Context& ctx)
 {
   NdrNodeDiscoveryResultVec result;
 

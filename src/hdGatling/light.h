@@ -138,7 +138,6 @@ public:
 
 private:
   GiSphereLight* _giSphereLight = nullptr;
-  GiDomeLight* _giDomeLight = nullptr;
 };
 
 

@@ -136,7 +136,7 @@ HdCommandDescriptors HdGatlingRenderDelegate::GetCommandDescriptors() const
   return COMMAND_DESCRIPTORS;
 }
 
-bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, const HdCommandArgs& args)
+bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, [[maybe_unused]] const HdCommandArgs& args)
 {
   if (command == HdGatlingCommandTokens->printLicenses)
   {

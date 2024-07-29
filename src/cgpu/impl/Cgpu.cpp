@@ -375,6 +375,7 @@ namespace gtl
 
   /* API method implementation. */
 
+#ifndef NDEBUG
   static bool cgpuFindLayer(const char* name, size_t layerCount, VkLayerProperties* layers)
   {
     for (size_t i = 0; i < layerCount; i++)
@@ -386,6 +387,7 @@ namespace gtl
     }
     return false;
   }
+#endif
 
   static bool cgpuFindExtension(const char* name, size_t extensionCount, VkExtensionProperties* extensions)
   {
@@ -409,7 +411,7 @@ namespace gtl
       .pObjectName = name
     };
 
-    VkResult result = vkSetDebugUtilsObjectNameEXT(device, &info);
+    [[maybe_unused]] VkResult result = vkSetDebugUtilsObjectNameEXT(device, &info);
 
     assert(result == VK_SUCCESS);
   }
@@ -691,7 +693,7 @@ namespace gtl
     GbSmallVector<VkQueueFamilyProperties, 32> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, queueFamilies.data());
 
-    int32_t queueFamilyIndex = -1;
+    uint32_t queueFamilyIndex = UINT32_MAX;
     for (uint32_t i = 0; i < queueFamilyCount; ++i)
     {
       const VkQueueFamilyProperties* queue_family = &queueFamilies[i];
@@ -701,7 +703,7 @@ namespace gtl
         queueFamilyIndex = i;
       }
     }
-    if (queueFamilyIndex == -1)
+    if (queueFamilyIndex == UINT32_MAX)
     {
       iinstance->ideviceStore.free(handle);
       CGPU_RETURN_ERROR("no suitable queue family");
@@ -947,7 +949,7 @@ namespace gtl
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = nullptr,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = (uint32_t) queueFamilyIndex,
+      .queueFamilyIndex = queueFamilyIndex,
     };
 
     result = idevice->table.vkCreateCommandPool(
@@ -1943,7 +1945,7 @@ namespace gtl
 
     for (uint32_t i = 0; i < groups.size(); i++)
     {
-      VkRayTracingShaderGroupCreateInfoKHR createInfo = {
+      VkRayTracingShaderGroupCreateInfoKHR sgCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
         .pNext = nullptr,
         .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
@@ -1953,7 +1955,8 @@ namespace gtl
         .intersectionShader = VK_SHADER_UNUSED_KHR,
         .pShaderGroupCaptureReplayHandle = nullptr,
       };
-      groups[i] = createInfo;
+
+      groups[i] = sgCreateInfo;
     }
 
     bool anyNullClosestHitShader = false;
@@ -2259,7 +2262,7 @@ cleanup_fail:
       .pNext = nullptr,
       .geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
       .geometry = asGeomData,
-      .flags = createInfo.isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
+      .flags = VkGeometryFlagsKHR(createInfo.isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0)
     };
 
     bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
@@ -2368,7 +2371,7 @@ cleanup_fail:
           }
         },
       },
-      .flags = areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : VkGeometryFlagsKHR(0),
+      .flags = VkGeometryFlagsKHR(areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0)
     };
 
     if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as))
@@ -3324,6 +3327,7 @@ cleanup_fail:
     VkSubmitInfo2KHR submitInfo = {
       .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2_KHR,
       .pNext = nullptr,
+      .flags = 0,
       .waitSemaphoreInfoCount = (uint32_t) waitSubmitInfos.size(),
       .pWaitSemaphoreInfos = waitSubmitInfos.data(),
       .commandBufferInfoCount = 1,

@@ -157,7 +157,7 @@ fail:
 
   bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
   {
-    uint64_t rowCount = height;
+    uint32_t rowCount = height;
     uint64_t rowSize = size / rowCount;
 
     if (rowSize > BUFFER_HALF_SIZE)
@@ -170,7 +170,7 @@ fail:
     while (rowsStaged < rowCount)
     {
       uint64_t remainingSpace = BUFFER_HALF_SIZE - m_stagedBytes;
-      uint64_t maxCopyRowCount = remainingSpace / rowSize; // truncate
+      uint32_t maxCopyRowCount = uint32_t(remainingSpace / rowSize); // truncate
 
       if (maxCopyRowCount == 0)
       {
@@ -179,13 +179,13 @@ fail:
           return false;
         }
 
-        maxCopyRowCount = BUFFER_HALF_SIZE / rowSize; // truncate
+        maxCopyRowCount = uint32_t(BUFFER_HALF_SIZE / rowSize); // truncate
       }
 
-      uint64_t remainingRowCount = rowCount - rowsStaged;
-      uint64_t copyRowCount = std::min(remainingRowCount, maxCopyRowCount);
+      uint32_t remainingRowCount = rowCount - rowsStaged;
+      uint32_t copyRowCount = std::min(remainingRowCount, maxCopyRowCount);
 
-      auto copyFunc = [this, dst, rowsStaged, width, depth, copyRowCount](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
+      auto copyFunc = [this, dst, rowsStaged, width, depth, copyRowCount](uint64_t srcOffset, [[maybe_unused]] uint64_t dstOffset, [[maybe_unused]] uint64_t size) {
         CgpuBufferImageCopyDesc desc;
         desc.bufferOffset = srcOffset;
         desc.texelOffsetX = 0;

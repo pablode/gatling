@@ -30,18 +30,17 @@ namespace gtl
                                  CgpuBufferUsageFlags bufferUsage)
     : m_device(device)
     , m_stager(stager)
-    , m_delayedResourceDestroyer(delayedResourceDestroyer)
     , m_elementSize(elementSize)
     , m_updateStrategy(updateStrategy)
+    , m_deviceBuffer(m_device,
+                     delayedResourceDestroyer,
+                     bufferUsage | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
     , m_hostBuffer(m_device,
                    delayedResourceDestroyer,
                    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
                    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
                      (updateStrategy == UpdateStrategy::PersistentMapping ? CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL : 0))
-    , m_deviceBuffer(m_device,
-                     delayedResourceDestroyer,
-                     bufferUsage | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
   {
 
   }

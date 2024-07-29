@@ -77,7 +77,6 @@ namespace gtl
   private:
     CgpuDevice m_device;
     GgpuStager& m_stager;
-    GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
     uint64_t m_elementSize;
     UpdateStrategy m_updateStrategy;
 

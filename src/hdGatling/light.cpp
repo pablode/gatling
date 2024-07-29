@@ -106,7 +106,7 @@ HdGatlingSphereLight::HdGatlingSphereLight(const SdfPath& id, GiScene* scene)
 }
 
 void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
-                                HdRenderParam* renderParam,
+                                [[maybe_unused]] HdRenderParam* renderParam,
                                 HdDirtyBits* dirtyBits)
 {
   const SdfPath& id = GetId();
@@ -146,7 +146,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
   *dirtyBits = HdChangeTracker::Clean;
 }
 
-void HdGatlingSphereLight::Finalize(HdRenderParam* renderParam)
+void HdGatlingSphereLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
 {
   giDestroySphereLight(_scene, _giSphereLight);
 }
@@ -161,7 +161,7 @@ HdGatlingDistantLight::HdGatlingDistantLight(const SdfPath& id, GiScene* scene)
 }
 
 void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
-                                 HdRenderParam* renderParam,
+                                 [[maybe_unused]] HdRenderParam* renderParam,
                                  HdDirtyBits* dirtyBits)
 {
   const SdfPath& id = GetId();
@@ -201,7 +201,7 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
   *dirtyBits = HdChangeTracker::Clean;
 }
 
-void HdGatlingDistantLight::Finalize(HdRenderParam* renderParam)
+void HdGatlingDistantLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
 {
   giDestroyDistantLight(_scene, _giDistantLight);
 }
@@ -216,7 +216,7 @@ HdGatlingRectLight::HdGatlingRectLight(const SdfPath& id, GiScene* scene)
 }
 
 void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
-                              HdRenderParam* renderParam,
+                              [[maybe_unused]] HdRenderParam* renderParam,
                               HdDirtyBits* dirtyBits)
 {
   const SdfPath& id = GetId();
@@ -264,7 +264,7 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
   *dirtyBits = HdChangeTracker::Clean;
 }
 
-void HdGatlingRectLight::Finalize(HdRenderParam* renderParam)
+void HdGatlingRectLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
 {
   giDestroyRectLight(_scene, _giRectLight);
 }
@@ -279,7 +279,7 @@ HdGatlingDiskLight::HdGatlingDiskLight(const SdfPath& id, GiScene* scene)
 }
 
 void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
-                              HdRenderParam* renderParam,
+                              [[maybe_unused]] HdRenderParam* renderParam,
                               HdDirtyBits* dirtyBits)
 {
   const SdfPath& id = GetId();
@@ -324,7 +324,7 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
   *dirtyBits = HdChangeTracker::Clean;
 }
 
-void HdGatlingDiskLight::Finalize(HdRenderParam* renderParam)
+void HdGatlingDiskLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
 {
   giDestroyDiskLight(_scene, _giDiskLight);
 }
@@ -338,7 +338,7 @@ HdGatlingDomeLight::HdGatlingDomeLight(const SdfPath& id, GiScene* scene)
 }
 
 void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
-                              HdRenderParam* renderParam,
+                              [[maybe_unused]] HdRenderParam* renderParam,
                               HdDirtyBits* dirtyBits)
 {
   if (!HdChangeTracker::IsDirty(*dirtyBits))
@@ -414,7 +414,7 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   }
 }
 
-void HdGatlingDomeLight::Finalize(HdRenderParam* renderParam)
+void HdGatlingDomeLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
 {
   DestroyDomeLight(renderParam);
 }
@@ -448,7 +448,7 @@ HdGatlingSimpleLight::HdGatlingSimpleLight(const SdfPath& id, GiScene* scene)
 }
 
 void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
-                                HdRenderParam* renderParam,
+                                [[maybe_unused]] HdRenderParam* renderParam,
                                 HdDirtyBits* dirtyBits)
 {
   const SdfPath& id = GetId();
@@ -485,7 +485,7 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
   *dirtyBits = HdChangeTracker::Clean;
 }
 
-void HdGatlingSimpleLight::Finalize(HdRenderParam* renderParam)
+void HdGatlingSimpleLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
 {
   if (_giSphereLight)
   {
