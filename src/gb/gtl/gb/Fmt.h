@@ -18,5 +18,7 @@
 #pragma once
 
 #include <quill/bundled/fmt/format.h>
+#include <quill/bundled/fmt/printf.h>
 
 #define GB_FMT(fmt, ...) fmtquill::format(fmt, __VA_ARGS__)
+#define GB_FMT_SPRINTF(fmt, ...) fmtquill::sprintf(fmt, __VA_ARGS__)

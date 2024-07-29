@@ -27,18 +27,20 @@
 
 #include <volk.h>
 
+#include <gtl/gb/Fmt.h>
+#include <gtl/gb/Log.h>
+
 #ifdef __clang__
 #pragma clang diagnostic push
 // Silence nullability log spam on AppleClang
 #pragma clang diagnostic ignored "-Wnullability-completeness"
 #endif
 
-// Uncomment for VMA debug logging
-//#define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
-//    fprintf(stderr, (format), __VA_ARGS__);    \
-//    fprintf(stderr, "\n");                     \
-//    GB_LOG((format), __VA_ARGS__);             \
-//  } while (false)
+#ifdef GTL_VERBOSE
+#define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
+    GB_DEBUG_DYN("[VMA] {}", GB_FMT_SPRINTF((format), __VA_ARGS__)); \
+  } while (false)
+#endif
 
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>

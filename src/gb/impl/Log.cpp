@@ -39,6 +39,9 @@ namespace gtl
     const char* logPattern = "[%(time)] (%(log_level)) %(message)";
     const char* timestampFormat = "%H:%M:%S.%Qms";
     s_logger = quill::Frontend::create_or_get_logger("root", std::move(sink), logPattern, timestampFormat);
+#ifdef GTL_VERBOSE
+    s_logger->set_log_level(quill::LogLevel::Debug);
+#endif
 
     quill::BackendOptions options;
     options.thread_name = "GbLog";

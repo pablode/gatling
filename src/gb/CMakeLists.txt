@@ -26,5 +26,9 @@ target_link_libraries(
     quill
 )
 
+if(GTL_VERBOSE)
+  target_compile_definitions(gb PUBLIC GTL_VERBOSE=1)
+endif()
+
 # Required since library is linked into hdGatling DSO
 set_target_properties(gb PROPERTIES POSITION_INDEPENDENT_CODE ON)

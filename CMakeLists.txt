@@ -23,6 +23,7 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
 endforeach()
 
 option(GTL_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
+option(GTL_VERBOSE "Enable verbose logging." OFF)
 
 if(${GTL_BUILD_HDGATLING})
   find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)

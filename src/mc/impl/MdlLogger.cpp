@@ -78,9 +78,12 @@ namespace gtl
   {
 #ifdef NDEBUG
     const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_ERROR;
+#elif defined(GTL_VERBOSE)
+    const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_INFO;
 #else
     const mi::base::Message_severity minLogLevel = mi::base::MESSAGE_SEVERITY_WARNING;
 #endif
+
     if (level > minLogLevel)
     {
       return;
@@ -98,11 +101,15 @@ namespace gtl
 
     if (level <= mi::base::MESSAGE_SEVERITY_ERROR)
     {
-      GB_ERROR("{}", message);
+      GB_ERROR("[MDL] {}", message);
+    }
+    else if (level <= mi::base::MESSAGE_SEVERITY_WARNING)
+    {
+      GB_WARN("[MDL] {}", message);
     }
     else
     {
-      GB_LOG("{}", message);
+      GB_DEBUG("[MDL] {}", message);
     }
   }
 
