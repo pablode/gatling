@@ -1591,7 +1591,8 @@ namespace gtl
       CGPU_RETURN_ERROR("failed to create descriptor set layout");
     }
 
-    uint32_t bufferCount = 0;
+    uint32_t uniformBufferCount = 0;
+    uint32_t storageBufferCount = 0;
     uint32_t storageImageCount = 0;
     uint32_t sampledImageCount = 0;
     uint32_t samplerCount = 0;
@@ -1603,7 +1604,8 @@ namespace gtl
 
       switch (binding->descriptorType)
       {
-      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: bufferCount += binding->count; break;
+      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: storageBufferCount += binding->count; break;
+      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: uniformBufferCount += binding->count; break;
       case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storageImageCount += binding->count; break;
       case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampledImageCount += binding->count; break;
       case VK_DESCRIPTOR_TYPE_SAMPLER: samplerCount += binding->count; break;
@@ -1622,10 +1624,16 @@ namespace gtl
     uint32_t poolSizeCount = 0;
     VkDescriptorPoolSize poolSizes[16];
 
-    if (bufferCount > 0)
+    if (uniformBufferCount > 0)
+    {
+      poolSizes[poolSizeCount].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      poolSizes[poolSizeCount].descriptorCount = uniformBufferCount;
+      poolSizeCount++;
+    }
+    if (storageBufferCount > 0)
     {
       poolSizes[poolSizeCount].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      poolSizes[poolSizeCount].descriptorCount = bufferCount;
+      poolSizes[poolSizeCount].descriptorCount = storageBufferCount;
       poolSizeCount++;
     }
     if (storageImageCount > 0)
@@ -2672,7 +2680,8 @@ cleanup_fail:
       {
         bool slotHandled = false;
 
-        if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+        if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+            layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
         {
           for (uint32_t k = 0; k < bindings->bufferCount; ++k)
           {
