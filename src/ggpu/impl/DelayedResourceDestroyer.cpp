@@ -67,6 +67,12 @@ namespace gtl
     enqueueDestroyFunc([=]() { cgpuDestroyImage(m_device, handle); });
   }
 
+  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuShader handle)
+  {
+    assert(handle.handle);
+    enqueueDestroyFunc([=]() { cgpuDestroyShader(m_device, handle); });
+  }
+
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuPipeline handle)
   {
     assert(handle.handle);

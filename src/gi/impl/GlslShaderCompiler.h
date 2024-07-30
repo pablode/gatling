@@ -25,25 +25,25 @@ namespace fs = std::filesystem;
 
 namespace gtl
 {
+// TODO: this sucks! or add static_assert for size
+  enum class GiShaderStage
+  {
+    Compute = 0x020,
+    RayGen = 0x100,
+    AnyHit = 0x200,
+    ClosestHit = 0x400,
+    Miss = 0x800
+  };
+
   class GiGlslShaderCompiler
   {
-  public:
-    enum class ShaderStage
-    {
-      AnyHit,
-      ClosestHit,
-      Compute,
-      Miss,
-      RayGen
-    };
-
   public:
     GiGlslShaderCompiler(const fs::path& shaderPath);
 
     ~GiGlslShaderCompiler();
 
   public:
-    bool compileGlslToSpv(ShaderStage stage,
+    bool compileGlslToSpv(GiShaderStage stage,
                           std::string_view source,
                           std::vector<uint8_t>& spv);
 

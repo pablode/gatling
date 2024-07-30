@@ -124,7 +124,7 @@ namespace gtl
     }
 
     std::string source = stitcher.source();
-    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::RayGen, source, spv);
+    return m_shaderCompiler->compileGlslToSpv(GiShaderStage::RayGen, source, spv);
   }
 
   bool GiGlslShaderGen::generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv)
@@ -146,7 +146,7 @@ namespace gtl
     }
 
     std::string source = stitcher.source();
-    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::Miss, source, spv);
+    return m_shaderCompiler->compileGlslToSpv(GiShaderStage::Miss, source, spv);
   }
 
   bool GiGlslShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)
@@ -206,7 +206,7 @@ namespace gtl
     stitcher.replaceFirst("#pragma mdl_generated_code", params.shadingGlsl);
 
     std::string source = stitcher.source();
-    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::ClosestHit, source, spv);
+    return m_shaderCompiler->compileGlslToSpv(GiShaderStage::ClosestHit, source, spv);
   }
 
   bool GiGlslShaderGen::generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv)
@@ -236,6 +236,6 @@ namespace gtl
     stitcher.replaceFirst("#pragma mdl_generated_code", params.opacityEvalGlsl);
 
     std::string source = stitcher.source();
-    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::AnyHit, source, spv);
+    return m_shaderCompiler->compileGlslToSpv(GiShaderStage::AnyHit, source, spv);
   }
 }

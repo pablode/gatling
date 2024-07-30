@@ -22,3 +22,4 @@
 
 #define GB_FMT(fmt, ...) fmtquill::format(fmt, __VA_ARGS__)
 #define GB_FMT_SPRINTF(fmt, ...) fmtquill::sprintf(fmt, __VA_ARGS__)
+#define GB_FMT_TO(outIt, fmt, ...) fmtquill::format_to(outIt, fmt, __VA_ARGS__)

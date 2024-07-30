@@ -49,6 +49,7 @@ namespace gtl
 
     void enqueueDestruction(CgpuBuffer handle);
     void enqueueDestruction(CgpuImage handle);
+    void enqueueDestruction(CgpuShader handle);
     void enqueueDestruction(CgpuPipeline handle);
     void enqueueDestruction(CgpuSemaphore handle);
     void enqueueDestruction(CgpuCommandBuffer handle);

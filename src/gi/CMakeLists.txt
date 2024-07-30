@@ -5,6 +5,8 @@ set(GI_SRCS
   impl/AssetReader.cpp
   impl/GlslShaderCompiler.h
   impl/GlslShaderCompiler.cpp
+  impl/GlslShaderProvider.h
+  impl/GlslShaderProvider.cpp
   impl/GlslShaderGen.h
   impl/GlslShaderGen.cpp
   impl/GlslStitcher.h

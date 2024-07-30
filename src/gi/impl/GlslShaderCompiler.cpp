@@ -26,7 +26,7 @@
 
 namespace
 {
-  using ShaderStage = gtl::GiGlslShaderCompiler::ShaderStage;
+  using ShaderStage = gtl::GiShaderStage;
 
   EShLanguage _GetGlslangShaderLanguage(ShaderStage stage)
   {
@@ -97,8 +97,8 @@ namespace gtl
     }
   };
 
-  GiGlslShaderCompiler::GiGlslShaderCompiler(const fs::path& shaderPath)
-    : m_fileIncluder(std::make_shared<_FileIncluder>(shaderPath))
+  GiGlslShaderCompiler::GiGlslShaderCompiler(const fs::path& shaderDir)
+    : m_fileIncluder(std::make_shared<_FileIncluder>(shaderDir))
   {
     // glslang requires this static initialization, however it internally
     // ref-counts and is thread-safe. The return value seems to be unused.
@@ -110,9 +110,9 @@ namespace gtl
     glslang::FinalizeProcess(); // see above
   }
 
-  bool GiGlslShaderCompiler::compileGlslToSpv(ShaderStage stage,
-                                               std::string_view source,
-                                               std::vector<uint8_t>& spv)
+  bool GiGlslShaderCompiler::compileGlslToSpv(GiShaderStage stage,
+                                              std::string_view source,
+                                              std::vector<uint8_t>& spv)
   {
     EShLanguage language = _GetGlslangShaderLanguage(stage);
 
