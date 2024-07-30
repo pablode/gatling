@@ -1081,9 +1081,10 @@ namespace gtl
 
     idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestamp_pool, nullptr);
     idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
-    idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
     vmaDestroyAllocator(idevice->allocator);
+
+    idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
     iinstance->ideviceStore.free(device.handle);
     return true;
