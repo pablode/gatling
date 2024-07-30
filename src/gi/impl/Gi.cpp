@@ -53,6 +53,7 @@
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
 #include <gtl/gb/Log.h>
+#include <gtl/gb/Data.h>
 
 #include <MaterialXCore/Document.h>
 
@@ -505,7 +506,7 @@ fail:
       return *totalSize;
     }
 
-    const uint64_t offset = ((*totalSize) + alignment - 1) / alignment * alignment;
+    const uint64_t offset = gbAlignUpwards(*totalSize, alignment);
 
     (*totalSize) = offset + bufferSize;
 

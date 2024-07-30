@@ -1,5 +1,6 @@
 add_library(
   gb STATIC
+  gtl/gb/Data.h
   gtl/gb/Fmt.h
   gtl/gb/HandleStore.h
   gtl/gb/LinearDataStore.h

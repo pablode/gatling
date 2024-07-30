@@ -27,6 +27,7 @@
 
 #include <volk.h>
 
+#include <gtl/gb/Data.h>
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 
@@ -1794,11 +1795,6 @@ namespace gtl
     return true;
   }
 
-  static uint32_t cgpuAlignSize(uint32_t size, uint32_t alignment)
-  {
-      return (size + (alignment - 1)) & ~(alignment - 1);
-  }
-
   static bool cgpuCreateRtPipelineSbt(CgpuIDevice* idevice,
                                       CgpuIPipeline* ipipeline,
                                       uint32_t groupCount,
@@ -1806,14 +1802,14 @@ namespace gtl
                                       uint32_t hitGroupCount)
   {
     uint32_t handleSize = idevice->properties.shaderGroupHandleSize;
-    uint32_t alignedHandleSize = cgpuAlignSize(handleSize, idevice->properties.shaderGroupHandleAlignment);
+    uint32_t alignedHandleSize = gbAlignUpwards(handleSize, idevice->properties.shaderGroupHandleAlignment);
 
-    ipipeline->sbtRgen.stride = cgpuAlignSize(alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtRgen.stride = gbAlignUpwards(alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
     ipipeline->sbtRgen.size = ipipeline->sbtRgen.stride; // Special raygen condition: size must be equal to stride
     ipipeline->sbtMiss.stride = alignedHandleSize;
-    ipipeline->sbtMiss.size = cgpuAlignSize(missShaderCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtMiss.size = gbAlignUpwards(missShaderCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
     ipipeline->sbtHit.stride = alignedHandleSize;
-    ipipeline->sbtHit.size = cgpuAlignSize(hitGroupCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtHit.size = gbAlignUpwards(hitGroupCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
 
     uint32_t firstGroup = 0;
     uint32_t dataSize = handleSize * groupCount;
