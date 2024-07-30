@@ -94,21 +94,21 @@ int main(int argc, const char* argv[])
 {
   // Init plugin.
   HdRendererPluginRegistry& pluginRegistry = HdRendererPluginRegistry::GetInstance();
-  HdRendererPluginHandle pluginHandle = pluginRegistry.GetOrCreateRendererPlugin(_AppTokens->HdGatlingRendererPlugin);
+  HdRendererPluginHandle plugin = pluginRegistry.GetOrCreateRendererPlugin(_AppTokens->HdGatlingRendererPlugin);
 
-  if (!pluginHandle)
+  if (!plugin)
   {
     fprintf(stderr, "HdGatling plugin not found\n");
     return EXIT_FAILURE;
   }
 
-  if (!pluginHandle->IsSupported())
+  if (!plugin->IsSupported())
   {
     fprintf(stderr, "HdGatling plugin not supported\n");
     return EXIT_FAILURE;
   }
 
-  HdRenderDelegate* renderDelegate = pluginHandle->CreateRenderDelegate();
+  HdRenderDelegate* renderDelegate = plugin->CreateRenderDelegate();
   TF_AXIOM(renderDelegate);
 
   // Handle cmdline args.
@@ -142,10 +142,10 @@ int main(int argc, const char* argv[])
   HdRenderIndex* renderIndex = HdRenderIndex::New(renderDelegate, HdDriverVector());
   TF_AXIOM(renderIndex);
 
-  UsdImagingDelegate sceneDelegate(renderIndex, SdfPath::AbsoluteRootPath());
-  sceneDelegate.Populate(stage->GetPseudoRoot());
-  sceneDelegate.SetTime(0);
-  sceneDelegate.SetRefineLevelFallback(4);
+  std::unique_ptr<UsdImagingDelegate> sceneDelegate = std::make_unique<UsdImagingDelegate>(renderIndex, SdfPath::AbsoluteRootPath());
+  sceneDelegate->Populate(stage->GetPseudoRoot());
+  sceneDelegate->SetTime(0);
+  sceneDelegate->SetRefineLevelFallback(4);
 
   HdCamera* camera = _FindCamera(stage, renderIndex, settings.cameraPath);
   if (!camera)
@@ -241,13 +241,22 @@ int main(int argc, const char* argv[])
   VtDictionary metadata;
   image->Write(storage, metadata);
 
-  renderBuffer->Unmap();
   writeTimer.Stop();
-
   printf("Wrote image (%.3fs)\n", writeTimer.GetSeconds());
   fflush(stdout);
 
+  renderBuffer->Unmap();
+  HdRenderParam* renderParam = renderDelegate->GetRenderParam();
+  renderBuffer->Finalize(renderParam);
   renderDelegate->DestroyBprim(renderBuffer);
+
+  tasks.clear();
+  renderTask.reset();
+  renderPass.reset();
+  sceneDelegate.reset();
+  stage.Reset();
+  delete renderIndex;
+  plugin->DeleteRenderDelegate(renderDelegate);
 
   return EXIT_SUCCESS;
 }
