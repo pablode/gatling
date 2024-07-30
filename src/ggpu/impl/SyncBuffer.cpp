@@ -47,10 +47,11 @@ namespace gtl
 
   GgpuSyncBuffer::~GgpuSyncBuffer()
   {
-    assert(m_size == 0);
-    assert(m_mappedHostMem == nullptr);
-    assert(m_hostBuffer.size() == 0);
-    assert(m_updateStrategy == UpdateStrategy::PersistentMapping || m_deviceBuffer.size() == 0);
+    if (m_mappedHostMem)
+    {
+      cgpuUnmapBuffer(m_device, m_hostBuffer.buffer());
+      m_mappedHostMem = nullptr;
+    }
   }
 
   uint8_t* GgpuSyncBuffer::read(uint64_t byteOffset, uint64_t byteSize)
