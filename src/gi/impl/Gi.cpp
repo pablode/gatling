@@ -419,6 +419,7 @@ fail:
     }
     if (s_stager)
     {
+      s_stager->flush();
       s_stager->free();
       s_stager.reset();
     }
