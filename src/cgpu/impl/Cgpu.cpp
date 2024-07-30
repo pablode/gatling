@@ -1105,8 +1105,8 @@ namespace gtl
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .codeSize = createInfo.size,
-      .pCode = (uint32_t*) createInfo.source,
+      .codeSize = createInfo.spv.size,
+      .pCode = (uint32_t*) createInfo.spv.data,
     };
 
     VkResult result = idevice->table.vkCreateShaderModule(
@@ -1120,7 +1120,7 @@ namespace gtl
       CGPU_RETURN_ERROR("failed to create shader module");
     }
 
-    if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
+    if (!cgpuReflectShader((uint32_t*) createInfo.spv.data, createInfo.spv.size, &ishader->reflection))
     {
       idevice->table.vkDestroyShaderModule(
         idevice->logicalDevice,

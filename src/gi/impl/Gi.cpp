@@ -1126,8 +1126,7 @@ cleanup:
             const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
 
             if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
+                                    .spv = spv,
                                     .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT
                                   }, &closestHitShader))
             {
@@ -1143,8 +1142,7 @@ cleanup:
             const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
 
             if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
+                                    .spv = spv,
                                     .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
                                   }, &anyHitShader))
             {
@@ -1169,8 +1167,7 @@ cleanup:
             const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
 
             if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
+                                    .spv = spv,
                                     .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
                                   }, &anyHitShader))
             {
@@ -1207,8 +1204,7 @@ cleanup:
       }
 
       if (!cgpuCreateShader(s_device, {
-                              .size = spv.size(),
-                              .source = spv.data(),
+                              .spv = spv,
                               .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN
                             }, &rgenShader))
       {
@@ -1233,8 +1229,7 @@ cleanup:
 
         CgpuShader missShader;
         if (!cgpuCreateShader(s_device, {
-                                .size = spv.size(),
-                                .source = spv.data(),
+                                .spv = spv,
                                 .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
                               }, &missShader))
         {
@@ -1254,8 +1249,7 @@ cleanup:
 
         CgpuShader missShader;
         if (!cgpuCreateShader(s_device, {
-                                .size = spv.size(),
-                                .source = spv.data(),
+                                .spv = spv,
                                 .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
                               }, &missShader))
         {

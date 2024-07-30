@@ -21,6 +21,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include <gtl/gb/Data.h>
+
 namespace gtl
 {
   constexpr static const uint64_t CGPU_WHOLE_SIZE = ~0ULL;
@@ -311,8 +313,7 @@ namespace gtl
 
   struct CgpuShaderCreateInfo
   {
-    uint64_t size;
-    const uint8_t* source;
+    GbSpan<uint8_t> spv;
     CgpuShaderStageFlags stageFlags;
     const char* debugName = nullptr;
   };
