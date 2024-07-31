@@ -44,18 +44,9 @@ namespace gtl
       return false;
     }
 
-    if (!GiGlslShaderCompiler::init())
-    {
-      return false;
-    }
     m_shaderCompiler = std::make_shared<GiGlslShaderCompiler>(m_shaderPath);
 
     return true;
-  }
-
-  GiGlslShaderGen::~GiGlslShaderGen()
-  {
-    GiGlslShaderCompiler::deinit();
   }
 
   void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, const GiGlslShaderGen::CommonShaderParams& params)

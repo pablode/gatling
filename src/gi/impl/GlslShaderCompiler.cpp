@@ -97,37 +97,17 @@ namespace gtl
     }
   };
 
-  static bool s_glslangInitialized = false;
-
-  bool GiGlslShaderCompiler::init()
-  {
-    if (s_glslangInitialized)
-    {
-      assert(false);
-      return true;
-    }
-
-    s_glslangInitialized = glslang::InitializeProcess();
-
-    return s_glslangInitialized;
-  }
-
-  void GiGlslShaderCompiler::deinit()
-  {
-    if (!s_glslangInitialized)
-    {
-      assert(false);
-      return;
-    }
-
-    glslang::FinalizeProcess();
-
-    s_glslangInitialized = false;
-  }
-
   GiGlslShaderCompiler::GiGlslShaderCompiler(const fs::path& shaderPath)
     : m_fileIncluder(std::make_shared<_FileIncluder>(shaderPath))
   {
+    // glslang requires this static initialization, however it internally
+    // ref-counts and is thread-safe. The return value seems to be unused.
+    [[maybe_unused]] int r = glslang::InitializeProcess();
+  }
+
+  GiGlslShaderCompiler::~GiGlslShaderCompiler()
+  {
+    glslang::FinalizeProcess(); // see above
   }
 
   bool GiGlslShaderCompiler::compileGlslToSpv(ShaderStage stage,

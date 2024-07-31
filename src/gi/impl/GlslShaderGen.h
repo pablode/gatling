@@ -40,8 +40,6 @@ namespace gtl
   public:
     bool init(std::string_view shaderPath, McRuntime& runtime);
 
-    ~GiGlslShaderGen();
-
   public:
     struct MaterialGenInfo
     {

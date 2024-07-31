@@ -40,14 +40,12 @@ namespace gtl
   public:
     GiGlslShaderCompiler(const fs::path& shaderPath);
 
+    ~GiGlslShaderCompiler();
+
   public:
     bool compileGlslToSpv(ShaderStage stage,
                           std::string_view source,
                           std::vector<uint8_t>& spv);
-
-    static bool init();
-
-    static void deinit();
 
   private:
     std::shared_ptr<class _FileIncluder> m_fileIncluder;
