@@ -412,11 +412,6 @@ fail:
       s_texSys.reset();
     }
     s_shaderGen.reset();
-    if (s_delayedResourceDestroyer)
-    {
-      s_delayedResourceDestroyer->destroyAll();
-      s_delayedResourceDestroyer.reset();
-    }
     if (s_stager)
     {
       s_stager->flush();
@@ -427,6 +422,11 @@ fail:
     {
       cgpuDestroySampler(s_device, s_texSampler);
       s_texSampler = {};
+    }
+    if (s_delayedResourceDestroyer)
+    {
+      s_delayedResourceDestroyer->destroyAll();
+      s_delayedResourceDestroyer.reset();
     }
     if (s_device.handle)
     {
