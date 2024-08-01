@@ -11,6 +11,8 @@ set(GI_SRCS
   impl/GlslStitcher.cpp
   impl/Mmap.h
   impl/Mmap.cpp
+  impl/ShaderCacheFactory.h
+  impl/ShaderCacheFactory.cpp
   impl/TextureManager.h
   impl/TextureManager.cpp
   impl/Turbo.h

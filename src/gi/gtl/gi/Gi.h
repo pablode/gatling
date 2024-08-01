@@ -103,7 +103,7 @@ namespace gtl
     float transform[3][4];
   };
 
-  struct GiShaderCacheParams
+  struct GiShaderCacheCreateInfoOld
   {
     GiAovId            aovId;
     bool               depthOfField;
@@ -176,7 +176,7 @@ namespace gtl
   GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params);
   void giDestroyBvh(GiBvh* bvh);
 
-  GiShaderCache* giCreateShaderCache(const GiShaderCacheParams& params);
+  GiShaderCache* giCreateShaderCache(const GiShaderCacheCreateInfoOld& createInfo);
   void giDestroyShaderCache(GiShaderCache* cache);
   bool giShaderCacheNeedsRebuild();
   bool giGeomCacheNeedsRebuild();

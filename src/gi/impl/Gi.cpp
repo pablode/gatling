@@ -24,6 +24,7 @@
 #include "Turbo.h"
 #include "AssetReader.h"
 #include "GlslShaderGen.h"
+#include "ShaderCacheFactory.h"
 #include "interface/rp_main.h"
 
 #include <stdlib.h>
@@ -90,25 +91,9 @@ namespace gtl
 
   struct GiBvh
   {
-    CgpuBuffer          blasPayloadsBuffer;
-    GiScene*            scene;
-    CgpuTlas            tlas;
-  };
-
-  struct GiShaderCache
-  {
-    uint32_t                       aovId = UINT32_MAX;
-    bool                           domeLightCameraVisible;
-    std::vector<CgpuShader>        hitShaders;
-    std::vector<CgpuImage>         images2d;
-    std::vector<CgpuImage>         images3d;
-    std::vector<const GiMaterial*> materials;
-    std::vector<CgpuShader>        missShaders;
-    CgpuPipeline                   pipeline;
-    bool                           hasPipelineClosestHitShader = false;
-    bool                           hasPipelineAnyHitShader = false;
-    CgpuShader                     rgenShader;
-    bool                           resetSampleOffset = true;
+    CgpuBuffer blasPayloadsBuffer;
+    GiScene*   scene;
+    CgpuTlas   tlas;
   };
 
   struct GiMaterial
@@ -560,11 +545,12 @@ fail:
         assert(blasInstanceProtos.count(mesh) == 0);
 
         // Find material for SBT index (FIXME: find a better solution)
+        // TODO: use a map for this
         uint32_t materialIndex = UINT32_MAX;
         GiShaderCache* shaderCache = params.shaderCache;
         for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
         {
-          if (shaderCache->materials[i] == instance->material)
+          if (shaderCache->materials[i] == instance->material->mcMat)
           {
             materialIndex = i;
             break;
@@ -689,14 +675,14 @@ fail:
 
         // Build BLAS
         {
-          const GiMaterial* material = shaderCache->materials[materialIndex];
+          const McMaterial* material = shaderCache->materials[materialIndex];
 
           bool blasCreated = cgpuCreateBlas(s_device, {
                                               .vertexBuffer = tmpPositionBuffer,
                                               .indexBuffer = tmpIndexBuffer,
                                               .maxVertex = (uint32_t) positionData.size(),
                                               .triangleCount = (uint32_t) indexData.size() / 3,
-                                              .isOpaque = !material->mcMat->hasCutoutTransparency
+                                              .isOpaque = !material->hasCutoutTransparency
                                             }, &blas);
 
           if (!blasCreated)
@@ -894,442 +880,42 @@ cleanup:
     return s_forceGeomCacheInvalid;
   }
 
-  GiShaderCache* giCreateShaderCache(const GiShaderCacheParams& params)
+  GiShaderCache* giCreateShaderCache(const GiShaderCacheCreateInfoOld& oldCreateInfo)
   {
     s_forceShaderCacheInvalid = false;
 
-    bool clockCyclesAov = params.aovId == GiAovId::ClockCycles;
-
-    if (clockCyclesAov && !s_deviceFeatures.shaderClock)
-    {
-      GB_ERROR("unsupported AOV - device feature missing");
-      return nullptr;
-    }
-
-    GiScene* scene = params.scene;
-
-    GB_LOG("material count: {}", params.materialCount);
-    GB_LOG("creating shader cache..");
-    fflush(stdout);
-
-    GiShaderCache* cache = nullptr;
-    CgpuPipeline pipeline;
-    CgpuShader rgenShader;
-    std::vector<CgpuShader> missShaders;
-    std::vector<CgpuShader> hitShaders;
-    std::vector<CgpuImage> images2d;
-    std::vector<CgpuImage> images3d;
-    std::vector<CgpuRtHitGroup> hitGroups;
-    std::vector<McTextureDescription> textureDescriptions;
-    bool hasPipelineClosestHitShader = false;
-    bool hasPipelineAnyHitShader = false;
-
+    const GiScene* scene = oldCreateInfo.scene;
     uint32_t diskLightCount = scene->diskLights.elementCount();
     uint32_t distantLightCount = scene->distantLights.elementCount();
     uint32_t rectLightCount = scene->rectLights.elementCount();
     uint32_t sphereLightCount = scene->sphereLights.elementCount();
-    uint32_t totalLightCount = diskLightCount + distantLightCount + rectLightCount + sphereLightCount;
 
-    bool nextEventEstimation = (params.nextEventEstimation && totalLightCount > 0);
+    GbSmallVector<const McMaterial*, 1024> materials;
+    materials.reserve(oldCreateInfo.materialCount);
+    for (size_t i = 0; i < oldCreateInfo.materialCount; i++)
+    {
+      materials.push_back(oldCreateInfo.materials[i]->mcMat);
+    }
 
-    GiGlslShaderGen::CommonShaderParams commonParams = {
-      .aovId = (int) params.aovId,
-      .diskLightCount = diskLightCount,
-      .distantLightCount = distantLightCount,
-      .mediumStackSize = params.mediumStackSize,
-      .rectLightCount = rectLightCount,
-      .sphereLightCount = sphereLightCount,
-      .texCount2d = 2, // +1 fallback and +1 real dome light
-      .texCount3d = 0
+    GiShaderCacheCreateInfo createInfo = {
+      .aovId                    = oldCreateInfo.aovId,
+      .depthOfField             = oldCreateInfo.depthOfField,
+      .diskLightCount           = diskLightCount,
+      .distantLightCount        = distantLightCount,
+      .domeLightCameraVisible   = oldCreateInfo.domeLightCameraVisible,
+      .filterImportanceSampling = oldCreateInfo.filterImportanceSampling,
+      .materials                = materials.data(),
+      .materialCount            = (uint32_t) materials.size(),
+      .mediumStackSize          = oldCreateInfo.mediumStackSize,
+      .nextEventEstimation      = oldCreateInfo.nextEventEstimation,
+      .progressiveAccumulation  = oldCreateInfo.progressiveAccumulation,
+      .rectLightCount           = rectLightCount,
+      .sphereLightCount         = sphereLightCount
     };
 
-    uint32_t& texCount2d = commonParams.texCount2d;
-    uint32_t& texCount3d = commonParams.texCount3d;
+    GiShaderCacheFactory factory(s_device, s_deviceFeatures, *s_shaderGen, *s_texSys);
 
-    // Create per-material closest-hit shaders.
-    //
-    // This is done in multiple phases: first, GLSL is generated from MDL, and
-    // texture information is extracted. The information is then used to generated
-    // the descriptor sets for the pipeline. Lastly, the GLSL is stiched, #defines
-    // are added, and the code is compiled to SPIR-V.
-    {
-      // 1. Generate GLSL from MDL
-      struct HitShaderCompInfo
-      {
-        GiGlslShaderGen::MaterialGenInfo genInfo;
-        uint32_t texOffset2d = 0;
-        uint32_t texOffset3d = 0;
-        std::vector<uint8_t> spv;
-        std::vector<uint8_t> shadowSpv;
-      };
-      struct HitGroupCompInfo
-      {
-        HitShaderCompInfo closestHitInfo;
-        std::optional<HitShaderCompInfo> anyHitInfo;
-      };
-
-      std::vector<HitGroupCompInfo> hitGroupCompInfos;
-      hitGroupCompInfos.resize(params.materialCount);
-
-      std::atomic_bool threadWorkFailed = false;
-#pragma omp parallel for
-      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
-      {
-        const McMaterial* material = params.materials[i]->mcMat;
-
-        HitGroupCompInfo groupInfo;
-        {
-          GiGlslShaderGen::MaterialGenInfo genInfo;
-          if (!s_shaderGen->generateMaterialShadingGenInfo(*material, genInfo))
-          {
-            threadWorkFailed = true;
-            continue;
-          }
-
-          HitShaderCompInfo hitInfo;
-          hitInfo.genInfo = genInfo;
-          groupInfo.closestHitInfo = hitInfo;
-        }
-        if (material->hasCutoutTransparency)
-        {
-          GiGlslShaderGen::MaterialGenInfo genInfo;
-          if (!s_shaderGen->generateMaterialOpacityGenInfo(*material, genInfo))
-          {
-            threadWorkFailed = true;
-            continue;
-          }
-
-          HitShaderCompInfo hitInfo;
-          hitInfo.genInfo = genInfo;
-          groupInfo.anyHitInfo = hitInfo;
-        }
-
-        hitGroupCompInfos[i] = groupInfo;
-      }
-      if (threadWorkFailed)
-      {
-        goto cleanup;
-      }
-
-      // 2. Sum up texture resources & calculate per-material index offsets.
-      for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
-      {
-        HitShaderCompInfo& closestHitShaderCompInfo = groupInfo.closestHitInfo;
-        closestHitShaderCompInfo.texOffset2d = texCount2d;
-        closestHitShaderCompInfo.texOffset3d = texCount3d;
-
-        for (const McTextureDescription& tr : closestHitShaderCompInfo.genInfo.textureDescriptions)
-        {
-          (tr.is3dImage ? texCount3d : texCount2d)++;
-          textureDescriptions.push_back(tr);
-        }
-
-        if (groupInfo.anyHitInfo)
-        {
-          HitShaderCompInfo& anyHitShaderCompInfo = *groupInfo.anyHitInfo;
-          anyHitShaderCompInfo.texOffset2d = texCount2d;
-          anyHitShaderCompInfo.texOffset3d = texCount3d;
-
-          for (const McTextureDescription& tr : anyHitShaderCompInfo.genInfo.textureDescriptions)
-          {
-            (tr.is3dImage ? texCount3d : texCount2d)++;
-            textureDescriptions.push_back(tr);
-          }
-
-          hasPipelineAnyHitShader |= true;
-        }
-      }
-
-      hasPipelineClosestHitShader = hitGroupCompInfos.size() > 0;
-
-      // 3. Generate final hit shader GLSL sources.
-      threadWorkFailed = false;
-#pragma omp parallel for
-      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
-      {
-        const McMaterial* material = params.materials[i]->mcMat;
-
-        HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
-
-        // Closest hit
-        {
-          GiGlslShaderGen::ClosestHitShaderParams hitParams = {
-            .baseFileName = "rp_main.chit",
-            .commonParams = commonParams,
-            .directionalBias = material->directionalBias,
-            .enableSceneTransforms = material->requiresSceneTransforms,
-            .hasBackfaceBsdf = material->hasBackfaceBsdf,
-            .hasBackfaceEdf = material->hasBackfaceEdf,
-            .hasCutoutTransparency = material->hasCutoutTransparency,
-            .hasVolumeAbsorptionCoeff = material->hasVolumeAbsorptionCoeff,
-            .hasVolumeScatteringCoeff = material->hasVolumeScatteringCoeff,
-            .isEmissive = material->isEmissive,
-            .isThinWalled = material->isThinWalled,
-            .nextEventEstimation = nextEventEstimation,
-            .shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource,
-            .textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d,
-            .textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d
-          };
-
-          if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
-          {
-            threadWorkFailed = true;
-            continue;
-          }
-        }
-
-        // Any hit
-        if (compInfo.anyHitInfo)
-        {
-          GiGlslShaderGen::AnyHitShaderParams hitParams = {
-            .baseFileName = "rp_main.ahit",
-            .commonParams = commonParams,
-            .enableSceneTransforms = material->requiresSceneTransforms,
-            .opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource,
-            .textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d,
-            .textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d
-          };
-
-          hitParams.shadowTest = false;
-          if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
-          {
-            threadWorkFailed = true;
-            continue;
-          }
-
-          hitParams.shadowTest = true;
-          if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->shadowSpv))
-          {
-            threadWorkFailed = true;
-            continue;
-          }
-        }
-      }
-      if (threadWorkFailed)
-      {
-        goto cleanup;
-      }
-
-      // 4. Compile the shaders to SPIV-V. (FIXME: multithread - beware of shared cgpu resource stores)
-      hitShaders.reserve(hitGroupCompInfos.size());
-      hitGroups.reserve(hitGroupCompInfos.size() * 2);
-
-      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
-      {
-        const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
-
-        // regular hit group
-        {
-          CgpuShader closestHitShader;
-          {
-            const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
-
-            if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
-                                    .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT
-                                  }, &closestHitShader))
-            {
-              goto cleanup;
-            }
-
-            hitShaders.push_back(closestHitShader);
-          }
-
-          CgpuShader anyHitShader;
-          if (compInfo.anyHitInfo)
-          {
-            const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
-
-            if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
-                                    .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
-                                  }, &anyHitShader))
-            {
-              goto cleanup;
-            }
-
-            hitShaders.push_back(anyHitShader);
-          }
-
-          CgpuRtHitGroup hitGroup;
-          hitGroup.closestHitShader = closestHitShader;
-          hitGroup.anyHitShader = anyHitShader;
-          hitGroups.push_back(hitGroup);
-        }
-
-        // shadow hit group
-        {
-          CgpuShader anyHitShader;
-
-          if (compInfo.anyHitInfo)
-          {
-            const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
-
-            if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
-                                    .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
-                                  }, &anyHitShader))
-            {
-              goto cleanup;
-            }
-
-            hitShaders.push_back(anyHitShader);
-          }
-
-          CgpuRtHitGroup hitGroup;
-          hitGroup.anyHitShader = anyHitShader;
-          hitGroups.push_back(hitGroup);
-        }
-      }
-    }
-
-    // Create ray generation shader.
-    {
-      GiGlslShaderGen::RaygenShaderParams rgenParams = {
-        .commonParams = commonParams,
-        .depthOfField = params.depthOfField,
-        .filterImportanceSampling = params.filterImportanceSampling,
-        .materialCount = params.materialCount,
-        .nextEventEstimation = nextEventEstimation,
-        .progressiveAccumulation = params.progressiveAccumulation,
-        .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
-        .shaderClockExts = clockCyclesAov
-      };
-
-      std::vector<uint8_t> spv;
-      if (!s_shaderGen->generateRgenSpirv("rp_main.rgen", rgenParams, spv))
-      {
-        goto cleanup;
-      }
-
-      if (!cgpuCreateShader(s_device, {
-                              .size = spv.size(),
-                              .source = spv.data(),
-                              .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN
-                            }, &rgenShader))
-      {
-        goto cleanup;
-      }
-    }
-
-    // Create miss shaders.
-    {
-      GiGlslShaderGen::MissShaderParams missParams = {
-        .commonParams = commonParams,
-        .domeLightCameraVisible = params.domeLightCameraVisible
-      };
-
-      // regular miss shader
-      {
-        std::vector<uint8_t> spv;
-        if (!s_shaderGen->generateMissSpirv("rp_main.miss", missParams, spv))
-        {
-          goto cleanup;
-        }
-
-        CgpuShader missShader;
-        if (!cgpuCreateShader(s_device, {
-                                .size = spv.size(),
-                                .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
-                              }, &missShader))
-        {
-          goto cleanup;
-        }
-
-        missShaders.push_back(missShader);
-      }
-
-      // shadow test miss shader
-      {
-        std::vector<uint8_t> spv;
-        if (!s_shaderGen->generateMissSpirv("rp_main_shadow.miss", missParams, spv))
-        {
-          goto cleanup;
-        }
-
-        CgpuShader missShader;
-        if (!cgpuCreateShader(s_device, {
-                                .size = spv.size(),
-                                .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
-                              }, &missShader))
-        {
-          goto cleanup;
-        }
-
-        missShaders.push_back(missShader);
-      }
-    }
-
-    // Upload textures.
-    if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images2d, images3d))
-    {
-      goto cleanup;
-    }
-    assert(images2d.size() == (texCount2d - 2));
-    assert(images3d.size() == texCount3d);
-
-    // Create RT pipeline.
-    {
-      GB_LOG("creating RT pipeline..");
-      fflush(stdout);
-
-      if (!cgpuCreateRtPipeline(s_device, {
-                                  .rgenShader = rgenShader,
-                                  .missShaderCount = (uint32_t)missShaders.size(),
-                                  .missShaders = missShaders.data(),
-                                  .hitGroupCount = (uint32_t)hitGroups.size(),
-                                  .hitGroups = hitGroups.data(),
-                                }, &pipeline))
-      {
-        goto cleanup;
-      }
-    }
-
-    cache = new GiShaderCache;
-    cache->aovId = (int) params.aovId;
-    cache->domeLightCameraVisible = params.domeLightCameraVisible;
-    cache->hitShaders = std::move(hitShaders);
-    cache->images2d = std::move(images2d);
-    cache->images3d = std::move(images3d);
-    cache->materials.resize(params.materialCount);
-    for (uint32_t i = 0; i < params.materialCount; i++)
-    {
-      cache->materials[i] = params.materials[i];
-    }
-    cache->missShaders = missShaders;
-    cache->pipeline = pipeline;
-    cache->rgenShader = rgenShader;
-    cache->hasPipelineClosestHitShader = hasPipelineClosestHitShader;
-    cache->hasPipelineAnyHitShader = hasPipelineAnyHitShader;
-
-cleanup:
-    if (!cache)
-    {
-      s_texSys->destroyUncachedImages(images2d);
-      s_texSys->destroyUncachedImages(images3d);
-      if (rgenShader.handle)
-      {
-        cgpuDestroyShader(s_device, rgenShader);
-      }
-      for (CgpuShader shader : missShaders)
-      {
-        cgpuDestroyShader(s_device, shader);
-      }
-      for (CgpuShader shader : hitShaders)
-      {
-        cgpuDestroyShader(s_device, shader);
-      }
-      if (pipeline.handle)
-      {
-        cgpuDestroyPipeline(s_device, pipeline);
-      }
-    }
-    return cache;
+    return factory.create(createInfo);
   }
 
   void giDestroyShaderCache(GiShaderCache* cache)
