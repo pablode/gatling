@@ -22,17 +22,100 @@
 
 #include <gtl/gb/Log.h>
 #include <gtl/mc/Material.h>
+#include <gtl/mc/Backend.h>
+
+namespace
+{
+  using namespace gtl;
+
+  bool _MakeMaterialGenInfo(const McGlslGenResult& codeGenResult,
+                            const std::string& resourcePathPrefix,
+                            GiGlslShaderGen::MaterialGenInfo& genInfo)
+  {
+    // Append resource path prefix for file-backed MDL modules.
+    std::vector<McTextureDescription> textureDescriptions = codeGenResult.textureDescriptions;
+
+    if (!resourcePathPrefix.empty())
+    {
+      for (McTextureDescription& texRes : textureDescriptions)
+      {
+        texRes.filePath = resourcePathPrefix + texRes.filePath;
+      }
+    }
+
+    // Remove MDL struct definitions because they're too bloated. We know more about the
+    // data from which the code is generated from and can reduce the memory footprint.
+    std::string glslSource = codeGenResult.source;
+    size_t mdlCodeOffset = glslSource.find("// user defined structs");
+    assert(mdlCodeOffset != std::string::npos);
+    glslSource = glslSource.substr(mdlCodeOffset, glslSource.size() - mdlCodeOffset);
+
+    genInfo = GiGlslShaderGen::MaterialGenInfo {
+      .glslSource = glslSource,
+      .textureDescriptions = textureDescriptions
+    };
+
+    return true;
+  }
+
+  bool _GenerateMaterialShadingGenInfo(McBackend& mcBackend,
+                                       const McMaterial& material,
+                                       GiGlslShaderGen::MaterialGenInfo& genInfo)
+  {
+    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_VOLUME_SCATTERING | MC_DF_FLAG_IOR;
+
+    if (material.isEmissive)
+    {
+      dfFlags |= MC_DF_FLAG_EMISSION | MC_DF_FLAG_EMISSION_INTENSITY;
+    }
+
+    if (material.isThinWalled)
+    {
+      dfFlags |= MC_DF_FLAG_THIN_WALLED | MC_DF_FLAG_BACKFACE_SCATTERING;
+
+      if (material.isEmissive)
+      {
+        dfFlags |= MC_DF_FLAG_BACKFACE_EMISSION | MC_DF_FLAG_BACKFACE_EMISSION_INTENSITY;
+      }
+    }
+
+    McGlslGenResult genResult;
+    if (!mcBackend.genGlsl(*material.mdlMaterial, McDfFlags(dfFlags), genResult))
+    {
+      return false;
+    }
+
+    return _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, genInfo);
+  }
+
+  bool _GenerateMaterialOpacityGenInfo(McBackend& mcBackend,
+                                       const McMaterial& material,
+                                       GiGlslShaderGen::MaterialGenInfo& genInfo)
+  {
+    McDfFlags dfFlags = MC_DF_FLAG_CUTOUT_OPACITY;
+
+    McGlslGenResult genResult;
+    if (!mcBackend.genGlsl(*material.mdlMaterial, dfFlags, genResult))
+    {
+      return false;
+    }
+
+    return _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, genInfo);
+  }
+}
 
 namespace gtl
 {
   GiShaderCacheFactory::GiShaderCacheFactory(CgpuDevice device,
                                              const CgpuPhysicalDeviceFeatures& deviceFeatures,
                                              GiGlslShaderGen& shaderGen,
-                                             GiTextureManager& textureManager)
+                                             GiTextureManager& textureManager,
+                                             McBackend& mcBackend)
     : m_device(device)
     , m_deviceFeatures(deviceFeatures)
     , m_shaderGen(shaderGen)
     , m_textureManager(textureManager)
+    , m_mcBackend(mcBackend)
   {
   }
 
@@ -115,7 +198,7 @@ namespace gtl
         HitGroupCompInfo groupInfo;
         {
           GiGlslShaderGen::MaterialGenInfo genInfo;
-          if (!m_shaderGen.generateMaterialShadingGenInfo(*material, genInfo))
+	  if (!_GenerateMaterialShadingGenInfo(m_mcBackend, *material, genInfo))
           {
             threadWorkFailed = true;
             continue;
@@ -128,7 +211,7 @@ namespace gtl
         if (material->hasCutoutTransparency)
         {
           GiGlslShaderGen::MaterialGenInfo genInfo;
-          if (!m_shaderGen.generateMaterialOpacityGenInfo(*material, genInfo))
+          if (!_GenerateMaterialOpacityGenInfo(m_mcBackend, *material, genInfo))
           {
             threadWorkFailed = true;
             continue;

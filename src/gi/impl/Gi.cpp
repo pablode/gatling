@@ -884,6 +884,13 @@ cleanup:
   {
     s_forceShaderCacheInvalid = false;
 
+    // TODO: cache in context
+    McBackend mcBackend;
+    if (!mcBackend.init(*s_mcRuntime))
+    {
+      return nullptr;
+    }
+
     const GiScene* scene = oldCreateInfo.scene;
     uint32_t diskLightCount = scene->diskLights.elementCount();
     uint32_t distantLightCount = scene->distantLights.elementCount();
@@ -913,7 +920,8 @@ cleanup:
       .sphereLightCount         = sphereLightCount
     };
 
-    GiShaderCacheFactory factory(s_device, s_deviceFeatures, *s_shaderGen, *s_texSys);
+    // TODO: cache in context
+    GiShaderCacheFactory factory(s_device, s_deviceFeatures, *s_shaderGen, *s_texSys, mcBackend);
 
     return factory.create(createInfo);
   }

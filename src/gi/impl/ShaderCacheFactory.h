@@ -25,6 +25,7 @@ namespace gtl
 {
   class GiGlslShaderGen;
   class GiTextureManager;
+  class McBackend;
   class McMaterial;
 
   struct GiShaderCache
@@ -66,7 +67,8 @@ namespace gtl
     GiShaderCacheFactory(CgpuDevice device,
                          const CgpuPhysicalDeviceFeatures& deviceFeatures,
                          GiGlslShaderGen& shaderGen,
-                         GiTextureManager& textureManager);
+                         GiTextureManager& textureManager,
+                         McBackend& mcBackend);
 
     GiShaderCache* create(const GiShaderCacheCreateInfo& createInfo);
 
@@ -75,5 +77,6 @@ namespace gtl
     const CgpuPhysicalDeviceFeatures& m_deviceFeatures;
     GiGlslShaderGen& m_shaderGen;
     GiTextureManager& m_textureManager;
+    McBackend& m_mcBackend;
   };
 }

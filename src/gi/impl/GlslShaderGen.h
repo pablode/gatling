@@ -47,9 +47,6 @@ namespace gtl
       std::vector<McTextureDescription> textureDescriptions;
     };
 
-    bool generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo);
-    bool generateMaterialOpacityGenInfo(const McMaterial& material, MaterialGenInfo& genInfo);
-
   public:
     struct CommonShaderParams
     {
