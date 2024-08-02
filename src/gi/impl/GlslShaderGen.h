@@ -69,7 +69,6 @@ namespace gtl
       bool nextEventEstimation;
       bool progressiveAccumulation;
       bool reorderInvocations;
-      bool shaderClockExts;
     };
 
     struct MissShaderParams

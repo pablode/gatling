@@ -103,6 +103,7 @@ namespace gtl
     // glslang requires this static initialization, however it internally
     // ref-counts and is thread-safe. The return value seems to be unused.
     [[maybe_unused]] int r = glslang::InitializeProcess();
+    assert(r);
   }
 
   GiGlslShaderCompiler::~GiGlslShaderCompiler()

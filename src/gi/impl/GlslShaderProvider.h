@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <functional>
 #include <filesystem>
 #include <unordered_map>
 
@@ -55,6 +56,8 @@ namespace gtl
     }
   };
 
+  using GiGlslSourceTransformer = std::function<std::string(const char*)>;
+
   class GiGlslShaderProvider
   {
   public:
@@ -67,7 +70,8 @@ namespace gtl
   public:
     CgpuShader provide(GiShaderStage stage,
                        const char* fileName,
-                       GiGlslDefines* glslDefines = nullptr);
+                       GiGlslDefines* glslDefines = nullptr,
+                       GiGlslSourceTransformer sourceTransformer = nullptr);
 
   private:
     const fs::path& m_shaderDir;

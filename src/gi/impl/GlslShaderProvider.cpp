@@ -64,7 +64,8 @@ namespace gtl
 
   CgpuShader GiGlslShaderProvider::provide(GiShaderStage stage,
                                            const char* fileName,
-                                           GiGlslDefines* glslDefines)
+                                           GiGlslDefines* glslDefines,
+                                           GiGlslSourceTransformer sourceTransformer)
   {
     std::string fileSource;
     fs::path shaderPath = m_shaderDir / fileName;
@@ -84,6 +85,10 @@ namespace gtl
     }
 
     std::string source = preamble + fileSource;
+    if (sourceTransformer)
+    {
+      source = sourceTransformer(source.data());
+    }
 
     std::hash<std::string> hasher;
     size_t hash = hasher(source);

@@ -49,104 +49,8 @@ namespace gtl
     return true;
   }
 
-  void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, const GiGlslShaderGen::CommonShaderParams& params)
-  {
-#if defined(NDEBUG) || defined(__APPLE__)
-    stitcher.appendDefine("NDEBUG");
-#endif
-
-    uint32_t totalLightCount = params.diskLightCount + params.distantLightCount +
-                               params.rectLightCount + params.sphereLightCount;
-
-    stitcher.appendDefine("AOV_ID", params.aovId);
-    stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) params.texCount2d);
-    stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) params.texCount3d);
-    stitcher.appendDefine("SPHERE_LIGHT_COUNT", (int32_t) params.sphereLightCount);
-    stitcher.appendDefine("DISTANT_LIGHT_COUNT", (int32_t) params.distantLightCount);
-    stitcher.appendDefine("RECT_LIGHT_COUNT", (int32_t) params.rectLightCount);
-    stitcher.appendDefine("DISK_LIGHT_COUNT", (int32_t) params.diskLightCount);
-    stitcher.appendDefine("TOTAL_LIGHT_COUNT", (int32_t) totalLightCount);
-    stitcher.appendDefine("MEDIUM_STACK_SIZE", (int32_t) params.mediumStackSize);
-  }
-
   bool GiGlslShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)
   {
-    GiGlslStitcher stitcher;
-    stitcher.appendVersion();
-
-    if (params.shaderClockExts)
-    {
-      stitcher.appendRequiredExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
-      stitcher.appendRequiredExtension("GL_ARB_shader_clock");
-    }
-    if (params.reorderInvocations)
-    {
-      stitcher.appendRequiredExtension("GL_NV_shader_invocation_reorder");
-      // For hit shader invocation reordering hint
-      stitcher.appendRequiredExtension("GL_EXT_buffer_reference");
-      stitcher.appendRequiredExtension("GL_EXT_buffer_reference_uvec2");
-
-      uint32_t reoderHintValueCount = params.materialCount + 1/* no hit */;
-      int32_t reorderHintBitCount = 0;
-
-      while (reoderHintValueCount >>= 1)
-      {
-        reorderHintBitCount++;
-      }
-
-      stitcher.appendDefine("REORDER_INVOCATIONS");
-      stitcher.appendDefine("REORDER_HINT_BIT_COUNT", reorderHintBitCount);
-    }
-
-    _sgGenerateCommonDefines(stitcher, params.commonParams);
-
-    if (params.depthOfField)
-    {
-      stitcher.appendDefine("DEPTH_OF_FIELD");
-    }
-    if (params.filterImportanceSampling)
-    {
-      stitcher.appendDefine("FILTER_IMPORTANCE_SAMPLING");
-    }
-    if (params.nextEventEstimation)
-    {
-      stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
-    }
-    if (params.progressiveAccumulation)
-    {
-      stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
-    }
-
-    fs::path filePath = m_shaderPath / fileName;
-    if (!stitcher.appendSourceFile(filePath))
-    {
-      return false;
-    }
-
-    std::string source = stitcher.source();
-    return m_shaderCompiler->compileGlslToSpv(GiShaderStage::RayGen, source, spv);
-  }
-
-  bool GiGlslShaderGen::generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv)
-  {
-    GiGlslStitcher stitcher;
-    stitcher.appendVersion();
-
-    _sgGenerateCommonDefines(stitcher, params.commonParams);
-
-    if (params.domeLightCameraVisible)
-    {
-      stitcher.appendDefine("DOME_LIGHT_CAMERA_VISIBLE");
-    }
-
-    fs::path filePath = m_shaderPath / fileName;
-    if (!stitcher.appendSourceFile(filePath))
-    {
-      return false;
-    }
-
-    std::string source = stitcher.source();
-    return m_shaderCompiler->compileGlslToSpv(GiShaderStage::Miss, source, spv);
   }
 
   bool GiGlslShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)
@@ -154,7 +58,7 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.commonParams);
+    //_sgGenerateCommonDefines(stitcher, params.commonParams);
 
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
@@ -214,7 +118,7 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    _sgGenerateCommonDefines(stitcher, params.commonParams);
+    //_sgGenerateCommonDefines(stitcher, params.commonParams);
 
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);

@@ -25,14 +25,13 @@ namespace fs = std::filesystem;
 
 namespace gtl
 {
-// TODO: this sucks! or add static_assert for size
   enum class GiShaderStage
   {
-    Compute = 0x020,
-    RayGen = 0x100,
-    AnyHit = 0x200,
-    ClosestHit = 0x400,
-    Miss = 0x800
+    Compute = 0,
+    RayGen,
+    AnyHit,
+    ClosestHit,
+    Miss
   };
 
   class GiGlslShaderCompiler

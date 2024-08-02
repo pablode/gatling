@@ -164,6 +164,20 @@ namespace gtl
     uint32_t& texCount2d = commonParams.texCount2d;
     uint32_t& texCount3d = commonParams.texCount3d;
 
+    GiGlslDefines baseDefs;
+    baseDefs.setDefine("AOV_ID", (int) createInfo.aovId);
+    baseDefs.setDefine("TEXTURE_COUNT_2D", texCount2d);
+    baseDefs.setDefine("TEXTURE_COUNT_3D", texCount3d);
+    baseDefs.setDefine("SPHERE_LIGHT_COUNT", createInfo.sphereLightCount);
+    baseDefs.setDefine("DISTANT_LIGHT_COUNT", createInfo.distantLightCount);
+    baseDefs.setDefine("RECT_LIGHT_COUNT", createInfo.rectLightCount);
+    baseDefs.setDefine("DISK_LIGHT_COUNT", createInfo.diskLightCount);
+    baseDefs.setDefine("TOTAL_LIGHT_COUNT", totalLightCount);
+    baseDefs.setDefine("MEDIUM_STACK_SIZE", createInfo.mediumStackSize);
+#if defined(NDEBUG)
+    baseDefs.setDefine("NDEBUG");
+#endif
+
     // Create per-material closest-hit shaders.
     //
     // This is done in multiple phases: first, GLSL is generated from MDL, and
@@ -406,81 +420,51 @@ namespace gtl
 
     // Create ray generation shader.
     {
-      GiGlslShaderGen::RaygenShaderParams rgenParams = {
-        .commonParams = commonParams,
-        .depthOfField = createInfo.depthOfField,
-        .filterImportanceSampling = createInfo.filterImportanceSampling,
-        .materialCount = createInfo.materialCount,
-        .nextEventEstimation = nextEventEstimation,
-        .progressiveAccumulation = createInfo.progressiveAccumulation,
-        .reorderInvocations = m_deviceFeatures.rayTracingInvocationReorder,
-        .shaderClockExts = clockCyclesAov
-      };
+      GiGlslDefines defs = baseDefs;
+      defs.setConditionalDefine(createInfo.depthOfField, "DEPTH_OF_FIELD");
+      defs.setConditionalDefine(createInfo.filterImportanceSampling, "FILTER_IMPORTANCE_SAMPLING");
+      defs.setConditionalDefine(createInfo.nextEventEstimation, "NEXT_EVENT_ESTIMATION");
+      defs.setConditionalDefine(createInfo.progressiveAccumulation, "PROGRESSIVE_ACCUMULATION");
+      defs.setConditionalDefine(createInfo.depthOfField, "DEPTH_OF_FIELD");
 
-      std::vector<uint8_t> spv;
-      if (!m_shaderGen.generateRgenSpirv("rp_main.rgen", rgenParams, spv))
+      if (m_deviceFeatures.rayTracingInvocationReorder)
       {
-        goto cleanup;
+        uint32_t reoderHintValueCount = createInfo.materialCount + 1/* no hit */;
+        uint32_t reorderHintBitCount = 0;
+  
+        while (reoderHintValueCount >>= 1)
+        {
+          reorderHintBitCount++;
+        }
+  
+        defs.setDefine("REORDER_INVOCATIONS");
+        defs.setDefine("REORDER_HINT_BIT_COUNT", reorderHintBitCount);
       }
 
-      if (!cgpuCreateShader(m_device, {
-                              .size = spv.size(),
-                              .source = spv.data(),
-                              .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN
-                            }, &rgenShader))
-      {
+      rgenShader = m_shaderProvider.provide(GiShaderStage::RayGen, "rp_main.rgen", &defs);
+      if (!rgenShader.handle)
         goto cleanup;
-      }
     }
 
-    // Create miss shaders.
+    // Regular miss shader.
     {
-      GiGlslShaderGen::MissShaderParams missParams = {
-        .commonParams = commonParams,
-        .domeLightCameraVisible = createInfo.domeLightCameraVisible
-      };
+      GiGlslDefines defs = baseDefs;
+      defs.setConditionalDefine(createInfo.domeLightCameraVisible, "DOME_LIGHT_CAMERA_VISIBLE");
 
-      // regular miss shader
-      {
-        std::vector<uint8_t> spv;
-        if (!m_shaderGen.generateMissSpirv("rp_main.miss", missParams, spv))
-        {
-          goto cleanup;
-        }
+      CgpuShader shader = m_shaderProvider.provide(GiShaderStage::Miss, "rp_main.miss", &defs);
+      if (!shader.handle)
+        goto cleanup;
 
-        CgpuShader missShader;
-        if (!cgpuCreateShader(m_device, {
-                                .size = spv.size(),
-                                .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
-                              }, &missShader))
-        {
-          goto cleanup;
-        }
+      missShaders.push_back(shader);
+    }
 
-        missShaders.push_back(missShader);
-      }
+    // Shadow miss shader.
+    {
+      CgpuShader shader = m_shaderProvider.provide(GiShaderStage::Miss, "rp_main_shadow.miss");
+      if (!shader.handle)
+        goto cleanup;
 
-      // shadow test miss shader
-      {
-        std::vector<uint8_t> spv;
-        if (!m_shaderGen.generateMissSpirv("rp_main_shadow.miss", missParams, spv))
-        {
-          goto cleanup;
-        }
-
-        CgpuShader missShader;
-        if (!cgpuCreateShader(m_device, {
-                                .size = spv.size(),
-                                .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
-                              }, &missShader))
-        {
-          goto cleanup;
-        }
-
-        missShaders.push_back(missShader);
-      }
+      missShaders.push_back(shader);
     }
 
     // Upload textures.

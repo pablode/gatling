@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Gi.h"
+#include "GlslShaderProvider.h"
 
 #include <gtl/cgpu/Cgpu.h>
 
@@ -78,5 +79,6 @@ namespace gtl
     GiGlslShaderGen& m_shaderGen;
     GiTextureManager& m_textureManager;
     McBackend& m_mcBackend;
+    GiGlslShaderProvider m_shaderProvider; // TODO: init
   };
 }
