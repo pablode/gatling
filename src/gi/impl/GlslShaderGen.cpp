@@ -51,7 +51,7 @@ namespace gtl
 
   void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, const GiGlslShaderGen::CommonShaderParams& params)
   {
-#if defined(NDEBUG) || defined(__APPLE__)
+#if defined(NDEBUG)
     stitcher.appendDefine("NDEBUG");
 #endif
 

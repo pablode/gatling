@@ -666,12 +666,10 @@ namespace gtl
       idevice->features.shaderClock = true;
     }
 
-#ifndef __APPLE__
     if (enableOptionalExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME))
     {
       idevice->features.debugPrintf = true;
     }
-#endif
 #endif
 
     if (enableOptionalExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME))
