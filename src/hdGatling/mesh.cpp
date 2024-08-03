@@ -598,12 +598,12 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
   }
   else if (interpolation == HdInterpolationInstance)
   {
-    TF_CODING_ERROR("primvar interpolation mode 'instance' not supported");
+    TF_CODING_ERROR("Primvar interpolation mode 'instance' not supported (%s)", id.GetText());
     return false;
   }
   else
   {
-    TF_CODING_ERROR("primvar interpolation mode not handled");
+    TF_CODING_ERROR("Primvar interpolation mode not handled");
     return false;
   }
 
@@ -624,21 +624,14 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   meshUtil.ComputeTriangleIndices(&s.faces, &primitiveParams);
 
   // Points: required per vertex.
-  HdInterpolation pointInterpolation;
-  bool foundPoints = _FindPrimvarInterpolationByName(sceneDelegate, HdTokens->points, pointInterpolation);
+  VtValue boxedPoints = GetPoints(sceneDelegate);
 
-  if (!foundPoints)
+  if (boxedPoints.IsEmpty())
   {
-    TF_RUNTIME_ERROR("Points primvar not found!");
-    return;
-  }
-  else if (pointInterpolation != HdInterpolation::HdInterpolationVertex)
-  {
-    TF_RUNTIME_ERROR("Points primvar is not vertex-interpolated!");
+    TF_RUNTIME_ERROR("Points primvar not found (%s)", id.GetText());
     return;
   }
 
-  VtValue boxedPoints = sceneDelegate->Get(id, HdTokens->points);
   s.points = boxedPoints.Get<VtVec3fArray>();
 
   // Colors: only support constant interpolation because we can create a material for it.
