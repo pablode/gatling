@@ -1196,7 +1196,7 @@ cleanup:
         .nextEventEstimation = nextEventEstimation,
         .progressiveAccumulation = params.progressiveAccumulation,
         .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
-        .shaderClockExts = clockCyclesAov
+        .shaderClockExt = clockCyclesAov
       };
 
       std::vector<uint8_t> spv;

@@ -74,18 +74,12 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    if (params.shaderClockExts)
+    if (params.shaderClockExt)
     {
-      stitcher.appendRequiredExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
-      stitcher.appendRequiredExtension("GL_ARB_shader_clock");
+      stitcher.appendDefine("REQUIRE_CLOCK");
     }
     if (params.reorderInvocations)
     {
-      stitcher.appendRequiredExtension("GL_NV_shader_invocation_reorder");
-      // For hit shader invocation reordering hint
-      stitcher.appendRequiredExtension("GL_EXT_buffer_reference");
-      stitcher.appendRequiredExtension("GL_EXT_buffer_reference_uvec2");
-
       uint32_t reoderHintValueCount = params.materialCount + 1/* no hit */;
       int32_t reorderHintBitCount = 0;
 

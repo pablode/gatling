@@ -37,8 +37,6 @@ namespace gtl
     void appendDefine(std::string_view name, int32_t value);
     void appendDefine(std::string_view name, float value);
 
-    void appendRequiredExtension(std::string_view name);
-
     void appendString(std::string_view value);
 
     bool appendSourceFile(fs::path path);

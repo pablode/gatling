@@ -67,11 +67,6 @@ namespace gtl
     m_source << "#define " << name << " " << value << "\n";
   }
 
-  void GiGlslStitcher::appendRequiredExtension(std::string_view name)
-  {
-    m_source << "#extension " << name << ": require\n";
-  }
-
   void GiGlslStitcher::appendString(std::string_view value)
   {
     m_source << value;
