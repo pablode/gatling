@@ -82,6 +82,7 @@ namespace gtl
   {
     CgpuBlas blas;
     CgpuBuffer payloadBuffer;
+    rp::BlasPayload payload;
   };
 
   // We cache the mesh CPU data first and defer the GPU upload / BLAS build
@@ -542,37 +543,33 @@ fail:
                                   uint64_t& totalIndicesSize,
                                   uint64_t& totalVerticesSize)
   {
-    std::unordered_map<const GiMesh*, CgpuBlasInstance> blasInstanceProtos;
-
     for (uint32_t m = 0; m < params.meshInstanceCount; m++)
     {
       const GiMeshInstance* instance = &params.meshInstances[m];
       GiMesh* mesh = instance->mesh;
+
+      // Find material for SBT index (FIXME: find a better solution)
+      uint32_t materialIndex = UINT32_MAX;
+      GiShaderCache* shaderCache = params.shaderCache;
+      for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
+      {
+          if (shaderCache->materials[i] == instance->material)
+          {
+              materialIndex = i;
+              break;
+          }
+      }
+      if (materialIndex == UINT32_MAX)
+      {
+          GB_ERROR("invalid BLAS material");
+          continue;
+      }
 
       // Build mesh BLAS & buffers if they don't exist yet
       if (GiMeshCpuData* data = std::get_if<GiMeshCpuData>(&mesh->data); data)
       {
         if (data->faces.empty())
         {
-          continue;
-        }
-
-        assert(blasInstanceProtos.count(mesh) == 0);
-
-        // Find material for SBT index (FIXME: find a better solution)
-        uint32_t materialIndex = UINT32_MAX;
-        GiShaderCache* shaderCache = params.shaderCache;
-        for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
-        {
-          if (shaderCache->materials[i] == instance->material)
-          {
-            materialIndex = i;
-            break;
-          }
-        }
-        if (materialIndex == UINT32_MAX)
-        {
-          GB_ERROR("invalid BLAS material");
           continue;
         }
 
@@ -619,6 +616,7 @@ fail:
         CgpuBuffer tmpPositionBuffer;
         CgpuBuffer tmpIndexBuffer;
         CgpuBuffer payloadBuffer;
+        rp::BlasPayload payload;
 
         uint64_t indicesSize = indexData.size() * sizeof(uint32_t);
         uint64_t verticesSize = vertexData.size() * sizeof(rp::FVertex);
@@ -711,27 +709,6 @@ fail:
         cgpuDestroyBuffer(s_device, tmpIndexBuffer);
         tmpIndexBuffer.handle = 0;
 
-        // Append BLAS for lifetime management
-        {
-          GiMeshGpuData newData = {
-            .blas = blas,
-            .payloadBuffer = payloadBuffer
-          };
-          mesh->data = newData;
-        }
-
-        // Set proto entry
-        {
-          assert(blasPayloads.size() < (1 << 25));
-
-          CgpuBlasInstance proto = {
-            .as = blas,
-            .hitGroupIndex = materialIndex * 2, // always two hit groups per material: regular & shadow
-            .instanceCustomIndex = uint32_t(blasPayloads.size())
-          };
-          blasInstanceProtos[mesh] = proto;
-        }
-
         // Append BLAS payload data
         {
           uint64_t payloadBufferAddress = cgpuGetBufferAddress(s_device, payloadBuffer);
@@ -748,11 +725,20 @@ fail:
           }
 
           uint64_t vertexBufferSize = (vertexBufferOffset/* account for align */ - indexBufferOffset/* account for preamble */);
-          blasPayloads.push_back({
+          payload = rp::BlasPayload{
             .bufferAddress = payloadBufferAddress,
             .vertexOffset = uint32_t(vertexBufferSize / sizeof(rp::FVertex)), // offset to skip index buffer
             .bitfield = bitfield
-          });
+          };
+        }
+
+        // Append BLAS for lifetime management
+        {
+          mesh->data = GiMeshGpuData{
+            .blas = blas,
+            .payloadBuffer = payloadBuffer,
+            .payload = payload
+          };
         }
 
         // (we ignore padding and the preamble in the reporting, but they are negligible)
@@ -775,17 +761,21 @@ fail_cleanup:
         }
       }
 
-      if (GiMeshGpuData* data = std::get_if<GiMeshGpuData>(&mesh->data); !data)
+      GiMeshGpuData* data = std::get_if<GiMeshGpuData>(&mesh->data);
+      if (!data)
       {
-        continue; // invalid geometry; GPU data was not created
+        continue; // invalid geometry or an error occurred
       }
 
-      // Create mesh instance for TLAS. All fields are cached except transform.
-      CgpuBlasInstance blasInstance = blasInstanceProtos[mesh];
-
+      // Create BLAS instance for TLAS.
+      CgpuBlasInstance blasInstance;
+      blasInstance.as = data->blas;
+      blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
+      blasInstance.instanceCustomIndex = uint32_t(blasPayloads.size());
       memcpy(blasInstance.transform, instance->transform, sizeof(float) * 12);
 
       blasInstances.push_back(blasInstance);
+      blasPayloads.push_back(data->payload);
     }
   }
 
