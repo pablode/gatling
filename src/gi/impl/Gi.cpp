@@ -184,7 +184,6 @@ namespace gtl
   };
 
   bool s_cgpuInitialized = false;
-  bool s_loggerInitialized = false;
   CgpuDevice s_device;
   CgpuPhysicalDeviceFeatures s_deviceFeatures;
   CgpuPhysicalDeviceProperties s_deviceProperties;
@@ -326,11 +325,7 @@ namespace gtl
       return GiStatus::Error;
     }
 
-    if (!s_loggerInitialized)
-    {
-      gbLogInit();
-      s_loggerInitialized = true;
-    }
+    gbLogInit();
 
     _PrintInitInfo(params);
 

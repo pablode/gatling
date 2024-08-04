@@ -25,7 +25,7 @@ namespace gtl
 {
   // Unfortunately is it not enough to only hook report_query() or log_message().
 
-  GtLogFlushListener::GtLogFlushListener(const ContextOptions&) {}
+  GtLogFlushListener::GtLogFlushListener(const ContextOptions&) { gbLogInit(); }
 
   void GtLogFlushListener::report_query(const QueryData&) { gbLogFlush(); }
 

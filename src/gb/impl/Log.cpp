@@ -29,7 +29,10 @@ namespace gtl
 
   void gbLogInit()
   {
-    assert(!s_logger);
+    if (s_logger)
+    {
+      return;
+    }
 
     quill::ConsoleColours consoleColors;
     consoleColors.set_default_colours();
