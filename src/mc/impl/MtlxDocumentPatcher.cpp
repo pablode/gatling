@@ -475,10 +475,7 @@ namespace gtl
     }
 #endif
 
-    // MaterialX PR #1417 introduced geompropvalue support in 1.38.9+ although it's not advertised in the changelog.
-#if (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION < 9)
     _PatchGeomprops(document);
-#endif
 
     _PatchNodeNames(document);
 
