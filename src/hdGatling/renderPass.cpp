@@ -278,10 +278,9 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
     meshes.push_back(giMesh);
 
-    const GfMatrix4d& prototypeTransform = mesh->GetPrototypeTransform();
     for (size_t i = 0; i < transforms.size(); i++)
     {
-      GfMatrix4d T = prototypeTransform * transforms[i];
+      GfMatrix4d T = transforms[i];
 
       float instanceTransform[3][4] = {
         { (float) T[0][0], (float) T[1][0], (float) T[2][0], (float) T[3][0] },

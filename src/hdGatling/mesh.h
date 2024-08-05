@@ -46,8 +46,6 @@ public:
 
   GiMesh* GetGiMesh() const;
 
-  const GfMatrix4d& GetPrototypeTransform() const;
-
   const GfVec3f& GetColor() const;
 
   bool HasColor() const;
@@ -77,7 +75,6 @@ private:
 
 private:
   GiMesh* _giMesh = nullptr;
-  GfMatrix4d _prototypeTransform;
   GfVec3f _color;
   bool _hasColor = false;
 };

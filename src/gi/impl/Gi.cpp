@@ -120,6 +120,7 @@ namespace gtl
   struct GiMesh
   {
     GiMeshDataVariant data;
+    glm::mat3x4 transform;
     bool flipFacing;
     int id;
   };
@@ -517,10 +518,16 @@ fail:
 
     GiMesh* mesh = new GiMesh {
       .data = std::move(cpuData),
+      .transform = glm::mat3x4(1.0f),
       .flipFacing = desc.isLeftHanded,
       .id = desc.id
     };
     return mesh;
+  }
+
+  void giSetMeshTransform(GiMesh* mesh, float transform[3][4])
+  {
+    memcpy(glm::value_ptr(mesh->transform), transform, sizeof(float) * 12);
   }
 
   void giDestroyMesh(GiMesh* mesh)
@@ -763,11 +770,13 @@ fail_cleanup:
       }
 
       // Create BLAS instance for TLAS.
+      glm::mat3x4 transform = glm::mat3x4(glm::mat4(mesh->transform) * glm::mat4(glm::make_mat3x4((float*) instance->transform)));
+
       CgpuBlasInstance blasInstance;
       blasInstance.as = data->blas;
       blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
       blasInstance.instanceCustomIndex = uint32_t(blasPayloads.size());
-      memcpy(blasInstance.transform, instance->transform, sizeof(float) * 12);
+      memcpy(blasInstance.transform, glm::value_ptr(transform), sizeof(float) * 12);
 
       blasInstances.push_back(blasInstance);
       blasPayloads.push_back(data->payload);

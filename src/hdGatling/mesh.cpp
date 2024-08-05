@@ -377,7 +377,6 @@ namespace
 
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
   : HdMesh(id)
-  , _prototypeTransform(1.0)
   , _color(0.0, 0.0, 0.0)
   , _hasColor(false)
 {
@@ -408,7 +407,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   if ((*dirtyBits & HdChangeTracker::DirtyInstancer) |
       (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
   {
-
     _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
 
     const SdfPath& instancerId = GetInstancerId();
@@ -430,24 +428,30 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
   }
 
-  if (*dirtyBits & HdChangeTracker::DirtyTransform)
-  {
-    _prototypeTransform = sceneDelegate->GetTransform(id);
-  }
-
   bool updateGeometry =
     (*dirtyBits & HdChangeTracker::DirtyPoints) |
     (*dirtyBits & HdChangeTracker::DirtyNormals) |
     (*dirtyBits & HdChangeTracker::DirtyTopology);
 
-  *dirtyBits = HdChangeTracker::Clean;
-
-  if (!updateGeometry)
+  if (updateGeometry)
   {
-    return;
+    _CreateGiMesh(sceneDelegate);
   }
 
-  _CreateGiMesh(sceneDelegate);
+  if (_giMesh && (*dirtyBits & HdChangeTracker::DirtyTransform))
+  {
+    GfMatrix4d t = sceneDelegate->GetTransform(id);
+
+    float transform[3][4] = {
+      { (float) t[0][0], (float) t[1][0], (float) t[2][0], (float) t[3][0] },
+      { (float) t[0][1], (float) t[1][1], (float) t[2][1], (float) t[3][1] },
+      { (float) t[0][2], (float) t[1][2], (float) t[2][2], (float) t[3][2] }
+    };
+
+    giSetMeshTransform(_giMesh, transform);
+  }
+
+  *dirtyBits = HdChangeTracker::Clean;
 }
 
 bool HdGatlingMesh::_FindPrimvarInterpolationByName(HdSceneDelegate* sceneDelegate,
@@ -798,11 +802,6 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 GiMesh* HdGatlingMesh::GetGiMesh() const
 {
   return _giMesh;
-}
-
-const GfMatrix4d& HdGatlingMesh::GetPrototypeTransform() const
-{
-  return _prototypeTransform;
 }
 
 const GfVec3f& HdGatlingMesh::GetColor() const

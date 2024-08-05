@@ -171,6 +171,7 @@ namespace gtl
   void giDestroyMaterial(GiMaterial* mat);
 
   GiMesh* giCreateMesh(const GiMeshDesc& desc);
+  void giSetMeshTransform(GiMesh* mesh, float transform[3][4]);
   void giDestroyMesh(GiMesh* mesh);
 
   GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params);
