@@ -267,20 +267,13 @@ vec3 mdl_adapt_normal(State state, vec3 normal)
     return state.normal;
 #endif
 
-    // Calculate the perfect reflection vector
-    vec3 r = reflect(gl_WorldRayDirectionEXT, normal);
+    vec3 r = normalize(reflect(gl_WorldRayDirectionEXT, normal));
 
-    // Return if shading normal does not fall under geometric surface (angle between r and normal within 90 degrees)
-    float a = dot(r, state.geom_normal);
-    if (a >= 0.0)
-    {
-        return normal;
-    }
+    float a = max(0.0, dot(r, -state.geom_normal));
 
-    // Otherwise, bend normal (see above paper, A.3)
-    float b = max(0.0001, dot(normal, state.geom_normal));
+    float b = dot(normal, state.geom_normal);
 
-    vec3 tangent = normalize(r - (a / b) * normal);
+    vec3 tangent = normalize(r + (a / b) * normal);
 
     vec3 new_normal = normalize(-gl_WorldRayDirectionEXT + tangent);
 
