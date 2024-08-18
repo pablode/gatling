@@ -560,7 +560,10 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
 
   HdVtBufferSource buffer(name, boxedValues);
 
-  if (interpolation == HdInterpolationVertex)
+  if (interpolation == HdInterpolationVertex ||
+      // Varying is equivalent to Vertex for non-subdivided polygonal surfaces (and we don't support subdivision):
+      // https://github.com/usd-wg/assets/tree/907d5f17bbe933fc14441a3f3ab69a5bd8abe32a/docs/PrimvarInterpolation#vertex
+      interpolation == HdInterpolationVarying)
   {
     result = boxedValues;
     isIndexed = true;
