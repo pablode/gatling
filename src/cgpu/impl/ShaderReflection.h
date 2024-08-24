@@ -18,7 +18,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <gtl/gb/SmallVector.h>
+#include <vector>
 
 namespace gtl
 {
@@ -34,7 +34,7 @@ namespace gtl
   struct CgpuShaderReflection
   {
     uint32_t pushConstantsSize;
-    GbSmallVector<CgpuShaderReflectionBinding, 32> bindings;
+    std::vector<CgpuShaderReflectionBinding> bindings;
   };
 
   bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);

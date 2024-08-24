@@ -34,7 +34,7 @@ namespace gtl
     }
 
     bool result = false;
-    GbSmallVector<SpvReflectDescriptorBinding*, 32> bindings;
+    std::vector<SpvReflectDescriptorBinding*> bindings;
 
     uint32_t bindingCount;
     if (spvReflectEnumerateDescriptorBindings(&shaderModule, &bindingCount, nullptr) != SPV_REFLECT_RESULT_SUCCESS)

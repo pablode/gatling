@@ -21,6 +21,12 @@
 
 namespace gtl
 {
+  GbHandleStore::GbHandleStore()
+  {
+    m_versions.reserve(1024);
+    m_freeList.reserve(32);
+  }
+
   uint64_t GbHandleStore::allocateHandle()
   {
     uint32_t index;

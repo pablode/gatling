@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <array>
 #include <memory>
 
 #include <volk.h>
@@ -97,17 +98,17 @@ namespace gtl
 
   struct CgpuIPipeline
   {
-    VkPipeline                                       pipeline;
-    VkPipelineLayout                                 layout;
-    VkDescriptorPool                                 descriptorPool;
-    VkDescriptorSet                                  descriptorSet;
-    VkDescriptorSetLayout                            descriptorSetLayout;
-    GbSmallVector<VkDescriptorSetLayoutBinding, 128> descriptorSetLayoutBindings;
-    VkPipelineBindPoint                              bindPoint;
-    VkStridedDeviceAddressRegionKHR                  sbtRgen;
-    VkStridedDeviceAddressRegionKHR                  sbtMiss;
-    VkStridedDeviceAddressRegionKHR                  sbtHit;
-    CgpuIBuffer                                      sbt;
+    VkPipeline                                pipeline;
+    VkPipelineLayout                          layout;
+    VkDescriptorPool                          descriptorPool;
+    VkDescriptorSet                           descriptorSet;
+    VkDescriptorSetLayout                     descriptorSetLayout;
+    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+    VkPipelineBindPoint                       bindPoint;
+    VkStridedDeviceAddressRegionKHR           sbtRgen;
+    VkStridedDeviceAddressRegionKHR           sbtMiss;
+    VkStridedDeviceAddressRegionKHR           sbtHit;
+    CgpuIBuffer                               sbt;
   };
 
   struct CgpuIShader
@@ -435,8 +436,8 @@ namespace gtl
       return false;
     }
 
-    GbSmallVector<const char*, 8> enabledLayers;
-    GbSmallVector<const char*, 8> enabledExtensions;
+    GbSmallVector<const char*, 4> enabledLayers;
+    GbSmallVector<const char*, 16> enabledExtensions;
     bool debugUtilsEnabled = false;
 #ifndef NDEBUG
     {
@@ -460,7 +461,7 @@ namespace gtl
       uint32_t extensionCount;
       vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 
-      GbSmallVector<VkExtensionProperties, 512> availableExtensions(extensionCount);
+      std::vector<VkExtensionProperties> availableExtensions(extensionCount);
       vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
 
 #ifndef NDEBUG
@@ -550,7 +551,7 @@ namespace gtl
       GB_WARN("more than one device found -- choosing first one");
     }
 
-    GbSmallVector<VkPhysicalDevice, 8> physicalDevices(physDeviceCount);
+    GbSmallVector<VkPhysicalDevice, 4> physicalDevices(physDeviceCount);
     vkEnumeratePhysicalDevices(iinstance->instance, &physDeviceCount, physicalDevices.data());
 
     idevice->physicalDevice = physicalDevices[0];
@@ -606,10 +607,10 @@ namespace gtl
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, nullptr);
 
-    GbSmallVector<VkExtensionProperties, 1024> extensions(extensionCount);
+    std::vector<VkExtensionProperties> extensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
-    GbSmallVector<const char*, 16> requiredExtensions = {
+    std::array<const char*, 10> requiredExtensions = {
       VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
       VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -622,7 +623,7 @@ namespace gtl
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME
     };
 
-    GbSmallVector<const char*, 32> enabledExtensions;
+    GbSmallVector<const char*, 8> enabledExtensions;
     for (uint32_t i = 0; i < requiredExtensions.size(); i++)
     {
       const char* extension = requiredExtensions[i];
@@ -688,7 +689,7 @@ namespace gtl
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, nullptr);
 
-    GbSmallVector<VkQueueFamilyProperties, 32> queueFamilies(queueFamilyCount);
+    GbSmallVector<VkQueueFamilyProperties, 8> queueFamilies(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, queueFamilies.data());
 
     uint32_t queueFamilyIndex = UINT32_MAX;
@@ -1555,8 +1556,10 @@ namespace gtl
   static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice, CgpuIPipeline* ipipeline, CgpuIShader* ishader, VkShaderStageFlags stageFlags)
   {
     const CgpuShaderReflection* shaderReflection = &ishader->reflection;
+    size_t bindingCount = shaderReflection->bindings.size();
 
-    for (uint32_t i = 0; i < shaderReflection->bindings.size(); i++)
+    ipipeline->descriptorSetLayoutBindings.resize(bindingCount);
+    for (uint32_t i = 0; i < bindingCount; i++)
     {
       const CgpuShaderReflectionBinding* binding_reflection = &shaderReflection->bindings[i];
 
@@ -1568,14 +1571,14 @@ namespace gtl
         .pImmutableSamplers = nullptr,
       };
 
-      ipipeline->descriptorSetLayoutBindings.push_back(layoutBinding);
+      ipipeline->descriptorSetLayoutBindings[i] = layoutBinding;
     }
 
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .bindingCount = (uint32_t) ipipeline->descriptorSetLayoutBindings.size(),
+      .bindingCount = (uint32_t) bindingCount,
       .pBindings = ipipeline->descriptorSetLayoutBindings.data(),
     };
 
@@ -1816,7 +1819,7 @@ namespace gtl
     uint32_t firstGroup = 0;
     uint32_t dataSize = handleSize * groupCount;
 
-    GbSmallVector<uint8_t, 64> handleData(dataSize);
+    std::vector<uint8_t> handleData(dataSize);
     if (idevice->table.vkGetRayTracingShaderGroupHandlesKHR(idevice->logicalDevice, ipipeline->pipeline, firstGroup, groupCount, handleData.size(), handleData.data()) != VK_SUCCESS)
     {
       CGPU_RETURN_ERROR("failed to create sbt handles");
@@ -1886,11 +1889,13 @@ namespace gtl
     CGPU_RESOLVE_OR_RETURN_SHADER(createInfo.rgenShader, irgenShader);
 
     // Set up stages
-    GbSmallVector<VkPipelineShaderStageCreateInfo, 128> stages;
+    std::vector<VkPipelineShaderStageCreateInfo> stages;
+    stages.reserve(256);
+
     VkShaderStageFlags shaderStageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
     auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
-      VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {
+      VkPipelineShaderStageCreateInfo stageCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .pNext = nullptr,
         .flags = 0,
@@ -1899,7 +1904,7 @@ namespace gtl
         .pName = "main",
         .pSpecializationInfo = nullptr,
       };
-      stages.push_back(pipeline_shader_stage_create_info);
+      stages.push_back(stageCreateInfo);
     };
 
     // Ray gen
@@ -1947,12 +1952,12 @@ namespace gtl
     }
 
     // Set up groups
-    GbSmallVector<VkRayTracingShaderGroupCreateInfoKHR, 128> groups;
-    groups.resize(1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount);
+    size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups(groupCount);
 
     for (uint32_t i = 0; i < groups.size(); i++)
     {
-      VkRayTracingShaderGroupCreateInfoKHR sgCreateInfo = {
+      VkRayTracingShaderGroupCreateInfoKHR groupCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
         .pNext = nullptr,
         .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
@@ -1963,7 +1968,7 @@ namespace gtl
         .pShaderGroupCaptureReplayHandle = nullptr,
       };
 
-      groups[i] = sgCreateInfo;
+      groups[i] = groupCreateInfo;
     }
 
     bool anyNullClosestHitShader = false;
@@ -2533,7 +2538,8 @@ cleanup_fail:
     CGPU_RESOLVE_OR_RETURN_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_OR_RETURN_DEVICE(icommandBuffer->device, idevice);
 
-    GbSmallVector<VkImageMemoryBarrier2KHR, 64> barriers;
+    std::vector<VkImageMemoryBarrier2KHR> barriers;
+    barriers.reserve(64);
 
     /* FIXME: this has quadratic complexity */
     const CgpuShaderReflection* reflection = &ishader->reflection;
@@ -2647,15 +2653,17 @@ cleanup_fail:
     CGPU_RESOLVE_OR_RETURN_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_OR_RETURN_PIPELINE(pipeline, ipipeline);
 
-    GbSmallVector<VkDescriptorBufferInfo, 64> bufferInfos;
-    GbSmallVector<VkDescriptorImageInfo, 128> imageInfos;
+    GbSmallVector<VkDescriptorBufferInfo, 8> bufferInfos;
     GbSmallVector<VkWriteDescriptorSetAccelerationStructureKHR, 1> asInfos;
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.reserve(128);
 
     bufferInfos.reserve(bindings->bufferCount);
     imageInfos.reserve(bindings->imageCount + bindings->samplerCount);
     asInfos.reserve(bindings->tlasCount);
 
-    GbSmallVector<VkWriteDescriptorSet, 128> writeDescriptorSets;
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets;
+    writeDescriptorSets.reserve(128);
 
     /* FIXME: this has a rather high complexity */
     for (uint32_t i = 0; i < ipipeline->descriptorSetLayoutBindings.size(); i++)
@@ -3013,7 +3021,8 @@ cleanup_fail:
     CGPU_RESOLVE_OR_RETURN_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_OR_RETURN_DEVICE(icommandBuffer->device, idevice);
 
-    GbSmallVector<VkMemoryBarrier2KHR, 128> vkMemBarriers;
+    std::vector<VkMemoryBarrier2KHR> vkMemBarriers;
+    vkMemBarriers.reserve(128);
 
     for (uint32_t i = 0; i < barrier->memoryBarrierCount; ++i)
     {
@@ -3030,8 +3039,10 @@ cleanup_fail:
       vkMemBarriers.push_back(bVk);
     }
 
-    GbSmallVector<VkBufferMemoryBarrier2KHR, 32> vkBufferMemBarriers;
-    GbSmallVector<VkImageMemoryBarrier2KHR, 128> vkImageMemBarriers;
+    std::vector<VkBufferMemoryBarrier2KHR> vkBufferMemBarriers;
+    vkBufferMemBarriers.reserve(16);
+    std::vector<VkImageMemoryBarrier2KHR> vkImageMemBarriers;
+    vkImageMemBarriers.reserve(128);
 
     for (uint32_t i = 0; i < barrier->bufferBarrierCount; ++i)
     {

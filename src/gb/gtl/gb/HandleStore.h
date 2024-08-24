@@ -20,14 +20,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-
-#include "SmallVector.h"
+#include <vector>
 
 namespace gtl
 {
   class GbHandleStore
   {
   public:
+    GbHandleStore();
+
     uint64_t allocateHandle();
 
     bool isHandleValid(uint64_t handle) const;
@@ -36,7 +37,7 @@ namespace gtl
 
   private:
     uint32_t m_maxIndex = 0;
-    GbSmallVector<uint32_t, 1024> m_versions;
-    GbSmallVector<uint32_t, 64> m_freeList;
+    std::vector<uint32_t> m_versions;
+    std::vector<uint32_t> m_freeList;
   };
 }
