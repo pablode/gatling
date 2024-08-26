@@ -184,6 +184,11 @@ namespace gtl
     uint32_t sampleOffset = 0;
   };
 
+  struct GiInstancer
+  {
+    // TODO
+  };
+
   bool s_cgpuInitialized = false;
   CgpuDevice s_device;
   CgpuPhysicalDeviceFeatures s_deviceFeatures;
@@ -2042,5 +2047,15 @@ cleanup:
       cgpuDestroyBuffer(s_device, renderBuffer->stagingBuffer);
 
     delete renderBuffer;
+  }
+
+  GiInstancer* giCreateInstancer()
+  {
+    return new GiInstancer();
+  }
+
+  void giDestroyInstancer(GiInstancer* instancer)
+  {
+    delete instancer;
   }
 }

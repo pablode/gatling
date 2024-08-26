@@ -56,6 +56,7 @@ namespace gtl
   struct GiDiskLight;
   struct GiDomeLight;
   struct GiRenderBuffer;
+  struct GiInstancer;
 
   struct GiCameraDesc
   {
@@ -229,4 +230,7 @@ namespace gtl
 
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height);
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer);
+
+  GiInstancer* giCreateInstancer();
+  void giDestroyInstancer(GiInstancer* instancer);
 }
