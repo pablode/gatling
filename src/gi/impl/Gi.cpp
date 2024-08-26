@@ -91,9 +91,9 @@ namespace gtl
 
   struct GiBvh
   {
-    CgpuBuffer          blasPayloadsBuffer;
-    GiScene*            scene;
-    CgpuTlas            tlas;
+    CgpuBuffer blasPayloadsBuffer;
+    GiScene*   scene;
+    CgpuTlas   tlas;
   };
 
   struct GiShaderCache
@@ -117,9 +117,15 @@ namespace gtl
     McMaterial* mcMat;
   };
 
+  struct GiInstancer
+  {
+    std::vector<glm::mat4> transforms;
+  };
+
   struct GiMesh
   {
     GiMeshDataVariant data;
+    const GiInstancer* instancer;
     glm::mat3x4 transform;
     bool flipFacing;
     int id;
@@ -182,11 +188,6 @@ namespace gtl
     uint32_t height = 0;
     uint32_t size = 0;
     uint32_t sampleOffset = 0;
-  };
-
-  struct GiInstancer
-  {
-    // TODO
   };
 
   bool s_cgpuInitialized = false;
@@ -523,6 +524,7 @@ fail:
 
     GiMesh* mesh = new GiMesh {
       .data = std::move(cpuData),
+      .instancer = nullptr,
       .transform = glm::mat3x4(1.0f),
       .flipFacing = desc.isLeftHanded,
       .id = desc.id
@@ -2057,5 +2059,16 @@ cleanup:
   void giDestroyInstancer(GiInstancer* instancer)
   {
     delete instancer;
+  }
+
+  void giSetInstancerTransforms(GiInstancer* instancer, float (*transforms)[4][4], uint32_t transformCount)
+  {
+    instancer->transforms.resize(transformCount);
+    memcpy(instancer->transforms.data(), transforms, transformCount * 16 * 4);
+  }
+
+  void giSetMeshInstancer(GiMesh* mesh, const GiInstancer* instancer)
+  {
+    mesh->instancer = instancer;
   }
 }

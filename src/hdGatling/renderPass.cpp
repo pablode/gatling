@@ -213,7 +213,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       HdGatlingInstancer* instancer = static_cast<HdGatlingInstancer*>(boxedInstancer);
 
       const SdfPath& meshId = mesh->GetId();
-      transforms = instancer->ComputeInstanceTransforms(meshId);
+      //transforms = instancer->ComputeInstanceTransforms(meshId); // TODO: replace
     }
 
     const SdfPath& materialId = mesh->GetMaterialId();

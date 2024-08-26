@@ -173,6 +173,7 @@ namespace gtl
 
   GiMesh* giCreateMesh(const GiMeshDesc& desc);
   void giSetMeshTransform(GiMesh* mesh, float transform[3][4]);
+  void giSetMeshInstancer(GiMesh* mesh, const GiInstancer* instancer);
   void giDestroyMesh(GiMesh* mesh);
 
   GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params);
@@ -233,4 +234,5 @@ namespace gtl
 
   GiInstancer* giCreateInstancer();
   void giDestroyInstancer(GiInstancer* instancer);
+  void giSetInstancerTransforms(GiInstancer* instancer, float (*transforms)[4][4], uint32_t transformCount);
 }

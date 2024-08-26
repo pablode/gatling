@@ -18,6 +18,9 @@
 #pragma once
 
 #include <pxr/imaging/hd/instancer.h>
+#include <pxr/base/gf/matrix4f.h>
+
+#include <gtl/gi/Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -30,14 +33,17 @@ public:
   ~HdGatlingInstancer() override;
 
 public:
-  VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototypeId);
+  VtMatrix4fArray ComputeInstanceTransforms(const SdfPath& prototypeId);
 
   void Sync(HdSceneDelegate* sceneDelegate,
             HdRenderParam* renderParam,
             HdDirtyBits* dirtyBits) override;
 
+  gtl::GiInstancer* GetGiInstancer() { return _giInstancer; }
+
 private:
   TfHashMap<TfToken, VtValue, TfToken::HashFunctor> _primvarMap;
+  gtl::GiInstancer* _giInstancer = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

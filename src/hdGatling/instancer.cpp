@@ -28,10 +28,12 @@ HdGatlingInstancer::HdGatlingInstancer(HdSceneDelegate* delegate,
                                        const SdfPath& id)
   : HdInstancer(delegate, id)
 {
+  _giInstancer = gtl::giCreateInstancer();
 }
 
 HdGatlingInstancer::~HdGatlingInstancer()
 {
+  gtl::giDestroyInstancer(_giInstancer);
 }
 
 void HdGatlingInstancer::Sync(HdSceneDelegate* sceneDelegate,
@@ -40,15 +42,18 @@ void HdGatlingInstancer::Sync(HdSceneDelegate* sceneDelegate,
 {
   TF_UNUSED(renderParam);
 
-  _UpdateInstancer(sceneDelegate, dirtyBits);
-
   const SdfPath& id = GetId();
+  HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
+  HdInstancer::_SyncInstancerAndParents(renderIndex, id);
+
+  //_UpdateInstancer(sceneDelegate, dirtyBits);
 
   if (!HdChangeTracker::IsAnyPrimvarDirty(*dirtyBits, id))
   {
     return;
   }
 
+  // TODO: remove primvarMap member
   const HdPrimvarDescriptorVector& primvars = sceneDelegate->GetPrimvarDescriptors(id, HdInterpolation::HdInterpolationInstance);
 
   for (const HdPrimvarDescriptor& primvar : primvars)
@@ -78,6 +83,11 @@ void HdGatlingInstancer::Sync(HdSceneDelegate* sceneDelegate,
 
     _primvarMap[primName] = value;
   }
+
+  const VtMatrix4fArray& transforms = ComputeInstanceTransforms(id);
+  auto transformsPtr = (float(*)[4][4]) &transforms;
+
+  gtl::giSetInstancerTransforms(_giInstancer, transformsPtr, transforms.size());
 }
 
 namespace
@@ -89,7 +99,7 @@ namespace
   };
 }
 
-VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& prototypeId)
+VtMatrix4fArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& prototypeId)
 {
   HdSceneDelegate* sceneDelegate = GetDelegate();
 
@@ -160,7 +170,7 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
 
   const VtIntArray& instanceIndices = sceneDelegate->GetInstanceIndices(id, prototypeId);
 
-  VtMatrix4dArray transforms;
+  VtMatrix4fArray transforms;
   transforms.resize(instanceIndices.size());
 
   for (size_t i = 0; i < instanceIndices.size(); i++)
@@ -192,7 +202,7 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
       mat = temp * mat;
     }
 
-    transforms[i] = mat;
+    transforms[i] = GfMatrix4f(mat);
   }
 
   // Calculate instance transforms for all instancer instances.
@@ -207,9 +217,9 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
   HdInstancer* boxedParentInstancer = renderIndex.GetInstancer(parentId);
   HdGatlingInstancer* parentInstancer = static_cast<HdGatlingInstancer*>(boxedParentInstancer);
 
-  VtMatrix4dArray parentTransforms = parentInstancer->ComputeInstanceTransforms(id);
+  VtMatrix4fArray parentTransforms = parentInstancer->ComputeInstanceTransforms(id);
 
-  VtMatrix4dArray transformProducts;
+  VtMatrix4fArray transformProducts;
   transformProducts.resize(parentTransforms.size() * transforms.size());
 
   for (size_t i = 0; i < parentTransforms.size(); i++)

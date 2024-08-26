@@ -16,12 +16,12 @@
 //
 
 #include "mesh.h"
+#include "instancer.h"
 
 #include <pxr/base/gf/matrix4f.h>
 #include <pxr/imaging/hd/meshUtil.h>
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hd/smoothNormals.h>
-#include <pxr/imaging/hd/instancer.h>
 #include <pxr/imaging/hd/vtBufferSource.h>
 #include <pxr/usd/usdUtils/pipeline.h>
 
@@ -405,16 +405,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   const SdfPath& id = GetId();
 
-  if ((*dirtyBits & HdChangeTracker::DirtyInstancer) |
-      (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
-  {
-    _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
-
-    const SdfPath& instancerId = GetInstancerId();
-
-    HdInstancer::_SyncInstancerAndParents(renderIndex, instancerId);
-  }
-
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
   {
     const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
@@ -450,6 +440,19 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     };
 
     giSetMeshTransform(_giMesh, transform);
+  }
+
+  const SdfPath& instancerId = GetInstancerId();
+  _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
+
+  if (_giMesh && ((*dirtyBits & HdChangeTracker::DirtyInstancer) ||
+      (*dirtyBits & HdChangeTracker::DirtyInstanceIndex)))
+  {
+    HdInstancer* boxedInstancer = renderIndex.GetInstancer(instancerId);
+    HdGatlingInstancer* instancer = static_cast<HdGatlingInstancer*>(boxedInstancer);
+    GiInstancer* giInstancer = instancer->GetGiInstancer();
+
+    gtl::giSetMeshInstancer(_giMesh, giInstancer);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
