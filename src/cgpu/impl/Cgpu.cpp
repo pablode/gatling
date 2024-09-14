@@ -68,7 +68,7 @@ namespace gtl
     VkPhysicalDevice             physicalDevice;
     VkQueue                      computeQueue;
     VkCommandPool                commandPool;
-    VkQueryPool                  timestamp_pool;
+    VkQueryPool                  timestampPool;
     VolkDeviceTable              table;
     CgpuPhysicalDeviceFeatures   features;
     CgpuPhysicalDeviceProperties properties;
@@ -560,21 +560,22 @@ namespace gtl
     vkGetPhysicalDeviceFeatures(idevice->physicalDevice, &features);
     idevice->features = cgpuTranslatePhysicalDeviceFeatures(&features);
 
-    VkPhysicalDeviceAccelerationStructurePropertiesKHR asProperties = {};
-    asProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR;
-    asProperties.pNext = nullptr;
-
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties = {};
-    rtPipelineProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-    rtPipelineProperties.pNext = &asProperties;
-
-    VkPhysicalDeviceSubgroupProperties subgroupProperties = {};
-    subgroupProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-    subgroupProperties.pNext = &rtPipelineProperties;
-
-    VkPhysicalDeviceProperties2 deviceProperties = {};
-    deviceProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    deviceProperties.pNext = &subgroupProperties;
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR asProperties = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
+      .pNext = nullptr
+    };
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
+      .pNext = &asProperties
+    };
+    VkPhysicalDeviceSubgroupProperties subgroupProperties = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
+      .pNext = &rtPipelineProperties
+    };
+    VkPhysicalDeviceProperties2 deviceProperties = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+      .pNext = &subgroupProperties
+    };
 
     vkGetPhysicalDeviceProperties2(idevice->physicalDevice, &deviceProperties);
 
@@ -980,7 +981,7 @@ namespace gtl
       idevice->logicalDevice,
       &timestampPoolCreateInfo,
       nullptr,
-      &idevice->timestamp_pool
+      &idevice->timestampPool
     );
 
     if (result != VK_SUCCESS)
@@ -1036,7 +1037,7 @@ namespace gtl
     {
       iinstance->ideviceStore.free(handle);
 
-      idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestamp_pool, nullptr);
+      idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
       idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
@@ -1078,7 +1079,7 @@ namespace gtl
       idevice->table.vkDestroyPipelineCache(idevice->logicalDevice, idevice->pipelineCache, nullptr);
     }
 
-    idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestamp_pool, nullptr);
+    idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
     idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
 
     vmaDestroyAllocator(idevice->allocator);
@@ -3126,7 +3127,7 @@ cleanup_fail:
 
     idevice->table.vkCmdResetQueryPool(
       icommandBuffer->commandBuffer,
-      idevice->timestamp_pool,
+      idevice->timestampPool,
       offset,
       count
     );
@@ -3144,7 +3145,7 @@ cleanup_fail:
       icommandBuffer->commandBuffer,
       // FIXME: use correct pipeline flag bits
       VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR,
-      idevice->timestamp_pool,
+      idevice->timestampPool,
       timestampIndex
     );
 
@@ -3170,7 +3171,7 @@ cleanup_fail:
 
     idevice->table.vkCmdCopyQueryPoolResults(
       icommandBuffer->commandBuffer,
-      idevice->timestamp_pool,
+      idevice->timestampPool,
       offset,
       count,
       ibuffer->buffer,
