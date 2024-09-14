@@ -1061,7 +1061,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      CGPU_RETURN_ERROR("failed to create pipeline cache");
+      GB_ERROR("{}:{}: {}", __FILE__, __LINE__, "failed to create pipeline cache");
 
       idevice->pipelineCache = VK_NULL_HANDLE;
     }
