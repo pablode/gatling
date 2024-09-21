@@ -145,7 +145,12 @@ void _PatchMaterialXColor3Vector3Mismatches(HdMaterialNetwork2& network)
     {
       SdrShaderPropertyConstPtr sdrInput = sdrNode->GetShaderInput(input.first);
 
-      SdfValueTypeName inputType = sdrInput->GetTypeAsSdfType().first;
+      auto ndrSdfType = sdrInput->GetTypeAsSdfType();
+#if PXR_VERSION > 2408
+      SdfValueTypeName inputType = ndrSdfType.GetSdfType();
+#else
+      SdfValueTypeName inputType = ndrSdfType.first;
+#endif
       if (inputType == SdfValueTypeNames->Token)
       {
         continue;
@@ -173,7 +178,12 @@ void _PatchMaterialXColor3Vector3Mismatches(HdMaterialNetwork2& network)
           continue;
         }
 
-        SdfValueTypeName upstreamOutputType = upstreamSdrOutput->GetTypeAsSdfType().first;
+        auto upstreamNdrSdfType = upstreamSdrOutput->GetTypeAsSdfType();
+#if PXR_VERSION > 2408
+        SdfValueTypeName upstreamOutputType = upstreamNdrSdfType.GetSdfType();
+#else
+        SdfValueTypeName upstreamOutputType = upstreamNdrSdfType.first;
+#endif
         if (upstreamOutputType == SdfValueTypeNames->Token)
         {
           continue;

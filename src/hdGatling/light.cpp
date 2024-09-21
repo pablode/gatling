@@ -37,7 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace
 {
-  float _AreaEllipsoid(const GfMatrix4d& t, float radiusX, float radiusY, float radiusZ)
+  float _AreaEllipsoid(float radiusX, float radiusY, float radiusZ)
   {
     float ab = powf(radiusX * radiusY, 1.6f);
     float ac = powf(radiusX * radiusZ, 1.6f);
@@ -111,7 +111,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
-  const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
+  const GfMatrix4f transform(sceneDelegate->GetTransform(id));
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
@@ -129,7 +129,7 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
     VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
     bool normalize = boxedNormalize.GetWithDefault<bool>(false);
-    float area = _AreaEllipsoid(transform, radiusX, radiusY, radiusZ);
+    float area = _AreaEllipsoid(radiusX, radiusY, radiusZ);
     float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
     GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate, normalizeFactor);
 
@@ -168,8 +168,8 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
-    const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
-    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
+    const GfMatrix4f transform(sceneDelegate->GetTransform(id));
+    GfMatrix4f normalMatrix(transform.GetInverse().GetTranspose());
 
     GfVec3f dir = normalMatrix.TransformDir(GfVec3f(0.0f, 0.0f, -1.0f));
     dir.Normalize();
@@ -221,7 +221,7 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
-  const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
+  const GfMatrix4f transform(sceneDelegate->GetTransform(id));
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {
@@ -284,7 +284,7 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 {
   const SdfPath& id = GetId();
 
-  const GfMatrix4d& transform = sceneDelegate->GetTransform(id);
+  const GfMatrix4f transform(sceneDelegate->GetTransform(id));
 
   if (*dirtyBits & DirtyBits::DirtyTransform)
   {

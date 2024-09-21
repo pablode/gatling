@@ -17,6 +17,7 @@
 
 #include "mesh.h"
 
+#include <pxr/base/gf/matrix4f.h>
 #include <pxr/imaging/hd/meshUtil.h>
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hd/smoothNormals.h>
@@ -62,7 +63,7 @@ namespace
     _VertexAttr<float> bitangentSigns;
   };
 
-  GiVertex _MakeGiVertex(GfMatrix4d transform, GfMatrix4d normalMatrix, const GfVec3f& point, const GfVec3f& normal,
+  GiVertex _MakeGiVertex(const GfMatrix4f& transform, const GfMatrix4f& normalMatrix, const GfVec3f& point, const GfVec3f& normal,
                          const GfVec2f& texCoords, const GfVec3f& tangent, float bitangentSign)
   {
     GfVec3f newPoint = transform.Transform(point);
@@ -293,11 +294,11 @@ namespace
   }
 
   void _BakeMeshGeometry(_VertexStreams& s,
-                         const GfMatrix4d& transform,
+                         const GfMatrix4f& transform,
                          std::vector<GiFace>& faces,
                          std::vector<GiVertex>& vertices)
   {
-    GfMatrix4d normalMatrix = transform.GetInverse().GetTranspose();
+    GfMatrix4f normalMatrix(transform.GetInverse().GetTranspose());
 
     bool hasTexCoords = s.texCoords.array.size() > 0;
     bool calcTangents = s.tangents.array.empty();
@@ -786,7 +787,7 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 
   std::vector<GiFace> faces;
   std::vector<GiVertex> vertices;
-  _BakeMeshGeometry(s, GfMatrix4d(1.0), faces, vertices);
+  _BakeMeshGeometry(s, GfMatrix4f(1.0f), faces, vertices);
 
   TfToken orientation = topology.GetOrientation();
   bool isLeftHanded = (orientation == _tokens->leftHanded);
