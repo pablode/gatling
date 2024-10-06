@@ -376,10 +376,11 @@ namespace
 
 }
 
-HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
+HdGatlingMesh::HdGatlingMesh(const SdfPath& id, GiScene* scene)
   : HdMesh(id)
   , _color(0.0, 0.0, 0.0)
   , _hasColor(false)
+  , _giScene(scene)
 {
 }
 
@@ -451,8 +452,9 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     HdInstancer* boxedInstancer = renderIndex.GetInstancer(instancerId);
     HdGatlingInstancer* instancer = static_cast<HdGatlingInstancer*>(boxedInstancer);
     GiInstancer* giInstancer = instancer->GetGiInstancer();
+    //uint32_t instanceIndex = renderIndex.GetInstancerIndex(
 
-    gtl::giSetMeshInstancer(_giMesh, giInstancer);
+    gtl::giSetInstancerMesh(giInstancer, _giMesh, 0); // TODO: instancer index
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -801,7 +803,8 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     .id = GetPrimId(),
     .isLeftHanded = isLeftHanded,
     .vertexCount = (uint32_t) vertices.size(),
-    .vertices = vertices.data()
+    .vertices = vertices.data(),
+    .scene = _giScene
   };
   _giMesh = giCreateMesh(desc);
 }

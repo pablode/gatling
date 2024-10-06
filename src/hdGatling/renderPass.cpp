@@ -168,8 +168,7 @@ bool HdGatlingRenderPass::IsConverged() const
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
                                       std::vector<const GiMaterial*>& materials,
-                                      std::vector<const GiMesh*>& meshes,
-                                      std::vector<GiMeshInstance>& instances)
+                                      std::vector<const GiMesh*>& meshes)
 {
   _ClearMaterials();
 
@@ -278,7 +277,8 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
 
     meshes.push_back(giMesh);
 
-    for (size_t i = 0; i < transforms.size(); i++)
+    // TODO: move
+    /*for (size_t i = 0; i < transforms.size(); i++)
     {
       GfMatrix4d T = transforms[i];
 
@@ -293,7 +293,7 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       instance.mesh = giMesh;
       memcpy(instance.transform, instanceTransform, sizeof(instanceTransform));
       instances.push_back(instance);
-    }
+    }*/
   }
 }
 
@@ -414,8 +414,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     // FIXME: cache results for shader cache rebuild
     std::vector<const GiMaterial*> materials;
     std::vector<const GiMesh*> meshes;
-    std::vector<GiMeshInstance> instances;
-    _BakeMeshes(renderIndex, _rootMatrix, materials, meshes, instances);
+    _BakeMeshes(renderIndex, _rootMatrix, materials, meshes);
 
     if (rebuildShaderCache)
     {
@@ -451,8 +450,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       }
 
       GiBvhParams bvhParams = {
-        .meshInstanceCount = (uint32_t) instances.size(),
-        .meshInstances = instances.data(),
         .shaderCache = _shaderCache
       };
       _bvh = giCreateBvh(_scene, bvhParams);

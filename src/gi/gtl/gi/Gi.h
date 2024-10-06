@@ -47,7 +47,6 @@ namespace gtl
   struct GiBvh;
   struct GiMaterial;
   struct GiMesh;
-  struct GiMeshInstance;
   struct GiShaderCache;
   struct GiScene;
   struct GiSphereLight;
@@ -95,13 +94,7 @@ namespace gtl
     bool      isLeftHanded;
     uint32_t  vertexCount;
     GiVertex* vertices;
-  };
-
-  struct GiMeshInstance
-  {
-    const GiMaterial* material;
-    GiMesh* mesh;
-    float transform[3][4];
+    GiScene*  scene;
   };
 
   struct GiShaderCacheParams
@@ -120,8 +113,6 @@ namespace gtl
 
   struct GiBvhParams
   {
-    uint32_t              meshInstanceCount;
-    const GiMeshInstance* meshInstances;
     GiShaderCache*        shaderCache;
   };
 
@@ -173,7 +164,6 @@ namespace gtl
 
   GiMesh* giCreateMesh(const GiMeshDesc& desc);
   void giSetMeshTransform(GiMesh* mesh, float transform[3][4]);
-  void giSetMeshInstancer(GiMesh* mesh, const GiInstancer* instancer);
   void giDestroyMesh(GiMesh* mesh);
 
   GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params);
@@ -232,7 +222,8 @@ namespace gtl
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height);
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer);
 
-  GiInstancer* giCreateInstancer();
+  GiInstancer* giCreateInstancer(GiScene* scene);
   void giDestroyInstancer(GiInstancer* instancer);
   void giSetInstancerTransforms(GiInstancer* instancer, float (*transforms)[4][4], uint32_t transformCount);
+  void giSetInstancerMesh(GiInstancer* instancer, GiMesh* mesh, uint32_t index);
 }

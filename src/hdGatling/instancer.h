@@ -22,13 +22,19 @@
 
 #include <gtl/gi/Gi.h>
 
+namespace gtl
+{
+  struct GiScene;
+}
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdGatlingInstancer final : public HdInstancer
 {
 public:
   HdGatlingInstancer(HdSceneDelegate* delegate,
-                     const SdfPath& id);
+                     const SdfPath& id,
+                     gtl::GiScene* scene);
 
   ~HdGatlingInstancer() override;
 

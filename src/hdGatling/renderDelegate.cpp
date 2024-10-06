@@ -183,7 +183,7 @@ void HdGatlingRenderDelegate::CommitResources(HdChangeTracker* tracker)
 
 HdInstancer* HdGatlingRenderDelegate::CreateInstancer(HdSceneDelegate* delegate, const SdfPath& id)
 {
-  return new HdGatlingInstancer(delegate, id);
+  return new HdGatlingInstancer(delegate, id, _giScene);
 }
 
 void HdGatlingRenderDelegate::DestroyInstancer(HdInstancer* instancer)
@@ -216,7 +216,7 @@ HdRprim* HdGatlingRenderDelegate::CreateRprim(const TfToken& typeId, const SdfPa
 {
   if (typeId == HdPrimTypeTokens->mesh)
   {
-    return new HdGatlingMesh(rprimId);
+    return new HdGatlingMesh(rprimId, _giScene);
   }
 
   return nullptr;

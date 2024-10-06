@@ -25,10 +25,11 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingInstancer::HdGatlingInstancer(HdSceneDelegate* delegate,
-                                       const SdfPath& id)
+                                       const SdfPath& id,
+                                       gtl::GiScene* scene)
   : HdInstancer(delegate, id)
 {
-  _giInstancer = gtl::giCreateInstancer();
+  _giInstancer = gtl::giCreateInstancer(scene);
 }
 
 HdGatlingInstancer::~HdGatlingInstancer()
