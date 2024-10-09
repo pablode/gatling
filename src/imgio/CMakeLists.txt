@@ -12,6 +12,8 @@ add_library(
   impl/JpegDecoder.cpp
   impl/PngDecoder.h
   impl/PngDecoder.cpp
+  impl/TiffDecoder.h
+  impl/TiffDecoder.cpp
 )
 
 set_target_properties(
@@ -36,5 +38,6 @@ target_link_libraries(
     spng
     turbojpeg-static
     OpenEXR::OpenEXR
-    stb
+    stb # for HDR
+    tiff tiffxx
 )

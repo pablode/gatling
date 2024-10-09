@@ -20,6 +20,7 @@
 #include "JpegDecoder.h"
 #include "ExrDecoder.h"
 #include "HdrDecoder.h"
+#include "TiffDecoder.h"
 
 #include <stdlib.h>
 
@@ -42,6 +43,11 @@ namespace gtl
     if (r == ImgioError::UnsupportedEncoding)
     {
       r = ImgioHdrDecoder::decode(size, data, img);
+    }
+
+    if (r == ImgioError::UnsupportedEncoding)
+    {
+      r = ImgioTiffDecoder::decode(size, data, img);
     }
 
     return r;
