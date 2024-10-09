@@ -52,3 +52,6 @@
 [submodule "extern/doctest"]
 	path = extern/doctest
 	url = https://github.com/doctest/doctest.git
+[submodule "extern/libtiff"]
+	path = extern/libtiff
+	url = https://gitlab.com/libtiff/libtiff.git

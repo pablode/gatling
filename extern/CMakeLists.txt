@@ -104,6 +104,16 @@ set(CMAKE_INSTALL_DOCDIR "${CMAKE_CURRENT_BINARY_DIR}/doc" CACHE PATH "" FORCE)
 add_subdirectory(libjpeg-turbo)
 target_include_directories(turbojpeg-static PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libjpeg-turbo>)
 
+# libtiff
+#
+#
+set(tiff-tools OFF)
+set(tiff-tests OFF)
+set(tiff-contrib OFF)
+set(tiff-docs OFF)
+set(tiff-install OFF)
+add_subdirectory(libtiff)
+
 #
 # Imath
 #
