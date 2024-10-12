@@ -64,16 +64,17 @@ namespace gtl
 
   struct CgpuIDevice
   {
-    VkDevice                     logicalDevice;
-    VkPhysicalDevice             physicalDevice;
+    VmaAllocator                 allocator;
+    VmaPool                      asScratchMemoryPool;
     VkQueue                      computeQueue;
     VkCommandPool                commandPool;
-    VkQueryPool                  timestampPool;
-    VolkDeviceTable              table;
     CgpuPhysicalDeviceFeatures   features;
-    CgpuPhysicalDeviceProperties properties;
-    VmaAllocator                 allocator;
+    VkDevice                     logicalDevice;
+    VkPhysicalDevice             physicalDevice;
     VkPipelineCache              pipelineCache;
+    CgpuPhysicalDeviceProperties properties;
+    VolkDeviceTable              table;
+    VkQueryPool                  timestampPool;
   };
 
   struct CgpuIBuffer
@@ -526,6 +527,40 @@ namespace gtl
   {
     vkDestroyInstance(iinstance->instance, nullptr);
     iinstance.reset();
+  }
+
+  static VkResult cgpuCreateMemoryPool(VmaPool& pool,
+                                       VmaAllocator allocator,
+                                       VkBufferUsageFlags bufferUsage,
+                                       VmaMemoryUsage memoryUsage,
+                                       VkDeviceSize blockSize,
+                                       uint32_t allocationAlignment = 0)
+  {
+
+      VkBufferCreateInfo createInfoTemplate = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = 0x1000, // doesn't matter
+        .usage = bufferUsage
+      };
+
+      VmaAllocationCreateInfo allocCreateInfo = {
+        .usage = memoryUsage
+      };
+
+      uint32_t memTypeIndex;
+      VkResult result = vmaFindMemoryTypeIndexForBufferInfo(allocator, &createInfoTemplate,
+                                                            &allocCreateInfo, &memTypeIndex);
+      if (result != VK_SUCCESS)
+      {
+        return result;
+      }
+
+      VmaPoolCreateInfo poolCreateInfo = {
+        .memoryTypeIndex = memTypeIndex,
+        .blockSize = blockSize,
+        .minAllocationAlignment = allocationAlignment
+      };
+      return vmaCreatePool(allocator, &poolCreateInfo, &pool);
   }
 
   bool cgpuCreateDevice(CgpuDevice* device)
@@ -1044,6 +1079,24 @@ namespace gtl
       CGPU_RETURN_ERROR("failed to create vma allocator");
     }
 
+    result = cgpuCreateMemoryPool(idevice->asScratchMemoryPool, idevice->allocator,
+                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                                  VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                  8 * 1024 * 1024, // 8 MB, RTXMU default
+                                  idevice->properties.minAccelerationStructureScratchOffsetAlignment);
+
+    if (result != VK_SUCCESS)
+    {
+      iinstance->ideviceStore.free(handle);
+
+      vmaDestroyAllocator(idevice->allocator);
+      idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
+      idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
+      idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
+
+      CGPU_RETURN_ERROR("failed to create AS scratch memory pool");
+    }
+
     VkPipelineCacheCreateInfo cacheCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
       .pNext = nullptr,
@@ -1073,6 +1126,8 @@ namespace gtl
   bool cgpuDestroyDevice(CgpuDevice device)
   {
     CGPU_RESOLVE_OR_RETURN_DEVICE(device, idevice);
+
+    vmaDestroyPool(idevice->allocator, idevice->asScratchMemoryPool);
 
     if (idevice->pipelineCache != VK_NULL_HANDLE)
     {
@@ -1163,7 +1218,8 @@ namespace gtl
                                        uint64_t size,
                                        uint64_t alignment,
                                        CgpuIBuffer* ibuffer,
-                                       const char* debugName)
+                                       const char* debugName,
+                                       VmaPool memoryPool = VK_NULL_HANDLE)
   {
     VkBufferCreateInfo bufferInfo = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -1176,8 +1232,10 @@ namespace gtl
       .pQueueFamilyIndices = nullptr,
     };
 
-    VmaAllocationCreateInfo vmaAllocCreateInfo = {};
-    vmaAllocCreateInfo.requiredFlags = (VkMemoryPropertyFlags) memoryProperties;
+    VmaAllocationCreateInfo allocCreateInfo = {
+      .requiredFlags = (VkMemoryPropertyFlags) memoryProperties,
+      .pool = memoryPool
+    };
 
     VkResult result;
     if (alignment > 0)
@@ -1185,7 +1243,7 @@ namespace gtl
       result = vmaCreateBufferWithAlignment(
         idevice->allocator,
         &bufferInfo,
-        &vmaAllocCreateInfo,
+        &allocCreateInfo,
         alignment,
         &ibuffer->buffer,
         &ibuffer->allocation,
@@ -1197,7 +1255,7 @@ namespace gtl
       result = vmaCreateBuffer(
         idevice->allocator,
         &bufferInfo,
-        &vmaAllocCreateInfo,
+        &allocCreateInfo,
         &ibuffer->buffer,
         &ibuffer->allocation,
         nullptr
@@ -2177,7 +2235,8 @@ cleanup_fail:
                                   CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                                   asBuildSizesInfo.buildScratchSize,
                                   idevice->properties.minAccelerationStructureScratchOffsetAlignment,
-                                  &iscratchBuffer, "[AS scratch buffer]"))
+                                  &iscratchBuffer, "[AS scratch buffer]",
+                                  idevice->asScratchMemoryPool))
     {
       cgpuDestroyIBuffer(idevice, iasBuffer);
       idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, *as, nullptr);
