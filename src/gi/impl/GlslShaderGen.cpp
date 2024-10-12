@@ -176,20 +176,20 @@ namespace gtl
 
   bool GiGlslShaderGen::generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    auto dfFlags = MC_DF_FLAG_SCATTERING | MC_DF_FLAG_VOLUME_ABSORPTION | MC_DF_FLAG_VOLUME_SCATTERING | MC_DF_FLAG_IOR;
+    auto dfFlags = McDfFlags::Scattering | McDfFlags::VolumeAbsorption | McDfFlags::VolumeScattering | McDfFlags::Ior;
 
     if (material.isEmissive)
     {
-      dfFlags |= MC_DF_FLAG_EMISSION | MC_DF_FLAG_EMISSION_INTENSITY;
+      dfFlags |= McDfFlags::Emission | McDfFlags::EmissionIntensity;
     }
 
     if (material.isThinWalled)
     {
-      dfFlags |= MC_DF_FLAG_THIN_WALLED | MC_DF_FLAG_BACKFACE_SCATTERING;
+      dfFlags |= McDfFlags::ThinWalled | McDfFlags::BackfaceScattering;
 
       if (material.isEmissive)
       {
-        dfFlags |= MC_DF_FLAG_BACKFACE_EMISSION | MC_DF_FLAG_BACKFACE_EMISSION_INTENSITY;
+        dfFlags |= McDfFlags::BackfaceEmission | McDfFlags::BackfaceEmissionIntensity;
       }
     }
 
@@ -204,7 +204,7 @@ namespace gtl
 
   bool GiGlslShaderGen::generateMaterialOpacityGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    McDfFlags dfFlags = MC_DF_FLAG_CUTOUT_OPACITY;
+    McDfFlags dfFlags = McDfFlags::CutoutOpacity;
 
     McGlslGenResult genResult;
     if (!m_mcBackend->genGlsl(*material.mdlMaterial, dfFlags, genResult))

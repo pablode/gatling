@@ -35,7 +35,7 @@ namespace fs = std::filesystem;
 
 namespace gtl
 {
-  const static std::array<mi::neuraylib::Target_function_description, MC_DF_FLAG_COUNT> FUNC_DESCS = {
+  const static std::array<mi::neuraylib::Target_function_description, size_t(McDfFlags::FLAG_COUNT)> FUNC_DESCS = {
     mi::neuraylib::Target_function_description("surface.scattering", "mdl_bsdf_scattering"),
     mi::neuraylib::Target_function_description("surface.emission.emission", "mdl_edf_emission"),
     mi::neuraylib::Target_function_description("surface.emission.intensity", "mdl_edf_emission_intensity"),
@@ -260,11 +260,11 @@ namespace gtl
 
   bool McBackend::genGlsl(const McMdlMaterial& material, McDfFlags dfFlags, McGlslGenResult& result)
   {
-    GbSmallVector<mi::neuraylib::Target_function_description, MC_DF_FLAG_COUNT> fDescs;
+    GbSmallVector<mi::neuraylib::Target_function_description, size_t(McDfFlags::FLAG_COUNT)> fDescs;
 
-    for (size_t i = 0; i < MC_DF_FLAG_COUNT; i++)
+    for (size_t i = 0; i < size_t(McDfFlags::FLAG_COUNT); i++)
     {
-      if (dfFlags & (1 << i))
+      if (size_t(dfFlags) & (1 << i))
       {
         fDescs.push_back(FUNC_DESCS[i]);
       }

@@ -22,6 +22,8 @@
 #include <vector>
 #include <memory>
 
+#include <gtl/gb/Enum.h>
+
 namespace gtl
 {
   class McRuntime;
@@ -45,21 +47,22 @@ namespace gtl
     std::vector<McTextureDescription> textureDescriptions;
   };
 
-  enum McDfFlags
+  enum class McDfFlags
   {
-    MC_DF_FLAG_SCATTERING                  = (1 <<  0),
-    MC_DF_FLAG_EMISSION                    = (1 <<  1),
-    MC_DF_FLAG_EMISSION_INTENSITY          = (1 <<  2),
-    MC_DF_FLAG_THIN_WALLED                 = (1 <<  3),
-    MC_DF_FLAG_VOLUME_ABSORPTION           = (1 <<  4),
-    MC_DF_FLAG_VOLUME_SCATTERING           = (1 <<  5),
-    MC_DF_FLAG_CUTOUT_OPACITY              = (1 <<  6),
-    MC_DF_FLAG_IOR                         = (1 <<  7),
-    MC_DF_FLAG_BACKFACE_SCATTERING         = (1 <<  8),
-    MC_DF_FLAG_BACKFACE_EMISSION           = (1 <<  9),
-    MC_DF_FLAG_BACKFACE_EMISSION_INTENSITY = (1 << 10),
-    MC_DF_FLAG_COUNT                       = 11
+    Scattering                = (1 <<  0),
+    Emission                  = (1 <<  1),
+    EmissionIntensity         = (1 <<  2),
+    ThinWalled                = (1 <<  3),
+    VolumeAbsorption          = (1 <<  4),
+    VolumeScattering          = (1 <<  5),
+    CutoutOpacity             = (1 <<  6),
+    Ior                       = (1 <<  7),
+    BackfaceScattering        = (1 <<  8),
+    BackfaceEmission          = (1 <<  9),
+    BackfaceEmissionIntensity = (1 << 10),
+    FLAG_COUNT                = 11
   };
+  GB_DECLARE_ENUM_BITOPS(McDfFlags)
 
   class McBackend
   {
