@@ -21,6 +21,6 @@
 
 namespace gtl
 {
-  template<typename T, int C>
+  template<typename T, size_t C>
   using GbSmallVector = std::vector<T>;
 }
