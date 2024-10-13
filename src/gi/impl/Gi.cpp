@@ -173,6 +173,7 @@ namespace gtl
     CgpuImage fallbackDomeLightTexture;
     std::unordered_set<GiBvh*> bvhs;
     std::unordered_set<GiMesh*> meshes;
+    std::mutex mutex;
   };
 
   struct GiRenderBuffer
@@ -528,7 +529,10 @@ fail:
       .scene = scene
     };
 
-    scene->meshes.insert(mesh);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->meshes.insert(mesh);
+    }
     return mesh;
   }
 
@@ -549,7 +553,12 @@ fail:
       cgpuDestroyBlas(s_device, data->blas);
       cgpuDestroyBuffer(s_device, data->payloadBuffer);
     }
-    mesh->scene->meshes.erase(mesh);
+
+    GiScene* scene = mesh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->meshes.erase(mesh);
+    }
     delete mesh;
   }
 
@@ -864,7 +873,10 @@ fail_cleanup:
     bvh->scene = scene;
     bvh->tlas = tlas;
 
-    scene->bvhs.insert(bvh);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->bvhs.insert(bvh);
+    }
 
 cleanup:
     if (!bvh)
@@ -884,10 +896,14 @@ cleanup:
 
   void giDestroyBvh(GiBvh* bvh)
   {
-    bvh->scene->bvhs.erase(bvh);
-
     cgpuDestroyTlas(s_device, bvh->tlas);
     cgpuDestroyBuffer(s_device, bvh->blasPayloadsBuffer);
+
+    GiScene* scene = bvh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->bvhs.erase(bvh);
+    }
     delete bvh;
   }
 
@@ -1716,6 +1732,8 @@ cleanup:
 
   GiSphereLight* giCreateSphereLight(GiScene* scene)
   {
+    std::lock_guard guard(scene->mutex);
+
     auto* light = new GiSphereLight;
     light->scene = scene;
     light->gpuHandle = scene->sphereLights.allocate();
@@ -1740,6 +1758,8 @@ cleanup:
 
   void giDestroySphereLight(GiScene* scene, GiSphereLight* light)
   {
+    std::lock_guard guard(scene->mutex);
+
     scene->sphereLights.free(light->gpuHandle);
     delete light;
   }
@@ -1790,6 +1810,8 @@ cleanup:
 
   GiDistantLight* giCreateDistantLight(GiScene* scene)
   {
+    std::lock_guard guard(scene->mutex);
+
     auto* light = new GiDistantLight;
     light->scene = scene;
     light->gpuHandle = scene->distantLights.allocate();
@@ -1812,6 +1834,8 @@ cleanup:
 
   void giDestroyDistantLight(GiScene* scene, GiDistantLight* light)
   {
+    std::lock_guard guard(scene->mutex);
+
     scene->distantLights.free(light->gpuHandle);
     delete light;
   }
@@ -1858,6 +1882,8 @@ cleanup:
 
   GiRectLight* giCreateRectLight(GiScene* scene)
   {
+    std::lock_guard guard(scene->mutex);
+
     auto* light = new GiRectLight;
     light->scene = scene;
     light->gpuHandle = scene->rectLights.allocate();
@@ -1884,6 +1910,8 @@ cleanup:
 
   void giDestroyRectLight(GiScene* scene, GiRectLight* light)
   {
+    std::lock_guard guard(scene->mutex);
+
     scene->rectLights.free(light->gpuHandle);
     delete light;
   }
@@ -1938,6 +1966,8 @@ cleanup:
 
   GiDiskLight* giCreateDiskLight(GiScene* scene)
   {
+    std::lock_guard guard(scene->mutex);
+
     auto* light = new GiDiskLight;
     light->scene = scene;
     light->gpuHandle = scene->diskLights.allocate();
@@ -1964,6 +1994,8 @@ cleanup:
 
   void giDestroyDiskLight(GiScene* scene, GiDiskLight* light)
   {
+    std::lock_guard guard(scene->mutex);
+
     scene->diskLights.free(light->gpuHandle);
     delete light;
   }
@@ -2018,6 +2050,8 @@ cleanup:
 
   GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)
   {
+    std::lock_guard guard(scene->mutex);
+
     auto* light = new GiDomeLight;
     light->scene = scene;
     light->textureFilePath = filePath;
@@ -2026,6 +2060,7 @@ cleanup:
 
   void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
   {
+    std::lock_guard guard(scene->mutex);
     delete light;
   }
 
