@@ -37,7 +37,6 @@ public:
   HdGatlingRenderPass(HdRenderIndex* index,
                       const HdRprimCollection& collection,
                       const HdRenderSettingsMap& settings,
-                      const MaterialNetworkCompiler& materialNetworkCompiler,
                       GiScene* scene);
 
   ~HdGatlingRenderPass() override;
@@ -52,20 +51,14 @@ protected:
 private:
   void _BakeMeshes(HdRenderIndex* renderIndex,
                    GfMatrix4d rootTransform,
-                   std::vector<const GiMaterial*>& materials,
                    std::vector<const GiMesh*>& meshes,
                    std::vector<GiMeshInstance>& instances);
 
   void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const;
 
-  void _ClearMaterials();
-
 private:
   GiScene* _scene;
   const HdRenderSettingsMap& _settings;
-  const MaterialNetworkCompiler& _materialNetworkCompiler;
-  GiMaterial* _defaultMaterial;
-  std::vector<GiMaterial*> _materials;
   bool _isConverged;
   uint32_t _lastSceneStateVersion;
   uint32_t _lastSprimIndexVersion;

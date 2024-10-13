@@ -20,9 +20,7 @@
 #include "renderParam.h"
 #include "mesh.h"
 #include "instancer.h"
-#include "material.h"
 #include "tokens.h"
-#include "materialNetworkCompiler.h"
 
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>
@@ -53,26 +51,6 @@ namespace
 #endif
     { HdAovTokens->primId,                   GiAovId::ObjectId     },
   };
-
-  std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* name)
-  {
-    // Prefer UsdPreviewSurface over MDL diffuse or unlit because we want to give a good first
-    // impression (many people will try Pixar's Kitchen scene first), regardless of whether the user
-    // is aware of the use or purpose of the displayColor attribute (as opposed to a preview material).
-    static const char* USDPREVIEWSURFACE_MTLX_DOC = R"(
-      <?xml version="1.0"?>
-      <materialx version="1.38">
-        <UsdPreviewSurface name="gatling_SR_%s" type="surfaceshader">
-          <input name="diffuseColor" type="color3" value="%f, %f, %f" />
-        </UsdPreviewSurface>
-        <surfacematerial name="gatling_MAT_%s" type="material">
-          <input name="surfaceshader" type="surfaceshader" nodename="gatling_SR_%s" />
-        </surfacematerial>
-      </materialx>
-    )";
-
-    return TfStringPrintf(USDPREVIEWSURFACE_MTLX_DOC, name, color[0], color[1], color[2], name, name);
-  }
 
   const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVector& aovBindings)
   {
@@ -115,12 +93,10 @@ namespace
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
                                          const HdRprimCollection& collection,
                                          const HdRenderSettingsMap& settings,
-                                         const MaterialNetworkCompiler& materialNetworkCompiler,
                                          GiScene* scene)
   : HdRenderPass(index, collection)
   , _scene(scene)
   , _settings(settings)
-  , _materialNetworkCompiler(materialNetworkCompiler)
   , _isConverged(false)
   , _lastSceneStateVersion(UINT32_MAX)
   , _lastSprimIndexVersion(UINT32_MAX)
@@ -129,20 +105,6 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , _bvh(nullptr)
   , _shaderCache(nullptr)
 {
-  auto defaultDiffuseColor = GfVec3f(0.18f); // UsdPreviewSurface spec
-  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(defaultDiffuseColor, "invalid");
-
-  _defaultMaterial = giCreateMaterialFromMtlxStr(defaultMatSrc.c_str());
-  TF_AXIOM(_defaultMaterial);
-}
-
-void HdGatlingRenderPass::_ClearMaterials()
-{
-  for (GiMaterial* mat : _materials)
-  {
-    giDestroyMaterial(mat);
-  }
-  _materials.clear();
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
@@ -155,9 +117,6 @@ HdGatlingRenderPass::~HdGatlingRenderPass()
   {
     giDestroyShaderCache(_shaderCache);
   }
-
-  giDestroyMaterial(_defaultMaterial);
-  _ClearMaterials();
 }
 
 bool HdGatlingRenderPass::IsConverged() const
@@ -167,28 +126,15 @@ bool HdGatlingRenderPass::IsConverged() const
 
 void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
                                       GfMatrix4d rootTransform,
-                                      std::vector<const GiMaterial*>& materials,
                                       std::vector<const GiMesh*>& meshes,
                                       std::vector<GiMeshInstance>& instances)
 {
-  _ClearMaterials();
-
-  TfHashMap<std::string, uint32_t, TfHash> materialMap;
-  materialMap[""] = 0;
-
-  materials.push_back(_defaultMaterial);
-
   for (const auto& rprimId : renderIndex->GetRprimIds())
   {
     const HdRprim* rprim = renderIndex->GetRprim(rprimId);
 
     const HdGatlingMesh* mesh = static_cast<const HdGatlingMesh*>(rprim);
-    if (!mesh)
-    {
-      continue;
-    }
-
-    if (!mesh->IsVisible())
+    if (!mesh || !mesh->IsVisible())
     {
       continue;
     }
@@ -216,66 +162,6 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       transforms = instancer->ComputeInstanceTransforms(meshId);
     }
 
-    const SdfPath& materialId = mesh->GetMaterialId();
-    std::string materialIdStr = materialId.GetAsString();
-
-    uint32_t materialIndex = 0;
-    if (!materialId.IsEmpty() && materialMap.find(materialIdStr) != materialMap.end())
-    {
-      materialIndex = materialMap[materialIdStr];
-    }
-    else
-    {
-      HdSprim* sprim = renderIndex->GetSprim(HdPrimTypeTokens->material, materialId);
-      HdGatlingMaterial* material = static_cast<HdGatlingMaterial*>(sprim);
-
-      GiMaterial* giMat = nullptr;
-      if (material)
-      {
-        const HdMaterialNetwork2* network = material->GetNetwork();
-
-        if (network)
-        {
-          giMat = _materialNetworkCompiler.CompileNetwork(sprim->GetId(), *network);
-
-          if (giMat)
-          {
-            _materials.push_back(giMat);
-          }
-        }
-      }
-
-      if (!giMat && mesh->HasColor())
-      {
-        // Try to reuse color material by including the RGB value in the name
-        const GfVec3f& color = mesh->GetColor();
-        materialIdStr = TfStringPrintf("color_%f_%f_%f", color[0], color[1], color[2]);
-        std::replace(materialIdStr.begin(), materialIdStr.end(), '.', '_'); // _1.9_ -> _1_9_
-
-        if (materialMap.find(materialIdStr) != materialMap.end())
-        {
-          materialIndex = materialMap[materialIdStr];
-        }
-        else
-        {
-          std::string colorMatSrc = _MakeMaterialXColorMaterialSrc(color, materialIdStr.c_str());
-          GiMaterial* giColorMat = giCreateMaterialFromMtlxStr(colorMatSrc.c_str());
-          if (giColorMat)
-          {
-            _materials.push_back(giColorMat);
-            giMat = giColorMat;
-          }
-        }
-      }
-
-      if (giMat)
-      {
-        materialIndex = materials.size();
-        materials.push_back(giMat);
-        materialMap[materialIdStr] = materialIndex;
-      }
-    }
-
     meshes.push_back(giMesh);
 
     for (size_t i = 0; i < transforms.size(); i++)
@@ -289,7 +175,6 @@ void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
       };
 
       GiMeshInstance instance;
-      instance.material = materials[materialIndex];
       instance.mesh = giMesh;
       memcpy(instance.transform, instanceTransform, sizeof(instanceTransform));
       instances.push_back(instance);
@@ -412,10 +297,9 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     _rootMatrix = GfMatrix4d(1.0);// viewMatrix;
 
     // FIXME: cache results for shader cache rebuild
-    std::vector<const GiMaterial*> materials;
     std::vector<const GiMesh*> meshes;
     std::vector<GiMeshInstance> instances;
-    _BakeMeshes(renderIndex, _rootMatrix, materials, meshes, instances);
+    _BakeMeshes(renderIndex, _rootMatrix, meshes, instances);
 
     if (rebuildShaderCache)
     {
@@ -431,8 +315,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
         .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
         .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
         .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
-        .materialCount = (uint32_t) materials.size(),
-        .materials = materials.data(),
         .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
         .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
         .scene = _scene,

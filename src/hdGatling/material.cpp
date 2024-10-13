@@ -16,6 +16,7 @@
 //
 
 #include "material.h"
+#include "materialNetworkCompiler.h"
 
 #include <gtl/gi/Gi.h>
 
@@ -23,13 +24,20 @@ using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id)
+HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id,
+                                     const MaterialNetworkCompiler& materialNetworkCompiler)
   : HdMaterial(id)
+  , _materialNetworkCompiler(materialNetworkCompiler)
 {
 }
 
 HdGatlingMaterial::~HdGatlingMaterial()
 {
+  if (_giMaterial)
+  {
+    giDestroyMaterial(_giMaterial);
+    _giMaterial = nullptr;
+  }
 }
 
 HdDirtyBits HdGatlingMaterial::GetInitialDirtyBitsMask() const
@@ -57,7 +65,11 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
 
   if (!resource.IsHolding<HdMaterialNetworkMap>())
   {
-    _network.reset();
+    if (_giMaterial)
+    {
+      giDestroyMaterial(_giMaterial);
+      _giMaterial = nullptr;
+    }
     return;
   }
 
@@ -68,19 +80,23 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   if (isVolume)
   {
     TF_WARN("Volume %s unsupported", id.GetText());
-    _network.reset();
+
+    if (_giMaterial)
+    {
+      giDestroyMaterial(_giMaterial);
+      _giMaterial = nullptr;
+    }
     return;
   }
 
-  _network = std::make_unique<HdMaterialNetwork2>();
-  *_network = network;
+  _giMaterial = _materialNetworkCompiler.CompileNetwork(id, network);
 
   giInvalidateShaderCache(); // FIXME: track dirty state in RenderParam
 }
 
-const HdMaterialNetwork2* HdGatlingMaterial::GetNetwork() const
+const GiMaterial* HdGatlingMaterial::GetGiMaterial() const
 {
-  return _network.get();
+  return _giMaterial;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

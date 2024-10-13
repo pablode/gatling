@@ -23,6 +23,8 @@
 namespace gtl
 {
   struct GiMesh;
+  struct GiMaterial;
+  struct GiScene;
 }
 
 using namespace gtl;
@@ -32,7 +34,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdGatlingMesh final : public HdMesh
 {
 public:
-  HdGatlingMesh(const SdfPath& id);
+  HdGatlingMesh(const SdfPath& id,
+                GiScene* scene,
+                const GiMaterial* defaultMaterial);
 
   ~HdGatlingMesh() override;
 
@@ -77,6 +81,8 @@ private:
   GiMesh* _giMesh = nullptr;
   GfVec3f _color;
   bool _hasColor = false;
+  GiScene* _scene;
+  const GiMaterial* _defaultMaterial;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
