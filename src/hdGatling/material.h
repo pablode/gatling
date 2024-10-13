@@ -20,12 +20,20 @@
 #include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/sceneDelegate.h>
 
+namespace gtl
+{
+  struct GiMaterial;
+}
+
 PXR_NAMESPACE_OPEN_SCOPE
+
+class MaterialNetworkCompiler;
 
 class HdGatlingMaterial final : public HdMaterial
 {
 public:
-  HdGatlingMaterial(const SdfPath& id);
+  HdGatlingMaterial(const SdfPath& id,
+                    const MaterialNetworkCompiler& materialNetworkCompiler);
 
   ~HdGatlingMaterial() override;
 
@@ -37,10 +45,11 @@ public:
             HdDirtyBits* dirtyBits) override;
 
 public:
-  const HdMaterialNetwork2* GetNetwork() const;
+  const gtl::GiMaterial* GetGiMaterial() const;
 
 private:
-  std::unique_ptr<HdMaterialNetwork2> _network;
+  const MaterialNetworkCompiler& _materialNetworkCompiler;
+  gtl::GiMaterial* _giMaterial = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

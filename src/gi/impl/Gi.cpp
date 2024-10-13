@@ -123,6 +123,8 @@ namespace gtl
     glm::mat3x4 transform;
     bool flipFacing;
     int id;
+    const GiMaterial* material;
+    GiScene* scene;
   };
 
   struct GiSphereLight
@@ -170,6 +172,7 @@ namespace gtl
     glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
     CgpuImage fallbackDomeLightTexture;
     std::unordered_set<GiBvh*> bvhs;
+    std::unordered_set<GiMesh*> meshes;
   };
 
   struct GiRenderBuffer
@@ -509,7 +512,7 @@ fail:
     return offset;
   }
 
-  GiMesh* giCreateMesh(const GiMeshDesc& desc)
+  GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc)
   {
     GiMeshCpuData cpuData = {
       .faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]),
@@ -520,14 +523,23 @@ fail:
       .data = std::move(cpuData),
       .transform = glm::mat3x4(1.0f),
       .flipFacing = desc.isLeftHanded,
-      .id = desc.id
+      .material = nullptr,
+      .id = desc.id,
+      .scene = scene
     };
+
+    scene->meshes.insert(mesh);
     return mesh;
   }
 
   void giSetMeshTransform(GiMesh* mesh, float transform[3][4])
   {
     memcpy(glm::value_ptr(mesh->transform), transform, sizeof(float) * 12);
+  }
+
+  void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat)
+  {
+    mesh->material = mat;
   }
 
   void giDestroyMesh(GiMesh* mesh)
@@ -537,6 +549,8 @@ fail:
       cgpuDestroyBlas(s_device, data->blas);
       cgpuDestroyBuffer(s_device, data->payloadBuffer);
     }
+    mesh->scene->meshes.erase(mesh);
+    delete mesh;
   }
 
   void _giBuildGeometryStructures(const GiBvhParams& params,
@@ -555,7 +569,7 @@ fail:
       GiShaderCache* shaderCache = params.shaderCache;
       for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
       {
-          if (shaderCache->materials[i] == instance->material)
+          if (shaderCache->materials[i] == mesh->material)
           {
               materialIndex = i;
               break;
@@ -902,7 +916,14 @@ cleanup:
 
     GiScene* scene = params.scene;
 
-    GB_LOG("material count: {}", params.materialCount);
+    std::vector<const GiMaterial*> materials;
+    materials.reserve(scene->meshes.size());
+    for (auto* m : scene->meshes)
+    {
+      materials.push_back(m->material);
+    }
+
+    GB_LOG("material count: {}", materials.size());
     GB_LOG("creating shader cache..");
     fflush(stdout);
 
@@ -963,13 +984,13 @@ cleanup:
       };
 
       std::vector<HitGroupCompInfo> hitGroupCompInfos;
-      hitGroupCompInfos.resize(params.materialCount);
+      hitGroupCompInfos.resize(materials.size());
 
       std::atomic_bool threadWorkFailed = false;
 #pragma omp parallel for
       for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
       {
-        const McMaterial* material = params.materials[i]->mcMat;
+        const McMaterial* material = materials[i]->mcMat;
 
         HitGroupCompInfo groupInfo;
         {
@@ -1041,7 +1062,7 @@ cleanup:
 #pragma omp parallel for
       for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
       {
-        const McMaterial* material = params.materials[i]->mcMat;
+        const McMaterial* material = materials[i]->mcMat;
 
         HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
@@ -1188,7 +1209,7 @@ cleanup:
         .commonParams = commonParams,
         .depthOfField = params.depthOfField,
         .filterImportanceSampling = params.filterImportanceSampling,
-        .materialCount = params.materialCount,
+        .materialCount = uint32_t(materials.size()),
         .nextEventEstimation = nextEventEstimation,
         .progressiveAccumulation = params.progressiveAccumulation,
         .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
@@ -1292,10 +1313,10 @@ cleanup:
     cache->hitShaders = std::move(hitShaders);
     cache->images2d = std::move(images2d);
     cache->images3d = std::move(images3d);
-    cache->materials.resize(params.materialCount);
-    for (uint32_t i = 0; i < params.materialCount; i++)
+    cache->materials.resize(materials.size());
+    for (uint32_t i = 0; i < cache->materials.size(); i++)
     {
-      cache->materials[i] = params.materials[i];
+      cache->materials[i] = materials[i];
     }
     cache->missShaders = missShaders;
     cache->pipeline = pipeline;

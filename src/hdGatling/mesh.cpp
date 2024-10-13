@@ -16,6 +16,7 @@
 //
 
 #include "mesh.h"
+#include "material.h"
 
 #include <pxr/base/gf/matrix4f.h>
 #include <pxr/imaging/hd/meshUtil.h>
@@ -376,10 +377,14 @@ namespace
 
 }
 
-HdGatlingMesh::HdGatlingMesh(const SdfPath& id)
+HdGatlingMesh::HdGatlingMesh(const SdfPath& id,
+                             GiScene* scene,
+                             const GiMaterial* defaultMaterial)
   : HdMesh(id)
   , _color(0.0, 0.0, 0.0)
   , _hasColor(false)
+  , _scene(scene)
+  , _defaultMaterial(defaultMaterial)
 {
 }
 
@@ -415,15 +420,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     HdInstancer::_SyncInstancerAndParents(renderIndex, instancerId);
   }
 
-  if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
-  {
-    const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
-
-    SetMaterialId(materialId);
-
-    giInvalidateGeomCache(); // FIXME: remove this hack
-  }
-
   if (*dirtyBits & HdChangeTracker::DirtyVisibility)
   {
     _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
@@ -436,7 +432,15 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   if (updateGeometry)
   {
+    if (_giMesh)
+    {
+      giDestroyMesh(_giMesh);
+      _giMesh = nullptr;
+    }
+
     _CreateGiMesh(sceneDelegate);
+
+    (*dirtyBits) |= HdChangeTracker::DirtyMaterialId; // force material assignment
   }
 
   if (_giMesh && (*dirtyBits & HdChangeTracker::DirtyTransform))
@@ -450,6 +454,27 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     };
 
     giSetMeshTransform(_giMesh, transform);
+  }
+
+  if (_giMesh && (*dirtyBits & HdChangeTracker::DirtyMaterialId))
+  {
+    const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
+
+    SetMaterialId(materialId);
+
+    // Because Hydra syncs Rprims last, it is guaranteed that the material has been processed
+    auto* materialPrim = static_cast<HdGatlingMaterial*>(renderIndex.GetSprim(HdPrimTypeTokens->material, materialId));
+
+    const GiMaterial* giMat = materialPrim ? materialPrim->GetGiMaterial() : nullptr;
+
+    if (!giMat)
+    {
+      giMat = _defaultMaterial;
+    }
+
+    giSetMeshMaterial(_giMesh, giMat);
+
+    giInvalidateGeomCache(); // FIXME: remove this hack
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -800,7 +825,7 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     .vertexCount = (uint32_t) vertices.size(),
     .vertices = vertices.data()
   };
-  _giMesh = giCreateMesh(desc);
+  _giMesh = giCreateMesh(_scene, desc);
 }
 
 GiMesh* HdGatlingMesh::GetGiMesh() const

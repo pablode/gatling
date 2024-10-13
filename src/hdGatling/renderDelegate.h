@@ -110,6 +110,7 @@ private:
   HdRenderSettingDescriptorList _debugSettingDescriptors;
   std::unique_ptr<HdRenderParam> _renderParam;
   GiScene* _giScene = nullptr;
+  GiMaterial* _defaultMaterial = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

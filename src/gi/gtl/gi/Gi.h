@@ -98,7 +98,6 @@ namespace gtl
 
   struct GiMeshInstance
   {
-    const GiMaterial* material;
     GiMesh* mesh;
     float transform[3][4];
   };
@@ -170,8 +169,9 @@ namespace gtl
   GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier);
   void giDestroyMaterial(GiMaterial* mat);
 
-  GiMesh* giCreateMesh(const GiMeshDesc& desc);
+  GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc);
   void giSetMeshTransform(GiMesh* mesh, float transform[3][4]);
+  void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat);
   void giDestroyMesh(GiMesh* mesh);
 
   GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params);

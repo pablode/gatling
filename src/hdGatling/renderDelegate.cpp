@@ -57,6 +57,26 @@ namespace
   {
     HdPrimTypeTokens->renderBuffer
   };
+
+  std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* name)
+  {
+    // Prefer UsdPreviewSurface over MDL diffuse or unlit because we want to give a good first
+    // impression (many people will try Pixar's Kitchen scene first), regardless of whether the user
+    // is aware of the use or purpose of the displayColor attribute (as opposed to a preview material).
+    static const char* USDPREVIEWSURFACE_MTLX_DOC = R"(
+      <?xml version="1.0"?>
+      <materialx version="1.38">
+        <UsdPreviewSurface name="gatling_SR_%s" type="surfaceshader">
+          <input name="diffuseColor" type="color3" value="%f, %f, %f" />
+        </UsdPreviewSurface>
+        <surfacematerial name="gatling_MAT_%s" type="material">
+          <input name="surfaceshader" type="surfaceshader" nodename="gatling_SR_%s" />
+        </surfacematerial>
+      </materialx>
+    )";
+
+    return TfStringPrintf(USDPREVIEWSURFACE_MTLX_DOC, name, color[0], color[1], color[2], name, name);
+  }
 }
 
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
@@ -98,11 +118,18 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
     _settingsMap[key] = value;
   }
 
+  auto defaultDiffuseColor = GfVec3f(0.18f); // UsdPreviewSurface spec
+  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(defaultDiffuseColor, "invalid");
+
+  _defaultMaterial = giCreateMaterialFromMtlxStr(defaultMatSrc.c_str());
+  TF_AXIOM(_defaultMaterial);
+
   _giScene = giCreateScene();
 }
 
 HdGatlingRenderDelegate::~HdGatlingRenderDelegate()
 {
+  giDestroyMaterial(_defaultMaterial);
   giDestroyScene(_giScene);
 }
 
@@ -166,7 +193,7 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, [[maybe_unus
 HdRenderPassSharedPtr HdGatlingRenderDelegate::CreateRenderPass(HdRenderIndex* index,
                                                                 const HdRprimCollection& collection)
 {
-  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, _materialNetworkCompiler, _giScene));
+  return HdRenderPassSharedPtr(new HdGatlingRenderPass(index, collection, _settingsMap, _giScene));
 }
 
 HdResourceRegistrySharedPtr HdGatlingRenderDelegate::GetResourceRegistry() const
@@ -216,7 +243,7 @@ HdRprim* HdGatlingRenderDelegate::CreateRprim(const TfToken& typeId, const SdfPa
 {
   if (typeId == HdPrimTypeTokens->mesh)
   {
-    return new HdGatlingMesh(rprimId);
+    return new HdGatlingMesh(rprimId, _giScene, _defaultMaterial);
   }
 
   return nullptr;
@@ -240,7 +267,7 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   }
   else if (typeId == HdPrimTypeTokens->material)
   {
-    return new HdGatlingMaterial(sprimId);
+    return new HdGatlingMaterial(sprimId, _materialNetworkCompiler);
   }
   else if (typeId == HdPrimTypeTokens->sphereLight)
   {
