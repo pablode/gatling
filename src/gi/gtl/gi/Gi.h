@@ -99,7 +99,6 @@ namespace gtl
   struct GiMeshInstance
   {
     GiMesh* mesh;
-    float transform[3][4];
   };
 
   struct GiShaderCacheParams
@@ -171,6 +170,7 @@ namespace gtl
 
   GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc);
   void giSetMeshTransform(GiMesh* mesh, float transform[3][4]);
+  void giSetMeshInstanceTransforms(GiMesh* mesh, uint32_t count, const float (*transforms)[4][4]);
   void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat);
   void giDestroyMesh(GiMesh* mesh);
 
