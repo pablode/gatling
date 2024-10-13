@@ -30,7 +30,7 @@ public:
   ~HdGatlingInstancer() override;
 
 public:
-  VtMatrix4dArray ComputeInstanceTransforms(const SdfPath& prototypeId);
+  VtMatrix4fArray ComputeInstanceTransforms(const SdfPath& prototypeId);
 
   void Sync(HdSceneDelegate* sceneDelegate,
             HdRenderParam* renderParam,

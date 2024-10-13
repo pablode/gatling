@@ -18,6 +18,7 @@
 #include "instancer.h"
 
 #include <pxr/imaging/hd/sceneDelegate.h>
+#include <pxr/base/gf/matrix4f.h>
 #include <pxr/base/gf/quath.h>
 #include <pxr/base/gf/quatf.h>
 #include <pxr/base/gf/quatd.h>
@@ -89,7 +90,7 @@ namespace
   };
 }
 
-VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& prototypeId)
+VtMatrix4fArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& prototypeId)
 {
   HdSceneDelegate* sceneDelegate = GetDelegate();
 
@@ -160,35 +161,38 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
 
   const VtIntArray& instanceIndices = sceneDelegate->GetInstanceIndices(id, prototypeId);
 
-  VtMatrix4dArray transforms;
+  VtMatrix4fArray transforms;
   transforms.resize(instanceIndices.size());
 
   for (size_t i = 0; i < instanceIndices.size(); i++)
   {
     int instanceIndex = instanceIndices[i];
 
-    GfMatrix4d mat = instancerTransform;
+    auto mat = GfMatrix4f(instancerTransform);
 
-    GfMatrix4d temp;
+    GfMatrix4f temp;
 
     if (i < translations.size())
     {
-      temp.SetTranslate(translations[instanceIndex]);
+      auto t = GfVec3f(translations[instanceIndex]);
+      temp.SetTranslate(t);
       mat = temp * mat;
     }
     if (i < rotations.size())
     {
-      temp.SetRotate(rotations[instanceIndex]);
+      auto r = GfQuatf(rotations[instanceIndex]);
+      temp.SetRotate(r);
       mat = temp * mat;
     }
     if (i < scales.size())
     {
-      temp.SetScale(scales[instanceIndex]);
+      auto s = GfVec3f(scales[instanceIndex]);
+      temp.SetScale(s);
       mat = temp * mat;
     }
     if (i < instanceTransforms.size())
     {
-      temp = instanceTransforms[instanceIndex];
+      temp = GfMatrix4f(instanceTransforms[instanceIndex]);
       mat = temp * mat;
     }
 
@@ -207,9 +211,9 @@ VtMatrix4dArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
   HdInstancer* boxedParentInstancer = renderIndex.GetInstancer(parentId);
   HdGatlingInstancer* parentInstancer = static_cast<HdGatlingInstancer*>(boxedParentInstancer);
 
-  VtMatrix4dArray parentTransforms = parentInstancer->ComputeInstanceTransforms(id);
+  VtMatrix4fArray parentTransforms = parentInstancer->ComputeInstanceTransforms(id);
 
-  VtMatrix4dArray transformProducts;
+  VtMatrix4fArray transformProducts;
   transformProducts.resize(parentTransforms.size() * transforms.size());
 
   for (size_t i = 0; i < parentTransforms.size(); i++)

@@ -17,6 +17,7 @@
 
 #include "mesh.h"
 #include "material.h"
+#include "instancer.h"
 
 #include <pxr/base/gf/matrix4f.h>
 #include <pxr/imaging/hd/meshUtil.h>
@@ -410,16 +411,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   const SdfPath& id = GetId();
 
-  if ((*dirtyBits & HdChangeTracker::DirtyInstancer) |
-      (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
-  {
-    _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
-
-    const SdfPath& instancerId = GetInstancerId();
-
-    HdInstancer::_SyncInstancerAndParents(renderIndex, instancerId);
-  }
-
   if (*dirtyBits & HdChangeTracker::DirtyVisibility)
   {
     _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
@@ -441,6 +432,34 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     _CreateGiMesh(sceneDelegate);
 
     (*dirtyBits) |= HdChangeTracker::DirtyMaterialId; // force material assignment
+  }
+
+  if (_giMesh &&
+      ((*dirtyBits & HdChangeTracker::DirtyInstancer) ||
+      (*dirtyBits & HdChangeTracker::DirtyInstanceIndex)))
+  {
+    _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
+
+    const SdfPath& instancerId = GetInstancerId();
+
+    HdInstancer::_SyncInstancerAndParents(renderIndex, instancerId);
+
+    VtMatrix4fArray transforms;
+    if (instancerId.IsEmpty())
+    {
+      transforms.resize(1);
+      transforms[0] = GfMatrix4f(1.0);
+    }
+    else
+    {
+      HdInstancer* boxedInstancer = renderIndex.GetInstancer(instancerId);
+      HdGatlingInstancer* instancer = static_cast<HdGatlingInstancer*>(boxedInstancer);
+
+      transforms = instancer->ComputeInstanceTransforms(id);
+    }
+
+    giSetMeshInstanceTransforms(_giMesh, uint32_t(transforms.size()),
+                                (const float(*)[4][4]) transforms[0].data());
   }
 
   if (_giMesh && (*dirtyBits & HdChangeTracker::DirtyTransform))

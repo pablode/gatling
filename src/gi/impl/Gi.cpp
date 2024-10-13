@@ -123,6 +123,7 @@ namespace gtl
     glm::mat3x4 transform;
     bool flipFacing;
     int id;
+    std::vector<glm::mat3x4> instanceTransforms;
     const GiMaterial* material;
     GiScene* scene;
   };
@@ -541,6 +542,15 @@ fail:
     memcpy(glm::value_ptr(mesh->transform), transform, sizeof(float) * 12);
   }
 
+  void giSetMeshInstanceTransforms(GiMesh* mesh, uint32_t count, const float (*transforms)[4][4])
+  {
+    mesh->instanceTransforms.resize(count);
+    for (uint32_t i = 0; i < count; i++)
+    {
+      mesh->instanceTransforms[i] = glm::mat3x4(glm::make_mat4((const float*) transforms[i]));
+    }
+  }
+
   void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat)
   {
     mesh->material = mat;
@@ -792,17 +802,20 @@ fail_cleanup:
         continue; // invalid geometry or an error occurred
       }
 
-      // Create BLAS instance for TLAS.
-      glm::mat3x4 transform = glm::mat3x4(glm::mat4(mesh->transform) * glm::mat4(glm::make_mat3x4((float*) instance->transform)));
+      for (const glm::mat3x4& t : mesh->instanceTransforms)
+      {
+        // Create BLAS instance for TLAS.
+        glm::mat3x4 transform = glm::mat3x4(glm::mat4(mesh->transform) * glm::mat4(t));
 
-      CgpuBlasInstance blasInstance;
-      blasInstance.as = data->blas;
-      blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
-      blasInstance.instanceCustomIndex = uint32_t(blasPayloads.size());
-      memcpy(blasInstance.transform, glm::value_ptr(transform), sizeof(float) * 12);
+        CgpuBlasInstance blasInstance;
+        blasInstance.as = data->blas;
+        blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
+        blasInstance.instanceCustomIndex = uint32_t(blasPayloads.size());
+        memcpy(blasInstance.transform, glm::value_ptr(transform), sizeof(float) * 12);
 
-      blasInstances.push_back(blasInstance);
-      blasPayloads.push_back(data->payload);
+        blasInstances.push_back(blasInstance);
+        blasPayloads.push_back(data->payload);
+      }
     }
   }
 
