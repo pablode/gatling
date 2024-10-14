@@ -47,7 +47,6 @@ namespace gtl
   struct GiBvh;
   struct GiMaterial;
   struct GiMesh;
-  struct GiMeshInstance;
   struct GiShaderCache;
   struct GiScene;
   struct GiSphereLight;
@@ -96,11 +95,6 @@ namespace gtl
     GiVertex* vertices;
   };
 
-  struct GiMeshInstance
-  {
-    GiMesh* mesh;
-  };
-
   struct GiShaderCacheParams
   {
     GiAovId            aovId;
@@ -117,9 +111,9 @@ namespace gtl
 
   struct GiBvhParams
   {
-    uint32_t              meshInstanceCount;
-    const GiMeshInstance* meshInstances;
-    GiShaderCache*        shaderCache;
+    GiMesh**        meshes;
+    uint32_t        meshCount;
+    GiShaderCache*  shaderCache;
   };
 
   struct GiRenderParams
