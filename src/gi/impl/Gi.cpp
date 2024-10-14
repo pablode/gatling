@@ -578,10 +578,9 @@ fail:
                                   uint64_t& totalIndicesSize,
                                   uint64_t& totalVerticesSize)
   {
-    for (uint32_t m = 0; m < params.meshInstanceCount; m++)
+    for (uint32_t m = 0; m < params.meshCount; m++)
     {
-      const GiMeshInstance* instance = &params.meshInstances[m];
-      GiMesh* mesh = instance->mesh;
+      GiMesh* mesh = params.meshes[m];
 
       // Find material for SBT index (FIXME: find a better solution)
       uint32_t materialIndex = UINT32_MAX;
