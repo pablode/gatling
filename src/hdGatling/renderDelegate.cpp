@@ -87,6 +87,10 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   , _resourceRegistry(std::make_shared<HdResourceRegistry>())
   , _renderParam(std::make_unique<HdGatlingRenderParam>())
 {
+#if PXR_VERSION < 2408
+  TF_WARN("Outdated USD version (below v24.08); material updates may not propagate to meshes");
+#endif
+
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Samples per pixel", HdGatlingSettingsTokens->spp, VtValue{1} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max bounces", HdGatlingSettingsTokens->maxBounces, VtValue{13} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette bounce offset", HdGatlingSettingsTokens->rrBounceOffset, VtValue{3} });
