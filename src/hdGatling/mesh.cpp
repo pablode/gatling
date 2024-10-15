@@ -492,8 +492,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     }
 
     giSetMeshMaterial(_giMesh, giMat);
-
-    giInvalidateGeomCache(); // FIXME: remove this hack
   }
 
   *dirtyBits = HdChangeTracker::Clean;

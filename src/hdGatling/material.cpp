@@ -90,8 +90,6 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   _giMaterial = _materialNetworkCompiler.CompileNetwork(id, network);
-
-  giInvalidateShaderCache(); // FIXME: track dirty state in RenderParam
 }
 
 const GiMaterial* HdGatlingMaterial::GetGiMaterial() const

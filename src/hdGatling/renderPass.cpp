@@ -124,30 +124,6 @@ bool HdGatlingRenderPass::IsConverged() const
   return _isConverged;
 }
 
-void HdGatlingRenderPass::_BakeMeshes(HdRenderIndex* renderIndex,
-                                      GfMatrix4d rootTransform,
-                                      std::vector<GiMesh*>& meshes)
-{
-  for (const auto& rprimId : renderIndex->GetRprimIds())
-  {
-    const HdRprim* rprim = renderIndex->GetRprim(rprimId);
-
-    const HdGatlingMesh* mesh = static_cast<const HdGatlingMesh*>(rprim);
-    if (!mesh || !mesh->IsVisible())
-    {
-      continue;
-    }
-
-    GiMesh* giMesh = mesh->GetGiMesh();
-    if (!giMesh)
-    {
-      continue;
-    }
-
-    meshes.push_back(giMesh);
-  }
-}
-
 void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const
 {
   // We transform the scene into camera space at the beginning, so for
@@ -263,9 +239,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     _rootMatrix = GfMatrix4d(1.0);// viewMatrix;
 
     // FIXME: cache results for shader cache rebuild
-    std::vector<GiMesh*> meshes;
-    _BakeMeshes(renderIndex, _rootMatrix, meshes);
-
     if (rebuildShaderCache)
     {
       if (_shaderCache)
@@ -298,8 +271,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       }
 
       GiBvhParams bvhParams = {
-        .meshes = meshes.data(),
-        .meshCount = uint32_t(meshes.size()),
         .shaderCache = _shaderCache
       };
       _bvh = giCreateBvh(_scene, bvhParams);

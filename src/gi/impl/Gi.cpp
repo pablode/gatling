@@ -53,6 +53,7 @@
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
 #include <gtl/gb/Log.h>
+#include <gtl/gb/Enum.h>
 
 #include <MaterialXCore/Document.h>
 
@@ -85,10 +86,6 @@ namespace gtl
     rp::BlasPayload payload;
   };
 
-  // We cache the mesh CPU data first and defer the GPU upload / BLAS build
-  // to the next render call, where we update the variant.
-  using GiMeshDataVariant = std::variant<GiMeshCpuData, GiMeshGpuData>;
-
   struct GiBvh
   {
     CgpuBuffer          blasPayloadsBuffer;
@@ -119,13 +116,14 @@ namespace gtl
 
   struct GiMesh
   {
-    GiMeshDataVariant data;
     glm::mat3x4 transform;
     bool flipFacing;
     int id;
     std::vector<glm::mat3x4> instanceTransforms;
     const GiMaterial* material;
     GiScene* scene;
+    GiMeshCpuData cpuData;
+    std::optional<GiMeshGpuData> gpuData;
   };
 
   struct GiSphereLight
@@ -162,6 +160,15 @@ namespace gtl
     float specular = 1.0f;
   };
 
+  enum class GiSceneDirtyFlags : uint32_t
+  {
+    Clean = 0,
+    DirtyTlas,
+    DirtyRtPipeline,
+    All = ~0u
+  };
+  GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
+
   struct GiScene
   {
     GgpuDenseDataStore sphereLights;
@@ -175,6 +182,7 @@ namespace gtl
     std::unordered_set<GiBvh*> bvhs;
     std::unordered_set<GiMesh*> meshes;
     std::mutex mutex;
+    GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::All;
   };
 
   struct GiRenderBuffer
@@ -522,12 +530,12 @@ fail:
     };
 
     GiMesh* mesh = new GiMesh {
-      .data = std::move(cpuData),
       .transform = glm::mat3x4(1.0f),
       .flipFacing = desc.isLeftHanded,
       .material = nullptr,
       .id = desc.id,
-      .scene = scene
+      .scene = scene,
+      .cpuData = cpuData
     };
 
     {
@@ -540,6 +548,12 @@ fail:
   void giSetMeshTransform(GiMesh* mesh, float transform[3][4])
   {
     memcpy(glm::value_ptr(mesh->transform), transform, sizeof(float) * 12);
+
+    GiScene* scene = mesh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+    }
   }
 
   void giSetMeshInstanceTransforms(GiMesh* mesh, uint32_t count, const float (*transforms)[4][4])
@@ -549,19 +563,45 @@ fail:
     {
       mesh->instanceTransforms[i] = glm::mat3x4(glm::make_mat4((const float*) transforms[i]));
     }
+
+    GiScene* scene = mesh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+    }
   }
 
   void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat)
   {
+    McMaterial* newMcMat = mat->mcMat;
+    McMaterial* oldMcMat = mesh->material ? mesh->material->mcMat : nullptr;
+
+    GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::DirtyRtPipeline;
+    if (oldMcMat && newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency)
+    {
+      // material data such as alpha is used in the BVH build; invalidate BVH
+      dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+      mesh->gpuData.reset();
+    }
+
     mesh->material = mat;
+
+    GiScene* scene = mesh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->dirtyFlags |= dirtyFlags;
+    }
   }
 
   void giDestroyMesh(GiMesh* mesh)
   {
-    if (GiMeshGpuData* data = std::get_if<GiMeshGpuData>(&mesh->data); data)
+    auto& gpuData = mesh->gpuData;
+
+    if (gpuData.has_value())
     {
-      cgpuDestroyBlas(s_device, data->blas);
-      cgpuDestroyBuffer(s_device, data->payloadBuffer);
+      cgpuDestroyBlas(s_device, gpuData->blas);
+      cgpuDestroyBuffer(s_device, gpuData->payloadBuffer);
+      gpuData.reset();
     }
 
     GiScene* scene = mesh->scene;
@@ -572,19 +612,19 @@ fail:
     delete mesh;
   }
 
-  void _giBuildGeometryStructures(const GiBvhParams& params,
+  void _giBuildGeometryStructures(GiScene* scene,
+                                  GiShaderCache* shaderCache,
                                   std::vector<CgpuBlasInstance>& blasInstances,
                                   std::vector<rp::BlasPayload>& blasPayloads,
                                   uint64_t& totalIndicesSize,
                                   uint64_t& totalVerticesSize)
   {
-    for (uint32_t m = 0; m < params.meshCount; m++)
+    for (auto it = scene->meshes.begin(); it != scene->meshes.end(); ++it)
     {
-      GiMesh* mesh = params.meshes[m];
+      GiMesh* mesh = *it;
 
       // Find material for SBT index (FIXME: find a better solution)
       uint32_t materialIndex = UINT32_MAX;
-      GiShaderCache* shaderCache = params.shaderCache;
       for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
       {
           if (shaderCache->materials[i] == mesh->material)
@@ -600,9 +640,11 @@ fail:
       }
 
       // Build mesh BLAS & buffers if they don't exist yet
-      if (GiMeshCpuData* data = std::get_if<GiMeshCpuData>(&mesh->data); data)
+      if (!mesh->gpuData.has_value())
       {
-        if (data->faces.empty())
+        const auto& data = mesh->cpuData;
+
+        if (data.faces.empty())
         {
           continue;
         }
@@ -616,12 +658,12 @@ fail:
         // Collect vertices
         std::vector<rp::FVertex> vertexData;
         std::vector<CgpuVertex> positionData;
-        vertexData.resize(data->vertices.size());
-        positionData.resize(data->vertices.size());
+        vertexData.resize(data.vertices.size());
+        positionData.resize(data.vertices.size());
 
         for (uint32_t i = 0; i < positionData.size(); i++)
         {
-          const GiVertex& cpuVert = data->vertices[i];
+          const GiVertex& cpuVert = data.vertices[i];
           uint32_t encodedNormal = _EncodeDirection(glm::make_vec3(cpuVert.norm));
           uint32_t encodedTangent = _EncodeDirection(glm::make_vec3(cpuVert.tangent));
 
@@ -635,11 +677,11 @@ fail:
 
         // Collect indices
         std::vector<uint32_t> indexData;
-        indexData.reserve(data->faces.size() * 3);
+        indexData.reserve(data.faces.size() * 3);
 
-        for (uint32_t i = 0; i < data->faces.size(); i++)
+        for (uint32_t i = 0; i < data.faces.size(); i++)
         {
-          const auto* face = &data->faces[i];
+          const auto* face = &data.faces[i];
           indexData.push_back(face->v_i[0]);
           indexData.push_back(face->v_i[1]);
           indexData.push_back(face->v_i[2]);
@@ -768,7 +810,7 @@ fail:
 
         // Append BLAS for lifetime management
         {
-          mesh->data = GiMeshGpuData{
+          mesh->gpuData = GiMeshGpuData{
             .blas = blas,
             .payloadBuffer = payloadBuffer,
             .payload = payload
@@ -795,8 +837,8 @@ fail_cleanup:
         }
       }
 
-      GiMeshGpuData* data = std::get_if<GiMeshGpuData>(&mesh->data);
-      if (!data)
+      const auto& data = mesh->gpuData;
+      if (!data.has_value())
       {
         continue; // invalid geometry or an error occurred
       }
@@ -835,7 +877,7 @@ fail_cleanup:
     uint64_t verticesSize = 0;
     CgpuBuffer blasPayloadsBuffer;
 
-    _giBuildGeometryStructures(params, blasInstances, blasPayloads, indicesSize, verticesSize);
+    _giBuildGeometryStructures(scene, params.shaderCache, blasInstances, blasPayloads, indicesSize, verticesSize);
 
     GB_LOG("BLAS build finished");
     GB_LOG("> {} unique BLAS", blasPayloads.size());
