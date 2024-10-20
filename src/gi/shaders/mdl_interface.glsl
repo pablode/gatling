@@ -296,6 +296,12 @@ vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default
 
 vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default_value, bool uniform_lookup)
 {
+#ifdef CAMERA_POSITION_SCENE_DATA_INDEX
+    if (scene_data_id == CAMERA_POSITION_SCENE_DATA_INDEX)
+    {
+      return PC.cameraPosition;
+    }
+#endif
     return default_value;
 }
 

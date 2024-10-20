@@ -155,6 +155,20 @@ namespace
 
     return value->get_value();
   }
+
+  int _FindCameraPositionSceneDataIndex(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    for (mi::Size i = 0; i < compiledMaterial->get_referenced_scene_data_count(); i++)
+    {
+      const char* name = compiledMaterial->get_referenced_scene_data_name(i);
+
+      if (strcmp(name, "CAMERA_POSITION") == 0)
+      {
+        return int(i) + 1; // index 0 is invalid
+      }
+    }
+    return 0;
+  }
 }
 
 namespace gtl
@@ -190,7 +204,8 @@ namespace gtl
       .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
       .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
-      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()
+      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
+      .cameraPositionSceneDataIndex = _FindCameraPositionSceneDataIndex(compiledMaterial)
     };
   }
 
@@ -245,7 +260,8 @@ namespace gtl
       .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
       .resourcePathPrefix = resourcePathPrefix,
       .mdlMaterial = mdlMaterial,
-      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform()
+      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
+      .cameraPositionSceneDataIndex = _FindCameraPositionSceneDataIndex(compiledMaterial)
     };
   }
 }

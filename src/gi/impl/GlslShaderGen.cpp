@@ -262,6 +262,10 @@ namespace gtl
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
     }
+    if (params.cameraPositionSceneDataIndex > 0)
+    {
+      stitcher.appendDefine("CAMERA_POSITION_SCENE_DATA_INDEX", params.cameraPositionSceneDataIndex);
+    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
@@ -291,6 +295,10 @@ namespace gtl
     if (params.enableSceneTransforms)
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
+    }
+    if (params.cameraPositionSceneDataIndex > 0)
+    {
+      stitcher.appendDefine("CAMERA_POSITION_SCENE_DATA_INDEX", params.cameraPositionSceneDataIndex);
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;

@@ -37,5 +37,6 @@ namespace gtl
     std::string resourcePathPrefix;
     std::shared_ptr<McMdlMaterial> mdlMaterial;
     bool requiresSceneTransforms;
+    int cameraPositionSceneDataIndex;
   };
 }

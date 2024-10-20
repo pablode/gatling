@@ -87,6 +87,7 @@ namespace gtl
       CommonShaderParams commonParams;
       float directionalBias;
       bool enableSceneTransforms;
+      int cameraPositionSceneDataIndex;
       bool hasBackfaceBsdf;
       bool hasBackfaceEdf;
       bool hasCutoutTransparency;
@@ -105,6 +106,7 @@ namespace gtl
       std::string_view baseFileName;
       CommonShaderParams commonParams;
       bool enableSceneTransforms;
+      int cameraPositionSceneDataIndex;
       std::string_view opacityEvalGlsl;
       bool shadowTest;
       uint32_t textureIndexOffset2d;

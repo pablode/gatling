@@ -1052,6 +1052,7 @@ cleanup:
             .commonParams = commonParams,
             .directionalBias = material->directionalBias,
             .enableSceneTransforms = material->requiresSceneTransforms,
+            .cameraPositionSceneDataIndex = material->cameraPositionSceneDataIndex,
             .hasBackfaceBsdf = material->hasBackfaceBsdf,
             .hasBackfaceEdf = material->hasBackfaceEdf,
             .hasCutoutTransparency = material->hasCutoutTransparency,
@@ -1079,6 +1080,7 @@ cleanup:
             .baseFileName = "rp_main.ahit",
             .commonParams = commonParams,
             .enableSceneTransforms = material->requiresSceneTransforms,
+            .cameraPositionSceneDataIndex = material->cameraPositionSceneDataIndex,
             .opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource,
             .textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d,
             .textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d
