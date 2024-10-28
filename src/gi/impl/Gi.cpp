@@ -88,9 +88,9 @@ namespace gtl
 
   struct GiBvh
   {
-    CgpuBuffer          blasPayloadsBuffer;
-    GiScene*            scene;
-    CgpuTlas            tlas;
+    CgpuBuffer blasPayloadsBuffer;
+    GiScene*   scene;
+    CgpuTlas   tlas;
   };
 
   struct GiShaderCache
@@ -164,6 +164,7 @@ namespace gtl
   {
     Clean = 0,
     DirtyTlas,
+    DirtyBlases,
     DirtyRtPipeline,
     All = ~0u
   };
@@ -613,7 +614,7 @@ fail:
   }
 
   void _giBuildGeometryStructures(GiScene* scene,
-                                  GiShaderCache* shaderCache,
+                                  const GiShaderCache* shaderCache,
                                   std::vector<CgpuBlasInstance>& blasInstances,
                                   std::vector<rp::BlasPayload>& blasPayloads,
                                   uint64_t& totalIndicesSize,
@@ -808,14 +809,11 @@ fail:
           };
         }
 
-        // Append BLAS for lifetime management
-        {
-          mesh->gpuData = GiMeshGpuData{
-            .blas = blas,
-            .payloadBuffer = payloadBuffer,
-            .payload = payload
-          };
-        }
+        mesh->gpuData = GiMeshGpuData{
+          .blas = blas,
+          .payloadBuffer = payloadBuffer,
+          .payload = payload
+        };
 
         // (we ignore padding and the preamble in the reporting, but they are negligible)
         totalVerticesSize += verticesSize;
@@ -945,6 +943,7 @@ cleanup:
         cgpuDestroyTlas(s_device, tlas);
       }
     }
+
     return bvh;
   }
 
@@ -1456,7 +1455,7 @@ cleanup:
     s_stager->flush();
 
     const GiBvh* bvh = params.bvh;
-    const GiShaderCache* shader_cache = params.shaderCache;
+    const GiShaderCache* shaderCache = params.shaderCache;
     GiScene* scene = params.scene;
 
     // Upload dome lights.
@@ -1600,7 +1599,7 @@ cleanup:
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
 
-    size_t imageCount = shader_cache->images2d.size() + shader_cache->images3d.size() + 2/* dome lights */;
+    size_t imageCount = shaderCache->images2d.size() + shaderCache->images3d.size() + 2/* dome lights */;
 
     std::vector<CgpuImageBinding> images;
     images.reserve(imageCount);
@@ -1610,15 +1609,15 @@ cleanup:
     images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture, .index = 0 });
     images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture,         .index = 1 });
 
-    for (uint32_t i = 0; i < shader_cache->images2d.size(); i++)
+    for (uint32_t i = 0; i < shaderCache->images2d.size(); i++)
     {
       images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D,
-                         .image = shader_cache->images2d[i],
+                         .image = shaderCache->images2d[i],
                          .index = 2/* dome lights */ + i });
     }
-    for (uint32_t i = 0; i < shader_cache->images3d.size(); i++)
+    for (uint32_t i = 0; i < shaderCache->images3d.size(); i++)
     {
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = shader_cache->images3d[i], .index = i });
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = shaderCache->images3d[i], .index = i });
     }
 
     CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
@@ -1641,26 +1640,26 @@ cleanup:
     if (!cgpuBeginCommandBuffer(commandBuffer))
       goto cleanup;
 
-    if (!cgpuCmdTransitionShaderImageLayouts(commandBuffer, shader_cache->rgenShader, (uint32_t) images.size(), images.data()))
+    if (!cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, (uint32_t) images.size(), images.data()))
       goto cleanup;
 
-    if (!cgpuCmdUpdateBindings(commandBuffer, shader_cache->pipeline, &bindings))
+    if (!cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, &bindings))
       goto cleanup;
 
-    if (!cgpuCmdBindPipeline(commandBuffer, shader_cache->pipeline))
+    if (!cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline))
       goto cleanup;
 
     // Trace rays.
     {
       CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_FLAG_RAYGEN | CGPU_SHADER_STAGE_FLAG_MISS;
-      pushShaderStages |= shader_cache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT : 0;
-      pushShaderStages |= shader_cache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_FLAG_ANY_HIT : 0;
+      pushShaderStages |= shaderCache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT : 0;
+      pushShaderStages |= shaderCache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_FLAG_ANY_HIT : 0;
 
-      if (!cgpuCmdPushConstants(commandBuffer, shader_cache->pipeline, pushShaderStages, sizeof(pushData), &pushData))
+      if (!cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData))
         goto cleanup;
     }
 
-    if (!cgpuCmdTraceRays(commandBuffer, shader_cache->pipeline, imageWidth, imageHeight))
+    if (!cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight))
       goto cleanup;
 
     // Copy output buffer to staging buffer.
@@ -1729,7 +1728,7 @@ cleanup:
       goto cleanup;
 
     // Normalize debug AOV heatmaps.
-    if (shader_cache->aovId == (int) GiAovId::ClockCycles)
+    if (shaderCache->aovId == (int) GiAovId::ClockCycles)
     {
       int valueCount = pixelCount * compCount;
 
