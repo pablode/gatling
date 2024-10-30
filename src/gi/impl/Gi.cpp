@@ -120,10 +120,11 @@ namespace gtl
     bool flipFacing;
     int id;
     std::vector<glm::mat3x4> instanceTransforms;
-    const GiMaterial* material;
+    const GiMaterial* material = nullptr;
     GiScene* scene;
     GiMeshCpuData cpuData;
     std::optional<GiMeshGpuData> gpuData;
+    bool visible = true;
   };
 
   struct GiSphereLight
@@ -162,11 +163,11 @@ namespace gtl
 
   enum class GiSceneDirtyFlags : uint32_t
   {
-    Clean = 0,
-    DirtyTlas,
-    DirtyBlases,
-    DirtyRtPipeline,
-    All = ~0u
+    Clean           = 0,
+    DirtyTlas       = 1,
+    DirtyBlases     = 2,
+    DirtyRtPipeline = 4,
+    All             = ~0u
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
 
@@ -180,10 +181,11 @@ namespace gtl
     GiDomeLight* domeLight = nullptr; // weak ptr
     glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
     CgpuImage fallbackDomeLightTexture;
-    std::unordered_set<GiBvh*> bvhs;
     std::unordered_set<GiMesh*> meshes;
     std::mutex mutex;
     GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::All;
+    GiShaderCache* shaderCache = nullptr;
+    GiBvh* bvh = nullptr;
   };
 
   struct GiRenderBuffer
@@ -212,7 +214,6 @@ namespace gtl
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
   std::unique_ptr<GiTextureManager> s_texSys;
   std::atomic_bool s_forceShaderCacheInvalid = false;
-  std::atomic_bool s_forceGeomCacheInvalid = false; // TODO: remove
   std::atomic_bool s_resetSampleOffset = false;
 
 #ifdef GI_SHADER_HOTLOADING
@@ -533,7 +534,6 @@ fail:
     GiMesh* mesh = new GiMesh {
       .transform = glm::mat3x4(1.0f),
       .flipFacing = desc.isLeftHanded,
-      .material = nullptr,
       .id = desc.id,
       .scene = scene,
       .cpuData = cpuData
@@ -594,6 +594,17 @@ fail:
     }
   }
 
+  void giSetMeshVisibility(GiMesh* mesh, bool visible)
+  {
+    mesh->visible = visible;
+
+    GiScene* scene = mesh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+    }
+  }
+
   void giDestroyMesh(GiMesh* mesh)
   {
     auto& gpuData = mesh->gpuData;
@@ -623,6 +634,12 @@ fail:
     for (auto it = scene->meshes.begin(); it != scene->meshes.end(); ++it)
     {
       GiMesh* mesh = *it;
+
+      // Don't build BLAS/TLAS for non-visible geometry
+      if (!mesh->visible)
+      {
+        continue;
+      }
 
       // Find material for SBT index (FIXME: find a better solution)
       uint32_t materialIndex = UINT32_MAX;
@@ -858,10 +875,9 @@ fail_cleanup:
     }
   }
 
-  GiBvh* giCreateBvh(GiScene* scene, const GiBvhParams& params)
+// TODO: rename to private methods
+  GiBvh* giCreateBvh(GiScene* scene, const GiShaderCache* shaderCache)
   {
-    s_forceGeomCacheInvalid = false; // TODO: remove
-
     GiBvh* bvh = nullptr;
 
     GB_LOG("creating bvh..");
@@ -875,7 +891,7 @@ fail_cleanup:
     uint64_t verticesSize = 0;
     CgpuBuffer blasPayloadsBuffer;
 
-    _giBuildGeometryStructures(scene, params.shaderCache, blasInstances, blasPayloads, indicesSize, verticesSize);
+    _giBuildGeometryStructures(scene, shaderCache, blasInstances, blasPayloads, indicesSize, verticesSize);
 
     GB_LOG("BLAS build finished");
     GB_LOG("> {} unique BLAS", blasPayloads.size());
@@ -925,11 +941,6 @@ fail_cleanup:
     bvh->scene = scene;
     bvh->tlas = tlas;
 
-    {
-      std::lock_guard guard(scene->mutex);
-      scene->bvhs.insert(bvh);
-    }
-
 cleanup:
     if (!bvh)
     {
@@ -951,30 +962,11 @@ cleanup:
   {
     cgpuDestroyTlas(s_device, bvh->tlas);
     cgpuDestroyBuffer(s_device, bvh->blasPayloadsBuffer);
-
-    GiScene* scene = bvh->scene;
-    {
-      std::lock_guard guard(scene->mutex);
-      scene->bvhs.erase(bvh);
-    }
     delete bvh;
-  }
-
-  // FIXME: move this into the GiScene struct - also, want to rebuild with cached data at shader granularity
-  bool giShaderCacheNeedsRebuild()
-  {
-    return s_forceShaderCacheInvalid;
-  }
-  // TODO: remove
-  bool giGeomCacheNeedsRebuild()
-  {
-    return s_forceGeomCacheInvalid;
   }
 
   GiShaderCache* giCreateShaderCache(const GiShaderCacheParams& params)
   {
-    s_forceShaderCacheInvalid = false;
-
     bool clockCyclesAov = params.aovId == GiAovId::ClockCycles;
 
     if (clockCyclesAov && !s_deviceFeatures.shaderClock)
@@ -1440,23 +1432,41 @@ cleanup:
     s_resetSampleOffset = true;
   }
 
-  void giInvalidateShaderCache()
-  {
-    s_forceShaderCacheInvalid = true;
-  }
-
-  void giInvalidateGeomCache()
-  {
-    s_forceGeomCacheInvalid = true;
-  }
-
   GiStatus giRender(const GiRenderParams& params, float* rgbaImg)
   {
     s_stager->flush();
 
-    const GiBvh* bvh = params.bvh;
-    const GiShaderCache* shaderCache = params.shaderCache;
     GiScene* scene = params.scene;
+
+    if (s_forceShaderCacheInvalid)
+    {
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyRtPipeline | GiSceneDirtyFlags::DirtyTlas;
+      s_forceShaderCacheInvalid = false;
+    }
+
+    if (!scene->shaderCache || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyRtPipeline))
+    {
+      if (scene->shaderCache) giDestroyShaderCache(scene->shaderCache);
+
+      scene->shaderCache = giCreateShaderCache(*params.shaderCacheParams);
+
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyRtPipeline;
+    }
+
+    if (!scene->bvh ||
+        bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyBlases) ||
+        bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyTlas))
+    {
+      if (scene->bvh) giDestroyBvh(scene->bvh);
+
+      scene->bvh = giCreateBvh(scene, scene->shaderCache);
+
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBlases;
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyTlas;
+    }
+
+    GiBvh* bvh = scene->bvh;
+    const GiShaderCache* shaderCache = scene->shaderCache;
 
     // Upload dome lights.
     glm::vec4 backgroundColor = glm::make_vec4(params.backgroundColor);
@@ -1776,6 +1786,14 @@ cleanup:
 
   void giDestroyScene(GiScene* scene)
   {
+    if (scene->bvh)
+    {
+      giDestroyBvh(scene->bvh);
+    }
+    if (scene->shaderCache)
+    {
+      giDestroyShaderCache(scene->shaderCache);
+    }
     if (scene->domeLight)
     {
       s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);

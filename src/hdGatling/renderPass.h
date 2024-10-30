@@ -60,9 +60,6 @@ private:
   uint32_t _lastRenderSettingsVersion;
   uint32_t _lastVisChangeCount;
   GiAovId _lastAovId;
-  GiBvh* _bvh;
-  GiShaderCache* _shaderCache;
-  GfMatrix4d _rootMatrix;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -411,11 +411,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   const SdfPath& id = GetId();
 
-  if (*dirtyBits & HdChangeTracker::DirtyVisibility)
-  {
-    _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
-  }
-
   bool updateGeometry =
     (*dirtyBits & HdChangeTracker::DirtyPoints) |
     (*dirtyBits & HdChangeTracker::DirtyNormals) |
@@ -429,14 +424,24 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
       _giMesh = nullptr;
     }
 
-    _CreateGiMesh(sceneDelegate);
+    _CreateGiMesh(sceneDelegate); // TODO: return ptr
 
     (*dirtyBits) |= HdChangeTracker::DirtyMaterialId; // force material assignment
   }
 
-  if (_giMesh &&
-      ((*dirtyBits & HdChangeTracker::DirtyInstancer) ||
-      (*dirtyBits & HdChangeTracker::DirtyInstanceIndex)))
+  if (!_giMesh)
+  {
+    return;
+  }
+
+  if (*dirtyBits & HdChangeTracker::DirtyVisibility)
+  {
+    _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
+
+    giSetMeshVisibility(_giMesh, sceneDelegate->GetVisible(id));
+  }
+
+  if ((*dirtyBits & HdChangeTracker::DirtyInstancer) || (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
   {
     _UpdateInstancer(sceneDelegate, &dirtyBitsCopy);
 
@@ -462,7 +467,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
                                 (const float(*)[4][4]) transforms[0].data());
   }
 
-  if (_giMesh && (*dirtyBits & HdChangeTracker::DirtyTransform))
+  if (*dirtyBits & HdChangeTracker::DirtyTransform)
   {
     GfMatrix4d t = sceneDelegate->GetTransform(id);
 
@@ -475,8 +480,9 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     giSetMeshTransform(_giMesh, transform);
   }
 
-  if (_giMesh && (*dirtyBits & HdChangeTracker::DirtyMaterialId))
+  if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
   {
+    // TODO: can this path be empty? -> default material
     const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
 
     SetMaterialId(materialId);

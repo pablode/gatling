@@ -102,21 +102,11 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , _lastSprimIndexVersion(UINT32_MAX)
   , _lastRenderSettingsVersion(UINT32_MAX)
   , _lastVisChangeCount(UINT32_MAX)
-  , _bvh(nullptr)
-  , _shaderCache(nullptr)
 {
 }
 
 HdGatlingRenderPass::~HdGatlingRenderPass()
 {
-  if (_bvh)
-  {
-    giDestroyBvh(_bvh);
-  }
-  if (_shaderCache)
-  {
-    giDestroyShaderCache(_shaderCache);
-  }
 }
 
 bool HdGatlingRenderPass::IsConverged() const
@@ -126,14 +116,11 @@ bool HdGatlingRenderPass::IsConverged() const
 
 void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const
 {
-  // We transform the scene into camera space at the beginning, so for
-  // subsequent camera transforms, we need to 'substract' the initial transform.
-  GfMatrix4d absInvViewMatrix = camera.GetTransform();
-  GfMatrix4d relViewMatrix = absInvViewMatrix * _rootMatrix;
+  const GfMatrix4d& transform = camera.GetTransform();
 
-  GfVec3d position = relViewMatrix.Transform(GfVec3d(0.0, 0.0, 0.0));
-  GfVec3d forward = relViewMatrix.TransformDir(GfVec3d(0.0, 0.0, -1.0));
-  GfVec3d up = relViewMatrix.TransformDir(GfVec3d(0.0, 1.0, 0.0));
+  GfVec3d position = transform.Transform(GfVec3d(0.0, 0.0, 0.0));
+  GfVec3d forward = transform.TransformDir(GfVec3d(0.0, 0.0, -1.0));
+  GfVec3d up = transform.TransformDir(GfVec3d(0.0, 1.0, 0.0));
 
   forward.Normalize();
   up.Normalize();
@@ -215,87 +202,44 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   bool visibilityChanged = (_lastVisChangeCount != visibilityChangeCount);
   bool aovChanged = (aovId != _lastAovId);
 
+  // TODO: also remove(?)
   if (sceneChanged || renderSettingsChanged || visibilityChanged || aovChanged)
   {
     giInvalidateFramebuffer();
   }
 
+  // TODO: remove(?)
   _lastSceneStateVersion = sceneStateVersion;
   _lastSprimIndexVersion = sprimIndexVersion;
   _lastRenderSettingsVersion = renderSettingsStateVersion;
   _lastVisChangeCount = visibilityChangeCount;
   _lastAovId = aovId;
 
-  bool rebuildShaderCache = !_shaderCache || aovChanged || giShaderCacheNeedsRebuild() || renderSettingsChanged;
-
-  bool rebuildBvh = !_bvh || visibilityChanged;
-
-  if (rebuildShaderCache || rebuildBvh)
-  {
-    // Transform scene into camera space to increase floating point precision.
-    // FIXME: reintroduce and don't apply rotation
-    // https://pharr.org/matt/blog/2018/03/02/rendering-in-camera-space
-    //GfMatrix4d viewMatrix = camera->GetTransform().GetInverse();
-    _rootMatrix = GfMatrix4d(1.0);// viewMatrix;
-
-    // FIXME: cache results for shader cache rebuild
-    if (rebuildShaderCache)
-    {
-      if (_shaderCache)
-      {
-        giDestroyShaderCache(_shaderCache);
-      }
-
-      auto domeLightCameraVisibilityValueIt = _settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
-
-      GiShaderCacheParams shaderParams = {
-        .aovId = aovId,
-        .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
-        .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
-        .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
-        .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
-        .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
-        .scene = _scene,
-        .mediumStackSize = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->mediumStackSize)->second).Get<uint32_t>()
-      };
-      _shaderCache = giCreateShaderCache(shaderParams);
-
-      TF_VERIFY(_shaderCache, "Unable to create shader cache");
-    }
-
-    if (_shaderCache && (rebuildBvh || giGeomCacheNeedsRebuild()))
-    {
-      if (_bvh)
-      {
-        giDestroyBvh(_bvh);
-      }
-
-      GiBvhParams bvhParams = {
-        .shaderCache = _shaderCache
-      };
-      _bvh = giCreateBvh(_scene, bvhParams);
-
-      TF_VERIFY(_bvh, "Unable to create bvh");
-    }
-  }
-
-  if (!_bvh || !_shaderCache)
-  {
-    return;
-  }
-
   GfVec4f backgroundColor = aovBinding->clearValue.GetWithDefault<GfVec4f>(GfVec4f(0.f));
 
   bool clippingEnabled = renderPassState->GetClippingEnabled() &&
                          _settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
 
+  auto domeLightCameraVisibilityValueIt = _settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
+
   GiCameraDesc giCamera;
   _ConstructGiCamera(*camera, giCamera, clippingEnabled);
 
+  // TODO: rename to render settings
+  GiShaderCacheParams shaderCacheParams = {
+    .aovId = aovId,
+    .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
+    .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
+    .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
+    .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
+    .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
+    .mediumStackSize = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->mediumStackSize)->second).Get<uint32_t>(),
+    .scene = _scene
+  };
+
   GiRenderParams renderParams = {
-    .bvh = _bvh,
+    .shaderCacheParams = &shaderCacheParams,
     .camera = giCamera,
-    .shaderCache = _shaderCache,
     .renderBuffer = renderBuffer->GetGiRenderBuffer(),
     .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),
     .maxBounces = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<uint32_t>(),
