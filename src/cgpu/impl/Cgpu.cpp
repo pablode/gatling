@@ -722,6 +722,11 @@ namespace gtl
     }
 #endif
 
+    if (enableOptionalExtension(VK_KHR_PIPELINE_EXECUTABLE_PROPERTIES_EXTENSION_NAME))
+    {
+      idevice->features.pipelineExecutableProperties = true;
+    }
+
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, nullptr);
 
@@ -745,6 +750,17 @@ namespace gtl
     }
 
     void* pNext = nullptr;
+
+    VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR pipelineExecutablePropertiesFeatures = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR,
+      .pNext = nullptr,
+      .pipelineExecutableInfo = VK_TRUE
+    };
+
+    if (idevice->features.pipelineExecutableProperties)
+    {
+      pNext = &pipelineExecutablePropertiesFeatures;
+    }
 
     VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableMemoryFeatures = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT,
@@ -1769,6 +1785,29 @@ namespace gtl
     return true;
   }
 
+  static void cgpuPrintPipelineStatistics(CgpuIDevice* idevice, VkPipeline pipeline)
+  {
+    VkPipelineInfoKHR pipelineInfo = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR,
+      .pNext = nullptr,
+      .pipeline = pipeline
+    };
+
+    uint32_t propertyCount;
+    std::vector<VkPipelineExecutablePropertiesKHR> properties;
+
+    idevice->table.vkGetPipelineExecutablePropertiesKHR(idevice->logicalDevice, &pipelineInfo, &propertyCount, nullptr);
+    properties.resize(propertyCount);
+
+    idevice->table.vkGetPipelineExecutablePropertiesKHR(idevice->logicalDevice, &pipelineInfo, &propertyCount, properties.data());
+
+GB_ERROR("property count: {}", propertyCount);
+
+#ifdef GTL_VERBOSE
+
+#endif
+  }
+
   bool cgpuCreateComputePipeline(CgpuDevice device,
                                  CgpuComputePipelineCreateInfo createInfo,
                                  CgpuPipeline* pipeline)
@@ -1841,6 +1880,11 @@ namespace gtl
         nullptr
       );
       CGPU_RETURN_ERROR("failed to create compute pipeline");
+    }
+
+    if (idevice->features.pipelineExecutableProperties)
+    {
+      cgpuPrintPipelineStatistics(idevice, ipipeline->pipeline);
     }
 
     if (iinstance->debugUtilsEnabled && createInfo.debugName)
@@ -2077,6 +2121,9 @@ namespace gtl
       uint32_t groupCount = hitStageAndGroupOffset + createInfo.hitGroupCount;
 
       VkPipelineCreateFlags flags = 0;
+#ifndef NDEBUG
+      flags |= VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR;
+#endif
       if (!anyNullClosestHitShader && createInfo.hitGroupCount > 0)
       {
         flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
@@ -2112,6 +2159,11 @@ namespace gtl
                                                         &ipipeline->pipeline) != VK_SUCCESS)
       {
         goto cleanup_fail;
+      }
+
+      if (idevice->features.pipelineExecutableProperties)
+      {
+        cgpuPrintPipelineStatistics(idevice, ipipeline->pipeline);
       }
 
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;

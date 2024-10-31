@@ -463,6 +463,7 @@ namespace gtl
     bool pageableDeviceLocalMemory;
     bool debugPrintf;
     bool textureCompressionBC;
+    bool pipelineExecutableProperties;
     bool pipelineStatisticsQuery;
     bool shaderImageGatherExtended;
     bool shaderStorageImageExtendedFormats;
