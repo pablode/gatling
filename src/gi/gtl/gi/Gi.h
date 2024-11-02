@@ -117,8 +117,8 @@ namespace gtl
     GiAovId          aovId;
     GiCameraDesc     camera;
     GiDomeLight*     domeLight;
-    GiRenderSettings renderSettings;
     GiRenderBuffer*  renderBuffer;
+    GiRenderSettings renderSettings;
     GiScene*         scene;
   };
 
