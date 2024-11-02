@@ -55,11 +55,6 @@ private:
   GiScene* _scene;
   const HdRenderSettingsMap& _settings;
   bool _isConverged;
-  uint32_t _lastSceneStateVersion;
-  uint32_t _lastSprimIndexVersion;
-  uint32_t _lastRenderSettingsVersion;
-  uint32_t _lastVisChangeCount;
-  GiAovId _lastAovId;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

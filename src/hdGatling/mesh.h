@@ -75,7 +75,7 @@ private:
                                 bool& sequentiallyIndexed,
                                 VtValue& result) const;
 
-  void _CreateGiMesh(HdSceneDelegate* sceneDelegate);
+  GiMesh* _CreateGiMesh(HdSceneDelegate* sceneDelegate);
 
 private:
   GiMesh* _giMesh = nullptr;

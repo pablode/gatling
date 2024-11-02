@@ -424,7 +424,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
       _giMesh = nullptr;
     }
 
-    _CreateGiMesh(sceneDelegate); // TODO: return ptr
+    _giMesh = _CreateGiMesh(sceneDelegate);
 
     (*dirtyBits) |= HdChangeTracker::DirtyMaterialId; // force material assignment
   }
@@ -482,7 +482,6 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
   {
-    // TODO: can this path be empty? -> default material
     const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
 
     SetMaterialId(materialId);
@@ -666,7 +665,7 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
   return true;
 }
 
-void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
+GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 {
   const SdfPath& id = GetId();
 
@@ -685,7 +684,7 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   if (boxedPoints.IsEmpty())
   {
     TF_RUNTIME_ERROR("Points primvar not found (%s)", id.GetText());
-    return;
+    return nullptr;
   }
 
   s.points = boxedPoints.Get<VtVec3fArray>();
@@ -848,7 +847,8 @@ void HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     .vertexCount = (uint32_t) vertices.size(),
     .vertices = vertices.data()
   };
-  _giMesh = giCreateMesh(_scene, desc);
+
+  return giCreateMesh(_scene, desc);
 }
 
 GiMesh* HdGatlingMesh::GetGiMesh() const

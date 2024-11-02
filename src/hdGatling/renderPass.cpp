@@ -98,10 +98,6 @@ HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
   , _scene(scene)
   , _settings(settings)
   , _isConverged(false)
-  , _lastSceneStateVersion(UINT32_MAX)
-  , _lastSprimIndexVersion(UINT32_MAX)
-  , _lastRenderSettingsVersion(UINT32_MAX)
-  , _lastVisChangeCount(UINT32_MAX)
 {
 }
 
@@ -179,6 +175,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
+  GiAovId aovId = _GetAovId(aovBinding->aovName);
+
   HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding->renderBuffer);
   if (renderBuffer->GetFormat() != HdFormatFloat32Vec4)
   {
@@ -191,30 +189,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
 
-  uint32_t sceneStateVersion = changeTracker.GetSceneStateVersion();
-  uint32_t sprimIndexVersion = changeTracker.GetSprimIndexVersion();
-  uint32_t visibilityChangeCount = changeTracker.GetVisibilityChangeCount();
-  uint32_t renderSettingsStateVersion = renderDelegate->GetRenderSettingsVersion();
-  GiAovId aovId = _GetAovId(aovBinding->aovName);
-
-  bool sceneChanged = (sceneStateVersion != _lastSceneStateVersion);
-  bool renderSettingsChanged = (renderSettingsStateVersion != _lastRenderSettingsVersion);
-  bool visibilityChanged = (_lastVisChangeCount != visibilityChangeCount);
-  bool aovChanged = (aovId != _lastAovId);
-
-  // TODO: also remove(?)
-  if (sceneChanged || renderSettingsChanged || visibilityChanged || aovChanged)
-  {
-    giInvalidateFramebuffer();
-  }
-
-  // TODO: remove(?)
-  _lastSceneStateVersion = sceneStateVersion;
-  _lastSprimIndexVersion = sprimIndexVersion;
-  _lastRenderSettingsVersion = renderSettingsStateVersion;
-  _lastVisChangeCount = visibilityChangeCount;
-  _lastAovId = aovId;
-
   GfVec4f backgroundColor = aovBinding->clearValue.GetWithDefault<GfVec4f>(GfVec4f(0.f));
 
   bool clippingEnabled = renderPassState->GetClippingEnabled() &&
@@ -225,31 +199,27 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   GiCameraDesc giCamera;
   _ConstructGiCamera(*camera, giCamera, clippingEnabled);
 
-  // TODO: rename to render settings
-  GiShaderCacheParams shaderCacheParams = {
-    .aovId = aovId,
-    .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
-    .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
-    .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
-    .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
-    .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
-    .mediumStackSize = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->mediumStackSize)->second).Get<uint32_t>(),
-    .scene = _scene
-  };
-
   GiRenderParams renderParams = {
-    .shaderCacheParams = &shaderCacheParams,
+    .aovId = aovId,
     .camera = giCamera,
-    .renderBuffer = renderBuffer->GetGiRenderBuffer(),
-    .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),
-    .maxBounces = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<uint32_t>(),
-    .spp = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<uint32_t>(),
-    .rrBounceOffset = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<uint32_t>(),
-    .rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>(),
-    .maxSampleValue = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>(),
-    .maxVolumeWalkLength = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxVolumeWalkLength)->second).Get<uint32_t>(),
-    .backgroundColor = { backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] },
     .domeLight = renderParam->ActiveDomeLight(),
+    .renderBuffer = renderBuffer->GetGiRenderBuffer(),
+    .renderSettings = {
+      .backgroundColor = { backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] },
+      .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
+      .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
+      .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
+      .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),
+      .maxBounces = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<uint32_t>(),
+      .maxSampleValue = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>(),
+      .maxVolumeWalkLength = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxVolumeWalkLength)->second).Get<uint32_t>(),
+      .mediumStackSize = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->mediumStackSize)->second).Get<uint32_t>(),
+      .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
+      .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
+      .rrBounceOffset = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<uint32_t>(),
+      .rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>(),
+      .spp = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<uint32_t>()
+    },
     .scene = _scene
   };
 

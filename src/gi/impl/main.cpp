@@ -130,31 +130,6 @@ public:
 
 TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
 {
-  GiShaderCacheParams shaderCacheParams = {
-    .aovId = GiAovId::Color,
-    .depthOfField = false,
-    .domeLightCameraVisible = false,
-    .filterImportanceSampling = false,
-    .materialCount = 0,
-    .materials = nullptr,
-    .nextEventEstimation = false,
-    .progressiveAccumulation = true,
-    .scene = m_scene,
-    .mediumStackSize = 1
-  };
-
-  GiShaderCache* shaderCache = giCreateShaderCache(shaderCacheParams);
-  REQUIRE(shaderCache);
-
-  GiBvhParams bvhParams = {
-    .meshInstanceCount = 0,
-    .meshInstances = nullptr,
-    .shaderCache = shaderCache
-  };
-
-  GiBvh* bvh = giCreateBvh(m_scene, bvhParams);
-  REQUIRE(bvh);
-
   GiCameraDesc camDesc = {
     .position = { 0.0f, 0.0f, 0.0f },
     .forward = { 0.0f, 0.0f, -1.0f },
@@ -169,19 +144,26 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
   };
 
   GiRenderParams renderParams =  {
-    .bvh = bvh,
+    .aovId = GiAovId::Color,
     .camera = camDesc,
-    .shaderCache = shaderCache,
-    .renderBuffer = m_renderBuffer,
-    .lightIntensityMultiplier = 1.0f,
-    .maxBounces = 8,
-    .spp = 1,
-    .rrBounceOffset = 255,
-    .rrInvMinTermProb = 0.0f,
-    .maxSampleValue = 100.0f,
-    .maxVolumeWalkLength = 7,
-    .backgroundColor = { 0.5f, 0.5f, 0.5f, 1.0f },
     .domeLight = nullptr,
+    .renderBuffer = m_renderBuffer,
+    .renderSettings = {
+      .backgroundColor = { 0.5f, 0.5f, 0.5f, 1.0f },
+      .depthOfField = false,
+      .domeLightCameraVisible = false,
+      .filterImportanceSampling = false,
+      .lightIntensityMultiplier = 1.0f,
+      .maxBounces = 8,
+      .maxSampleValue = 100.0f,
+      .maxVolumeWalkLength = 7,
+      .mediumStackSize = 1,
+      .nextEventEstimation = false,
+      .progressiveAccumulation = true,
+      .rrBounceOffset = 255,
+      .rrInvMinTermProb = 0.0f,
+      .spp = 1
+    },
     .scene = m_scene
   };
 
@@ -189,7 +171,4 @@ TEST_CASE_FIXTURE(GraphicalTestFixture, "EmptyScene")
   REQUIRE_EQ(giRender(renderParams, outputImg.data()), GiStatus::Ok);
 
   CHECK(compareWithRef(outputImg.data()));
-
-  giDestroyShaderCache(shaderCache);
-  giDestroyBvh(bvh);
 }

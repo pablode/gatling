@@ -94,34 +94,32 @@ namespace gtl
     GiVertex* vertices;
   };
 
-  // TODO: rename
-  struct GiShaderCacheParams
+  struct GiRenderSettings
   {
-    GiAovId  aovId;
+    float    backgroundColor[4];
     bool     depthOfField;
     bool     domeLightCameraVisible;
     bool     filterImportanceSampling;
+    float    lightIntensityMultiplier;
+    uint32_t maxBounces;
+    float    maxSampleValue;
+    uint32_t maxVolumeWalkLength;
+    uint32_t mediumStackSize;
     bool     nextEventEstimation;
     bool     progressiveAccumulation;
-    uint32_t mediumStackSize;
-    GiScene* scene;
+    uint32_t rrBounceOffset;
+    float    rrInvMinTermProb;
+    uint32_t spp;
   };
 
   struct GiRenderParams
   {
-    const GiShaderCacheParams* shaderCacheParams;
-    GiCameraDesc    camera;
-    GiRenderBuffer* renderBuffer;
-    float           lightIntensityMultiplier;
-    uint32_t        maxBounces;
-    uint32_t        spp;
-    uint32_t        rrBounceOffset;
-    float           rrInvMinTermProb;
-    float           maxSampleValue;
-    uint32_t        maxVolumeWalkLength;
-    float           backgroundColor[4];
-    GiDomeLight*    domeLight;
-    GiScene*        scene;
+    GiAovId          aovId;
+    GiCameraDesc     camera;
+    GiDomeLight*     domeLight;
+    GiRenderSettings renderSettings;
+    GiRenderBuffer*  renderBuffer;
+    GiScene*         scene;
   };
 
   struct GiInitParams
@@ -158,8 +156,6 @@ namespace gtl
   void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat);
   void giSetMeshVisibility(GiMesh* mesh, bool visible);
   void giDestroyMesh(GiMesh* mesh);
-
-  void giInvalidateFramebuffer();
 
   GiStatus giRender(const GiRenderParams& params, float* rgbaImg);
 

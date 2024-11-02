@@ -163,11 +163,16 @@ namespace gtl
 
   enum class GiSceneDirtyFlags : uint32_t
   {
-    Clean           = 0,
-    DirtyTlas       = 1,
-    DirtyBlases     = 2,
-    DirtyRtPipeline = 4,
-    All             = ~0u
+    Clean               = (1 << 0),
+    DirtyTlas           = (1 << 1),
+    DirtyBlases         = (1 << 2),
+    DirtyFramebuffer    = (1 << 4),
+    // TODO: implement invalidation of stages
+    DirtyRtPipelineRgen = (1 << 8),
+    DirtyRtPipelineHit  = (1 << 8),
+    DirtyRtPipelineMiss = (1 << 8),
+    DirtyRtPipeline     = (DirtyRtPipelineRgen | DirtyRtPipelineHit | DirtyRtPipelineMiss),
+    All                 = ~0u
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
 
@@ -186,6 +191,7 @@ namespace gtl
     GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::All;
     GiShaderCache* shaderCache = nullptr;
     GiBvh* bvh = nullptr;
+    GiRenderParams oldRenderParams = {};
   };
 
   struct GiRenderBuffer
@@ -542,6 +548,7 @@ fail:
     {
       std::lock_guard guard(scene->mutex);
       scene->meshes.insert(mesh);
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
     }
     return mesh;
   }
@@ -620,6 +627,7 @@ fail:
     {
       std::lock_guard guard(scene->mutex);
       scene->meshes.erase(mesh);
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
     }
     delete mesh;
   }
@@ -875,8 +883,7 @@ fail_cleanup:
     }
   }
 
-// TODO: rename to private methods
-  GiBvh* giCreateBvh(GiScene* scene, const GiShaderCache* shaderCache)
+  GiBvh* _giCreateBvh(GiScene* scene, const GiShaderCache* shaderCache)
   {
     GiBvh* bvh = nullptr;
 
@@ -965,8 +972,9 @@ cleanup:
     delete bvh;
   }
 
-  GiShaderCache* giCreateShaderCache(const GiShaderCacheParams& params)
+  GiShaderCache* giCreateShaderCache(const GiRenderParams& params)
   {
+    const GiRenderSettings& renderSettings = params.renderSettings;
     bool clockCyclesAov = params.aovId == GiAovId::ClockCycles;
 
     if (clockCyclesAov && !s_deviceFeatures.shaderClock)
@@ -1006,13 +1014,13 @@ cleanup:
     uint32_t sphereLightCount = scene->sphereLights.elementCount();
     uint32_t totalLightCount = diskLightCount + distantLightCount + rectLightCount + sphereLightCount;
 
-    bool nextEventEstimation = (params.nextEventEstimation && totalLightCount > 0);
+    bool nextEventEstimation = (renderSettings.nextEventEstimation && totalLightCount > 0);
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovId = (int) params.aovId,
       .diskLightCount = diskLightCount,
       .distantLightCount = distantLightCount,
-      .mediumStackSize = params.mediumStackSize,
+      .mediumStackSize = renderSettings.mediumStackSize,
       .rectLightCount = rectLightCount,
       .sphereLightCount = sphereLightCount,
       .texCount2d = 2, // +1 fallback and +1 real dome light
@@ -1268,11 +1276,11 @@ cleanup:
     {
       GiGlslShaderGen::RaygenShaderParams rgenParams = {
         .commonParams = commonParams,
-        .depthOfField = params.depthOfField,
-        .filterImportanceSampling = params.filterImportanceSampling,
+        .depthOfField = renderSettings.depthOfField,
+        .filterImportanceSampling = renderSettings.filterImportanceSampling,
         .materialCount = uint32_t(materials.size()),
         .nextEventEstimation = nextEventEstimation,
-        .progressiveAccumulation = params.progressiveAccumulation,
+        .progressiveAccumulation = renderSettings.progressiveAccumulation,
         .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
         .shaderClockExt = clockCyclesAov
       };
@@ -1297,7 +1305,7 @@ cleanup:
     {
       GiGlslShaderGen::MissShaderParams missParams = {
         .commonParams = commonParams,
-        .domeLightCameraVisible = params.domeLightCameraVisible
+        .domeLightCameraVisible = renderSettings.domeLightCameraVisible
       };
 
       // regular miss shader
@@ -1370,7 +1378,7 @@ cleanup:
 
     cache = new GiShaderCache;
     cache->aovId = (int) params.aovId;
-    cache->domeLightCameraVisible = params.domeLightCameraVisible;
+    cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
     cache->hitShaders = std::move(hitShaders);
     cache->images2d = std::move(images2d);
     cache->images3d = std::move(images3d);
@@ -1427,9 +1435,49 @@ cleanup:
     delete cache;
   }
 
-  void giInvalidateFramebuffer()
+  GiSceneDirtyFlags _CalcDirtyFlagsForRenderParams(const GiRenderParams& a,
+                                                   const GiRenderParams& b)
   {
-    s_resetSampleOffset = true;
+    GiSceneDirtyFlags flags = {};
+
+    if (memcmp(&a, &b, sizeof(GiRenderParams)) == 0)
+    {
+      return flags;
+    }
+
+    if (a.aovId != b.aovId ||
+        memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
+        memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0 ||
+        a.domeLight != b.domeLight ||
+        a.scene != b.scene)
+    {
+      flags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    }
+
+    const GiRenderSettings& ra = a.renderSettings;
+    const GiRenderSettings& rb = b.renderSettings;
+
+    if (memcmp(ra.backgroundColor, rb.backgroundColor, sizeof(float) * 4) != 0 ||
+        ra.domeLightCameraVisible != rb.domeLightCameraVisible)
+    {
+      flags |= GiSceneDirtyFlags::DirtyRtPipelineMiss;
+    }
+
+    if (ra.depthOfField != rb.depthOfField ||
+        ra.filterImportanceSampling != rb.filterImportanceSampling ||
+        ra.maxVolumeWalkLength != rb.maxVolumeWalkLength ||
+        ra.progressiveAccumulation != rb.progressiveAccumulation)
+    {
+      flags |= GiSceneDirtyFlags::DirtyRtPipelineRgen;
+    }
+
+    if (ra.mediumStackSize != rb.mediumStackSize ||
+        ra.nextEventEstimation != rb.nextEventEstimation)
+    {
+      flags |= GiSceneDirtyFlags::DirtyRtPipeline;
+    }
+
+    return flags;
   }
 
   GiStatus giRender(const GiRenderParams& params, float* rgbaImg)
@@ -1437,20 +1485,36 @@ cleanup:
     s_stager->flush();
 
     GiScene* scene = params.scene;
+    GiRenderBuffer* renderBuffer = params.renderBuffer;
+    const GiRenderSettings& renderSettings = params.renderSettings;
 
     if (s_forceShaderCacheInvalid)
     {
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyRtPipeline | GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyRtPipeline | GiSceneDirtyFlags::DirtyFramebuffer;
       s_forceShaderCacheInvalid = false;
+    }
+
+    if (s_resetSampleOffset)
+    {
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+      s_resetSampleOffset = false;
+    }
+
+    if (GiSceneDirtyFlags flags = _CalcDirtyFlagsForRenderParams(params, scene->oldRenderParams); bool(flags))
+    {
+      scene->dirtyFlags |= flags;
+
+      memcpy(&scene->oldRenderParams, &params, sizeof(GiRenderParams));
     }
 
     if (!scene->shaderCache || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyRtPipeline))
     {
       if (scene->shaderCache) giDestroyShaderCache(scene->shaderCache);
 
-      scene->shaderCache = giCreateShaderCache(*params.shaderCacheParams);
+      scene->shaderCache = giCreateShaderCache(params);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyRtPipeline;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyTlas; // SBT
     }
 
     if (!scene->bvh ||
@@ -1459,17 +1523,24 @@ cleanup:
     {
       if (scene->bvh) giDestroyBvh(scene->bvh);
 
-      scene->bvh = giCreateBvh(scene, scene->shaderCache);
+      scene->bvh = _giCreateBvh(scene, scene->shaderCache);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBlases;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    }
+
+    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyFramebuffer))
+    {
+      renderBuffer->sampleOffset = 0;
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyFramebuffer;
     }
 
     GiBvh* bvh = scene->bvh;
     const GiShaderCache* shaderCache = scene->shaderCache;
 
     // Upload dome lights.
-    glm::vec4 backgroundColor = glm::make_vec4(params.backgroundColor);
+    glm::vec4 backgroundColor = glm::make_vec4(renderSettings.backgroundColor);
     if (backgroundColor != scene->backgroundColor)
     {
       glm::u8vec4 u8BgColor(backgroundColor * 255.0f);
@@ -1538,7 +1609,6 @@ cleanup:
     }
 
     // Set up output buffer.
-    GiRenderBuffer* renderBuffer = params.renderBuffer;
     uint32_t imageWidth = renderBuffer->width;
     uint32_t imageHeight = renderBuffer->height;
 
@@ -1550,12 +1620,6 @@ cleanup:
     {
       GB_ERROR("failed to resize render buffer!");
       return GiStatus::Error;
-    }
-
-    if (s_resetSampleOffset)
-    {
-      renderBuffer->sampleOffset = 0;
-      s_resetSampleOffset = false;
     }
 
     // Set up GPU data.
@@ -1577,6 +1641,7 @@ cleanup:
     glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
     uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
 
+
     rp::PushConstants pushData = {
       .cameraPosition                 = glm::make_vec3(params.camera.position),
       .imageDims                      = ((imageHeight << 16) | imageWidth),
@@ -1586,17 +1651,17 @@ cleanup:
       .cameraVFoV                     = params.camera.vfov,
       .sampleOffset                   = renderBuffer->sampleOffset,
       .lensRadius                     = lensRadius,
-      .sampleCount                    = params.spp,
-      .maxSampleValue                 = params.maxSampleValue,
+      .sampleCount                    = renderSettings.spp,
+      .maxSampleValue                 = renderSettings.maxSampleValue,
       .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
       .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
       .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
-      .maxBouncesAndRrBounceOffset    = ((params.maxBounces << 16) | params.rrBounceOffset),
-      .rrInvMinTermProb               = params.rrInvMinTermProb,
-      .lightIntensityMultiplier       = params.lightIntensityMultiplier,
+      .maxBouncesAndRrBounceOffset    = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
+      .rrInvMinTermProb               = renderSettings.rrInvMinTermProb,
+      .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
       .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
       .sensorExposure                 = params.camera.exposure,
-      .maxVolumeWalkLength            = params.maxVolumeWalkLength
+      .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength
     };
 
     std::vector<CgpuBufferBinding> buffers;
@@ -1755,7 +1820,7 @@ cleanup:
       }
     }
 
-    renderBuffer->sampleOffset += params.spp;
+    renderBuffer->sampleOffset += renderSettings.spp;
 
     result = GiStatus::Ok;
 
@@ -1826,6 +1891,8 @@ cleanup:
     data->radiusXYZ[1] = 0.5f;
     data->radiusXYZ[2] = 0.5f;
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     return light;
   }
 
@@ -1845,6 +1912,8 @@ cleanup:
     data->pos[0] = pos[0];
     data->pos[1] = pos[1];
     data->pos[2] = pos[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb)
@@ -1855,6 +1924,8 @@ cleanup:
     data->baseEmission[0] = rgb[0];
     data->baseEmission[1] = rgb[1];
     data->baseEmission[2] = rgb[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetSphereLightRadius(GiSphereLight* light, float radiusX, float radiusY, float radiusZ)
@@ -1871,6 +1942,8 @@ cleanup:
     data->radiusXYZ[1] = radiusY;
     data->radiusXYZ[2] = radiusZ;
     data->area = area;
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetSphereLightDiffuseSpecular(GiSphereLight* light, float diffuse, float specular)
@@ -1879,6 +1952,8 @@ cleanup:
     assert(data);
 
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   GiDistantLight* giCreateDistantLight(GiScene* scene)
@@ -1902,6 +1977,8 @@ cleanup:
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
     data->invPdf = 1.0f;
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     return light;
   }
 
@@ -1921,6 +1998,8 @@ cleanup:
     data->direction[0] = direction[0];
     data->direction[1] = direction[1];
     data->direction[2] = direction[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDistantLightBaseEmission(GiDistantLight* light, float* rgb)
@@ -1931,6 +2010,8 @@ cleanup:
     data->baseEmission[0] = rgb[0];
     data->baseEmission[1] = rgb[1];
     data->baseEmission[2] = rgb[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDistantLightAngle(GiDistantLight* light, float angle)
@@ -1943,6 +2024,8 @@ cleanup:
 
     data->angle = angle;
     data->invPdf = invPdf;
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDistantLightDiffuseSpecular(GiDistantLight* light, float diffuse, float specular)
@@ -1951,6 +2034,8 @@ cleanup:
     assert(data);
 
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   GiRectLight* giCreateRectLight(GiScene* scene)
@@ -1978,6 +2063,8 @@ cleanup:
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     return light;
   }
 
@@ -1997,6 +2084,8 @@ cleanup:
     data->origin[0] = origin[0];
     data->origin[1] = origin[1];
     data->origin[2] = origin[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetRectLightTangents(GiRectLight* light, float* t0, float* t1)
@@ -2008,6 +2097,8 @@ cleanup:
     assert(data);
 
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetRectLightBaseEmission(GiRectLight* light, float* rgb)
@@ -2018,6 +2109,8 @@ cleanup:
     data->baseEmission[0] = rgb[0];
     data->baseEmission[1] = rgb[1];
     data->baseEmission[2] = rgb[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetRectLightDimensions(GiRectLight* light, float width, float height)
@@ -2027,6 +2120,8 @@ cleanup:
 
     data->width = width;
     data->height = height;
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float specular)
@@ -2035,6 +2130,8 @@ cleanup:
     assert(data);
 
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   GiDiskLight* giCreateDiskLight(GiScene* scene)
@@ -2062,6 +2159,8 @@ cleanup:
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     return light;
   }
 
@@ -2081,6 +2180,8 @@ cleanup:
     data->origin[0] = origin[0];
     data->origin[1] = origin[1];
     data->origin[2] = origin[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDiskLightTangents(GiDiskLight* light, float* t0, float* t1)
@@ -2092,6 +2193,8 @@ cleanup:
     assert(data);
 
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb)
@@ -2102,6 +2205,8 @@ cleanup:
     data->baseEmission[0] = rgb[0];
     data->baseEmission[1] = rgb[1];
     data->baseEmission[2] = rgb[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDiskLightRadius(GiDiskLight* light, float radiusX, float radiusY)
@@ -2111,6 +2216,8 @@ cleanup:
 
     data->radiusX = radiusX;
     data->radiusY = radiusY;
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular)
@@ -2119,6 +2226,8 @@ cleanup:
     assert(data);
 
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath)
@@ -2131,6 +2240,7 @@ cleanup:
     return light;
   }
 
+  // TODO: don't need scene param
   void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
   {
     std::lock_guard guard(scene->mutex);
@@ -2140,17 +2250,20 @@ cleanup:
   void giSetDomeLightRotation(GiDomeLight* light, float* quat)
   {
     light->rotation = glm::make_quat(quat);
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb)
   {
     light->baseEmission = glm::make_vec3(rgb);
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular)
   {
     light->diffuse = diffuse;
     light->specular = specular;
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height)
