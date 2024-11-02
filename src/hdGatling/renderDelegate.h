@@ -42,7 +42,7 @@ public:
 public:
   HdRenderSettingDescriptorList GetRenderSettingDescriptors() const override;
 
-  void SetRenderSetting(TfToken const& key, VtValue const& value) override;
+  void SetRenderSetting(const TfToken& key, const VtValue& value) override;
 
   HdCommandDescriptors GetCommandDescriptors() const override;
 

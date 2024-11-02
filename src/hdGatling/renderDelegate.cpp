@@ -142,7 +142,7 @@ HdRenderSettingDescriptorList HdGatlingRenderDelegate::GetRenderSettingDescripto
   return _settingDescriptors;
 }
 
-void HdGatlingRenderDelegate::SetRenderSetting(TfToken const& key, VtValue const& value)
+void HdGatlingRenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value)
 {
 #ifdef NDEBUG
   // Disallow changing debug render settings in release config.

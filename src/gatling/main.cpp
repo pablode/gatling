@@ -28,6 +28,7 @@
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderBuffer.h>
 #include <pxr/imaging/hd/renderIndex.h>
+#include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hf/pluginDesc.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/tokens.h>
@@ -110,6 +111,8 @@ int main(int argc, const char* argv[])
 
   HdRenderDelegate* renderDelegate = plugin->CreateRenderDelegate();
   TF_AXIOM(renderDelegate);
+
+  renderDelegate->SetRenderSetting(HdRenderSettingsTokens->enableInteractive, VtValue(false));
 
   // Handle cmdline args.
   AppSettings settings;

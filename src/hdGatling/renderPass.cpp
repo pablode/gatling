@@ -29,6 +29,7 @@
 #include <pxr/base/gf/matrix3d.h>
 #include <pxr/base/gf/camera.h>
 
+#include <gtl/gb/Log.h>
 #include <gtl/gi/Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -52,23 +53,22 @@ namespace
     { HdAovTokens->primId,                   GiAovId::ObjectId     },
   };
 
-  const HdRenderPassAovBinding* _FilterAovBinding(const HdRenderPassAovBindingVector& aovBindings)
+  const HdRenderPassAovBinding* _PrepareAovBindings(const HdRenderPassAovBindingVector& aovBindings, TfToken selectedAov)
   {
+    const HdRenderPassAovBinding* colorBinding = nullptr;
+
     for (const HdRenderPassAovBinding& aovBinding : aovBindings)
     {
-      bool aovSupported = _aovIdMappings.count(aovBinding.aovName) > 0;
-
-      if (aovSupported)
+      if (aovBinding.aovName == selectedAov)
       {
-        return &aovBinding;
+        colorBinding = &aovBinding;
       }
 
       HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
       renderBuffer->SetConverged(true);
-      continue;
     }
 
-    return nullptr;
+    return colorBinding;
   }
 
   GiAovId _GetAovId(const TfToken& aovName)
@@ -87,6 +87,44 @@ namespace
     }
 
     return id;
+  }
+
+  bool _IsInteractive(const HdRenderSettingsMap& settings)
+  {
+    auto settingIt = settings.find(HdRenderSettingsTokens->enableInteractive);
+    if (settingIt != settings.end())
+    {
+      return settingIt->second.Get<bool>();
+    }
+
+    // https://www.sidefx.com/docs/hdk/_h_d_k__u_s_d_hydra.html#HDK_USDHydraCustomSettingsInteractive
+    const static TfToken houdiniInteractive("houdini:interactive", TfToken::Immortal);
+    settingIt = settings.find(houdiniInteractive);
+
+    if (settingIt != settings.end())
+    {
+      const VtValue& val = settingIt->second;
+
+      const char* str = nullptr;
+      if (val.IsHolding<std::string>())
+      {
+        str = val.UncheckedGet<std::string>().c_str();
+      }
+      else if (val.IsHolding<TfToken>())
+      {
+        str = val.UncheckedGet<TfToken>().GetText();
+      }
+      else
+      {
+        // FIXME: need to build against Houdini SDK and extract UT_StringHolder in this case
+        GB_ERROR("failed to get string from houdini:interactive setting");
+        return false;
+      }
+
+      return strcmp(str, "normal") != 0;
+    }
+
+    return true;
   }
 }
 
@@ -154,8 +192,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 {
   TF_UNUSED(renderTags);
 
-  _isConverged = false;
-
   const HdCamera* camera = renderPassState->GetCamera();
   if (!camera)
   {
@@ -168,7 +204,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
-  const HdRenderPassAovBinding* aovBinding = _FilterAovBinding(aovBindings);
+  const HdRenderPassAovBinding* aovBinding = _PrepareAovBindings(aovBindings, HdAovTokens->color);
   if (!aovBinding)
   {
     TF_RUNTIME_ERROR("AOV not supported");
@@ -231,7 +267,9 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
 
   renderBuffer->Unmap();
 
-  _isConverged = true;
+  _isConverged = !_IsInteractive(_settings);
+
+  renderBuffer->SetConverged(_isConverged);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
