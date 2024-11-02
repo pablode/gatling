@@ -164,9 +164,9 @@ namespace gtl
   enum class GiSceneDirtyFlags : uint32_t
   {
     Clean               = (1 << 0),
-    DirtyTlas           = (1 << 1),
+    DirtyBvh            = (1 << 1),
     DirtyFramebuffer    = (1 << 2),
-    // TODO: implement invalidation of stages
+    // FIXME: implement invalidation of stages
     DirtyRtPipelineRgen = (1 << 4),
     DirtyRtPipelineHit  = (1 << 4),
     DirtyRtPipelineMiss = (1 << 4),
@@ -547,7 +547,7 @@ fail:
     {
       std::lock_guard guard(scene->mutex);
       scene->meshes.insert(mesh);
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
     return mesh;
   }
@@ -559,7 +559,7 @@ fail:
     GiScene* scene = mesh->scene;
     {
       std::lock_guard guard(scene->mutex);
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
   }
 
@@ -574,7 +574,7 @@ fail:
     GiScene* scene = mesh->scene;
     {
       std::lock_guard guard(scene->mutex);
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
   }
 
@@ -587,7 +587,7 @@ fail:
     if (oldMcMat && newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency)
     {
       // material data such as alpha is used in the BVH build; invalidate BVH
-      dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+      dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
       mesh->gpuData.reset();
     }
 
@@ -607,7 +607,7 @@ fail:
     GiScene* scene = mesh->scene;
     {
       std::lock_guard guard(scene->mutex);
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
   }
 
@@ -626,7 +626,7 @@ fail:
     {
       std::lock_guard guard(scene->mutex);
       scene->meshes.erase(mesh);
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
     delete mesh;
   }
@@ -865,6 +865,9 @@ fail_cleanup:
         continue; // invalid geometry or an error occurred
       }
 
+      totalIndicesSize += mesh->cpuData.faces.size() * sizeof(uint32_t) * 3;
+      totalVerticesSize += mesh->cpuData.vertices.size() * sizeof(rp::FVertex);
+
       for (const glm::mat3x4& t : mesh->instanceTransforms)
       {
         // Create BLAS instance for TLAS.
@@ -899,7 +902,7 @@ fail_cleanup:
 
     _giBuildGeometryStructures(scene, shaderCache, blasInstances, blasPayloads, indicesSize, verticesSize);
 
-    GB_LOG("BLAS build finished");
+    GB_LOG("BLAS builds finished");
     GB_LOG("> {} unique BLAS", blasPayloads.size());
     GB_LOG("> {} BLAS instances", blasInstances.size());
     GB_LOG("> {:.2f} MiB total indices", indicesSize * BYTES_TO_MIB);
@@ -964,14 +967,14 @@ cleanup:
     return bvh;
   }
 
-  void giDestroyBvh(GiBvh* bvh)
+  void _giDestroyBvh(GiBvh* bvh)
   {
     cgpuDestroyTlas(s_device, bvh->tlas);
     cgpuDestroyBuffer(s_device, bvh->blasPayloadsBuffer);
     delete bvh;
   }
 
-  GiShaderCache* giCreateShaderCache(const GiRenderParams& params)
+  GiShaderCache* _giCreateShaderCache(const GiRenderParams& params)
   {
     const GiRenderSettings& renderSettings = params.renderSettings;
     bool clockCyclesAov = params.aovId == GiAovId::ClockCycles;
@@ -1423,7 +1426,7 @@ cleanup:
     return cache;
   }
 
-  void giDestroyShaderCache(GiShaderCache* cache)
+  void _giDestroyShaderCache(GiShaderCache* cache)
   {
     s_texSys->destroyUncachedImages(cache->images2d);
     s_texSys->destroyUncachedImages(cache->images3d);
@@ -1514,21 +1517,21 @@ cleanup:
 
     if (!scene->shaderCache || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyRtPipeline))
     {
-      if (scene->shaderCache) giDestroyShaderCache(scene->shaderCache);
+      if (scene->shaderCache) _giDestroyShaderCache(scene->shaderCache);
 
-      scene->shaderCache = giCreateShaderCache(params);
+      scene->shaderCache = _giCreateShaderCache(params);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyRtPipeline;
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyTlas; // SBT
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBvh; // SBT
     }
 
-    if (!scene->bvh || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyTlas))
+    if (!scene->bvh || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyBvh))
     {
-      if (scene->bvh) giDestroyBvh(scene->bvh);
+      if (scene->bvh) _giDestroyBvh(scene->bvh);
 
       scene->bvh = _giCreateBvh(scene, scene->shaderCache);
 
-      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyTlas;
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBvh;
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
     }
 
@@ -1855,11 +1858,11 @@ cleanup:
   {
     if (scene->bvh)
     {
-      giDestroyBvh(scene->bvh);
+      _giDestroyBvh(scene->bvh);
     }
     if (scene->shaderCache)
     {
-      giDestroyShaderCache(scene->shaderCache);
+      _giDestroyShaderCache(scene->shaderCache);
     }
     if (scene->domeLight)
     {
@@ -2276,7 +2279,7 @@ cleanup:
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    // FIXME: don't destroy resources in use (append them to deletion queue?)
+    // FIXME: don't destroy resources in use (append them to deletion queue)
 
     if (renderBuffer->buffer.handle)
       cgpuDestroyBuffer(s_device, renderBuffer->buffer);
