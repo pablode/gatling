@@ -165,12 +165,11 @@ namespace gtl
   {
     Clean               = (1 << 0),
     DirtyTlas           = (1 << 1),
-    DirtyBlases         = (1 << 2),
-    DirtyFramebuffer    = (1 << 4),
+    DirtyFramebuffer    = (1 << 2),
     // TODO: implement invalidation of stages
-    DirtyRtPipelineRgen = (1 << 8),
-    DirtyRtPipelineHit  = (1 << 8),
-    DirtyRtPipelineMiss = (1 << 8),
+    DirtyRtPipelineRgen = (1 << 4),
+    DirtyRtPipelineHit  = (1 << 4),
+    DirtyRtPipelineMiss = (1 << 4),
     DirtyRtPipeline     = (DirtyRtPipelineRgen | DirtyRtPipelineHit | DirtyRtPipelineMiss),
     All                 = ~0u
   };
@@ -989,6 +988,12 @@ cleanup:
     materials.reserve(scene->meshes.size());
     for (auto* m : scene->meshes)
     {
+      if (!m->material)
+      {
+        assert(false);
+        GB_ERROR("coding error - mesh without material!");
+        return nullptr;
+      }
       materials.push_back(m->material);
     }
 
@@ -1517,15 +1522,12 @@ cleanup:
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyTlas; // SBT
     }
 
-    if (!scene->bvh ||
-        bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyBlases) ||
-        bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyTlas))
+    if (!scene->bvh || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyTlas))
     {
       if (scene->bvh) giDestroyBvh(scene->bvh);
 
       scene->bvh = _giCreateBvh(scene, scene->shaderCache);
 
-      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBlases;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyTlas;
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
     }
@@ -2240,10 +2242,8 @@ cleanup:
     return light;
   }
 
-  // TODO: don't need scene param
-  void giDestroyDomeLight(GiScene* scene, GiDomeLight* light)
+  void giDestroyDomeLight(GiDomeLight* light)
   {
-    std::lock_guard guard(scene->mutex);
     delete light;
   }
 

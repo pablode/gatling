@@ -193,7 +193,7 @@ namespace gtl
   void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular);
 
   GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
-  void giDestroyDomeLight(GiScene* scene, GiDomeLight* light);
+  void giDestroyDomeLight(GiDomeLight* light);
   void giSetDomeLightRotation(GiDomeLight* light, float* quat);
   void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb);
   void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular);

@@ -434,7 +434,7 @@ void HdGatlingDomeLight::DestroyDomeLight(HdRenderParam* renderParam)
   auto rp = static_cast<HdGatlingRenderParam*>(renderParam);
   rp->RemoveDomeLight(_giDomeLight);
 
-  giDestroyDomeLight(_scene, _giDomeLight);
+  giDestroyDomeLight(_giDomeLight);
 
   _giDomeLight = nullptr;
 }
