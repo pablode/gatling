@@ -2133,6 +2133,10 @@ GB_ERROR("property count: {}", propertyCount);
         flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
       }
 
+// <TODO: check compilation time>
+flags |= VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT;
+// </TODO>
+
       VkRayTracingPipelineCreateInfoKHR rtPipelineCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
         .pNext = nullptr,
