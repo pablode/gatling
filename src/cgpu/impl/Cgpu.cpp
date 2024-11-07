@@ -2378,8 +2378,8 @@ cleanup_fail:
     if (!cgpuCreateIBufferAligned(idevice,
                                   CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
                                   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                                  (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR), 0,
-                                  &itlas->instances, createInfo.debugName))
+                                  (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
+                                  16/*required by spec*/, &itlas->instances, createInfo.debugName))
     {
       iinstance->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
