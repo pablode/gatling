@@ -126,6 +126,7 @@ namespace gtl
     GiMeshCpuData cpuData;
     std::optional<GiMeshGpuData> gpuData;
     bool visible = true;
+    std::string name;
   };
 
   struct GiSphereLight
@@ -545,7 +546,8 @@ fail:
       .flipFacing = desc.isLeftHanded,
       .id = desc.id,
       .scene = scene,
-      .cpuData = cpuData
+      .cpuData = cpuData,
+      .name = desc.name
     };
 
     {
@@ -799,7 +801,8 @@ fail:
                                               .indexBuffer = tmpIndexBuffer,
                                               .maxVertex = (uint32_t) positionData.size(),
                                               .triangleCount = (uint32_t) indexData.size() / 3,
-                                              .isOpaque = !material->mcMat->hasCutoutTransparency
+                                              .isOpaque = !material->mcMat->hasCutoutTransparency,
+                                              .debugName = mesh->name.c_str()
                                             }, &blas);
 
           if (!blasCreated)

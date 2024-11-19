@@ -838,6 +838,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     .faces = faces.data(),
     .id = GetPrimId(),
     .isLeftHanded = isLeftHanded,
+    .name = id.GetText(),
     .vertexCount = (uint32_t) vertices.size(),
     .vertices = vertices.data()
   };

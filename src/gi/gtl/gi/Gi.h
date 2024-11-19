@@ -86,12 +86,13 @@ namespace gtl
 
   struct GiMeshDesc
   {
-    uint32_t  faceCount;
-    GiFace*   faces;
-    int       id;
-    bool      isLeftHanded;
-    uint32_t  vertexCount;
-    GiVertex* vertices;
+    uint32_t    faceCount;
+    GiFace*     faces;
+    int         id;
+    bool        isLeftHanded;
+    const char* name;
+    uint32_t    vertexCount;
+    GiVertex*   vertices;
   };
 
   struct GiRenderSettings
