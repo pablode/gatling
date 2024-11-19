@@ -618,8 +618,8 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
   }
   else if (interpolation == HdInterpolationConstant)
   {
-    result = _ExpandBufferElements(buffer, type, primitiveParams.size());
-    isIndexed = true;
+    result = _ExpandBufferElements(buffer, type, primitiveParams.size() * 3);
+    isIndexed = false;
   }
   else if (interpolation == HdInterpolationFaceVarying)
   {
