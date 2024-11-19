@@ -1262,14 +1262,14 @@ namespace gtl
       );
     }
 
-    if (debugName)
-    {
-      vmaSetAllocationName(idevice->allocator, ibuffer->allocation, debugName);
-    }
-
     if (result != VK_SUCCESS)
     {
       CGPU_RETURN_ERROR("failed to create buffer");
+    }
+
+    if (debugName)
+    {
+      vmaSetAllocationName(idevice->allocator, ibuffer->allocation, debugName);
     }
 
     ibuffer->size = size;
