@@ -123,9 +123,9 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   }
 
   auto defaultDiffuseColor = GfVec3f(0.18f); // UsdPreviewSurface spec
-  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(defaultDiffuseColor, "invalid");
+  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(defaultDiffuseColor, "default");
 
-  _defaultMaterial = giCreateMaterialFromMtlxStr(defaultMatSrc.c_str());
+  _defaultMaterial = giCreateMaterialFromMtlxStr("__gatling_default", defaultMatSrc.c_str());
   TF_AXIOM(_defaultMaterial);
 
   _giScene = giCreateScene();

@@ -112,6 +112,7 @@ namespace gtl
   struct GiMaterial
   {
     McMaterial* mcMat;
+    std::string name;
   };
 
   struct GiMesh
@@ -464,20 +465,21 @@ fail:
     s_aggregateAssetReader->addAssetReader(reader);
   }
 
-  GiMaterial* giCreateMaterialFromMtlxStr(const char* str)
+  GiMaterial* giCreateMaterialFromMtlxStr(const char* name, const char* mtlxSrc)
   {
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(str);
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc);
     if (!mcMat)
     {
       return nullptr;
     }
 
-    GiMaterial* mat = new GiMaterial;
-    mat->mcMat = mcMat;
-    return mat;
+    return new GiMaterial {
+      .mcMat = mcMat,
+      .name = name
+    };
   }
 
-  GiMaterial* giCreateMaterialFromMtlxDoc(const std::shared_ptr<void/*MaterialX::Document*/> doc)
+  GiMaterial* giCreateMaterialFromMtlxDoc(const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc)
   {
     mx::DocumentPtr resolvedDoc = std::static_pointer_cast<mx::Document>(doc);
     if (!doc)
@@ -491,12 +493,13 @@ fail:
       return nullptr;
     }
 
-    GiMaterial* mat = new GiMaterial;
-    mat->mcMat = mcMat;
-    return mat;
+    return new GiMaterial {
+      .mcMat = mcMat,
+      .name = name
+    };
   }
 
-  GiMaterial* giCreateMaterialFromMdlFile(const char* filePath, const char* subIdentifier)
+  GiMaterial* giCreateMaterialFromMdlFile(const char* name, const char* filePath, const char* subIdentifier)
   {
     McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier);
     if (!mcMat)
@@ -504,9 +507,10 @@ fail:
       return nullptr;
     }
 
-    GiMaterial* mat = new GiMaterial;
-    mat->mcMat = mcMat;
-    return mat;
+    return new GiMaterial {
+      .mcMat = mcMat,
+      .name = name
+    };
   }
 
   void giDestroyMaterial(GiMaterial* mat)

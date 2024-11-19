@@ -40,7 +40,7 @@ public:
   GiMaterial* CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
 
 private:
-  GiMaterial* _TryCompileMdlNetwork(const HdMaterialNetwork2& network) const;
+  GiMaterial* _TryCompileMdlNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
 
   GiMaterial* _TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
 

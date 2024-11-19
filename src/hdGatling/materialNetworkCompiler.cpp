@@ -424,7 +424,7 @@ MaterialNetworkCompiler::MaterialNetworkCompiler(const mx::DocumentPtr mtlxStdLi
 
 GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
-  GiMaterial* result = _TryCompileMdlNetwork(network);
+  GiMaterial* result = _TryCompileMdlNetwork(id, network);
 
   if (!result)
   {
@@ -439,7 +439,7 @@ GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdM
   return result;
 }
 
-GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   if (network.nodes.size() != 1)
   {
@@ -463,7 +463,7 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(const HdMaterialNetwo
   const std::string& subIdentifier = (*subIdentifierIt).second;
   const std::string& fileUri = sdrNode->GetResolvedImplementationURI();
 
-  return giCreateMaterialFromMdlFile(fileUri.c_str(), subIdentifier.c_str());
+  return giCreateMaterialFromMdlFile(id.GetText(), fileUri.c_str(), subIdentifier.c_str());
 }
 
 GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
@@ -482,7 +482,7 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(const SdfPath& id, c
     return nullptr;
   }
 
-  return giCreateMaterialFromMtlxDoc(doc);
+  return giCreateMaterialFromMtlxDoc(id.GetText(), doc);
 }
 
 mx::DocumentPtr MaterialNetworkCompiler::_CreateMaterialXDocumentFromNetwork(const SdfPath& id,
