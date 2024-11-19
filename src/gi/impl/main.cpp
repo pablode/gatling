@@ -87,7 +87,7 @@ private:
   void loadRefImage()
   {
     std::string testName = doctest::detail::g_cs->currentTest->m_name;
-    auto imgPath = GB_FMT("{}/{}{}", GI_REF_IMAGE_DIR, testName, REF_IMAGE_EXT);
+    auto imgPath = GB_FMT("{}/{}{}", GI_TESTENV_DIR, testName, REF_IMAGE_EXT);
 
     GiFile* file;
     REQUIRE(giFileOpen(imgPath.c_str(), GiFileUsage::Read, &file));

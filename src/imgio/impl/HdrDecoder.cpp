@@ -56,7 +56,7 @@ namespace gtl
         for (uint32_t k = 0; k < 4; k++)
         {
           uint32_t cIndex = (i + j * img->width) * 4 + k;
-          img->data[cIndex] = uint8_t(std::min(int(hdrData[cIndex] * 255.0), 255));
+          img->data[cIndex] = uint8_t(std::min(int(hdrData[cIndex] * 255.0f), 255));
         }
       }
     }

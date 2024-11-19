@@ -68,9 +68,9 @@ namespace
     }
   };
 
-  uint8_t _floatToByte(float value)
+  uint8_t _FloatToByte(float value)
   {
-    int result = (int)std::floor(255 * value + 0.499999f);
+    int result = (int) std::floor(255 * value);
     return std::min(255, std::max(0, result));
   }
 }
@@ -115,10 +115,10 @@ namespace gtl
           const Imf::Rgba& value = tmpPixels[img->height - h - 1][w];
 
           uint64_t offset = (w + h * img->width) * 4;
-          img->data[offset + 0] = _floatToByte(value.r);
-          img->data[offset + 1] = _floatToByte(value.g);
-          img->data[offset + 2] = _floatToByte(value.b);
-          img->data[offset + 3] = _floatToByte(value.a);
+          img->data[offset + 0] = _FloatToByte(value.r);
+          img->data[offset + 1] = _FloatToByte(value.g);
+          img->data[offset + 2] = _FloatToByte(value.b);
+          img->data[offset + 3] = _FloatToByte(value.a);
         }
       }
     }
