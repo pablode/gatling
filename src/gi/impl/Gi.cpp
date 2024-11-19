@@ -552,9 +552,9 @@ fail:
     return mesh;
   }
 
-  void giSetMeshTransform(GiMesh* mesh, float transform[3][4])
+  void giSetMeshTransform(GiMesh* mesh, const float* transform)
   {
-    memcpy(glm::value_ptr(mesh->transform), transform, sizeof(float) * 12);
+    mesh->transform = glm::mat3x4(glm::transpose(glm::make_mat4(transform)));
 
     GiScene* scene = mesh->scene;
     {
@@ -568,7 +568,7 @@ fail:
     mesh->instanceTransforms.resize(count);
     for (uint32_t i = 0; i < count; i++)
     {
-      mesh->instanceTransforms[i] = glm::mat3x4(glm::make_mat4((const float*) transforms[i]));
+      mesh->instanceTransforms[i] = glm::mat3x4(glm::transpose(glm::make_mat4((const float*) transforms[i])));
     }
 
     GiScene* scene = mesh->scene;

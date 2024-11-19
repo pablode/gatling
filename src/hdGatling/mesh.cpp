@@ -464,21 +464,14 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
       transforms = instancer->ComputeInstanceTransforms(id);
     }
 
-    giSetMeshInstanceTransforms(_giMesh, uint32_t(transforms.size()),
-                                (const float(*)[4][4]) transforms[0].data());
+    giSetMeshInstanceTransforms(_giMesh, uint32_t(transforms.size()), (const float(*)[4][4]) transforms[0].data());
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform)
   {
-    GfMatrix4d t = sceneDelegate->GetTransform(id);
+    auto transform = GfMatrix4f(sceneDelegate->GetTransform(id));
 
-    float transform[3][4] = {
-      { (float) t[0][0], (float) t[1][0], (float) t[2][0], (float) t[3][0] },
-      { (float) t[0][1], (float) t[1][1], (float) t[2][1], (float) t[3][1] },
-      { (float) t[0][2], (float) t[1][2], (float) t[2][2], (float) t[3][2] }
-    };
-
-    giSetMeshTransform(_giMesh, transform);
+    giSetMeshTransform(_giMesh, transform.data());
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
