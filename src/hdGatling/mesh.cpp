@@ -414,6 +414,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   bool updateGeometry =
     (*dirtyBits & HdChangeTracker::DirtyPoints) |
     (*dirtyBits & HdChangeTracker::DirtyNormals) |
+    (*dirtyBits & HdChangeTracker::DirtyPrimvar) |
     (*dirtyBits & HdChangeTracker::DirtyTopology);
 
   if (updateGeometry)
@@ -653,7 +654,7 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
   }
   else if (interpolation == HdInterpolationInstance)
   {
-    TF_CODING_ERROR("Primvar interpolation mode 'instance' not supported (%s)", id.GetText());
+    TF_RUNTIME_ERROR("Primvar interpolation mode 'instance' not supported (%s)", id.GetText());
     return false;
   }
   else
@@ -870,6 +871,7 @@ HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const
 {
   return HdChangeTracker::DirtyPoints |
          HdChangeTracker::DirtyNormals |
+         HdChangeTracker::DirtyPrimvar |
          HdChangeTracker::DirtyTopology |
          HdChangeTracker::DirtyInstancer |
          HdChangeTracker::DirtyInstanceIndex |
