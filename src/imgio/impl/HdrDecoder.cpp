@@ -37,6 +37,8 @@ namespace gtl
       return ImgioError::UnsupportedEncoding;
     }
 
+    stbi_set_flip_vertically_on_load(1);
+
     int num_components;
     float* hdrData = stbi_loadf_from_memory((const stbi_uc*) data, (int) size, (int*) &img->width, (int*) &img->height, &num_components, 4);
     if (!hdrData)

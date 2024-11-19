@@ -112,7 +112,7 @@ namespace gtl
       {
         for (long w = 0; w < tmpPixels.width(); w++)
         {
-          const Imf::Rgba& value = tmpPixels[h][w];
+          const Imf::Rgba& value = tmpPixels[img->height - h - 1][w];
 
           uint64_t offset = (w + h * img->width) * 4;
           img->data[offset + 0] = _floatToByte(value.r);

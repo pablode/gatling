@@ -24,6 +24,19 @@
 
 namespace gtl
 {
+  static void _FlipImage(ImgioImage* img)
+  {
+    for (uint32_t i = 0; i < img->height / 2; i++)
+    for (uint32_t j = 0; j < img->width; j++)
+    for (uint32_t k = 0; k < 4; k++)
+    {
+      uint32_t ipix = (i * img->width + j) * 4;
+      uint32_t opix = ((img->height - i - 1) * img->width + j) * 4;
+
+      std::swap(img->data[ipix + k], img->data[opix + k]);
+    }
+  }
+
   ImgioError ImgioPngDecoder::decode(size_t size, const void* data, ImgioImage* img)
   {
     int err;
@@ -61,6 +74,8 @@ namespace gtl
     img->height = ihdr.height;
 
     spng_ctx_free(ctx);
+
+    _FlipImage(img);
 
     return ImgioError::None;
 

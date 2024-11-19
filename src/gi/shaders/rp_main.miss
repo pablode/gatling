@@ -46,7 +46,7 @@ vec3 quatRotateDir(vec4 q, vec3 dir)
 vec3 sampleDomeLight(uint domeLightIndex, vec3 rayDir)
 {
     float u = (atan(rayDir.z, rayDir.x) + 0.5 * PI) / (2.0 * PI);
-    float v = acos(rayDir.y) / PI;
+    float v = 1.0 - acos(rayDir.y) / PI;
 
     const uint lodLevel = 0;
     return textureLod(sampler2D(textures_2d[nonuniformEXT(domeLightIndex)], tex_sampler), vec2(u, v), lodLevel).rgb;

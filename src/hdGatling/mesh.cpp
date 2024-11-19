@@ -84,7 +84,7 @@ namespace
     vertex.norm[1] = newNormal[1];
     vertex.norm[2] = newNormal[2];
     vertex.u = texCoords[0];
-    vertex.v = 1.0f - texCoords[1];
+    vertex.v = texCoords[1];
     vertex.tangent[0] = newTangent[0];
     vertex.tangent[1] = newTangent[1];
     vertex.tangent[2] = newTangent[2];

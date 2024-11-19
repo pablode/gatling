@@ -48,7 +48,7 @@ namespace gtl
 
     int result = tjDecompress2(instance, (const unsigned char*) data, (unsigned long) size,
                                (unsigned char*) &img->data[0], (int) img->width, 0,
-                               (int) img->height, pixelFormat, TJFLAG_ACCURATEDCT);
+                               (int) img->height, pixelFormat, TJFLAG_ACCURATEDCT | TJFLAG_BOTTOMUP);
     tjDestroy(instance);
 
     if (result < 0)

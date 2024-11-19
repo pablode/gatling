@@ -43,7 +43,7 @@ namespace gtl
     img->size = img->width * img->height * 4;
     img->data.resize(img->size);
 
-    int result = TIFFReadRGBAImageOriented(tiff, img->width, img->height, (uint32_t*) &img->data[0], ORIENTATION_TOPLEFT, 1);
+    int result = TIFFReadRGBAImageOriented(tiff, img->width, img->height, (uint32_t*) &img->data[0], ORIENTATION_BOTLEFT, 1);
 
     TIFFClose(tiff);
 
