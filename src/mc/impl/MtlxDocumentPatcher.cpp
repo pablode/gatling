@@ -34,9 +34,6 @@ const char* TYPE_VECTOR3 = "vector3";
 const char* ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING =
   "GATLING_DISABLE_MTLX_USDUVTEXTURE_COLOR_SPACE_PATCHING";
 
-const char* ENVVAR_DISABLE_IMAGE_COLOR_SPACE_PATCHING =
-  "GATLING_DISABLE_MTLX_IMAGE_COLOR_SPACE_PATCHING";
-
 void _SanitizeFilePath(std::string& path)
 {
   // The MDL SDK does not take raw OS paths. First, only forward-facing slashes are allowed.
@@ -279,40 +276,6 @@ void _PatchUsdUVTextureColorSpaces(mx::DocumentPtr document)
   }
 }
 
-// Currently, the HdMtlxCreateMtlxDocumentFromHdNetwork helper function commonly used by Hydra render
-// delegates that support MaterialX does not copy color spaces: https://github.com/PixarAnimationStudios/USD/issues/1523
-// We work around this issue by setting an <image> node's colorspace attribute to sRGB if the node type
-// is color3. If it isn't (but rather float/vec2/vec3/vec4), we mark it as linear.
-void _PatchImageSrgbColorSpaces(mx::DocumentPtr document)
-{
-  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
-  {
-    mx::ElementPtr elem = treeIt.getElement();
-
-    mx::NodePtr node = elem->asA<mx::Node>();
-    if (!node || node->hasColorSpace()) // don't overwrite color space, f.i. from above sourceColorSpace patching
-    {
-      continue;
-    }
-
-    const mx::string& category = node->getCategory();
-
-    if (category != "image" && category != "tiledimage")
-    {
-      continue;
-    }
-
-    const mx::string& valueType = node->getType();
-
-    // Actually we should also check for TYPE_COLOR4 here, however the UsdUVTexture
-    // node is used for normal maps and it contains an <image> node of type color4 in
-    // its implementation (which is the case because there's no <vector> specialization
-    // of the node in MaterialX). Checking for color4 therefore incorrectly tags all
-    // UsdPreviewSurface normal maps as sRGB.
-    node->setColorSpace(valueType == TYPE_COLOR3 ? "srgb_texture" : "lin_rec709");
-  }
-}
-
 // MDL spec 1.7.2 17th Jan 2022, section 5.6
 std::unordered_set<std::string_view> s_reservedMDLIdentifiers = {
   "annotation", "auto", "bool", "bool2", "bool3", "bool4", "break", "bsdf",
@@ -467,13 +430,6 @@ namespace gtl
     {
       _PatchUsdUVTextureColorSpaces(document);
     }
-
-#if defined(PXR_VERSION) && PXR_VERSION <= 2308
-    if (!getenv(ENVVAR_DISABLE_IMAGE_COLOR_SPACE_PATCHING))
-    {
-      _PatchImageSrgbColorSpaces(document);
-    }
-#endif
 
     _PatchGeomprops(document);
 
