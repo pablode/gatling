@@ -987,8 +987,7 @@ cleanup:
 
     GiScene* scene = params.scene;
 
-    std::vector<const GiMaterial*> materials;
-    materials.reserve(scene->meshes.size());
+    std::set<const GiMaterial*> materialSet;
     for (auto* m : scene->meshes)
     {
       if (!m->material)
@@ -997,8 +996,10 @@ cleanup:
         GB_ERROR("coding error - mesh without material!");
         return nullptr;
       }
-      materials.push_back(m->material);
+      materialSet.insert(m->material);
     }
+
+    std::vector<const GiMaterial*> materials(materialSet.begin(), materialSet.end());
 
     GB_LOG("material count: {}", materials.size());
     GB_LOG("creating shader cache..");
