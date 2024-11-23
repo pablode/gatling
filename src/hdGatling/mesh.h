@@ -22,6 +22,8 @@
 
 #include <gtl/gi/Gi.h>
 
+#include <optional>
+
 using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
