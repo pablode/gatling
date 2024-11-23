@@ -30,7 +30,7 @@ There are [prebuilt binaries](https://github.com/pablode/gatling/releases) which
 Alternatively, for a full source build you need to
 
 - download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK</a> 2023.0.4 binaries
-- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v24.03">USD 24.03</a> with MaterialX support
+- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v24.11">USD 24.03+</a> with MaterialX support
 
 > Note: it is recommended to have NASM 2.13+ or YASM 1.2.0+ in your PATH to speed up image decoding.
 
@@ -82,9 +82,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 * Features: certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (GeomSubset, subdivision) are not yet supported. UDIM textures, volumes, displacement and other rendering features have yet to be implemented.
 
-* Arbitrary primvar reading: Gatling currently does not implement MDL scene data, which means that MaterialX `geompropvalue` and UsdPreviewSurface `UsdPrimvarReader` nodes are unsupported.
-
-* Real-time editing: changing material parameters, transforming meshes or instances, and adjusting render settings currently result in full or partial cache rebuilds.
+* Real-time editing: changing material parameters and adjusting render settings currently result in long loading times.
 
 ### License
 
