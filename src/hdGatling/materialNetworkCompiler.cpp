@@ -259,7 +259,7 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
       }
       else
       {
-        TF_CODING_ERROR("unsupported UsdUVTexture color space");
+        TF_CODING_ERROR("Unsupported UsdUVTexture color space");
       }
 
       parameters.erase(sourceColorSpace);

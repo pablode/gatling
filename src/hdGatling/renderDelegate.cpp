@@ -183,7 +183,7 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, [[maybe_unus
     return true;
   }
 
-  TF_CODING_ERROR("Unsupported command %s", command.GetText());
+  TF_RUNTIME_ERROR("Unsupported command %s", command.GetText());
 
   return false;
 }

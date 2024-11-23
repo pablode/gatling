@@ -83,7 +83,7 @@ namespace
     }
     else
     {
-      TF_CODING_ERROR(TfStringPrintf("Invalid AOV id %s", aovName.GetText()));
+      TF_RUNTIME_ERROR(TfStringPrintf("Invalid AOV id %s", aovName.GetText()));
     }
 
     return id;
@@ -216,7 +216,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding->renderBuffer);
   if (renderBuffer->GetFormat() != HdFormatFloat32Vec4)
   {
-    TF_RUNTIME_ERROR("Unsupported render buffer format");
+    TF_CODING_ERROR("Unsupported render buffer format");
     return;
   }
 

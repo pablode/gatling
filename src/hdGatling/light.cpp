@@ -31,8 +31,6 @@
 
 #include <gtl/gi/Gi.h>
 
-#include <assert.h>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace
@@ -77,7 +75,7 @@ GfVec3f HdGatlingLight::_CalcBaseEmission(HdSceneDelegate* sceneDelegate, float 
   VtValue boxedExposureAttr = sceneDelegate->GetLightParamValue(id, HdLightTokens->exposure);
   float exposure = boxedExposureAttr.GetWithDefault<float>(0.0f);
 
-  assert(normalizeFactor > 0.0f);
+  TF_AXIOM(normalizeFactor > 0.0f);
 
   float normalizedIntensity = intensity * powf(2.0f, exposure) / normalizeFactor;
 
@@ -358,7 +356,8 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (!boxedTextureFile.IsHolding<SdfAssetPath>())
   {
-    TF_CODING_ERROR("Param %s does not hold SdfAssetPath - unsupported!", id.GetString().c_str());
+    TF_WARN("%s:%s does not hold SdfAssetPath - ignoring!",
+      id.GetText(), HdLightTokens->textureFile.GetText());
     return;
   }
 
@@ -367,7 +366,7 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   std::string path = assetPath.GetResolvedPath();
   if (path.empty())
   {
-    TF_CODING_ERROR("Asset path is not resolved!");
+    TF_RUNTIME_ERROR("Unable to resolve asset path!");
     return;
   }
 
@@ -456,7 +455,7 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
   VtValue boxedGlfLight = sceneDelegate->Get(id, HdLightTokens->params);
   if (!boxedGlfLight.IsHolding<GlfSimpleLight>())
   {
-    TF_CODING_ERROR("SimpleLight has no data payload!");
+    TF_WARN("SimpleLight %s has no data payload - ignoring", id.GetText());
     return;
   }
 

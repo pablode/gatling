@@ -102,7 +102,7 @@ namespace
   {
     const float EPS = 0.0001f;
     size_t tangentCount = meshNormals.size();
-    TF_VERIFY(tangentCount == meshPoints.size());
+    TF_AXIOM(tangentCount == meshPoints.size());
 
     VtVec3fArray tangents(tangentCount, GfVec3f(0.0f));
     VtVec3fArray bitangents(tangentCount, GfVec3f(0.0f));
@@ -382,7 +382,7 @@ namespace
     else if (type == HdTypeInt32Vec2) return _ExpandBufferElements<GfVec2i>(buffer, elementExpansion);
     else if (type == HdTypeInt32)     return _ExpandBufferElements<int32_t>(buffer, elementExpansion);
 
-    TF_VERIFY(false);
+    TF_AXIOM(false);
     return VtValue();
   }
 
@@ -418,7 +418,7 @@ namespace
     else if (type == HdTypeInt32Vec2) return _DeindexBufferElements<GfVec2i>(buffer, faces);
     else if (type == HdTypeInt32)     return _DeindexBufferElements<int32_t>(buffer, faces);
 
-    TF_VERIFY(false);
+    TF_AXIOM(false);
     return VtValue();
   }
 
@@ -433,7 +433,7 @@ namespace
     else if (type == HdTypeInt32Vec2) return VtValue(VtVec2iArray(elementCount));
     else if (type == HdTypeInt32)     return VtValue(VtIntArray(elementCount));
 
-    TF_VERIFY(false);
+    TF_AXIOM(false);
     return VtValue();
   }
 
@@ -672,7 +672,7 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   }
   else if (primvarDesc.interpolation == HdInterpolationFaceVarying)
   {
-    assert(!indexingAllowed);
+    TF_AXIOM(!indexingAllowed);
 
     HdMeshTopology topology = GetMeshTopology(sceneDelegate);
     HdMeshUtil meshUtil(&topology, id);
@@ -686,7 +686,7 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   }
   else if (primvarDesc.interpolation == HdInterpolationUniform)
   {
-    assert(!indexingAllowed);
+    TF_AXIOM(!indexingAllowed);
 
     uint32_t faceCount = faces.size();
     result = _CreateSizedArray(type, faceCount * 3);
@@ -699,8 +699,8 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
     {
       int oldFaceIndex = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[faceIndex]);
 
-      assert((faceIndex * 3 + 2) < result.GetArraySize());
-      assert(oldFaceIndex < boxedValues.GetArraySize());
+      TF_DEV_AXIOM((faceIndex * 3 + 2) < result.GetArraySize());
+      TF_DEV_AXIOM(oldFaceIndex < boxedValues.GetArraySize());
 
       memcpy(&dstPtr[(faceIndex * 3 + 0) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
       memcpy(&dstPtr[(faceIndex * 3 + 1) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
@@ -869,7 +869,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     Hd_VertexAdjacency adjacency;
     adjacency.BuildAdjacencyTable(&topology);
     normals = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, points.size(), points.cdata());
-    TF_VERIFY(normals.size() == points.size());
+    TF_AXIOM(normals.size() == points.size());
 
     if (!useIndexing)
     {
@@ -892,7 +892,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   if (foundNormals)
   {
     auto normalsIt = primvarMap.find(HdTokens->normals);
-    assert(normalsIt != primvarMap.end());
+    TF_AXIOM(normalsIt != primvarMap.end());
 
     const ProcessedPrimvar& pn = normalsIt->second;
     TF_VERIFY(pn.type == HdTypeFloatVec3);
