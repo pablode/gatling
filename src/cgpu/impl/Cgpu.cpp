@@ -369,7 +369,9 @@ namespace gtl
     case 0x10DE:
       return "NVIDIA";
     case 0x8086:
-      return "INTEL";
+      return "Intel";
+    case VK_VENDOR_ID_MESA:
+      return "Mesa";
     default:
       return "UNKNOWN";
     }
