@@ -34,7 +34,6 @@
 #define GTL_LATEST_TESTED_NEURAYLIB_VERSION 52
 
 static_assert(MI_NEURAYLIB_API_VERSION >= 48, "MDL SDK version is too old!");
-static_assert(MI_NEURAYLIB_API_VERSION < 52, "2023.1.X MDL SDK has crash issues - use 2023.0.4 instead!");
 static_assert(MI_NEURAYLIB_API_VERSION <= GTL_LATEST_TESTED_NEURAYLIB_VERSION, "Untested MDL SDK version!");
 
 namespace

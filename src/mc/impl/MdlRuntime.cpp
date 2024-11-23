@@ -34,10 +34,6 @@ namespace gtl
     {
       m_transaction->commit();
     }
-    if (m_neuray)
-    {
-      m_neuray->shutdown();
-    }
   }
 
   bool McMdlRuntime::init(std::string_view libDir)
