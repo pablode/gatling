@@ -626,7 +626,7 @@ namespace gtl
     }
 
     GB_LOG("> name: {}", deviceProperties.properties.deviceName);
-    GB_LOG("> vendor: {} ({})", cgpuGetVendorName(deviceProperties.properties.vendorID), deviceProperties.properties.vendorID);
+    GB_LOG("> vendor: {} ({:#08x})", cgpuGetVendorName(deviceProperties.properties.vendorID), deviceProperties.properties.vendorID);
 
     if (apiVersion < CGPU_MIN_VK_API_VERSION)
     {
