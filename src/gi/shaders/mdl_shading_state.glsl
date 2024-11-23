@@ -63,6 +63,21 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec2 uv_2 = vec2(v_2.field2.z, v_2.field2.w);
     vec2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
 
+#if SCENE_DATA_COUNT > 0
+    BlasPayloadBufferPreamble preamble = indices.preamble;
+
+    mdl_renderer_state rendererState;
+    rendererState.hitIndices[0] = f.v_0;
+    rendererState.hitIndices[1] = f.v_1;
+    rendererState.hitIndices[2] = f.v_2;
+    rendererState.hitBarycentrics = hit_bc;
+    for (uint i = 0; i < SCENE_DATA_COUNT; i++)
+    {
+      rendererState.sceneDataInfos[i] = preamble.sceneDataInfos[i];
+    }
+    rendererState.sceneDataBufferAddress = payload.bufferAddress;
+#endif
+
     // State
     state.normal = normal;
     state.geom_normal = geomNormal;
@@ -74,6 +89,9 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
 #ifdef SCENE_TRANSFORMS
     state.world_to_object = mat4(gl_WorldToObjectEXT);
     state.object_to_world = mat4(gl_ObjectToWorldEXT);
+#endif
+#if SCENE_DATA_COUNT > 0
+    state.renderer_state = rendererState;
 #endif
 }
 

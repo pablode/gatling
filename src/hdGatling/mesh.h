@@ -20,12 +20,7 @@
 #include <pxr/imaging/hd/mesh.h>
 #include <pxr/base/gf/vec2f.h>
 
-namespace gtl
-{
-  struct GiMesh;
-  struct GiMaterial;
-  struct GiScene;
-}
+#include <gtl/gi/Gi.h>
 
 using namespace gtl;
 
@@ -50,10 +45,6 @@ public:
 
   GiMesh* GetGiMesh() const;
 
-  const GfVec3f& GetColor() const;
-
-  bool HasColor() const;
-
 protected:
   HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
@@ -61,26 +52,40 @@ protected:
                  HdDirtyBits *dirtyBits) override;
 
 private:
-  bool _FindPrimvarInterpolationByName(HdSceneDelegate* sceneDelegate,
-                                       TfToken name,
-                                       HdInterpolation& interpolation) const;
+  void _AnalyzePrimvars(HdSceneDelegate* sceneDelegate,
+                        bool& foundNormals,
+                        bool& indexingAllowed);
 
-  TfToken _FindPrimvarByRole(HdSceneDelegate* sceneDelegate,
-                             TfToken role) const;
+  struct ProcessedPrimvar
+  {
+    HdInterpolation interpolation;
+    HdType type;
+    TfToken role;
+    VtValue indexMatchingData;
+  };
 
-  bool _ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
-                                VtIntArray primitiveParams,
-                                TfToken name,
-                                HdType type,
-                                bool& sequentiallyIndexed,
-                                VtValue& result) const;
+  using PrimvarMap = std::unordered_map<TfToken, ProcessedPrimvar, TfToken::HashFunctor>;
+
+  std::vector<GiPrimvarData> _CollectSecondaryPrimvars(const PrimvarMap& primvarMap);
+
+  std::optional<ProcessedPrimvar> _ProcessPrimvar(HdSceneDelegate* sceneDelegate,
+                                                  const VtIntArray& primitiveParams,
+                                                  const HdPrimvarDescriptor& primvarDesc,
+                                                  const VtVec3iArray& faces,
+                                                  uint32_t vertexCount,
+                                                  bool indexingAllowed,
+                                                  bool constantAllowed);
+
+  PrimvarMap _ProcessPrimvars(HdSceneDelegate* sceneDelegate,
+                              const VtIntArray& primitiveParams,
+                              const VtVec3iArray& faces,
+                              uint32_t vertexCount,
+                              bool indexingAllowed);
 
   GiMesh* _CreateGiMesh(HdSceneDelegate* sceneDelegate);
 
 private:
   GiMesh* _giMesh = nullptr;
-  GfVec3f _color;
-  bool _hasColor = false;
   GiScene* _scene;
   const GiMaterial* _defaultMaterial;
 };

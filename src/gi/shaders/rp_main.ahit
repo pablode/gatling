@@ -11,6 +11,10 @@
 
 #include "colormap.glsl"
 
+#if SCENE_DATA_COUNT > 0
+#include "mdl_renderer_state.glsl"
+#define RENDERER_STATE_TYPE mdl_renderer_state
+#endif
 #include "mdl_types.glsl"
 #include "rp_main_descriptors.glsl"
 

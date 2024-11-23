@@ -48,21 +48,14 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 namespace
 {
-  template<typename T>
-  struct _VertexAttr
-  {
-    VtArray<T> array;
-    bool indexed;
-  };
-
   struct _VertexStreams
   {
     VtVec3iArray faces;
     VtVec3fArray points;
-    _VertexAttr<GfVec3f> normals;
-    _VertexAttr<GfVec2f> texCoords;
-    _VertexAttr<GfVec3f> tangents;
-    _VertexAttr<float> bitangentSigns;
+    VtVec3fArray normals;
+    VtVec2fArray texCoords;
+    VtVec3fArray tangents;
+    VtFloatArray bitangentSigns;
   };
 
   GiVertex _MakeGiVertex(const GfMatrix4f& transform, const GfMatrix4f& normalMatrix, const GfVec3f& point, const GfVec3f& normal,
@@ -102,13 +95,14 @@ namespace
   // http://foundationsofgameenginedev.com/FGED2-sample.pdf
   void _CalculateTextureTangents(const VtVec3iArray& meshFaces,
                                  const VtVec3fArray& meshPoints,
-                                 const _VertexAttr<GfVec3f>& meshNormals,
-                                 const _VertexAttr<GfVec2f>& meshTexCoords,
+                                 const VtVec3fArray& meshNormals,
+                                 const VtVec2fArray& meshTexCoords,
                                  VtVec3fArray& meshTangents,
                                  VtFloatArray& meshBitangentSigns)
   {
     const float EPS = 0.0001f;
-    size_t tangentCount = meshNormals.array.size();
+    size_t tangentCount = meshNormals.size();
+    TF_VERIFY(tangentCount == meshPoints.size());
 
     VtVec3fArray tangents(tangentCount, GfVec3f(0.0f));
     VtVec3fArray bitangents(tangentCount, GfVec3f(0.0f));
@@ -121,12 +115,12 @@ namespace
       const auto& p0 = meshPoints[f[0]];
       const auto& p1 = meshPoints[f[1]];
       const auto& p2 = meshPoints[f[2]];
-      const auto& n0 = meshNormals.array[meshNormals.indexed ? f[0] : (i * 3 + 0)];
-      const auto& n1 = meshNormals.array[meshNormals.indexed ? f[1] : (i * 3 + 1)];
-      const auto& n2 = meshNormals.array[meshNormals.indexed ? f[2] : (i * 3 + 2)];
-      const auto& t0 = meshTexCoords.array[meshTexCoords.indexed ? f[0] : (i * 3 + 0)];
-      const auto& t1 = meshTexCoords.array[meshTexCoords.indexed ? f[1] : (i * 3 + 1)];
-      const auto& t2 = meshTexCoords.array[meshTexCoords.indexed ? f[2] : (i * 3 + 2)];
+      const auto& n0 = meshNormals[f[0]];
+      const auto& n1 = meshNormals[f[1]];
+      const auto& n2 = meshNormals[f[2]];
+      const auto& t0 = meshTexCoords[f[0]];
+      const auto& t1 = meshTexCoords[f[1]];
+      const auto& t2 = meshTexCoords[f[2]];
 
       GfVec3f e1 = p1 - p0, e2 = p2 - p0;
       float x1 = t1[0] - t0[0], x2 = t2[0] - t0[0];
@@ -150,9 +144,9 @@ namespace
         b = GfVec3f::XAxis();
       }
 
-      size_t outIndex0 = meshNormals.indexed ? f[0] : (i * 3 + 0);
-      size_t outIndex1 = meshNormals.indexed ? f[1] : (i * 3 + 1);
-      size_t outIndex2 = meshNormals.indexed ? f[2] : (i * 3 + 2);
+      size_t outIndex0 = f[0];
+      size_t outIndex1 = f[1];
+      size_t outIndex2 = f[2];
 
       // Assets can author out-of-range indices (f.i. Intel's Sponza scene). Skip those.
       if (outIndex0 >= tangentCount || outIndex1 >= tangentCount || outIndex2 >= tangentCount)
@@ -177,7 +171,7 @@ namespace
 
     for (size_t i = 0; i < tangentCount; i++)
     {
-      const GfVec3f& n = meshNormals.array[i].GetNormalized();
+      const GfVec3f& n = meshNormals[i].GetNormalized();
 
       // Robust special-case handling based on the logic from DirectXMesh:
       // https://github.com/microsoft/DirectXMesh/blob/5647700332a2a2504000529902ac3164c058d616/DirectXMesh/DirectXMeshTangentFrame.cpp#L126-L162
@@ -252,18 +246,18 @@ namespace
   }
 
   void _CalculateFallbackTangents(const VtVec3iArray& meshFaces,
-                                  const _VertexAttr<GfVec3f>& meshNormals,
+                                  const VtVec3fArray& meshNormals,
                                   VtVec3fArray& meshTangents,
                                   VtFloatArray& meshBitangentSigns)
   {
-    size_t normalCount = meshNormals.array.size();
+    size_t normalCount = meshNormals.size();
 
     meshTangents.resize(normalCount);
     meshBitangentSigns.resize(normalCount);
 
     for (size_t i = 0; i < normalCount; i++)
     {
-      const GfVec3f normal = meshNormals.array[i];
+      const GfVec3f normal = meshNormals[i];
 
       GfVec3f tangent, bitangent;
       _DuffOrthonormalBasis(normal, tangent, bitangent);
@@ -275,24 +269,21 @@ namespace
 
   void _CalculateTangents(const VtVec3iArray& meshFaces,
                           const VtVec3fArray& meshPoints,
-                          const _VertexAttr<GfVec3f>& meshNormals,
-                          const _VertexAttr<GfVec2f>& meshTexCoords,
-                          _VertexAttr<GfVec3f>& meshTangents,
-                          _VertexAttr<float>& meshBitangentSigns)
+                          const VtVec3fArray& meshNormals,
+                          const VtVec2fArray& meshTexCoords,
+                          VtVec3fArray& meshTangents,
+                          VtFloatArray& meshBitangentSigns)
   {
-    bool hasTexCoords = meshTexCoords.array.size() > 0;
+    bool hasTexCoords = meshTexCoords.size() > 0;
 
     if (hasTexCoords)
     {
-      _CalculateTextureTangents(meshFaces, meshPoints, meshNormals, meshTexCoords, meshTangents.array, meshBitangentSigns.array);
+      _CalculateTextureTangents(meshFaces, meshPoints, meshNormals, meshTexCoords, meshTangents, meshBitangentSigns);
     }
     else
     {
-      _CalculateFallbackTangents(meshFaces, meshNormals, meshTangents.array, meshBitangentSigns.array);
+      _CalculateFallbackTangents(meshFaces, meshNormals, meshTangents, meshBitangentSigns);
     }
-
-    meshTangents.indexed = meshNormals.indexed;
-    meshBitangentSigns.indexed = meshNormals.indexed;
   }
 
   void _BakeMeshGeometry(_VertexStreams& s,
@@ -302,9 +293,9 @@ namespace
   {
     GfMatrix4f normalMatrix(transform.GetInverse().GetTranspose());
 
-    bool hasTexCoords = s.texCoords.array.size() > 0;
-    bool calcTangents = s.tangents.array.empty();
-    bool calcBitangentSigns = s.bitangentSigns.array.empty();
+    bool hasTexCoords = s.texCoords.size() > 0;
+    bool calcTangents = s.tangents.empty();
+    bool calcBitangentSigns = s.bitangentSigns.empty();
 
     if (!calcTangents && calcBitangentSigns)
     {
@@ -314,9 +305,8 @@ namespace
       calcTangents = true;
 #else
       TF_WARN("tangents have been provided without handedness; assuming positive");
-      size_t signCount = std::max(s.normals.array.size(), s.tangents.array.size());
-      s.bitangentSigns.array = VtFloatArray(signCount, 1.0f);
-      s.bitangentSigns.indexed = s.normals.indexed && s.tangents.indexed;
+      size_t signCount = std::max(s.normals.size(), s.tangents.size());
+      s.bitangentSigns = VtFloatArray(signCount, 1.0f);
 #endif
     }
     if (calcTangents)
@@ -324,7 +314,6 @@ namespace
       _CalculateTangents(s.faces, s.points, s.normals, s.texCoords, s.tangents, s.bitangentSigns);
     }
 
-    bool isAnyPrimvarNotIndexed = !s.normals.indexed || !s.texCoords.indexed || !s.tangents.indexed;
     uint32_t vertexOffset = vertices.size();
 
     for (size_t i = 0; i < s.faces.size(); i++)
@@ -332,58 +321,159 @@ namespace
       const GfVec3i& vertexIndices = s.faces[i];
 
       GiFace face;
-      face.v_i[0] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 0) : vertexIndices[0]);
-      face.v_i[1] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 1) : vertexIndices[1]);
-      face.v_i[2] = vertexOffset + (isAnyPrimvarNotIndexed ? (i * 3 + 2) : vertexIndices[2]);
-
-      // We always need three unique vertices per face.
-      if (isAnyPrimvarNotIndexed)
-      {
-        for (size_t j = 0; j < 3; j++)
-        {
-          const GfVec3f& point = s.points[vertexIndices[j]];
-          const GfVec3f& normal = s.normals.array[s.normals.indexed ? vertexIndices[j] : (i * 3 + j)];
-          GfVec2f texCoords = hasTexCoords ? s.texCoords.array[s.texCoords.indexed ? vertexIndices[j] : (i * 3 + j)] : GfVec2f();
-
-          GfVec3f tangent = s.tangents.array[s.tangents.indexed ? vertexIndices[j] : (i * 3 + j)];
-          float bitangentSign = s.bitangentSigns.array[s.bitangentSigns.indexed ? vertexIndices[j] : (i * 3 + j)];
-
-          GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords, tangent, bitangentSign);
-          vertices.push_back(vertex);
-        }
-      }
+      face.v_i[0] = vertexOffset + vertexIndices[0];
+      face.v_i[1] = vertexOffset + vertexIndices[1];
+      face.v_i[2] = vertexOffset + vertexIndices[2];
 
       faces.push_back(face);
-    }
-
-    // Early-out if the vertices are not indexed.
-    if (isAnyPrimvarNotIndexed)
-    {
-      return;
     }
 
     for (size_t j = 0; j < s.points.size(); j++)
     {
       const GfVec3f& point = s.points[j];
-      const GfVec3f& normal = s.normals.array[j];
-      GfVec2f texCoords = hasTexCoords ? s.texCoords.array[j] : GfVec2f();
+      const GfVec3f& normal = s.normals[j];
+      GfVec2f texCoords = hasTexCoords ? s.texCoords[j] : GfVec2f();
 
-      GfVec3f tangent = s.tangents.array[j];
-      float bitangentSign = s.bitangentSigns.array[j];
+      GfVec3f tangent = s.tangents[j];
+      float bitangentSign = s.bitangentSigns[j];
 
       GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords, tangent, bitangentSign);
       vertices.push_back(vertex);
     }
   }
 
+  bool _PrimvarTypeSupported(const VtValue& value)
+  {
+    return value.IsHolding<VtVec4fArray>() ||
+           value.IsHolding<VtVec3fArray>() ||
+           value.IsHolding<VtVec2fArray>() ||
+           value.IsHolding<VtFloatArray>() ||
+           value.IsHolding<VtVec4iArray>() ||
+           value.IsHolding<VtVec3iArray>() ||
+           value.IsHolding<VtVec2iArray>() ||
+           value.IsHolding<VtBoolArray>() ||
+           value.IsHolding<VtIntArray>();
+  }
+
+  template<typename T>
+  VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, size_t elementExpansion)
+  {
+    VtArray<T> result(buffer.GetNumElements() * elementExpansion);
+
+    for (size_t i = 0; i < buffer.GetNumElements(); i++)
+    {
+      for (size_t j = 0; j < elementExpansion; j++)
+      {
+        result[i * elementExpansion + j] = ((T*) buffer.GetData())[i];
+      }
+    }
+
+    return VtValue(std::move(result));
+  }
+
+  VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, HdType type, size_t elementExpansion)
+  {
+    if (type == HdTypeFloatVec4)      return _ExpandBufferElements<GfVec4f>(buffer, elementExpansion);
+    else if (type == HdTypeFloatVec3) return _ExpandBufferElements<GfVec3f>(buffer, elementExpansion);
+    else if (type == HdTypeFloatVec2) return _ExpandBufferElements<GfVec2f>(buffer, elementExpansion);
+    else if (type == HdTypeFloat)     return _ExpandBufferElements<float>(buffer, elementExpansion);
+    else if (type == HdTypeInt32Vec4) return _ExpandBufferElements<GfVec4i>(buffer, elementExpansion);
+    else if (type == HdTypeInt32Vec3) return _ExpandBufferElements<GfVec3i>(buffer, elementExpansion);
+    else if (type == HdTypeInt32Vec2) return _ExpandBufferElements<GfVec2i>(buffer, elementExpansion);
+    else if (type == HdTypeInt32)     return _ExpandBufferElements<int32_t>(buffer, elementExpansion);
+
+    TF_VERIFY(false);
+    return VtValue();
+  }
+
+  template<typename T>
+  VtValue _DeindexBufferElements(const HdVtBufferSource& buffer, const VtVec3iArray& faces)
+  {
+    VtArray<T> result(faces.size() * 3);
+
+    for (size_t i = 0; i < faces.size(); i++)
+    {
+      for (size_t j = 0; j < 3; j++)
+      {
+        const GfVec3i& f = faces[i];
+
+        uint32_t srcIdx = f[j];
+        uint32_t dstIdx = i * 3 + j;
+
+        result[dstIdx] = ((T*) buffer.GetData())[srcIdx];
+      }
+    }
+
+    return VtValue(std::move(result));
+  }
+
+  VtValue _DeindexBufferElements(HdType type, const HdVtBufferSource& buffer, const VtVec3iArray& faces)
+  {
+    if (type == HdTypeFloatVec4)      return _DeindexBufferElements<GfVec4f>(buffer, faces);
+    else if (type == HdTypeFloatVec3) return _DeindexBufferElements<GfVec3f>(buffer, faces);
+    else if (type == HdTypeFloatVec2) return _DeindexBufferElements<GfVec2f>(buffer, faces);
+    else if (type == HdTypeFloat)     return _DeindexBufferElements<float>(buffer, faces);
+    else if (type == HdTypeInt32Vec4) return _DeindexBufferElements<GfVec4i>(buffer, faces);
+    else if (type == HdTypeInt32Vec3) return _DeindexBufferElements<GfVec3i>(buffer, faces);
+    else if (type == HdTypeInt32Vec2) return _DeindexBufferElements<GfVec2i>(buffer, faces);
+    else if (type == HdTypeInt32)     return _DeindexBufferElements<int32_t>(buffer, faces);
+
+    TF_VERIFY(false);
+    return VtValue();
+  }
+
+  VtValue _CreateSizedArray(HdType type, uint32_t elementCount)
+  {
+    if (type == HdTypeFloatVec4)      return VtValue(VtVec4fArray(elementCount));
+    else if (type == HdTypeFloatVec3) return VtValue(VtVec3fArray(elementCount));
+    else if (type == HdTypeFloatVec2) return VtValue(VtVec2fArray(elementCount));
+    else if (type == HdTypeFloat)     return VtValue(VtFloatArray(elementCount));
+    else if (type == HdTypeInt32Vec4) return VtValue(VtVec4iArray(elementCount));
+    else if (type == HdTypeInt32Vec3) return VtValue(VtVec3iArray(elementCount));
+    else if (type == HdTypeInt32Vec2) return VtValue(VtVec2iArray(elementCount));
+    else if (type == HdTypeInt32)     return VtValue(VtIntArray(elementCount));
+
+    TF_VERIFY(false);
+    return VtValue();
+  }
+
+  const static TfToken _texcoordPrimvarNameHints[] = {
+    UsdUtilsGetPrimaryUVSetName(),
+    _tokens->st,
+    _tokens->st0,
+    _tokens->st_0,
+    _tokens->st1,
+    _tokens->st_1,
+    _tokens->UV0,
+    _tokens->UV1
+  };
+
+  bool _IsPrimvarEligibleForVertexData(const TfToken& name, const TfToken& role)
+  {
+    if (name == HdTokens->normals ||
+        name == _tokens->tangents ||
+        name == _tokens->bitangentSigns ||
+        role == HdPrimvarRoleTokens->textureCoordinate)
+    {
+      return true;
+    }
+
+    for (const TfToken& t : _texcoordPrimvarNameHints)
+    {
+      if (name == t)
+      {
+        return true;
+      }
+    }
+
+    return false;
+  }
 }
 
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id,
                              GiScene* scene,
                              const GiMaterial* defaultMaterial)
   : HdMesh(id)
-  , _color(0.0, 0.0, 0.0)
-  , _hasColor(false)
   , _scene(scene)
   , _defaultMaterial(defaultMaterial)
 {
@@ -496,127 +586,94 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   *dirtyBits = HdChangeTracker::Clean;
 }
 
-bool HdGatlingMesh::_FindPrimvarInterpolationByName(HdSceneDelegate* sceneDelegate,
-                                                    TfToken name,
-                                                    HdInterpolation& interpolation) const
+
+void HdGatlingMesh::_AnalyzePrimvars(HdSceneDelegate* sceneDelegate,
+                                     bool& foundNormals,
+                                     bool& indexingAllowed)
 {
-  for (int i = 0; i < int(HdInterpolationCount); i++)
-  {
-    interpolation = (HdInterpolation) i;
+  const SdfPath& id = GetId();
 
-    const auto& primvarDescs = GetPrimvarDescriptors(sceneDelegate, interpolation);
+  foundNormals = false;
+  indexingAllowed = true;
 
-    for (const HdPrimvarDescriptor& primvar : primvarDescs)
-    {
-      if (primvar.name == name)
-      {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-TfToken HdGatlingMesh::_FindPrimvarByRole(HdSceneDelegate* sceneDelegate,
-                                          TfToken role) const
-{
   for (int i = 0; i < int(HdInterpolationCount); i++)
   {
     const auto& primvarDescs = GetPrimvarDescriptors(sceneDelegate, (HdInterpolation) i);
 
     for (const HdPrimvarDescriptor& primvar : primvarDescs)
     {
-      if (primvar.role == role)
+      VtValue value = GetPrimvar(sceneDelegate, primvar.name);
+
+      if (!_PrimvarTypeSupported(value))
       {
-        return primvar.name;
+        continue;
+      }
+
+      if (primvar.interpolation == HdInterpolationFaceVarying ||
+          primvar.interpolation == HdInterpolationUniform)
+      {
+        indexingAllowed = false;
+      }
+
+      if (primvar.name == HdTokens->normals)
+      {
+        foundNormals = true;
       }
     }
   }
-
-  return TfToken();
 }
 
-template<typename T>
-VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, size_t elementExpansion)
+std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(HdSceneDelegate* sceneDelegate,
+                                                                              const VtIntArray& primitiveParams,
+                                                                              const HdPrimvarDescriptor& primvarDesc,
+                                                                              const VtVec3iArray& faces,
+                                                                              uint32_t vertexCount,
+                                                                              bool indexingAllowed,
+                                                                              bool constantAllowed)
 {
-  VtArray<T> result(buffer.GetNumElements() * elementExpansion);
-
-  for (size_t i = 0; i < buffer.GetNumElements(); i++)
-  {
-    for (size_t j = 0; j < elementExpansion; j++)
-    {
-      result[i * elementExpansion + j] = ((T*) buffer.GetData())[i];
-    }
-  }
-
-  return VtValue(std::move(result));
-}
-
-VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, HdType type, size_t elementExpansion)
-{
-  if (type == HdTypeFloatVec4)
-  {
-    return _ExpandBufferElements<GfVec4f>(buffer, elementExpansion);
-  }
-  else if (type == HdTypeFloatVec3)
-  {
-    return _ExpandBufferElements<GfVec3f>(buffer, elementExpansion);
-  }
-  else if (type == HdTypeFloatVec2)
-  {
-    return _ExpandBufferElements<GfVec2f>(buffer, elementExpansion);
-  }
-  else if (type == HdTypeFloat)
-  {
-    return _ExpandBufferElements<float>(buffer, elementExpansion);
-  }
-  TF_VERIFY(false);
-  return VtValue();
-}
-
-bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
-                                             VtIntArray primitiveParams,
-                                             TfToken name,
-                                             HdType type,
-                                             bool& isIndexed,
-                                             VtValue& result) const
-{
-  HdInterpolation interpolation;
-  if (!_FindPrimvarInterpolationByName(sceneDelegate, name, interpolation))
-  {
-    return false;
-  }
-
   const SdfPath& id = GetId();
 
-  VtValue boxedValues = sceneDelegate->Get(id, name);
+  VtValue boxedValues = GetPrimvar(sceneDelegate, primvarDesc.name);
+  HdType type = HdGetValueTupleType(boxedValues).type;
 
-  if ((type == HdTypeFloatVec4 && !boxedValues.IsHolding<VtVec4fArray>()) ||
-      (type == HdTypeFloatVec3 && !boxedValues.IsHolding<VtVec3fArray>()) ||
-      (type == HdTypeFloatVec2 && !boxedValues.IsHolding<VtVec2fArray>()) ||
-      (type == HdTypeFloat     && !boxedValues.IsHolding<VtFloatArray>()))
+  if (!_PrimvarTypeSupported(boxedValues))
   {
-    return false;
+    return std::nullopt;
   }
 
-  HdVtBufferSource buffer(name, boxedValues);
+  // Gi doesn't natively support bool primvars; convert them to ints
+  if (type == HdTypeBool)
+  {
+    auto boolArray = boxedValues.Get<VtBoolArray>();
+    VtIntArray intArray(boolArray.size());
 
-  if (interpolation == HdInterpolationVertex ||
+    for (int i = 0; i < boolArray.size(); i++)
+    {
+      intArray[i] = boolArray[i] ? 1 : 0;
+    }
+
+    boxedValues = VtValue(std::move(intArray));
+    type = HdTypeInt32;
+  }
+
+  VtValue result;
+  HdVtBufferSource buffer(primvarDesc.name, boxedValues);
+
+  if (primvarDesc.interpolation == HdInterpolationVertex ||
       // Varying is equivalent to Vertex for non-subdivided polygonal surfaces (and we don't support subdivision):
       // https://github.com/usd-wg/assets/tree/907d5f17bbe933fc14441a3f3ab69a5bd8abe32a/docs/PrimvarInterpolation#vertex
-      interpolation == HdInterpolationVarying)
+      primvarDesc.interpolation == HdInterpolationVarying)
   {
-    result = boxedValues;
-    isIndexed = true;
+    result = indexingAllowed ? boxedValues : _DeindexBufferElements(type, buffer, faces);
   }
-  else if (interpolation == HdInterpolationConstant)
+  else if (primvarDesc.interpolation == HdInterpolationConstant)
   {
-    result = _ExpandBufferElements(buffer, type, primitiveParams.size() * 3);
-    isIndexed = false;
+    result = constantAllowed ? boxedValues : _ExpandBufferElements(buffer, type, vertexCount);
   }
-  else if (interpolation == HdInterpolationFaceVarying)
+  else if (primvarDesc.interpolation == HdInterpolationFaceVarying)
   {
+    assert(!indexingAllowed);
+
     HdMeshTopology topology = GetMeshTopology(sceneDelegate);
     HdMeshUtil meshUtil(&topology, id);
     if (!meshUtil.ComputeTriangulatedFaceVaryingPrimvar(buffer.GetData(),
@@ -624,223 +681,337 @@ bool HdGatlingMesh::_ReadTriangulatedPrimvar(HdSceneDelegate* sceneDelegate,
                                                         type,
                                                         &result))
     {
-      return false;
+      return std::nullopt;
     }
-    isIndexed = false;
   }
-  else if (interpolation == HdInterpolationUniform)
+  else if (primvarDesc.interpolation == HdInterpolationUniform)
   {
-    result = _ExpandBufferElements(buffer, type, 3);
-    uint8_t* dstPtr = (uint8_t*) HdGetValueData(result);
+    assert(!indexingAllowed);
+
+    uint32_t faceCount = faces.size();
+    result = _CreateSizedArray(type, faceCount * 3);
+
     uint8_t* srcPtr = (uint8_t*) HdGetValueData(boxedValues);
+    uint8_t* dstPtr = (uint8_t*) HdGetValueData(result);
     size_t elementSize = HdDataSizeOfType(type);
 
-    for (size_t faceIndex = 0; faceIndex < primitiveParams.size(); faceIndex++)
+    for (size_t faceIndex = 0; faceIndex < faceCount; faceIndex++)
     {
       int oldFaceIndex = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[faceIndex]);
+
+      assert((faceIndex * 3 + 2) < result.GetArraySize());
+      assert(oldFaceIndex < boxedValues.GetArraySize());
 
       memcpy(&dstPtr[(faceIndex * 3 + 0) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
       memcpy(&dstPtr[(faceIndex * 3 + 1) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
       memcpy(&dstPtr[(faceIndex * 3 + 2) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
     }
-    isIndexed = false;
   }
-  else if (interpolation == HdInterpolationInstance)
+  else if (primvarDesc.interpolation == HdInterpolationInstance)
   {
-    TF_RUNTIME_ERROR("Primvar interpolation mode 'instance' not supported (%s)", id.GetText());
-    return false;
+    TF_WARN("Primvar interpolation mode 'instance' not supported (%s)", id.GetText());
+    return std::nullopt;
   }
   else
   {
-    TF_CODING_ERROR("Primvar interpolation mode not handled");
-    return false;
+    TF_WARN("Primvar interpolation mode not handled");
+    return std::nullopt;
   }
 
-  return true;
+  return ProcessedPrimvar{
+    .interpolation = primvarDesc.interpolation,
+    .type = type,
+    .role = primvarDesc.role,
+    .indexMatchingData = result
+  };
+}
+
+HdGatlingMesh::PrimvarMap HdGatlingMesh::_ProcessPrimvars(HdSceneDelegate* sceneDelegate,
+                                                          const VtIntArray& primitiveParams,
+                                                          const VtVec3iArray& faces,
+                                                          uint32_t vertexCount,
+                                                          bool indexingAllowed)
+{
+  PrimvarMap map;
+
+  for (int i = 0; i < int(HdInterpolationCount); i++)
+  {
+    const auto& primvarDescs = GetPrimvarDescriptors(sceneDelegate, (HdInterpolation) i);
+
+    for (const HdPrimvarDescriptor& primvar : primvarDescs)
+    {
+      const TfToken& name = primvar.name;
+
+      if (name.IsEmpty() || name == HdTokens->points)
+      {
+        continue;
+      }
+
+      // Don't allow primvars that could be baked into vertices to be constant
+      bool constantAllowed = !_IsPrimvarEligibleForVertexData(name, primvar.role);
+
+      auto p = _ProcessPrimvar(sceneDelegate, primitiveParams, primvar, faces, vertexCount, indexingAllowed, constantAllowed);
+      if (p.has_value())
+      {
+        map[name] = *p;
+      }
+    }
+  }
+
+  return map;
+}
+
+std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const PrimvarMap& primvarMap)
+{
+  const SdfPath& id = GetId();
+
+  std::vector<GiPrimvarData> result;
+
+  for (auto it = primvarMap.begin(); it != primvarMap.end(); it++)
+  {
+    const TfToken& name = it->first;
+    const ProcessedPrimvar& p = it->second;
+
+    if (name.IsEmpty() ||
+#if 0
+        // FIXME: optimization disabled, see MtlxDocumentPatcher.cpp
+        name == _tokens->st || name == _tokens->st0 || name == _tokens->st_0 ||
+        name == _tokens->UV0 || name == _tokens->tangents ||
+#endif
+        name == HdTokens->points || name == HdTokens->normals)
+    {
+      continue;
+    }
+
+    GiPrimvarType type;
+    switch (p.type)
+    {
+    case HdTypeFloat:
+      type = GiPrimvarType::Float;
+      break;
+    case HdTypeFloatVec2:
+      type = GiPrimvarType::Vec2;
+      break;
+    case HdTypeFloatVec3:
+      type = GiPrimvarType::Vec3;
+      break;
+    case HdTypeFloatVec4:
+      type = GiPrimvarType::Vec4;
+      break;
+    case HdTypeInt32:
+      type = GiPrimvarType::Int;
+      break;
+    case HdTypeInt32Vec2:
+      type = GiPrimvarType::Int2;
+      break;
+    case HdTypeInt32Vec3:
+      type = GiPrimvarType::Int3;
+      break;
+    case HdTypeInt32Vec4:
+      type = GiPrimvarType::Int4;
+      break;
+    default:
+      TF_WARN("primvar type %i of %s in %s is unsupported", int(p.type), id.GetText(), name.GetText());
+      continue;
+    }
+
+    uint32_t dataSize = HdDataSizeOfTupleType(HdGetValueTupleType(p.indexMatchingData));
+
+    std::vector<uint8_t> data(dataSize);
+    const uint8_t* srcPtr = (uint8_t*) HdGetValueData(p.indexMatchingData);
+    memcpy(&data[0], srcPtr, data.size());
+
+    result.push_back(GiPrimvarData{
+      .name = name.GetString(),
+      .type = type,
+      .interpolation = (p.interpolation == HdInterpolationConstant ?
+        GiPrimvarInterpolation::Constant : GiPrimvarInterpolation::Vertex),
+      .data = data
+    });
+  }
+
+  return result;
 }
 
 GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 {
   const SdfPath& id = GetId();
 
-  _VertexStreams s;
+  VtVec3iArray faces;
 
   // Faces
   const HdMeshTopology& topology = GetMeshTopology(sceneDelegate);
   HdMeshUtil meshUtil(&topology, id);
 
   VtIntArray primitiveParams;
-  meshUtil.ComputeTriangleIndices(&s.faces, &primitiveParams);
+  meshUtil.ComputeTriangleIndices(&faces, &primitiveParams);
 
-  // Points: required per vertex.
+  // Points (required; one per vertex)
   VtValue boxedPoints = GetPoints(sceneDelegate);
 
-  if (boxedPoints.IsEmpty())
+  if (boxedPoints.IsEmpty() || !boxedPoints.IsHolding<VtVec3fArray>())
   {
     TF_RUNTIME_ERROR("Points primvar not found (%s)", id.GetText());
     return nullptr;
   }
 
-  s.points = boxedPoints.Get<VtVec3fArray>();
+  // Analyze primvars
+  bool foundNormals;
+  bool useIndexing;
+  _AnalyzePrimvars(sceneDelegate, foundNormals, useIndexing);
 
-  // Colors: only support constant interpolation because we can create a material for it.
-  HdInterpolation colorInterpolation;
-  bool foundColor = _FindPrimvarInterpolationByName(sceneDelegate, HdTokens->displayColor, colorInterpolation);
+  // Generate fallback normals on original points
+  VtVec3fArray normals;
+  if (!foundNormals)
+  {
+    VtVec3fArray points = boxedPoints.UncheckedGet<VtVec3fArray>();
 
-  if (foundColor && colorInterpolation == HdInterpolation::HdInterpolationConstant)
-  {
-    VtValue boxedColors = sceneDelegate->Get(id, HdTokens->displayColor);
-    const VtVec3fArray& colors = boxedColors.Get<VtVec3fArray>();
-    _color = colors[0];
-    _hasColor = true;
-  }
-  else
-  {
-    _hasColor = false;
-  }
-
-  // Normals: calculate them from the topology if no primvar exists.
-  VtValue boxedNormals;
-  bool areNormalsIndexed;
-  bool foundNormals = _ReadTriangulatedPrimvar(sceneDelegate,
-                                               primitiveParams,
-                                               HdTokens->normals,
-                                               HdTypeFloatVec3,
-                                               areNormalsIndexed,
-                                               boxedNormals);
-
-  if (foundNormals)
-  {
-    s.normals.array = boxedNormals.Get<VtVec3fArray>();
-    s.normals.indexed = areNormalsIndexed;
-  }
-  else
-  {
     Hd_VertexAdjacency adjacency;
     adjacency.BuildAdjacencyTable(&topology);
-    s.normals.array = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, s.points.size(), s.points.cdata());
-    s.normals.indexed = true;
+    normals = Hd_SmoothNormals::ComputeSmoothNormals(&adjacency, points.size(), points.cdata());
+    TF_VERIFY(normals.size() == points.size());
+
+    if (!useIndexing)
+    {
+      HdVtBufferSource buffer(HdTokens->normals, VtValue(normals));
+      normals = _DeindexBufferElements(HdTypeFloatVec3, buffer, faces).Get<VtVec3fArray>();
+    }
   }
 
-  // Tex Coords: ideally should be read explicitly from primvars. But since this isn't implemented yet, we use
-  //             heuristics to select a primvar likely containing tex coords. We start by checking well-known names.
-  const TfToken texcoordPrimvarNameHints[] = {
-     UsdUtilsGetPrimaryUVSetName(),
-    _tokens->st,
-    _tokens->st0,
-    _tokens->st_0,
-    _tokens->st1,
-    _tokens->st_1,
-    _tokens->UV0,
-    _tokens->UV1
-  };
-
-  TfToken texcoordPrimvarName;
-  for (const TfToken& name : texcoordPrimvarNameHints)
+  // Deindex points and process primvars
+  if (!useIndexing)
   {
-    HdInterpolation unusedInterpolation;
-    if (_FindPrimvarInterpolationByName(sceneDelegate, name, unusedInterpolation))
+    HdVtBufferSource buffer(HdTokens->points, boxedPoints);
+    boxedPoints = _DeindexBufferElements(HdTypeFloatVec3, buffer, faces);
+  }
+  VtVec3fArray points = boxedPoints.UncheckedGet<VtVec3fArray>();
+
+  PrimvarMap primvarMap = _ProcessPrimvars(sceneDelegate, primitiveParams, faces, points.size(), useIndexing);
+
+  // Use normals if authored
+  if (foundNormals)
+  {
+    auto normalsIt = primvarMap.find(HdTokens->normals);
+    assert(normalsIt != primvarMap.end());
+
+    const ProcessedPrimvar& pn = normalsIt->second;
+    TF_VERIFY(pn.type == HdTypeFloatVec3);
+
+    normals = pn.indexMatchingData.Get<VtVec3fArray>();
+  }
+
+  // Texcoords. Find primary primvar by name and role.
+  TfToken texcoordPrimvarName;
+  for (const TfToken& name : _texcoordPrimvarNameHints)
+  {
+    if (primvarMap.count(name) > 0)
     {
       texcoordPrimvarName = name;
       break;
     }
   }
 
-  // Otherwise, we select any primvar of a specific role.
   if (texcoordPrimvarName.IsEmpty())
   {
-    texcoordPrimvarName = _FindPrimvarByRole(sceneDelegate, HdPrimvarRoleTokens->textureCoordinate);
-  }
-
-  if (!texcoordPrimvarName.IsEmpty())
-  {
-    VtValue boxedTexCoords;
-    bool isIndexed;
-    if (_ReadTriangulatedPrimvar(sceneDelegate,
-                                 primitiveParams,
-                                 texcoordPrimvarName,
-                                 HdTypeFloatVec2,
-                                 isIndexed,
-                                 boxedTexCoords))
+    for (auto it = primvarMap.begin(); it != primvarMap.end(); it++)
     {
-      s.texCoords.array = boxedTexCoords.Get<VtVec2fArray>();
-      s.texCoords.indexed = isIndexed;
-    }
-  }
-
-  // Tangents & bitangents: either read combined vec4 array, or two separate primvars.
-  VtValue boxedTangents;
-  bool areTangentsIndexed;
-  if (_ReadTriangulatedPrimvar(sceneDelegate,
-                               primitiveParams,
-                               _tokens->tangents,
-                               HdTypeFloatVec4,
-                               areTangentsIndexed,
-                               boxedTangents))
-  {
-    s.tangents.indexed = areTangentsIndexed;
-    s.bitangentSigns.indexed = areTangentsIndexed;
-
-    VtVec3fArray& tangents = s.tangents.array;
-    VtFloatArray& bitangentSigns = s.bitangentSigns.array;
-
-    VtVec4fArray vec4Tangents = boxedTangents.Get<VtVec4fArray>();
-    tangents.resize(vec4Tangents.size());
-    bitangentSigns.resize(vec4Tangents.size());
-
-    for (size_t i = 0; i < vec4Tangents.size(); i++)
-    {
-      tangents[i] = GfVec3f(vec4Tangents[i].data());
-      bitangentSigns[i] = vec4Tangents[i][3];
-    }
-  }
-  else if (_ReadTriangulatedPrimvar(sceneDelegate,
-           primitiveParams,
-           _tokens->tangents,
-           HdTypeFloatVec3,
-           areTangentsIndexed,
-           boxedTangents))
-  {
-    s.tangents.indexed = areTangentsIndexed;
-    s.tangents.array = boxedTangents.Get<VtVec3fArray>();
-
-    const TfToken bitangentSignPrimvarNameHints[] = {
-      _tokens->tangentSigns,   // <= guc 0.2
-      _tokens->bitangentSigns  //  > guc 0.2
-    };
-
-    for (const TfToken& name : bitangentSignPrimvarNameHints)
-    {
-      VtValue boxedBitangentSigns;
-      bool areBitangentSignsIndexed;
-      if (_ReadTriangulatedPrimvar(sceneDelegate,
-                                   primitiveParams,
-                                   name,
-                                   HdTypeFloat,
-                                   areBitangentSignsIndexed,
-                                   boxedBitangentSigns))
+      if (it->second.role == HdPrimvarRoleTokens->textureCoordinate)
       {
-        s.bitangentSigns.indexed = areBitangentSignsIndexed;
-        s.bitangentSigns.array = boxedBitangentSigns.Get<VtFloatArray>();
+        texcoordPrimvarName = it->first;
       }
     }
   }
 
-  std::vector<GiFace> faces;
-  std::vector<GiVertex> vertices;
-  _BakeMeshGeometry(s, GfMatrix4f(1.0f), faces, vertices);
+  VtVec2fArray texCoords;
+  if (!texcoordPrimvarName.IsEmpty())
+  {
+    const ProcessedPrimvar& pt = primvarMap[texcoordPrimvarName];
+    TF_VERIFY(pt.type == HdTypeFloatVec2);
 
+    texCoords = pt.indexMatchingData.Get<VtVec2fArray>();
+  }
+
+  // Tangents. Although barely used in practice.
+  VtVec3fArray tangents;
+  VtFloatArray bitangentSigns;
+
+  auto tangentsIt = primvarMap.find(_tokens->tangents);
+  if (tangentsIt != primvarMap.end())
+  {
+    const ProcessedPrimvar& pt = tangentsIt->second;
+
+    if (pt.type == HdTypeFloatVec4)
+    {
+      VtVec4fArray vec4Tangents = pt.indexMatchingData.Get<VtVec4fArray>();
+      tangents.resize(vec4Tangents.size());
+      bitangentSigns.resize(vec4Tangents.size());
+
+      for (size_t i = 0; i < vec4Tangents.size(); i++)
+      {
+        tangents[i] = GfVec3f(vec4Tangents[i].data());
+        bitangentSigns[i] = vec4Tangents[i][3];
+      }
+    }
+    else if (pt.type == HdTypeFloatVec3)
+    {
+      tangents = pt.indexMatchingData.Get<VtVec3fArray>();
+
+      auto bitangentSignsIt = primvarMap.find(_tokens->bitangentSigns);
+      if (bitangentSignsIt != primvarMap.end())
+      {
+        const ProcessedPrimvar& pb = tangentsIt->second;
+
+        if (pb.type == HdTypeFloat)
+        {
+          bitangentSigns = pb.indexMatchingData.Get<VtFloatArray>();
+        }
+      }
+    }
+    else
+    {
+      TF_WARN("Invalid tangents type for %s", id.GetText());
+    }
+  }
+
+  // Deindex faces
+  if (!useIndexing)
+  {
+    for (size_t i = 0; i < faces.size(); i++)
+    {
+      faces[i] = GfVec3i(i * 3 + 0, i * 3 + 1, i * 3 + 2);
+    }
+  }
+
+  // Create vertices and indices
+  _VertexStreams s = {
+    .faces = faces,
+    .points = points,
+    .normals = normals,
+    .texCoords = texCoords,
+    .tangents = tangents,
+    .bitangentSigns = bitangentSigns,
+  };
+
+  std::vector<GiFace> giFaces;
+  std::vector<GiVertex> giVertices;
+  _BakeMeshGeometry(s, GfMatrix4f(1.0f), giFaces, giVertices);
+
+  // Collect secondary primvars
+  std::vector<GiPrimvarData> secondaryPrimvars = _CollectSecondaryPrimvars(primvarMap);
+
+  // Create mesh
   TfToken orientation = topology.GetOrientation();
   bool isLeftHanded = (orientation == _tokens->leftHanded);
 
   GiMeshDesc desc = {
-    .faceCount = (uint32_t) faces.size(),
-    .faces = faces.data(),
+    .faceCount = (uint32_t) giFaces.size(),
+    .faces = giFaces.data(),
     .id = GetPrimId(),
     .isLeftHanded = isLeftHanded,
     .name = id.GetText(),
-    .vertexCount = (uint32_t) vertices.size(),
-    .vertices = vertices.data()
+    .primvars = secondaryPrimvars,
+    .vertexCount = (uint32_t) giVertices.size(),
+    .vertices = giVertices.data()
   };
 
   return giCreateMesh(_scene, desc);
@@ -849,16 +1020,6 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 GiMesh* HdGatlingMesh::GetGiMesh() const
 {
   return _giMesh;
-}
-
-const GfVec3f& HdGatlingMesh::GetColor() const
-{
-  return _color;
-}
-
-bool HdGatlingMesh::HasColor() const
-{
-  return _hasColor;
 }
 
 HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const

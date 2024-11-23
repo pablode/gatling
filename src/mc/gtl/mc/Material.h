@@ -19,6 +19,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 namespace gtl
 {
@@ -37,6 +38,7 @@ namespace gtl
     std::string resourcePathPrefix;
     std::shared_ptr<McMdlMaterial> mdlMaterial;
     bool requiresSceneTransforms;
+    std::vector<const char*> sceneDataNames;
     int cameraPositionSceneDataIndex;
   };
 }

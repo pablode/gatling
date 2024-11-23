@@ -156,6 +156,18 @@ namespace
     return value->get_value();
   }
 
+  std::vector<const char*> _ExtractSceneDataNames(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  {
+    std::vector<const char*> names;
+
+    for (mi::Size i = 0; i < compiledMaterial->get_referenced_scene_data_count(); i++)
+    {
+      names.push_back(compiledMaterial->get_referenced_scene_data_name(i));
+    }
+
+    return names;
+  }
+
   int _FindCameraPositionSceneDataIndex(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
   {
     for (mi::Size i = 0; i < compiledMaterial->get_referenced_scene_data_count(); i++)
@@ -205,6 +217,7 @@ namespace gtl
       .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
+      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial),
       .cameraPositionSceneDataIndex = _FindCameraPositionSceneDataIndex(compiledMaterial)
     };
   }
@@ -261,6 +274,7 @@ namespace gtl
       .resourcePathPrefix = resourcePathPrefix,
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
+      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial),
       .cameraPositionSceneDataIndex = _FindCameraPositionSceneDataIndex(compiledMaterial)
     };
   }

@@ -58,25 +58,22 @@ namespace
     HdPrimTypeTokens->renderBuffer
   };
 
-  std::string _MakeMaterialXColorMaterialSrc(const GfVec3f& color, const char* name)
-  {
-    // Prefer UsdPreviewSurface over MDL diffuse or unlit because we want to give a good first
-    // impression (many people will try Pixar's Kitchen scene first), regardless of whether the user
-    // is aware of the use or purpose of the displayColor attribute (as opposed to a preview material).
-    static const char* USDPREVIEWSURFACE_MTLX_DOC = R"(
-      <?xml version="1.0"?>
-      <materialx version="1.38">
-        <UsdPreviewSurface name="gatling_SR_%s" type="surfaceshader">
-          <input name="diffuseColor" type="color3" value="%f, %f, %f" />
-        </UsdPreviewSurface>
-        <surfacematerial name="gatling_MAT_%s" type="material">
-          <input name="surfaceshader" type="surfaceshader" nodename="gatling_SR_%s" />
-        </surfacematerial>
-      </materialx>
-    )";
-
-    return TfStringPrintf(USDPREVIEWSURFACE_MTLX_DOC, name, color[0], color[1], color[2], name, name);
-  }
+  // By default, we visualize the display color if it exists (otherwise grey).
+  static const char* _defaultMaterialXMaterial = R"(
+    <?xml version="1.0"?>
+    <materialx version="1.38">
+      <geompropvalue name="gatling_GP_default" type="color3">
+        <input name="geomprop" type="string" value="displayColor" />
+        <input name="default" type="color3" value="0.18, 0.18, 0.18" />
+      </geompropvalue>
+      <UsdPreviewSurface name="gatling_SR_default" type="surfaceshader">
+        <input name="diffuseColor" type="color3" nodename="gatling_GP_default" />
+      </UsdPreviewSurface>
+      <surfacematerial name="gatling_MAT_default" type="material">
+        <input name="surfaceshader" type="surfaceshader" nodename="gatling_SR_default" />
+      </surfacematerial>
+    </materialx>
+  )";
 }
 
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
@@ -122,10 +119,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
     _settingsMap[key] = value;
   }
 
-  auto defaultDiffuseColor = GfVec3f(0.18f); // UsdPreviewSurface spec
-  std::string defaultMatSrc = _MakeMaterialXColorMaterialSrc(defaultDiffuseColor, "default");
-
-  _defaultMaterial = giCreateMaterialFromMtlxStr("__gatling_default", defaultMatSrc.c_str());
+  _defaultMaterial = giCreateMaterialFromMtlxStr("__gatling_default", _defaultMaterialXMaterial);
   TF_AXIOM(_defaultMaterial);
 
   _giScene = giCreateScene();

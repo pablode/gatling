@@ -96,6 +96,7 @@ namespace gtl
       bool isEmissive;
       bool isThinWalled;
       bool nextEventEstimation;
+      uint32_t sceneDataCount;
       std::string_view shadingGlsl;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;
@@ -108,6 +109,7 @@ namespace gtl
       bool enableSceneTransforms;
       int cameraPositionSceneDataIndex;
       std::string_view opacityEvalGlsl;
+      uint32_t sceneDataCount;
       bool shadowTest;
       uint32_t textureIndexOffset2d;
       uint32_t textureIndexOffset3d;

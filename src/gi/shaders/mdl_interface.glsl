@@ -282,15 +282,47 @@ vec3 mdl_adapt_normal(State state, vec3 normal)
 
 #endif
 
-// TODO: implement scene data support
+// Buffer references to read different data types
+layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefInt { int data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefFloat { float data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 8 /* largest type */) buffer BufferRefVec2 { vec2 data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 16/* largest type */) buffer BufferRefVec4 { vec4 data[]; };
 
 bool scene_data_isvalid(inout State state, int scene_data_id)
 {
+#if SCENE_DATA_COUNT > 0
+    if (scene_data_id == 0 || scene_data_id > SCENE_DATA_COUNT)
+    {
+      return false;
+    }
+
+    mdl_renderer_state rs = state.renderer_state;
+    return rs.sceneDataInfos[scene_data_id - 1] != UINT32_MAX;
+#endif
     return false;
 }
 
 vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default_value, bool uniform_lookup)
 {
+#if SCENE_DATA_COUNT > 0
+    if (scene_data_isvalid(state, scene_data_id))
+    {
+        mdl_renderer_state rs = state.renderer_state;
+
+        uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        BufferRefVec4 ref = BufferRefVec4(address);
+
+        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant);
+        vec4 val0 = ref.data[hitIndices[0]];
+        vec4 val1 = ref.data[hitIndices[1]];
+        vec4 val2 = ref.data[hitIndices[2]];
+
+        vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
+        return val0 * bc.x + val1 * bc.y + val2 * bc.z;
+    }
+#endif
     return default_value;
 }
 
@@ -302,45 +334,141 @@ vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default
       return PC.cameraPosition;
     }
 #endif
+
+#if SCENE_DATA_COUNT > 0
+    if (scene_data_isvalid(state, scene_data_id))
+    {
+        mdl_renderer_state rs = state.renderer_state;
+
+        uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        BufferRefFloat ref = BufferRefFloat(address);
+
+        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant) * 3;
+        vec3 val0 = vec3(ref.data[hitIndices[0] + 0], ref.data[hitIndices[0] + 1], ref.data[hitIndices[0] + 2]);
+        vec3 val1 = vec3(ref.data[hitIndices[1] + 0], ref.data[hitIndices[1] + 1], ref.data[hitIndices[1] + 2]);
+        vec3 val2 = vec3(ref.data[hitIndices[2] + 0], ref.data[hitIndices[2] + 1], ref.data[hitIndices[2] + 2]);
+
+        vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
+        return val0 * bc.x + val1 * bc.y + val2 * bc.z;
+    }
+#endif
+
     return default_value;
 }
 
 vec3 scene_data_lookup_color(inout State state, int scene_data_id, vec3 default_value, bool uniform_lookup)
 {
-    return default_value;
+    return scene_data_lookup_float3(state, scene_data_id, default_value, uniform_lookup);
 }
 
 vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default_value, bool uniform_lookup)
 {
+#if SCENE_DATA_COUNT > 0
+    if (scene_data_isvalid(state, scene_data_id))
+    {
+        mdl_renderer_state rs = state.renderer_state;
+
+        uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        BufferRefVec2 ref = BufferRefVec2(address);
+
+        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant);
+        vec2 val0 = ref.data[hitIndices[0]];
+        vec2 val1 = ref.data[hitIndices[1]];
+        vec2 val2 = ref.data[hitIndices[2]];
+
+        vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
+        return val0 * bc.x + val1 * bc.y + val2 * bc.z;
+    }
+#endif
     return default_value;
 }
 
 float scene_data_lookup_float(inout State state, int scene_data_id, float default_value, bool uniform_lookup)
 {
+#if SCENE_DATA_COUNT > 0
+    if (scene_data_isvalid(state, scene_data_id))
+    {
+        mdl_renderer_state rs = state.renderer_state;
+
+        uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        BufferRefFloat ref = BufferRefFloat(address);
+
+        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant);
+        vec3 val = vec3(ref.data[hitIndices[0]], ref.data[hitIndices[1]], ref.data[hitIndices[2]]);
+
+        vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
+        return val.x * bc.x + val.y * bc.y + val.z * bc.z;
+    }
+#endif
     return default_value;
 }
 
-ivec4 scene_data_lookup_int4(inout State state, int scene_data_id, ivec4 default_value, bool uniform_lookup)
+int scene_data_lookup_int(inout State state, int scene_data_id, int index_offset, int default_value, bool uniform_lookup)
 {
-    return default_value;
-}
+#if SCENE_DATA_COUNT > 0
+    if (scene_data_isvalid(state, scene_data_id))
+    {
+        mdl_renderer_state rs = state.renderer_state;
 
-ivec3 scene_data_lookup_int3(inout State state, int scene_data_id, ivec3 default_value, bool uniform_lookup)
-{
-    return default_value;
-}
+        uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        BufferRefInt ref = BufferRefInt(address);
 
-ivec2 scene_data_lookup_int2(inout State state, int scene_data_id, ivec2 default_value, bool uniform_lookup)
-{
+        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant) + index_offset;
+        ivec3 val = ivec3(ref.data[hitIndices[0]], ref.data[hitIndices[1]], ref.data[hitIndices[2]]);
+
+        vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
+
+        // nearest interpolation
+        if (bc.x > bc.y)
+        {
+          return bc.x > bc.z ? val.x : val.z;
+        }
+        else
+        {
+          return bc.y > bc.z ? val.y : val.z;
+        }
+    }
+#endif
     return default_value;
 }
 
 int scene_data_lookup_int(inout State state, int scene_data_id, int default_value, bool uniform_lookup)
 {
-    return default_value;
+    return scene_data_lookup_int(state, scene_data_id, 0, default_value, uniform_lookup);
+}
+
+// NOTE: the following functions are implemented in a less efficient way because MaterialX does not support them.
+
+ivec4 scene_data_lookup_int4(inout State state, int scene_data_id, ivec4 default_value, bool uniform_lookup)
+{
+    return ivec4(scene_data_lookup_int(state, scene_data_id, 0, default_value.x, uniform_lookup),
+                 scene_data_lookup_int(state, scene_data_id, 1, default_value.y, uniform_lookup),
+                 scene_data_lookup_int(state, scene_data_id, 2, default_value.z, uniform_lookup),
+                 scene_data_lookup_int(state, scene_data_id, 3, default_value.w, uniform_lookup));
+}
+
+ivec3 scene_data_lookup_int3(inout State state, int scene_data_id, ivec3 default_value, bool uniform_lookup)
+{
+    return ivec3(scene_data_lookup_int(state, scene_data_id, 0, default_value.x, uniform_lookup),
+                 scene_data_lookup_int(state, scene_data_id, 1, default_value.y, uniform_lookup),
+                 scene_data_lookup_int(state, scene_data_id, 2, default_value.z, uniform_lookup));
+}
+
+ivec2 scene_data_lookup_int2(inout State state, int scene_data_id, ivec2 default_value, bool uniform_lookup)
+{
+    return ivec2(scene_data_lookup_int(state, scene_data_id, 0, default_value.x, uniform_lookup),
+                 scene_data_lookup_int(state, scene_data_id, 1, default_value.y, uniform_lookup));
 }
 
 mat4 scene_data_lookup_float4x4(inout State state, int scene_data_id, mat4 default_value, bool uniform_lookup)
 {
-    return default_value;
+    return default_value; // TODO: not implemented
 }

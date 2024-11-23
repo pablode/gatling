@@ -112,10 +112,15 @@ struct BlasPayload
   GI_UINT   bitfield;
 };
 
+const GI_UINT BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT = 0x80000000u; //(1 << 31);
+const GI_UINT BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK = 0x7FFFFFFFu;
+
+const GI_UINT MAX_SCENE_DATA_COUNT = 7;
+
 struct BlasPayloadBufferPreamble
 {
   GI_INT objectId;
-  GI_INT padding[7];
+  GI_UINT sceneDataInfos[MAX_SCENE_DATA_COUNT];
 };
 
 GI_BINDING_INDEX(OUT_PIXELS,     0)

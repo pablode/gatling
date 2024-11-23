@@ -76,6 +76,7 @@ namespace gtl
   struct GiMeshCpuData
   {
     std::vector<GiFace> faces;
+    std::vector<GiPrimvarData> primvars;
     std::vector<GiVertex> vertices;
   };
 
@@ -538,6 +539,7 @@ fail:
   {
     GiMeshCpuData cpuData = {
       .faces = std::vector<GiFace>(&desc.faces[0], &desc.faces[desc.faceCount]),
+      .primvars = desc.primvars,
       .vertices = std::vector<GiVertex>(&desc.vertices[0], &desc.vertices[desc.vertexCount])
     };
 
@@ -590,11 +592,32 @@ fail:
     McMaterial* oldMcMat = mesh->material ? mesh->material->mcMat : nullptr;
 
     GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::DirtyRtPipeline;
-    if (oldMcMat && newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency)
+    if (oldMcMat)
     {
-      // material data such as alpha is used in the BVH build; invalidate BVH
-      dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
-      mesh->gpuData.reset();
+      // material data such as alpha is used in the BVH build
+      bool transparencyChanged = newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency;
+
+      const auto& newPrimvarNames = newMcMat->sceneDataNames;
+      const auto& oldPrimvarNames = oldMcMat->sceneDataNames;
+
+      bool primvarsChanged = newPrimvarNames.size() != oldPrimvarNames.size();
+      if (!primvarsChanged)
+      {
+        for (size_t i = 0; i < newPrimvarNames.size(); i++)
+        {
+          if (strcmp(newPrimvarNames[i], oldPrimvarNames[i]) != 0)
+          {
+            primvarsChanged = true;
+            break;
+          }
+        }
+      }
+
+      if (transparencyChanged || primvarsChanged)
+      {
+        dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+        mesh->gpuData.reset();
+      }
     }
 
     mesh->material = mat;
@@ -655,10 +678,12 @@ fail:
       }
 
       // Find material for SBT index (FIXME: find a better solution)
+      const GiMaterial* material = mesh->material;
+
       uint32_t materialIndex = UINT32_MAX;
       for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
       {
-          if (shaderCache->materials[i] == mesh->material)
+          if (shaderCache->materials[i] == material)
           {
               materialIndex = i;
               break;
@@ -680,12 +705,6 @@ fail:
           continue;
         }
 
-        // Payload buffer preamble
-        rp::BlasPayloadBufferPreamble preamble = {
-          .objectId = mesh->id
-        };
-        uint32_t preambleSize = sizeof(rp::BlasPayloadBufferPreamble);
-
         // Collect vertices
         std::vector<rp::FVertex> vertexData;
         std::vector<CgpuVertex> positionData;
@@ -706,6 +725,8 @@ fail:
           positionData[i] = CgpuVertex{ .x = cpuVert.pos[0], .y = cpuVert.pos[1], .z = cpuVert.pos[2] };
         }
 
+        uint64_t verticesSize = vertexData.size() * sizeof(rp::FVertex);
+
         // Collect indices
         std::vector<uint32_t> indexData;
         indexData.reserve(data.faces.size() * 3);
@@ -718,19 +739,109 @@ fail:
           indexData.push_back(face->v_i[2]);
         }
 
+        uint64_t indicesSize = indexData.size() * sizeof(uint32_t);
+
+        // Prepare scene data & preamble
+        std::vector<const GiPrimvarData*> primvars;
+        if (material)
+        {
+          for (const char* sceneDataName : material->mcMat->sceneDataNames)
+          {
+            const GiPrimvarData* primvar = nullptr;
+
+            for (const GiPrimvarData& p : mesh->cpuData.primvars)
+            {
+              // FIXME: we should check if scene data and primvar types match to prevent crashes
+              if (p.name == sceneDataName && !p.data.empty())
+              {
+                primvar = &p;
+                break;
+              }
+            }
+
+            if (!primvar)
+            {
+              GB_DEBUG("scene data {} not found for mesh {} with material {}", mesh->name, sceneDataName, material->name);
+              continue;
+            }
+
+            if (primvars.size() >= rp::MAX_SCENE_DATA_COUNT)
+            {
+              GB_ERROR("scene data limit exceeded for {}; using default value for {}", mesh->name, sceneDataName);
+              continue;
+            }
+
+            primvars.push_back(primvar);
+          }
+        }
+
+        uint64_t preambleSize = sizeof(rp::BlasPayloadBufferPreamble);
+
+        uint64_t payloadBufferSize = preambleSize;
+        uint64_t indexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), indicesSize, &payloadBufferSize);
+        uint64_t vertexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), verticesSize, &payloadBufferSize);
+
+        std::vector<uint32_t> sceneDataOffsets;
+        for (const GiPrimvarData* s : primvars)
+        {
+          if (!s)
+          {
+            sceneDataOffsets.push_back(0);
+            continue;
+          }
+
+          uint32_t alignment;
+          switch (s->type)
+          {
+          case GiPrimvarType::Float:
+          case GiPrimvarType::Int:
+          case GiPrimvarType::Int2: // single float fetches
+          case GiPrimvarType::Int3: // single float fetches
+          case GiPrimvarType::Int4: // single float fetches
+            alignment = 4;
+            break;
+          case GiPrimvarType::Vec2:
+            alignment = 8;
+            break;
+          case GiPrimvarType::Vec3:
+            alignment = 4; // single float fetches
+            break;
+          case GiPrimvarType::Vec4:
+            alignment = 16;
+            break;
+          default:
+            assert(false);
+            GB_ERROR("coding error: unhandled type size!");
+            alignment = 4;
+            break;
+          }
+
+          sceneDataOffsets.push_back(giAlignBuffer(alignment, s->data.size(), &payloadBufferSize));
+        }
+
+        rp::BlasPayloadBufferPreamble preamble = { .objectId = mesh->id };
+        for (size_t i = 0; i < primvars.size(); i++)
+        {
+          const GiPrimvarData* primvar = primvars[i];
+
+          if (!primvar)
+          {
+            preamble.sceneDataInfos[i] = UINT32_MAX; // mark as invalid
+            continue;
+          }
+
+          bool isConstant = (primvar->interpolation == GiPrimvarInterpolation::Constant);
+          uint32_t info = (sceneDataOffsets[i] & rp::BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK) |
+                          (isConstant * rp::BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+          preamble.sceneDataInfos[i] = info;
+        }
+
         // Upload GPU data
         CgpuBlas blas;
         CgpuBuffer tmpPositionBuffer;
         CgpuBuffer tmpIndexBuffer;
         CgpuBuffer payloadBuffer;
         rp::BlasPayload payload;
-
-        uint64_t indicesSize = indexData.size() * sizeof(uint32_t);
-        uint64_t verticesSize = vertexData.size() * sizeof(rp::FVertex);
-
-        uint64_t payloadBufferSize = preambleSize;
-        uint64_t indexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), indicesSize, &payloadBufferSize);
-        uint64_t vertexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), verticesSize, &payloadBufferSize);
 
         uint64_t tmpIndexBufferSize = indicesSize;
         uint64_t tmpPositionBufferSize = positionData.size() * sizeof(CgpuVertex);
@@ -788,6 +899,21 @@ fail:
         {
           GB_ERROR("failed to stage BLAS data");
           goto fail_cleanup;
+        }
+
+        for (size_t i = 0; i < primvars.size(); i++)
+        {
+          const GiPrimvarData* s = primvars[i];
+          if (!s)
+          {
+            continue;
+          }
+
+          if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer, sceneDataOffsets[i]))
+          {
+            GB_ERROR("failed to stage BLAS primvar");
+            goto fail_cleanup;
+          }
         }
 
         s_stager->flush();
@@ -1149,6 +1275,9 @@ cleanup:
       {
         const McMaterial* material = materials[i]->mcMat;
 
+        auto sceneDataCount = uint32_t(material->sceneDataNames.size())
+          - int(bool(material->cameraPositionSceneDataIndex));
+
         HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
         // Closest hit
@@ -1167,6 +1296,7 @@ cleanup:
             .isEmissive = material->isEmissive,
             .isThinWalled = material->isThinWalled,
             .nextEventEstimation = nextEventEstimation,
+            .sceneDataCount = sceneDataCount,
             .shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource,
             .textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d,
             .textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d
@@ -1188,6 +1318,7 @@ cleanup:
             .enableSceneTransforms = material->requiresSceneTransforms,
             .cameraPositionSceneDataIndex = material->cameraPositionSceneDataIndex,
             .opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource,
+            .sceneDataCount = sceneDataCount,
             .textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d,
             .textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d
           };

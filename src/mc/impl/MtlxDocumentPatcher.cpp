@@ -166,53 +166,6 @@ void _PatchColor3Vector3Mismatches(mx::DocumentPtr document)
   }
 }
 
-// HACK/FIXME:
-// One big limitation of the MDL backend is currently that geompropvalue
-// reader nodes are not implemented (they return a value of zero). By
-// removing them, the default geomprop (e.g. UV0) is used, provided by the
-// MDL state, which we can fill by anticipating certain geomprops/primvars
-// on the Hydra side (e.g. the 'st' primvar). This way, we can still get
-// proper texture coordinates in MOST cases, but not all.
-void _PatchGeomprops(mx::DocumentPtr document)
-{
-  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
-  {
-    mx::ElementPtr elem = treeIt.getElement();
-
-    mx::NodePtr node = elem->asA<mx::Node>();
-    if (!node)
-    {
-      continue;
-    }
-
-    const mx::string& category = node->getCategory();
-
-    if (category != "geompropvalue" && category != "UsdPrimvarReader")
-    {
-      continue;
-    }
-
-    const mx::string& nodeDefString = node->getNodeDefString();
-    if (nodeDefString == "ND_geompropvalue_vector2" || nodeDefString == "ND_UsdPrimvarReader_vector2")
-    {
-      // Node most likely reads a texcoord; substitute it with a texcoord node.
-      std::vector<mx::InputPtr> inputs = node->getActiveInputs();
-
-      for (mx::InputPtr input : inputs)
-      {
-        node->removeInput(input->getName());
-      }
-
-      node->setNodeDefString("ND_texcoord_vector2");
-    }
-    else
-    {
-      // Otherwise, we just remove it.
-      document->removeNode(node->getName());
-    }
-  }
-}
-
 // This function serves two purposes: first, for USD versions below 23.11, we
 // translate the 'sourceColorSpace' input to actual MaterialX colorspaces (this
 // input is not part of the NodeDef, but we add it in the render delegate and
@@ -395,26 +348,130 @@ void _PatchSecondaryTexcoordIndices(mx::DocumentPtr document)
       continue;
     }
 
-    mx::InputPtr input = node->getActiveInput("index");
+    mx::InputPtr indexInput = node->getActiveInput("index");
+    if( !indexInput)
+    {
+      continue;
+    }
+
+    mx::ValuePtr boxedIndex = indexInput->getValue();
+    if (!boxedIndex || !boxedIndex->isA<int>())
+    {
+      continue;
+    }
+
+    int index = boxedIndex->asA<int>();
+    if (index == 0)
+    {
+      continue;
+    }
+
+    node->setCategory("geompropvalue");
+
+    for (mx::InputPtr input : node->getInputs())
+    {
+      node->removeInput(input->getName());
+    }
+
+    mx::InputPtr geompropInput = node->addInput("geomprop", mx::FILENAME_TYPE_STRING);
+
+    std::string primvarName = GB_FMT("st{}", index);
+    geompropInput->setValueString(primvarName);
+
+    GB_WARN("texcoord node \"{}\" has unsupported index {}; patching to geompropvalue of \"{}\"",
+      node->getNamePath(), index, primvarName);
+  }
+}
+
+void _PatchColorNodes(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node)
+    {
+      continue;
+    }
+
+    const mx::string& category = node->getCategory();
+    if (category != "color")
+    {
+      continue;
+    }
+
+    node->setCategory("geompropvalue");
+    node->setType(TYPE_COLOR3); // FIXME: hook up displayOpacity if type is color4
+
+    for (mx::InputPtr input : node->getInputs())
+    {
+      node->removeInput(input->getName());
+    }
+
+    mx::InputPtr geompropInput = node->addInput("geomprop", mx::FILENAME_TYPE_STRING);
+
+    std::string primvarName = "displayColor";
+    geompropInput->setValueString(primvarName);
+
+    GB_WARN("replaced color node \"{}\" with geompropvalue of \"{}\"",
+      node->getNamePath(), primvarName);
+  }
+}
+
+// We're guaranteed to use st/st0/UV0 as texture coordinates in our vertex data, so prefer
+// this to explicitly sampling a primvar for performance reasons.
+void _PatchDefaultGeomprops(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node)
+    {
+      continue;
+    }
+
+    const mx::string& category = node->getCategory();
+
+    if (category != "geompropvalue")
+    {
+      continue;
+    }
+
+    mx::InputPtr input = node->getActiveInput("geomprop");
     if( !input)
     {
       continue;
     }
 
     mx::ValuePtr value = input->getValue();
-    if (!value || !value->isA<int>())
+    if (!value || !value->isA<std::string>())
     {
       continue;
     }
 
-    int index = value->asA<int>();
-    if (index == 0)
+    std::string geomprop = value->asA<std::string>();
+
+    bool isTexcoord = geomprop == "st" ||
+                      geomprop == "st0" ||
+                      geomprop == "st_0" ||
+                      geomprop == "UV0";
+
+    bool isTangent = (geomprop == "tangents");
+
+    if (!isTexcoord && !isTangent)
     {
       continue;
     }
 
-    GB_WARN("texcoord node \"{}\" has unsupported index {}; falling back to index 0", node->getNamePath(), index);
-    input->setValueString("0");
+    for (mx::InputPtr i : node->getInputs())
+    {
+      node->removeInput(i->getName());
+    }
+
+    node->setCategory(isTexcoord ? "texcoord" : "tangent");
   }
 }
 
@@ -431,10 +488,24 @@ namespace gtl
       _PatchUsdUVTextureColorSpaces(document);
     }
 
-    _PatchGeomprops(document);
-
     _PatchNodeNames(document);
 
+    // FIXME: optimization currently disabled due to bug in MaterialX (also see HdGatlingMesh)
+    // https://github.com/AcademySoftwareFoundation/MaterialX/issues/2117
+#if 0
+    for (mx::NodeGraphPtr graph : document->getNodeGraphs())
+    {
+      if (graph->getActiveSourceUri() == document->getSourceUri())
+      {
+        graph->flattenSubgraphs();
+      }
+    }
+
     _PatchSecondaryTexcoordIndices(document);
+
+    _PatchColorNodes(document);
+
+    _PatchDefaultGeomprops(document);
+#endif
   }
 }

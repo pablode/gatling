@@ -100,13 +100,13 @@ struct State // Shading_state_material
 
     /// An offset to add to any argument block read accesses.
     uint                arg_block_offset;
+#endif
 
 #if defined(RENDERER_STATE_TYPE)
     /// A user-defined structure that allows to pass renderer information; for instance about the
     /// hit-point or buffer references; to mdl run-time functions. This is especially required for
     /// the scene data access. The fields of this structure are not altered by generated code.
     RENDERER_STATE_TYPE renderer_state;
-#endif
 #endif
 };
 

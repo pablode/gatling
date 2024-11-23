@@ -55,6 +55,24 @@ namespace gtl
   struct GiDomeLight;
   struct GiRenderBuffer;
 
+  enum class GiPrimvarType
+  {
+    Float, Vec2, Vec3, Vec4, Int, Int2, Int3, Int4
+  };
+
+  enum class GiPrimvarInterpolation
+  {
+    Constant, Vertex
+  };
+
+  struct GiPrimvarData
+  {
+    std::string name;
+    GiPrimvarType type;
+    GiPrimvarInterpolation interpolation;
+    std::vector<uint8_t> data;
+  };
+
   struct GiCameraDesc
   {
     float position[3];
@@ -86,13 +104,14 @@ namespace gtl
 
   struct GiMeshDesc
   {
-    uint32_t    faceCount;
-    GiFace*     faces;
-    int         id;
-    bool        isLeftHanded;
-    const char* name;
-    uint32_t    vertexCount;
-    GiVertex*   vertices;
+    uint32_t                          faceCount;
+    GiFace*                           faces;
+    int                               id;
+    bool                              isLeftHanded;
+    const char*                       name;
+    const std::vector<GiPrimvarData>& primvars;
+    uint32_t                          vertexCount;
+    GiVertex*                         vertices;
   };
 
   struct GiRenderSettings
