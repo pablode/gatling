@@ -113,8 +113,9 @@ install(
     COMPONENT hdGatling
 )
 
-add_executable(hdGatling_test main.cpp)
-target_link_libraries(hdGatling_test gt gb hd)
+add_executable(hdGatling_test main.cpp tokens.h tokens.cpp)
+target_link_libraries(hdGatling_test gt gb hd hio usd usdGeom usdImaging usdRender)
+
 add_dependencies(hdGatling_test hdGatling)
 
 # Test executable operates on hdGatling installed to a local directory
@@ -129,4 +130,6 @@ target_compile_definitions(
   hdGatling_test
   PRIVATE
     HDGATLING_INSTALL_DIR="${HDGATLING_INSTALL_DIR}"
+    HDGATLING_TESTENV_DIR="${CMAKE_CURRENT_SOURCE_DIR}/testenv"
+    HDGATLING_TEST_OUTPUT_DIR="${GTL_TEST_OUTPUT_DIR}/hdGatling"
 )
