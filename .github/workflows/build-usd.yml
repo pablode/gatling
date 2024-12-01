@@ -21,8 +21,16 @@ on:
         required: false
         type: string
         default: "MDL-SDK"
-      upload-archives:
+      upload-install-artifacts:
         description: "Whether build results should be uploaded or not"
+        required: false
+        type: boolean
+        default: false
+      run-graphical-tests:
+        required: false
+        type: boolean
+        default: false
+      upload-test-artifacts:
         required: false
         type: boolean
         default: false
@@ -38,25 +46,31 @@ jobs:
           image: ubuntu-20.04
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
-          upload-archive: ${{ inputs.upload-archives }}
+          upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
           archive-file-name: "gatling_USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           cmake-params:
+          run-graphical-tests: ${{ inputs.run-graphical-tests }}
+          executable-suffix:
 
         - name: Ubuntu / clang
           image: ubuntu-20.04
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           # Don't upload clang build results -- we already have GCC's
-          upload-archive: false
+          upload-install-artifacts: false
           cmake-params: -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
+          run-graphical-tests: false
+          executable-suffix:
 
         - name: Windows / MSVC
           image: windows-2019
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
-          upload-archive: ${{ inputs.upload-archives }}
+          upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
           archive-file-name: "gatling_USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           cmake-params: -G"Visual Studio 16 2019" -Ax64
+          run-graphical-tests: false
+          executable-suffix: '.exe'
 
     uses: ./.github/workflows/build.yml
     with:
@@ -64,8 +78,11 @@ jobs:
       build-config: ${{ inputs.build-config }}
       usd-download-url: ${{ matrix.usd-download-url }}
       usd-install-path: ${{ matrix.usd-install-path }}
-      upload-archive: ${{ matrix.upload-archive }}
+      upload-install-artifacts: ${{ matrix.upload-install-artifacts }}
       archive-name: build-${{ inputs.build-config }}-${{ github.sha }}
       archive-file-name: ${{ matrix.archive-file-name }}
       mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}
       cmake-params: ${{ matrix.cmake-params }}
+      run-graphical-tests: ${{ matrix.run-graphical-tests }}
+      upload-test-artifacts: ${{ inputs.upload-test-artifacts }}
+      executable-suffix: ${{ matrix.executable-suffix }}

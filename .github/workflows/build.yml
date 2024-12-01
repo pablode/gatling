@@ -16,7 +16,7 @@ on:
       usd-install-path:
         required: true
         type: string
-      upload-archive:
+      upload-install-artifacts:
         required: false
         type: boolean
         default: false
@@ -36,6 +36,18 @@ on:
         required: false
         type: boolean
         default: false
+      run-graphical-tests:
+        required: false
+        type: boolean
+        default: false
+      upload-test-artifacts:
+        required: false
+        type: boolean
+        default: false
+      executable-suffix:
+        required: false
+        type: string
+        default: ''
 
 defaults:
   run:
@@ -54,11 +66,37 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        lfs: true
 
     - name: Install libgl1 package
       if: runner.os == 'Linux'
       # There seems to be a transitive dependency on libGL (perhaps by hgi)
       run: sudo apt-get update && sudo apt-get install libgl1-mesa-dev
+
+    - name: Install Mesa & Vulkan packages
+      if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}
+      run: |
+        sudo add-apt-repository ppa:kisak/kisak-mesa
+        sudo apt update
+        sudo apt upgrade
+        sudo apt-get install mesa-utils xvfb qt5-default libgl1-mesa-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers
+
+    - name: Set up graphical environment variables
+      if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}
+      run: |
+        echo "LD_LIBRARY_PATH=${{ inputs.usd-install-path }}/lib" >> $GITHUB_ENV
+        echo "DISPLAY=:1" >> $GITHUB_ENV
+        echo "LIBGL_ALWAYS_SOFTWARE=1" >> $GITHUB_ENV
+        echo "GALLIUM_DRIVER=llvmpipe" >> $GITHUB_ENV
+
+    - name: Start virtual framebuffer
+      if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}
+      run: |
+        Xvfb :1 -screen 0 1280x960x24 &
+
+    - name: Test vulkaninfo
+      if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}
+      run: vulkaninfo
 
     - name: Fetch USD binaries
       run: curl ${{ inputs.usd-download-url }} -L -v -o USD.tar.gz
@@ -109,13 +147,12 @@ jobs:
 
     - name: Run imgio_test
       working-directory: BUILD
-      if: runner.os != 'Windows'
-      run: ./bin/imgio_test
+      run: ./bin/imgio_test${{ inputs.executable-suffix }}
 
-    - name: Run imgio_test
+    - name: Run hdGatling_test
       working-directory: BUILD
-      if: runner.os == 'Windows'
-      run: ./bin/imgio_test.exe
+      if: inputs.run-graphical-tests
+      run: ./bin/hdGatling_test${{ inputs.executable-suffix }}
 
     - name: Install gatling
       working-directory: BUILD
@@ -134,13 +171,21 @@ jobs:
         mv hdGatling dso/usd_plugins
         mv hdGatling* dso/usd
 
-    - name: Create archive
-      if: inputs.upload-archive
+    - name: Upload test artifacts
+      if: ${{ inputs.run-graphical-tests && inputs.upload-test-artifacts && failure() }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-artifacts
+        path: TEST/*
+        retention-days: 7
+
+    - name: Create install artifacts
+      if: inputs.upload-install-artifacts
       working-directory: INSTALL
       run: tar -zcvf ${{ inputs.archive-file-name }} *
 
     - name: Upload archive
-      if: inputs.upload-archive
+      if: inputs.upload-install-artifacts
       uses: actions/upload-artifact@v3
       with:
         name: ${{ inputs.archive-name }}

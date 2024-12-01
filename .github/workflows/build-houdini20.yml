@@ -39,7 +39,7 @@ jobs:
       build-config: Release
       usd-download-url: ${{ matrix.usd-download-url }}
       usd-install-path: ${{ matrix.usd-install-path }}
-      upload-archive: true
+      upload-install-artifacts: true
       archive-name: build-Release-${{ github.sha }}
       archive-file-name: ${{ matrix.archive-file-name }}
       mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}

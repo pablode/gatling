@@ -23,6 +23,8 @@ jobs:
     with:
       usd-version: 24.11
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      run-graphical-tests: true
+      upload-test-artifacts: true
 
   build-2408:
     name: Build gatling for USD v24.08 (Release)
@@ -31,6 +33,8 @@ jobs:
     with:
       usd-version: 24.08
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      run-graphical-tests: true
+      upload-test-artifacts: true
 
   build-2405:
     name: Build gatling for USD v24.05 (Release)

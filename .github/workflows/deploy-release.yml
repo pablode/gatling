@@ -17,7 +17,8 @@ jobs:
     with:
       usd-version: 24.11
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
-      upload-archives: true
+      upload-install-artifacts: true
+      run-graphical-tests: true
 
   build-usd2408:
     name: Build gatling for USD v24.08
@@ -26,7 +27,8 @@ jobs:
     with:
       usd-version: 24.08
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
-      upload-archives: true
+      upload-install-artifacts: true
+      run-graphical-tests: true
 
   build-usd2405:
     name: Build gatling for USD v24.05
@@ -35,7 +37,7 @@ jobs:
     with:
       usd-version: 24.05
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
-      upload-archives: true
+      upload-install-artifacts: true
 
   build-usd2403:
     name: Build gatling for USD v24.03
@@ -44,7 +46,7 @@ jobs:
     with:
       usd-version: 24.03
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
-      upload-archives: true
+      upload-install-artifacts: true
 
   build-houdini20:
     name: Build gatling for Houdini 20.0
