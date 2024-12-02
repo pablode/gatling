@@ -170,3 +170,15 @@ set(DOCTEST_SCRIPT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/doctest/scripts/cmake/docte
 # meshoptimizer
 #
 add_subdirectory(meshoptimizer)
+
+#
+# blosc
+#
+set(BUILD_SHARED OFF)
+set(BUILD_TESTS OFF)
+set(BUILD_FUZZERS OFF)
+set(BUILD_BENCHMARKS OFF)
+set(BUILD_EXAMPLES OFF)
+set(BUILD_PLUGINS OFF)
+set(BUILD_LITE ON)
+add_subdirectory(c-blosc2)

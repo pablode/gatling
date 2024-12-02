@@ -58,3 +58,6 @@
 [submodule "extern/meshoptimizer"]
 	path = extern/meshoptimizer
 	url = https://github.com/zeux/meshoptimizer.git
+[submodule "extern/c-blosc2"]
+	path = extern/c-blosc2
+	url = https://github.com/Blosc/c-blosc2.git
