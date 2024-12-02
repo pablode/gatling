@@ -50,6 +50,7 @@ function(configure_target TARGET)
       glslang
       glslang-default-resource-limits
       SPIRV
+      meshoptimizer
   )
 
   if(OpenMP_CXX_FOUND)

@@ -55,3 +55,6 @@
 [submodule "extern/libtiff"]
 	path = extern/libtiff
 	url = https://gitlab.com/libtiff/libtiff.git
+[submodule "extern/meshoptimizer"]
+	path = extern/meshoptimizer
+	url = https://github.com/zeux/meshoptimizer.git
