@@ -11,6 +11,8 @@ set(GI_SRCS
   impl/GlslStitcher.cpp
   impl/Mmap.h
   impl/Mmap.cpp
+  impl/MeshProcessing.h
+  impl/MeshProcessing.cpp
   impl/TextureManager.h
   impl/TextureManager.cpp
   impl/Turbo.h
