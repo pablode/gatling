@@ -427,6 +427,10 @@ public:
 
 TEST_SUITE("Graphical")
 {
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
+  {
+  }
+
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Mesh.PrimvarInterpolation")
   {
   }
