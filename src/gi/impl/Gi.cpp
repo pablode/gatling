@@ -58,6 +58,8 @@
 
 #include <MaterialXCore/Document.h>
 
+#include <blosc2.h>
+
 namespace mx = MaterialX;
 
 constexpr static const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
@@ -118,7 +120,7 @@ namespace gtl
     std::vector<glm::mat3x4> instanceTransforms;
     const GiMaterial* material = nullptr;
     GiScene* scene;
-    GiMeshData cpuData;
+    GiMeshDataCompressed cpuData;
     std::optional<GiMeshGpuData> gpuData;
     bool visible = true;
     std::string name;
@@ -404,6 +406,9 @@ namespace gtl
     s_fileWatcher->watch();
 #endif
 
+    blosc2_init();
+    blosc2_set_nthreads(4);
+
     return GiStatus::Ok;
 
 fail:
@@ -687,7 +692,7 @@ fail:
       // Build mesh BLAS & buffers if they don't exist yet
       if (!mesh->gpuData.has_value())
       {
-        const auto& data = mesh->cpuData;
+        const auto& data = giDecompressMeshData(mesh->cpuData);
 
         if (data.faces.empty())
         {
@@ -738,7 +743,7 @@ fail:
           {
             const GiPrimvarData* primvar = nullptr;
 
-            for (const GiPrimvarData& p : mesh->cpuData.primvars)
+            for (const GiPrimvarData& p : data.primvars)
             {
               // FIXME: we should check if scene data and primvar types match to prevent crashes
               if (p.name == sceneDataName && !p.data.empty())
@@ -987,8 +992,8 @@ fail_cleanup:
         continue; // invalid geometry or an error occurred
       }
 
-      totalIndicesSize += mesh->cpuData.faces.size() * sizeof(uint32_t) * 3;
-      totalVerticesSize += mesh->cpuData.vertices.size() * sizeof(rp::FVertex);
+      totalIndicesSize += mesh->cpuData.faceCount * sizeof(uint32_t) * 3;
+      totalVerticesSize += mesh->cpuData.vertexCount * sizeof(rp::FVertex);
 
       for (const glm::mat3x4& t : mesh->instanceTransforms)
       {

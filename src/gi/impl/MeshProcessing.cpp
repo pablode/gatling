@@ -18,6 +18,7 @@
 #include "MeshProcessing.h"
 
 #include <meshoptimizer.h>
+#include <blosc2.h>
 
 #include <gtl/gb/Log.h>
 
@@ -51,14 +52,97 @@ namespace
       return 0;
     }
   }
+
+  template<typename T>
+  GiMeshBuffer _CompressMeshBuffer(const std::vector<T>& data)
+  {
+    GiMeshBuffer buf;
+    buf.uncompressedSize = data.size() * sizeof(T);
+    buf.isCompressed = buf.uncompressedSize >= 1024;
+
+    if (!buf.isCompressed)
+    {
+      buf.data.resize(buf.uncompressedSize);
+      memcpy(&buf.data[0], &data[0], buf.data.size());
+      return buf;
+    }
+
+    buf.data.resize(buf.uncompressedSize + BLOSC2_MAX_OVERHEAD);
+
+    uint32_t dataSize = blosc1_compress(3, BLOSC_BITSHUFFLE, sizeof(T),
+      buf.uncompressedSize, &data[0], &buf.data[0], buf.data.size());
+
+    buf.data.resize(dataSize);
+    buf.data.shrink_to_fit();
+    return buf;
+  }
+
+  template<typename T>
+  std::vector<T> _DecompressMeshBuffer(const GiMeshBuffer& buf)
+  {
+    std::vector<T> data(buf.uncompressedSize / sizeof(T));
+
+    if (!buf.isCompressed)
+    {
+      memcpy(&data[0], &buf.data[0], buf.uncompressedSize);
+      return data;
+    }
+
+    uint32_t dataSize = blosc1_decompress(&buf.data[0], &data[0], buf.uncompressedSize);
+    assert(dataSize > 0);
+    data.resize(dataSize / sizeof(T));
+    return std::move(data);
+  }
+
+  GiMeshDataCompressed _CompressData(const std::vector<GiFace>& faces,
+                                     const std::vector<GiVertex>& vertices,
+                                     const std::vector<GiPrimvarData>& primvars)
+  {
+    auto logBufferCompression = [](const std::string_view name, const GiMeshBuffer& buf)
+    {
+      if (!buf.isCompressed)
+      {
+        return;
+      }
+
+      GB_DEBUG("compressed {} ({} bytes -> {} bytes, {:.1f}x)", name, buf.uncompressedSize,
+        buf.data.size(), float(buf.uncompressedSize) / float(buf.data.size()));
+    };
+
+    GiMeshDataCompressed m;
+    m.faces = _CompressMeshBuffer(faces);
+    m.vertices = _CompressMeshBuffer(vertices);
+
+    logBufferCompression("faces", m.faces);
+    logBufferCompression("vertices", m.vertices);
+
+    m.primvars.resize(primvars.size());
+    for (size_t i = 0; i < primvars.size(); i++)
+    {
+      const auto& p = primvars[i];
+
+      auto& o = m.primvars[i];
+      o.name = p.name;
+      o.type = p.type;
+      o.interpolation = p.interpolation;
+      o.buffer = _CompressMeshBuffer(p.data);
+
+      logBufferCompression(p.name, o.buffer);
+    }
+
+    m.faceCount = faces.size();
+    m.vertexCount = vertices.size();
+    return m;
+  }
 }
 
 namespace gtl
 {
-  GiMeshData giProcessMeshData(uint32_t vertexCount, const GiVertex* vertices,
-                               uint32_t faceCount, const GiFace* faces,
-                               const std::vector<GiPrimvarData>& primvars)
+  GiMeshDataCompressed giProcessMeshData(uint32_t vertexCount, const GiVertex* vertices,
+                                         uint32_t faceCount, const GiFace* faces,
+                                         const std::vector<GiPrimvarData>& primvars)
   {
+    // Remap vertex streams.
     std::vector<meshopt_Stream> streams;
     streams.reserve(primvars.size());
 
@@ -84,7 +168,7 @@ namespace gtl
     std::vector<GiFace> newFaces(faceCount);
     meshopt_remapIndexBuffer((uint32_t*) &newFaces[0], &faces[0].v_i[0], faceCount * 3, remap.data());
 
-    std::vector newPrimvars = primvars;
+    std::vector<GiPrimvarData> newPrimvars = primvars;
     for (uint32_t i = 0; i < primvars.size(); i++)
     {
       const auto& o = primvars[i];
@@ -101,12 +185,28 @@ namespace gtl
       meshopt_remapVertexBuffer(&n.data[0], &o.data[0], vertexCount, typeSize, remap.data());
     }
 
-    GiMeshData cpuData = {
-      .faces = newFaces,
-      .primvars = newPrimvars,
-      .vertices = newVertices
-    };
+    // Compress data using blosc.
+    return _CompressData(newFaces, newVertices, newPrimvars);
+  }
 
-    return cpuData;
+  GiMeshData giDecompressMeshData(const GiMeshDataCompressed& m)
+  {
+    std::vector<GiFace> faces = _DecompressMeshBuffer<GiFace>(m.faces);
+    std::vector<GiVertex> vertices = _DecompressMeshBuffer<GiVertex>(m.vertices);
+
+    std::vector<GiPrimvarData> primvars(m.primvars.size());
+    for (size_t i = 0; i < primvars.size(); i++)
+    {
+      const auto& p = m.primvars[i];
+
+      primvars[i] = GiPrimvarData {
+        .name = p.name,
+        .type = p.type,
+        .interpolation = p.interpolation,
+        .data = _DecompressMeshBuffer<uint8_t>(p.buffer)
+      };
+    }
+
+    return GiMeshData { faces, primvars, vertices };
   }
 }
