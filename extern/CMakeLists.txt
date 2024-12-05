@@ -57,7 +57,7 @@ target_link_libraries(volk PUBLIC Vulkan-Headers)
 set(VMA_STATIC_VULKAN_FUNCTIONS OFF)
 set(VMA_DYNAMIC_VULKAN_FUNCTIONS OFF)
 add_subdirectory(VulkanMemoryAllocator)
-target_link_libraries(VulkanMemoryAllocator PUBLIC $<BUILD_INTERFACE:Vulkan-Headers>)
+target_link_libraries(VulkanMemoryAllocator INTERFACE $<BUILD_INTERFACE:Vulkan-Headers>)
 
 # SPIRV-Headers (SPIRV-Tools dependency)
 set(SPIRV_SKIP_TESTS ON)

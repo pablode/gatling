@@ -1032,8 +1032,8 @@ namespace gtl
     }
 
     VmaVulkanFunctions vmaVulkanFunctions = {
-      .vkGetInstanceProcAddr = nullptr,
-      .vkGetDeviceProcAddr = nullptr,
+      .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+      .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
       .vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties,
       .vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties,
       .vkAllocateMemory = idevice->table.vkAllocateMemory,
