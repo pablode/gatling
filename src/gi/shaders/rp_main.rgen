@@ -385,12 +385,16 @@ void main()
         vec2 rand2_xy = rng1d_next2f(rng_state);
 #endif
 
-        // Uniform pixel area sampling
-        vec2 sampleOffset = rand2_xy;
+        vec2 sampleOffset = vec2(0.5);
 
+#ifdef JITTERED_SAMPLING
 #ifdef FILTER_IMPORTANCE_SAMPLING
         // Importance sample multi-pixel filtering kernel
         sampleOffset = vec2(0.5) + fisGauss(rand2_xy);
+#else
+        // Uniform pixel area sampling
+        sampleOffset = rand2_xy;
+#endif
 #endif
 
         vec3 P =

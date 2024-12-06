@@ -138,6 +138,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   ((referenceName, "gtl:referenceName"))
   ((spp, "gtl:spp"))
   ((errorPixelThreshold, "gtl:errorPixelThreshold"))
+  ((jitteredSampling, "gtl:jitteredSampling"))
 );
 
 int main(int argc, char** argv)
@@ -177,6 +178,7 @@ private:
     std::string referenceName;
     uint32_t spp;
     uint32_t errorPixelThreshold;
+    bool jitteredSampling = true;
   };
 
 public:
@@ -246,6 +248,14 @@ private:
       REQUIRE(it->second.IsHolding<int>());
       settings.errorPixelThreshold = it->second.UncheckedGet<int>();
     }
+    {
+      auto it = ns.find(_nsTokens->jitteredSampling);
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<bool>());
+        settings.jitteredSampling = it->second.UncheckedGet<bool>();
+      }
+    }
   }
 
   void diffAgainstRef(const std::vector<uint8_t>& testValues,
@@ -300,6 +310,7 @@ private:
 
     setRenderSetting(HdGatlingSettingsTokens->spp, VtValue(namespacedSettings.spp));
     setRenderSetting(HdGatlingSettingsTokens->depthOfField, VtValue(!product.disableDepthOfField));
+    setRenderSetting(HdGatlingSettingsTokens->jitteredSampling, VtValue(namespacedSettings.jitteredSampling));
 
     // Set up rendering state.
     uint32_t width = product.resolution[0];

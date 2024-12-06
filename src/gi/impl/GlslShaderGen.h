@@ -68,6 +68,7 @@ namespace gtl
       CommonShaderParams commonParams;
       bool depthOfField;
       bool filterImportanceSampling;
+      bool jitteredSampling;
       uint32_t materialCount;
       bool nextEventEstimation;
       bool progressiveAccumulation;

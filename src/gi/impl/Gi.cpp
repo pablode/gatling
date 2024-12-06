@@ -1425,6 +1425,7 @@ cleanup:
         .commonParams = commonParams,
         .depthOfField = renderSettings.depthOfField,
         .filterImportanceSampling = renderSettings.filterImportanceSampling,
+        .jitteredSampling = renderSettings.jitteredSampling,
         .materialCount = uint32_t(materials.size()),
         .nextEventEstimation = nextEventEstimation,
         .progressiveAccumulation = renderSettings.progressiveAccumulation,
@@ -1612,6 +1613,7 @@ cleanup:
 
     if (ra.depthOfField != rb.depthOfField ||
         ra.filterImportanceSampling != rb.filterImportanceSampling ||
+        ra.jitteredSampling != rb.jitteredSampling ||
         ra.maxVolumeWalkLength != rb.maxVolumeWalkLength ||
         ra.progressiveAccumulation != rb.progressiveAccumulation)
     {

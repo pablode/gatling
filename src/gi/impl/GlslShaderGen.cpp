@@ -102,6 +102,10 @@ namespace gtl
     {
       stitcher.appendDefine("FILTER_IMPORTANCE_SAMPLING");
     }
+    if (params.jitteredSampling)
+    {
+      stitcher.appendDefine("JITTERED_SAMPLING");
+    }
     if (params.nextEventEstimation)
     {
       stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
