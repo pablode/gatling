@@ -20,7 +20,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT
 #include <doctest/doctest.h>
 
+#include <quill/Frontend.h>
+
 #include <gtl/gb/Fmt.h>
+#include <gtl/gb/Log.h>
 #include <gtl/gt/LogFlushListener.h>
 
 #include <pxr/base/plug/plugin.h>
@@ -70,6 +73,30 @@ namespace
     const char* testName = doctest::detail::g_cs->currentTest->m_name;
     return fs::path(HDGATLING_TEST_OUTPUT_DIR) / testName;
   }
+
+  class _ErrorCheckSink final : public quill::Sink
+  {
+  public:
+    void write_log(quill::MacroMetadata const*, uint64_t, std::string_view, std::string_view,
+                   std::string const&, std::string_view, quill::LogLevel logLevel, std::string_view,
+                   std::string_view, std::vector<std::pair<std::string, std::string>> const*,
+                   std::string_view, std::string_view log_statement) override
+    {
+      if (logLevel == quill::LogLevel::Error)
+      {
+        m_errorCount++;
+      }
+    }
+
+    void flush_sink() override {}
+
+    void reset_error_count() { m_errorCount = 0; }
+
+    uint32_t get_error_count() const { return m_errorCount; }
+
+  private:
+    uint32_t m_errorCount = 0;
+  };
 
   class _SimpleRenderTask final : public HdTask
   {
@@ -415,7 +442,27 @@ public:
   }
 };
 
-class SimpleGraphicalTestFixture
+class GraphicalTestFixture
+{
+private:
+  std::shared_ptr<_ErrorCheckSink> m_errorCheckSink;
+
+public:
+  GraphicalTestFixture()
+  {
+    auto sink = quill::Frontend::create_or_get_sink<_ErrorCheckSink>("ErrorCheck");
+    m_errorCheckSink = std::static_pointer_cast<_ErrorCheckSink>(sink);
+    m_errorCheckSink->reset_error_count();
+    gbLogInit({ m_errorCheckSink });
+  }
+
+  ~GraphicalTestFixture()
+  {
+    CHECK_EQ(m_errorCheckSink->get_error_count(), 0);
+  }
+};
+
+class SimpleGraphicalTestFixture : public GraphicalTestFixture
 {
 public:
   SimpleGraphicalTestFixture()
