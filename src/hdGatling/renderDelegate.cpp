@@ -350,4 +350,13 @@ TfTokenVector HdGatlingRenderDelegate::GetShaderSourceTypes() const
   return TfTokenVector{ HdGatlingSourceTypes->mtlx, HdGatlingSourceTypes->mdl };
 }
 
+#if PXR_VERSION >= 2408
+bool HdGatlingRenderDelegate::IsParallelSyncEnabled(const TfToken& primType) const
+{
+  return primType == HdPrimTypeTokens->mesh ||
+         primType == HdPrimTypeTokens->material ||
+         primType == HdPrimTypeTokens->instancer;
+}
+#endif
+
 PXR_NAMESPACE_CLOSE_SCOPE

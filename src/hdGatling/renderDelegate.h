@@ -102,6 +102,10 @@ public:
 
   TfTokenVector GetShaderSourceTypes() const override;
 
+#if PXR_VERSION >= 2408
+  bool IsParallelSyncEnabled(const TfToken& primType) const override;
+#endif
+
 private:
   const MaterialNetworkCompiler& _materialNetworkCompiler;
   const std::string _resourcePath;
