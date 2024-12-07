@@ -538,31 +538,28 @@ namespace gtl
                                        VkDeviceSize blockSize,
                                        uint32_t allocationAlignment = 0)
   {
+    VkBufferCreateInfo createInfoTemplate = {};
+    createInfoTemplate.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    createInfoTemplate.size = 0x1000; // doesn't matter
+    createInfoTemplate.usage = bufferUsage;
 
-      VkBufferCreateInfo createInfoTemplate = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = 0x1000, // doesn't matter
-        .usage = bufferUsage
-      };
+    VmaAllocationCreateInfo allocCreateInfo = {};
+    allocCreateInfo.usage = memoryUsage;
 
-      VmaAllocationCreateInfo allocCreateInfo = {
-        .usage = memoryUsage
-      };
+    uint32_t memTypeIndex;
+    VkResult result = vmaFindMemoryTypeIndexForBufferInfo(allocator, &createInfoTemplate,
+                                                          &allocCreateInfo, &memTypeIndex);
+    if (result != VK_SUCCESS)
+    {
+      return result;
+    }
 
-      uint32_t memTypeIndex;
-      VkResult result = vmaFindMemoryTypeIndexForBufferInfo(allocator, &createInfoTemplate,
-                                                            &allocCreateInfo, &memTypeIndex);
-      if (result != VK_SUCCESS)
-      {
-        return result;
-      }
+    VmaPoolCreateInfo poolCreateInfo = {};
+    poolCreateInfo.memoryTypeIndex = memTypeIndex;
+    poolCreateInfo.blockSize = blockSize;
+    poolCreateInfo.minAllocationAlignment = allocationAlignment;
 
-      VmaPoolCreateInfo poolCreateInfo = {
-        .memoryTypeIndex = memTypeIndex,
-        .blockSize = blockSize,
-        .minAllocationAlignment = allocationAlignment
-      };
-      return vmaCreatePool(allocator, &poolCreateInfo, &pool);
+    return vmaCreatePool(allocator, &poolCreateInfo, &pool);
   }
 
   bool cgpuCreateDevice(CgpuDevice* device)
@@ -1234,10 +1231,9 @@ namespace gtl
       .pQueueFamilyIndices = nullptr,
     };
 
-    VmaAllocationCreateInfo allocCreateInfo = {
-      .requiredFlags = (VkMemoryPropertyFlags) memoryProperties,
-      .pool = memoryPool
-    };
+    VmaAllocationCreateInfo allocCreateInfo = {};
+    allocCreateInfo.requiredFlags = (VkMemoryPropertyFlags) memoryProperties;
+    allocCreateInfo.pool = memoryPool;
 
     VkResult result;
     if (alignment > 0)
