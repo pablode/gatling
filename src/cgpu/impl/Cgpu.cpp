@@ -373,7 +373,7 @@ namespace gtl
     case VK_VENDOR_ID_MESA:
       return "Mesa";
     default:
-      return "UNKNOWN";
+      return nullptr;
     }
   }
 
@@ -621,7 +621,15 @@ namespace gtl
     }
 
     GB_LOG("> name: {}", deviceProperties.properties.deviceName);
-    GB_LOG("> vendor: {} ({:#08x})", cgpuGetVendorName(deviceProperties.properties.vendorID), deviceProperties.properties.vendorID);
+
+    if (const char* vendor = cgpuGetVendorName(deviceProperties.properties.vendorID); vendor)
+    {
+      GB_LOG("> vendor: {}", vendor);
+    }
+    else
+    {
+      GB_LOG("> vendor: Unknown ({:#08x})", deviceProperties.properties.vendorID);
+    }
 
     if (apiVersion < CGPU_MIN_VK_API_VERSION)
     {
