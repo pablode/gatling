@@ -27,7 +27,7 @@ namespace gtl
 {
   static quill::Logger* s_logger = nullptr;
 
-  void gbLogInit()
+  void gbLogInit(const std::vector<std::shared_ptr<quill::Sink>>& extraSinks)
   {
     if (s_logger)
     {
@@ -39,9 +39,11 @@ namespace gtl
     consoleColors.set_colour(quill::LogLevel::Info, quill::ConsoleColours::white);
     auto sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("console", consoleColors);
 
-    const char* logPattern = "[%(time)] (%(log_level)) %(message)";
-    const char* timestampFormat = "%H:%M:%S.%Qms";
-    s_logger = quill::Frontend::create_or_get_logger("root", std::move(sink), logPattern, timestampFormat);
+    std::vector<std::shared_ptr<quill::Sink>> sinks = extraSinks;
+    sinks.push_back(std::move(sink));
+
+    quill::PatternFormatterOptions formatOptions("[%(time)] (%(log_level)) %(message)", "%H:%M:%S.%Qms");
+    s_logger = quill::Frontend::create_or_get_logger("root", sinks, formatOptions);
 #ifdef GTL_VERBOSE
     s_logger->set_log_level(quill::LogLevel::Debug);
 #endif

@@ -19,7 +19,7 @@
 
 #include <quill/Logger.h>
 #include <quill/LogMacros.h>
-
+#include <quill/sinks/Sink.h>
 #include <quill/std/Array.h>
 #include <quill/std/FilesystemPath.h>
 #include <quill/std/UnorderedMap.h>
@@ -34,7 +34,7 @@
 
 namespace gtl
 {
-  void gbLogInit();
+  void gbLogInit(const std::vector<std::shared_ptr<quill::Sink>>& extraSinks = {});
 
   quill::Logger* gbGetLogger();
 
