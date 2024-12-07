@@ -1093,6 +1093,8 @@ namespace gtl
       CGPU_RETURN_ERROR("failed to create AS scratch memory pool");
     }
 
+    vmaSetPoolName(idevice->allocator, idevice->asScratchMemoryPool, "[AS scratch memory pool]");
+
     VkPipelineCacheCreateInfo cacheCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
       .pNext = nullptr,
