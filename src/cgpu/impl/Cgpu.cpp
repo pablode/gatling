@@ -535,7 +535,6 @@ namespace gtl
                                        VmaAllocator allocator,
                                        VkBufferUsageFlags bufferUsage,
                                        VmaMemoryUsage memoryUsage,
-                                       VkDeviceSize blockSize,
                                        uint32_t allocationAlignment = 0)
   {
     VkBufferCreateInfo createInfoTemplate = {};
@@ -556,7 +555,6 @@ namespace gtl
 
     VmaPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.memoryTypeIndex = memTypeIndex;
-    poolCreateInfo.blockSize = blockSize;
     poolCreateInfo.minAllocationAlignment = allocationAlignment;
 
     return vmaCreatePool(allocator, &poolCreateInfo, &pool);
@@ -1081,7 +1079,6 @@ namespace gtl
     result = cgpuCreateMemoryPool(idevice->asScratchMemoryPool, idevice->allocator,
                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                                   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                  8 * 1024 * 1024, // 8 MB, RTXMU default
                                   idevice->properties.minAccelerationStructureScratchOffsetAlignment);
 
     if (result != VK_SUCCESS)
