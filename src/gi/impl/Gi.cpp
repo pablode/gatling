@@ -1605,8 +1605,7 @@ cleanup:
     const GiRenderSettings& ra = a.renderSettings;
     const GiRenderSettings& rb = b.renderSettings;
 
-    if (memcmp(ra.backgroundColor, rb.backgroundColor, sizeof(float) * 4) != 0 ||
-        ra.domeLightCameraVisible != rb.domeLightCameraVisible)
+    if (ra.domeLightCameraVisible != rb.domeLightCameraVisible)
     {
       flags |= GiSceneDirtyFlags::DirtyRtPipelineMiss;
     }
