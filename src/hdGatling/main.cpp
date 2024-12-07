@@ -481,4 +481,8 @@ TEST_SUITE("Graphical")
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Mesh.PrimvarInterpolation")
   {
   }
+
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Render.Empty1x1")
+  {
+  }
 }
