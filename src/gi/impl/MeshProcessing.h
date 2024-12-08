@@ -56,8 +56,8 @@ namespace gtl
     uint32_t vertexCount;
   };
 
-  GiMeshDataCompressed giProcessMeshData(uint32_t vertexCount, const GiVertex* vertices,
-                                         uint32_t faceCount, const GiFace* faces,
+  GiMeshDataCompressed giProcessMeshData(const std::vector<GiFace>& faces,
+                                         const std::vector<GiVertex>& vertices,
                                          const std::vector<GiPrimvarData>& primvars);
 
   GiMeshData giDecompressMeshData(const GiMeshDataCompressed& data);

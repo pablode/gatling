@@ -105,13 +105,13 @@ namespace gtl
   struct GiMeshDesc
   {
     uint32_t                          faceCount;
-    GiFace*                           faces;
+    const std::vector<GiFace>&        faces;
     int                               id;
     bool                              isLeftHanded;
     const char*                       name;
     const std::vector<GiPrimvarData>& primvars;
     uint32_t                          vertexCount;
-    GiVertex*                         vertices;
+    const std::vector<GiVertex>&      vertices;
   };
 
   struct GiRenderSettings
