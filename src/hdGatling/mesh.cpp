@@ -1004,14 +1004,12 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   bool isLeftHanded = (orientation == _tokens->leftHanded);
 
   GiMeshDesc desc = {
-    .faceCount = (uint32_t) giFaces.size(),
-    .faces = giFaces.data(),
+    .faces = giFaces,
     .id = GetPrimId(),
     .isLeftHanded = isLeftHanded,
     .name = id.GetText(),
     .primvars = secondaryPrimvars,
-    .vertexCount = (uint32_t) giVertices.size(),
-    .vertices = giVertices.data()
+    .vertices = giVertices,
   };
 
   return giCreateMesh(_scene, desc);

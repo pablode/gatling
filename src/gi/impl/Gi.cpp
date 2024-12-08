@@ -541,8 +541,7 @@ fail:
       .flipFacing = desc.isLeftHanded,
       .id = desc.id,
       .scene = scene,
-      .cpuData = giProcessMeshData(desc.vertexCount, desc.vertices,
-                                   desc.faceCount, desc.faces, desc.primvars),
+      .cpuData = giProcessMeshData(desc.faces, desc.vertices, desc.primvars),
       .name = desc.name
     };
 

@@ -138,11 +138,20 @@ namespace
 
 namespace gtl
 {
-  GiMeshDataCompressed giProcessMeshData(uint32_t vertexCount, const GiVertex* vertices,
-                                         uint32_t faceCount, const GiFace* faces,
+  GiMeshDataCompressed giProcessMeshData(const std::vector<GiFace>& faces,
+                                         const std::vector<GiVertex>& vertices,
                                          const std::vector<GiPrimvarData>& primvars)
   {
-    // Remap vertex streams.
+    // Remap vertices & compress data.
+
+    auto faceCount = uint32_t(faces.size());
+    auto vertexCount = uint32_t(vertices.size());
+
+    if (vertexCount < 16)
+    {
+      return _CompressData(faces, vertices, primvars);
+    }
+
     std::vector<meshopt_Stream> streams;
     streams.reserve(primvars.size());
 
@@ -160,6 +169,16 @@ namespace gtl
     std::vector<uint32_t> remap(vertexCount);
     uint32_t newVertexCount = meshopt_generateVertexRemapMulti(remap.data(), &faces[0].v_i[0], faceCount * 3,
                                                                vertexCount, streams.data(), streams.size());
+
+    if (newVertexCount == vertexCount)
+    {
+      return _CompressData(faces, vertices, primvars);
+    }
+    else
+    {
+      float ratio = float(newVertexCount) / float(vertexCount) * 100.0f;
+      GB_DEBUG("remapped {} to {} vertices ({:.2f}%)", vertexCount, newVertexCount, ratio);
+    }
 
     std::vector<GiVertex> newVertices(newVertexCount);
     meshopt_remapVertexBuffer((void*) newVertices.data(), (void*) &vertices[0],
@@ -185,7 +204,6 @@ namespace gtl
       meshopt_remapVertexBuffer(&n.data[0], &o.data[0], vertexCount, typeSize, remap.data());
     }
 
-    // Compress data using blosc.
     return _CompressData(newFaces, newVertices, newPrimvars);
   }
 
