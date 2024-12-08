@@ -120,7 +120,7 @@ namespace gtl
     std::vector<glm::mat3x4> instanceTransforms;
     const GiMaterial* material = nullptr;
     GiScene* scene;
-    GiMeshDataCompressed cpuData;
+    GiMeshData cpuData;
     std::optional<GiMeshGpuData> gpuData;
     bool visible = true;
     std::string name;
@@ -691,9 +691,12 @@ fail:
       // Build mesh BLAS & buffers if they don't exist yet
       if (!mesh->gpuData.has_value())
       {
-        const auto& data = giDecompressMeshData(mesh->cpuData);
+        std::vector<GiFace> meshFaces;
+        std::vector<GiVertex> meshVertices;
+        std::vector<GiPrimvarData> meshPrimvars;
+        giDecompressMeshData(mesh->cpuData, meshFaces, meshVertices, meshPrimvars);
 
-        if (data.faces.empty())
+        if (meshFaces.empty())
         {
           continue;
         }
@@ -701,12 +704,12 @@ fail:
         // Collect vertices
         std::vector<rp::FVertex> vertexData;
         std::vector<CgpuVertex> positionData;
-        vertexData.resize(data.vertices.size());
-        positionData.resize(data.vertices.size());
+        vertexData.resize(meshVertices.size());
+        positionData.resize(meshVertices.size());
 
         for (uint32_t i = 0; i < positionData.size(); i++)
         {
-          const GiVertex& cpuVert = data.vertices[i];
+          const GiVertex& cpuVert = meshVertices[i];
           uint32_t encodedNormal = _EncodeDirection(glm::make_vec3(cpuVert.norm));
           uint32_t encodedTangent = _EncodeDirection(glm::make_vec3(cpuVert.tangent));
 
@@ -722,11 +725,11 @@ fail:
 
         // Collect indices
         std::vector<uint32_t> indexData;
-        indexData.reserve(data.faces.size() * 3);
+        indexData.reserve(meshFaces.size() * 3);
 
-        for (uint32_t i = 0; i < data.faces.size(); i++)
+        for (uint32_t i = 0; i < meshFaces.size(); i++)
         {
-          const auto* face = &data.faces[i];
+          const auto* face = &meshFaces[i];
           indexData.push_back(face->v_i[0]);
           indexData.push_back(face->v_i[1]);
           indexData.push_back(face->v_i[2]);
@@ -742,7 +745,7 @@ fail:
           {
             const GiPrimvarData* primvar = nullptr;
 
-            for (const GiPrimvarData& p : data.primvars)
+            for (const GiPrimvarData& p : meshPrimvars)
             {
               // FIXME: we should check if scene data and primvar types match to prevent crashes
               if (p.name == sceneDataName && !p.data.empty())

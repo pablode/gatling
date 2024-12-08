@@ -23,15 +23,6 @@
 
 namespace gtl
 {
-  struct GiMeshDataCompressed;
-
-  struct GiMeshData
-  {
-    std::vector<GiFace> faces;
-    std::vector<GiPrimvarData> primvars;
-    std::vector<GiVertex> vertices;
-  };
-
   struct GiMeshBuffer
   {
     bool isCompressed;
@@ -47,7 +38,7 @@ namespace gtl
     GiMeshBuffer buffer;
   };
 
-  struct GiMeshDataCompressed
+  struct GiMeshData
   {
     GiMeshBuffer faces;
     GiMeshBuffer vertices;
@@ -56,9 +47,12 @@ namespace gtl
     uint32_t vertexCount;
   };
 
-  GiMeshDataCompressed giProcessMeshData(const std::vector<GiFace>& faces,
-                                         const std::vector<GiVertex>& vertices,
-                                         const std::vector<GiPrimvarData>& primvars);
+  GiMeshData giProcessMeshData(const std::vector<GiFace>& faces,
+                               const std::vector<GiVertex>& vertices,
+                               const std::vector<GiPrimvarData>& primvars);
 
-  GiMeshData giDecompressMeshData(const GiMeshDataCompressed& data);
+  void giDecompressMeshData(const GiMeshData& cmd,
+                            std::vector<GiFace>& faces,
+                            std::vector<GiVertex>& vertices,
+                            std::vector<GiPrimvarData>& primvars);
 }

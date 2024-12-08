@@ -94,9 +94,9 @@ namespace
     return std::move(data);
   }
 
-  GiMeshDataCompressed _CompressData(const std::vector<GiFace>& faces,
-                                     const std::vector<GiVertex>& vertices,
-                                     const std::vector<GiPrimvarData>& primvars)
+  GiMeshData _CompressData(const std::vector<GiFace>& faces,
+                           const std::vector<GiVertex>& vertices,
+                           const std::vector<GiPrimvarData>& primvars)
   {
     auto logBufferCompression = [](const std::string_view name, const GiMeshBuffer& buf)
     {
@@ -109,7 +109,7 @@ namespace
         buf.data.size(), float(buf.uncompressedSize) / float(buf.data.size()));
     };
 
-    GiMeshDataCompressed m;
+    GiMeshData m;
     m.faces = _CompressMeshBuffer(faces);
     m.vertices = _CompressMeshBuffer(vertices);
 
@@ -138,9 +138,9 @@ namespace
 
 namespace gtl
 {
-  GiMeshDataCompressed giProcessMeshData(const std::vector<GiFace>& faces,
-                                         const std::vector<GiVertex>& vertices,
-                                         const std::vector<GiPrimvarData>& primvars)
+  GiMeshData giProcessMeshData(const std::vector<GiFace>& faces,
+                               const std::vector<GiVertex>& vertices,
+                               const std::vector<GiPrimvarData>& primvars)
   {
     // Remap vertices & compress data.
 
@@ -207,15 +207,18 @@ namespace gtl
     return _CompressData(newFaces, newVertices, newPrimvars);
   }
 
-  GiMeshData giDecompressMeshData(const GiMeshDataCompressed& m)
+  void giDecompressMeshData(const GiMeshData& cmd,
+                            std::vector<GiFace>& faces,
+                            std::vector<GiVertex>& vertices,
+                            std::vector<GiPrimvarData>& primvars)
   {
-    std::vector<GiFace> faces = _DecompressMeshBuffer<GiFace>(m.faces);
-    std::vector<GiVertex> vertices = _DecompressMeshBuffer<GiVertex>(m.vertices);
+    faces = _DecompressMeshBuffer<GiFace>(cmd.faces);
+    vertices = _DecompressMeshBuffer<GiVertex>(cmd.vertices);
 
-    std::vector<GiPrimvarData> primvars(m.primvars.size());
+    primvars.resize(cmd.primvars.size());
     for (size_t i = 0; i < primvars.size(); i++)
     {
-      const auto& p = m.primvars[i];
+      const auto& p = cmd.primvars[i];
 
       primvars[i] = GiPrimvarData {
         .name = p.name,
@@ -224,7 +227,5 @@ namespace gtl
         .data = _DecompressMeshBuffer<uint8_t>(p.buffer)
       };
     }
-
-    return GiMeshData { faces, primvars, vertices };
   }
 }
