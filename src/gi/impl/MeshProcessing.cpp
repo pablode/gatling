@@ -69,7 +69,7 @@ namespace
 
     buf.data.resize(buf.uncompressedSize + BLOSC2_MAX_OVERHEAD);
 
-    uint32_t dataSize = blosc1_compress(3, BLOSC_BITSHUFFLE, sizeof(T),
+    uint32_t dataSize = blosc1_compress(1, BLOSC_BITSHUFFLE, sizeof(T),
       buf.uncompressedSize, &data[0], &buf.data[0], buf.data.size());
 
     buf.data.resize(dataSize);

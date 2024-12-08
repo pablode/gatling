@@ -408,6 +408,10 @@ namespace gtl
 
     blosc2_init();
     blosc2_set_nthreads(4);
+    {
+      int rcode = blosc1_set_compressor("zstd");
+      assert(rcode != -1);
+    }
 
     return GiStatus::Ok;
 
