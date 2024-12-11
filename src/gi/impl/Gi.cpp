@@ -194,10 +194,9 @@ namespace gtl
 
   struct GiRenderBuffer
   {
-    CgpuBuffer buffer;
-    CgpuBuffer stagingBuffer;
-    uint32_t bufferWidth = 0;
-    uint32_t bufferHeight = 0;
+    CgpuBuffer deviceMem;
+    CgpuBuffer hostMem;
+    void* mappedHostMem;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t size = 0;
@@ -261,66 +260,6 @@ namespace gtl
     return glm::packUnorm2x16(e);
   }
 
-  bool _giResizeRenderBufferIfNeeded(GiRenderBuffer* renderBuffer, uint32_t pixelStride)
-  {
-    uint32_t width = renderBuffer->width;
-    uint32_t height = renderBuffer->height;
-    uint32_t bufferSize = width * height * pixelStride;
-
-    bool reallocBuffers = (renderBuffer->bufferWidth != width) ||
-                          (renderBuffer->bufferHeight != height);
-
-    if (!reallocBuffers)
-    {
-      return true;
-    }
-
-    if (renderBuffer->buffer.handle)
-    {
-      cgpuDestroyBuffer(s_device, renderBuffer->buffer);
-      renderBuffer->buffer.handle = 0;
-    }
-    if (renderBuffer->stagingBuffer.handle)
-    {
-      cgpuDestroyBuffer(s_device, renderBuffer->stagingBuffer);
-      renderBuffer->stagingBuffer.handle = 0;
-    }
-
-    if (width == 0 || height == 0)
-    {
-      return true;
-    }
-
-    GB_LOG("recreating output buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
-
-    if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                            .size = bufferSize,
-                            .debugName = "RenderBuffer"
-                          }, &renderBuffer->buffer))
-    {
-      return false;
-    }
-
-    if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                            .size = bufferSize,
-                            .debugName = "RenderBufferStaging"
-                          }, &renderBuffer->stagingBuffer))
-    {
-      cgpuDestroyBuffer(s_device, renderBuffer->buffer);
-      return false;
-    }
-
-    renderBuffer->bufferWidth = width;
-    renderBuffer->bufferHeight = height;
-    renderBuffer->size = bufferSize;
-
-    return true;
-  }
-
   void _PrintInitInfo(const GiInitParams& params)
   {
     GB_LOG("gatling {}.{}.{} built against MaterialX {}.{}.{}", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH,
@@ -328,6 +267,24 @@ namespace gtl
     GB_LOG("> shader path: \"{}\"", params.shaderPath);
     GB_LOG("> MDL runtime path: \"{}\"", params.mdlRuntimePath);
     GB_LOG("> MDL search paths: {}", params.mdlSearchPaths);
+  }
+
+  void _EncodeRenderBufferAsHeatmap(GiRenderBuffer* renderBuffer)
+  {
+    int valueCount = renderBuffer->width * renderBuffer->height;
+    float* rgbaImg = (float*) renderBuffer->mappedHostMem;
+
+    float maxValue = 0.0f;
+    for (int i = 0; i < valueCount; i += 4) {
+      maxValue = std::max(maxValue, rgbaImg[i]); // only consider first channel
+    }
+    for (int i = 0; i < valueCount && maxValue > 0.0f; i += 4) {
+      int valIndex = std::min(int((rgbaImg[i] / maxValue) * 255.0), 255);
+      rgbaImg[i + 0] = (float) TURBO_SRGB_FLOATS[valIndex][0];
+      rgbaImg[i + 1] = (float) TURBO_SRGB_FLOATS[valIndex][1];
+      rgbaImg[i + 2] = (float) TURBO_SRGB_FLOATS[valIndex][2];
+      rgbaImg[i + 3] = 255;
+    }
   }
 
   GiStatus giInitialize(const GiInitParams& params)
@@ -1757,12 +1714,6 @@ cleanup:
     int pixelStride = compCount * sizeof(float);
     int pixelCount = imageWidth * imageHeight;
 
-    if (!_giResizeRenderBufferIfNeeded(renderBuffer, pixelStride))
-    {
-      GB_ERROR("failed to resize render buffer!");
-      return GiStatus::Error;
-    }
-
     // Set up GPU data.
     CgpuCommandBuffer commandBuffer;
     CgpuSemaphore semaphore;
@@ -1808,7 +1759,7 @@ cleanup:
     std::vector<CgpuBufferBinding> buffers;
     buffers.reserve(16);
 
-    buffers.push_back({ .binding = rp::BINDING_INDEX_OUT_PIXELS, .buffer = renderBuffer->buffer });
+    buffers.push_back({ .binding = rp::BINDING_INDEX_OUT_PIXELS, .buffer = renderBuffer->deviceMem });
     buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
@@ -1881,7 +1832,7 @@ cleanup:
     // Copy output buffer to staging buffer.
     {
       CgpuBufferMemoryBarrier bufferBarrier = {
-        .buffer = renderBuffer->buffer,
+        .buffer = renderBuffer->deviceMem,
         .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
         .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
         .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
@@ -1896,12 +1847,15 @@ cleanup:
         goto cleanup;
     }
 
-    if (!cgpuCmdCopyBuffer(commandBuffer, renderBuffer->buffer, 0, renderBuffer->stagingBuffer))
+    if (!cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem))
+      goto cleanup;
+
+    if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
       goto cleanup;
 
     {
       CgpuBufferMemoryBarrier bufferBarrier = {
-        .buffer = renderBuffer->stagingBuffer,
+        .buffer = renderBuffer->hostMem,
         .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
         .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
         .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
@@ -1933,32 +1887,9 @@ cleanup:
 
     s_delayedResourceDestroyer->nextFrame();
 
-    // Read data from GPU to image.
-    uint8_t* mapped_staging_mem;
-    if (!cgpuMapBuffer(s_device, renderBuffer->stagingBuffer, (void**) &mapped_staging_mem))
-      goto cleanup;
-
-    memcpy(rgbaImg, mapped_staging_mem, renderBuffer->size);
-
-    if (!cgpuUnmapBuffer(s_device, renderBuffer->stagingBuffer))
-      goto cleanup;
-
-    // Normalize debug AOV heatmaps.
     if (shaderCache->aovId == (int) GiAovId::ClockCycles)
     {
-      int valueCount = pixelCount * compCount;
-
-      float max_value = 0.0f;
-      for (int i = 0; i < valueCount; i += 4) {
-        max_value = std::max(max_value, rgbaImg[i]);
-      }
-      for (int i = 0; i < valueCount && max_value > 0.0f; i += 4) {
-        int val_index = std::min(int((rgbaImg[i] / max_value) * 255.0), 255);
-        rgbaImg[i + 0] = (float) TURBO_SRGB_FLOATS[val_index][0];
-        rgbaImg[i + 1] = (float) TURBO_SRGB_FLOATS[val_index][1];
-        rgbaImg[i + 2] = (float) TURBO_SRGB_FLOATS[val_index][2];
-        rgbaImg[i + 3] = 255;
-      }
+      _EncodeRenderBufferAsHeatmap(renderBuffer);
     }
 
     renderBuffer->sampleOffset += renderSettings.spp;
@@ -2407,7 +2338,45 @@ cleanup:
 
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height)
   {
+    uint32_t bufferSize = width * height * sizeof(float) * 4;
+
+    GB_LOG("creating render buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
+
+    CgpuBuffer deviceMem;
+    if (!cgpuCreateBuffer(s_device, {
+                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                            .size = bufferSize,
+                            .debugName = "RenderBufferGpu"
+                          }, &deviceMem))
+    {
+      return nullptr;
+    }
+
+    CgpuBuffer hostMem;
+    if (!cgpuCreateBuffer(s_device, {
+                            .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                            .size = bufferSize,
+                            .debugName = "RenderBufferCpu"
+                          }, &hostMem))
+    {
+      cgpuDestroyBuffer(s_device, deviceMem);
+      return nullptr;
+    }
+
+    void* mappedMem;
+    if (!cgpuMapBuffer(s_device, hostMem, &mappedMem))
+    {
+      cgpuDestroyBuffer(s_device, hostMem);
+      cgpuDestroyBuffer(s_device, deviceMem);
+      return nullptr;
+    }
+
     return new GiRenderBuffer{
+      .deviceMem = deviceMem,
+      .hostMem = hostMem,
+      .mappedHostMem = mappedMem,
       .width = width,
       .height = height
     };
@@ -2415,13 +2384,14 @@ cleanup:
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    // FIXME: don't destroy resources in use (append them to deletion queue)
-
-    if (renderBuffer->buffer.handle)
-      cgpuDestroyBuffer(s_device, renderBuffer->buffer);
-    if (renderBuffer->stagingBuffer.handle)
-      cgpuDestroyBuffer(s_device, renderBuffer->stagingBuffer);
-
+    cgpuUnmapBuffer(s_device, renderBuffer->hostMem);
+    s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->deviceMem);
+    s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->hostMem);
     delete renderBuffer;
+  }
+
+  void* giGetRenderBufferMem(GiRenderBuffer* renderBuffer)
+  {
+    return renderBuffer->mappedHostMem;
   }
 }

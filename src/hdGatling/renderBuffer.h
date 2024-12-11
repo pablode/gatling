@@ -71,12 +71,10 @@ protected:
   void _Deallocate() override;
 
 private:
-  void* _bufferMem;
   uint32_t _width;
   uint32_t _height;
   HdFormat _format;
   bool _isMultiSampled;
-  bool _isMapped;
   bool _isConverged;
   GiRenderBuffer* _renderBuffer = nullptr;
 };

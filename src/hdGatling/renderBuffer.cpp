@@ -26,9 +26,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdGatlingRenderBuffer::HdGatlingRenderBuffer(const SdfPath& id)
   : HdRenderBuffer(id)
 {
-  _isMapped = false;
   _isConverged = false;
-  _bufferMem = nullptr;
 }
 
 HdGatlingRenderBuffer::~HdGatlingRenderBuffer()
@@ -45,8 +43,15 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
     _renderBuffer = nullptr;
   }
 
+  if (format != HdFormatFloat32Vec4)
+  {
+    TF_RUNTIME_ERROR("Unsupported render buffer format!");
+    return false;
+  }
+
   if (dimensions[2] != 1)
   {
+    TF_RUNTIME_ERROR("3D render buffers not supported!");
     return false;
   }
 
@@ -55,18 +60,14 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
   _format = format;
   _isMultiSampled = multiSampled;
 
-  size_t size = _width * _height * HdDataSizeOfFormat(_format);
-
-  _bufferMem = realloc(_bufferMem, size);
-
-  if (!_bufferMem)
+  _renderBuffer = giCreateRenderBuffer(_width, _height);
+  if (!_renderBuffer)
   {
+    TF_RUNTIME_ERROR("Failed to create render buffer!");
     return false;
   }
 
-  _renderBuffer = giCreateRenderBuffer(_width, _height);
-
-  return _renderBuffer != nullptr;
+  return true;
 }
 
 unsigned int HdGatlingRenderBuffer::GetWidth() const
@@ -106,14 +107,12 @@ void HdGatlingRenderBuffer::SetConverged(bool converged)
 
 void* HdGatlingRenderBuffer::Map()
 {
-  _isMapped = true;
-
-  return _bufferMem;
+  return _renderBuffer ? giGetRenderBufferMem(_renderBuffer) : nullptr;
 }
 
 bool HdGatlingRenderBuffer::IsMapped() const
 {
-  return _isMapped;
+  return bool(_renderBuffer);
 }
 
 GiRenderBuffer* HdGatlingRenderBuffer::GetGiRenderBuffer() const
@@ -123,7 +122,6 @@ GiRenderBuffer* HdGatlingRenderBuffer::GetGiRenderBuffer() const
 
 void HdGatlingRenderBuffer::Unmap()
 {
-  _isMapped = false;
 }
 
 void HdGatlingRenderBuffer::Resolve()
@@ -136,8 +134,6 @@ void HdGatlingRenderBuffer::_Deallocate()
   {
     giDestroyRenderBuffer(_renderBuffer);
   }
-
-  free(_bufferMem);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

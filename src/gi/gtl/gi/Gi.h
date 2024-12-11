@@ -221,4 +221,5 @@ namespace gtl
 
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height);
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer);
+  void* giGetRenderBufferMem(GiRenderBuffer* renderBuffer);
 }
