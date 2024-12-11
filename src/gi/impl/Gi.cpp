@@ -54,6 +54,7 @@
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
+#include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Enum.h>
 #include <gtl/gb/SmallVector.h>
@@ -1691,6 +1692,18 @@ cleanup:
         GB_ERROR("failed to create AOV default values buffer");
         return GiStatus::Error;
       }
+
+#ifdef GTL_VERBOSE
+      std::string aovDebugMsg = "AOVs: ";
+      for (uint32_t i = 0; i < params.aovBindings.size(); i++)
+      {
+        const GiAovBinding& binding = params.aovBindings[i];
+
+        if (i != 0) aovDebugMsg += ", ";
+        aovDebugMsg += GB_FMT("{}", int(binding.aovId));
+      }
+      GB_DEBUG("{}", aovDebugMsg);
+#endif
 
       std::vector<uint8_t> defaultsData(conservativeSize);
       for (uint32_t i = 0; i < params.aovBindings.size(); i++)
