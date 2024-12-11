@@ -67,8 +67,8 @@ void main()
 
     rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
 
-#if AOV_ID != AOV_ID_COLOR
-    return;
+#if (AOV_MASK & AOV_BIT_COLOR) == 0
+    return; // early-out if color AOV not requested
 #endif
 
     bool useFallbackDomeLight = false;

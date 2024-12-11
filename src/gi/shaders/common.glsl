@@ -1,6 +1,8 @@
 #ifndef H_COMMON
 #define H_COMMON
 
+#include "aovs.glsl"
+
 const uint UINT32_MAX = 0xFFFFFFFFu;
 const float FLOAT_MAX = 3.402823466e38;
 const float FLOAT_MIN = 1.175494351e-38;
@@ -12,20 +14,6 @@ const float PI = 3.1415926535897932384626433832795;
 #else
 #define ASSERT(cond, str)
 #endif
-
-// These must match the IDs in gi.h
-#define AOV_ID_COLOR 0
-#define AOV_ID_NORMAL 1
-#define AOV_ID_DEBUG_NEE 2
-#define AOV_ID_DEBUG_BARYCENTRICS 3
-#define AOV_ID_DEBUG_TEXCOORDS 4
-#define AOV_ID_DEBUG_BOUNCES 5
-#define AOV_ID_DEBUG_CLOCK_CYCLES 6
-#define AOV_ID_DEBUG_OPACITY 7
-#define AOV_ID_DEBUG_TANGENTS 8
-#define AOV_ID_DEBUG_BITANGENTS 9
-#define AOV_ID_DEBUG_THIN_WALLED 10
-#define AOV_ID_OBJECTID 11
 
 float safe_div(float f1, float f2)
 {

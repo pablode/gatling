@@ -53,7 +53,7 @@ namespace gtl
   public:
     struct CommonShaderParams
     {
-      int32_t aovId;
+      uint32_t aovMask;
       uint32_t diskLightCount;
       uint32_t distantLightCount;
       uint32_t mediumStackSize;
@@ -73,7 +73,6 @@ namespace gtl
       bool nextEventEstimation;
       bool progressiveAccumulation;
       bool reorderInvocations;
-      bool shaderClockExt;
     };
 
     struct MissShaderParams

@@ -44,6 +44,7 @@
 #include <gtl/ggpu/Stager.h>
 #include <gtl/ggpu/DelayedResourceDestroyer.h>
 #include <gtl/ggpu/DenseDataStore.h>
+#include <gtl/ggpu/ResizableBuffer.h>
 #include <gtl/cgpu/Cgpu.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -55,6 +56,7 @@
 #include <gtl/mc/Runtime.h>
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Enum.h>
+#include <gtl/gb/SmallVector.h>
 
 #include <MaterialXCore/Document.h>
 
@@ -62,10 +64,10 @@
 
 namespace mx = MaterialX;
 
-constexpr static const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
-
 namespace gtl
 {
+  constexpr static const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
+
   namespace rp = shader_interface::rp_main;
 
   class McRuntime;
@@ -92,7 +94,7 @@ namespace gtl
 
   struct GiShaderCache
   {
-    uint32_t                       aovId = UINT32_MAX;
+    uint32_t                       aovMask;
     bool                           domeLightCameraVisible;
     std::vector<CgpuShader>        hitShaders;
     std::vector<CgpuImage>         images2d;
@@ -162,15 +164,16 @@ namespace gtl
 
   enum class GiSceneDirtyFlags : uint32_t
   {
-    Clean               = (1 << 0),
-    DirtyBvh            = (1 << 1),
-    DirtyFramebuffer    = (1 << 2),
+    Clean                   = (1 << 0),
+    DirtyBvh                = (1 << 1),
+    DirtyFramebuffer        = (1 << 2),
     // FIXME: implement invalidation of stages
-    DirtyRtPipelineRgen = (1 << 4),
-    DirtyRtPipelineHit  = (1 << 4),
-    DirtyRtPipelineMiss = (1 << 4),
-    DirtyRtPipeline     = (DirtyRtPipelineRgen | DirtyRtPipelineHit | DirtyRtPipelineMiss),
-    All                 = ~0u
+    DirtyRtPipelineRgen     = (1 << 4),
+    DirtyRtPipelineHit      = (1 << 4),
+    DirtyRtPipelineMiss     = (1 << 4),
+    DirtyRtPipeline         = (DirtyRtPipelineRgen | DirtyRtPipelineHit | DirtyRtPipelineMiss),
+    DirtyAovBindingDefaults = (1 << 5),
+    All                     = ~0u
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
 
@@ -190,6 +193,8 @@ namespace gtl
     GiShaderCache* shaderCache = nullptr;
     GiBvh* bvh = nullptr;
     GiRenderParams oldRenderParams = {};
+    CgpuBuffer aovDefaultValues;
+    uint32_t sampleOffset = 0;
   };
 
   struct GiRenderBuffer
@@ -200,7 +205,6 @@ namespace gtl
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t size = 0;
-    uint32_t sampleOffset = 0;
   };
 
   bool s_cgpuInitialized = false;
@@ -1063,15 +1067,19 @@ cleanup:
   GiShaderCache* _giCreateShaderCache(const GiRenderParams& params)
   {
     const GiRenderSettings& renderSettings = params.renderSettings;
-    bool clockCyclesAov = params.aovId == GiAovId::ClockCycles;
-
-    if (clockCyclesAov && !s_deviceFeatures.shaderClock)
-    {
-      GB_ERROR("unsupported AOV - device feature missing");
-      return nullptr;
-    }
-
     GiScene* scene = params.scene;
+
+    uint32_t aovMask = 0;
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      if (binding.aovId == GiAovId::ClockCycles && !s_deviceFeatures.shaderClock)
+      {
+        GB_ERROR("clock cycles AOV misses device feature - ignoring");
+        continue;
+      }
+
+      aovMask |= (1 << int(binding.aovId));
+    }
 
     std::set<const GiMaterial*> materialSet;
     for (auto* m : scene->meshes)
@@ -1112,7 +1120,7 @@ cleanup:
     bool nextEventEstimation = (renderSettings.nextEventEstimation && totalLightCount > 0);
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
-      .aovId = (int) params.aovId,
+      .aovMask = aovMask,
       .diskLightCount = diskLightCount,
       .distantLightCount = distantLightCount,
       .mediumStackSize = renderSettings.mediumStackSize,
@@ -1382,8 +1390,7 @@ cleanup:
         .materialCount = uint32_t(materials.size()),
         .nextEventEstimation = nextEventEstimation,
         .progressiveAccumulation = renderSettings.progressiveAccumulation,
-        .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder,
-        .shaderClockExt = clockCyclesAov
+        .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder
       };
 
       std::vector<uint8_t> spv;
@@ -1478,7 +1485,7 @@ cleanup:
     }
 
     cache = new GiShaderCache;
-    cache->aovId = (int) params.aovId;
+    cache->aovMask = aovMask;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
     cache->hitShaders = std::move(hitShaders);
     cache->images2d = std::move(images2d);
@@ -1536,8 +1543,8 @@ cleanup:
     delete cache;
   }
 
-  GiSceneDirtyFlags _CalcDirtyFlagsForRenderParams(const GiRenderParams& a,
-                                                   const GiRenderParams& b)
+  GiSceneDirtyFlags _CalcDirtyFlagsForRenderParams(const GiRenderParams& a/*new*/,
+                                                   const GiRenderParams& b/*old*/)
   {
     GiSceneDirtyFlags flags = {};
 
@@ -1546,8 +1553,40 @@ cleanup:
       return flags;
     }
 
-    if (a.aovId != b.aovId ||
-        memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
+    bool aovCountChanged = a.aovBindings.size() != b.aovBindings.size();
+    bool aovsChanged = aovCountChanged;
+    bool aovDefaultsChanged = false;
+    if (!aovCountChanged)
+    {
+      auto& oldAovs = b.aovBindings;
+      auto& newAovs = a.aovBindings;
+
+      for (int i = 0; i < newAovs.size(); i++)
+      {
+        auto& oldAov = oldAovs[i];
+        auto& newAov = newAovs[i];
+
+        if (oldAov.aovId != newAov.aovId || oldAov.renderBuffer != newAov.renderBuffer)
+        {
+          aovsChanged = true;
+          break;
+        }
+        if (memcmp(oldAov.clearValue, newAov.clearValue, GI_MAX_AOV_COMP_SIZE) == 0)
+        {
+          aovDefaultsChanged = true;
+        }
+      }
+    }
+    if (aovsChanged)
+    {
+      flags |= GiSceneDirtyFlags::DirtyRtPipeline;
+    }
+    if (aovsChanged || aovDefaultsChanged)
+    {
+      flags |= GiSceneDirtyFlags::DirtyAovBindingDefaults;
+    }
+
+    if (memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
         memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0 ||
         a.domeLight != b.domeLight ||
         a.scene != b.scene)
@@ -1581,12 +1620,12 @@ cleanup:
     return flags;
   }
 
-  GiStatus giRender(const GiRenderParams& params, float* rgbaImg)
+  GiStatus giRender(const GiRenderParams& params)
   {
     s_stager->flush();
 
     GiScene* scene = params.scene;
-    GiRenderBuffer* renderBuffer = params.renderBuffer;
+    //GiRenderBuffer* renderBuffer = params.aovBindings[0].renderBuffer;
     const GiRenderSettings& renderSettings = params.renderSettings;
 
     if (s_forceShaderCacheInvalid)
@@ -1605,7 +1644,7 @@ cleanup:
     {
       scene->dirtyFlags |= flags;
 
-      memcpy(&scene->oldRenderParams, &params, sizeof(GiRenderParams));
+      scene->oldRenderParams = params;
     }
 
     if (!scene->shaderCache || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyRtPipeline))
@@ -1630,15 +1669,60 @@ cleanup:
 
     if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyFramebuffer))
     {
-      renderBuffer->sampleOffset = 0;
+      scene->sampleOffset = 0;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyFramebuffer;
+    }
+
+    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyAovBindingDefaults))
+    {
+      if (scene->aovDefaultValues.handle)
+      {
+        s_delayedResourceDestroyer->enqueueDestruction(scene->aovDefaultValues);
+      }
+
+      size_t conservativeSize = int(GiAovId::COUNT) * GI_MAX_AOV_COMP_SIZE;
+      if (!cgpuCreateBuffer(s_device, {
+                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                              .size = conservativeSize,
+                              .debugName = "AovDefaults"
+                            }, &scene->aovDefaultValues))
+      {
+        GB_ERROR("failed to create AOV default values buffer");
+        return GiStatus::Error;
+      }
+
+      std::vector<uint8_t> defaultsData(conservativeSize);
+      for (uint32_t i = 0; i < params.aovBindings.size(); i++)
+      {
+        const GiAovBinding& binding = params.aovBindings[i];
+        memcpy(&defaultsData[i * GI_MAX_AOV_COMP_SIZE], &binding.clearValue[0], GI_MAX_AOV_COMP_SIZE);
+      }
+
+      if (!s_stager->stageToBuffer(&defaultsData[0], conservativeSize, scene->aovDefaultValues, 0) ||
+          !s_stager->flush())
+      {
+        GB_ERROR("failed to stage AOV default values");
+        return GiStatus::Error;
+      }
+
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyAovBindingDefaults;
     }
 
     GiBvh* bvh = scene->bvh;
     const GiShaderCache* shaderCache = scene->shaderCache;
 
     // Upload dome lights.
-    glm::vec4 backgroundColor = glm::make_vec4(renderSettings.backgroundColor);
+    glm::vec4 backgroundColor(0.0f);
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      if (binding.aovId != GiAovId::Color)
+      {
+        continue;
+      }
+      memcpy(&backgroundColor[0], binding.clearValue, GI_MAX_AOV_COMP_SIZE);
+    }
+
     if (backgroundColor != scene->backgroundColor)
     {
       glm::u8vec4 u8BgColor(backgroundColor * 255.0f);
@@ -1706,13 +1790,9 @@ cleanup:
       GB_ERROR("{}:{}: stager flush failed!", __FILE__, __LINE__);
     }
 
-    // Set up output buffer.
-    uint32_t imageWidth = renderBuffer->width;
-    uint32_t imageHeight = renderBuffer->height;
-
-    int compCount = 4;
-    int pixelStride = compCount * sizeof(float);
-    int pixelCount = imageWidth * imageHeight;
+    // FIXME: use values from Hydra camera and ensure they match the render buffers
+    uint32_t imageWidth = params.aovBindings[0].renderBuffer->width;
+    uint32_t imageHeight = params.aovBindings[0].renderBuffer->height;
 
     // Set up GPU data.
     CgpuCommandBuffer commandBuffer;
@@ -1733,7 +1813,6 @@ cleanup:
     glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
     uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
 
-
     rp::PushConstants pushData = {
       .cameraPosition                 = glm::make_vec3(params.camera.position),
       .imageDims                      = ((imageHeight << 16) | imageWidth),
@@ -1741,7 +1820,7 @@ cleanup:
       .focusDistance                  = params.camera.focusDistance,
       .cameraUp                       = camUp,
       .cameraVFoV                     = params.camera.vfov,
-      .sampleOffset                   = renderBuffer->sampleOffset,
+      .sampleOffset                   = scene->sampleOffset,
       .lensRadius                     = lensRadius,
       .sampleCount                    = renderSettings.spp,
       .maxSampleValue                 = renderSettings.maxSampleValue,
@@ -1759,12 +1838,35 @@ cleanup:
     std::vector<CgpuBufferBinding> buffers;
     buffers.reserve(16);
 
-    buffers.push_back({ .binding = rp::BINDING_INDEX_OUT_PIXELS, .buffer = renderBuffer->deviceMem });
     buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
+
+    buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_F, .buffer = scene->aovDefaultValues });
+    buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_I, .buffer = scene->aovDefaultValues });
+
+    std::array<uint32_t, size_t(GiAovId::COUNT)> aovBindingIndices = {
+      rp::BINDING_INDEX_AOV_COLOR,
+      rp::BINDING_INDEX_AOV_NORMAL,
+      rp::BINDING_INDEX_AOV_NEE,
+      rp::BINDING_INDEX_AOV_BARYCENTRICS,
+      rp::BINDING_INDEX_AOV_TEXCOORDS,
+      rp::BINDING_INDEX_AOV_BOUNCES,
+      rp::BINDING_INDEX_AOV_CLOCK_CYCLES,
+      rp::BINDING_INDEX_AOV_OPACITY,
+      rp::BINDING_INDEX_AOV_TANGENTS,
+      rp::BINDING_INDEX_AOV_BITANGENTS,
+      rp::BINDING_INDEX_AOV_THIN_WALLED,
+      rp::BINDING_INDEX_AOV_OBJECT_ID
+    };
+
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      uint32_t bindingIndex = aovBindingIndices[int(binding.aovId)];
+      buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
+    }
 
     size_t imageCount = shaderCache->images2d.size() + shaderCache->images3d.size() + 2/* dome lights */;
 
@@ -1829,44 +1931,61 @@ cleanup:
     if (!cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight))
       goto cleanup;
 
-    // Copy output buffer to staging buffer.
+    // Copy device to host memory.
     {
-      CgpuBufferMemoryBarrier bufferBarrier = {
-        .buffer = renderBuffer->deviceMem,
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ
-      };
-      CgpuPipelineBarrier barrier = {
-        .bufferBarrierCount = 1,
-        .bufferBarriers = &bufferBarrier
+      GbSmallVector<CgpuBufferMemoryBarrier, 5> preBarriers;
+      GbSmallVector<CgpuBufferMemoryBarrier, 5> postBarriers;
+
+      preBarriers.resize(params.aovBindings.size());
+      postBarriers.resize(params.aovBindings.size());
+
+      for (size_t i = 0; i < params.aovBindings.size(); i++)
+      {
+        const GiAovBinding& binding = params.aovBindings[i];
+        GiRenderBuffer* renderBuffer = binding.renderBuffer;
+
+        preBarriers[i] = CgpuBufferMemoryBarrier {
+          .buffer = renderBuffer->deviceMem,
+          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
+          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
+          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ
+        };
+
+        postBarriers[i] = CgpuBufferMemoryBarrier {
+          .buffer = renderBuffer->hostMem,
+          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
+          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
+          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
+          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_HOST_READ
+        };
+      }
+
+      CgpuPipelineBarrier preBarrier = {
+        .bufferBarrierCount = (uint32_t) preBarriers.size(),
+        .bufferBarriers = preBarriers.data()
       };
 
-      if (!cgpuCmdPipelineBarrier(commandBuffer, &barrier))
+      if (!cgpuCmdPipelineBarrier(commandBuffer, &preBarrier))
         goto cleanup;
-    }
 
-    if (!cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem))
-      goto cleanup;
+      for (const GiAovBinding& binding : params.aovBindings)
+      {
+        GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-    if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
-      goto cleanup;
+        if (!cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem))
+          goto cleanup;
 
-    {
-      CgpuBufferMemoryBarrier bufferBarrier = {
-        .buffer = renderBuffer->hostMem,
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_HOST_READ
-      };
-      CgpuPipelineBarrier barrier = {
-        .bufferBarrierCount = 1,
-        .bufferBarriers = &bufferBarrier
+        if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
+          goto cleanup;
+      }
+
+      CgpuPipelineBarrier postBarrier = {
+        .bufferBarrierCount = (uint32_t) postBarriers.size(),
+        .bufferBarriers = postBarriers.data()
       };
 
-      if (!cgpuCmdPipelineBarrier(commandBuffer, &barrier))
+      if (!cgpuCmdPipelineBarrier(commandBuffer, &postBarrier))
         goto cleanup;
     }
 
@@ -1887,12 +2006,15 @@ cleanup:
 
     s_delayedResourceDestroyer->nextFrame();
 
-    if (shaderCache->aovId == (int) GiAovId::ClockCycles)
+    for (const GiAovBinding& binding : params.aovBindings)
     {
-      _EncodeRenderBufferAsHeatmap(renderBuffer);
+      if (binding.aovId == GiAovId::ClockCycles)
+      {
+        _EncodeRenderBufferAsHeatmap(binding.renderBuffer);
+      }
     }
 
-    renderBuffer->sampleOffset += renderSettings.spp;
+    scene->sampleOffset += renderSettings.spp;
 
     result = GiStatus::Ok;
 
@@ -1916,7 +2038,7 @@ cleanup:
       .distantLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DistantLight), 64),
       .rectLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::RectLight), 64),
       .diskLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DiskLight), 64),
-      .fallbackDomeLightTexture = fallbackDomeLightTexture
+      .fallbackDomeLightTexture = fallbackDomeLightTexture,
     };
     return scene;
   }
@@ -1935,6 +2057,10 @@ cleanup:
     {
       s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
       scene->domeLightTexture.handle = 0;
+    }
+    if (scene->aovDefaultValues.handle)
+    {
+      cgpuDestroyBuffer(s_device, scene->aovDefaultValues);
     }
     cgpuDestroyImage(s_device, scene->fallbackDomeLightTexture);
     delete scene;
@@ -2338,7 +2464,7 @@ cleanup:
 
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height)
   {
-    uint32_t bufferSize = width * height * sizeof(float) * 4;
+    uint32_t bufferSize = width * height * GI_MAX_AOV_COMP_SIZE;
 
     GB_LOG("creating render buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
 

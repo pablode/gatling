@@ -219,8 +219,6 @@ void HdGatlingRenderDelegate::DestroyInstancer(HdInstancer* instancer)
 
 HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& name) const
 {
-  TF_UNUSED(name);
-
   HdAovDescriptor aovDescriptor;
   aovDescriptor.format = HdFormatFloat32Vec4;
   aovDescriptor.multiSampled = false;

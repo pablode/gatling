@@ -25,6 +25,8 @@
 
 namespace gtl
 {
+  constexpr static const uint32_t GI_MAX_AOV_COMP_SIZE = 16; // vec4
+
   enum class GiStatus { Ok, Error };
 
   enum class GiAovId
@@ -40,7 +42,8 @@ namespace gtl
     Tangents,
     Bitangents,
     ThinWalled,
-    ObjectId
+    ObjectId,
+    COUNT
   };
 
   struct GiAsset;
@@ -116,7 +119,6 @@ namespace gtl
 
   struct GiRenderSettings
   {
-    float    backgroundColor[4];
     bool     depthOfField;
     bool     domeLightCameraVisible;
     bool     filterImportanceSampling;
@@ -133,14 +135,20 @@ namespace gtl
     uint32_t spp;
   };
 
+  struct GiAovBinding
+  {
+    GiAovId         aovId;
+    uint8_t         clearValue[GI_MAX_AOV_COMP_SIZE];
+    GiRenderBuffer* renderBuffer;
+  };
+
   struct GiRenderParams
   {
-    GiAovId          aovId;
-    GiCameraDesc     camera;
-    GiDomeLight*     domeLight;
-    GiRenderBuffer*  renderBuffer;
-    GiRenderSettings renderSettings;
-    GiScene*         scene;
+    std::vector<GiAovBinding> aovBindings;
+    GiCameraDesc              camera;
+    GiDomeLight*              domeLight;
+    GiRenderSettings          renderSettings;
+    GiScene*                  scene;
   };
 
   struct GiInitParams
@@ -178,7 +186,7 @@ namespace gtl
   void giSetMeshVisibility(GiMesh* mesh, bool visible);
   void giDestroyMesh(GiMesh* mesh);
 
-  GiStatus giRender(const GiRenderParams& params, float* rgbaImg);
+  GiStatus giRender(const GiRenderParams& params);
 
   GiScene* giCreateScene();
   void giDestroyScene(GiScene* scene);

@@ -14,7 +14,9 @@
 #extension GL_EXT_buffer_reference_uvec2: require
 #endif
 
-#ifdef REQUIRE_CLOCK
+#include "aovs.glsl"
+
+#if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
 #extension GL_EXT_shader_explicit_arithmetic_types_int64: require
 #extension GL_ARB_shader_clock: require
 #endif
@@ -109,7 +111,8 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     return false;
 }
 
-vec3 evaluate_sample(vec3 ray_origin,
+vec3 evaluate_sample(uint pixelIndex,
+                     vec3 ray_origin,
                      vec3 ray_dir,
                      RNG_STATE_TYPE rng_state)
 {
@@ -260,10 +263,9 @@ vec3 evaluate_sample(vec3 ray_origin,
             rayPayload.rng_state = shadowRayPayload.rng_state;
             rayPayload.radiance += rayPayload.neeContrib * float(addContrib);
 
-#if AOV_ID == AOV_ID_DEBUG_NEE
-            rayPayload.radiance = shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-            rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
-            return;
+#if (AOV_MASK & AOV_BIT_DEBUG_NEE) != 0
+            if (bounce == 0)
+              NeeAov[pixelIndex] = shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
 #endif
         }
 #endif
@@ -311,9 +313,9 @@ vec3 evaluate_sample(vec3 ray_origin,
         rayPayload.bitfield++;
     }
 
-#if AOV_ID == AOV_ID_DEBUG_BOUNCES
+#if (AOV_MASK & AOV_BIT_DEBUG_BOUNCES) != 0
     uint bounces = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
-    return colormap_inferno(float(bounces) / float(maxBounces));
+    BouncesAov[pixelIndex] = colormap_inferno(float(bounces) / float(maxBounces));
 #endif
 
     // Radiance clamping
@@ -345,9 +347,43 @@ vec2 fisGauss(vec2 xi)
     return vec2(cos(phi), sin(phi)) * r;
 }
 
+void clearAovs(uint pixelIndex)
+{
+#if (AOV_MASK & AOV_BIT_COLOR) != 0
+  if (PC.sampleOffset == 0)
+  {
+    ColorAov[pixelIndex] = ClearValuesF[AOV_ID_COLOR];
+  }
+#endif
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+  NormalsAov[pixelIndex] = ClearValuesF[AOV_ID_NORMAL].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
+  BarycentricsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BARYCENTRICS].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
+  TexcoordsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_TEXCOORDS].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
+  OpacityAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_OPACITY].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
+  TangentsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_TANGENTS].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
+  BitangentsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BITANGENTS].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
+  ThinWalledAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_THIN_WALLED].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_OBJECTID) != 0
+  ObjectIdAov[pixelIndex] = ClearValuesI[AOV_ID_OBJECTID].x;
+#endif
+}
+
 void main()
 {
-#if AOV_ID == AOV_ID_DEBUG_CLOCK_CYCLES
+#if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
     uint64_t start_cycle_count = clockARB();
 #endif
 
@@ -356,6 +392,8 @@ void main()
     uint imageHeight = PC.imageDims >> 16;
 
     uint pixel_index = pixel_pos.x + pixel_pos.y * imageWidth;
+
+    clearAovs(pixel_index);
 
     vec3 camera_right = cross(PC.cameraForward, PC.cameraUp);
     float aspect_ratio = float(imageWidth) / float(imageHeight);
@@ -432,14 +470,16 @@ void main()
         rayDir += vec3(equal(rayDir, vec3(0.0))) * FLOAT_MIN;
 
         /* Path trace sample and accumulate color. */
-        vec3 sample_color = evaluate_sample(rayOrigin, rayDir, rng_state);
+        vec3 sample_color = evaluate_sample(pixel_index, rayOrigin, rayDir, rng_state);
         pixel_color += sample_color * inv_sample_count;
     }
 
-#if AOV_ID == AOV_ID_DEBUG_CLOCK_CYCLES
-    float cycles_elapsed_norm = float(clockARB() - start_cycle_count) / float(UINT32_MAX);
-    pixel_color = vec3(cycles_elapsed_norm, 0.0, 0.0);
+#if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
+    uint cyclesElapsed = uint(clockARB() - start_cycle_count);
+    ClockCyclesAov[pixel_index] = cyclesElapsed;
 #endif
+
+#if (AOV_MASK & AOV_BIT_COLOR) != 0
 
 #ifdef PROGRESSIVE_ACCUMULATION
     if (PC.sampleOffset > 0)
@@ -449,9 +489,10 @@ void main()
       float weight_old = float(PC.sampleOffset) * inv_total_sample_count;
       float weight_new = float(PC.sampleCount) * inv_total_sample_count;
 
-      pixel_color = weight_old * pixels[pixel_index].rgb + weight_new * pixel_color;
+      pixel_color = weight_old * ColorAov[pixel_index].rgb + weight_new * pixel_color;
     }
 #endif
 
-    pixels[pixel_index] = vec4(pixel_color, 1.0);
+    ColorAov[pixel_index] = vec4(pixel_color, 1.0);
+#endif
 }

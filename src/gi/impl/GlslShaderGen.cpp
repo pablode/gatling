@@ -58,7 +58,7 @@ namespace gtl
     uint32_t totalLightCount = params.diskLightCount + params.distantLightCount +
                                params.rectLightCount + params.sphereLightCount;
 
-    stitcher.appendDefine("AOV_ID", params.aovId);
+    stitcher.appendDefine("AOV_MASK", (int) params.aovMask);
     stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) params.texCount2d);
     stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) params.texCount3d);
     stitcher.appendDefine("SPHERE_LIGHT_COUNT", (int32_t) params.sphereLightCount);
@@ -74,10 +74,6 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    if (params.shaderClockExt)
-    {
-      stitcher.appendDefine("REQUIRE_CLOCK");
-    }
     if (params.reorderInvocations)
     {
       uint32_t reoderHintValueCount = params.materialCount + 1/* no hit */;

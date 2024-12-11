@@ -53,40 +53,36 @@ namespace
     { HdAovTokens->primId,                   GiAovId::ObjectId     },
   };
 
-  const HdRenderPassAovBinding* _PrepareAovBindings(const HdRenderPassAovBindingVector& aovBindings, TfToken selectedAov)
+  std::vector<GiAovBinding> _PrepareAovBindings(const HdRenderPassAovBindingVector& aovBindings)
   {
-    const HdRenderPassAovBinding* colorBinding = nullptr;
+    std::vector<GiAovBinding> result;
 
-    for (const HdRenderPassAovBinding& aovBinding : aovBindings)
+    for (const HdRenderPassAovBinding& binding : aovBindings)
     {
-      if (aovBinding.aovName == selectedAov)
+      HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(binding.renderBuffer);
+      const TfToken& name = binding.aovName;
+
+      auto it = _aovIdMappings.find(name);
+      if (it == _aovIdMappings.end())
       {
-        colorBinding = &aovBinding;
+        TF_RUNTIME_ERROR(TfStringPrintf("Unsupported AOV %s", name.GetText()));
+        renderBuffer->SetConverged(true);
+        continue;
       }
 
-      HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
-      renderBuffer->SetConverged(true);
+      auto valueType = HdGetValueTupleType(binding.clearValue).type;
+      size_t valueSize = HdDataSizeOfType(valueType);
+      const void* valuePtr = HdGetValueData(binding.clearValue);
+
+      GiAovBinding b;
+      b.aovId = it->second;
+      memcpy(&b.clearValue[0], valuePtr, valueSize);
+      b.renderBuffer = renderBuffer->GetGiRenderBuffer();
+
+      result.push_back(b);
     }
 
-    return colorBinding;
-  }
-
-  GiAovId _GetAovId(const TfToken& aovName)
-  {
-    GiAovId id = GiAovId::Color;
-
-    auto iter = _aovIdMappings.find(aovName);
-
-    if (iter != _aovIdMappings.end())
-    {
-      id = iter->second;
-    }
-    else
-    {
-      TF_RUNTIME_ERROR(TfStringPrintf("Invalid AOV id %s", aovName.GetText()));
-    }
-
-    return id;
+    return result;
   }
 
   bool _IsInteractive(const HdRenderSettingsMap& settings)
@@ -198,25 +194,12 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
-  const HdRenderPassAovBindingVector& aovBindings = renderPassState->GetAovBindings();
+  const auto& hdAovBindings = renderPassState->GetAovBindings();
+
+  std::vector<GiAovBinding> aovBindings = _PrepareAovBindings(hdAovBindings);
   if (aovBindings.empty())
   {
-    return;
-  }
-
-  const HdRenderPassAovBinding* aovBinding = _PrepareAovBindings(aovBindings, HdAovTokens->color);
-  if (!aovBinding)
-  {
-    TF_RUNTIME_ERROR("AOV not supported");
-    return;
-  }
-
-  GiAovId aovId = _GetAovId(aovBinding->aovName);
-
-  HdGatlingRenderBuffer* renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding->renderBuffer);
-  if (renderBuffer->GetFormat() != HdFormatFloat32Vec4)
-  {
-    TF_CODING_ERROR("Unsupported render buffer format");
+    // If this is due to an unsupported AOV, we already logged an error about it.
     return;
   }
 
@@ -224,8 +207,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
-
-  GfVec4f backgroundColor = aovBinding->clearValue.GetWithDefault<GfVec4f>(GfVec4f(0.f));
 
   bool clippingEnabled = renderPassState->GetClippingEnabled() &&
                          _settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
@@ -236,12 +217,10 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   _ConstructGiCamera(*camera, giCamera, clippingEnabled);
 
   GiRenderParams renderParams = {
-    .aovId = aovId,
+    .aovBindings = aovBindings,
     .camera = giCamera,
     .domeLight = renderParam->ActiveDomeLight(),
-    .renderBuffer = renderBuffer->GetGiRenderBuffer(),
     .renderSettings = {
-      .backgroundColor = { backgroundColor[0], backgroundColor[1], backgroundColor[2], backgroundColor[3] },
       .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
       .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
       .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
@@ -260,17 +239,17 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     .scene = _scene
   };
 
-  float* imgData = (float*) renderBuffer->Map();
-
-  GiStatus result = giRender(renderParams, imgData);
+  GiStatus result = giRender(renderParams);
 
   TF_VERIFY(result == GiStatus::Ok, "Unable to render scene.");
 
-  renderBuffer->Unmap();
-
   _isConverged = !_IsInteractive(_settings);
 
-  renderBuffer->SetConverged(_isConverged);
+  for (const auto& aovBinding : hdAovBindings)
+  {
+    auto renderBuffer = static_cast<HdGatlingRenderBuffer*>(aovBinding.renderBuffer);
+    renderBuffer->SetConverged(_isConverged);
+  }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

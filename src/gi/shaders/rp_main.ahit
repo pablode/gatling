@@ -42,10 +42,10 @@ void main()
   float opacity = mdl_cutout_opacity(shading_state);
 
 #ifndef SHADOW_TEST
-#if AOV_ID == AOV_ID_DEBUG_OPACITY
-  rayPayload.radiance = (opacity == 0.0) ? vec3(1.0) : colormap_viridis(opacity);
-  rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
-  return;
+#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
+  uint imageWidth = PC.imageDims & 0xFFFFu;
+  uint pixelIndex = gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * imageWidth;
+  OpacityAov[pixelIndex] = (opacity == 0.0) ? vec3(1.0) : colormap_viridis(opacity);
 #endif
 #endif
 

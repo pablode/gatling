@@ -55,6 +55,12 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
     return false;
   }
 
+  if (dimensions[0] == 0 || dimensions[1] == 0)
+  {
+    TF_RUNTIME_ERROR("Can't allocate empty render buffer!");
+    return false;
+  }
+
   _width = dimensions[0];
   _height = dimensions[1];
   _format = format;
