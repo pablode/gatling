@@ -203,8 +203,8 @@ private:
   struct NamespacedSettings
   {
     std::string referenceName;
-    uint32_t spp;
-    uint32_t errorPixelThreshold;
+    uint32_t spp = 1;
+    uint32_t errorPixelThreshold = 0;
     bool jitteredSampling = true;
   };
 
@@ -265,15 +265,19 @@ private:
     }
     {
       auto it = ns.find(_nsTokens->spp);
-      REQUIRE_NE(it, ns.end());
-      REQUIRE(it->second.IsHolding<int>());
-      settings.spp = it->second.UncheckedGet<int>();
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<int>());
+        settings.spp = it->second.UncheckedGet<int>();
+      }
     }
     {
       auto it = ns.find(_nsTokens->errorPixelThreshold);
-      REQUIRE_NE(it, ns.end());
-      REQUIRE(it->second.IsHolding<int>());
-      settings.errorPixelThreshold = it->second.UncheckedGet<int>();
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<int>());
+        settings.errorPixelThreshold = it->second.UncheckedGet<int>();
+      }
     }
     {
       auto it = ns.find(_nsTokens->jitteredSampling);
