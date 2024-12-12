@@ -401,13 +401,21 @@ private:
     float* mappedMem = (float*) renderBuffer->Map();
     REQUIRE(mappedMem);
 
+    bool gammaEncode = (aovBindings[0].aovName == HdAovTokens->color);
     size_t channelCount = width * height * 4;
     std::vector<uint8_t> byteValues(channelCount);
     for (int i = 0; i < channelCount; i += 4)
     {
-      byteValues[i + 0] = uint8_t(_AccurateLinearToSrgb(mappedMem[i + 0]) * 255.0);
-      byteValues[i + 1] = uint8_t(_AccurateLinearToSrgb(mappedMem[i + 1]) * 255.0);
-      byteValues[i + 2] = uint8_t(_AccurateLinearToSrgb(mappedMem[i + 2]) * 255.0);
+      for (int j = 0; j < 3; j++)
+      {
+        float r = mappedMem[i + j];
+        if (gammaEncode)
+        {
+          r =  _AccurateLinearToSrgb(r);
+        }
+        byteValues[i + j] = uint8_t(r * 255.0);
+      }
+
       byteValues[i + 3] = 255;
     }
 
