@@ -369,8 +369,15 @@ private:
     renderPassState->SetOverrideWindowPolicy(overrideWindowPolicy);
 #endif
 
+    const auto& renderVarIndices = product.renderVarIndices;
+    REQUIRE_EQ(renderVarIndices.size(), 1);
+    const auto& renderVars = m_renderSpec.renderVars;
+    REQUIRE(!renderVars.empty());
+
+    const UsdRenderSpec::RenderVar& renderVar = renderVars[renderVarIndices[0]];
+
     HdRenderPassAovBindingVector aovBindings(1);
-    aovBindings[0].aovName = HdAovTokens->color; // FIXME: consider RenderVars
+    aovBindings[0].aovName = TfToken(renderVar.sourceName);
     aovBindings[0].clearValue = VtValue(GfVec4f(1.0f));
     aovBindings[0].renderBuffer = renderBuffer;
     renderPassState->SetAovBindings(aovBindings);
