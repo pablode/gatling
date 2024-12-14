@@ -158,7 +158,7 @@ namespace gtl
     streams.push_back(meshopt_Stream{ (void*) &vertices[0], sizeof(GiVertex), sizeof(GiVertex) });
     for (const GiPrimvarData& p : primvars)
     {
-      if (p.interpolation == GiPrimvarInterpolation::Constant)
+      if (p.interpolation != GiPrimvarInterpolation::Vertex)
       {
         continue;
       }
@@ -192,7 +192,7 @@ namespace gtl
     {
       const auto& o = primvars[i];
 
-      if (o.interpolation == GiPrimvarInterpolation::Constant)
+      if (o.interpolation != GiPrimvarInterpolation::Vertex)
       {
         continue;
       }

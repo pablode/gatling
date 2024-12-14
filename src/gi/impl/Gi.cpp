@@ -789,8 +789,10 @@ fail:
           }
 
           bool isConstant = (primvar->interpolation == GiPrimvarInterpolation::Constant);
+          bool isUniform = (primvar->interpolation == GiPrimvarInterpolation::Uniform);
           uint32_t info = (sceneDataOffsets[i] & rp::BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK) |
-                          (isConstant * rp::BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+                          (isConstant * rp::BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT) |
+                          (isUniform * rp::BLAS_PREAMBLE_SCENE_DATA_BITFLAG_UNIFORM);
           preamble.sceneDataInfos[i] = info;
         }
 

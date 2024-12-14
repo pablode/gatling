@@ -609,8 +609,7 @@ void HdGatlingMesh::_AnalyzePrimvars(HdSceneDelegate* sceneDelegate,
         continue;
       }
 
-      if (primvar.interpolation == HdInterpolationFaceVarying ||
-          primvar.interpolation == HdInterpolationUniform)
+      if (primvar.interpolation == HdInterpolationFaceVarying)
       {
         indexingAllowed = false;
       }
@@ -629,7 +628,7 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
                                                                               const VtVec3iArray& faces,
                                                                               uint32_t vertexCount,
                                                                               bool indexingAllowed,
-                                                                              bool constantAllowed)
+                                                                              bool forceVertexInterpolation)
 {
   const SdfPath& id = GetId();
 
@@ -656,19 +655,19 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
     type = HdTypeInt32;
   }
 
-  VtValue result;
+  VtValue result = boxedValues;
   HdVtBufferSource buffer(primvarDesc.name, boxedValues);
 
-  if (primvarDesc.interpolation == HdInterpolationVertex ||
+  if ((primvarDesc.interpolation == HdInterpolationVertex ||
       // Varying is equivalent to Vertex for non-subdivided polygonal surfaces (and we don't support subdivision):
       // https://github.com/usd-wg/assets/tree/907d5f17bbe933fc14441a3f3ab69a5bd8abe32a/docs/PrimvarInterpolation#vertex
-      primvarDesc.interpolation == HdInterpolationVarying)
+      primvarDesc.interpolation == HdInterpolationVarying) && !indexingAllowed)
   {
-    result = indexingAllowed ? boxedValues : _DeindexBufferElements(type, buffer, faces);
+    result = _DeindexBufferElements(type, buffer, faces);
   }
-  else if (primvarDesc.interpolation == HdInterpolationConstant)
+  else if (primvarDesc.interpolation == HdInterpolationConstant && forceVertexInterpolation)
   {
-    result = constantAllowed ? boxedValues : _ExpandBufferElements(buffer, type, vertexCount);
+    result = _ExpandBufferElements(buffer, type, vertexCount);
   }
   else if (primvarDesc.interpolation == HdInterpolationFaceVarying)
   {
@@ -686,10 +685,8 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   }
   else if (primvarDesc.interpolation == HdInterpolationUniform)
   {
-    TF_AXIOM(!indexingAllowed);
-
-    uint32_t faceCount = faces.size();
-    result = _CreateSizedArray(type, faceCount * 3);
+    uint32_t faceCount = faces.size() * (forceVertexInterpolation ? 3 : 1);
+    result = _CreateSizedArray(type, faceCount);
 
     uint8_t* srcPtr = (uint8_t*) HdGetValueData(boxedValues);
     uint8_t* dstPtr = (uint8_t*) HdGetValueData(result);
@@ -699,12 +696,18 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
     {
       int oldFaceIndex = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[faceIndex]);
 
-      TF_DEV_AXIOM((faceIndex * 3 + 2) < result.GetArraySize());
       TF_DEV_AXIOM(oldFaceIndex < boxedValues.GetArraySize());
 
-      memcpy(&dstPtr[(faceIndex * 3 + 0) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
-      memcpy(&dstPtr[(faceIndex * 3 + 1) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
-      memcpy(&dstPtr[(faceIndex * 3 + 2) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+      if (forceVertexInterpolation)
+      {
+        memcpy(&dstPtr[(faceIndex * 3 + 0) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+        memcpy(&dstPtr[(faceIndex * 3 + 1) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+        memcpy(&dstPtr[(faceIndex * 3 + 2) * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+      }
+      else
+      {
+        memcpy(&dstPtr[faceIndex * elementSize], &srcPtr[oldFaceIndex * elementSize], elementSize);
+      }
     }
   }
   else if (primvarDesc.interpolation == HdInterpolationInstance)
@@ -712,14 +715,9 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
     TF_WARN("Primvar interpolation mode 'instance' not supported (%s)", id.GetText());
     return std::nullopt;
   }
-  else
-  {
-    TF_WARN("Primvar interpolation mode not handled");
-    return std::nullopt;
-  }
 
   return ProcessedPrimvar{
-    .interpolation = primvarDesc.interpolation,
+    .interpolation = forceVertexInterpolation ? HdInterpolationVertex : primvarDesc.interpolation,
     .type = type,
     .role = primvarDesc.role,
     .indexMatchingData = result
@@ -747,10 +745,10 @@ HdGatlingMesh::PrimvarMap HdGatlingMesh::_ProcessPrimvars(HdSceneDelegate* scene
         continue;
       }
 
-      // Don't allow primvars that could be baked into vertices to be constant
-      bool constantAllowed = !_IsPrimvarEligibleForVertexData(name, primvar.role);
+      // Force primvars that could be baked into vertices to be vertex-interpolated
+      bool forceVertexInterpolation = _IsPrimvarEligibleForVertexData(name, primvar.role);
 
-      auto p = _ProcessPrimvar(sceneDelegate, primitiveParams, primvar, faces, vertexCount, indexingAllowed, constantAllowed);
+      auto p = _ProcessPrimvar(sceneDelegate, primitiveParams, primvar, faces, vertexCount, indexingAllowed, forceVertexInterpolation);
       if (p.has_value())
       {
         map[name] = *p;
@@ -821,11 +819,24 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
     const uint8_t* srcPtr = (uint8_t*) HdGetValueData(p.indexMatchingData);
     memcpy(&data[0], srcPtr, data.size());
 
+    GiPrimvarInterpolation interpolation;
+    if (p.interpolation == HdInterpolationConstant)
+    {
+      interpolation = GiPrimvarInterpolation::Constant;
+    }
+    else if (p.interpolation == HdInterpolationUniform)
+    {
+      interpolation = GiPrimvarInterpolation::Uniform;
+    }
+    else
+    {
+      interpolation = GiPrimvarInterpolation::Vertex;
+    }
+
     result.push_back(GiPrimvarData{
       .name = name.GetString(),
       .type = type,
-      .interpolation = (p.interpolation == HdInterpolationConstant ?
-        GiPrimvarInterpolation::Constant : GiPrimvarInterpolation::Vertex),
+      .interpolation = interpolation,
       .data = data
     });
   }

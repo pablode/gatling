@@ -302,6 +302,20 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
     return false;
 }
 
+#if SCENE_DATA_COUNT > 0
+uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uniformLookup)
+{
+  if (bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_UNIFORM))
+  {
+    return uvec3(gl_PrimitiveID);
+  }
+
+  bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+
+  return rs.hitIndices * int(!uniformLookup && !sceneDataConstant);
+}
+#endif
+
 vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default_value, bool uniform_lookup)
 {
 #if SCENE_DATA_COUNT > 0
@@ -313,11 +327,10 @@ vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
         BufferRefVec4 ref = BufferRefVec4(address);
 
-        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
-        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant);
-        vec4 val0 = ref.data[hitIndices[0]];
-        vec4 val1 = ref.data[hitIndices[1]];
-        vec4 val2 = ref.data[hitIndices[2]];
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
+        vec4 val0 = ref.data[indices[0]];
+        vec4 val1 = ref.data[indices[1]];
+        vec4 val2 = ref.data[indices[2]];
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
         return val0 * bc.x + val1 * bc.y + val2 * bc.z;
@@ -344,11 +357,10 @@ vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
         BufferRefFloat ref = BufferRefFloat(address);
 
-        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
-        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant) * 3;
-        vec3 val0 = vec3(ref.data[hitIndices[0] + 0], ref.data[hitIndices[0] + 1], ref.data[hitIndices[0] + 2]);
-        vec3 val1 = vec3(ref.data[hitIndices[1] + 0], ref.data[hitIndices[1] + 1], ref.data[hitIndices[1] + 2]);
-        vec3 val2 = vec3(ref.data[hitIndices[2] + 0], ref.data[hitIndices[2] + 1], ref.data[hitIndices[2] + 2]);
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * 3;
+        vec3 val0 = vec3(ref.data[indices[0] + 0], ref.data[indices[0] + 1], ref.data[indices[0] + 2]);
+        vec3 val1 = vec3(ref.data[indices[1] + 0], ref.data[indices[1] + 1], ref.data[indices[1] + 2]);
+        vec3 val2 = vec3(ref.data[indices[2] + 0], ref.data[indices[2] + 1], ref.data[indices[2] + 2]);
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
         return val0 * bc.x + val1 * bc.y + val2 * bc.z;
@@ -374,11 +386,10 @@ vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
         BufferRefVec2 ref = BufferRefVec2(address);
 
-        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
-        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant);
-        vec2 val0 = ref.data[hitIndices[0]];
-        vec2 val1 = ref.data[hitIndices[1]];
-        vec2 val2 = ref.data[hitIndices[2]];
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
+        vec2 val0 = ref.data[indices[0]];
+        vec2 val1 = ref.data[indices[1]];
+        vec2 val2 = ref.data[indices[2]];
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
         return val0 * bc.x + val1 * bc.y + val2 * bc.z;
@@ -398,9 +409,8 @@ float scene_data_lookup_float(inout State state, int scene_data_id, float defaul
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
         BufferRefFloat ref = BufferRefFloat(address);
 
-        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
-        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant);
-        vec3 val = vec3(ref.data[hitIndices[0]], ref.data[hitIndices[1]], ref.data[hitIndices[2]]);
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
+        vec3 val = vec3(ref.data[indices[0]], ref.data[indices[1]], ref.data[indices[2]]);
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
         return val.x * bc.x + val.y * bc.y + val.z * bc.z;
@@ -420,9 +430,8 @@ int scene_data_lookup_int(inout State state, int scene_data_id, int index_offset
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
         BufferRefInt ref = BufferRefInt(address);
 
-        bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
-        uvec3 hitIndices = rs.hitIndices * int(!uniform_lookup && !sceneDataConstant) + index_offset;
-        ivec3 val = ivec3(ref.data[hitIndices[0]], ref.data[hitIndices[1]], ref.data[hitIndices[2]]);
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) + index_offset;
+        ivec3 val = ivec3(ref.data[indices[0]], ref.data[indices[1]], ref.data[indices[2]]);
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
 
