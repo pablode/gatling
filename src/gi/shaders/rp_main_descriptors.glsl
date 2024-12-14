@@ -35,6 +35,8 @@ layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) buffer BlasPayloadBuffer {
   BlasPayload blas_payloads[];
 };
 
+layout(binding = BINDING_INDEX_INSTANCE_IDS, std430) buffer InstanceIdsBuffer { int InstanceIds[]; };
+
 layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_F, std430) buffer ClearValueBufferF { vec4 ClearValuesF[]; };
 layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_I, std430) buffer ClearValueBufferI { ivec4 ClearValuesI[]; };
 

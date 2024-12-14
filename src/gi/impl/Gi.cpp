@@ -89,6 +89,7 @@ namespace gtl
   struct GiBvh
   {
     CgpuBuffer blasPayloadsBuffer;
+    CgpuBuffer instanceIdsBuffer;
     GiScene*   scene;
     CgpuTlas   tlas;
   };
@@ -619,9 +620,15 @@ fail:
                                   const GiShaderCache* shaderCache,
                                   std::vector<CgpuBlasInstance>& blasInstances,
                                   std::vector<rp::BlasPayload>& blasPayloads,
+                                  std::vector<int> instanceIds,
                                   uint64_t& totalIndicesSize,
                                   uint64_t& totalVerticesSize)
   {
+    size_t meshCount = scene->meshes.size();
+    blasInstances.reserve(meshCount);
+    blasPayloads.reserve(meshCount);
+    instanceIds.reserve(meshCount);
+
     for (auto it = scene->meshes.begin(); it != scene->meshes.end(); ++it)
     {
       GiMesh* mesh = *it;
@@ -788,11 +795,10 @@ fail:
             continue;
           }
 
-          bool isConstant = (primvar->interpolation == GiPrimvarInterpolation::Constant);
-          bool isUniform = (primvar->interpolation == GiPrimvarInterpolation::Uniform);
+          static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
+
           uint32_t info = (sceneDataOffsets[i] & rp::BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK) |
-                          (isConstant * rp::BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT) |
-                          (isUniform * rp::BLAS_PREAMBLE_SCENE_DATA_BITFLAG_UNIFORM);
+                          (uint32_t(primvar->interpolation) << rp::BLAS_PREAMBLE_SCENE_DATA_INTERPOLATION_OFFSET);
           preamble.sceneDataInfos[i] = info;
         }
 
@@ -961,6 +967,7 @@ fail_cleanup:
       totalIndicesSize += mesh->cpuData.faceCount * sizeof(uint32_t) * 3;
       totalVerticesSize += mesh->cpuData.vertexCount * sizeof(rp::FVertex);
 
+      int instanceId = 0;
       for (const glm::mat3x4& t : mesh->instanceTransforms)
       {
         // Create BLAS instance for TLAS.
@@ -974,6 +981,7 @@ fail_cleanup:
 
         blasInstances.push_back(blasInstance);
         blasPayloads.push_back(data->payload);
+        instanceIds.push_back(instanceId++);
       }
     }
   }
@@ -989,11 +997,13 @@ fail_cleanup:
     CgpuTlas tlas;
     std::vector<CgpuBlasInstance> blasInstances;
     std::vector<rp::BlasPayload> blasPayloads;
+    std::vector<int> instanceIds;
     uint64_t indicesSize = 0;
     uint64_t verticesSize = 0;
     CgpuBuffer blasPayloadsBuffer;
+    CgpuBuffer instanceIdsBuffer;
 
-    _giBuildGeometryStructures(scene, shaderCache, blasInstances, blasPayloads, indicesSize, verticesSize);
+    _giBuildGeometryStructures(scene, shaderCache, blasInstances, blasPayloads, instanceIds, indicesSize, verticesSize);
 
     GB_LOG("BLAS builds finished");
     GB_LOG("> {} unique BLAS", blasPayloads.size());
@@ -1037,9 +1047,32 @@ fail_cleanup:
       }
     }
 
+    // Upload instance IDs.
+    {
+      uint64_t bufferSize = (instanceIds.empty() ? 1 : instanceIds.size()) * sizeof(int);
+
+      if (!cgpuCreateBuffer(s_device, {
+                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                              .size = bufferSize,
+                              .debugName = "InstanceIds"
+                            }, &instanceIdsBuffer))
+      {
+        GB_ERROR("failed to create instance IDs buffer");
+        goto cleanup;
+      }
+
+      if (!instanceIds.empty() && !s_stager->stageToBuffer((uint8_t*) instanceIds.data(), bufferSize, instanceIdsBuffer))
+      {
+        GB_ERROR("failed to upload addresses to instance IDs buffer");
+        goto cleanup;
+      }
+    }
+
     // Fill cache struct.
     bvh = new GiBvh;
     bvh->blasPayloadsBuffer = blasPayloadsBuffer;
+    bvh->instanceIdsBuffer = instanceIdsBuffer;
     bvh->scene = scene;
     bvh->tlas = tlas;
 
@@ -1050,6 +1083,10 @@ cleanup:
       if (blasPayloadsBuffer.handle)
       {
         cgpuDestroyBuffer(s_device, blasPayloadsBuffer);
+      }
+      if (instanceIdsBuffer.handle)
+      {
+        cgpuDestroyBuffer(s_device, instanceIdsBuffer);
       }
       if (tlas.handle)
       {
@@ -1064,6 +1101,7 @@ cleanup:
   {
     cgpuDestroyTlas(s_device, bvh->tlas);
     cgpuDestroyBuffer(s_device, bvh->blasPayloadsBuffer);
+    cgpuDestroyBuffer(s_device, bvh->instanceIdsBuffer);
     delete bvh;
   }
 
@@ -1858,6 +1896,7 @@ cleanup:
     buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
+    buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_IDS, .buffer = bvh->instanceIdsBuffer });
 
     buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_F, .buffer = scene->aovDefaultValues });
     buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_I, .buffer = scene->aovDefaultValues });

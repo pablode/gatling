@@ -710,9 +710,9 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
       }
     }
   }
-  else if (primvarDesc.interpolation == HdInterpolationInstance)
+  else if (primvarDesc.interpolation == HdInterpolationInstance && forceVertexInterpolation)
   {
-    TF_WARN("Primvar interpolation mode 'instance' not supported (%s)", id.GetText());
+    TF_WARN("Interpolation mode 'instance' unsupported for primary primvar %s", id.GetText());
     return std::nullopt;
   }
 
@@ -820,16 +820,16 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
     memcpy(&data[0], srcPtr, data.size());
 
     GiPrimvarInterpolation interpolation;
-    if (p.interpolation == HdInterpolationConstant)
-    {
+    if (p.interpolation == HdInterpolationConstant) {
       interpolation = GiPrimvarInterpolation::Constant;
     }
-    else if (p.interpolation == HdInterpolationUniform)
-    {
+    else if (p.interpolation == HdInterpolationInstance) {
+      interpolation = GiPrimvarInterpolation::Instance;
+    }
+    else if (p.interpolation == HdInterpolationUniform) {
       interpolation = GiPrimvarInterpolation::Uniform;
     }
-    else
-    {
+    else {
       interpolation = GiPrimvarInterpolation::Vertex;
     }
 

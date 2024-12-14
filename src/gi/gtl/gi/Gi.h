@@ -65,7 +65,7 @@ namespace gtl
 
   enum class GiPrimvarInterpolation
   {
-    Constant, Uniform, Vertex
+    Constant, Instance, Uniform, Vertex, COUNT
   };
 
   struct GiPrimvarData

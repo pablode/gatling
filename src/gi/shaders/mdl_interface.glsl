@@ -305,12 +305,22 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
 #if SCENE_DATA_COUNT > 0
 uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uniformLookup)
 {
-  if (bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_UNIFORM))
+  // contains GiPrimvarInterpolation enum
+  uint interpolation = (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_INTERPOLATION_MASK)
+    >> BLAS_PREAMBLE_SCENE_DATA_INTERPOLATION_OFFSET;
+
+  if (interpolation == 2/*uniform*/)
   {
     return uvec3(gl_PrimitiveID);
   }
 
-  bool sceneDataConstant = bool(sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_BITFLAG_CONSTANT);
+  if (interpolation == 1/*instance*/)
+  {
+    int instanceId = InstanceIds[gl_InstanceID];
+    return uvec3(instanceId);
+  }
+
+  bool sceneDataConstant = (interpolation == 0/*constant*/);
 
   return rs.hitIndices * int(!uniformLookup && !sceneDataConstant);
 }
