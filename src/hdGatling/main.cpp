@@ -421,12 +421,24 @@ private:
     REQUIRE(mappedMem);
 
     bool gammaEncode = (aovBindings[0].aovName == HdAovTokens->color);
+    bool singleIntChannel = aovBindings[0].aovName == HdAovTokens->primId;
+
     size_t channelCount = width * height * 4;
     std::vector<uint8_t> byteValues(channelCount);
     for (int i = 0; i < channelCount; i += 4)
     {
       for (int j = 0; j < 3; j++)
       {
+        if (singleIntChannel)
+        {
+          int r = *((int*) &mappedMem[i / 4 + i % 4]);
+          byteValues[i + 0] = ((r >>  0) & 0xFF);
+          byteValues[i + 1] = ((r >>  8) & 0xFF);
+          byteValues[i + 2] = ((r >> 16) & 0xFF);
+          byteValues[i + 3] = 255;
+          continue;
+        }
+
         float r = mappedMem[i + j];
         if (gammaEncode)
         {
@@ -517,6 +529,10 @@ TEST_SUITE("Graphical")
   }
 
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Mesh.PrimvarInterpolation")
+  {
+  }
+
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Render.AOVs")
   {
   }
 
