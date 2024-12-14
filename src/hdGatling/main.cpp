@@ -152,6 +152,33 @@ namespace
     spec.data = data;
     return spec;
   }
+
+  struct _GraphicalTestPaths
+  {
+    fs::path testImg;
+    fs::path refImg;
+    fs::path diffImg;
+  };
+
+  _GraphicalTestPaths _MakeGraphicalTestPaths(const std::string& name)
+  {
+    std::string testImgName = "test";
+    std::string refImgName = "ref";
+    std::string diffImgName = "diff";
+
+    if (!name.empty())
+    {
+      testImgName += "_" + name;
+      refImgName += "_" + name;
+      diffImgName += "_" + name;
+    }
+
+    return _GraphicalTestPaths {
+      .testImg = _GetTestOutputDir() / (testImgName + ".png"),
+      .refImg = _GetTestInputDir() / (refImgName + ".png"),
+      .diffImg = _GetTestOutputDir() / (diffImgName + ".png"),
+    };
+  }
 }
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -162,7 +189,6 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 TF_DEFINE_PRIVATE_TOKENS(
   _nsTokens,
-  ((referenceName, "gtl:referenceName"))
   ((spp, "gtl:spp"))
   ((errorPixelThreshold, "gtl:errorPixelThreshold"))
   ((jitteredSampling, "gtl:jitteredSampling"))
@@ -202,7 +228,6 @@ private:
 
   struct NamespacedSettings
   {
-    std::string referenceName;
     uint32_t spp = 1;
     uint32_t errorPixelThreshold = 0;
     bool jitteredSampling = true;
@@ -257,12 +282,6 @@ public:
 private:
   void readNamespacedSettings(const VtDictionary& ns, NamespacedSettings& settings)
   {
-    {
-      auto it = ns.find(_nsTokens->referenceName);
-      REQUIRE_NE(it, ns.end());
-      REQUIRE(it->second.IsHolding<TfToken>());
-      settings.referenceName = it->second.UncheckedGet<TfToken>();
-    }
     {
       auto it = ns.find(_nsTokens->spp);
       if (it != ns.end())
@@ -421,18 +440,18 @@ private:
 
     renderBuffer->Unmap();
 
-    auto outputPath = _GetTestOutputDir() / product.name.GetString();
-    fs::create_directories(outputPath.parent_path());
-    HioImageSharedPtr image = HioImage::OpenForWriting(outputPath.string());
+    std::string productName = product.name.GetString();
+    auto paths = _MakeGraphicalTestPaths(productName);
+
+    fs::create_directories(paths.testImg.parent_path());
+    HioImageSharedPtr image = HioImage::OpenForWriting(paths.testImg.string());
     REQUIRE(image);
 
     VtDictionary metadata;
     HioImage::StorageSpec testStorage = _MakeStorageSpec(width, height, byteValues.data());
     REQUIRE(image->Write(testStorage, metadata));
 
-    auto refPath = _GetTestInputDir() / namespacedSettings.referenceName;
-    auto diffPath = outputPath.replace_filename("diff.png");
-    diffAgainstRef(byteValues, width, height, refPath, diffPath, namespacedSettings.errorPixelThreshold);
+    diffAgainstRef(byteValues, width, height, paths.refImg, paths.diffImg, namespacedSettings.errorPixelThreshold);
 
     // Dispose of resources.
     HdRenderParam* renderParam = m_renderDelegate->GetRenderParam();
