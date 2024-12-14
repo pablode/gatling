@@ -104,8 +104,7 @@ jobs:
     - name: Unpack USD binaries
       run: mkdir -p ${{ inputs.usd-install-path }} && tar -xvf USD.tar.gz -C ${{ inputs.usd-install-path }}
 
-    # We need to put the USD libs in the PATH because we build against USD's MaterialX
-    # distribution. The libs are shared and loaded for gi_test's ctest discovery.
+    # We need to put the USD libs in the PATH because we build against USD's MaterialX distribution.
     - name: Set up USD environment variables
       if: runner.os == 'Windows'
       run: |
@@ -143,7 +142,7 @@ jobs:
 
     - name: Build gatling
       working-directory: BUILD
-      run: cmake --build . --config ${{ inputs.build-config }} -j 2 --target hdGatling gatling imgio_test gi_test hdGatling_test
+      run: cmake --build . --config ${{ inputs.build-config }} -j 2 --target hdGatling gatling imgio_test hdGatling_test
 
     - name: Run imgio_test
       working-directory: BUILD
