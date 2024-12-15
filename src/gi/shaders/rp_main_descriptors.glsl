@@ -73,8 +73,17 @@ layout(binding = BINDING_INDEX_AOV_BITANGENTS, std430) buffer BitangentsBuffer {
 #if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
 layout(binding = BINDING_INDEX_AOV_THIN_WALLED, std430) buffer ThinWalledBuffer { vec3 ThinWalledAov[]; };
 #endif
-#if (AOV_MASK & AOV_BIT_OBJECTID) != 0
+#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
 layout(binding = BINDING_INDEX_AOV_OBJECT_ID, std430) buffer ObjectIdBuffer { int ObjectIdAov[]; };
+#endif
+#if (AOV_MASK & AOV_BIT_DEPTH) != 0
+layout(binding = BINDING_INDEX_AOV_DEPTH, std430) buffer DepthBuffer { float DepthAov[]; };
+#endif
+#if (AOV_MASK & AOV_BIT_FACE_ID) != 0
+layout(binding = BINDING_INDEX_AOV_FACE_ID, std430) buffer FaceIdBuffer { int FaceIdAov[]; };
+#endif
+#if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
+layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) buffer InstanceIdBuffer { int InstanceIdAov[]; };
 #endif
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
@@ -86,5 +95,7 @@ layout(buffer_reference, std430, buffer_reference_align = 32/* largest type: ver
   BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
   FVertex data[];
 };
+
+layout(buffer_reference, std430, buffer_reference_align = 4) buffer RawIntBuffer { int data[]; };
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };

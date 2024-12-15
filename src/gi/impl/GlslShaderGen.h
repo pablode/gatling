@@ -65,6 +65,7 @@ namespace gtl
 
     struct RaygenShaderParams
     {
+      bool clippingPlanes;
       CommonShaderParams commonParams;
       bool depthOfField;
       bool filterImportanceSampling;

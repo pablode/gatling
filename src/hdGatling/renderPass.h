@@ -49,7 +49,7 @@ protected:
                 const TfTokenVector& renderTags) override;
 
 private:
-  void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const;
+  void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera) const;
 
 private:
   GiScene* _scene;

@@ -43,6 +43,9 @@ namespace gtl
     Bitangents,
     ThinWalled,
     ObjectId,
+    Depth,
+    FaceId,
+    InstanceId,
     COUNT
   };
 
@@ -120,6 +123,7 @@ namespace gtl
 
   struct GiRenderSettings
   {
+    bool     clippingPlanes;
     bool     depthOfField;
     bool     domeLightCameraVisible;
     bool     filterImportanceSampling;

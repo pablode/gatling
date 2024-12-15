@@ -110,6 +110,10 @@ namespace gtl
     {
       stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
     }
+    if (params.clippingPlanes)
+    {
+      stitcher.appendDefine("CLIPPING_PLANES");
+    }
 
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))

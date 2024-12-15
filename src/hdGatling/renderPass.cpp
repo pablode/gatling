@@ -51,6 +51,9 @@ namespace
     { HdGatlingAovTokens->debugThinWalled,   GiAovId::ThinWalled   },
 #endif
     { HdAovTokens->primId,                   GiAovId::ObjectId     },
+    { HdAovTokens->depth,                    GiAovId::Depth        },
+    { HdAovTokens->elementId,                GiAovId::FaceId       },
+    { HdAovTokens->instanceId,               GiAovId::InstanceId   },
   };
 
   std::vector<GiAovBinding> _PrepareAovBindings(const HdRenderPassAovBindingVector& aovBindings)
@@ -144,7 +147,7 @@ bool HdGatlingRenderPass::IsConverged() const
   return _isConverged;
 }
 
-void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera, bool clippingEnabled) const
+void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera) const
 {
   const GfMatrix4d& transform = camera.GetTransform();
 
@@ -178,8 +181,8 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.fStop = float(focusOn) * camera.GetFStop();
   giCamera.focusDistance = camera.GetFocusDistance();
   giCamera.focalLength = focalLength;
-  giCamera.clipStart = clippingEnabled ? camera.GetClippingRange().GetMin() : 0.0f;
-  giCamera.clipEnd = clippingEnabled ? camera.GetClippingRange().GetMax() : FLT_MAX;
+  giCamera.clipStart = camera.GetClippingRange().GetMin();
+  giCamera.clipEnd = camera.GetClippingRange().GetMax();
   giCamera.exposure = camera.GetExposure();
 }
 
@@ -208,19 +211,20 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
 
-  bool clippingEnabled = renderPassState->GetClippingEnabled() &&
-                         _settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
+  bool clippingPlanes = renderPassState->GetClippingEnabled() &&
+                        _settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
 
   auto domeLightCameraVisibilityValueIt = _settings.find(HdRenderSettingsTokens->domeLightCameraVisibility);
 
   GiCameraDesc giCamera;
-  _ConstructGiCamera(*camera, giCamera, clippingEnabled);
+  _ConstructGiCamera(*camera, giCamera);
 
   GiRenderParams renderParams = {
     .aovBindings = aovBindings,
     .camera = giCamera,
     .domeLight = renderParam->ActiveDomeLight(),
     .renderSettings = {
+      .clippingPlanes = clippingPlanes,
       .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
       .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
       .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),

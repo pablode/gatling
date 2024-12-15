@@ -1432,6 +1432,7 @@ cleanup:
     // Create ray generation shader.
     {
       GiGlslShaderGen::RaygenShaderParams rgenParams = {
+        .clippingPlanes = renderSettings.clippingPlanes,
         .commonParams = commonParams,
         .depthOfField = renderSettings.depthOfField,
         .filterImportanceSampling = renderSettings.filterImportanceSampling,
@@ -1651,7 +1652,8 @@ cleanup:
       flags |= GiSceneDirtyFlags::DirtyRtPipelineMiss;
     }
 
-    if (ra.depthOfField != rb.depthOfField ||
+    if (ra.clippingPlanes != rb.clippingPlanes ||
+        ra.depthOfField != rb.depthOfField ||
         ra.filterImportanceSampling != rb.filterImportanceSampling ||
         ra.jitteredSampling != rb.jitteredSampling ||
         ra.maxVolumeWalkLength != rb.maxVolumeWalkLength ||
@@ -1920,7 +1922,10 @@ cleanup:
       rp::BINDING_INDEX_AOV_TANGENTS,
       rp::BINDING_INDEX_AOV_BITANGENTS,
       rp::BINDING_INDEX_AOV_THIN_WALLED,
-      rp::BINDING_INDEX_AOV_OBJECT_ID
+      rp::BINDING_INDEX_AOV_OBJECT_ID,
+      rp::BINDING_INDEX_AOV_DEPTH,
+      rp::BINDING_INDEX_AOV_FACE_ID,
+      rp::BINDING_INDEX_AOV_INSTANCE_ID
     };
 
     for (const GiAovBinding& binding : params.aovBindings)

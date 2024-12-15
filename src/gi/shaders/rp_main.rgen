@@ -147,8 +147,15 @@ vec3 evaluate_sample(uint pixelIndex,
              break;
         }
 
-        float tMin = (bounce == 0) ? clipRange.x : 0.0;
-        float tMax = (bounce == 0) ? clipRange.y : FLOAT_MAX;
+        float tMin = 0.0;
+        float tMax = FLOAT_MAX;
+#ifdef CLIPPING_PLANES
+        if (bounce == 0)
+        {
+          tMin = clipRange.x;
+          tMax = clipRange.y;
+        }
+#endif
 
         // Calculate distance for volume sampling
 #if MEDIUM_STACK_SIZE > 0
@@ -376,8 +383,17 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
   ThinWalledAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_THIN_WALLED].rgb;
 #endif
-#if (AOV_MASK & AOV_BIT_OBJECTID) != 0
-  ObjectIdAov[pixelIndex] = ClearValuesI[AOV_ID_OBJECTID].x;
+#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
+  ObjectIdAov[pixelIndex] = ClearValuesI[AOV_ID_OBJECT_ID].x;
+#endif
+#if (AOV_MASK & AOV_BIT_DEPTH) != 0
+  DepthAov[pixelIndex] = ClearValuesF[AOV_ID_DEPTH].x;
+#endif
+#if (AOV_MASK & AOV_BIT_FACE_ID) != 0
+  FaceIdAov[pixelIndex] = ClearValuesI[AOV_ID_FACE_ID].x;
+#endif
+#if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
+  InstanceIdAov[pixelIndex] = ClearValuesI[AOV_ID_INSTANCE_ID].x;
 #endif
 }
 

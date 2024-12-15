@@ -192,6 +192,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   ((spp, "gtl:spp"))
   ((errorPixelThreshold, "gtl:errorPixelThreshold"))
   ((jitteredSampling, "gtl:jitteredSampling"))
+  ((clippingPlanes, "gtl:clippingPlanes"))
 );
 
 int main(int argc, char** argv)
@@ -231,6 +232,7 @@ private:
     uint32_t spp = 1;
     uint32_t errorPixelThreshold = 0;
     bool jitteredSampling = true;
+    bool clippingPlanes = false;
   };
 
 public:
@@ -306,6 +308,14 @@ private:
         settings.jitteredSampling = it->second.UncheckedGet<bool>();
       }
     }
+    {
+      auto it = ns.find(_nsTokens->clippingPlanes);
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<bool>());
+        settings.clippingPlanes = it->second.UncheckedGet<bool>();
+      }
+    }
   }
 
   void diffAgainstRef(const std::vector<uint8_t>& testValues,
@@ -361,6 +371,7 @@ private:
     setRenderSetting(HdGatlingSettingsTokens->spp, VtValue(namespacedSettings.spp));
     setRenderSetting(HdGatlingSettingsTokens->depthOfField, VtValue(!product.disableDepthOfField));
     setRenderSetting(HdGatlingSettingsTokens->jitteredSampling, VtValue(namespacedSettings.jitteredSampling));
+    setRenderSetting(HdGatlingSettingsTokens->clippingPlanes, VtValue(namespacedSettings.clippingPlanes));
 
     // Set up rendering state.
     uint32_t width = product.resolution[0];
@@ -421,7 +432,10 @@ private:
     REQUIRE(mappedMem);
 
     bool gammaEncode = (aovBindings[0].aovName == HdAovTokens->color);
-    bool singleIntChannel = aovBindings[0].aovName == HdAovTokens->primId;
+    bool singleFloatChannel = (aovBindings[0].aovName == HdAovTokens->depth);
+    bool singleIntChannel = aovBindings[0].aovName == HdAovTokens->primId ||
+                            aovBindings[0].aovName == HdAovTokens->elementId ||
+                            aovBindings[0].aovName == HdAovTokens->instanceId;
 
     size_t channelCount = width * height * 4;
     std::vector<uint8_t> byteValues(channelCount);
@@ -429,6 +443,16 @@ private:
     {
       for (int j = 0; j < 3; j++)
       {
+        if (singleFloatChannel)
+        {
+          float r = mappedMem[i / 4 + i % 4];
+          byteValues[i + 0] = uint8_t(r * 255.0f);
+          byteValues[i + 1] = uint8_t(r * 255.0f);
+          byteValues[i + 2] = uint8_t(r * 255.0f);
+          byteValues[i + 3] = 255;
+          continue;
+        }
+
         if (singleIntChannel)
         {
           int r = *((int*) &mappedMem[i / 4 + i % 4]);
