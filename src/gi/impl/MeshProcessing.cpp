@@ -95,6 +95,7 @@ namespace
   }
 
   GiMeshData _CompressData(const std::vector<GiFace>& faces,
+                           const std::vector<int>& faceIds,
                            const std::vector<GiVertex>& vertices,
                            const std::vector<GiPrimvarData>& primvars)
   {
@@ -111,9 +112,11 @@ namespace
 
     GiMeshData m;
     m.faces = _CompressMeshBuffer(faces);
+    m.faceIds = _CompressMeshBuffer(faceIds);
     m.vertices = _CompressMeshBuffer(vertices);
 
     logBufferCompression("faces", m.faces);
+    logBufferCompression("faceIds", m.faceIds);
     logBufferCompression("vertices", m.vertices);
 
     m.primvars.resize(primvars.size());
@@ -139,6 +142,7 @@ namespace
 namespace gtl
 {
   GiMeshData giProcessMeshData(const std::vector<GiFace>& faces,
+                               const std::vector<int>& faceIds,
                                const std::vector<GiVertex>& vertices,
                                const std::vector<GiPrimvarData>& primvars)
   {
@@ -149,7 +153,7 @@ namespace gtl
 
     if (vertexCount < 16)
     {
-      return _CompressData(faces, vertices, primvars);
+      return _CompressData(faces, faceIds, vertices, primvars);
     }
 
     std::vector<meshopt_Stream> streams;
@@ -172,7 +176,7 @@ namespace gtl
 
     if (newVertexCount == vertexCount)
     {
-      return _CompressData(faces, vertices, primvars);
+      return _CompressData(faces, faceIds, vertices, primvars);
     }
     else
     {
@@ -204,15 +208,17 @@ namespace gtl
       meshopt_remapVertexBuffer(&n.data[0], &o.data[0], vertexCount, typeSize, remap.data());
     }
 
-    return _CompressData(newFaces, newVertices, newPrimvars);
+    return _CompressData(newFaces, faceIds, newVertices, newPrimvars);
   }
 
   void giDecompressMeshData(const GiMeshData& cmd,
                             std::vector<GiFace>& faces,
+                            std::vector<int>& faceIds,
                             std::vector<GiVertex>& vertices,
                             std::vector<GiPrimvarData>& primvars)
   {
     faces = _DecompressMeshBuffer<GiFace>(cmd.faces);
+    faceIds = _DecompressMeshBuffer<int>(cmd.faceIds);
     vertices = _DecompressMeshBuffer<GiVertex>(cmd.vertices);
 
     primvars.resize(cmd.primvars.size());

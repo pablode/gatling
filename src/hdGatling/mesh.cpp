@@ -856,6 +856,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 
   VtIntArray primitiveParams;
   meshUtil.ComputeTriangleIndices(&faces, &primitiveParams);
+  auto faceCount = uint32_t(faces.size());
 
   // Points (required; one per vertex)
   VtValue boxedPoints = GetPoints(sceneDelegate);
@@ -987,7 +988,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   // Deindex faces
   if (!useIndexing)
   {
-    for (size_t i = 0; i < faces.size(); i++)
+    for (uint32_t i = 0; i < faceCount; i++)
     {
       faces[i] = GfVec3i(i * 3 + 0, i * 3 + 1, i * 3 + 2);
     }
@@ -1010,12 +1011,20 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   // Collect secondary primvars
   std::vector<GiPrimvarData> secondaryPrimvars = _CollectSecondaryPrimvars(primvarMap);
 
+  TF_AXIOM(primitiveParams.size() == faceCount);
+  std::vector<int> faceIds(faceCount);
+  for (size_t i = 0; i < faceCount; i++)
+  {
+    faceIds[i] = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[i]);
+  }
+
   // Create mesh
   TfToken orientation = topology.GetOrientation();
   bool isLeftHanded = (orientation == _tokens->leftHanded);
 
   GiMeshDesc desc = {
     .faces = giFaces,
+    .faceIds = faceIds,
     .id = GetPrimId(),
     .isLeftHanded = isLeftHanded,
     .name = id.GetText(),

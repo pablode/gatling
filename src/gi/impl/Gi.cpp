@@ -504,7 +504,7 @@ fail:
       .flipFacing = desc.isLeftHanded,
       .id = desc.id,
       .scene = scene,
-      .cpuData = giProcessMeshData(desc.faces, desc.vertices, desc.primvars),
+      .cpuData = giProcessMeshData(desc.faces, desc.faceIds, desc.vertices, desc.primvars),
       .name = desc.name
     };
 
@@ -620,7 +620,7 @@ fail:
                                   const GiShaderCache* shaderCache,
                                   std::vector<CgpuBlasInstance>& blasInstances,
                                   std::vector<rp::BlasPayload>& blasPayloads,
-                                  std::vector<int> instanceIds,
+                                  std::vector<int>& instanceIds,
                                   uint64_t& totalIndicesSize,
                                   uint64_t& totalVerticesSize)
   {
@@ -661,9 +661,10 @@ fail:
       if (!mesh->gpuData.has_value())
       {
         std::vector<GiFace> meshFaces;
+        std::vector<int> meshFaceIds;
         std::vector<GiVertex> meshVertices;
         std::vector<GiPrimvarData> meshPrimvars;
-        giDecompressMeshData(mesh->cpuData, meshFaces, meshVertices, meshPrimvars);
+        giDecompressMeshData(mesh->cpuData, meshFaces, meshFaceIds, meshVertices, meshPrimvars);
 
         if (meshFaces.empty())
         {
@@ -741,10 +742,12 @@ fail:
         }
 
         uint64_t preambleSize = sizeof(rp::BlasPayloadBufferPreamble);
+        uint64_t faceIdsSize = meshFaceIds.size() * sizeof(int);
 
         uint64_t payloadBufferSize = preambleSize;
         uint64_t indexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), indicesSize, &payloadBufferSize);
         uint64_t vertexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), verticesSize, &payloadBufferSize);
+        uint64_t faceIdsBufferOffset = giAlignBuffer(sizeof(int), faceIdsSize, &payloadBufferSize);
 
         std::vector<uint32_t> sceneDataOffsets;
         for (const GiPrimvarData* s : primvars)
@@ -784,7 +787,11 @@ fail:
           sceneDataOffsets.push_back(giAlignBuffer(alignment, s->data.size(), &payloadBufferSize));
         }
 
-        rp::BlasPayloadBufferPreamble preamble = { .objectId = mesh->id };
+        rp::BlasPayloadBufferPreamble preamble
+        {
+          .objectId = mesh->id,
+          .faceIdsOffset = uint32_t(faceIdsBufferOffset)
+        };
         for (size_t i = 0; i < primvars.size(); i++)
         {
           const GiPrimvarData* primvar = primvars[i];
@@ -861,7 +868,8 @@ fail:
 
         if (!s_stager->stageToBuffer((uint8_t*) &preamble, preambleSize, payloadBuffer, 0) ||
             !s_stager->stageToBuffer((uint8_t*) indexData.data(), indicesSize, payloadBuffer, indexBufferOffset) ||
-            !s_stager->stageToBuffer((uint8_t*) vertexData.data(), verticesSize, payloadBuffer, vertexBufferOffset))
+            !s_stager->stageToBuffer((uint8_t*) vertexData.data(), verticesSize, payloadBuffer, vertexBufferOffset) ||
+            !s_stager->stageToBuffer((uint8_t*) meshFaceIds.data(), faceIdsSize, payloadBuffer, faceIdsBufferOffset))
         {
           GB_ERROR("failed to stage BLAS data");
           goto fail_cleanup;

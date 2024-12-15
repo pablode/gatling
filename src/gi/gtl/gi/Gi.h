@@ -109,6 +109,7 @@ namespace gtl
   {
     uint32_t                          faceCount;
     const std::vector<GiFace>&        faces;
+    const std::vector<int>&           faceIds;
     int                               id;
     bool                              isLeftHanded;
     const char*                       name;
