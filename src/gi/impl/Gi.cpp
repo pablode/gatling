@@ -1666,7 +1666,6 @@ cleanup:
     s_stager->flush();
 
     GiScene* scene = params.scene;
-    //GiRenderBuffer* renderBuffer = params.aovBindings[0].renderBuffer;
     const GiRenderSettings& renderSettings = params.renderSettings;
 
     if (s_forceShaderCacheInvalid)
