@@ -205,8 +205,10 @@ void main()
       DepthAov[pixelIndex] = logDepth;
 #endif
 #if (AOV_MASK & AOV_BIT_FACE_ID) != 0
-      RawIntBuffer faceIdsBuffer = RawIntBuffer(payload.bufferAddress + preamble.faceIdsOffset);
-      FaceIdAov[pixelIndex] = faceIdsBuffer.data[gl_PrimitiveID];
+      uint faceIdStride = 4 / ((preamble.faceIdsInfo & BLAS_PREAMBLE_FACE_ID_STRIDE_MASK) >> BLAS_PREAMBLE_FACE_ID_STRIDE_OFFSET);
+      uint faceIdsOffset = preamble.faceIdsInfo & BLAS_PREAMBLE_FACE_ID_MASK;
+      RawIntBuffer faceIdsBuffer = RawIntBuffer(payload.bufferAddress + faceIdsOffset);
+      FaceIdAov[pixelIndex] = faceIdsBuffer.data[gl_PrimitiveID / faceIdStride + gl_PrimitiveID % faceIdStride];
 #endif
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
       int instanceId = InstanceIds[gl_InstanceID];

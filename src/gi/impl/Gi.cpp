@@ -128,6 +128,7 @@ namespace gtl
     std::optional<GiMeshGpuData> gpuData;
     bool visible = true;
     std::string name;
+    uint32_t maxFaceId;
   };
 
   struct GiSphereLight
@@ -521,7 +522,8 @@ fail:
       .id = desc.id,
       .scene = scene,
       .cpuData = giProcessMeshData(desc.faces, desc.faceIds, desc.vertices, desc.primvars),
-      .name = desc.name
+      .name = desc.name,
+      .maxFaceId = desc.maxFaceId
     };
 
     {
@@ -758,7 +760,8 @@ fail:
         }
 
         uint64_t preambleSize = sizeof(rp::BlasPayloadBufferPreamble);
-        uint64_t faceIdsSize = meshFaceIds.size() * sizeof(int);
+        uint32_t faceIdStride = mesh->maxFaceId <= UINT8_MAX ? 1 : (mesh->maxFaceId <= UINT16_MAX ? 2 : 4);
+        uint64_t faceIdsSize = (meshFaceIds.size() * faceIdStride + 3) / 4 * 4; // align buffer size to 4 bytes
 
         uint64_t payloadBufferSize = preambleSize;
         uint64_t indexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), indicesSize, &payloadBufferSize);
@@ -806,7 +809,8 @@ fail:
         rp::BlasPayloadBufferPreamble preamble
         {
           .objectId = mesh->id,
-          .faceIdsOffset = uint32_t(faceIdsBufferOffset)
+          .faceIdsInfo = (faceIdStride << rp::BLAS_PREAMBLE_FACE_ID_STRIDE_OFFSET) |
+                         uint32_t(faceIdsBufferOffset)
         };
         for (size_t i = 0; i < primvars.size(); i++)
         {

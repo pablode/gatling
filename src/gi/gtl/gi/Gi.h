@@ -123,6 +123,7 @@ namespace gtl
     int                               id;
     bool                              isLeftHanded;
     const char*                       name;
+    uint32_t                          maxFaceId;
     const std::vector<GiPrimvarData>& primvars;
     uint32_t                          vertexCount;
     const std::vector<GiVertex>&      vertices;
