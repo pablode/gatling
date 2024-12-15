@@ -324,6 +324,8 @@ private:
                       const fs::path& diffPath,
                       uint32_t errorPixelThreshold)
   {
+    fs::remove(diffPath);
+
     HioImageSharedPtr refImage = HioImage::OpenForReading(refPath.string());
     REQUIRE(refImage);
 
