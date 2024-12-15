@@ -59,7 +59,7 @@ layout(binding = BINDING_INDEX_AOV_TEXCOORDS, std430) buffer TexcoordsBuffer { v
 layout(binding = BINDING_INDEX_AOV_BOUNCES, std430) buffer BouncesBuffer { vec3 BouncesAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
-layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, std430) buffer ClockCyclesBuffer { uint ClockCyclesAov[]; };
+layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, std430) buffer ClockCyclesBuffer { uvec3 ClockCyclesAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
 layout(binding = BINDING_INDEX_AOV_OPACITY, std430) buffer OpacityBuffer { vec3 OpacityAov[]; };

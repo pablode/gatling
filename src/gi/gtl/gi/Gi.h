@@ -61,6 +61,13 @@ namespace gtl
   struct GiDomeLight;
   struct GiRenderBuffer;
 
+  enum class GiRenderBufferFormat
+  {
+    Int32,
+    Float32,
+    Float32Vec4
+  };
+
   enum class GiPrimvarType
   {
     Float, Vec2, Vec3, Vec4, Int, Int2, Int3, Int4
@@ -232,7 +239,7 @@ namespace gtl
   void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb);
   void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular);
 
-  GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height);
+  GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format);
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer);
   void* giGetRenderBufferMem(GiRenderBuffer* renderBuffer);
 }

@@ -366,6 +366,13 @@ private:
 
   void produceProduct(const UsdRenderSpec::Product& product)
   {
+    const auto& renderVarIndices = product.renderVarIndices;
+    REQUIRE_EQ(renderVarIndices.size(), 1);
+    const auto& renderVars = m_renderSpec.renderVars;
+    REQUIRE(!renderVars.empty());
+
+    const UsdRenderSpec::RenderVar& renderVar = renderVars[renderVarIndices[0]];
+
     // Set render settings.
     NamespacedSettings namespacedSettings;
     readNamespacedSettings(product.namespacedSettings, namespacedSettings);
@@ -382,9 +389,12 @@ private:
     auto camera = static_cast<HdCamera*>(m_renderIndex->GetSprim(HdTokens->camera, product.cameraPath));
     REQUIRE(camera);
 
+    auto aovName = TfToken(renderVar.sourceName);
+    auto aovDesc = m_renderDelegate->GetDefaultAovDescriptor(aovName);
+
     auto renderBuffer = static_cast<HdRenderBuffer*>(m_renderDelegate->CreateFallbackBprim(HdPrimTypeTokens->renderBuffer));
     REQUIRE(renderBuffer);
-    REQUIRE(renderBuffer->Allocate(GfVec3i(width, height, 1), HdFormatFloat32Vec4, false));
+    REQUIRE(renderBuffer->Allocate(GfVec3i(width, height, 1), aovDesc.format, aovDesc.multiSampled));
 
     CameraUtilFraming framing;
     framing.dataWindow = GfRect2i(GfVec2i(0), product.resolution); // FIXME: consider product.dataWindowNDC
@@ -405,15 +415,8 @@ private:
     renderPassState->SetOverrideWindowPolicy(overrideWindowPolicy);
 #endif
 
-    const auto& renderVarIndices = product.renderVarIndices;
-    REQUIRE_EQ(renderVarIndices.size(), 1);
-    const auto& renderVars = m_renderSpec.renderVars;
-    REQUIRE(!renderVars.empty());
-
-    const UsdRenderSpec::RenderVar& renderVar = renderVars[renderVarIndices[0]];
-
     HdRenderPassAovBindingVector aovBindings(1);
-    aovBindings[0].aovName = TfToken(renderVar.sourceName);
+    aovBindings[0].aovName = aovName;
     aovBindings[0].clearValue = VtValue(GfVec4f(1.0f));
     aovBindings[0].renderBuffer = renderBuffer;
     renderPassState->SetAovBindings(aovBindings);
@@ -434,46 +437,34 @@ private:
     REQUIRE(mappedMem);
 
     bool gammaEncode = (aovBindings[0].aovName == HdAovTokens->color);
-    bool singleFloatChannel = (aovBindings[0].aovName == HdAovTokens->depth);
-    bool singleIntChannel = aovBindings[0].aovName == HdAovTokens->primId ||
-                            aovBindings[0].aovName == HdAovTokens->elementId ||
-                            aovBindings[0].aovName == HdAovTokens->instanceId;
+    bool isInt = (renderBuffer->GetFormat() == HdFormatInt32);
+    int compCount = (renderBuffer->GetFormat() == HdFormatFloat32Vec4) ? 4 :
+                      ((renderBuffer->GetFormat() == HdFormatFloat32Vec3) ? 3 : 1);
 
-    size_t channelCount = width * height * 4;
-    std::vector<uint8_t> byteValues(channelCount);
-    for (int i = 0; i < channelCount; i += 4)
+    size_t pixelCount = width * height;
+    std::vector<uint8_t> byteValues(pixelCount * 4);
+    for (int i = 0; i < pixelCount; i++)
     {
-      for (int j = 0; j < 3; j++)
+      for (int j = 0; j < 4; j++)
       {
-        if (singleFloatChannel)
+        if (isInt && compCount == 1)
         {
-          float r = mappedMem[i / 4 + i % 4];
-          byteValues[i + 0] = uint8_t(r * 255.0f);
-          byteValues[i + 1] = uint8_t(r * 255.0f);
-          byteValues[i + 2] = uint8_t(r * 255.0f);
-          byteValues[i + 3] = 255;
-          continue;
+          int r = *((int*) &mappedMem[i * compCount]);
+          byteValues[i * 4 + 0] = (r >>  0) & 0xFF;
+          byteValues[i * 4 + 1] = (r >>  8) & 0xFF;
+          byteValues[i * 4 + 2] = (r >> 16) & 0xFF;
+          break;
         }
 
-        if (singleIntChannel)
-        {
-          int r = *((int*) &mappedMem[i / 4 + i % 4]);
-          byteValues[i + 0] = ((r >>  0) & 0xFF);
-          byteValues[i + 1] = ((r >>  8) & 0xFF);
-          byteValues[i + 2] = ((r >> 16) & 0xFF);
-          byteValues[i + 3] = 255;
-          continue;
-        }
-
-        float r = mappedMem[i + j];
+        float r = mappedMem[i * compCount + std::min(j, compCount - 1)];
         if (gammaEncode)
         {
           r =  _AccurateLinearToSrgb(r);
         }
-        byteValues[i + j] = uint8_t(r * 255.0);
+        byteValues[i * 4 + j] = uint8_t(r * 255.0);
       }
 
-      byteValues[i + 3] = 255;
+      byteValues[i * 4 + 3] = 255; // always opaque
     }
 
     renderBuffer->Unmap();

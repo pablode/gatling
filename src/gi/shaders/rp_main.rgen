@@ -491,8 +491,8 @@ void main()
     }
 
 #if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
-    uint cyclesElapsed = uint(clockARB() - start_cycle_count);
-    ClockCyclesAov[pixel_index] = cyclesElapsed;
+    int cyclesElapsed = int(clockARB() - start_cycle_count);
+    ClockCyclesAov[pixel_index] = uvec3(cyclesElapsed, 0, 0);
 #endif
 
 #if (AOV_MASK & AOV_BIT_COLOR) != 0

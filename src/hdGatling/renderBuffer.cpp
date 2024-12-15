@@ -23,6 +23,17 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+using namespace gtl;
+
+namespace
+{
+  static std::map<HdFormat, GiRenderBufferFormat> s_supportedRenderBufferFormats = {
+    { HdFormatInt32, GiRenderBufferFormat::Int32 },
+    { HdFormatFloat32, GiRenderBufferFormat::Float32 },
+    { HdFormatFloat32Vec4, GiRenderBufferFormat::Float32Vec4 }
+  };
+}
+
 HdGatlingRenderBuffer::HdGatlingRenderBuffer(const SdfPath& id)
   : HdRenderBuffer(id)
 {
@@ -43,7 +54,8 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
     _renderBuffer = nullptr;
   }
 
-  if (format != HdFormatFloat32Vec4)
+  auto it = s_supportedRenderBufferFormats.find(format);
+  if (it == s_supportedRenderBufferFormats.end())
   {
     TF_RUNTIME_ERROR("Unsupported render buffer format!");
     return false;
@@ -66,7 +78,7 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
   _format = format;
   _isMultiSampled = multiSampled;
 
-  _renderBuffer = giCreateRenderBuffer(_width, _height);
+  _renderBuffer = giCreateRenderBuffer(_width, _height, it->second);
   if (!_renderBuffer)
   {
     TF_RUNTIME_ERROR("Failed to create render buffer!");

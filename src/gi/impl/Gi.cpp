@@ -266,6 +266,22 @@ namespace gtl
     return glm::packUnorm2x16(e);
   }
 
+  uint32_t _GiRenderBufferFormatStride(GiRenderBufferFormat format)
+  {
+    switch (format)
+    {
+    case GiRenderBufferFormat::Int32:
+      return 4;
+    case GiRenderBufferFormat::Float32:
+      return 4;
+    case GiRenderBufferFormat::Float32Vec4:
+      return 4 * 4;
+    default:
+      assert(false);
+      return 0;
+    }
+  }
+
   void _PrintInitInfo(const GiInitParams& params)
   {
     GB_LOG("gatling {}.{}.{} built against MaterialX {}.{}.{}", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH,
@@ -277,14 +293,14 @@ namespace gtl
 
   void _EncodeRenderBufferAsHeatmap(GiRenderBuffer* renderBuffer)
   {
-    int valueCount = renderBuffer->width * renderBuffer->height;
+    int channelCount = renderBuffer->width * renderBuffer->height * 4;
     float* rgbaImg = (float*) renderBuffer->mappedHostMem;
 
     float maxValue = 0.0f;
-    for (int i = 0; i < valueCount; i += 4) {
+    for (int i = 0; i < channelCount; i += 4) {
       maxValue = std::max(maxValue, rgbaImg[i]); // only consider first channel
     }
-    for (int i = 0; i < valueCount && maxValue > 0.0f; i += 4) {
+    for (int i = 0; i < channelCount && maxValue > 0.0f; i += 4) {
       int valIndex = std::min(int((rgbaImg[i] / maxValue) * 255.0), 255);
       rgbaImg[i + 0] = (float) TURBO_SRGB_FLOATS[valIndex][0];
       rgbaImg[i + 1] = (float) TURBO_SRGB_FLOATS[valIndex][1];
@@ -2528,9 +2544,10 @@ cleanup:
     light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
-  GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height)
+  GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format)
   {
-    uint32_t bufferSize = width * height * GI_MAX_AOV_COMP_SIZE;
+    uint32_t stride = _GiRenderBufferFormatStride(format);
+    uint32_t bufferSize = width * height * stride;
 
     GB_LOG("creating render buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
 
@@ -2565,7 +2582,7 @@ cleanup:
       return nullptr;
     }
 
-    return new GiRenderBuffer{
+    return new GiRenderBuffer {
       .deviceMem = deviceMem,
       .hostMem = hostMem,
       .mappedHostMem = mappedMem,
