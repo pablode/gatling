@@ -39,7 +39,6 @@ namespace
   const static std::unordered_map<TfToken, GiAovId, TfToken::HashFunctor> _aovIdMappings {
     { HdAovTokens->color,                    GiAovId::Color        },
     { HdAovTokens->normal,                   GiAovId::Normal       },
-#ifndef NDEBUG
     { HdGatlingAovTokens->debugNee,          GiAovId::NEE          },
     { HdGatlingAovTokens->debugBarycentrics, GiAovId::Barycentrics },
     { HdGatlingAovTokens->debugTexcoords,    GiAovId::Texcoords    },
@@ -49,7 +48,6 @@ namespace
     { HdGatlingAovTokens->debugTangents,     GiAovId::Tangents     },
     { HdGatlingAovTokens->debugBitangents,   GiAovId::Bitangents   },
     { HdGatlingAovTokens->debugThinWalled,   GiAovId::ThinWalled   },
-#endif
     { HdAovTokens->primId,                   GiAovId::ObjectId     },
     { HdAovTokens->depth,                    GiAovId::Depth        },
     { HdAovTokens->elementId,                GiAovId::FaceId       },
