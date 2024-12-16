@@ -417,7 +417,7 @@ private:
 
     HdRenderPassAovBindingVector aovBindings(1);
     aovBindings[0].aovName = aovName;
-    aovBindings[0].clearValue = VtValue(GfVec4f(1.0f));
+    aovBindings[0].clearValue = aovDesc.clearValue;
     aovBindings[0].renderBuffer = renderBuffer;
     renderPassState->SetAovBindings(aovBindings);
 

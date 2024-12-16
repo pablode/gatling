@@ -219,7 +219,11 @@ void HdGatlingRenderDelegate::DestroyInstancer(HdInstancer* instancer)
 
 HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& name) const
 {
-  if (name == HdAovTokens->depth)
+  if (name == HdAovTokens->color)
+  {
+    return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(GfVec4f(1.0f)));
+  }
+  else if (name == HdAovTokens->depth)
   {
     return HdAovDescriptor(HdFormatFloat32, true, VtValue(1.0f));
   }
@@ -230,7 +234,7 @@ HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& 
     return HdAovDescriptor(HdFormatInt32, true, VtValue(-1));
   }
 
-  return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(0.0f));
+  return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(GfVec4f(0.0f)));
 }
 
 HdRenderParam* HdGatlingRenderDelegate::GetRenderParam() const

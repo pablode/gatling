@@ -1644,12 +1644,12 @@ cleanup:
         auto& oldAov = oldAovs[i];
         auto& newAov = newAovs[i];
 
-        if (oldAov.aovId != newAov.aovId || oldAov.renderBuffer != newAov.renderBuffer)
+        if (oldAov.aovId != newAov.aovId)
         {
           aovsChanged = true;
           break;
         }
-        if (memcmp(oldAov.clearValue, newAov.clearValue, GI_MAX_AOV_COMP_SIZE) == 0)
+        if (memcmp(oldAov.clearValue, newAov.clearValue, GI_MAX_AOV_COMP_SIZE) != 0)
         {
           aovDefaultsChanged = true;
         }
@@ -1661,7 +1661,7 @@ cleanup:
     }
     if (aovsChanged || aovDefaultsChanged)
     {
-      flags |= GiSceneDirtyFlags::DirtyAovBindingDefaults;
+      flags |= GiSceneDirtyFlags::DirtyAovBindingDefaults | GiSceneDirtyFlags::DirtyFramebuffer;
     }
 
     if (memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
@@ -1786,10 +1786,10 @@ cleanup:
       for (uint32_t i = 0; i < params.aovBindings.size(); i++)
       {
         const GiAovBinding& binding = params.aovBindings[i];
-        memcpy(&defaultsData[i * GI_MAX_AOV_COMP_SIZE], &binding.clearValue[0], GI_MAX_AOV_COMP_SIZE);
+        memcpy(&defaultsData[int(binding.aovId) * GI_MAX_AOV_COMP_SIZE], &binding.clearValue[0], GI_MAX_AOV_COMP_SIZE);
       }
 
-      if (!s_stager->stageToBuffer(&defaultsData[0], conservativeSize, scene->aovDefaultValues, 0) ||
+      if (!s_stager->stageToBuffer(&defaultsData[0], defaultsData.size(), scene->aovDefaultValues) ||
           !s_stager->flush())
       {
         GB_ERROR("failed to stage AOV default values");
