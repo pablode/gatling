@@ -1021,6 +1021,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   // Create mesh
   TfToken orientation = topology.GetOrientation();
   bool isLeftHanded = (orientation == _tokens->leftHanded);
+  auto maxFaceId = (uint32_t) topology.GetNumFaces();
 
   GiMeshDesc desc = {
     .faces = giFaces,
@@ -1028,6 +1029,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     .id = GetPrimId(),
     .isLeftHanded = isLeftHanded,
     .name = id.GetText(),
+    .maxFaceId = maxFaceId,
     .primvars = secondaryPrimvars,
     .vertices = giVertices,
   };
