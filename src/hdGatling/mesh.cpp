@@ -58,29 +58,20 @@ namespace
     VtFloatArray bitangentSigns;
   };
 
-  GiVertex _MakeGiVertex(const GfMatrix4f& transform, const GfMatrix4f& normalMatrix, const GfVec3f& point, const GfVec3f& normal,
-                         const GfVec2f& texCoords, const GfVec3f& tangent, float bitangentSign)
+  GiVertex _MakeGiVertex(const GfVec3f& point, const GfVec3f& normal, const GfVec2f& texCoords, const GfVec3f& tangent, float bitangentSign)
   {
-    GfVec3f newPoint = transform.Transform(point);
-
-    GfVec3f newNormal = normalMatrix.TransformDir(normal);
-    newNormal.Normalize();
-
-    GfVec3f newTangent = transform.Transform(tangent);
-    newTangent.Normalize();
-
     GiVertex vertex;
-    vertex.pos[0] = newPoint[0];
-    vertex.pos[1] = newPoint[1];
-    vertex.pos[2] = newPoint[2];
-    vertex.norm[0] = newNormal[0];
-    vertex.norm[1] = newNormal[1];
-    vertex.norm[2] = newNormal[2];
+    vertex.pos[0] = point[0];
+    vertex.pos[1] = point[1];
+    vertex.pos[2] = point[2];
+    vertex.norm[0] = normal[0];
+    vertex.norm[1] = normal[1];
+    vertex.norm[2] = normal[2];
     vertex.u = texCoords[0];
     vertex.v = texCoords[1];
-    vertex.tangent[0] = newTangent[0];
-    vertex.tangent[1] = newTangent[1];
-    vertex.tangent[2] = newTangent[2];
+    vertex.tangent[0] = tangent[0];
+    vertex.tangent[1] = tangent[1];
+    vertex.tangent[2] = tangent[2];
     vertex.bitangentSign = bitangentSign;
 
     return vertex;
@@ -245,8 +236,7 @@ namespace
     bitangent = GfVec3f(b, nSign + n[1] * n[1] * a, -n[1]);
   }
 
-  void _CalculateFallbackTangents(const VtVec3iArray& meshFaces,
-                                  const VtVec3fArray& meshNormals,
+  void _CalculateFallbackTangents(const VtVec3fArray& meshNormals,
                                   VtVec3fArray& meshTangents,
                                   VtFloatArray& meshBitangentSigns)
   {
@@ -282,17 +272,14 @@ namespace
     }
     else
     {
-      _CalculateFallbackTangents(meshFaces, meshNormals, meshTangents, meshBitangentSigns);
+      _CalculateFallbackTangents(meshNormals, meshTangents, meshBitangentSigns);
     }
   }
 
   void _BakeMeshGeometry(_VertexStreams& s,
-                         const GfMatrix4f& transform,
                          std::vector<GiFace>& faces,
                          std::vector<GiVertex>& vertices)
   {
-    GfMatrix4f normalMatrix(transform.GetInverse().GetTranspose());
-
     bool hasTexCoords = s.texCoords.size() > 0;
     bool calcTangents = s.tangents.empty();
     bool calcBitangentSigns = s.bitangentSigns.empty();
@@ -314,16 +301,14 @@ namespace
       _CalculateTangents(s.faces, s.points, s.normals, s.texCoords, s.tangents, s.bitangentSigns);
     }
 
-    uint32_t vertexOffset = vertices.size();
-
     for (size_t i = 0; i < s.faces.size(); i++)
     {
       const GfVec3i& vertexIndices = s.faces[i];
 
       GiFace face;
-      face.v_i[0] = vertexOffset + vertexIndices[0];
-      face.v_i[1] = vertexOffset + vertexIndices[1];
-      face.v_i[2] = vertexOffset + vertexIndices[2];
+      face.v_i[0] = vertexIndices[0];
+      face.v_i[1] = vertexIndices[1];
+      face.v_i[2] = vertexIndices[2];
 
       faces.push_back(face);
     }
@@ -337,7 +322,7 @@ namespace
       GfVec3f tangent = s.tangents[j];
       float bitangentSign = s.bitangentSigns[j];
 
-      GiVertex vertex = _MakeGiVertex(transform, normalMatrix, point, normal, texCoords, tangent, bitangentSign);
+      GiVertex vertex = _MakeGiVertex(point, normal, texCoords, tangent, bitangentSign);
       vertices.push_back(vertex);
     }
   }
@@ -1006,7 +991,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
 
   std::vector<GiFace> giFaces;
   std::vector<GiVertex> giVertices;
-  _BakeMeshGeometry(s, GfMatrix4f(1.0f), giFaces, giVertices);
+  _BakeMeshGeometry(s, giFaces, giVertices);
 
   // Collect secondary primvars
   std::vector<GiPrimvarData> secondaryPrimvars = _CollectSecondaryPrimvars(primvarMap);
@@ -1035,11 +1020,6 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   };
 
   return giCreateMesh(_scene, desc);
-}
-
-GiMesh* HdGatlingMesh::GetGiMesh() const
-{
-  return _giMesh;
 }
 
 HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const

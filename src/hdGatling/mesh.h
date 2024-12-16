@@ -45,8 +45,6 @@ public:
 
   HdDirtyBits GetInitialDirtyBitsMask() const override;
 
-  GiMesh* GetGiMesh() const;
-
 protected:
   HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
