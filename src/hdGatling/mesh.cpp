@@ -466,9 +466,13 @@ HdGatlingMesh::HdGatlingMesh(const SdfPath& id,
 
 HdGatlingMesh::~HdGatlingMesh()
 {
-  if (_giMesh)
+  if (_baseMesh)
   {
-    giDestroyMesh(_giMesh);
+    giDestroyMesh(_baseMesh);
+  }
+  for (GiMesh* m : _subMeshes)
+  {
+    giDestroyMesh(m);
   }
 }
 
@@ -494,18 +498,23 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
   if (updateGeometry)
   {
-    if (_giMesh)
+    if (_baseMesh)
     {
-      giDestroyMesh(_giMesh);
-      _giMesh = nullptr;
+      giDestroyMesh(_baseMesh);
+      _baseMesh = nullptr;
     }
+    for (GiMesh* m : _subMeshes)
+    {
+      giDestroyMesh(m);
+    }
+    _subMeshes.clear();
 
-    _giMesh = _CreateGiMesh(sceneDelegate);
+    _CreateGiMeshes(sceneDelegate);
 
     (*dirtyBits) |= HdChangeTracker::DirtyMaterialId; // force material assignment
   }
 
-  if (!_giMesh)
+  if (!_baseMesh && _subMeshes.empty())
   {
     return;
   }
@@ -514,7 +523,14 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   {
     _UpdateVisibility(sceneDelegate, &dirtyBitsCopy);
 
-    giSetMeshVisibility(_giMesh, sceneDelegate->GetVisible(id));
+    if (_baseMesh)
+    {
+      giSetMeshVisibility(_baseMesh, sceneDelegate->GetVisible(id));
+    }
+    for (GiMesh* m : _subMeshes)
+    {
+      giSetMeshVisibility(m, sceneDelegate->GetVisible(id));
+    }
   }
 
   if ((*dirtyBits & HdChangeTracker::DirtyInstancer) || (*dirtyBits & HdChangeTracker::DirtyInstanceIndex))
@@ -539,17 +555,34 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
       transforms = instancer->ComputeInstanceTransforms(id);
     }
 
-    giSetMeshInstanceTransforms(_giMesh, uint32_t(transforms.size()), (const float(*)[4][4]) transforms[0].data());
+    auto transformsSize = uint32_t(transforms.size());
+    auto transformsData = (const float(*)[4][4]) transforms[0].data();
+
+    if (_baseMesh)
+    {
+      giSetMeshInstanceTransforms(_baseMesh, transformsSize, transformsData);
+    }
+    for (GiMesh* m : _subMeshes)
+    {
+      giSetMeshInstanceTransforms(m, transformsSize, transformsData);
+    }
   }
 
   if (*dirtyBits & HdChangeTracker::DirtyTransform)
   {
     auto transform = GfMatrix4f(sceneDelegate->GetTransform(id));
 
-    giSetMeshTransform(_giMesh, transform.data());
+    if (_baseMesh)
+    {
+      giSetMeshTransform(_baseMesh, transform.data());
+    }
+    for (GiMesh* m : _subMeshes)
+    {
+      giSetMeshTransform(m, transform.data());
+    }
   }
 
-  if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
+  if ((*dirtyBits & HdChangeTracker::DirtyMaterialId) && _baseMesh)
   {
     const SdfPath& materialId = sceneDelegate->GetMaterialId(id);
 
@@ -565,7 +598,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
       giMat = _defaultMaterial;
     }
 
-    giSetMeshMaterial(_giMesh, giMat);
+    giSetMeshMaterial(_baseMesh, giMat);
   }
 
   *dirtyBits = HdChangeTracker::Clean;
@@ -829,7 +862,7 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
   return result;
 }
 
-GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
+void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
 {
   const SdfPath& id = GetId();
 
@@ -849,7 +882,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   if (boxedPoints.IsEmpty() || !boxedPoints.IsHolding<VtVec3fArray>())
   {
     TF_RUNTIME_ERROR("Points primvar not found (%s)", id.GetText());
-    return nullptr;
+    return;
   }
 
   // Analyze primvars
@@ -979,7 +1012,7 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
     }
   }
 
-  // Create vertices and indices
+  // Collect vertices and indices
   _VertexStreams s = {
     .faces = faces,
     .points = points,
@@ -996,30 +1029,107 @@ GiMesh* HdGatlingMesh::_CreateGiMesh(HdSceneDelegate* sceneDelegate)
   // Collect secondary primvars
   std::vector<GiPrimvarData> secondaryPrimvars = _CollectSecondaryPrimvars(primvarMap);
 
-  TF_AXIOM(primitiveParams.size() == faceCount);
-  std::vector<int> faceIds(faceCount);
-  for (size_t i = 0; i < faceCount; i++)
+  // Collect geometry subset data
+  size_t oldFaceCount = topology.GetNumFaces();
+  std::vector<int> oldFaceOwnership(oldFaceCount, 0/*base mesh index*/);
+
+  const HdGeomSubsets& geomSubsets = topology.GetGeomSubsets();
+  for (size_t i = 0; i < geomSubsets.size(); i++)
   {
-    faceIds[i] = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[i]);
+    const HdGeomSubset& subset = geomSubsets[i];
+
+    for (int d : subset.indices)
+    {
+      if (d >= oldFaceOwnership.size())
+      {
+        std::string subsetName = subset.id.GetName();
+        TF_WARN("GeomSubset %s has invalid face index %i", subsetName.c_str(), d);
+        continue;
+      }
+      oldFaceOwnership[d] = i + 1; // 0 is base mesh
+    }
   }
 
-  // Create mesh
+  struct SubMeshData
+  {
+    std::vector<GiFace> faces;
+    std::vector<int> faceIds;
+    int maxFaceId = -1;
+  };
+  std::vector<SubMeshData> subMeshData(geomSubsets.size() + 1/*base mesh*/);
+
+  for (auto& d : subMeshData)
+  {
+    d.faces.reserve(faceCount);
+    d.faceIds.reserve(faceCount);
+  }
+
+  for (size_t i = 0; i < faceCount; i++)
+  {
+    int oldFaceId = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[i]);
+    int owner = oldFaceOwnership[oldFaceId];
+
+    SubMeshData& subMesh = subMeshData[owner];
+    subMesh.faces.push_back(giFaces[i]);
+    subMesh.faceIds.push_back(oldFaceId);
+    subMesh.maxFaceId = std::max(subMesh.maxFaceId, oldFaceId);
+  }
+
+  // Create submeshes
   TfToken orientation = topology.GetOrientation();
   bool isLeftHanded = (orientation == _tokens->leftHanded);
-  auto maxFaceId = (uint32_t) topology.GetNumFaces();
 
-  GiMeshDesc desc = {
-    .faces = giFaces,
-    .faceIds = faceIds,
-    .id = GetPrimId(),
-    .isLeftHanded = isLeftHanded,
-    .name = id.GetText(),
-    .maxFaceId = maxFaceId,
-    .primvars = secondaryPrimvars,
-    .vertices = giVertices,
+  auto createMesh = [&](const SubMeshData& subMesh) -> GiMesh* {
+    if (subMesh.maxFaceId == -1)
+    {
+      return nullptr;
+    }
+
+    GiMeshDesc desc = {
+      .faces = subMesh.faces,
+      .faceIds = subMesh.faceIds,
+      .id = GetPrimId(),
+      .isLeftHanded = isLeftHanded,
+      .name = id.GetText(),
+      .maxFaceId = (uint32_t) subMesh.maxFaceId,
+      .primvars = secondaryPrimvars,
+      .vertices = giVertices,
+    };
+
+    return giCreateMesh(_scene, desc);
   };
 
-  return giCreateMesh(_scene, desc);
+  HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
+
+  for (size_t i = 0; i < subMeshData.size(); i++)
+  {
+    const auto& data = subMeshData[i];
+
+    GiMesh* subMesh = createMesh(data);
+
+    if (i == 0)
+    {
+      _baseMesh = subMesh;
+    }
+    else if (subMesh)
+    {
+      _subMeshes.push_back(subMesh);
+
+      // Assign material to GeomSubset. Unlike the mesh material, changes invalidate the topology, causing a full rebuild.
+      const HdGeomSubset& geomSubset = geomSubsets[i - 1];
+
+      auto* materialPrim = static_cast<HdGatlingMaterial*>(renderIndex.GetSprim(HdPrimTypeTokens->material, geomSubset.materialId));
+
+      const GiMaterial* giMat = materialPrim ? materialPrim->GetGiMaterial() : nullptr;
+
+      if (!giMat)
+      {
+        giMat = _defaultMaterial;
+      }
+
+      giSetMeshMaterial(subMesh, giMat);
+    }
+  }
 }
 
 HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const

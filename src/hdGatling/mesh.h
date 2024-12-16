@@ -82,10 +82,12 @@ private:
                               uint32_t vertexCount,
                               bool indexingAllowed);
 
-  GiMesh* _CreateGiMesh(HdSceneDelegate* sceneDelegate);
+  void _CreateGiMeshes(HdSceneDelegate* sceneDelegate);
 
 private:
-  GiMesh* _giMesh = nullptr;
+  GiMesh* _baseMesh = nullptr;
+  std::vector<GiMesh*> _subMeshes;
+
   GiScene* _scene;
   const GiMaterial* _defaultMaterial;
 };
