@@ -31,59 +31,59 @@ layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[TEXTUR
 
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
 
-layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) buffer BlasPayloadBuffer {
+layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) readonly buffer BlasPayloadBuffer {
   BlasPayload blas_payloads[];
 };
 
-layout(binding = BINDING_INDEX_INSTANCE_IDS, std430) buffer InstanceIdsBuffer { int InstanceIds[]; };
+layout(binding = BINDING_INDEX_INSTANCE_IDS, std430) readonly buffer InstanceIdsBuffer { int InstanceIds[]; };
 
-layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_F, std430) buffer ClearValueBufferF { vec4 ClearValuesF[]; };
-layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_I, std430) buffer ClearValueBufferI { ivec4 ClearValuesI[]; };
+layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_F, std430) readonly buffer ClearValueBufferF { vec4 ClearValuesF[]; };
+layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_I, std430) readonly buffer ClearValueBufferI { ivec4 ClearValuesI[]; };
 
 #if (AOV_MASK & AOV_BIT_COLOR) != 0
 layout(binding = BINDING_INDEX_AOV_COLOR, std430) buffer Framebuffer { vec4 ColorAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
-layout(binding = BINDING_INDEX_AOV_NORMAL, std430) buffer NormalBuffer { vec3 NormalsAov[]; };
+layout(binding = BINDING_INDEX_AOV_NORMAL, std430) writeonly buffer NormalBuffer { vec3 NormalsAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_NEE) != 0
-layout(binding = BINDING_INDEX_AOV_NEE, std430) buffer NeeBuffer { vec3 NeeAov[]; };
+layout(binding = BINDING_INDEX_AOV_NEE, std430) writeonly writeonly buffer NeeBuffer { vec3 NeeAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
-layout(binding = BINDING_INDEX_AOV_BARYCENTRICS, std430) buffer BarycentricsBuffer { vec3 BarycentricsAov[]; };
+layout(binding = BINDING_INDEX_AOV_BARYCENTRICS, std430) writeonly buffer BarycentricsBuffer { vec3 BarycentricsAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
-layout(binding = BINDING_INDEX_AOV_TEXCOORDS, std430) buffer TexcoordsBuffer { vec3 TexcoordsAov[]; };
+layout(binding = BINDING_INDEX_AOV_TEXCOORDS, std430) writeonly buffer TexcoordsBuffer { vec3 TexcoordsAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BOUNCES) != 0
-layout(binding = BINDING_INDEX_AOV_BOUNCES, std430) buffer BouncesBuffer { vec3 BouncesAov[]; };
+layout(binding = BINDING_INDEX_AOV_BOUNCES, std430) writeonly buffer BouncesBuffer { vec3 BouncesAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
-layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, std430) buffer ClockCyclesBuffer { uvec3 ClockCyclesAov[]; };
+layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, std430) writeonly buffer ClockCyclesBuffer { uvec3 ClockCyclesAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-layout(binding = BINDING_INDEX_AOV_OPACITY, std430) buffer OpacityBuffer { vec3 OpacityAov[]; };
+layout(binding = BINDING_INDEX_AOV_OPACITY, std430) writeonly buffer OpacityBuffer { vec3 OpacityAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
-layout(binding = BINDING_INDEX_AOV_TANGENTS, std430) buffer TangentsBuffer { vec3 TangentsAov[]; };
+layout(binding = BINDING_INDEX_AOV_TANGENTS, std430) writeonly buffer TangentsBuffer { vec3 TangentsAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
-layout(binding = BINDING_INDEX_AOV_BITANGENTS, std430) buffer BitangentsBuffer { vec3 BitangentsAov[]; };
+layout(binding = BINDING_INDEX_AOV_BITANGENTS, std430) writeonly buffer BitangentsBuffer { vec3 BitangentsAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
-layout(binding = BINDING_INDEX_AOV_THIN_WALLED, std430) buffer ThinWalledBuffer { vec3 ThinWalledAov[]; };
+layout(binding = BINDING_INDEX_AOV_THIN_WALLED, std430) writeonly buffer ThinWalledBuffer { vec3 ThinWalledAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
-layout(binding = BINDING_INDEX_AOV_OBJECT_ID, std430) buffer ObjectIdBuffer { int ObjectIdAov[]; };
+layout(binding = BINDING_INDEX_AOV_OBJECT_ID, std430) writeonly buffer ObjectIdBuffer { int ObjectIdAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEPTH) != 0
-layout(binding = BINDING_INDEX_AOV_DEPTH, std430) buffer DepthBuffer { float DepthAov[]; };
+layout(binding = BINDING_INDEX_AOV_DEPTH, std430) writeonly buffer DepthBuffer { float DepthAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_FACE_ID) != 0
-layout(binding = BINDING_INDEX_AOV_FACE_ID, std430) buffer FaceIdBuffer { int FaceIdAov[]; };
+layout(binding = BINDING_INDEX_AOV_FACE_ID, std430) writeonly buffer FaceIdBuffer { int FaceIdAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
-layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) buffer InstanceIdBuffer { int InstanceIdAov[]; };
+layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) writeonly buffer InstanceIdBuffer { int InstanceIdAov[]; };
 #endif
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
