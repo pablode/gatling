@@ -703,14 +703,13 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   }
   else if (primvarDesc.interpolation == HdInterpolationUniform)
   {
-    uint32_t faceCount = faces.size() * (forceVertexInterpolation ? 3 : 1);
-    result = _CreateSizedArray(type, faceCount);
+    result = _CreateSizedArray(type, faces.size() * (forceVertexInterpolation ? 3 : 1));
 
     uint8_t* srcPtr = (uint8_t*) HdGetValueData(boxedValues);
     uint8_t* dstPtr = (uint8_t*) HdGetValueData(result);
     size_t elementSize = HdDataSizeOfType(type);
 
-    for (size_t faceIndex = 0; faceIndex < faceCount; faceIndex++)
+    for (size_t faceIndex = 0; faceIndex < faces.size(); faceIndex++)
     {
       int oldFaceIndex = HdMeshUtil::DecodeFaceIndexFromCoarseFaceParam(primitiveParams[faceIndex]);
 
