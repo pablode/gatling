@@ -785,33 +785,7 @@ fail:
             continue;
           }
 
-          uint32_t alignment;
-          switch (s->type)
-          {
-          case GiPrimvarType::Float:
-          case GiPrimvarType::Int:
-          case GiPrimvarType::Int2: // single float fetches
-          case GiPrimvarType::Int3: // single float fetches
-          case GiPrimvarType::Int4: // single float fetches
-            alignment = 4;
-            break;
-          case GiPrimvarType::Vec2:
-            alignment = 8;
-            break;
-          case GiPrimvarType::Vec3:
-            alignment = 4; // single float fetches
-            break;
-          case GiPrimvarType::Vec4:
-            alignment = 16;
-            break;
-          default:
-            assert(false);
-            GB_ERROR("coding error: unhandled type size!");
-            alignment = 4;
-            break;
-          }
-
-          sceneDataOffsets.push_back(giAlignBuffer(alignment, s->data.size(), &payloadBufferSize));
+          sceneDataOffsets.push_back(giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, s->data.size(), &payloadBufferSize));
         }
 
         rp::BlasPayloadBufferPreamble preamble
@@ -831,7 +805,7 @@ fail:
 
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
 
-          uint32_t info = (sceneDataOffsets[i] & rp::SCENE_DATA_OFFSET_MASK) |
+          uint32_t info = ((sceneDataOffsets[i] / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
                           (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
           preamble.sceneDataInfos[i] = info;
         }
