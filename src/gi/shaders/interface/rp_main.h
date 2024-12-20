@@ -131,6 +131,9 @@ struct BlasPayloadBufferPreamble
   GI_UINT faceIdsInfo;
   GI_UINT sceneDataInfos[MAX_SCENE_DATA_COUNT];
 };
+#ifdef __cplusplus
+static_assert((sizeof(BlasPayloadBufferPreamble) % 32) == 0);
+#endif
 
 GI_BINDING_INDEX(SPHERE_LIGHTS,  0)
 GI_BINDING_INDEX(DISTANT_LIGHTS, 1)
