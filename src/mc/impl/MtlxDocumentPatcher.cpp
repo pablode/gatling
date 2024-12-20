@@ -490,7 +490,7 @@ namespace gtl
 
     _PatchNodeNames(document);
 
-    // FIXME: optimization currently disabled due to bug in MaterialX (also see HdGatlingMesh)
+    // FIXME: we can't match nodes inside implementations due to a bug in MaterialX (also see HdGatlingMesh)
     // https://github.com/AcademySoftwareFoundation/MaterialX/issues/2117
 #if 0
     for (mx::NodeGraphPtr graph : document->getNodeGraphs())
@@ -500,12 +500,12 @@ namespace gtl
         graph->flattenSubgraphs();
       }
     }
+#endif
 
     _PatchSecondaryTexcoordIndices(document);
 
     _PatchColorNodes(document);
 
     _PatchDefaultGeomprops(document);
-#endif
   }
 }
