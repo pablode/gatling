@@ -739,10 +739,24 @@ fail:
         std::vector<const GiPrimvarData*> primvars;
         if (material)
         {
-          for (const char* sceneDataName : material->mcMat->sceneDataNames)
-          {
-            const GiPrimvarData* primvar = nullptr;
+          const std::vector<const char*> sceneDataNames = material->mcMat->sceneDataNames;
 
+          size_t sceneDataCount = sceneDataNames.size();
+          int overflowCount = int(sceneDataCount) - int(rp::MAX_SCENE_DATA_COUNT);
+
+          if (overflowCount > 0)
+          {
+              GB_ERROR("max scene data count exceeded for {}; ignoring {} scene data", mesh->name, overflowCount);
+              sceneDataCount = rp::MAX_SCENE_DATA_COUNT;
+          }
+
+          primvars.resize(sceneDataCount, nullptr);
+
+          for (size_t i = 0; i < sceneDataCount; i++)
+          {
+            const char* sceneDataName = sceneDataNames[i];
+
+            const GiPrimvarData* primvar = nullptr;
             for (const GiPrimvarData& p : meshPrimvars)
             {
               // FIXME: we should check if scene data and primvar types match to prevent crashes
@@ -759,13 +773,7 @@ fail:
               continue;
             }
 
-            if (primvars.size() >= rp::MAX_SCENE_DATA_COUNT)
-            {
-              GB_ERROR("scene data limit exceeded for {}; using default value for {}", mesh->name, sceneDataName);
-              continue;
-            }
-
-            primvars.push_back(primvar);
+            primvars[i] = primvar;
           }
         }
 
@@ -776,23 +784,13 @@ fail:
         uint64_t vertexBufferOffset = giAlignBuffer(sizeof(rp::FVertex), verticesSize, &payloadBufferSize);
         uint64_t faceIdsBufferOffset = giAlignBuffer(sizeof(int), faceIdsSize, &payloadBufferSize);
 
-        std::vector<uint32_t> sceneDataOffsets;
-        for (const GiPrimvarData* s : primvars)
-        {
-          if (!s)
-          {
-            sceneDataOffsets.push_back(0);
-            continue;
-          }
-
-          sceneDataOffsets.push_back(giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, s->data.size(), &payloadBufferSize));
-        }
-
         rp::BlasPayloadBufferPreamble preamble
         {
           .objectId = mesh->id,
           .faceIdsInfo = (faceIdStride << rp::FACE_ID_STRIDE_OFFSET) | uint32_t(faceIdsBufferOffset)
         };
+
+        std::vector<uint32_t> sceneDataOffsets(primvars.size());
         for (size_t i = 0; i < primvars.size(); i++)
         {
           const GiPrimvarData* primvar = primvars[i];
@@ -802,6 +800,9 @@ fail:
             preamble.sceneDataInfos[i] = UINT32_MAX; // mark as invalid
             continue;
           }
+
+          uint32_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &payloadBufferSize);
+          sceneDataOffsets[i] = sceneDataOffset;
 
           uint32_t stride = 0;
           switch (primvar->type)
@@ -832,7 +833,7 @@ fail:
           assert(stride < 4);
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
 
-          uint32_t info = ((sceneDataOffsets[i] / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
+          uint32_t info = ((sceneDataOffset / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
                           (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
                           (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
           preamble.sceneDataInfos[i] = info;
