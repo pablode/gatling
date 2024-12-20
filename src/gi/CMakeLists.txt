@@ -64,22 +64,20 @@ endif()
 # Required since library is linked into hdGatling DSO
 set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-if(${GTL_BUILD_HDGATLING})
-  install(
-    FILES "${MDL_SHARED_LIB}"
-    DESTINATION "./hdGatling/resources"
-    COMPONENT hdGatling
-  )
+install(
+  FILES "${MDL_SHARED_LIB}"
+  DESTINATION "./hdGatling/resources"
+  COMPONENT hdGatling
+)
 
-  install(
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-    DESTINATION "./hdGatling/resources"
-    COMPONENT hdGatling
-  )
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+  DESTINATION "./hdGatling/resources"
+  COMPONENT hdGatling
+)
 
-  install(
-    DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
-    DESTINATION "./hdGatling/resources/mdl"
-    COMPONENT hdGatling
-  )
-endif()
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
+  DESTINATION "./hdGatling/resources/mdl"
+  COMPONENT hdGatling
+)

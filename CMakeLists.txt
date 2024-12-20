@@ -24,14 +24,11 @@ endforeach()
 
 set(GTL_TEST_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/TEST")
 
-option(GTL_BUILD_HDGATLING "Build the gatling hydra render delegate." ON)
 option(GTL_VERBOSE "Enable verbose logging." OFF)
 
-if(${GTL_BUILD_HDGATLING})
-  find_package(OpenGL REQUIRED) # Required due to USD bug #3309
-  find_package(MaterialX REQUIRED HINTS ${USD_ROOT})
-  find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
-endif()
+find_package(OpenGL REQUIRED) # Required due to USD bug #3309
+find_package(MaterialX REQUIRED HINTS ${USD_ROOT})
+find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
 find_package(MDL REQUIRED)
 find_package(OpenMP)
 
