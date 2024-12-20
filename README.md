@@ -80,7 +80,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 ### Issues
 
-* Features: certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (GeomSubset, subdivision) are not yet supported. UDIM textures, volumes, displacement and other rendering features have yet to be implemented.
+* Features: certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (subdivision, UDIM, volumes, displacement) are not yet supported.
 
 * Real-time editing: changing material parameters and adjusting render settings currently result in long loading times.
 
