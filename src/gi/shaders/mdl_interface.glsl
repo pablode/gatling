@@ -334,9 +334,10 @@ vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint stride = (((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1) >> 2/* / 4 floats */;
         BufferRefVec4 ref = BufferRefVec4(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
         vec4 val0 = ref.data[indices[0]];
         vec4 val1 = ref.data[indices[1]];
         vec4 val2 = ref.data[indices[2]];
@@ -364,9 +365,10 @@ vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint stride = ((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1;
         BufferRefFloat ref = BufferRefFloat(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * 3;
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
         vec3 val0 = vec3(ref.data[indices[0] + 0], ref.data[indices[0] + 1], ref.data[indices[0] + 2]);
         vec3 val1 = vec3(ref.data[indices[1] + 0], ref.data[indices[1] + 1], ref.data[indices[1] + 2]);
         vec3 val2 = vec3(ref.data[indices[2] + 0], ref.data[indices[2] + 1], ref.data[indices[2] + 2]);
@@ -393,9 +395,10 @@ vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint stride = (((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1) >> 1/* / 2 floats */;
         BufferRefVec2 ref = BufferRefVec2(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
         vec2 val0 = ref.data[indices[0]];
         vec2 val1 = ref.data[indices[1]];
         vec2 val2 = ref.data[indices[2]];
@@ -416,9 +419,10 @@ float scene_data_lookup_float(inout State state, int scene_data_id, float defaul
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint stride = ((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1;
         BufferRefFloat ref = BufferRefFloat(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
         vec3 val = vec3(ref.data[indices[0]], ref.data[indices[1]], ref.data[indices[2]]);
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
@@ -437,9 +441,10 @@ int scene_data_lookup_int(inout State state, int scene_data_id, int index_offset
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
         uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint stride = ((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1;
         BufferRefInt ref = BufferRefInt(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) + index_offset;
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride + index_offset;
         ivec3 val = ivec3(ref.data[indices[0]], ref.data[indices[1]], ref.data[indices[2]]);
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);

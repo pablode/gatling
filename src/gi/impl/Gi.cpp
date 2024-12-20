@@ -803,9 +803,37 @@ fail:
             continue;
           }
 
+          uint32_t stride = 0;
+          switch (primvar->type)
+          {
+          case GiPrimvarType::Float:
+          case GiPrimvarType::Int:
+            stride = 1;
+            break;
+          case GiPrimvarType::Int2:
+          case GiPrimvarType::Vec2:
+            stride = 2;
+            break;
+          case GiPrimvarType::Int3:
+          case GiPrimvarType::Vec3:
+            stride = 3;
+            break;
+          case GiPrimvarType::Int4:
+          case GiPrimvarType::Vec4:
+            stride = 4;
+            break;
+          default:
+            assert(false);
+            GB_ERROR("coding error: unhandled type size!");
+            continue;
+          }
+          stride -= 1; // [0, 3] range -> 2 bit
+
+          assert(stride < 4);
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
 
           uint32_t info = ((sceneDataOffsets[i] / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
+                          (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
                           (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
           preamble.sceneDataInfos[i] = info;
         }
@@ -1137,7 +1165,7 @@ cleanup:
       if (!m->material)
       {
         assert(false);
-        GB_ERROR("coding error - mesh without material!");
+        GB_ERROR("coding error: mesh without material!");
         return nullptr;
       }
       materialSet.insert(m->material);
