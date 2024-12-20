@@ -817,8 +817,7 @@ fail:
         rp::BlasPayloadBufferPreamble preamble
         {
           .objectId = mesh->id,
-          .faceIdsInfo = (faceIdStride << rp::BLAS_PREAMBLE_FACE_ID_STRIDE_OFFSET) |
-                         uint32_t(faceIdsBufferOffset)
+          .faceIdsInfo = (faceIdStride << rp::FACE_ID_STRIDE_OFFSET) | uint32_t(faceIdsBufferOffset)
         };
         for (size_t i = 0; i < primvars.size(); i++)
         {
@@ -832,8 +831,8 @@ fail:
 
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
 
-          uint32_t info = (sceneDataOffsets[i] & rp::BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK) |
-                          (uint32_t(primvar->interpolation) << rp::BLAS_PREAMBLE_SCENE_DATA_INTERPOLATION_OFFSET);
+          uint32_t info = (sceneDataOffsets[i] & rp::SCENE_DATA_OFFSET_MASK) |
+                          (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
           preamble.sceneDataInfos[i] = info;
         }
 

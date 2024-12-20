@@ -306,8 +306,7 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
 uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uniformLookup)
 {
   // contains GiPrimvarInterpolation enum
-  uint interpolation = (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_INTERPOLATION_MASK)
-    >> BLAS_PREAMBLE_SCENE_DATA_INTERPOLATION_OFFSET;
+  uint interpolation = (sceneDataInfo & SCENE_DATA_INTERPOLATION_MASK) >> SCENE_DATA_INTERPOLATION_OFFSET;
 
   if (interpolation == 2/*uniform*/)
   {
@@ -334,7 +333,7 @@ vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK);
         BufferRefVec4 ref = BufferRefVec4(address);
 
         uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
@@ -364,7 +363,7 @@ vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK);
         BufferRefFloat ref = BufferRefFloat(address);
 
         uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * 3;
@@ -393,7 +392,7 @@ vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK);
         BufferRefVec2 ref = BufferRefVec2(address);
 
         uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
@@ -416,7 +415,7 @@ float scene_data_lookup_float(inout State state, int scene_data_id, float defaul
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK);
         BufferRefFloat ref = BufferRefFloat(address);
 
         uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup);
@@ -437,7 +436,7 @@ int scene_data_lookup_int(inout State state, int scene_data_id, int index_offset
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & BLAS_PREAMBLE_SCENE_DATA_OFFSET_MASK);
+        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK);
         BufferRefInt ref = BufferRefInt(address);
 
         uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) + index_offset;
