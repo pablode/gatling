@@ -7,7 +7,6 @@ on:
       - 'dev'
     paths-ignore:
       - '**.md'
-      - '**.glsl'
 
 jobs:
   build-mdl-sdk:
