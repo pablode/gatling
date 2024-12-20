@@ -752,6 +752,10 @@ fail:
 
           primvars.resize(sceneDataCount, nullptr);
 
+          if (sceneDataCount > 0)
+          {
+            GB_DEBUG("scene data for mesh {} with material {}:", mesh->name, material->name);
+          }
           for (size_t i = 0; i < sceneDataCount; i++)
           {
             const char* sceneDataName = sceneDataNames[i];
@@ -769,10 +773,11 @@ fail:
 
             if (!primvar)
             {
-              GB_DEBUG("scene data {} not found for mesh {} with material {}", mesh->name, sceneDataName, material->name);
+              GB_DEBUG("> [{}] {} (not found!)", i, sceneDataName);
               continue;
             }
 
+            GB_DEBUG("> [{}] {}", i, sceneDataName);
             primvars[i] = primvar;
           }
         }
