@@ -541,6 +541,10 @@ public:
 
 TEST_SUITE("Graphical")
 {
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MdlSimpleTextured")
+  {
+  }
+
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
   {
   }
