@@ -2200,6 +2200,8 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->sphereLights.free(light->gpuHandle);
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     delete light;
   }
 
@@ -2286,6 +2288,8 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->distantLights.free(light->gpuHandle);
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     delete light;
   }
 
@@ -2372,6 +2376,8 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->rectLights.free(light->gpuHandle);
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     delete light;
   }
 
@@ -2468,6 +2474,8 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->diskLights.free(light->gpuHandle);
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
     delete light;
   }
 
