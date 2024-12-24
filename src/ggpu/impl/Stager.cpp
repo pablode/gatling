@@ -105,8 +105,7 @@ fail:
 
     m_semaphoreCounter++;
 
-    if (!cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]))
-      return false;
+    cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
 
     uint32_t halfOffset = m_writeableHalf * BUFFER_HALF_SIZE;
     if (!cgpuFlushMappedMemory(m_device, m_stagingBuffer, halfOffset, halfOffset + m_stagedBytes))
@@ -138,11 +137,13 @@ fail:
     {
       m_commandsPending = true;
 
-      return cgpuCmdUpdateBuffer(m_commandBuffers[m_writeableHalf], src, size, dst, dstBaseOffset);
+      cgpuCmdUpdateBuffer(m_commandBuffers[m_writeableHalf], src, size, dst, dstBaseOffset);
+
+      return true;
     }
 
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
-      return cgpuCmdCopyBuffer(
+      cgpuCmdCopyBuffer(
         m_commandBuffers[m_writeableHalf],
         m_stagingBuffer,
         srcOffset,
@@ -195,7 +196,7 @@ fail:
         desc.texelOffsetZ = 0;
         desc.texelExtentZ = depth;
 
-        return cgpuCmdCopyBufferToImage(
+        cgpuCmdCopyBufferToImage(
           m_commandBuffers[m_writeableHalf],
           m_stagingBuffer,
           dst,
@@ -231,10 +232,7 @@ fail:
       uint64_t dstOffset = m_writeableHalf * BUFFER_HALF_SIZE + m_stagedBytes;
       memcpy(&m_mappedMem[dstOffset], &src[bytesAlreadyCopied], memcpyByteCount);
 
-      if (!copyFunc(dstOffset, bytesAlreadyCopied, memcpyByteCount))
-      {
-        return false;
-      }
+      copyFunc(dstOffset, bytesAlreadyCopied, memcpyByteCount);
 
       m_commandsPending = true;
       m_stagedBytes += memcpyByteCount;

@@ -2010,14 +2010,11 @@ cleanup:
     if (!cgpuBeginCommandBuffer(commandBuffer))
       goto cleanup;
 
-    if (!cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, (uint32_t) images.size(), images.data()))
-      goto cleanup;
+    cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, (uint32_t) images.size(), images.data());
 
-    if (!cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, &bindings))
-      goto cleanup;
+    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, &bindings);
 
-    if (!cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline))
-      goto cleanup;
+    cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline);
 
     // Trace rays.
     {
@@ -2025,12 +2022,10 @@ cleanup:
       pushShaderStages |= shaderCache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT : 0;
       pushShaderStages |= shaderCache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_FLAG_ANY_HIT : 0;
 
-      if (!cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData))
-        goto cleanup;
+      cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
     }
 
-    if (!cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight))
-      goto cleanup;
+    cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
 
     // Copy device to host memory.
     {
@@ -2067,15 +2062,13 @@ cleanup:
         .bufferBarriers = preBarriers.data()
       };
 
-      if (!cgpuCmdPipelineBarrier(commandBuffer, &preBarrier))
-        goto cleanup;
+      cgpuCmdPipelineBarrier(commandBuffer, &preBarrier);
 
       for (const GiAovBinding& binding : params.aovBindings)
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-        if (!cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem))
-          goto cleanup;
+        cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
 
         if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
           goto cleanup;
@@ -2086,13 +2079,11 @@ cleanup:
         .bufferBarriers = postBarriers.data()
       };
 
-      if (!cgpuCmdPipelineBarrier(commandBuffer, &postBarrier))
-        goto cleanup;
+      cgpuCmdPipelineBarrier(commandBuffer, &postBarrier);
     }
 
     // Submit command buffer.
-    if (!cgpuEndCommandBuffer(commandBuffer))
-      goto cleanup;
+    cgpuEndCommandBuffer(commandBuffer);
 
     if (!cgpuCreateSemaphore(s_device, &semaphore))
       goto cleanup;

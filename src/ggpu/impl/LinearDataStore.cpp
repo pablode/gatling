@@ -126,8 +126,7 @@ namespace gtl
       if (!m_buffer.resize(m_device, commandBuffer, newSize))
         goto cleanup;
 
-      if (!cgpuEndCommandBuffer(commandBuffer))
-        goto cleanup;
+      cgpuEndCommandBuffer(commandBuffer);
 
       if (!cgpuCreateSemaphore(m_device, &semaphore))
         goto cleanup;

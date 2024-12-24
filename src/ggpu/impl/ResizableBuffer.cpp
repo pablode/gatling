@@ -86,8 +86,7 @@ namespace gtl
     // Copy old buffer data if needed.
     if (m_size > 0)
     {
-      if (!cgpuCmdCopyBuffer(commandBuffer, m_buffer, 0, buffer, 0, m_size))
-        goto cleanup;
+      cgpuCmdCopyBuffer(commandBuffer, m_buffer, 0, buffer, 0, m_size);;
     }
 
     // Swap buffers, so that we always destroy the unused one.

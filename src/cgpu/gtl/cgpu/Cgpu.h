@@ -709,25 +709,25 @@ namespace gtl
     CgpuCommandBuffer commandBuffer
   );
 
-  bool cgpuCmdBindPipeline(
+  void cgpuCmdBindPipeline(
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline
   );
 
-  bool cgpuCmdTransitionShaderImageLayouts(
+  void cgpuCmdTransitionShaderImageLayouts(
     CgpuCommandBuffer commandBuffer,
     CgpuShader shader,
     uint32_t imageCount,
     const CgpuImageBinding* images
   );
 
-  bool cgpuCmdUpdateBindings(
+  void cgpuCmdUpdateBindings(
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
     const CgpuBindings* bindings
   );
 
-  bool cgpuCmdUpdateBuffer(
+  void cgpuCmdUpdateBuffer(
     CgpuCommandBuffer commandBuffer,
     const uint8_t* data,
     uint64_t size,
@@ -735,7 +735,7 @@ namespace gtl
     uint64_t dstOffset
   );
 
-  bool cgpuCmdCopyBuffer(
+  void cgpuCmdCopyBuffer(
     CgpuCommandBuffer commandBuffer,
     CgpuBuffer srcBuffer,
     uint64_t srcOffset,
@@ -744,14 +744,14 @@ namespace gtl
     uint64_t size = CGPU_WHOLE_SIZE
   );
 
-  bool cgpuCmdCopyBufferToImage(
+  void cgpuCmdCopyBufferToImage(
     CgpuCommandBuffer commandBuffer,
     CgpuBuffer buffer,
     CgpuImage image,
     const CgpuBufferImageCopyDesc* desc
   );
 
-  bool cgpuCmdPushConstants(
+  void cgpuCmdPushConstants(
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
     CgpuShaderStageFlags stageFlags,
@@ -759,30 +759,30 @@ namespace gtl
     const void* data
   );
 
-  bool cgpuCmdDispatch(
+  void cgpuCmdDispatch(
     CgpuCommandBuffer commandBuffer,
     uint32_t dimX,
     uint32_t dimY,
     uint32_t dimZ
   );
 
-  bool cgpuCmdPipelineBarrier(
+  void cgpuCmdPipelineBarrier(
     CgpuCommandBuffer commandBuffer,
     const CgpuPipelineBarrier* barrier
   );
 
-  bool cgpuCmdResetTimestamps(
+  void cgpuCmdResetTimestamps(
     CgpuCommandBuffer commandBuffer,
     uint32_t offset,
     uint32_t count
   );
 
-  bool cgpuCmdWriteTimestamp(
+  void cgpuCmdWriteTimestamp(
     CgpuCommandBuffer commandBuffer,
     uint32_t timestampIndex
   );
 
-  bool cgpuCmdCopyTimestamps(
+  void cgpuCmdCopyTimestamps(
     CgpuCommandBuffer commandBuffer,
     CgpuBuffer buffer,
     uint32_t offset,
@@ -790,14 +790,14 @@ namespace gtl
     bool waitUntilAvailable
   );
 
-  bool cgpuCmdTraceRays(
+  void cgpuCmdTraceRays(
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline rtPipeline,
     uint32_t width,
     uint32_t height
   );
 
-  bool cgpuEndCommandBuffer(
+  void cgpuEndCommandBuffer(
     CgpuCommandBuffer commandBuffer
   );
 
