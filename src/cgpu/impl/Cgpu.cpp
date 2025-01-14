@@ -863,9 +863,9 @@ namespace gtl
       .descriptorBindingUniformTexelBufferUpdateAfterBind = VK_FALSE,
       .descriptorBindingStorageTexelBufferUpdateAfterBind = VK_FALSE,
       .descriptorBindingUpdateUnusedWhilePending = VK_FALSE,
-      .descriptorBindingPartiallyBound = VK_FALSE,
+      .descriptorBindingPartiallyBound = VK_TRUE,
       .descriptorBindingVariableDescriptorCount = VK_FALSE,
-      .runtimeDescriptorArray = VK_FALSE,
+      .runtimeDescriptorArray = VK_TRUE,
     };
 
     VkPhysicalDeviceShaderFloat16Int8Features shaderFloat16Int8Features = {
@@ -1629,25 +1629,35 @@ namespace gtl
     const CgpuShaderReflection* shaderReflection = &ishader->reflection;
     size_t bindingCount = shaderReflection->bindings.size();
 
+    std::vector<VkDescriptorBindingFlagsEXT> bindingFlags(bindingCount);
     ipipeline->descriptorSetLayoutBindings.resize(bindingCount);
+
     for (uint32_t i = 0; i < bindingCount; i++)
     {
-      const CgpuShaderReflectionBinding* binding_reflection = &shaderReflection->bindings[i];
+      const CgpuShaderReflectionBinding* bindingReflection = &shaderReflection->bindings[i];
 
       VkDescriptorSetLayoutBinding layoutBinding = {
-        .binding = binding_reflection->binding,
-        .descriptorType = (VkDescriptorType) binding_reflection->descriptorType,
-        .descriptorCount = binding_reflection->count,
+        .binding = bindingReflection->binding,
+        .descriptorType = (VkDescriptorType) bindingReflection->descriptorType,
+        .descriptorCount = bindingReflection->count,
         .stageFlags = stageFlags,
         .pImmutableSamplers = nullptr,
       };
 
+      bindingFlags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
       ipipeline->descriptorSetLayoutBindings[i] = layoutBinding;
     }
 
+    VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layoutBindingFlags {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO,
+      .pNext = nullptr,
+      .bindingCount = (uint32_t) bindingCount,
+      .pBindingFlags = bindingFlags.data()
+    };
+
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-      .pNext = nullptr,
+      .pNext = &layoutBindingFlags,
       .flags = 0,
       .bindingCount = (uint32_t) bindingCount,
       .pBindings = ipipeline->descriptorSetLayoutBindings.data(),
@@ -2647,7 +2657,7 @@ cleanup_fail:
         }
         if (!imageBinding)
         {
-          CGPU_FATAL("descriptor set binding mismatch");
+          continue;
         }
 
         CGPU_RESOLVE_IMAGE(imageBinding->image, iimage);
@@ -2713,6 +2723,7 @@ cleanup_fail:
     }
   }
 
+  // TODO: add bind group resource type
   void cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
                              CgpuPipeline pipeline,
                              const CgpuBindings* bindings
@@ -2732,9 +2743,8 @@ cleanup_fail:
     asInfos.reserve(bindings->tlasCount);
 
     std::vector<VkWriteDescriptorSet> writeDescriptorSets;
-    writeDescriptorSets.reserve(128);
+    writeDescriptorSets.reserve(512);
 
-    /* FIXME: this has a rather high complexity */
     for (uint32_t i = 0; i < ipipeline->descriptorSetLayoutBindings.size(); i++)
     {
       const VkDescriptorSetLayoutBinding* layoutBinding = &ipipeline->descriptorSetLayoutBindings[i];
@@ -2752,142 +2762,132 @@ cleanup_fail:
         .pTexelBufferView = nullptr,
       };
 
-      for (uint32_t j = 0; j < layoutBinding->descriptorCount; j++)
+      if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+          layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
       {
-        bool slotHandled = false;
-
-        if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
-            layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+        for (uint32_t k = 0; k < bindings->bufferCount; ++k)
         {
-          for (uint32_t k = 0; k < bindings->bufferCount; ++k)
+          const CgpuBufferBinding* bufferBinding = &bindings->buffers[k];
+
+          if (bufferBinding->index >= layoutBinding->descriptorCount)
           {
-            const CgpuBufferBinding* bufferBinding = &bindings->buffers[k];
-
-            if (bufferBinding->binding != layoutBinding->binding || bufferBinding->index != j)
-            {
-              continue;
-            }
-
-            CGPU_RESOLVE_BUFFER(bufferBinding->buffer, ibuffer);
-
-            if ((bufferBinding->offset % idevice->properties.minStorageBufferOffsetAlignment) != 0)
-            {
-              CGPU_FATAL("buffer binding offset not aligned");
-            }
-
-            VkDescriptorBufferInfo bufferInfo = {
-              .buffer = ibuffer->buffer,
-              .offset = bufferBinding->offset,
-              .range = (bufferBinding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - bufferBinding->offset) : bufferBinding->size,
-            };
-            bufferInfos.push_back(bufferInfo);
-
-            if (j == 0)
-            {
-              writeDescriptorSet.pBufferInfo = &bufferInfos.back();
-            }
-
-            slotHandled = true;
-            break;
+            CGPU_FATAL("descriptor binding out of range");
           }
-        }
-        else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
-                 layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
-        {
-          for (uint32_t k = 0; k < bindings->imageCount; k++)
+
+          if (bufferBinding->binding != layoutBinding->binding)
           {
-            const CgpuImageBinding* imageBinding = &bindings->images[k];
-
-            if (imageBinding->binding != layoutBinding->binding || imageBinding->index != j)
-            {
-              continue;
-            }
-
-            CGPU_RESOLVE_IMAGE(imageBinding->image, iimage);
-
-            VkDescriptorImageInfo imageInfo = {
-              .sampler = VK_NULL_HANDLE,
-              .imageView = iimage->imageView,
-              .imageLayout = iimage->layout,
-            };
-            imageInfos.push_back(imageInfo);
-
-            if (j == 0)
-            {
-              writeDescriptorSet.pImageInfo = &imageInfos.back();
-            }
-
-            slotHandled = true;
-            break;
+            continue;
           }
-        }
-        else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
-        {
-          for (uint32_t k = 0; k < bindings->samplerCount; k++)
+
+          CGPU_RESOLVE_BUFFER(bufferBinding->buffer, ibuffer);
+
+          if ((bufferBinding->offset % idevice->properties.minStorageBufferOffsetAlignment) != 0)
           {
-            const CgpuSamplerBinding* samplerBinding = &bindings->samplers[k];
-
-            if (samplerBinding->binding != layoutBinding->binding || samplerBinding->index != j)
-            {
-              continue;
-            }
-
-            CGPU_RESOLVE_SAMPLER(samplerBinding->sampler, isampler);
-
-            VkDescriptorImageInfo imageInfo = {
-              .sampler = isampler->sampler,
-              .imageView = VK_NULL_HANDLE,
-              .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-            };
-            imageInfos.push_back(imageInfo);
-
-            if (j == 0)
-            {
-              writeDescriptorSet.pImageInfo = &imageInfos.back();
-            }
-
-            slotHandled = true;
-            break;
+            CGPU_FATAL("buffer binding offset not aligned");
           }
-        }
-        else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
-        {
-          for (uint32_t k = 0; k < bindings->tlasCount; ++k)
-          {
-            const CgpuTlasBinding* asBinding = &bindings->tlases[k];
 
-            if (asBinding->binding != layoutBinding->binding || asBinding->index != j)
-            {
-              continue;
-            }
+          VkDescriptorBufferInfo bufferInfo = {
+            .buffer = ibuffer->buffer,
+            .offset = bufferBinding->offset,
+            .range = (bufferBinding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - bufferBinding->offset) : bufferBinding->size,
+          };
+          bufferInfos.push_back(bufferInfo);
 
-            CGPU_RESOLVE_TLAS(asBinding->as, itlas);
-
-            VkWriteDescriptorSetAccelerationStructureKHR asInfo = {
-              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
-              .pNext = nullptr,
-              .accelerationStructureCount = 1,
-              .pAccelerationStructures = &itlas->as,
-            };
-            asInfos.push_back(asInfo);
-
-            if (j == 0)
-            {
-              writeDescriptorSet.pNext = &asInfos.back();
-            }
-
-            slotHandled = true;
-            break;
-          }
-        }
-
-        if (!slotHandled)
-        {
-          CGPU_FATAL("resource binding mismatch");
+          writeDescriptorSet.pBufferInfo = &bufferInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
         }
       }
+      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+               layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+      {
+        for (uint32_t k = 0; k < bindings->imageCount; k++)
+        {
+          const CgpuImageBinding* imageBinding = &bindings->images[k];
 
-      writeDescriptorSets.push_back(writeDescriptorSet);
+          if (imageBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
+          }
+
+          if (imageBinding->binding != layoutBinding->binding)
+          {
+            continue;
+          }
+
+          CGPU_RESOLVE_IMAGE(imageBinding->image, iimage);
+
+          VkDescriptorImageInfo imageInfo = {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = iimage->imageView,
+            .imageLayout = iimage->layout,
+          };
+          imageInfos.push_back(imageInfo);
+
+          writeDescriptorSet.dstArrayElement = k;
+          writeDescriptorSet.descriptorCount = 1;
+          writeDescriptorSet.pImageInfo = &imageInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
+        }
+      }
+      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
+      {
+        for (uint32_t k = 0; k < bindings->samplerCount; k++)
+        {
+          const CgpuSamplerBinding* samplerBinding = &bindings->samplers[k];
+
+          if (samplerBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
+          }
+
+          if (samplerBinding->binding != layoutBinding->binding)
+          {
+            continue;
+          }
+
+          CGPU_RESOLVE_SAMPLER(samplerBinding->sampler, isampler);
+
+          VkDescriptorImageInfo imageInfo = {
+            .sampler = isampler->sampler,
+            .imageView = VK_NULL_HANDLE,
+            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+          };
+          imageInfos.push_back(imageInfo);
+
+          writeDescriptorSet.pImageInfo = &imageInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
+        }
+      }
+      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+      {
+        for (uint32_t k = 0; k < bindings->tlasCount; ++k)
+        {
+          const CgpuTlasBinding* asBinding = &bindings->tlases[k];
+
+          if (asBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
+          }
+
+          if (asBinding->binding != layoutBinding->binding)
+          {
+            continue;
+          }
+
+          CGPU_RESOLVE_TLAS(asBinding->as, itlas);
+
+          VkWriteDescriptorSetAccelerationStructureKHR asInfo = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+            .pNext = nullptr,
+            .accelerationStructureCount = 1,
+            .pAccelerationStructures = &itlas->as,
+          };
+          asInfos.push_back(asInfo);
+
+          writeDescriptorSet.pNext = &asInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
+        }
+      }
     }
 
     idevice->table.vkUpdateDescriptorSets(

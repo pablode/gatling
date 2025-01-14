@@ -22,11 +22,11 @@ layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 #endif
 
 #if TEXTURE_COUNT_2D > 0
-layout(binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[TEXTURE_COUNT_2D];
+layout(binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_2D_COUNT];
 #endif
 
 #if TEXTURE_COUNT_3D > 0
-layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[TEXTURE_COUNT_3D];
+layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_3D_COUNT];
 #endif
 
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
