@@ -2347,6 +2347,7 @@ distribution.
     Ray Tracing Gems
     Ray Tracing Gems II
     doctest
+    OffsetAllocator
 ============================================================
 
 
@@ -2397,7 +2398,8 @@ distribution.
   Copyright (c) 2016-2023 Viktor Kirilov
 * For meshoptimizer, see also this required NOTICE:
   Copyright (c) 2016-2024 Arseny Kapoulkine
-
+* For OffsetAllocator, see also this required NOTICE:
+  Copyright (c) 2023 Sebastian Aaltonen
 
 ============================================================
     zlib-ng

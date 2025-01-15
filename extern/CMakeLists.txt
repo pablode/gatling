@@ -153,3 +153,9 @@ set(BUILD_EXAMPLES OFF)
 set(BUILD_PLUGINS OFF)
 set(BUILD_LITE ON)
 add_subdirectory(c-blosc2)
+
+#
+# OffsetAllocator
+#
+add_library(OffsetAllocator STATIC OffsetAllocator/offsetAllocator.cpp)
+target_include_directories(OffsetAllocator PUBLIC OffsetAllocator)

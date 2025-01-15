@@ -58,3 +58,6 @@
 [submodule "extern/c-blosc2"]
 	path = extern/c-blosc2
 	url = https://github.com/Blosc/c-blosc2.git
+[submodule "extern/OffsetAllocator"]
+	path = extern/OffsetAllocator
+	url = https://github.com/sebbbi/OffsetAllocator.git
