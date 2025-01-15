@@ -25,9 +25,11 @@ using namespace gtl;
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id,
+                                     GiScene* scene,
                                      const MaterialNetworkCompiler& materialNetworkCompiler)
   : HdMaterial(id)
   , _materialNetworkCompiler(materialNetworkCompiler)
+  , _giScene(scene)
 {
 }
 
@@ -89,7 +91,7 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
     return;
   }
 
-  _giMaterial = _materialNetworkCompiler.CompileNetwork(id, network);
+  _giMaterial = _materialNetworkCompiler.CompileNetwork(_giScene, id, network);
 }
 
 const GiMaterial* HdGatlingMaterial::GetGiMaterial() const

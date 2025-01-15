@@ -422,9 +422,9 @@ MaterialNetworkCompiler::MaterialNetworkCompiler(const mx::DocumentPtr mtlxStdLi
 {
 }
 
-GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::CompileNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const
 {
-  GiMaterial* result = _TryCompileMdlNetwork(id, network);
+  GiMaterial* result = _TryCompileMdlNetwork(scene, id, network);
 
   if (!result)
   {
@@ -433,13 +433,13 @@ GiMaterial* MaterialNetworkCompiler::CompileNetwork(const SdfPath& id, const HdM
     PreviewSurfaceNetworkPatcher patcher;
     patcher.Patch(patchedNetwork);
 
-    result = _TryCompileMtlxNetwork(id, patchedNetwork);
+    result = _TryCompileMtlxNetwork(scene, id, patchedNetwork);
   }
 
   return result;
 }
 
-GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   if (network.nodes.size() != 1)
   {
@@ -463,10 +463,10 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(const SdfPath& id, co
   const std::string& subIdentifier = (*subIdentifierIt).second;
   const std::string& fileUri = sdrNode->GetResolvedImplementationURI();
 
-  return giCreateMaterialFromMdlFile(id.GetText(), fileUri.c_str(), subIdentifier.c_str());
+  return giCreateMaterialFromMdlFile(scene, id.GetText(), fileUri.c_str(), subIdentifier.c_str());
 }
 
-GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const
+GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   HdMaterialNetwork2 mtlxNetwork = network;
   if (!_ConvertUsdNodesToMtlxNodes(mtlxNetwork))
@@ -482,7 +482,7 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(const SdfPath& id, c
     return nullptr;
   }
 
-  return giCreateMaterialFromMtlxDoc(id.GetText(), doc);
+  return giCreateMaterialFromMtlxDoc(scene, id.GetText(), doc);
 }
 
 mx::DocumentPtr MaterialNetworkCompiler::_CreateMaterialXDocumentFromNetwork(const SdfPath& id,

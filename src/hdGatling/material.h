@@ -23,6 +23,7 @@
 namespace gtl
 {
   struct GiMaterial;
+  struct GiScene;
 }
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -33,6 +34,7 @@ class HdGatlingMaterial final : public HdMaterial
 {
 public:
   HdGatlingMaterial(const SdfPath& id,
+                    gtl::GiScene* scene,
                     const MaterialNetworkCompiler& materialNetworkCompiler);
 
   ~HdGatlingMaterial() override;
@@ -50,6 +52,7 @@ public:
 private:
   const MaterialNetworkCompiler& _materialNetworkCompiler;
   gtl::GiMaterial* _giMaterial = nullptr;
+  gtl::GiScene* _giScene = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

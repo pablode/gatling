@@ -120,10 +120,10 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
     _settingsMap[key] = value;
   }
 
-  _defaultMaterial = giCreateMaterialFromMtlxStr("__gatling_default", _defaultMaterialXMaterial);
-  TF_AXIOM(_defaultMaterial);
-
   _giScene = giCreateScene();
+
+  _defaultMaterial = giCreateMaterialFromMtlxStr(_giScene, "__gatling_default", _defaultMaterialXMaterial);
+  TF_AXIOM(_defaultMaterial);
 }
 
 HdGatlingRenderDelegate::~HdGatlingRenderDelegate()
@@ -275,7 +275,7 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   }
   else if (typeId == HdPrimTypeTokens->material)
   {
-    return new HdGatlingMaterial(sprimId, _materialNetworkCompiler);
+    return new HdGatlingMaterial(sprimId, _giScene, _materialNetworkCompiler);
   }
   else if (typeId == HdPrimTypeTokens->sphereLight)
   {

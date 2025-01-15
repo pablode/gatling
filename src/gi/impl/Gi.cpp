@@ -63,6 +63,8 @@
 
 #include <blosc2.h>
 
+#include <offsetAllocator.hpp>
+
 namespace mx = MaterialX;
 
 namespace gtl
@@ -94,13 +96,22 @@ namespace gtl
     CgpuTlas   tlas;
   };
 
+  struct GiImageBinding
+  {
+    CgpuImage image;
+    uint32_t index;
+  };
+
   struct GiShaderCache
   {
     uint32_t                       aovMask;
     bool                           domeLightCameraVisible;
+    uint32_t                       domeLightsTexOffset;
     std::vector<CgpuShader>        hitShaders;
     std::vector<CgpuImage>         images2d;
     std::vector<CgpuImage>         images3d;
+    std::vector<GiImageBinding>    imageBindings2d;
+    std::vector<GiImageBinding>    imageBindings3d;
     std::vector<const GiMaterial*> materials;
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
@@ -114,6 +125,7 @@ namespace gtl
   {
     McMaterial* mcMat;
     std::string name;
+    GiScene* scene;
   };
 
   struct GiMesh
@@ -176,6 +188,7 @@ namespace gtl
     DirtyRtPipelineMiss     = (1 << 4),
     DirtyRtPipeline         = (DirtyRtPipelineRgen | DirtyRtPipelineHit | DirtyRtPipelineMiss),
     DirtyAovBindingDefaults = (1 << 5),
+    DirtySceneParams        = (1 << 6),
     All                     = ~0u
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
@@ -198,6 +211,9 @@ namespace gtl
     GiRenderParams oldRenderParams = {};
     CgpuBuffer aovDefaultValues;
     uint32_t sampleOffset = 0;
+    CgpuBuffer sceneParams;
+    OffsetAllocator::Allocator texture2dOffsets{rp::MAX_TEXTURE_2D_COUNT};
+    OffsetAllocator::Allocator texture3dOffsets{rp::MAX_TEXTURE_3D_COUNT};
   };
 
   struct GiRenderBuffer
@@ -446,7 +462,7 @@ fail:
     s_aggregateAssetReader->addAssetReader(reader);
   }
 
-  GiMaterial* giCreateMaterialFromMtlxStr(const char* name, const char* mtlxSrc)
+  GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc)
   {
     McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc);
     if (!mcMat)
@@ -454,13 +470,16 @@ fail:
       return nullptr;
     }
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
+
     return new GiMaterial {
       .mcMat = mcMat,
-      .name = name
+      .name = name,
+      .scene = scene
     };
   }
 
-  GiMaterial* giCreateMaterialFromMtlxDoc(const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc)
+  GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc)
   {
     mx::DocumentPtr resolvedDoc = std::static_pointer_cast<mx::Document>(doc);
     if (!doc)
@@ -474,13 +493,16 @@ fail:
       return nullptr;
     }
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
+
     return new GiMaterial {
       .mcMat = mcMat,
-      .name = name
+      .name = name,
+      .scene = scene
     };
   }
 
-  GiMaterial* giCreateMaterialFromMdlFile(const char* name, const char* filePath, const char* subIdentifier)
+  GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier)
   {
     McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier);
     if (!mcMat)
@@ -488,14 +510,19 @@ fail:
       return nullptr;
     }
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
+
     return new GiMaterial {
       .mcMat = mcMat,
-      .name = name
+      .name = name,
+      .scene = scene
     };
   }
 
   void giDestroyMaterial(GiMaterial* mat)
   {
+    GiScene* scene = mat->scene;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
     delete mat->mcMat;
     delete mat;
   }
@@ -1190,32 +1217,21 @@ cleanup:
     std::vector<CgpuShader> hitShaders;
     std::vector<CgpuImage> images2d;
     std::vector<CgpuImage> images3d;
+    std::vector<uint32_t> imageOffsets2d;
+    std::vector<uint32_t> imageOffsets3d;
     std::vector<CgpuRtHitGroup> hitGroups;
     std::vector<McTextureDescription> textureDescriptions;
+    OffsetAllocator::Allocator tex2dAllocator{rp::MAX_TEXTURE_2D_COUNT};
+    OffsetAllocator::Allocator tex3dAllocator{rp::MAX_TEXTURE_3D_COUNT};
     bool hasPipelineClosestHitShader = false;
     bool hasPipelineAnyHitShader = false;
 
-    uint32_t diskLightCount = scene->diskLights.elementCount();
-    uint32_t distantLightCount = scene->distantLights.elementCount();
-    uint32_t rectLightCount = scene->rectLights.elementCount();
-    uint32_t sphereLightCount = scene->sphereLights.elementCount();
-    uint32_t totalLightCount = diskLightCount + distantLightCount + rectLightCount + sphereLightCount;
-
-    bool nextEventEstimation = (renderSettings.nextEventEstimation && totalLightCount > 0);
-
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
-      .diskLightCount = diskLightCount,
-      .distantLightCount = distantLightCount,
-      .mediumStackSize = renderSettings.mediumStackSize,
-      .rectLightCount = rectLightCount,
-      .sphereLightCount = sphereLightCount,
-      .texCount2d = 2, // +1 fallback and +1 real dome light
-      .texCount3d = 0
+      .mediumStackSize = renderSettings.mediumStackSize
     };
 
-    uint32_t& texCount2d = commonParams.texCount2d;
-    uint32_t& texCount3d = commonParams.texCount3d;
+    OffsetAllocator::Allocation domeLightsAllocation = tex2dAllocator.allocate(2); // primary + secondary
 
     // Create per-material closest-hit shaders.
     //
@@ -1285,28 +1301,41 @@ cleanup:
       // 2. Sum up texture resources & calculate per-material index offsets.
       for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
       {
-        HitShaderCompInfo& closestHitShaderCompInfo = groupInfo.closestHitInfo;
-        closestHitShaderCompInfo.texOffset2d = texCount2d;
-        closestHitShaderCompInfo.texOffset3d = texCount3d;
-
-        for (const McTextureDescription& tr : closestHitShaderCompInfo.genInfo.textureDescriptions)
+        const auto allocTextureOffsets = [&](HitShaderCompInfo& compInfo)
         {
-          (tr.is3dImage ? texCount3d : texCount2d)++;
-          textureDescriptions.push_back(tr);
-        }
-
-        if (groupInfo.anyHitInfo)
-        {
-          HitShaderCompInfo& anyHitShaderCompInfo = *groupInfo.anyHitInfo;
-          anyHitShaderCompInfo.texOffset2d = texCount2d;
-          anyHitShaderCompInfo.texOffset3d = texCount3d;
-
-          for (const McTextureDescription& tr : anyHitShaderCompInfo.genInfo.textureDescriptions)
+          uint32_t texCount2d = 0;
+          uint32_t texCount3d = 0;
+          for (const McTextureDescription& tr : compInfo.genInfo.textureDescriptions)
           {
             (tr.is3dImage ? texCount3d : texCount2d)++;
             textureDescriptions.push_back(tr);
           }
 
+          OffsetAllocator::Allocation allocation2d = tex2dAllocator.allocate(texCount2d);
+          OffsetAllocator::Allocation allocation3d = tex3dAllocator.allocate(texCount3d);
+          compInfo.texOffset2d = allocation2d.offset;
+          compInfo.texOffset3d = allocation3d.offset;
+
+          texCount2d = 0;
+          texCount3d = 0;
+          for (const McTextureDescription& tr : compInfo.genInfo.textureDescriptions)
+          {
+            if (tr.is3dImage)
+            {
+              imageOffsets3d.push_back(allocation3d.offset + (texCount3d++));
+            }
+            else
+            {
+              imageOffsets2d.push_back(allocation2d.offset + (texCount2d++));
+            }
+          }
+        };
+
+        allocTextureOffsets(groupInfo.closestHitInfo);
+
+        if (groupInfo.anyHitInfo)
+        {
+          allocTextureOffsets(*groupInfo.anyHitInfo);
           hasPipelineAnyHitShader |= true;
         }
       }
@@ -1340,7 +1369,7 @@ cleanup:
             .hasVolumeScatteringCoeff = material->hasVolumeScatteringCoeff,
             .isEmissive = material->isEmissive,
             .isThinWalled = material->isThinWalled,
-            .nextEventEstimation = nextEventEstimation,
+            .nextEventEstimation = renderSettings.nextEventEstimation,
             .sceneDataCount = sceneDataCount,
             .shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource,
             .textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d,
@@ -1473,7 +1502,7 @@ cleanup:
         .filterImportanceSampling = renderSettings.filterImportanceSampling,
         .jitteredSampling = renderSettings.jitteredSampling,
         .materialCount = uint32_t(materials.size()),
-        .nextEventEstimation = nextEventEstimation,
+        .nextEventEstimation = renderSettings.nextEventEstimation,
         .progressiveAccumulation = renderSettings.progressiveAccumulation,
         .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder
       };
@@ -1549,8 +1578,6 @@ cleanup:
     {
       goto cleanup;
     }
-    assert(images2d.size() == (texCount2d - 2));
-    assert(images3d.size() == texCount3d);
 
     // Create RT pipeline.
     {
@@ -1572,7 +1599,16 @@ cleanup:
     cache = new GiShaderCache;
     cache->aovMask = aovMask;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
+    cache->domeLightsTexOffset = domeLightsAllocation.offset;
     cache->hitShaders = std::move(hitShaders);
+    for (uint32_t i = 0; i < images2d.size(); i++)
+    {
+      cache->imageBindings2d.push_back({ .image = images2d[i], .index = imageOffsets2d[i] });
+    }
+    for (uint32_t i = 0; i < images3d.size(); i++)
+    {
+      cache->imageBindings3d.push_back({ .image = images3d[i], .index = imageOffsets3d[i] });
+    }
     cache->images2d = std::move(images2d);
     cache->images3d = std::move(images3d);
     cache->materials.resize(materials.size());
@@ -1806,8 +1842,48 @@ cleanup:
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyAovBindingDefaults;
     }
 
-    GiBvh* bvh = scene->bvh;
     const GiShaderCache* shaderCache = scene->shaderCache;
+
+    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtySceneParams))
+    {
+      uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
+                                 scene->rectLights.elementCount() + scene->diskLights.elementCount();
+
+      rp::SceneParams sceneParams = {
+        .texture2dCount = (uint32_t) shaderCache->images2d.size(),
+        .texture3dCount = (uint32_t) shaderCache->images3d.size(),
+        .sphereLightCount = scene->sphereLights.elementCount(),
+        .distantLightCount = scene->distantLights.elementCount(),
+        .rectLightCount = scene->rectLights.elementCount(),
+        .diskLightCount = scene->diskLights.elementCount(),
+        .totalLightCount = totalLightCount
+      };
+
+      if (!scene->sceneParams.handle)
+      {
+        if (!cgpuCreateBuffer(s_device, {
+                                .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                                .size = sizeof(sceneParams),
+                                .debugName = "SceneParams"
+                              }, &scene->sceneParams))
+        {
+          GB_ERROR("failed to create scene params buffer");
+          return GiStatus::Error;
+        }
+      }
+
+      if (!s_stager->stageToBuffer((const uint8_t*) &sceneParams, sizeof(sceneParams), scene->sceneParams) ||
+          !s_stager->flush())
+      {
+        GB_ERROR("failed to stage scene params");
+        return GiStatus::Error;
+      }
+
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtySceneParams;
+    }
+
+    GiBvh* bvh = scene->bvh;
 
     // Upload dome lights.
     glm::vec4 backgroundColor(0.0f);
@@ -1935,6 +2011,7 @@ cleanup:
     std::vector<CgpuBufferBinding> buffers;
     buffers.reserve(16);
 
+    buffers.push_back({ .binding = rp::BINDING_INDEX_SCENE_PARAMS, .buffer = scene->sceneParams });
     buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
@@ -1976,18 +2053,18 @@ cleanup:
 
     CgpuSamplerBinding sampler = { .binding = rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
 
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture, .index = 0 });
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture,         .index = 1 });
+    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture,
+                       .index = shaderCache->domeLightsTexOffset + 0 });
+    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture,
+                       .index = shaderCache->domeLightsTexOffset + 1 });
 
-    for (uint32_t i = 0; i < shaderCache->images2d.size(); i++)
+    for (const GiImageBinding& b : shaderCache->imageBindings2d)
     {
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D,
-                         .image = shaderCache->images2d[i],
-                         .index = 2/* dome lights */ + i });
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = b.image, .index = b.index });
     }
-    for (uint32_t i = 0; i < shaderCache->images3d.size(); i++)
+    for (const GiImageBinding& b : shaderCache->imageBindings3d)
     {
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = shaderCache->images3d[i], .index = i });
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = b.image, .index = b.index });
     }
 
     CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
@@ -2154,6 +2231,10 @@ cleanup:
     {
       cgpuDestroyBuffer(s_device, scene->aovDefaultValues);
     }
+    if (scene->sceneParams.handle)
+    {
+      cgpuDestroyBuffer(s_device, scene->sceneParams);
+    }
     cgpuDestroyImage(s_device, scene->fallbackDomeLightTexture);
     delete scene;
   }
@@ -2181,7 +2262,7 @@ cleanup:
     data->radiusXYZ[1] = 0.5f;
     data->radiusXYZ[2] = 0.5f;
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     return light;
   }
@@ -2191,7 +2272,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->sphereLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     delete light;
   }
@@ -2269,7 +2350,7 @@ cleanup:
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
     data->invPdf = 1.0f;
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     return light;
   }
@@ -2279,7 +2360,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->distantLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     delete light;
   }
@@ -2357,7 +2438,7 @@ cleanup:
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     return light;
   }
@@ -2367,7 +2448,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->rectLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     delete light;
   }
@@ -2455,7 +2536,7 @@ cleanup:
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     return light;
   }
@@ -2465,7 +2546,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->diskLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
 
     delete light;
   }

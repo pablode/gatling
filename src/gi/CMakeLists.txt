@@ -55,6 +55,7 @@ target_link_libraries(
     meshoptimizer
     blosc2_static
     efsw-static
+    OffsetAllocator
 )
 
 if(OpenMP_CXX_FOUND)

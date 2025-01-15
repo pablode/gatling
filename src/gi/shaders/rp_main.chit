@@ -26,12 +26,12 @@ layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayloa
 
 hitAttributeEXT vec2 baryCoord;
 
+#ifdef NEXT_EVENT_ESTIMATION
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
 {
-#if SPHERE_LIGHT_COUNT > 0
-    if ((k4.x * TOTAL_LIGHT_COUNT) <= SPHERE_LIGHT_COUNT)
+    if ((k4.x * sceneParams.totalLightCount) <= sceneParams.sphereLightCount)
     {
-        uint lightIndex = min(uint(k4.y * SPHERE_LIGHT_COUNT), SPHERE_LIGHT_COUNT - 1);
+        uint lightIndex = min(uint(k4.y * sceneParams.sphereLightCount), sceneParams.sphereLightCount - 1);
 
         SphereLight light = sphereLights[lightIndex];
 
@@ -50,11 +50,9 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         power = light.baseEmission * PC.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
-#endif
-#if DISTANT_LIGHT_COUNT > 0
-    else if ((k4.x * TOTAL_LIGHT_COUNT) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT))
+    else if ((k4.x * sceneParams.totalLightCount) <= (sceneParams.sphereLightCount + sceneParams.distantLightCount))
     {
-        uint lightIndex = min(uint(k4.y * DISTANT_LIGHT_COUNT), DISTANT_LIGHT_COUNT - 1);
+        uint lightIndex = min(uint(k4.y * sceneParams.distantLightCount), sceneParams.distantLightCount - 1);
 
         DistantLight light = distantLights[lightIndex];
 
@@ -75,11 +73,9 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
             dirToLight = normalize(sin(theta) * (cos(phi) * t1 + sin(phi) * t2) + cos(theta) * dirToLight);
         }
     }
-#endif
-#if RECT_LIGHT_COUNT > 0
-    else if ((k4.x * TOTAL_LIGHT_COUNT) <= (SPHERE_LIGHT_COUNT + DISTANT_LIGHT_COUNT + RECT_LIGHT_COUNT))
+    else if ((k4.x * sceneParams.totalLightCount) <= (sceneParams.sphereLightCount + sceneParams.distantLightCount + sceneParams.rectLightCount))
     {
-        uint lightIndex = min(uint(k4.y * RECT_LIGHT_COUNT), RECT_LIGHT_COUNT - 1);
+        uint lightIndex = min(uint(k4.y * sceneParams.rectLightCount), sceneParams.rectLightCount - 1);
 
         RectLight light = rectLights[lightIndex];
 
@@ -102,11 +98,9 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         power = light.baseEmission * PC.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
-#endif
-#if DISK_LIGHT_COUNT > 0
     else
     {
-        uint lightIndex = min(uint(k4.y * DISK_LIGHT_COUNT), DISK_LIGHT_COUNT - 1);
+        uint lightIndex = min(uint(k4.y * sceneParams.diskLightCount), sceneParams.diskLightCount - 1);
 
         DiskLight light = diskLights[lightIndex];
         vec2 radiusXY = vec2(light.radiusX, light.radiusY);
@@ -129,11 +123,11 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         power = light.baseEmission * PC.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
-#endif
 
     power *= exp2(PC.sensorExposure);
-    invPdf *= float(TOTAL_LIGHT_COUNT);
+    invPdf *= float(sceneParams.totalLightCount);
 }
+#endif
 
 void main()
 {

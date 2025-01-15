@@ -54,18 +54,7 @@ namespace gtl
 #if defined(NDEBUG)
     stitcher.appendDefine("NDEBUG");
 #endif
-
-    uint32_t totalLightCount = params.diskLightCount + params.distantLightCount +
-                               params.rectLightCount + params.sphereLightCount;
-
     stitcher.appendDefine("AOV_MASK", (int) params.aovMask);
-    stitcher.appendDefine("TEXTURE_COUNT_2D", (int32_t) params.texCount2d);
-    stitcher.appendDefine("TEXTURE_COUNT_3D", (int32_t) params.texCount3d);
-    stitcher.appendDefine("SPHERE_LIGHT_COUNT", (int32_t) params.sphereLightCount);
-    stitcher.appendDefine("DISTANT_LIGHT_COUNT", (int32_t) params.distantLightCount);
-    stitcher.appendDefine("RECT_LIGHT_COUNT", (int32_t) params.rectLightCount);
-    stitcher.appendDefine("DISK_LIGHT_COUNT", (int32_t) params.diskLightCount);
-    stitcher.appendDefine("TOTAL_LIGHT_COUNT", (int32_t) totalLightCount);
     stitcher.appendDefine("MEDIUM_STACK_SIZE", (int32_t) params.mediumStackSize);
   }
 

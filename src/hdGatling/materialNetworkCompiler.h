@@ -24,6 +24,7 @@
 namespace gtl
 {
   struct GiMaterial;
+  struct GiScene;
 }
 
 using namespace gtl;
@@ -37,12 +38,12 @@ class MaterialNetworkCompiler
 public:
   MaterialNetworkCompiler(const MaterialX::DocumentPtr mtlxStdLib);
 
-  GiMaterial* CompileNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
+  GiMaterial* CompileNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const;
 
 private:
-  GiMaterial* _TryCompileMdlNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
+  GiMaterial* _TryCompileMdlNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const;
 
-  GiMaterial* _TryCompileMtlxNetwork(const SdfPath& id, const HdMaterialNetwork2& network) const;
+  GiMaterial* _TryCompileMtlxNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const;
 
   MaterialX::DocumentPtr _CreateMaterialXDocumentFromNetwork(const SdfPath& id,
                                                              const HdMaterialNetwork2& network) const;

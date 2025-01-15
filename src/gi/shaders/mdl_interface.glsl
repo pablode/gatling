@@ -44,7 +44,7 @@ bool tex_texture_isvalid(int tex)
 
 vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w, vec2 crop_u, vec2 crop_v, vec2 crop_w, float frame)
 {
-#if TEXTURE_COUNT_3D > 0
+#ifdef NEXT_EVENT_ESTIMATION
     if ((tex == 0) ||
         (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
         (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)) ||
@@ -61,7 +61,7 @@ vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
     coord.z = apply_wrap_and_crop(coord.z, wrap_w, crop_w, res.z);
 
-    ASSERT(array_idx < TEXTURE_COUNT_3D, "Error: invalid texture index\n");
+    ASSERT(array_idx < sceneParams.texture3dCount, "Error: invalid texture index\n");
     return texture(sampler3D(textures_3d[nonuniformEXT(array_idx)], tex_sampler), coord);
 #else
     ASSERT(tex == 0, "Error: invalid texture index\n");
@@ -91,7 +91,6 @@ vec3 tex_lookup_color_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w
 
 vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
 {
-#if TEXTURE_COUNT_3D > 0
     if (tex == 0)
     {
         return vec4(0, 0, 0, 0);
@@ -106,12 +105,8 @@ vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    ASSERT(array_idx < TEXTURE_COUNT_3D, "Error: invalid texture index\n");
+    ASSERT(array_idx < sceneParams.texture3dCount, "Error: invalid texture index\n");
     return texelFetch(sampler3D(textures_3d[nonuniformEXT(array_idx)], tex_sampler), coord, mipmap_level);
-#else
-    ASSERT(tex == 0, "Error: invalid texture index\n");
-    return vec4(0, 0, 0, 0);
-#endif
 }
 
 vec3 tex_texel_float3_3d(int tex, ivec3 coord, float frame)
@@ -136,7 +131,6 @@ vec3 tex_texel_color_3d(int tex, ivec3 coord, float frame)
 
 vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop_u, vec2 crop_v, float frame)
 {
-#if TEXTURE_COUNT_2D > 0
     if ((tex == 0) ||
         (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
         (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
@@ -151,12 +145,8 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
-    ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
+    ASSERT(array_idx < sceneParams.texture2dCount, "Error: invalid texture index\n");
     return texture(sampler2D(textures_2d[nonuniformEXT(array_idx)], tex_sampler), coord);
-#else
-    ASSERT(tex == 0, "Error: invalid texture index\n");
-    return vec4(0, 0, 0, 0);
-#endif
 }
 
 vec3 tex_lookup_float3_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop_u, vec2 crop_v, float frame)
@@ -181,7 +171,6 @@ vec3 tex_lookup_color_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop_
 
 vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
 {
-#if TEXTURE_COUNT_2D > 0
     if (tex == 0)
     {
         return vec4(0, 0, 0, 0);
@@ -196,12 +185,8 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
+    ASSERT(array_idx < sceneParams.texture2dCount, "Error: invalid texture index\n");
     return texelFetch(sampler2D(textures_2d[nonuniformEXT(array_idx)], tex_sampler), coord, mipmap_level);
-#else
-    ASSERT(tex == 0, "Error: invalid texture index\n");
-    return vec4(0, 0, 0, 0);
-#endif
 }
 
 vec3 tex_texel_float3_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
@@ -226,7 +211,6 @@ vec3 tex_texel_color_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
 
 ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
 {
-#if TEXTURE_COUNT_2D > 0
     if (tex == 0)
     {
         return ivec2(0, 0);
@@ -234,14 +218,10 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
 
     uint array_idx = TEXTURE_INDEX_OFFSET_2D + tex - 1;
 
-    ASSERT(array_idx < TEXTURE_COUNT_2D, "Error: invalid texture index\n");
+    ASSERT(array_idx < sceneParams.texture2dCount, "Error: invalid texture index\n");
 
     int mipmap_level = 0;
     return textureSize(textures_2d[nonuniformEXT(array_idx)], mipmap_level);
-#else
-    ASSERT(tex == 0, "Error: invalid texture index\n");
-    return ivec2(0, 0);
-#endif
 }
 
 int tex_width_2d(int tex, ivec2 uv_tile, float frame)

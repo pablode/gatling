@@ -1,33 +1,19 @@
 #include "interface/rp_main.h"
 #include "common.glsl"
 
-#if SPHERE_LIGHT_COUNT > 0
+layout(binding = BINDING_INDEX_SCENE_PARAMS, std430) readonly buffer SceneParamsBuffer { SceneParams sceneParams; };
+
+#ifdef NEXT_EVENT_ESTIMATION
 layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLightBuffer { SphereLight sphereLights[]; };
-#endif
-
-#if DISTANT_LIGHT_COUNT > 0
 layout(binding = BINDING_INDEX_DISTANT_LIGHTS, std430) readonly buffer DistantLightBuffer { DistantLight distantLights[]; };
-#endif
-
-#if RECT_LIGHT_COUNT > 0
 layout(binding = BINDING_INDEX_RECT_LIGHTS, std430) readonly buffer RectLightBuffer { RectLight rectLights[]; };
-#endif
-
-#if DISK_LIGHT_COUNT > 0
 layout(binding = BINDING_INDEX_DISK_LIGHTS, std430) readonly buffer DiskLightBuffer { DiskLight diskLights[]; };
 #endif
 
-#if (TEXTURE_COUNT_2D > 0) || (TEXTURE_COUNT_3D > 0)
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
-#endif
 
-#if TEXTURE_COUNT_2D > 0
 layout(binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_2D_COUNT];
-#endif
-
-#if TEXTURE_COUNT_3D > 0
 layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_3D_COUNT];
-#endif
 
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
 
