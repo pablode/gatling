@@ -1624,13 +1624,18 @@ namespace gtl
                                                  &ipipeline->layout) == VK_SUCCESS;
   }
 
-  static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice, CgpuIPipeline* ipipeline, CgpuIShader* ishader, VkShaderStageFlags stageFlags)
+  static bool cgpuCreatePipelineDescriptorSet(CgpuIDevice* idevice,
+                                              CgpuIShader* ishader,
+                                              VkShaderStageFlags stageFlags,
+                                              VkDescriptorPool& descriptorPool,
+                                              VkDescriptorSetLayout& descriptorSetLayout,
+                                              std::vector<VkDescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
   {
     const CgpuShaderReflection* shaderReflection = &ishader->reflection;
     size_t bindingCount = shaderReflection->bindings.size();
 
     std::vector<VkDescriptorBindingFlagsEXT> bindingFlags(bindingCount);
-    ipipeline->descriptorSetLayoutBindings.resize(bindingCount);
+    descriptorSetLayoutBindings.resize(bindingCount);
 
     for (uint32_t i = 0; i < bindingCount; i++)
     {
@@ -1645,7 +1650,7 @@ namespace gtl
       };
 
       bindingFlags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
-      ipipeline->descriptorSetLayoutBindings[i] = layoutBinding;
+      descriptorSetLayoutBindings[i] = layoutBinding;
     }
 
     VkDescriptorSetLayoutBindingFlagsCreateInfoEXT layoutBindingFlags {
@@ -1660,18 +1665,34 @@ namespace gtl
       .pNext = &layoutBindingFlags,
       .flags = 0,
       .bindingCount = (uint32_t) bindingCount,
-      .pBindings = ipipeline->descriptorSetLayoutBindings.data(),
+      .pBindings = descriptorSetLayoutBindings.data(),
     };
 
     VkResult result = idevice->table.vkCreateDescriptorSetLayout(
       idevice->logicalDevice,
       &descriptorSetLayoutCreateInfo,
       nullptr,
-      &ipipeline->descriptorSetLayout
+      &descriptorSetLayout
     );
 
     if (result != VK_SUCCESS) {
       CGPU_RETURN_ERROR("failed to create descriptor set layout");
+    }
+
+    return true;
+  }
+
+  static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice,
+                                            CgpuIShader* ishader,
+                                            VkShaderStageFlags stageFlags,
+                                            CgpuIPipeline* ipipeline)
+  {
+    if (!cgpuCreatePipelineDescriptorSet(idevice, ishader, stageFlags,
+                                         ipipeline->descriptorPool,
+                                         ipipeline->descriptorSetLayout,
+                                         ipipeline->descriptorSetLayoutBindings))
+    {
+      return false;
     }
 
     uint32_t uniformBufferCount = 0;
@@ -1681,6 +1702,7 @@ namespace gtl
     uint32_t samplerCount = 0;
     uint32_t asCount = 0;
 
+    const CgpuShaderReflection* shaderReflection = &ishader->reflection;
     for (uint32_t i = 0; i < shaderReflection->bindings.size(); i++)
     {
       const CgpuShaderReflectionBinding* binding = &shaderReflection->bindings[i];
@@ -1753,7 +1775,7 @@ namespace gtl
       .pPoolSizes = poolSizes,
     };
 
-    result = idevice->table.vkCreateDescriptorPool(
+    VkResult result = idevice->table.vkCreateDescriptorPool(
       idevice->logicalDevice,
       &descriptorPoolCreateInfo,
       nullptr,
@@ -1802,7 +1824,7 @@ namespace gtl
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
-    if (!cgpuCreatePipelineDescriptors(idevice, ipipeline, ishader, VK_SHADER_STAGE_COMPUTE_BIT))
+    if (!cgpuCreatePipelineDescriptors(idevice, ishader, VK_SHADER_STAGE_COMPUTE_BIT, ipipeline))
     {
       iinstance->ipipelineStore.free(handle);
       CGPU_RETURN_ERROR("failed to create descriptor set layout");
@@ -2082,7 +2104,7 @@ namespace gtl
                                            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                                            VK_SHADER_STAGE_MISS_BIT_KHR;
 
-    if (!cgpuCreatePipelineDescriptors(idevice, ipipeline, irgenShader, stageAccess))
+    if (!cgpuCreatePipelineDescriptors(idevice, irgenShader, stageAccess, ipipeline))
     {
       goto cleanup_fail;
     }
