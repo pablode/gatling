@@ -1973,8 +1973,6 @@ namespace gtl
     std::vector<VkPipelineShaderStageCreateInfo> stages;
     stages.reserve(256);
 
-    VkShaderStageFlags shaderStageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-
     auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
       VkPipelineShaderStageCreateInfo stageCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1992,10 +1990,6 @@ namespace gtl
     pushStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR, irgenShader->module);
 
     // Miss
-    if (createInfo.missShaderCount > 0)
-    {
-      shaderStageFlags |= VK_SHADER_STAGE_MISS_BIT_KHR;
-    }
     for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
     {
       CGPU_RESOLVE_SHADER(createInfo.missShaders[i], imissShader);
@@ -2017,7 +2011,6 @@ namespace gtl
         assert(iclosestHitShader->stageFlags == VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
 
         pushStage(iclosestHitShader->stageFlags, iclosestHitShader->module);
-        shaderStageFlags |= iclosestHitShader->stageFlags;
       }
 
       // Any hit (optional)
@@ -2028,7 +2021,6 @@ namespace gtl
         assert(ianyHitShader->stageFlags == VK_SHADER_STAGE_ANY_HIT_BIT_KHR);
 
         pushStage(ianyHitShader->stageFlags, ianyHitShader->module);
-        shaderStageFlags |= ianyHitShader->stageFlags;
       }
     }
 
@@ -2085,11 +2077,16 @@ namespace gtl
     }
 
     // Create descriptor and pipeline layout.
-    if (!cgpuCreatePipelineDescriptors(idevice, ipipeline, irgenShader, shaderStageFlags))
+    const VkShaderStageFlags stageAccess = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+                                           VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
+                                           VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                                           VK_SHADER_STAGE_MISS_BIT_KHR;
+
+    if (!cgpuCreatePipelineDescriptors(idevice, ipipeline, irgenShader, stageAccess))
     {
       goto cleanup_fail;
     }
-    if (!cgpuCreatePipelineLayout(idevice, ipipeline, irgenShader, shaderStageFlags))
+    if (!cgpuCreatePipelineLayout(idevice, ipipeline, irgenShader, stageAccess))
     {
       goto cleanup_fail;
     }
