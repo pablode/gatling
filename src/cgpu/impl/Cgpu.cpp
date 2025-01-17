@@ -675,7 +675,7 @@ namespace gtl
     std::vector<VkExtensionProperties> extensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
-    std::array<const char*, 11> requiredExtensions = {
+    std::array<const char*, 12> requiredExtensions = {
       VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
       VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -686,7 +686,8 @@ namespace gtl
       VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
       VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-      VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME
+      VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
+      VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME
     };
 
     GbSmallVector<const char*, 8> enabledExtensions;
@@ -821,9 +822,15 @@ namespace gtl
       pNext = &invocationReorderFeatures;
     }
 
+    VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT libraryGroupHandlesFeatures = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_EXT,
+      .pNext = pNext,
+      .pipelineLibraryGroupHandles = VK_TRUE
+    };
+
     VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timelineSemaphoreFeatures = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-      .pNext = pNext,
+      .pNext = &libraryGroupHandlesFeatures,
       .timelineSemaphore = VK_TRUE
     };
 
