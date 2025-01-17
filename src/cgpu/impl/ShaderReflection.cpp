@@ -24,6 +24,62 @@
 
 namespace gtl
 {
+  static uint32_t cgpuGetTypeDescriptionSize(const SpvReflectTypeDescription& typeDesc);
+
+  static uint32_t cgpuGetStructSize(const SpvReflectTypeDescription& typeDesc)
+  {
+      uint32_t size = 0;
+
+      for (uint32_t i = 0; i < typeDesc.member_count; i++)
+      {
+        size += cgpuGetTypeDescriptionSize(typeDesc.members[i]);
+      }
+
+      return size;
+  }
+
+  static uint32_t cgpuGetTypeDescriptionSize(const SpvReflectTypeDescription& typeDesc)
+  {
+    const SpvReflectNumericTraits& nt = typeDesc.traits.numeric;
+
+    uint32_t byteWidth = 8;
+    uint32_t size = (nt.scalar.width / byteWidth);
+    if (nt.vector.component_count > 0)
+    {
+      size *= nt.vector.component_count;
+    }
+
+    if (typeDesc.struct_type_description)
+    {
+      uint32_t elemSize = cgpuGetStructSize(*typeDesc.struct_type_description);
+
+      const auto& array = typeDesc.traits.array;
+      for (uint32_t d = 0; d < array.dims_count; d++)
+      {
+        size += elemSize * array.dims[d];
+      }
+    }
+
+    return size;
+  }
+
+  static uint32_t cgpuGetInterfaceVarSize(const SpvReflectInterfaceVariable* var)
+  {
+    uint32_t size = 0;
+
+    for (uint32_t i = 0; i < var->member_count; i++)
+    {
+      size += cgpuGetInterfaceVarSize(&var->members[i]);
+    }
+
+    if (var->type_description)
+    {
+      size += cgpuGetTypeDescriptionSize(*var->type_description);
+    }
+
+    return size;
+  };
+
   bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection)
   {
     SpvReflectShaderModule shaderModule = {};
@@ -34,9 +90,50 @@ namespace gtl
     }
 
     bool result = false;
-    std::vector<SpvReflectDescriptorBinding*> bindings;
 
     uint32_t bindingCount;
+    std::vector<SpvReflectDescriptorBinding*> bindings;
+
+    uint32_t interfaceVarCount;
+    std::vector<SpvReflectInterfaceVariable*> interfaceVars;
+
+    if (spvReflectEnumerateInterfaceVariables(&shaderModule, &interfaceVarCount, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
+    {
+      goto fail;
+    }
+
+    interfaceVars.resize(interfaceVarCount);
+    if (spvReflectEnumerateInterfaceVariables(&shaderModule, &interfaceVarCount, interfaceVars.data()) != SPV_REFLECT_RESULT_SUCCESS)
+    {
+      goto fail;
+    }
+
+    reflection->maxRayPayloadSize = 0;
+    reflection->maxRayHitAttributeSize = 0;
+
+    for (const SpvReflectInterfaceVariable* interfaceVar : interfaceVars)
+    {
+      if (interfaceVar->storage_class == SpvStorageClassRayPayloadKHR ||
+          interfaceVar->storage_class == SpvStorageClassIncomingRayPayloadKHR)
+      {
+        uint32_t size = cgpuGetInterfaceVarSize(interfaceVar);
+
+        if (size > reflection->maxRayPayloadSize)
+        {
+          reflection->maxRayPayloadSize = size;
+        }
+      }
+      else if (interfaceVar->storage_class == SpvStorageClassHitAttributeKHR)
+      {
+        uint32_t size = cgpuGetInterfaceVarSize(interfaceVar);
+
+        if (size > reflection->maxRayHitAttributeSize)
+        {
+          reflection->maxRayHitAttributeSize = size;
+        }
+      }
+    }
+
     if (spvReflectEnumerateDescriptorBindings(&shaderModule, &bindingCount, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
     {
       goto fail;

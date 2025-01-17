@@ -35,6 +35,8 @@ namespace gtl
   {
     uint32_t pushConstantsSize;
     std::vector<CgpuShaderReflectionBinding> bindings;
+    uint32_t maxRayPayloadSize;
+    uint32_t maxRayHitAttributeSize;
   };
 
   bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);
