@@ -2095,9 +2095,10 @@ cleanup:
 
     // Trace rays.
     {
-      CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_FLAG_RAYGEN | CGPU_SHADER_STAGE_FLAG_MISS;
-      pushShaderStages |= shaderCache->hasPipelineClosestHitShader ? CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT : 0;
-      pushShaderStages |= shaderCache->hasPipelineAnyHitShader ? CGPU_SHADER_STAGE_FLAG_ANY_HIT : 0;
+      CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_FLAG_RAYGEN |
+                                              CGPU_SHADER_STAGE_FLAG_MISS |
+                                              CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT |
+                                              CGPU_SHADER_STAGE_FLAG_ANY_HIT;
 
       cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
     }
