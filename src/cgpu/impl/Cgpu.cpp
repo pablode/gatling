@@ -1302,7 +1302,7 @@ namespace gtl
 
     const CgpuShaderReflection& reflection = ishader->reflection;
 
-    VkRayTracingPipelineInterfaceCreateInfoKHR rtInterfaceCreateInfo {
+    VkRayTracingPipelineInterfaceCreateInfoKHR interfaceCreateInfo {
       .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_INTERFACE_CREATE_INFO_KHR,
       .pNext = nullptr,
       .maxPipelineRayPayloadSize = reflection.maxRayPayloadSize,
@@ -1319,7 +1319,7 @@ namespace gtl
       .pGroups = nullptr,
       .maxPipelineRayRecursionDepth = 1,
       .pLibraryInfo = nullptr,
-      .pLibraryInterface = &rtInterfaceCreateInfo,
+      .pLibraryInterface = &interfaceCreateInfo,
       .pDynamicState = nullptr,
       .layout = library.layout,
       .basePipelineHandle = VK_NULL_HANDLE,
@@ -2101,69 +2101,9 @@ namespace gtl
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
-    // Zero-init for cleanup routine.
     memset(ipipeline, 0, sizeof(CgpuIPipeline));
 
-    // In a ray tracing pipeline, all shaders are expected to have the same descriptor set layouts. Here, we
-    // construct the descriptor set layouts and the pipeline layout from only the ray generation shader.
-    CGPU_RESOLVE_SHADER(createInfo.rgenShader, irgenShader);
-
-    // Set up stages
-    std::vector<VkPipelineShaderStageCreateInfo> stages;
-    stages.reserve(256);
-
-    auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
-      VkPipelineShaderStageCreateInfo stageCreateInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-        .pNext = nullptr,
-        .flags = 0,
-        .stage = stage,
-        .module = module,
-        .pName = CGPU_SHADER_ENTRY_POINT,
-        .pSpecializationInfo = nullptr,
-      };
-      stages.push_back(stageCreateInfo);
-    };
-
-    // Ray gen
-    pushStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR, irgenShader->module);
-
-    // Miss
-    for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
-    {
-      CGPU_RESOLVE_SHADER(createInfo.missShaders[i], imissShader);
-
-      assert(imissShader->module);
-      pushStage(VK_SHADER_STAGE_MISS_BIT_KHR, imissShader->module);
-    }
-
-    // Hit
-    for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
-    {
-      const CgpuRtHitGroup* hitGroup = &createInfo.hitGroups[i];
-
-      // Closest hit (optional)
-      if (hitGroup->closestHitShader.handle)
-      {
-        CGPU_RESOLVE_SHADER(hitGroup->closestHitShader, iclosestHitShader);
-
-        assert(iclosestHitShader->stageFlags == VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR);
-
-        pushStage(iclosestHitShader->stageFlags, iclosestHitShader->module);
-      }
-
-      // Any hit (optional)
-      if (hitGroup->anyHitShader.handle)
-      {
-        CGPU_RESOLVE_SHADER(hitGroup->anyHitShader, ianyHitShader);
-
-        assert(ianyHitShader->stageFlags == VK_SHADER_STAGE_ANY_HIT_BIT_KHR);
-
-        pushStage(ianyHitShader->stageFlags, ianyHitShader->module);
-      }
-    }
-
-    // Set up groups
+    // Gather groups
     size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups(groupCount);
 
@@ -2216,6 +2156,8 @@ namespace gtl
     }
 
     // Create descriptor and pipeline layout.
+    CGPU_RESOLVE_SHADER(createInfo.rgenShader, irgenShader);
+
     if (!cgpuCreatePipelineDescriptors(idevice, irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, ipipeline))
     {
       goto cleanup_fail;
@@ -2227,6 +2169,33 @@ namespace gtl
 
     // Create pipeline.
     {
+      const auto getShaderPipelineHandle = [](CgpuShader shader) {
+        CGPU_RESOLVE_SHADER(shader, ishader);
+        return ishader->pipelineLibrary.pipeline;
+      };
+
+      std::vector<VkPipeline> libraries;
+      libraries.reserve(groupCount);
+
+      libraries.push_back(irgenShader->pipelineLibrary.pipeline);
+      for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
+      {
+        libraries.push_back(getShaderPipelineHandle(createInfo.missShaders[i]));
+      }
+      for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
+      {
+        CgpuShader closestHitShader = createInfo.hitGroups[i].closestHitShader;
+        CgpuShader anyHitShader = createInfo.hitGroups[i].anyHitShader;
+        if (closestHitShader.handle)
+        {
+          libraries.push_back(getShaderPipelineHandle(closestHitShader));
+        }
+        if (anyHitShader.handle)
+        {
+          libraries.push_back(getShaderPipelineHandle(anyHitShader));
+        }
+      }
+
       uint32_t groupCount = hitStageAndGroupOffset + createInfo.hitGroupCount;
 
       VkPipelineCreateFlags flags = 0;
@@ -2239,17 +2208,33 @@ namespace gtl
         flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
       }
 
+      VkPipelineLibraryCreateInfoKHR libraryCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
+        .pNext = nullptr,
+        .libraryCount = (uint32_t) libraries.size(),
+        .pLibraries = libraries.data()
+      };
+
+      const CgpuShaderReflection& reflection = irgenShader->reflection;
+
+      VkRayTracingPipelineInterfaceCreateInfoKHR interfaceCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_INTERFACE_CREATE_INFO_KHR,
+        .pNext = nullptr,
+        .maxPipelineRayPayloadSize = reflection.maxRayPayloadSize,
+        .maxPipelineRayHitAttributeSize = reflection.maxRayHitAttributeSize
+      };
+
       VkRayTracingPipelineCreateInfoKHR rtPipelineCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
         .pNext = nullptr,
         .flags = flags,
-        .stageCount = (uint32_t) stages.size(),
-        .pStages = stages.data(),
+        .stageCount = 0,
+        .pStages = nullptr,
         .groupCount = (uint32_t) groups.size(),
         .pGroups = groups.data(),
         .maxPipelineRayRecursionDepth = 1,
-        .pLibraryInfo = nullptr,
-        .pLibraryInterface = nullptr,
+        .pLibraryInfo = &libraryCreateInfo,
+        .pLibraryInterface = &interfaceCreateInfo,
         .pDynamicState = nullptr,
         .layout = ipipeline->layout,
         .basePipelineHandle = VK_NULL_HANDLE,
