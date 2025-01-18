@@ -596,6 +596,13 @@ namespace gtl
     CgpuShader* shader
   );
 
+  bool cgpuCreateShaders(
+    CgpuDevice device,
+    uint32_t shaderCount,
+    CgpuShaderCreateInfo* createInfos,
+    CgpuShader* shaders
+  );
+
   bool cgpuDestroyShader(
     CgpuDevice device,
     CgpuShader shader

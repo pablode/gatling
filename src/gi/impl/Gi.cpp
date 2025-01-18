@@ -1417,79 +1417,63 @@ cleanup:
         goto cleanup;
       }
 
-      // 4. Compile the shaders to SPIV-V. (FIXME: multithread - beware of shared cgpu resource stores)
-      hitShaders.reserve(hitGroupCompInfos.size());
-      hitGroups.reserve(hitGroupCompInfos.size() * 2);
+      // 4. Compile the shaders to SPIV-V.
+      auto hitGroupCount = (uint32_t) hitGroupCompInfos.size();
 
-      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
+      std::vector<CgpuShaderCreateInfo> createInfos;
+      createInfos.reserve(hitGroupCount * 2);
+
+      for (uint32_t i = 0; i < int(hitGroupCount); i++)
       {
         const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
         // regular hit group
         {
-          CgpuShader closestHitShader;
-          {
-            const std::vector<uint8_t>& spv = compInfo.closestHitInfo.spv;
+          const std::vector<uint8_t>& cSpv = compInfo.closestHitInfo.spv;
+          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT });
 
-            if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
-                                    .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT
-                                  }, &closestHitShader))
-            {
-              goto cleanup;
-            }
-
-            hitShaders.push_back(closestHitShader);
-          }
-
-          CgpuShader anyHitShader;
           if (compInfo.anyHitInfo)
           {
-            const std::vector<uint8_t>& spv = compInfo.anyHitInfo->spv;
-
-            if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
-                                    .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
-                                  }, &anyHitShader))
-            {
-              goto cleanup;
-            }
-
-            hitShaders.push_back(anyHitShader);
+            const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->spv;
+            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT });
           }
-
-          CgpuRtHitGroup hitGroup;
-          hitGroup.closestHitShader = closestHitShader;
-          hitGroup.anyHitShader = anyHitShader;
-          hitGroups.push_back(hitGroup);
         }
 
         // shadow hit group
+        if (compInfo.anyHitInfo)
         {
-          CgpuShader anyHitShader;
-
-          if (compInfo.anyHitInfo)
-          {
-            const std::vector<uint8_t>& spv = compInfo.anyHitInfo->shadowSpv;
-
-            if (!cgpuCreateShader(s_device, {
-                                    .size = spv.size(),
-                                    .source = spv.data(),
-                                    .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT
-                                  }, &anyHitShader))
-            {
-              goto cleanup;
-            }
-
-            hitShaders.push_back(anyHitShader);
-          }
-
-          CgpuRtHitGroup hitGroup;
-          hitGroup.anyHitShader = anyHitShader;
-          hitGroups.push_back(hitGroup);
+          const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->shadowSpv;
+          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT });
         }
+      }
+
+      hitShaders.resize(createInfos.size());
+      if (!cgpuCreateShaders(s_device, (uint32_t) createInfos.size(), createInfos.data(), hitShaders.data()))
+      {
+        goto cleanup;
+      }
+
+      hitGroups.reserve(createInfos.size());
+      for (uint32_t i = 0, j = 0; i < hitGroupCount; i++)
+      {
+        const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
+
+        // regular hit group
+        CgpuRtHitGroup hitGroup;
+        hitGroup.closestHitShader = hitShaders[j++];
+        if (compInfo.anyHitInfo)
+        {
+          hitGroup.anyHitShader = hitShaders[j++];
+        }
+        hitGroups.push_back(hitGroup);
+
+        // shadow hit group
+        CgpuRtHitGroup shadowHitGroup;
+        if (compInfo.anyHitInfo)
+        {
+          shadowHitGroup.anyHitShader = hitShaders[j++];
+        }
+        hitGroups.push_back(shadowHitGroup);
       }
     }
 

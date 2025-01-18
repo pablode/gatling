@@ -1409,6 +1409,24 @@ namespace gtl
     return true;
   }
 
+  bool cgpuCreateShaders(CgpuDevice device,
+                         uint32_t shaderCount,
+                         CgpuShaderCreateInfo* createInfos,
+                         CgpuShader* shaders)
+  {
+    // TODO: parallelize with openmp when i > 1 (resolve ishaders)
+    for (uint32_t i = 0; i < shaderCount; i++)
+    {
+      if (!cgpuCreateShader(device, createInfos[i], &shaders[i]))
+      {
+        // TODO: free resources in failure case
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   bool cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
