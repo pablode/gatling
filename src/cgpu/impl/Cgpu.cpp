@@ -676,7 +676,7 @@ namespace gtl
     std::vector<VkExtensionProperties> extensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
-    std::array<const char*, 13> requiredExtensions = {
+    std::array<const char*, 16> requiredExtensions = {
       VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
       VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -689,7 +689,10 @@ namespace gtl
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
       VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
       VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME,
-      VK_KHR_MAINTENANCE_5_EXTENSION_NAME
+      VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
+      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, // required by VK_KHR_maintenance5
+      VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, // required by VK_KHR_dynamic_rendering
+      VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME // required by VK_KHR_depth_stencil_resolve
     };
 
     GbSmallVector<const char*, 8> enabledExtensions;
