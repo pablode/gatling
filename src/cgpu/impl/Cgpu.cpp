@@ -131,7 +131,7 @@ namespace gtl
 
   struct CgpuIShader
   {
-    VkShaderModule module;
+    VkShaderModule module = VK_NULL_HANDLE; // null for RT pipeline
     CgpuShaderReflection reflection;
     VkShaderStageFlagBits stageFlags;
     CgpuIPipelineLibrary pipelineLibrary;
@@ -675,7 +675,7 @@ namespace gtl
     std::vector<VkExtensionProperties> extensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
-    std::array<const char*, 12> requiredExtensions = {
+    std::array<const char*, 13> requiredExtensions = {
       VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
       VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -687,7 +687,8 @@ namespace gtl
       VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
       VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-      VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME
+      VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME,
+      VK_KHR_MAINTENANCE_5_EXTENSION_NAME
     };
 
     GbSmallVector<const char*, 8> enabledExtensions;
@@ -822,9 +823,15 @@ namespace gtl
       pNext = &invocationReorderFeatures;
     }
 
+    VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
+      .pNext = pNext,
+      .maintenance5 = VK_TRUE
+    };
+
     VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT libraryGroupHandlesFeatures = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_EXT,
-      .pNext = pNext,
+      .pNext = &maintenance5Features,
       .pipelineLibraryGroupHandles = VK_TRUE
     };
 
@@ -1275,7 +1282,10 @@ namespace gtl
     return true;
   }
 
-  static bool cgpuCreateRtPipelineLibrary(CgpuIDevice* idevice, CgpuIShader* ishader, VkShaderStageFlags stageFlags)
+  static bool cgpuCreateRtPipelineLibrary(CgpuIDevice* idevice,
+                                          const VkShaderModuleCreateInfo& moduleCreateInfo,
+                                          CgpuIShader* ishader,
+                                          VkShaderStageFlags stageFlags)
   {
     CgpuIPipelineLibrary& library = ishader->pipelineLibrary;
 
@@ -1299,10 +1309,10 @@ namespace gtl
 
     VkPipelineShaderStageCreateInfo stageCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      .pNext = nullptr,
+      .pNext = &moduleCreateInfo,
       .flags = 0,
       .stage = ishader->stageFlags,
-      .module = ishader->module,
+      .module = VK_NULL_HANDLE,
       .pName = CGPU_SHADER_ENTRY_POINT,
       .pSpecializationInfo = nullptr
     };
@@ -1362,50 +1372,50 @@ namespace gtl
 
     CGPU_RESOLVE_SHADER({ handle }, ishader);
 
-    VkShaderModuleCreateInfo shaderModuleCreateInfo = {
-      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-      .codeSize = createInfo.size,
-      .pCode = (uint32_t*) createInfo.source,
-    };
+    ishader->stageFlags = (VkShaderStageFlagBits)createInfo.stageFlags;
 
-    VkResult result = idevice->table.vkCreateShaderModule(
-      idevice->logicalDevice,
-      &shaderModuleCreateInfo,
-      nullptr,
-      &ishader->module
-    );
-    if (result != VK_SUCCESS) {
-      iinstance->ishaderStore.free(handle);
-      CGPU_RETURN_ERROR("failed to create shader module");
-    }
-
-    ishader->stageFlags = (VkShaderStageFlagBits) createInfo.stageFlags;
-
-    if (iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (!cgpuReflectShader((uint32_t*)createInfo.source, createInfo.size, &ishader->reflection))
     {
-      cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t) ishader->module, createInfo.debugName);
-    }
-
-    if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
-    {
-      idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
       iinstance->ishaderStore.free(handle);
       CGPU_RETURN_ERROR("failed to reflect shader");
     }
 
-    if (createInfo.stageFlags != CGPU_SHADER_STAGE_FLAG_COMPUTE)
+    VkShaderModuleCreateInfo moduleCreateInfo = {
+     .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+     .pNext = nullptr,
+     .flags = 0,
+     .codeSize = createInfo.size,
+     .pCode = (uint32_t*) createInfo.source,
+    };
+
+    if (createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_COMPUTE)
     {
-      if (!cgpuCreateRtPipelineLibrary(idevice, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS))
-      {
-        idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
+      VkResult result = idevice->table.vkCreateShaderModule(
+        idevice->logicalDevice,
+        &moduleCreateInfo,
+        nullptr,
+        &ishader->module
+      );
+
+      if (result != VK_SUCCESS) {
         iinstance->ishaderStore.free(handle);
-        CGPU_RETURN_ERROR("failed to create pipeline library");
+        CGPU_RETURN_ERROR("failed to create shader module");
       }
+
+      if (iinstance->debugUtilsEnabled && createInfo.debugName)
+      {
+        cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)ishader->module, createInfo.debugName);
+      }
+    }
+    else if (!cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS))
+    {
+      idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
+      iinstance->ishaderStore.free(handle);
+      CGPU_RETURN_ERROR("failed to create pipeline library");
     }
 
     shader->handle = handle;
+
     return true;
   }
 
@@ -1438,11 +1448,10 @@ namespace gtl
     idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, library.descriptorSetLayout, nullptr);
     idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, library.descriptorPool, nullptr);
 
-    idevice->table.vkDestroyShaderModule(
-      idevice->logicalDevice,
-      ishader->module,
-      nullptr
-    );
+    if (ishader->module != VK_NULL_HANDLE)
+    {
+      idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
+    }
 
     iinstance->ishaderStore.free(shader.handle);
 
