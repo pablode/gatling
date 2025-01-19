@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <array>
 #include <memory>
+#include <atomic>
 
 #include <volk.h>
 
@@ -1362,21 +1363,14 @@ namespace gtl
     return true;
   }
 
-  bool cgpuCreateShader(CgpuDevice device,
-                        CgpuShaderCreateInfo createInfo,
-                        CgpuShader* shader)
+  static bool cgpuCreateShader(CgpuIDevice* idevice,
+                               const CgpuShaderCreateInfo& createInfo,
+                               CgpuIShader* ishader)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-
-    uint64_t handle = iinstance->ishaderStore.allocate();
-
-    CGPU_RESOLVE_SHADER({ handle }, ishader);
-
     ishader->stageFlags = (VkShaderStageFlagBits)createInfo.stageFlags;
 
     if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
     {
-      iinstance->ishaderStore.free(handle);
       CGPU_RETURN_ERROR("failed to reflect shader");
     }
 
@@ -1408,7 +1402,6 @@ namespace gtl
       );
 
       if (result != VK_SUCCESS) {
-        iinstance->ishaderStore.free(handle);
         CGPU_RETURN_ERROR("failed to create shader module");
       }
 
@@ -1421,11 +1414,27 @@ namespace gtl
                                           createInfo.maxRayPayloadSize, createInfo.maxRayHitAttributeSize))
     {
       idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
-      iinstance->ishaderStore.free(handle);
       CGPU_RETURN_ERROR("failed to create pipeline library");
     }
 
-    shader->handle = handle;
+    return true;
+  }
+
+  bool cgpuCreateShader(CgpuDevice device,
+                        CgpuShaderCreateInfo createInfo,
+                        CgpuShader* shader)
+  {
+    CGPU_RESOLVE_DEVICE(device, idevice);
+
+    shader->handle = iinstance->ishaderStore.allocate();
+
+    CGPU_RESOLVE_SHADER(*shader, ishader);
+
+    if (!cgpuCreateShader(idevice, createInfo, ishader))
+    {
+      iinstance->ishaderStore.free(shader->handle);
+      return false;
+    }
 
     return true;
   }
@@ -1435,17 +1444,49 @@ namespace gtl
                          CgpuShaderCreateInfo* createInfos,
                          CgpuShader* shaders)
   {
-    // TODO: parallelize with openmp when i > 1 (resolve ishaders)
+    CGPU_RESOLVE_DEVICE(device, idevice);
+
     for (uint32_t i = 0; i < shaderCount; i++)
     {
-      if (!cgpuCreateShader(device, createInfos[i], &shaders[i]))
+      shaders[i].handle = iinstance->ishaderStore.allocate();
+    }
+
+    std::vector<CgpuIShader*> ishaders;
+    ishaders.resize(shaderCount, nullptr);
+
+    for (uint32_t i = 0; i < shaderCount; i++)
+    {
+      CGPU_RESOLVE_SHADER(shaders[i], ishader);
+      ishaders[i] = ishader;
+    }
+
+    std::atomic<int> errorCount = false;
+
+#pragma omp parallel for schedule(dynamic, 1)
+    for (int i = 0; i < int(shaderCount); i++)
+    {
+      if (!cgpuCreateShader(idevice, createInfos[i], ishaders[i]))
       {
-        // TODO: free resources in failure case
-        return false;
+        errorCount++;
       }
     }
 
-    return true;
+    if (errorCount == 0)
+    {
+      return true;
+    }
+
+    for (uint32_t i = 0; i < shaderCount; i++)
+    {
+      CgpuShader shader = shaders[i];
+      if (shader.handle)
+      {
+        cgpuDestroyShader(device, shader);
+      }
+      iinstance->ishaderStore.free(shader.handle);
+    }
+
+    return false;
   }
 
   bool cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
