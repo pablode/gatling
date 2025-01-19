@@ -2900,14 +2900,14 @@ cleanup_fail:
         {
           const CgpuBufferBinding* bufferBinding = &bindings->buffers[k];
 
-          if (bufferBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
           if (bufferBinding->binding != layoutBinding->binding)
           {
             continue;
+          }
+
+          if (bufferBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
           }
 
           CGPU_RESOLVE_BUFFER(bufferBinding->buffer, ibuffer);
@@ -2935,14 +2935,14 @@ cleanup_fail:
         {
           const CgpuImageBinding* imageBinding = &bindings->images[k];
 
-          if (imageBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
           if (imageBinding->binding != layoutBinding->binding)
           {
             continue;
+          }
+
+          if (imageBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
           }
 
           CGPU_RESOLVE_IMAGE(imageBinding->image, iimage);
@@ -2966,14 +2966,14 @@ cleanup_fail:
         {
           const CgpuSamplerBinding* samplerBinding = &bindings->samplers[k];
 
-          if (samplerBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
           if (samplerBinding->binding != layoutBinding->binding)
           {
             continue;
+          }
+
+          if (samplerBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
           }
 
           CGPU_RESOLVE_SAMPLER(samplerBinding->sampler, isampler);
@@ -2995,14 +2995,14 @@ cleanup_fail:
         {
           const CgpuTlasBinding* asBinding = &bindings->tlases[k];
 
-          if (asBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
           if (asBinding->binding != layoutBinding->binding)
           {
             continue;
+          }
+
+          if (asBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
           }
 
           CGPU_RESOLVE_TLAS(asBinding->as, itlas);
