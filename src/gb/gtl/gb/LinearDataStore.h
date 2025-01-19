@@ -32,7 +32,15 @@ namespace gtl
   public:
     uint64_t allocate()
     {
-      return m_handleStore.allocateHandle();
+      uint64_t handle = m_handleStore.allocateHandle();
+
+      uint32_t index = uint32_t(handle);
+      if (index >= m_objects.size())
+      {
+        m_objects.resize(index + 1);
+      }
+
+      return handle;
     }
 
     void free(uint64_t handle)
@@ -51,10 +59,6 @@ namespace gtl
       }
 
       uint32_t index = uint32_t(handle);
-      if (index >= m_objects.size())
-      {
-        m_objects.resize(index + 1);
-      }
 
       *object = &m_objects[index];
       return true;
