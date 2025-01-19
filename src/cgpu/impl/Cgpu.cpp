@@ -2223,16 +2223,6 @@ namespace gtl
 
       uint32_t groupCount = hitStageAndGroupOffset + createInfo.hitGroupCount;
 
-      VkPipelineCreateFlags flags = 0;
-      if (!anyNullClosestHitShader && createInfo.hitGroupCount > 0)
-      {
-        flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_CLOSEST_HIT_SHADERS_BIT_KHR;
-      }
-      if (!anyNullAnyHitShader && createInfo.hitGroupCount > 0)
-      {
-        flags |= VK_PIPELINE_CREATE_RAY_TRACING_NO_NULL_ANY_HIT_SHADERS_BIT_KHR;
-      }
-
       VkPipelineLibraryCreateInfoKHR libraryCreateInfo {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
         .pNext = nullptr,
@@ -2252,7 +2242,7 @@ namespace gtl
       VkRayTracingPipelineCreateInfoKHR rtPipelineCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
         .pNext = nullptr,
-        .flags = flags,
+        .flags = 0,
         .stageCount = 0,
         .pStages = nullptr,
         .groupCount = (uint32_t) groups.size(),
