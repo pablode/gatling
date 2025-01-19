@@ -1753,6 +1753,11 @@ cleanup:
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBvh; // SBT
     }
 
+    if (!scene->shaderCache)
+    {
+      return GiStatus::Error;
+    }
+
     if (!scene->bvh || bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyBvh))
     {
       if (scene->bvh) _giDestroyBvh(scene->bvh);
