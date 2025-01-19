@@ -1285,7 +1285,9 @@ namespace gtl
   static bool cgpuCreateRtPipelineLibrary(CgpuIDevice* idevice,
                                           const VkShaderModuleCreateInfo& moduleCreateInfo,
                                           CgpuIShader* ishader,
-                                          VkShaderStageFlags stageFlags)
+                                          VkShaderStageFlags stageFlags,
+                                          uint32_t maxRayPayloadSize,
+                                          uint32_t maxRayHitAttributeSize)
   {
     CgpuIPipelineLibrary& library = ishader->pipelineLibrary;
 
@@ -1317,13 +1319,11 @@ namespace gtl
       .pSpecializationInfo = nullptr
     };
 
-    const CgpuShaderReflection& reflection = ishader->reflection;
-
     VkRayTracingPipelineInterfaceCreateInfoKHR interfaceCreateInfo {
       .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_INTERFACE_CREATE_INFO_KHR,
       .pNext = nullptr,
-      .maxPipelineRayPayloadSize = reflection.maxRayPayloadSize,
-      .maxPipelineRayHitAttributeSize = reflection.maxRayHitAttributeSize
+      .maxPipelineRayPayloadSize = maxRayPayloadSize,
+      .maxPipelineRayHitAttributeSize = maxRayHitAttributeSize
     };
 
     VkRayTracingPipelineCreateInfoKHR rtPipelineCreateInfo = {
@@ -1374,11 +1374,21 @@ namespace gtl
 
     ishader->stageFlags = (VkShaderStageFlagBits)createInfo.stageFlags;
 
-    if (!cgpuReflectShader((uint32_t*)createInfo.source, createInfo.size, &ishader->reflection))
+    if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
     {
       iinstance->ishaderStore.free(handle);
       CGPU_RETURN_ERROR("failed to reflect shader");
     }
+
+#ifndef NDEBUG
+    if (createInfo.stageFlags != CGPU_SHADER_STAGE_FLAG_COMPUTE)
+    {
+      assert(createInfo.maxRayPayloadSize > 0);
+      assert(createInfo.maxRayHitAttributeSize > 0);
+      assert(ishader->reflection.maxRayPayloadSize <= createInfo.maxRayPayloadSize);
+      assert(ishader->reflection.maxRayHitAttributeSize <= createInfo.maxRayHitAttributeSize);
+    }
+#endif
 
     VkShaderModuleCreateInfo moduleCreateInfo = {
      .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -1407,7 +1417,8 @@ namespace gtl
         cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)ishader->module, createInfo.debugName);
       }
     }
-    else if (!cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS))
+    else if (!cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS,
+                                          createInfo.maxRayPayloadSize, createInfo.maxRayHitAttributeSize))
     {
       idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
       iinstance->ishaderStore.free(handle);
@@ -2239,13 +2250,14 @@ namespace gtl
         .pLibraries = libraries.data()
       };
 
-      const CgpuShaderReflection& reflection = irgenShader->reflection;
+      assert(createInfo.maxRayPayloadSize > 0);
+      assert(createInfo.maxRayHitAttributeSize > 0);
 
       VkRayTracingPipelineInterfaceCreateInfoKHR interfaceCreateInfo {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_INTERFACE_CREATE_INFO_KHR,
         .pNext = nullptr,
-        .maxPipelineRayPayloadSize = reflection.maxRayPayloadSize,
-        .maxPipelineRayHitAttributeSize = reflection.maxRayHitAttributeSize
+        .maxPipelineRayPayloadSize = createInfo.maxRayPayloadSize,
+        .maxPipelineRayHitAttributeSize = createInfo.maxRayHitAttributeSize
       };
 
       VkRayTracingPipelineCreateInfoKHR rtPipelineCreateInfo = {

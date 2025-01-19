@@ -324,6 +324,23 @@ namespace gtl
     }
   }
 
+  // IMPORTANT: this needs to match the rp_main* shaders. It is asserted in cgpu.
+  uint32_t _GetRpMainMaxRayHitAttributeSize()
+  {
+    return 8;
+  }
+
+  // IMPORTANT: this needs to match the rp_main* shaders. It is asserted in cgpu.
+  uint32_t _GetRpMainMaxRayPayloadSize(uint32_t mediumStackSize)
+  {
+    uint32_t size = 80;
+    if (mediumStackSize > 0)
+    {
+      size += mediumStackSize * 40 + 12;
+    }
+    return size;
+  }
+
   GiStatus giInitialize(const GiInitParams& params)
   {
 #ifdef NDEBUG
@@ -1222,6 +1239,9 @@ cleanup:
     OffsetAllocator::Allocator tex2dAllocator{rp::MAX_TEXTURE_2D_COUNT};
     OffsetAllocator::Allocator tex3dAllocator{rp::MAX_TEXTURE_3D_COUNT};
 
+    uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
+    uint32_t maxRayHitAttributeSize = _GetRpMainMaxRayHitAttributeSize();
+
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
       .mediumStackSize = renderSettings.mediumStackSize
@@ -1435,12 +1455,14 @@ cleanup:
         // regular hit group
         {
           const std::vector<uint8_t>& cSpv = compInfo.closestHitInfo.spv;
-          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT });
+          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT,
+                                  .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
 
           if (compInfo.anyHitInfo)
           {
             const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->spv;
-            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT });
+            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT,
+                                    .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
           }
         }
 
@@ -1448,7 +1470,8 @@ cleanup:
         if (compInfo.anyHitInfo)
         {
           const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->shadowSpv;
-          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT });
+          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT,
+                                  .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
         }
       }
 
@@ -1505,7 +1528,9 @@ cleanup:
       if (!cgpuCreateShader(s_device, {
                               .size = spv.size(),
                               .source = spv.data(),
-                              .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN
+                              .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN,
+                              .maxRayPayloadSize = maxRayPayloadSize,
+                              .maxRayHitAttributeSize = maxRayHitAttributeSize
                             }, &rgenShader))
       {
         goto cleanup;
@@ -1531,7 +1556,9 @@ cleanup:
         if (!cgpuCreateShader(s_device, {
                                 .size = spv.size(),
                                 .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
+                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
+                                .maxRayPayloadSize = maxRayPayloadSize,
+                                .maxRayHitAttributeSize = maxRayHitAttributeSize
                               }, &missShader))
         {
           goto cleanup;
@@ -1552,7 +1579,9 @@ cleanup:
         if (!cgpuCreateShader(s_device, {
                                 .size = spv.size(),
                                 .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS
+                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
+                                .maxRayPayloadSize = maxRayPayloadSize,
+                                .maxRayHitAttributeSize = maxRayHitAttributeSize
                               }, &missShader))
         {
           goto cleanup;
@@ -1579,6 +1608,8 @@ cleanup:
                                   .missShaders = missShaders.data(),
                                   .hitGroupCount = (uint32_t)hitGroups.size(),
                                   .hitGroups = hitGroups.data(),
+                                  .maxRayPayloadSize = maxRayPayloadSize,
+                                  .maxRayHitAttributeSize = maxRayHitAttributeSize
                                 }, &pipeline))
       {
         goto cleanup;

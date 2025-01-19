@@ -16,6 +16,7 @@ struct Medium
     float bias;
 };
 
+// NOTE: size needs to match _GetRpMainMaxRayPayloadSize()
 struct ShadeRayPayload
 {
     /* inout */ vec3 throughput;

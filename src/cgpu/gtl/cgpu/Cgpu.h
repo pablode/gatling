@@ -315,6 +315,8 @@ namespace gtl
     const uint8_t* source;
     CgpuShaderStageFlags stageFlags;
     const char* debugName = nullptr;
+    uint32_t maxRayPayloadSize = 0; // for RT shaders
+    uint32_t maxRayHitAttributeSize = 0; // for RT shaders
   };
 
   struct CgpuSamplerCreateInfo
@@ -360,6 +362,8 @@ namespace gtl
     uint32_t hitGroupCount = 0;
     const CgpuRtHitGroup* hitGroups = nullptr;
     const char* debugName = nullptr;
+    uint32_t maxRayPayloadSize = 0;
+    uint32_t maxRayHitAttributeSize = 0;
   };
 
   struct CgpuBlasCreateInfo
