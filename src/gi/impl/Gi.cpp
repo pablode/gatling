@@ -1335,6 +1335,18 @@ cleanup:
         }
       }
 
+      if (imageOffsets2d.size() > rp::MAX_TEXTURE_2D_COUNT)
+      {
+        GB_ERROR("max number of 2D textures exceeded");
+        goto cleanup;
+      }
+
+      if (imageOffsets3d.size() > rp::MAX_TEXTURE_3D_COUNT)
+      {
+        GB_ERROR("max number of 3D textures exceeded");
+        goto cleanup;
+      }
+
       // 3. Generate final hit shader GLSL sources.
       threadWorkFailed = false;
 #pragma omp parallel for
