@@ -1232,12 +1232,12 @@ namespace gtl
 
     for (uint32_t i = 0; i < bindingCount; i++)
     {
-      const CgpuShaderReflectionBinding* bindingReflection = &shaderReflection->bindings[i];
+      const CgpuShaderReflectionBinding& bindingReflection = shaderReflection->bindings[i];
 
       VkDescriptorSetLayoutBinding layoutBinding = {
-        .binding = bindingReflection->binding,
-        .descriptorType = (VkDescriptorType) bindingReflection->descriptorType,
-        .descriptorCount = bindingReflection->count,
+        .binding = bindingReflection.binding,
+        .descriptorType = (VkDescriptorType) bindingReflection.descriptorType,
+        .descriptorCount = bindingReflection.count,
         .stageFlags = stageFlags,
         .pImmutableSamplers = nullptr,
       };

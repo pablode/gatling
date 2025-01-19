@@ -154,15 +154,15 @@ namespace gtl
       {
         const SpvReflectDescriptorBinding* srcBinding = bindings[i];
 
-        CgpuShaderReflectionBinding* dstBinding = &reflection->bindings[i];
-        dstBinding->binding = srcBinding->binding;
-        dstBinding->count = srcBinding->count;
-        dstBinding->descriptorType = (int)srcBinding->descriptor_type;
+        CgpuShaderReflectionBinding& dstBinding = reflection->bindings[i];
+        dstBinding.binding = srcBinding->binding;
+        dstBinding.count = srcBinding->count;
+        dstBinding.descriptorType = (int)srcBinding->descriptor_type;
         // Unfortunately SPIRV-Reflect lacks the functionality to detect read accesses:
         // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
-        dstBinding->readAccess = srcBinding->accessed;
+        dstBinding.readAccess = srcBinding->accessed;
         const SpvReflectTypeDescription* typeDescription = srcBinding->type_description;
-        dstBinding->writeAccess = srcBinding->accessed && ~(typeDescription->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+        dstBinding.writeAccess = srcBinding->accessed && ~(typeDescription->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
       }
     }
 

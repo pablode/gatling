@@ -115,8 +115,6 @@ namespace gtl
     std::vector<const GiMaterial*> materials;
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
-    bool                           hasPipelineClosestHitShader = false;
-    bool                           hasPipelineAnyHitShader = false;
     CgpuShader                     rgenShader;
     bool                           resetSampleOffset = true;
   };
@@ -1223,8 +1221,6 @@ cleanup:
     std::vector<McTextureDescription> textureDescriptions;
     OffsetAllocator::Allocator tex2dAllocator{rp::MAX_TEXTURE_2D_COUNT};
     OffsetAllocator::Allocator tex3dAllocator{rp::MAX_TEXTURE_3D_COUNT};
-    bool hasPipelineClosestHitShader = false;
-    bool hasPipelineAnyHitShader = false;
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
@@ -1336,11 +1332,8 @@ cleanup:
         if (groupInfo.anyHitInfo)
         {
           allocTextureOffsets(*groupInfo.anyHitInfo);
-          hasPipelineAnyHitShader |= true;
         }
       }
-
-      hasPipelineClosestHitShader = hitGroupCompInfos.size() > 0;
 
       // 3. Generate final hit shader GLSL sources.
       threadWorkFailed = false;
@@ -1603,8 +1596,6 @@ cleanup:
     cache->missShaders = missShaders;
     cache->pipeline = pipeline;
     cache->rgenShader = rgenShader;
-    cache->hasPipelineClosestHitShader = hasPipelineClosestHitShader;
-    cache->hasPipelineAnyHitShader = hasPipelineAnyHitShader;
 
 cleanup:
     if (!cache)
