@@ -3020,7 +3020,7 @@ cleanup_fail:
           };
           imageInfos.push_back(imageInfo);
 
-          writeDescriptorSet.dstArrayElement = k;
+          writeDescriptorSet.dstArrayElement = imageBinding->index;
           writeDescriptorSet.descriptorCount = 1;
           writeDescriptorSet.pImageInfo = &imageInfos.back();
           writeDescriptorSets.push_back(writeDescriptorSet);
