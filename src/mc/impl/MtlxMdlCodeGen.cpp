@@ -17,7 +17,7 @@
 
 #include "MtlxMdlCodeGen.h"
 
-#include "MtlxDocumentPatcher.h"
+#include "MtlxDocPatch.h"
 #include "MtlxDocOps.h"
 
 #include <MaterialXCore/Definition.h>
@@ -191,8 +191,7 @@ namespace gtl
     mx::ShaderPtr shader = nullptr;
     try
     {
-      McMtlxDocumentPatcher patcher;
-      patcher.patch(mtlxDoc);
+      McPatchMtlxDocument(mtlxDoc);
 
       if (getenv("GATLING_DUMP_MTLX"))
       {

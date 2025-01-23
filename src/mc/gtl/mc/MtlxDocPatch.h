@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2019-2022 Pablo Delgado Krämer
+// Copyright (C) 2025 Pablo Delgado Krämer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -19,13 +19,7 @@
 
 #include <MaterialXCore/Document.h>
 
-#include <memory>
-
 namespace gtl
 {
-  class McMtlxDocumentPatcher
-  {
-  public:
-    void patch(MaterialX::DocumentPtr document);
-  };
+  void McPatchMtlxDocument(MaterialX::DocumentPtr doc);
 }

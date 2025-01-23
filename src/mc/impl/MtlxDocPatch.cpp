@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "MtlxDocumentPatcher.h"
+#include "MtlxDocPatch.h"
 
 #include <MaterialXCore/Types.h>
 
@@ -477,7 +477,7 @@ void _PatchDefaultGeomprops(mx::DocumentPtr document)
 
 namespace gtl
 {
-  void McMtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
+  void McPatchMtlxDocument(MaterialX::DocumentPtr document)
   {
     _SanitizeFilePaths(document);
 
