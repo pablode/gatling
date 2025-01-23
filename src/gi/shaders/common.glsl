@@ -4,6 +4,7 @@
 #include "aovs.glsl"
 
 const uint UINT32_MAX = 0xFFFFFFFFu;
+const uint UINT16_MAX = 0xFFFFu;
 const float FLOAT_MAX = 3.402823466e38;
 const float FLOAT_MIN = 1.175494351e-38;
 const float PI = 3.1415926535897932384626433832795;
