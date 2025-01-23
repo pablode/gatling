@@ -179,6 +179,9 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_ALBEDO) != 0
     AlbedoAov[pixelIndex] = ClearValuesF[AOV_ID_ALBEDO].rgb;
 #endif
+#if (AOV_MASK & AOV_BIT_TOPOHASH) != 0
+  TopoHashAov[pixelIndex] = ClearValuesI[AOV_ID_TOPOHASH].rgb;
+#endif
 }
 
 void main()

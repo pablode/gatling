@@ -1208,7 +1208,8 @@ mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
           payload = rp::BlasPayload{
             .bufferAddress = payloadBufferAddress,
             .vertexOffset = uint32_t(vertexBufferSize / sizeof(rp::FVertex)), // offset to skip index buffer
-            .bitfield = bitfield
+            .bitfield = bitfield,
+            .topoHash = material->topoHash.val
           };
         }
 
@@ -2495,7 +2496,8 @@ cleanup:
         rp::BINDING_INDEX_AOV_FACE_ID,
         rp::BINDING_INDEX_AOV_INSTANCE_ID,
         rp::BINDING_INDEX_AOV_DOUBLE_SIDED,
-        rp::BINDING_INDEX_AOV_ALBEDO
+        rp::BINDING_INDEX_AOV_ALBEDO,
+        rp::BINDING_INDEX_AOV_TOPOHASH
       };
 
       for (const GiAovBinding& binding : params.aovBindings)

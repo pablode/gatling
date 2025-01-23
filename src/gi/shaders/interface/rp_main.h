@@ -127,6 +127,7 @@ struct BlasPayload
   GI_UINT64 bufferAddress;
   GI_UINT   vertexOffset;
   GI_UINT   bitfield;
+  GI_UINT64 topoHash;
 };
 
 const GI_UINT FACE_ID_MASK = 0x3FFFFFFF;
@@ -201,6 +202,7 @@ GI_BINDING_INDEX(AOV_FACE_ID,      26)
 GI_BINDING_INDEX(AOV_INSTANCE_ID,  27)
 GI_BINDING_INDEX(AOV_DOUBLE_SIDED, 28)
 GI_BINDING_INDEX(AOV_ALBEDO,       29)
+GI_BINDING_INDEX(AOV_TOPOHASH,     30)
 
 // set 1 & set 2 (alised array)
 GI_BINDING_INDEX(TEXTURES,     0)
