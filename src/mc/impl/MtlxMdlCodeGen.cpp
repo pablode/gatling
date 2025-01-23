@@ -18,6 +18,7 @@
 #include "MtlxMdlCodeGen.h"
 
 #include "MtlxDocumentPatcher.h"
+#include "MtlxDocOps.h"
 
 #include <MaterialXCore/Definition.h>
 #include <MaterialXCore/Document.h>
@@ -172,19 +173,10 @@ namespace gtl
 
   bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
   {
-    try
-    {
-      mx::DocumentPtr doc = mx::createDocument();
-      doc->importLibrary(m_baseDoc);
-      mx::readFromXmlString(doc, mtlxStr.data());
+    McMtlxDocumentParser parser(m_baseDoc);
+    mx::DocumentPtr doc = parser.parse(mtlxStr);
 
-      return translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency);
-    }
-    catch (const std::exception& ex)
-    {
-      GB_ERROR("exception creating MaterialX document: {}", ex.what());
-      return false;
-    }
+    return translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency);
   }
 
   bool McMtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
