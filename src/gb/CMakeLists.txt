@@ -3,10 +3,12 @@ add_library(
   gtl/gb/Enum.h
   gtl/gb/Fmt.h
   gtl/gb/HandleStore.h
+  gtl/gb/Hash.h
   gtl/gb/LinearDataStore.h
   gtl/gb/Log.h
   gtl/gb/SmallVector.h
   impl/HandleStore.cpp
+  impl/Hash.cpp
   impl/LinearDataStore.cpp
   impl/Log.cpp
   impl/SmallVector.cpp
