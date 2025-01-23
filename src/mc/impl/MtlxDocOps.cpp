@@ -18,17 +18,20 @@
 #include "MtlxDocOps.h"
 
 #include <MaterialXFormat/Util.h>
+#include <MaterialXGenShader/Util.h>
+
+#include <gtl/gb/Log.h>
 
 namespace mx = MaterialX;
 
 namespace gtl
 {
-  McMtlxDocumentParser::McMtlxDocumentParser(const MaterialX::DocumentPtr stdLib)
+  McMtlxDocumentParser::McMtlxDocumentParser(const mx::DocumentPtr& stdLib)
     : m_stdLib(stdLib)
   {
   }
 
-  MaterialX::DocumentPtr McMtlxDocumentParser::parse(std::string_view str)
+  mx::DocumentPtr McMtlxDocumentParser::parse(std::string_view str)
   {
     try
     {
@@ -41,5 +44,44 @@ namespace gtl
     {
       return nullptr;;
     }
+  }
+
+  mx::NodePtr McMtlxFindSurfaceShader(const mx::DocumentPtr& doc, const char* name)
+  {
+    // Find material in document
+    auto materialNodes = doc->getMaterialNodes();
+
+    if (materialNodes.size() != 1)
+    {
+      // HdMtlx generates a new document for each material; there should be a single material
+      GB_ERROR("unexpected material count in mtlx document for material {}", name ? name : "<unnamed>");
+      return nullptr;
+    }
+
+    mx::NodePtr materialNode = materialNodes[0];
+
+    // Extract surface shader node
+    auto surfaceShaderNodes = mx::getShaderNodes(materialNode, mx::SURFACE_SHADER_TYPE_STRING);
+
+    mx::TypedElementPtr renderableElement = materialNode;
+    if (!surfaceShaderNodes.empty())
+    {
+      renderableElement = *surfaceShaderNodes.begin();
+
+      if (surfaceShaderNodes.size() > 1)
+      {
+        GB_WARN("found multiple surface shaders for material {}; choosing first", name ? name : "<unnamed>");
+      }
+    }
+
+    mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
+    if (!surfaceElement)
+    {
+      GB_WARN("could not find surface shader for material {}", name ? name : "<unnamed>");
+      return nullptr;
+    }
+
+    GB_DEBUG("found surface shader: {}", surfaceElement->getName());
+    return surfaceElement->asA<mx::Node>();
   }
 }
