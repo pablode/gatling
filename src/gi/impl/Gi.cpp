@@ -52,6 +52,7 @@
 #ifdef GI_SHADER_HOTLOADING
 #include <efsw/efsw.hpp>
 #endif
+#include <gtl/mc/Hash.h>
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
@@ -139,6 +140,7 @@ namespace gtl
     std::string name;
     GiScene* scene;
     std::optional<GiMaterialGpuData> gpuData;
+    GbHash topoHash;
   };
 
   struct GiMesh
@@ -551,7 +553,7 @@ fail:
       return nullptr;
     }
 
-    mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
+mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
     if (!surfaceShader)
     {
       return nullptr;
@@ -563,10 +565,16 @@ fail:
       return nullptr;
     }
 
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
+
+    GbHash topoHash = McHashMtlxNetworkTopological(patchedDoc, surfaceShader);
+    GB_DEBUG("material {} topoHash: {}", name, topoHash.val);
+
     GiMaterial* mat = new GiMaterial {
       .mcMat = mcMat,
       .name = name,
-      .scene = scene
+      .scene = scene,
+      .topoHash = topoHash
     };
 
     {
@@ -587,7 +595,8 @@ fail:
     GiMaterial* mat = new GiMaterial {
       .mcMat = mcMat,
       .name = name,
-      .scene = scene
+      .scene = scene,
+      .topoHash = GbHash{}
     };
 
     {
