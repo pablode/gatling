@@ -28,20 +28,21 @@
 
 namespace gtl
 {
-  class McMtlxDocumentPatcher;
-
   class McMtlxMdlCodeGen
   {
   public:
-    explicit McMtlxMdlCodeGen(const MaterialX::DocumentPtr mtlxStdLib, const std::string& customNodesPath);
+    explicit McMtlxMdlCodeGen(const MaterialX::DocumentPtr mtlxStdLib);
 
   public:
-    bool translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride);
-    bool translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride);
+    bool translate(const MaterialX::DocumentPtr& mtlxDoc,
+                   const MaterialX::NodePtr& surfaceShader,
+                   std::string& mdlSrc,
+                   std::string& subIdentifier,
+                   McOpacityClassification& opacityClass,
+                   bool& isAnimated);
 
   private:
     MaterialX::ShaderGeneratorPtr m_shaderGen;
     MaterialX::DocumentPtr m_baseDoc;
-    std::shared_ptr<McMtlxDocumentPatcher> m_docPatcher;
   };
 }
