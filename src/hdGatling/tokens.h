@@ -70,7 +70,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((debugOpacity, "debug:opacity"))                  \
   ((debugTangents, "debug:tangents"))                \
   ((debugBitangents, "debug:bitangents"))            \
-  ((debugThinWalled, "debug:thinWalled"))
+  ((debugThinWalled, "debug:thinWalled"))            \
+  ((debugTopoHash, "debug:topoHash"))
 
 #define HD_GATLING_COMMAND_TOKENS                    \
   (printLicenses)

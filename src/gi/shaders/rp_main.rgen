@@ -395,6 +395,9 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
   InstanceIdAov[pixelIndex] = ClearValuesI[AOV_ID_INSTANCE_ID].x;
 #endif
+#if (AOV_MASK & AOV_BIT_TOPOHASH) != 0
+  TopoHashAov[pixelIndex] = ClearValuesI[AOV_ID_TOPOHASH].rgb;
+#endif
 }
 
 void main()

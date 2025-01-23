@@ -213,6 +213,16 @@ void main()
       int instanceId = InstanceIds[gl_InstanceID];
       InstanceIdAov[pixelIndex] = instanceId;
 #endif
+#if (AOV_MASK & AOV_BIT_TOPOHASH) != 0
+      uint64_t topoHash = payload.topoHash;
+      uint lower16Bit = uint(topoHash & 0xFFFFu);
+      uvec3 colorI = uvec3(
+        uint(topoHash >> 48) & 0xFFFFu,
+        uint(topoHash >> 32) & 0xFFFFu,
+        uint(topoHash >> 16) & 0xFFFFu
+      ) ^ lower16Bit;
+      TopoHashAov[pixelIndex] = vec3(colorI) / float(UINT16_MAX);
+#endif
     }
 
     /* 3. Apply volume attenuation */

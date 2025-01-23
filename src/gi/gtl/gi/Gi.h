@@ -46,6 +46,7 @@ namespace gtl
     Depth,
     FaceId,
     InstanceId,
+    TopoHash,
     COUNT
   };
 

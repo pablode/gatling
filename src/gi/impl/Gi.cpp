@@ -1019,11 +1019,14 @@ fail:
             bitfield |= rp::BLAS_PAYLOAD_BITFLAG_FLIP_FACING;
           }
 
+          uint64_t topoHash = material->topoHash.val;
+
           uint64_t vertexBufferSize = (vertexBufferOffset/* account for align */ - indexBufferOffset/* account for preamble */);
           payload = rp::BlasPayload{
             .bufferAddress = payloadBufferAddress,
             .vertexOffset = uint32_t(vertexBufferSize / sizeof(rp::FVertex)), // offset to skip index buffer
-            .bitfield = bitfield
+            .bitfield = bitfield,
+            .topoHash = topoHash
           };
         }
 
@@ -2070,7 +2073,8 @@ cleanup:
       rp::BINDING_INDEX_AOV_OBJECT_ID,
       rp::BINDING_INDEX_AOV_DEPTH,
       rp::BINDING_INDEX_AOV_FACE_ID,
-      rp::BINDING_INDEX_AOV_INSTANCE_ID
+      rp::BINDING_INDEX_AOV_INSTANCE_ID,
+      rp::BINDING_INDEX_AOV_TOPOHASH
     };
 
     for (const GiAovBinding& binding : params.aovBindings)

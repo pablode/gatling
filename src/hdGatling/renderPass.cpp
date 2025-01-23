@@ -52,6 +52,7 @@ namespace
     { HdAovTokens->depth,                    GiAovId::Depth        },
     { HdAovTokens->elementId,                GiAovId::FaceId       },
     { HdAovTokens->instanceId,               GiAovId::InstanceId   },
+    { HdGatlingAovTokens->debugTopoHash,     GiAovId::TopoHash     },
   };
 
   std::vector<GiAovBinding> _PrepareAovBindings(const HdRenderPassAovBindingVector& aovBindings)
