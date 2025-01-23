@@ -18,17 +18,18 @@
 #include "MtlxDocOps.h"
 
 #include <MaterialXFormat/Util.h>
+#include <MaterialXGenShader/Util.h>
 
 namespace mx = MaterialX;
 
 namespace gtl
 {
-  McMtlxDocumentParser::McMtlxDocumentParser(const MaterialX::DocumentPtr stdLib)
+  McMtlxDocumentParser::McMtlxDocumentParser(const mx::DocumentPtr& stdLib)
     : m_stdLib(stdLib)
   {
   }
 
-  MaterialX::DocumentPtr McMtlxDocumentParser::parse(std::string_view str)
+  mx::DocumentPtr McMtlxDocumentParser::parse(std::string_view str)
   {
     try
     {
@@ -41,5 +42,44 @@ namespace gtl
     {
       return nullptr;;
     }
+  }
+
+  mx::TypedElementPtr McMtlxFindSurfaceShader(const mx::DocumentPtr& doc)
+  {
+    // Find renderable element.
+    std::vector<mx::TypedElementPtr> renderableElements;
+#if (MATERIALX_MAJOR_VERSION > 1) || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 38) || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION > 7)
+    renderableElements = mx::findRenderableElements(doc);
+#else
+    mx::findRenderableElements(doc, renderableElements);
+#endif
+
+    for (mx::TypedElementPtr elem : renderableElements)
+    {
+      // Extract surface shader node.
+      mx::TypedElementPtr renderableElement = renderableElements.at(0);
+      mx::NodePtr node = renderableElement->asA<mx::Node>();
+
+      if (node && node->getType() == mx::MATERIAL_TYPE_STRING)
+      {
+        auto shaderNodes = mx::getShaderNodes(node, mx::SURFACE_SHADER_TYPE_STRING);
+        if (!shaderNodes.empty())
+        {
+          renderableElement = *shaderNodes.begin();
+        }
+      }
+
+      mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
+      if (!surfaceElement)
+      {
+        return nullptr;
+      }
+
+      return surfaceElement->asA<mx::TypedElement>();
+    }
+
+    return nullptr;
   }
 }

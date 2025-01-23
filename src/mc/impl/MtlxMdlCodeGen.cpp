@@ -99,45 +99,6 @@ namespace
     // Use MaterialX helper function as fallback (not accurate, has false positives)
     return !mx::isTransparentSurface(element);
   }
-
-  mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc)
-  {
-    // Find renderable element.
-    std::vector<mx::TypedElementPtr> renderableElements;
-#if (MATERIALX_MAJOR_VERSION > 1) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 38) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION > 7)
-    renderableElements = mx::findRenderableElements(doc);
-#else
-    mx::findRenderableElements(doc, renderableElements);
-#endif
-
-    for (mx::TypedElementPtr elem : renderableElements)
-    {
-      // Extract surface shader node.
-      mx::TypedElementPtr renderableElement = renderableElements.at(0);
-      mx::NodePtr node = renderableElement->asA<mx::Node>();
-
-      if (node && node->getType() == mx::MATERIAL_TYPE_STRING)
-      {
-        auto shaderNodes = mx::getShaderNodes(node, mx::SURFACE_SHADER_TYPE_STRING);
-        if (!shaderNodes.empty())
-        {
-          renderableElement = *shaderNodes.begin();
-        }
-      }
-
-      mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
-      if (!surfaceElement)
-      {
-        return nullptr;
-      }
-
-      return surfaceElement->asA<mx::TypedElement>();
-    }
-
-    return nullptr;
-  }
 }
 
 namespace gtl
@@ -199,7 +160,7 @@ namespace gtl
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
       }
 
-      mx::TypedElementPtr element = _FindSurfaceShaderElement(mtlxDoc);
+      mx::TypedElementPtr element = McMtlxFindSurfaceShader(mtlxDoc);
       if (!element)
       {
         GB_ERROR("generation failed: surface shader not found");

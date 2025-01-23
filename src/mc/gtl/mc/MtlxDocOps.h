@@ -24,11 +24,13 @@ namespace gtl
   class McMtlxDocumentParser
   {
   public:
-    McMtlxDocumentParser(const MaterialX::DocumentPtr stdLib);
+    McMtlxDocumentParser(const MaterialX::DocumentPtr& stdLib);
 
     MaterialX::DocumentPtr parse(std::string_view str);
 
   private:
     MaterialX::DocumentPtr m_stdLib;
   };
+
+  MaterialX::TypedElementPtr McMtlxFindSurfaceShader(const MaterialX::DocumentPtr& doc);
 }
