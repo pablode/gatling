@@ -40,9 +40,8 @@ namespace gtl
     McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool isOpaque);
 
   public:
-    McMaterial* createFromMtlxStr(std::string_view docStr);
-
-    McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc);
+    McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
+                                  const MaterialX::TypedElementPtr& surfaceShader);
 
     McMaterial* createFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
 

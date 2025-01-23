@@ -222,25 +222,13 @@ namespace gtl
     };
   }
 
-  McMaterial* McFrontend::createFromMtlxStr(std::string_view docStr)
+  McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
+                                            const MaterialX::TypedElementPtr& surfaceShader)
   {
     std::string mdlSrc;
     std::string subIdentifier;
     bool hasCutoutTransparency;
-    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier, hasCutoutTransparency))
-    {
-      return nullptr;
-    }
-
-    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
-  }
-
-  McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc)
-  {
-    std::string mdlSrc;
-    std::string subIdentifier;
-    bool hasCutoutTransparency;
-    if (!m_mtlxMdlCodeGen->translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency))
+    if (!m_mtlxMdlCodeGen->translate(doc, surfaceShader, mdlSrc, subIdentifier, hasCutoutTransparency))
     {
       return nullptr;
     }

@@ -54,6 +54,8 @@
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
+#include <gtl/mc/MtlxDocOps.h>
+#include <gtl/mc/MtlxDocPatch.h>
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Enum.h>
@@ -234,6 +236,7 @@ namespace gtl
   std::unique_ptr<GiGlslShaderGen> s_shaderGen;
   std::unique_ptr<McRuntime> s_mcRuntime;
   std::unique_ptr<McFrontend> s_mcFrontend;
+  std::unique_ptr<McMtlxDocumentParser> s_mtlxDocParser;
   std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
   std::unique_ptr<GiTextureManager> s_texSys;
@@ -398,6 +401,7 @@ namespace gtl
     }
 
     s_mcFrontend = std::make_unique<McFrontend>(params.mdlSearchPaths, mtlxStdLib, *s_mcRuntime);
+    s_mtlxDocParser = std::make_unique<McMtlxDocumentParser>(mtlxStdLib);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))
@@ -479,19 +483,13 @@ fail:
 
   GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc)
   {
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc);
-    if (!mcMat)
+    mx::DocumentPtr doc = s_mtlxDocParser->parse(mtlxSrc);
+    if (!doc)
     {
       return nullptr;
     }
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
-
-    return new GiMaterial {
-      .mcMat = mcMat,
-      .name = name,
-      .scene = scene
-    };
+    return giCreateMaterialFromMtlxDoc(scene, name, std::static_pointer_cast<void>(doc));
   }
 
   GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc)
@@ -502,7 +500,11 @@ fail:
       return nullptr;
     }
 
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc);
+    McPatchMtlxDocument(resolvedDoc);
+
+    mx::TypedElementPtr surfaceShader = McMtlxFindSurfaceShader(resolvedDoc);
+
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc, surfaceShader);
     if (!mcMat)
     {
       return nullptr;

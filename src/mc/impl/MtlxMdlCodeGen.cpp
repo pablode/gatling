@@ -132,15 +132,11 @@ namespace gtl
     m_shaderGen->setUnitSystem(unitSystem);
   }
 
-  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
-  {
-    McMtlxDocumentParser parser(m_baseDoc);
-    mx::DocumentPtr doc = parser.parse(mtlxStr);
-
-    return translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency);
-  }
-
-  bool McMtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
+  bool McMtlxMdlCodeGen::translate(const mx::DocumentPtr& mtlxDoc,
+                                   const MaterialX::TypedElementPtr& surfaceShader,
+                                   std::string& mdlSrc,
+                                   std::string& subIdentifier,
+                                   bool& hasCutoutTransparency)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -152,24 +148,15 @@ namespace gtl
     mx::ShaderPtr shader = nullptr;
     try
     {
-      McPatchMtlxDocument(mtlxDoc);
-
       if (getenv("GATLING_DUMP_MTLX"))
       {
         std::string mtlxSrc = mx::writeToXmlString(mtlxDoc);
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
       }
 
-      mx::TypedElementPtr element = McMtlxFindSurfaceShader(mtlxDoc);
-      if (!element)
-      {
-        GB_ERROR("generation failed: surface shader not found");
-        return false;
-      }
-
-      subIdentifier = element->getName();
-      hasCutoutTransparency = !_HasSurfaceShaderNoCutoutTransparency(element);
-      shader = m_shaderGen->generate(subIdentifier, element, context);
+      subIdentifier = surfaceShader->getName();
+      hasCutoutTransparency = !_HasSurfaceShaderNoCutoutTransparency(surfaceShader);
+      shader = m_shaderGen->generate(subIdentifier, surfaceShader, context);
     }
     catch (const std::exception& ex)
     {

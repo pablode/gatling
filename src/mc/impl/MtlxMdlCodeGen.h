@@ -32,8 +32,11 @@ namespace gtl
     explicit McMtlxMdlCodeGen(const MaterialX::DocumentPtr mtlxStdLib);
 
   public:
-    bool translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency);
-    bool translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency);
+    bool translate(const MaterialX::DocumentPtr& mtlxDoc,
+                   const MaterialX::TypedElementPtr& surfaceShader,
+                   std::string& mdlSrc,
+                   std::string& subIdentifier,
+                   bool& hasCutoutTransparency);
 
   private:
     MaterialX::ShaderGeneratorPtr m_shaderGen;
