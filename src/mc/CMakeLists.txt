@@ -3,6 +3,8 @@ set(MC_SRCS
   gtl/mc/Frontend.h
   gtl/mc/Material.h
   gtl/mc/MaterialParameters.h
+  gtl/mc/MtlxDocOps.h
+  gtl/mc/MtlxDocPatch.h
   gtl/mc/Runtime.h
   impl/Backend.cpp
   impl/Frontend.cpp
@@ -19,8 +21,8 @@ set(MC_SRCS
   impl/MdlNeurayLoader.h
   impl/MdlRuntime.cpp
   impl/MdlRuntime.h
-  impl/MtlxDocumentPatcher.cpp
-  impl/MtlxDocumentPatcher.h
+  impl/MtlxDocOps.cpp
+  impl/MtlxDocPatch.cpp
   impl/MtlxMdlCodeGen.cpp
   impl/MtlxMdlCodeGen.h
   impl/Runtime.cpp
