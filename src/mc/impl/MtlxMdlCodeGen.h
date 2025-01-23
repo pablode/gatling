@@ -36,7 +36,6 @@ namespace gtl
     bool translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency);
 
   private:
-    MaterialX::FileSearchPath m_mtlxSearchPath;
     MaterialX::ShaderGeneratorPtr m_shaderGen;
     MaterialX::DocumentPtr m_baseDoc;
   };

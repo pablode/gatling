@@ -191,7 +191,6 @@ namespace gtl
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
-    context.registerSourceCodeSearchPath(m_mtlxSearchPath);
 
     mx::GenOptions& contextOptions = context.getOptions();
     contextOptions.targetDistanceUnit = "meter";
