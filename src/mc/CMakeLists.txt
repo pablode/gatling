@@ -1,6 +1,7 @@
 set(MC_SRCS
   gtl/mc/Backend.h
   gtl/mc/Frontend.h
+  gtl/mc/Hash.h
   gtl/mc/Material.h
   gtl/mc/MaterialParameters.h
   gtl/mc/MtlxDocOps.h
@@ -8,6 +9,7 @@ set(MC_SRCS
   gtl/mc/Runtime.h
   impl/Backend.cpp
   impl/Frontend.cpp
+  impl/Hash.cpp
   impl/Material.cpp
   impl/MdlEntityResolver.cpp
   impl/MdlEntityResolver.h
