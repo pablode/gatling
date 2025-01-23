@@ -55,6 +55,8 @@
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
+#include <gtl/mc/MtlxDocOps.h>
+#include <gtl/mc/MtlxDocPatch.h>
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Enum.h>
@@ -252,6 +254,8 @@ namespace gtl
   std::unique_ptr<GiGlslShaderGen> s_shaderGen;
   std::unique_ptr<McRuntime> s_mcRuntime;
   std::unique_ptr<McFrontend> s_mcFrontend;
+  std::unique_ptr<McMtlxDocumentParser> s_mtlxDocParser;
+  std::unique_ptr<McMtlxDocumentPatcher> s_mtlxDocPatcher;
   std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
   std::unique_ptr<GiTextureManager> s_texSys;
@@ -432,7 +436,9 @@ namespace gtl
       goto fail;
     }
 
-    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, params.mtlxCustomNodesPath, *s_mcRuntime);
+    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, *s_mcRuntime);
+    s_mtlxDocParser = std::make_unique<McMtlxDocumentParser>(mtlxStdLib);
+    s_mtlxDocPatcher = std::make_unique<McMtlxDocumentPatcher>(mtlxStdLib, params.mtlxCustomNodesPath);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))
@@ -510,6 +516,8 @@ fail:
     }
     s_threadPool.reset();
     s_mcFrontend.reset();
+    s_mtlxDocPatcher.reset();
+    s_mtlxDocParser.reset();
     s_mcRuntime.reset();
   }
 
@@ -520,23 +528,13 @@ fail:
 
   GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc, bool usdPreviewSurfacePresenceOverride)
   {
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc, name, usdPreviewSurfacePresenceOverride);
-    if (!mcMat)
+    mx::DocumentPtr doc = s_mtlxDocParser->parse(mtlxSrc);
+    if (!doc)
     {
       return nullptr;
     }
 
-    GiMaterial* mat = new GiMaterial {
-      .mcMat = mcMat,
-      .name = name,
-      .scene = scene
-    };
-
-    {
-      std::lock_guard guard(scene->mutex);
-      scene->materials.insert(mat);
-    }
-    return mat;
+    return giCreateMaterialFromMtlxDoc(scene, name, std::static_pointer_cast<void>(doc), usdPreviewSurfacePresenceOverride);
   }
 
   GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc, bool usdPreviewSurfacePresenceOverride)
@@ -547,7 +545,19 @@ fail:
       return nullptr;
     }
 
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc, name, usdPreviewSurfacePresenceOverride);
+    mx::DocumentPtr patchedDoc = s_mtlxDocPatcher->patch(resolvedDoc, usdPreviewSurfacePresenceOverride);
+    if (!patchedDoc)
+    {
+      return nullptr;
+    }
+
+    mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
+    if (!surfaceShader)
+    {
+      return nullptr;
+    }
+
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(patchedDoc, surfaceShader);
     if (!mcMat)
     {
       return nullptr;

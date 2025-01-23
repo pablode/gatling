@@ -164,7 +164,7 @@ namespace
 
 namespace gtl
 {
-  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const mx::DocumentPtr mtlxStdLib, const std::string& customNodesPath)
+  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const mx::DocumentPtr mtlxStdLib)
   {
     // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
@@ -191,24 +191,14 @@ namespace gtl
 
     unitSystem->setUnitConverterRegistry(unitRegistry);
     m_shaderGen->setUnitSystem(unitSystem);
-
-    m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customNodesPath);
   }
 
-  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride)
-  {
-    McMtlxDocumentParser parser(m_baseDoc);
-    mx::DocumentPtr doc = parser.parse(mtlxStr);
-
-    if (!doc)
-    {
-      return false;
-    }
-
-    return translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated, usdPreviewSurfacePresenceOverride);
-  }
-
-  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride)
+  bool McMtlxMdlCodeGen::translate(const mx::DocumentPtr& mtlxDoc,
+                                   const mx::NodePtr& surfaceShader,
+                                   std::string& mdlSrc,
+                                   std::string& subIdentifier,
+                                   McOpacityClassification& opacityClass,
+                                   bool& isAnimated)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -220,25 +210,16 @@ namespace gtl
     mx::ShaderPtr shader = nullptr;
     try
     {
-      mx::DocumentPtr patchedDoc = m_docPatcher->patch(mtlxDoc, usdPreviewSurfacePresenceOverride);
-
       if (getenv("GTL_DUMP_MTLX"))
       {
-        std::string mtlxSrc = mx::writeToXmlString(patchedDoc);
+        std::string mtlxSrc = mx::writeToXmlString(mtlxDoc);
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
       }
 
-      mx::TypedElementPtr element = McMtlxFindSurfaceShader(patchedDoc, name);
-      if (!element)
-      {
-        GB_ERROR("generation failed: surface shader not found");
-        return false;
-      }
-
-      subIdentifier = element->getName();
-      opacityClass = _ClassifySurfaceShaderOpacity(element);
-      isAnimated = _HasDocumentTimeNode(patchedDoc);
-      shader = m_shaderGen->generate(subIdentifier, element, context);
+      subIdentifier = surfaceShader->getName();
+      opacityClass = _ClassifySurfaceShaderOpacity(surfaceShader);
+      isAnimated = _HasDocumentTimeNode(mtlxDoc);
+      shader = m_shaderGen->generate(subIdentifier, surfaceShader, context);
     }
     catch (const std::exception& ex)
     {
