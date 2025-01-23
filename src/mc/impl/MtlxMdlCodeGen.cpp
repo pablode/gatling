@@ -18,6 +18,7 @@
 #include "MtlxMdlCodeGen.h"
 
 #include "MtlxDocumentPatcher.h"
+#include "MtlxDocOps.h"
 
 #include <MaterialXCore/Definition.h>
 #include <MaterialXCore/Document.h>
@@ -235,19 +236,15 @@ namespace gtl
 
   bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride)
   {
-    try
-    {
-      mx::DocumentPtr doc = mx::createDocument();
-      doc->importLibrary(m_baseDoc);
-      mx::readFromXmlString(doc, mtlxStr.data());
+    McMtlxDocumentParser parser(m_baseDoc);
+    mx::DocumentPtr doc = parser.parse(mtlxStr);
 
-      return translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated, usdPreviewSurfacePresenceOverride);
-    }
-    catch (const std::exception& ex)
+    if (!doc)
     {
-      GB_ERROR("exception creating MaterialX document: {}", ex.what());
       return false;
     }
+
+    return translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated, usdPreviewSurfacePresenceOverride);
   }
 
   bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride)
