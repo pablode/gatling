@@ -160,45 +160,6 @@ namespace
 
     return false;
   }
-
-  mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc, const char* name)
-  {
-    // Find material in document
-    auto materialNodes = doc->getMaterialNodes();
-
-    if (materialNodes.size() != 1)
-    {
-      // HdMtlx generates a new document for each material; there should be a single material
-      GB_ERROR("unexpected material count in mtlx document for material {}", name);
-      return nullptr;
-    }
-
-    mx::NodePtr materialNode = materialNodes[0];
-
-    // Extract surface shader node
-    auto surfaceShaderNodes = mx::getShaderNodes(materialNode, mx::SURFACE_SHADER_TYPE_STRING);
-
-    mx::TypedElementPtr renderableElement = materialNode;
-    if (!surfaceShaderNodes.empty())
-    {
-      renderableElement = *surfaceShaderNodes.begin();
-
-      if (surfaceShaderNodes.size() > 1)
-      {
-        GB_WARN("found multiple surface shaders for material {}; choosing first", name);
-      }
-    }
-
-    mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
-    if (!surfaceElement)
-    {
-      GB_WARN("could not find surface shader for material {}", name);
-      return nullptr;
-    }
-
-    GB_DEBUG("found surface shader: {}", surfaceElement->getName());
-    return surfaceElement->asA<mx::TypedElement>();
-  }
 }
 
 namespace gtl
@@ -267,7 +228,7 @@ namespace gtl
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
       }
 
-      mx::TypedElementPtr element = _FindSurfaceShaderElement(patchedDoc, name);
+      mx::TypedElementPtr element = McMtlxFindSurfaceShader(patchedDoc, name);
       if (!element)
       {
         GB_ERROR("generation failed: surface shader not found");
