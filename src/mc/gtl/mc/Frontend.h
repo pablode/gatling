@@ -41,7 +41,7 @@ namespace gtl
 
   public:
     McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
-                                  const MaterialX::TypedElementPtr& surfaceShader);
+                                  const MaterialX::NodePtr& surfaceShader);
 
     McMaterial* createFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
 

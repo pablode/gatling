@@ -133,7 +133,7 @@ namespace gtl
   }
 
   bool McMtlxMdlCodeGen::translate(const mx::DocumentPtr& mtlxDoc,
-                                   const MaterialX::TypedElementPtr& surfaceShader,
+                                   const mx::NodePtr& surfaceShader,
                                    std::string& mdlSrc,
                                    std::string& subIdentifier,
                                    bool& hasCutoutTransparency)

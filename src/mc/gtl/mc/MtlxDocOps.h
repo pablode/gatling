@@ -32,5 +32,5 @@ namespace gtl
     MaterialX::DocumentPtr m_stdLib;
   };
 
-  MaterialX::TypedElementPtr McMtlxFindSurfaceShader(const MaterialX::DocumentPtr& doc);
+  MaterialX::NodePtr McMtlxFindSurfaceShader(const MaterialX::DocumentPtr& doc);
 }

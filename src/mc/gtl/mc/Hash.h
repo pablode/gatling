@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2019-2022 Pablo Delgado Krämer
+// Copyright (C) 2025 Pablo Delgado Krämer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,29 +17,12 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <string>
-
 #include <MaterialXCore/Document.h>
-#include <MaterialXFormat/File.h>
-#include <MaterialXGenShader/ShaderGenerator.h>
+
+#include <gtl/gb/Hash.h>
 
 namespace gtl
 {
-  class McMtlxMdlCodeGen
-  {
-  public:
-    explicit McMtlxMdlCodeGen(const MaterialX::DocumentPtr mtlxStdLib);
-
-  public:
-    bool translate(const MaterialX::DocumentPtr& mtlxDoc,
-                   const MaterialX::NodePtr& surfaceShader,
-                   std::string& mdlSrc,
-                   std::string& subIdentifier,
-                   bool& hasCutoutTransparency);
-
-  private:
-    MaterialX::ShaderGeneratorPtr m_shaderGen;
-    MaterialX::DocumentPtr m_baseDoc;
-  };
+  GbHash McHashMtlxNetworkTopological(const MaterialX::DocumentPtr& doc,
+                                      const MaterialX::NodePtr& surfaceShader);
 }

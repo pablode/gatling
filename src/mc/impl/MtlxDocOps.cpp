@@ -44,7 +44,7 @@ namespace gtl
     }
   }
 
-  mx::TypedElementPtr McMtlxFindSurfaceShader(const mx::DocumentPtr& doc)
+  mx::NodePtr McMtlxFindSurfaceShader(const mx::DocumentPtr& doc)
   {
     // Find renderable element.
     std::vector<mx::TypedElementPtr> renderableElements;
@@ -77,7 +77,7 @@ namespace gtl
         return nullptr;
       }
 
-      return surfaceElement->asA<mx::TypedElement>();
+      return surfaceElement->asA<mx::Node>();
     }
 
     return nullptr;

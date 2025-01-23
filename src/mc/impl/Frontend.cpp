@@ -223,7 +223,7 @@ namespace gtl
   }
 
   McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
-                                            const MaterialX::TypedElementPtr& surfaceShader)
+                                            const MaterialX::NodePtr& surfaceShader)
   {
     std::string mdlSrc;
     std::string subIdentifier;

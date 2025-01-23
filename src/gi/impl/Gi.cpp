@@ -51,6 +51,7 @@
 #ifdef GI_SHADER_HOTLOADING
 #include <efsw/efsw.hpp>
 #endif
+#include <gtl/mc/Hash.h>
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
@@ -126,6 +127,7 @@ namespace gtl
     McMaterial* mcMat;
     std::string name;
     GiScene* scene;
+    GbHash topoHash;
   };
 
   struct GiMesh
@@ -502,7 +504,7 @@ fail:
 
     McPatchMtlxDocument(resolvedDoc);
 
-    mx::TypedElementPtr surfaceShader = McMtlxFindSurfaceShader(resolvedDoc);
+    mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(resolvedDoc);
 
     McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc, surfaceShader);
     if (!mcMat)
@@ -512,10 +514,14 @@ fail:
 
     scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
 
+    GbHash topoHash = McHashMtlxNetworkTopological(resolvedDoc, surfaceShader);
+    GB_DEBUG("material {} topoHash: {}", name, topoHash.val);
+
     return new GiMaterial {
       .mcMat = mcMat,
       .name = name,
-      .scene = scene
+      .scene = scene,
+      .topoHash = topoHash
     };
   }
 
@@ -529,10 +535,12 @@ fail:
 
     scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
 
+    GbHash topoHash = {}; // we don't support topological deduplication for MDL
     return new GiMaterial {
       .mcMat = mcMat,
       .name = name,
-      .scene = scene
+      .scene = scene,
+      .topoHash = topoHash
     };
   }
 

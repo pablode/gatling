@@ -31,12 +31,19 @@ namespace gtl
     }
   };
 
-  template <class T>
-  inline GbHash GbHashAppend(GbHash other, const T& v)
+  inline GbHash GbHashCombine(GbHash hash, GbHash other)
   {
-    uint64_t seed = other.val;
+    uint64_t val = hash.val;
+    val ^= other.val + 0x9e3779b9 + (val << 6) + (val >> 2);
+    return GbHash{ val };
+  }
+
+  template <class T>
+  inline GbHash GbHashAppend(GbHash hash, const T& v)
+  {
+    uint64_t val = hash.val;
     std::hash<T> hasher;
-    seed ^= hasher(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    return GbHash{ seed };
+    val ^= hasher(v) + 0x9e3779b9 + (val << 6) + (val >> 2);
+    return GbHash{ val };
   }
 }
