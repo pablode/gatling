@@ -5,6 +5,7 @@ add_library(
   gtl/mc/Material.h
   gtl/mc/MaterialParameters.h
   gtl/mc/MtlxDocOps.h
+  gtl/mc/MtlxDocPatch.h
   gtl/mc/Runtime.h
   impl/Backend.cpp
   impl/Frontend.cpp
@@ -13,7 +14,6 @@ add_library(
   impl/MdlEntityResolver.h
   impl/MdlLogger.cpp
   impl/MdlLogger.h
-  impl/MtlxDocOps.cpp
   impl/MdlMaterial.cpp
   impl/MdlMaterial.h
   impl/MdlMaterialCompiler.cpp
@@ -22,8 +22,8 @@ add_library(
   impl/MdlNeurayLoader.h
   impl/MdlRuntime.cpp
   impl/MdlRuntime.h
-  impl/MtlxDocumentPatcher.cpp
-  impl/MtlxDocumentPatcher.h
+  impl/MtlxDocOps.cpp
+  impl/MtlxDocPatch.cpp
   impl/MtlxMdlCodeGen.cpp
   impl/MtlxMdlCodeGen.h
   impl/Runtime.cpp

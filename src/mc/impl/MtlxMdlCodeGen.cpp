@@ -17,7 +17,7 @@
 
 #include "MtlxMdlCodeGen.h"
 
-#include "MtlxDocumentPatcher.h"
+#include "MtlxDocPatch.h"
 #include "MtlxDocOps.h"
 
 #include <MaterialXCore/Definition.h>
