@@ -1026,10 +1026,13 @@ fail:
 
         // Append BLAS payload data
         {
+          CgpuBuffer paramBuffer = material->parameterBuffer;
+
           uint64_t payloadBufferAddress = cgpuGetBufferAddress(s_device, payloadBuffer);
-          if (payloadBufferAddress == 0)
+          uint64_t paramBufferAddress = paramBuffer.handle ? cgpuGetBufferAddress(s_device, paramBuffer) : 0;
+          if (payloadBufferAddress == 0 || paramBufferAddress == 0)
           {
-            GB_ERROR("failed to get index-vertex buffer address");
+            GB_ERROR("failed to get BLAS payload buffer addresses");
             goto fail_cleanup;
           }
 
@@ -1043,6 +1046,7 @@ fail:
 
           uint64_t vertexBufferSize = (vertexBufferOffset/* account for align */ - indexBufferOffset/* account for preamble */);
           payload = rp::BlasPayload{
+            .paramBufferAddress = paramBufferAddress,
             .bufferAddress = payloadBufferAddress,
             .vertexOffset = uint32_t(vertexBufferSize / sizeof(rp::FVertex)), // offset to skip index buffer
             .bitfield = bitfield,
