@@ -144,6 +144,7 @@ namespace gtl
     GiScene* scene;
     std::optional<GiMaterialGpuData> gpuData;
     GbHash topoHash;
+    CgpuBuffer parameterBuffer;
   };
 
   struct GiMesh
@@ -577,7 +578,7 @@ fail:
       return nullptr;
     }
 
-mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
+    mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
     if (!surfaceShader)
     {
       return nullptr;
@@ -589,6 +590,21 @@ mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
       return nullptr;
     }
 
+    std::string debugName = GB_FMT("MaterialParams_{}", name);
+
+    CgpuBuffer paramBuffer;
+    if (!cgpuCreateBuffer(s_ctx, {
+                            .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::TransferDst,
+                            .memoryProperties = CgpuMemoryProperties::DeviceLocal,
+                            .size = 1024,
+                            .debugName = debugName.c_str()
+                          }, &paramBuffer))
+    {
+      delete mcMat;
+      GB_ERROR("failed to allocate material parameter buffer");
+      return nullptr;
+    }
+
     GbHash topoHash = McHashMtlxNetworkTopological(patchedDoc, surfaceShader);
     GB_DEBUG("material {} topoHash: {}", name, topoHash.val);
 
@@ -596,7 +612,8 @@ mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
       .mcMat = mcMat,
       .name = name,
       .scene = scene,
-      .topoHash = topoHash
+      .topoHash = topoHash,
+      .parameterBuffer = paramBuffer
     };
 
     {
@@ -614,11 +631,27 @@ mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
       return nullptr;
     }
 
+    std::string debugName = GB_FMT("MaterialParams_{}", name);
+
+    CgpuBuffer paramBuffer;
+    if (!cgpuCreateBuffer(s_ctx, {
+                            .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::TransferDst,
+                            .memoryProperties = CgpuMemoryProperties::DeviceLocal,
+                            .size = 1024,
+                            .debugName = debugName.c_str()
+                          }, &paramBuffer))
+    {
+      delete mcMat;
+      GB_ERROR("failed to allocate material parameter buffer");
+      return nullptr;
+    }
+
     GiMaterial* mat = new GiMaterial {
       .mcMat = mcMat,
       .name = name,
       .scene = scene,
-      .topoHash = GbHash{}
+      .topoHash = GbHash{},
+      .parameterBuffer = paramBuffer
     };
 
     {
@@ -649,6 +682,11 @@ mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
     GiScene* scene = mat->scene;
     {
       std::lock_guard guard(scene->mutex);
+
+      if (mat->parameterBuffer.handle)
+      {
+        cgpuDestroyBuffer(s_ctx, mat->parameterBuffer);
+      }
 
       if (mat->gpuData)
       {
