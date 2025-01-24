@@ -2,14 +2,13 @@ add_library(
   mc STATIC
   gtl/mc/Backend.h
   gtl/mc/Frontend.h
-  gtl/mc/Hash.h
   gtl/mc/Material.h
   gtl/mc/MtlxDocOps.h
   gtl/mc/MtlxDocPatch.h
+  gtl/mc/MtlxHash.h
   gtl/mc/Runtime.h
   impl/Backend.cpp
   impl/Frontend.cpp
-  impl/Hash.cpp
   impl/Material.cpp
   impl/MdlLogger.cpp
   impl/MdlLogger.h
@@ -23,6 +22,7 @@ add_library(
   impl/MdlRuntime.h
   impl/MtlxDocOps.cpp
   impl/MtlxDocPatch.cpp
+  impl/MtlxHash.cpp
   impl/MtlxMdlCodeGen.cpp
   impl/MtlxMdlCodeGen.h
   impl/Runtime.cpp

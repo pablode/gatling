@@ -51,7 +51,7 @@
 #ifdef GI_SHADER_HOTLOADING
 #include <efsw/efsw.hpp>
 #endif
-#include <gtl/mc/Hash.h>
+#include <gtl/mc/MtlxHash.h>
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
@@ -530,7 +530,9 @@ fail:
 
     scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
 
-    GbHash topoHash = McHashMtlxNetworkTopological(resolvedDoc, surfaceShader);
+    McMtlxNodeHashMap topoHashes = McHashMtlxNetworkTopological(resolvedDoc, surfaceShader);
+    GbHash topoHash = topoHashes[surfaceShader];
+
     GB_DEBUG("material {} topoHash: {}", name, topoHash.val);
 
     return new GiMaterial {

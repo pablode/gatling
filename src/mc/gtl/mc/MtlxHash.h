@@ -23,6 +23,8 @@
 
 namespace gtl
 {
-  GbHash McHashMtlxNetworkTopological(const MaterialX::DocumentPtr& doc,
-                                      const MaterialX::NodePtr& surfaceShader);
+  using McMtlxNodeHashMap = std::unordered_map<MaterialX::NodePtr, GbHash>;
+
+  McMtlxNodeHashMap McHashMtlxNetworkTopological(const MaterialX::DocumentPtr& doc,
+                                                 const MaterialX::NodePtr& surfaceShader);
 }

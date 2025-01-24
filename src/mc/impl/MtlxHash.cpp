@@ -15,7 +15,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "Hash.h"
+#include "MtlxHash.h"
 
 #include <MaterialXCore/Document.h>
 
@@ -28,10 +28,10 @@ namespace mx = MaterialX;
 namespace gtl
 {
   // FIXME: this function assumes no cycles
-  GbHash McHashMtlxNetworkTopological(const MaterialX::DocumentPtr& doc,
-                                      const MaterialX::NodePtr& surfaceShader)
+  McMtlxNodeHashMap McHashMtlxNetworkTopological(const MaterialX::DocumentPtr& doc,
+                                                 const MaterialX::NodePtr& surfaceShader)
   {
-    std::unordered_map<mx::NodePtr, GbHash> topoHashes;
+    std::unordered_map<mx::NodePtr, GbHash> hashes;
 
     // We don't use topolical sorting, but instead traverse the graph. this culls nodes
     // from the document and also disregards node graph boundaries.
@@ -40,9 +40,9 @@ namespace gtl
 
     hashNode = [&](const mx::NodePtr& node)
     {
-      if (topoHashes.count(node) > 0)
+      if (hashes.count(node) > 0)
       {
-        return topoHashes[node];
+        return hashes[node];
       }
 
       GbHash hash;
@@ -71,11 +71,13 @@ namespace gtl
         hash = GbHashAppend(hash, node->getColorSpace());
       }
 
-      topoHashes[node] = hash;
+      hashes[node] = hash;
 
       return hash;
     };
 
-    return hashNode(surfaceShader);
+    hashNode(surfaceShader);
+
+    return hashes;
   }
 }
