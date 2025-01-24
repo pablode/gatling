@@ -128,6 +128,7 @@ namespace gtl
     std::string name;
     GiScene* scene;
     GbHash topoHash;
+    CgpuBuffer parameterBuffer;
   };
 
   struct GiMesh
@@ -512,6 +513,21 @@ fail:
       return nullptr;
     }
 
+    std::string debugName = GB_FMT("MaterialParams_{}", name);
+
+    CgpuBuffer paramBuffer;
+    if (!cgpuCreateBuffer(s_device, {
+                            .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                            .size = 1024,
+                            .debugName = debugName.c_str()
+                          }, &paramBuffer))
+    {
+      delete mcMat;
+      GB_ERROR("failed to allocate material parameter buffer");
+      return nullptr;
+    }
+
     scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
 
     GbHash topoHash = McHashMtlxNetworkTopological(resolvedDoc, surfaceShader);
@@ -521,26 +537,26 @@ fail:
       .mcMat = mcMat,
       .name = name,
       .scene = scene,
-      .topoHash = topoHash
+      .topoHash = topoHash,
+      .parameterBuffer = paramBuffer
     };
   }
 
   GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier)
   {
     McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier);
-    if (!mcMat)
-    {
-      return nullptr;
-    }
 
     scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
 
     GbHash topoHash = {}; // we don't support topological deduplication for MDL
+    CgpuBuffer paramBuffer;
+
     return new GiMaterial {
       .mcMat = mcMat,
       .name = name,
       .scene = scene,
-      .topoHash = topoHash
+      .topoHash = topoHash,
+      .parameterBuffer = paramBuffer
     };
   }
 
@@ -548,6 +564,10 @@ fail:
   {
     GiScene* scene = mat->scene;
     scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
+    if (mat->parameterBuffer.handle)
+    {
+      cgpuDestroyBuffer(s_device, mat->parameterBuffer);
+    }
     delete mat->mcMat;
     delete mat;
   }
