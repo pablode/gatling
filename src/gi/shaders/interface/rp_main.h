@@ -124,6 +124,7 @@ const GI_UINT BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED = (1 << 0);
 
 struct BlasPayload
 {
+  GI_UINT64 paramBufferAddress;
   GI_UINT64 bufferAddress;
   GI_UINT   vertexOffset;
   GI_UINT   bitfield;
