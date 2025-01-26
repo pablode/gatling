@@ -21,10 +21,18 @@
 
 #include <gtl/gb/Hash.h>
 
+#include <unordered_map>
+#include <unordered_set>
+
 namespace gtl
 {
   using McMtlxNodeHashMap = std::unordered_map<MaterialX::NodePtr, GbHash>;
 
-  McMtlxNodeHashMap McHashMtlxNetworkTopological(const MaterialX::DocumentPtr& doc,
-                                                 const MaterialX::NodePtr& surfaceShader);
+  McMtlxNodeHashMap McHashMtlxNetworkTopological(const MaterialX::NodePtr& surfaceShader);
+
+  using McMtlxTopoNetworkDiff = std::unordered_map<MaterialX::NodePtr/*of document 1*/,
+                                                   std::unordered_set<std::string/* input names*/>>;
+
+  McMtlxTopoNetworkDiff McDiffTopoEquivalentMtlxNetworks(const MaterialX::NodePtr& surfaceShader1,
+                                                         const MaterialX::NodePtr& surfaceShader2);
 }
