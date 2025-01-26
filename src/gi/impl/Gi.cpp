@@ -530,10 +530,10 @@ fail:
 
     scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
 
-    McMtlxNodeHashMap topoHashes = McHashMtlxNetworkTopological(resolvedDoc, surfaceShader);
+    McMtlxNodeHashMap topoHashes = McHashMtlxNetworkTopological(surfaceShader);
     GbHash topoHash = topoHashes[surfaceShader];
 
-    GB_DEBUG("material {} topoHash: {}", name, topoHash.val);
+    GB_DEBUG("material {} topoHash: {}", name, topoHash);
 
     return new GiMaterial {
       .mcMat = mcMat,
@@ -1044,7 +1044,7 @@ fail:
             bitfield |= rp::BLAS_PAYLOAD_BITFLAG_FLIP_FACING;
           }
 
-          uint64_t topoHash = material->topoHash.val;
+          uint64_t topoHash = material->topoHash;
 
           uint64_t vertexBufferSize = (vertexBufferOffset/* account for align */ - indexBufferOffset/* account for preamble */);
           payload = rp::BlasPayload{

@@ -36,7 +36,7 @@ namespace gtl
     // We don't use topolical sorting, but instead traverse the graph. this culls nodes
     // from the document and also disregards node graph boundaries.
 
-    std::function<GbHash(const mx::NodePtr& node)> hashNode;
+    std::function<GbHash(const mx::NodePtr&)> hashNode;
 
     hashNode = [&](const mx::NodePtr& node)
     {
@@ -45,7 +45,7 @@ namespace gtl
         return hashes[node];
       }
 
-      GbHash hash;
+      GbHash hash = 0;
 
       mx::NodeDefPtr nodeDef = node->getNodeDef();
       hash = GbHashAppend(hash, nodeDef->getName());

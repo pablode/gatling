@@ -21,29 +21,19 @@
 
 namespace gtl
 {
-  struct GbHash
-  {
-    uint64_t val = 0;
-
-    inline bool operator==(const GbHash& other)
-    {
-      return val == other.val;
-    }
-  };
+  using GbHash = uint64_t;
 
   inline GbHash GbHashCombine(GbHash hash, GbHash other)
   {
-    uint64_t val = hash.val;
-    val ^= other.val + 0x9e3779b9 + (val << 6) + (val >> 2);
-    return GbHash{ val };
+    hash ^= other + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    return hash;
   }
 
   template <class T>
   inline GbHash GbHashAppend(GbHash hash, const T& v)
   {
-    uint64_t val = hash.val;
     std::hash<T> hasher;
-    val ^= hasher(v) + 0x9e3779b9 + (val << 6) + (val >> 2);
-    return GbHash{ val };
+    hash ^= hasher(v) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    return hash;
   }
 }
