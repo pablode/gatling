@@ -20,6 +20,7 @@
 #include <MaterialXCore/Document.h>
 
 #include <gtl/gb/Hash.h>
+#include <gtl/gb/Log.h> // TODO
 
 #include <unordered_map>
 #include <assert.h>
@@ -82,6 +83,7 @@ namespace gtl
   }
 
   McMtlxTopoNetworkDiff McDiffTopoEquivalentMtlxNetworks(const MaterialX::NodePtr& surfaceShader1,
+                                                         const McMtlxNodeHashMap& nodeHashMap1,
                                                          const MaterialX::NodePtr& surfaceShader2)
   {
     McMtlxTopoNetworkDiff diff;
@@ -130,9 +132,11 @@ namespace gtl
         mx::ValuePtr value2 = input2 ? input2->getValue() : ndInput->getValue();
 
         // NOTE: improved comparison func proposed in MaterialX PR #2199
-        if (value1->getValueString() != value2->getValueString())
+        if (bool(value1) != bool(value2) ||
+            (value1 && value2 && value1->getValueString() != value2->getValueString()))
         {
-          diff[node1].insert(inputName);
+          GbHash hash = nodeHashMap1.at(node1);
+          diff[hash].insert(inputName);
         }
       }
 
@@ -144,5 +148,24 @@ namespace gtl
     traverseNode(surfaceShader1, surfaceShader2);
 
     return diff;
+  }
+
+  McMtlxNetworkValueDiff McMtlxExtractNetworkValues(const MaterialX::NodePtr& surfaceShader,
+                                                    const McMtlxNodeHashMap& nodeHashMap,
+                                                    const McMtlxTopoNetworkDiff& diff)
+  {
+    McMtlxNetworkValueDiff values;
+
+    // TODO: traverse graph like above
+
+    // TODO: look up node ptr nodeHashMap -> hash
+
+    // TODO: find hash in diff: if it exists, need to diff node values
+
+	// TODO: for that, iter through the inputs
+
+	// TODO: append value ptr to values
+
+    return values;
   }
 }

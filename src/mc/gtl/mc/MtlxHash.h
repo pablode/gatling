@@ -24,15 +24,27 @@
 #include <unordered_map>
 #include <unordered_set>
 
+// TODO: consistent McMtlx prefix. in general, rename functions.
 namespace gtl
 {
   using McMtlxNodeHashMap = std::unordered_map<MaterialX::NodePtr, GbHash>;
+  using McMtlxTopoNetworkDiff = std::unordered_map<GbHash, std::unordered_set<std::string/* input names*/>>;
+  using McMtlxNetworkValueDiff = std::vector<std::vector<MaterialX::ConstValuePtr>>;
 
   McMtlxNodeHashMap McHashMtlxNetworkTopological(const MaterialX::NodePtr& surfaceShader);
 
-  using McMtlxTopoNetworkDiff = std::unordered_map<MaterialX::NodePtr/*of document 1*/,
-                                                   std::unordered_set<std::string/* input names*/>>;
-
   McMtlxTopoNetworkDiff McDiffTopoEquivalentMtlxNetworks(const MaterialX::NodePtr& surfaceShader1,
+                                                         const McMtlxNodeHashMap& nodeHashMap1,
                                                          const MaterialX::NodePtr& surfaceShader2);
+
+  McMtlxNetworkValueDiff McMtlxExtractNetworkValues(const MaterialX::NodePtr& surfaceShader,
+                                                    const McMtlxNodeHashMap& nodeHashMap,
+                                                    const McMtlxTopoNetworkDiff& diff);
+
+  // TODO: is it not clear yet where to write mx::ValuePtr into raw memory.
+
+  // TODO: maybe MtlxDocUtils.h -> McBytePackMtlxValues(size_t alignment)
+
+  // TODO: we also need another function that inserts geompropvalue nodes into a network.
+  // TODO: this function should take McMtlxTopoNetworkDiff (<node, input>[]). maybe geomprop name prefix
 }

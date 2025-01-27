@@ -129,6 +129,9 @@ namespace gtl
     GiScene* scene;
     GbHash topoHash;
     CgpuBuffer parameterBuffer;
+    mx::DocumentPtr mtlxDoc;
+    mx::NodePtr mtlxSurfaceShader;
+    McMtlxNodeHashMap mtlxNodeHashes;
   };
 
   struct GiMesh
@@ -540,7 +543,10 @@ fail:
       .name = name,
       .scene = scene,
       .topoHash = topoHash,
-      .parameterBuffer = paramBuffer
+      .parameterBuffer = paramBuffer,
+      .mtlxDoc = resolvedDoc,
+      .mtlxSurfaceShader = surfaceShader,
+      .mtlxNodeHashes = topoHashes
     };
   }
 
@@ -558,7 +564,10 @@ fail:
       .name = name,
       .scene = scene,
       .topoHash = topoHash,
-      .parameterBuffer = paramBuffer
+      .parameterBuffer = paramBuffer,
+      .mtlxDoc = nullptr,
+      .mtlxSurfaceShader = nullptr,
+      .mtlxNodeHashes = {}
     };
   }
 
@@ -1257,6 +1266,53 @@ cleanup:
       }
       materialSet.insert(m->material);
     }
+
+// <WIP>
+std::unordered_map<GbHash, std::set<const GiMaterial*>> topoMats;
+
+for (auto it = scene->meshes.begin(); it != scene->meshes.end(); it++)
+{
+const GiMaterial* mat = (*it)->material;
+topoMats[mat->topoHash].insert(mat);
+}
+
+for (const auto& kv : topoMats)
+{
+ auto& v = kv.second;
+const auto& k = kv.first;
+if (v.size() < 2)
+{
+GB_LOG("skipped topoHash {}", k);
+continue;
+}
+
+
+GB_LOG("diffing topoHash {} (2 out of {})", k, v.size());
+
+auto vit = v.begin();
+auto mat1MtlxSs = (*vit)->mtlxSurfaceShader;
+auto hashMap1 = (*vit)->mtlxNodeHashes;
+vit++;
+auto mat2MtlxSs = (*vit)->mtlxSurfaceShader;
+
+auto networkDiff = McDiffTopoEquivalentMtlxNetworks(mat1MtlxSs, hashMap1, mat2MtlxSs);
+
+for (auto kv : networkDiff)
+{
+  auto node = kv.first;//hash actually
+  auto inputSet = kv.second;
+
+  GB_LOG("{}", node);
+for (auto input : inputSet)
+{
+  GB_LOG("> {}", input);
+}
+
+}
+
+}
+
+// </WIP>
 
     std::vector<const GiMaterial*> materials(materialSet.begin(), materialSet.end());
 
