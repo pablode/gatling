@@ -23,9 +23,6 @@ on:
       archive-name:
         required: true
         type: string
-      archive-file-name:
-        required: false
-        type: string
       mdl-sdk-cache-key:
         required: true
         type: string
@@ -172,21 +169,21 @@ jobs:
 
     - name: Upload test artifacts
       if: ${{ inputs.run-graphical-tests && inputs.upload-test-artifacts && failure() }}
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: test-artifacts
+        name: test-artifacts-${{ runner.os }}
         path: TEST/*
         retention-days: 7
 
     - name: Create install artifacts
       if: inputs.upload-install-artifacts
       working-directory: INSTALL
-      run: tar -zcvf ${{ inputs.archive-file-name }} *
+      run: tar -zcvf ${{ inputs.archive-name }}.tar.gz *
 
     - name: Upload archive
       if: inputs.upload-install-artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.archive-name }}
-        path: INSTALL/${{ inputs.archive-file-name }}
+        path: INSTALL/${{ inputs.archive-name }}.tar.gz
         retention-days: 7

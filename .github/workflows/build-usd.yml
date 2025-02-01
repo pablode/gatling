@@ -2,10 +2,6 @@ name: Build gatling for USD
 
 on:
   workflow_call:
-    outputs:
-      archive-name:
-        description: "Name of the archive containing the build artifacts"
-        value: build-${{ inputs.build-config }}-${{ github.sha }}
     inputs:
       build-config:
         description: "Name of the CMake build configuration"
@@ -47,7 +43,7 @@ jobs:
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
-          archive-file-name: "gatling_USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
+          archive-name: gatling_USD${{ inputs.usd-version }}_Linux_x64
           cmake-params:
           run-graphical-tests: ${{ inputs.run-graphical-tests }}
           executable-suffix:
@@ -67,7 +63,7 @@ jobs:
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
-          archive-file-name: "gatling_USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
+          archive-name: gatling_USD${{ inputs.usd-version }}_Windows_x64
           cmake-params: -G"Visual Studio 16 2019" -Ax64
           run-graphical-tests: false
           executable-suffix: '.exe'
@@ -79,8 +75,7 @@ jobs:
       usd-download-url: ${{ matrix.usd-download-url }}
       usd-install-path: ${{ matrix.usd-install-path }}
       upload-install-artifacts: ${{ matrix.upload-install-artifacts }}
-      archive-name: build-${{ inputs.build-config }}-${{ github.sha }}
-      archive-file-name: ${{ matrix.archive-file-name }}
+      archive-name: ${{ matrix.archive-name }}
       mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}
       cmake-params: ${{ matrix.cmake-params }}
       run-graphical-tests: ${{ matrix.run-graphical-tests }}

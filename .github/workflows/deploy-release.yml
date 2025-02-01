@@ -61,30 +61,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download artifacts for USD v24.11
-        uses: actions/download-artifact@v3
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.build-usd2411.outputs.archive-name }}
-
-      - name: Download artifacts for USD v24.08
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ needs.build-usd2408.outputs.archive-name }}
-
-      - name: Download artifacts for USD v24.05
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ needs.build-usd2405.outputs.archive-name }}
-
-      - name: Download artifacts for USD v24.03
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ needs.build-usd2403.outputs.archive-name }}
-
-      - name: Download artifacts for Houdini 20.0
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ needs.build-houdini20.outputs.archive-name }}
+          merge-multiple: true
 
       - name: Deploy draft release
         uses: softprops/action-gh-release@d4e8205d7e959a9107da6396278b2f1f07af0f9b
