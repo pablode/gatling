@@ -215,8 +215,7 @@ namespace gtl
 
     _sgGenerateCommonDefines(stitcher, params.commonParams);
 
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
     stitcher.appendDefine("MEDIUM_DIRECTIONAL_BIAS", params.directionalBias);
     stitcher.appendDefine("SCENE_DATA_COUNT", (int32_t) params.sceneDataCount);
 
@@ -280,8 +279,7 @@ namespace gtl
 
     _sgGenerateCommonDefines(stitcher, params.commonParams);
 
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_2D", (int32_t) params.textureIndexOffset2d);
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET_3D", (int32_t) params.textureIndexOffset3d);
+    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
     stitcher.appendDefine("SCENE_DATA_COUNT", (int32_t) params.sceneDataCount);
 
     if (params.shadowTest)

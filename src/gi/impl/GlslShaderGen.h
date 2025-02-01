@@ -93,8 +93,7 @@ namespace gtl
       bool nextEventEstimation;
       uint32_t sceneDataCount;
       std::string_view shadingGlsl;
-      uint32_t textureIndexOffset2d;
-      uint32_t textureIndexOffset3d;
+      uint32_t textureIndexOffset;
     };
 
     struct AnyHitShaderParams
@@ -106,8 +105,7 @@ namespace gtl
       std::string_view opacityEvalGlsl;
       uint32_t sceneDataCount;
       bool shadowTest;
-      uint32_t textureIndexOffset2d;
-      uint32_t textureIndexOffset3d;
+      uint32_t textureIndexOffset;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);

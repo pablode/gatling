@@ -12,8 +12,8 @@ layout(binding = BINDING_INDEX_DISK_LIGHTS, std430) readonly buffer DiskLightBuf
 
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 
-layout(binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_2D_COUNT];
-layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_3D_COUNT];
+layout(binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
+layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
 
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
 

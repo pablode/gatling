@@ -210,8 +210,6 @@ namespace gtl
     CgpuBuffer aovDefaultValues;
     uint32_t sampleOffset = 0;
     CgpuBuffer sceneParams;
-    OffsetAllocator::Allocator texture2dOffsets{rp::MAX_TEXTURE_2D_COUNT};
-    OffsetAllocator::Allocator texture3dOffsets{rp::MAX_TEXTURE_3D_COUNT};
   };
 
   struct GiRenderBuffer
@@ -1236,8 +1234,7 @@ cleanup:
     std::vector<uint32_t> imageOffsets3d;
     std::vector<CgpuRtHitGroup> hitGroups;
     std::vector<McTextureDescription> textureDescriptions;
-    OffsetAllocator::Allocator tex2dAllocator{rp::MAX_TEXTURE_2D_COUNT};
-    OffsetAllocator::Allocator tex3dAllocator{rp::MAX_TEXTURE_3D_COUNT};
+    OffsetAllocator::Allocator texAllocator{rp::MAX_TEXTURE_COUNT};
 
     uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
     uint32_t maxRayHitAttributeSize = _GetRpMainMaxRayHitAttributeSize();
@@ -1247,7 +1244,7 @@ cleanup:
       .mediumStackSize = renderSettings.mediumStackSize
     };
 
-    OffsetAllocator::Allocation domeLightsAllocation = tex2dAllocator.allocate(2); // primary + secondary
+    OffsetAllocator::Allocation domeLightsAllocation = texAllocator.allocate(2); // primary + secondary
 
     // Create per-material closest-hit shaders.
     //
@@ -1260,8 +1257,7 @@ cleanup:
       struct HitShaderCompInfo
       {
         GiGlslShaderGen::MaterialGenInfo genInfo;
-        uint32_t texOffset2d = 0;
-        uint32_t texOffset3d = 0;
+        uint32_t texOffset = 0;
         std::vector<uint8_t> spv;
         std::vector<uint8_t> shadowSpv;
       };
@@ -1319,31 +1315,31 @@ cleanup:
       {
         const auto allocTextureOffsets = [&](HitShaderCompInfo& compInfo)
         {
-          uint32_t texCount2d = 0;
-          uint32_t texCount3d = 0;
+          uint32_t texCount = 0;
           for (const McTextureDescription& tr : compInfo.genInfo.textureDescriptions)
           {
-            (tr.is3dImage ? texCount3d : texCount2d)++;
+            texCount++;
             textureDescriptions.push_back(tr);
           }
 
-          OffsetAllocator::Allocation allocation2d = tex2dAllocator.allocate(texCount2d);
-          OffsetAllocator::Allocation allocation3d = tex3dAllocator.allocate(texCount3d);
-          compInfo.texOffset2d = allocation2d.offset;
-          compInfo.texOffset3d = allocation3d.offset;
+          if (texCount > 0)
+          {
+            OffsetAllocator::Allocation allocation = texAllocator.allocate(texCount);
+            compInfo.texOffset = allocation.offset;
+          }
 
-          texCount2d = 0;
-          texCount3d = 0;
+          texCount = 0;
           for (const McTextureDescription& tr : compInfo.genInfo.textureDescriptions)
           {
             if (tr.is3dImage)
             {
-              imageOffsets3d.push_back(allocation3d.offset + (texCount3d++));
+              imageOffsets3d.push_back(compInfo.texOffset + texCount);
             }
             else
             {
-              imageOffsets2d.push_back(allocation2d.offset + (texCount2d++));
+              imageOffsets2d.push_back(compInfo.texOffset + texCount);
             }
+            texCount++;
           }
         };
 
@@ -1355,15 +1351,9 @@ cleanup:
         }
       }
 
-      if (imageOffsets2d.size() > rp::MAX_TEXTURE_2D_COUNT)
+      if (textureDescriptions.size() > rp::MAX_TEXTURE_COUNT)
       {
-        GB_ERROR("max number of 2D textures exceeded");
-        goto cleanup;
-      }
-
-      if (imageOffsets3d.size() > rp::MAX_TEXTURE_3D_COUNT)
-      {
-        GB_ERROR("max number of 3D textures exceeded");
+        GB_ERROR("max number of textures exceeded");
         goto cleanup;
       }
 
@@ -1397,8 +1387,7 @@ cleanup:
             .nextEventEstimation = renderSettings.nextEventEstimation,
             .sceneDataCount = sceneDataCount,
             .shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource,
-            .textureIndexOffset2d = compInfo.closestHitInfo.texOffset2d,
-            .textureIndexOffset3d = compInfo.closestHitInfo.texOffset3d
+            .textureIndexOffset = compInfo.closestHitInfo.texOffset
           };
 
           if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
@@ -1418,8 +1407,7 @@ cleanup:
             .cameraPositionSceneDataIndex = material->cameraPositionSceneDataIndex,
             .opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource,
             .sceneDataCount = sceneDataCount,
-            .textureIndexOffset2d = compInfo.anyHitInfo->texOffset2d,
-            .textureIndexOffset3d = compInfo.anyHitInfo->texOffset3d
+            .textureIndexOffset = compInfo.anyHitInfo->texOffset
           };
 
           hitParams.shadowTest = false;
