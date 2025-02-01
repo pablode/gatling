@@ -1245,6 +1245,7 @@ cleanup:
     };
 
     OffsetAllocator::Allocation domeLightsAllocation = texAllocator.allocate(2); // primary + secondary
+    assert(domeLightsAllocation.offset == 0);
 
     // Create per-material closest-hit shaders.
     //
@@ -2071,6 +2072,7 @@ cleanup:
 
     for (const GiImageBinding& b : shaderCache->imageBindings2d)
     {
+      assert(b.index != 0 && b.index != 1); // reserved for dome lights
       images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = b.image, .index = b.index });
     }
     for (const GiImageBinding& b : shaderCache->imageBindings3d)

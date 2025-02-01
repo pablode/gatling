@@ -3,12 +3,10 @@
 
 layout(binding = BINDING_INDEX_SCENE_PARAMS, std430) readonly buffer SceneParamsBuffer { SceneParams sceneParams; };
 
-#ifdef NEXT_EVENT_ESTIMATION
 layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLightBuffer { SphereLight sphereLights[]; };
 layout(binding = BINDING_INDEX_DISTANT_LIGHTS, std430) readonly buffer DistantLightBuffer { DistantLight distantLights[]; };
 layout(binding = BINDING_INDEX_RECT_LIGHTS, std430) readonly buffer RectLightBuffer { RectLight rectLights[]; };
 layout(binding = BINDING_INDEX_DISK_LIGHTS, std430) readonly buffer DiskLightBuffer { DiskLight diskLights[]; };
-#endif
 
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 

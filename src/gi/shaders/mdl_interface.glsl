@@ -44,7 +44,6 @@ bool tex_texture_isvalid(int tex)
 
 vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w, vec2 crop_u, vec2 crop_v, vec2 crop_w, float frame)
 {
-#ifdef NEXT_EVENT_ESTIMATION
     if ((tex == 0) ||
         (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
         (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)) ||
@@ -63,10 +62,6 @@ vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
 
     ASSERT(array_idx < sceneParams.texture3dCount, "Error: invalid texture index\n");
     return texture(sampler3D(textures_3d[nonuniformEXT(array_idx)], tex_sampler), coord);
-#else
-    ASSERT(tex == 0, "Error: invalid texture index\n");
-    return vec4(0, 0, 0, 0);
-#endif
 }
 
 vec3 tex_lookup_float3_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w, vec2 crop_u, vec2 crop_v, vec2 crop_w, float frame)
