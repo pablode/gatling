@@ -18,6 +18,16 @@ jobs:
     with:
       cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
 
+  build-2502:
+    name: Build gatling for USD v25.02 (Release)
+    needs: build-mdl-sdk
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 25.02
+      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      run-graphical-tests: true
+      upload-test-artifacts: true
+
   build-2411:
     name: Build gatling for USD v24.11 (Release)
     needs: build-mdl-sdk
