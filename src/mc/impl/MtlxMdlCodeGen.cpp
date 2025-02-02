@@ -203,7 +203,7 @@ namespace gtl
       McMtlxDocumentPatcher patcher;
       patcher.patch(mtlxDoc);
 
-      if (getenv("GATLING_DUMP_MTLX"))
+      if (getenv("GTL_DUMP_MTLX"))
       {
         std::string mtlxSrc = mx::writeToXmlString(mtlxDoc);
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
@@ -233,7 +233,7 @@ namespace gtl
     mx::ShaderStage pixelStage = shader->getStage(mx::Stage::PIXEL);
     mdlSrc = pixelStage.getSourceCode();
 
-    if (getenv("GATLING_DUMP_MDL"))
+    if (getenv("GTL_DUMP_MDL"))
     {
       GB_LOG("MDL source: \n{}", mdlSrc);
     }
