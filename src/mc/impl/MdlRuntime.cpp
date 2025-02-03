@@ -19,8 +19,12 @@
 
 #include "MdlLogger.h"
 #include "MdlNeurayLoader.h"
+#include "MdlEntityResolver.h"
 
 #include <mi/mdl_sdk.h>
+
+#include <gtl/gb/Fmt.h>
+#include <gtl/gb/Log.h>
 
 namespace gtl
 {
@@ -36,7 +40,7 @@ namespace gtl
     }
   }
 
-  bool McMdlRuntime::init(std::string_view libDir)
+  bool McMdlRuntime::init(std::string_view libDir, const std::vector<std::string>& mdlSearchPaths)
   {
     m_loader = std::make_shared<McMdlNeurayLoader>();
     if (!m_loader->init(libDir))
@@ -60,6 +64,34 @@ namespace gtl
     {
       m_logger->message(mi::base::MESSAGE_SEVERITY_FATAL, "Unable to start Neuray");
       return false;
+    }
+
+    m_impExpApi = mi::base::Handle<mi::neuraylib::IMdl_impexp_api>(m_neuray->get_api_component<mi::neuraylib::IMdl_impexp_api>());
+
+    mi::base::Handle<mi::neuraylib::IMdl_entity_resolver> standardResolver = mi::base::Handle<mi::neuraylib::IMdl_entity_resolver>(m_config->get_entity_resolver());
+    m_entityResolver = mi::base::Handle<McMdlEntityResolver>(new McMdlEntityResolver(m_impExpApi, standardResolver));
+    m_config->set_entity_resolver(m_entityResolver.get());
+
+    m_config->add_mdl_system_paths();
+    m_config->add_mdl_user_paths();
+
+    if (m_config->get_mdl_paths_length() > 0)
+    {
+      std::vector<const char*> defaultSearchPaths;
+      for (mi::Size i = 0; i < m_config->get_mdl_paths_length(); i++)
+      {
+        defaultSearchPaths.push_back(m_config->get_mdl_path(i)->get_c_str());
+      }
+      GB_LOG("prepended MDL search paths: {}", defaultSearchPaths);
+    }
+
+    for (const std::string& s : mdlSearchPaths)
+    {
+      if (m_config->add_mdl_path(s.c_str()))
+      {
+        auto logMsg = GB_FMT("MDL search path could not be added: \"{}\"", s);
+        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, logMsg.c_str());
+      }
     }
 
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(m_neuray->get_api_component<mi::neuraylib::IDatabase>());

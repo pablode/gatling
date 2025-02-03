@@ -19,6 +19,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gtl
 {
@@ -37,5 +38,5 @@ namespace gtl
     McMdlRuntime* m_mdlRuntime = nullptr;
   };
 
-  McRuntime* McLoadRuntime(std::string_view libDir);
+  McRuntime* McLoadRuntime(std::string_view libDir, const std::vector<std::string>& mdlSearchPaths);
 }

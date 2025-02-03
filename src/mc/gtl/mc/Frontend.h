@@ -32,8 +32,7 @@ namespace gtl
   class McFrontend
   {
   public:
-    McFrontend(const std::vector<std::string>& mdlSearchPaths,
-               const MaterialX::DocumentPtr mtlxStdLib,
+    McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
                McRuntime& mdlRuntime);
 
   private:
@@ -44,7 +43,7 @@ namespace gtl
 
     McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc);
 
-    McMaterial* createFromMdlFile(std::string_view filePath, std::string_view subIdentifier);
+    McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier);
 
   private:
     std::shared_ptr<McMdlMaterialCompiler> m_mdlMaterialCompiler;

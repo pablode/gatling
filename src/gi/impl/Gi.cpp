@@ -402,13 +402,13 @@ namespace gtl
 
     s_delayedResourceDestroyer = std::make_unique<GgpuDelayedResourceDestroyer>(s_device);
 
-    s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath));
+    s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath, params.mdlSearchPaths));
     if (!s_mcRuntime)
     {
       goto fail;
     }
 
-    s_mcFrontend = std::make_unique<McFrontend>(params.mdlSearchPaths, mtlxStdLib, *s_mcRuntime);
+    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, *s_mcRuntime);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))

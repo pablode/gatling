@@ -185,12 +185,11 @@ namespace
 
 namespace gtl
 {
-  McFrontend::McFrontend(const std::vector<std::string>& mdlSearchPaths,
-                         const MaterialX::DocumentPtr mtlxStdLib,
+  McFrontend::McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
                          McRuntime& runtime)
   {
     McMdlRuntime& mdlRuntime = runtime.getMdlRuntime();
-    m_mdlMaterialCompiler = std::make_shared<McMdlMaterialCompiler>(mdlRuntime, mdlSearchPaths);
+    m_mdlMaterialCompiler = std::make_shared<McMdlMaterialCompiler>(mdlRuntime);
     m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib);
   }
 
@@ -248,7 +247,7 @@ namespace gtl
     return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
   }
 
-  McMaterial* McFrontend::createFromMdlFile(std::string_view filePath, std::string_view subIdentifier)
+  McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
     if (!m_mdlMaterialCompiler->compileFromFile(filePath, subIdentifier, compiledMaterial))

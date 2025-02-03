@@ -36,10 +36,10 @@ namespace gtl
     return *m_mdlRuntime;
   }
 
-  McRuntime* McLoadRuntime(std::string_view libDir)
+  McRuntime* McLoadRuntime(std::string_view libDir, const std::vector<std::string>& mdlSearchPaths)
   {
     McMdlRuntime* r = new McMdlRuntime();
-    if (!r->init(libDir))
+    if (!r->init(libDir, mdlSearchPaths))
     {
         delete r;
         return nullptr;

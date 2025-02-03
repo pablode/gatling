@@ -7,6 +7,8 @@ add_library(
   impl/Backend.cpp
   impl/Frontend.cpp
   impl/Material.cpp
+  impl/MdlEntityResolver.cpp
+  impl/MdlEntityResolver.h
   impl/MdlLogger.cpp
   impl/MdlLogger.h
   impl/MdlMaterial.cpp

@@ -21,14 +21,17 @@
 #include <mi/neuraylib/ineuray.h>
 #include <mi/neuraylib/idatabase.h>
 #include <mi/neuraylib/itransaction.h>
-#include <mi/neuraylib/imdl_configuration.h>
 #include <mi/neuraylib/imdl_backend_api.h>
+#include <mi/neuraylib/imdl_configuration.h>
+#include <mi/neuraylib/imdl_entity_resolver.h>
 #include <mi/neuraylib/imdl_impexp_api.h>
 #include <mi/neuraylib/imdl_factory.h>
 
 #include <memory>
 #include <string_view>
+#include <vector>
 
+#include "MdlEntityResolver.h"
 #include "MdlLogger.h"
 
 namespace gtl
@@ -43,7 +46,7 @@ namespace gtl
     ~McMdlRuntime();
 
   public:
-    bool init(std::string_view libDir);
+    bool init(std::string_view libDir, const std::vector<std::string>& mdlSearchPaths);
 
     mi::base::Handle<McMdlLogger> getLogger();
     mi::base::Handle<mi::neuraylib::IDatabase> getDatabase();
@@ -57,6 +60,8 @@ namespace gtl
     std::shared_ptr<McMdlNeurayLoader> m_loader;
 
     mi::base::Handle<McMdlLogger> m_logger;
+    mi::base::Handle<McMdlEntityResolver> m_entityResolver;
+
     mi::base::Handle<mi::neuraylib::INeuray> m_neuray;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
