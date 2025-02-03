@@ -18,6 +18,7 @@
 #include "MdlMaterialCompiler.h"
 
 #include "MdlRuntime.h"
+#include "MdlEntityResolver.h"
 
 #include <gtl/gb/Fmt.h>
 
@@ -42,8 +43,7 @@ namespace
 
 namespace gtl
 {
-  McMdlMaterialCompiler::McMdlMaterialCompiler(McMdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths)
-    : m_mdlSearchPaths(mdlSearchPaths)
+  McMdlMaterialCompiler::McMdlMaterialCompiler(McMdlRuntime& runtime)
   {
     m_logger = mi::base::Handle<McMdlLogger>(runtime.getLogger());
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
@@ -57,66 +57,34 @@ namespace gtl
                                                 std::string_view identifier,
                                                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
-    std::lock_guard<std::mutex> guard(m_mutex); // Serialize since the search path is global...
-
     std::string moduleName = _MakeModuleName(identifier);
-
-    addStandardSearchPaths();
 
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
       return m_impExpApi->load_module_from_string(m_transaction.get(), moduleName.c_str(), srcStr.data(), context);
     };
 
-    bool result = compile(identifier, moduleName, modCreateFunc, compiledMaterial);
-
-    m_config->clear_mdl_paths();
-
-    return result;
+    return compile(identifier, moduleName, modCreateFunc, compiledMaterial);
   }
 
-  bool McMdlMaterialCompiler::compileFromFile(std::string_view filePath,
+  bool McMdlMaterialCompiler::compileFromFile(const char* filePath,
                                               std::string_view identifier,
                                               mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
   {
-    std::lock_guard<std::mutex> guard(m_mutex); // Serialize since the search path is global...
-
     std::string fileDir = fs::path(filePath).parent_path().string();
     std::string moduleName = GB_FMT("::{}", fs::path(filePath).stem().string());
 
-    if (m_config->add_mdl_path(fileDir.c_str()))
-    {
-      m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, "unable to add asset MDL files");
-    }
-
-    // The free TurboSquid USD+MDL models, and possibly thousand paid ones too, come with some of the required Omni* files,
-    // but some others are referenced and missing. If we include the directory of the asset as an MDL path after our own Omni*
-    // MDL files, the Omni* files that come with the asset will be loaded instead of ours. They link to the other files that do
-    // not exist, causing compilation to fail. By changing the load order, our complete Omni*-file suite will be used instead.
-    addStandardSearchPaths();
-
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
+      McMdlEntityResolverUserData* userData = new McMdlEntityResolverUserData();
+      userData->dirPrefix = fileDir;
+
+      context->set_option("user_data", userData); // pass to entity resolver
+
       return m_impExpApi->load_module(m_transaction.get(), moduleName.c_str(), context);
     };
 
-    bool result = compile(identifier, moduleName, modCreateFunc, compiledMaterial);
-
-    m_config->clear_mdl_paths();
-
-    return result;
-  }
-
-  void McMdlMaterialCompiler::addStandardSearchPaths()
-  {
-    for (const std::string& s : m_mdlSearchPaths)
-    {
-      if (m_config->add_mdl_path(s.c_str()))
-      {
-        auto logMsg = GB_FMT("MDL search path could not be added: \"{}\"", s);
-        m_logger->message(mi::base::MESSAGE_SEVERITY_WARNING, logMsg.c_str());
-      }
-    }
+    return compile(identifier, moduleName, modCreateFunc, compiledMaterial);
   }
 
   bool McMdlMaterialCompiler::compile(std::string_view identifier,

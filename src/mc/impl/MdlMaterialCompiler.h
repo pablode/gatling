@@ -20,7 +20,6 @@
 #include <string_view>
 #include <functional>
 #include <vector>
-#include <mutex>
 
 #include <mi/base/handle.h>
 #include <mi/neuraylib/icompiled_material.h>
@@ -41,20 +40,18 @@ namespace gtl
   class McMdlMaterialCompiler
   {
   public:
-    McMdlMaterialCompiler(McMdlRuntime& runtime, const std::vector<std::string>& mdlSearchPaths);
+    McMdlMaterialCompiler(McMdlRuntime& runtime);
 
   public:
     bool compileFromString(std::string_view srcStr,
                            std::string_view identifier,
                            mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
-    bool compileFromFile(std::string_view filePath,
+    bool compileFromFile(const char* filePath,
                          std::string_view identifier,
                          mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
   private:
-    void addStandardSearchPaths();
-
     bool compile(std::string_view identifier,
                  std::string_view moduleName,
                  std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
@@ -66,10 +63,6 @@ namespace gtl
                                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
 
   private:
-    const std::vector<std::string> m_mdlSearchPaths;
-
-    std::mutex m_mutex;
-
     mi::base::Handle<McMdlLogger> m_logger;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
