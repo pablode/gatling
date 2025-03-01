@@ -97,6 +97,9 @@ namespace gtl
     uint32_t interfaceVarCount;
     std::vector<SpvReflectInterfaceVariable*> interfaceVars;
 
+    uint32_t descriptorSetCount;
+    std::vector<SpvReflectDescriptorSet*> descriptorSets;
+
     if (spvReflectEnumerateInterfaceVariables(&shaderModule, &interfaceVarCount, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
     {
       goto fail;
@@ -134,27 +137,37 @@ namespace gtl
       }
     }
 
-    if (spvReflectEnumerateDescriptorBindings(&shaderModule, &bindingCount, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
+    if (spvReflectEnumerateDescriptorSets(&shaderModule, &descriptorSetCount, nullptr) != SPV_REFLECT_RESULT_SUCCESS)
     {
       goto fail;
     }
 
-    if (bindingCount > 0)
+    descriptorSets.resize(descriptorSetCount);
+    if (spvReflectEnumerateDescriptorSets(&shaderModule, &descriptorSetCount, descriptorSets.data()) != SPV_REFLECT_RESULT_SUCCESS)
     {
-      bindings.resize(bindingCount);
+      goto fail;
+    }
 
-      if (spvReflectEnumerateDescriptorBindings(&shaderModule, &bindingCount, bindings.data()) != SPV_REFLECT_RESULT_SUCCESS)
+    reflection->descriptorSets.resize(descriptorSetCount);
+    for (uint32_t j = 0; j < descriptorSetCount; j++)
+    {
+      const SpvReflectDescriptorSet* srcDescriptorSet = descriptorSets[j];
+      uint32_t bindingCount = srcDescriptorSet->binding_count;
+
+      if (bindingCount ==  0)
       {
-        goto fail;
+        continue;
       }
 
-      reflection->bindings.resize(bindingCount);
+      CgpuShaderReflectionDescriptorSet& dstDescriptorSet = reflection->descriptorSets[j];
+      std::vector<CgpuShaderReflectionBinding>& dstBindings = dstDescriptorSet.bindings;
+      dstBindings.resize(bindingCount);
 
-      for (uint32_t i = 0; i < bindings.size(); i++)
+      for (uint32_t i = 0; i < bindingCount; i++)
       {
-        const SpvReflectDescriptorBinding* srcBinding = bindings[i];
+        const SpvReflectDescriptorBinding* srcBinding = srcDescriptorSet->bindings[i];
 
-        CgpuShaderReflectionBinding& dstBinding = reflection->bindings[i];
+        CgpuShaderReflectionBinding& dstBinding = dstBindings[i];
         dstBinding.binding = srcBinding->binding;
         dstBinding.count = srcBinding->count;
         dstBinding.descriptorType = (int)srcBinding->descriptor_type;

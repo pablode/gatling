@@ -31,10 +31,15 @@ namespace gtl
     bool writeAccess;
   };
 
+  struct CgpuShaderReflectionDescriptorSet
+  {
+    std::vector<CgpuShaderReflectionBinding> bindings;
+  };
+
   struct CgpuShaderReflection
   {
+    std::vector<CgpuShaderReflectionDescriptorSet> descriptorSets;
     uint32_t pushConstantsSize;
-    std::vector<CgpuShaderReflectionBinding> bindings;
     uint32_t maxRayPayloadSize;
     uint32_t maxRayHitAttributeSize;
   };

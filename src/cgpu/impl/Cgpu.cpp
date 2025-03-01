@@ -67,6 +67,8 @@ namespace gtl
                                                                             VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                                                                             VK_SHADER_STAGE_MISS_BIT_KHR;
 
+  constexpr static const uint32_t CGPU_DESCRIPTOR_SET_INDEX = 0; // TODO: support multiple descriptor sets
+
   constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
 
   /* Internal structures. */
@@ -1242,14 +1244,17 @@ namespace gtl
                                               std::vector<VkDescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
   {
     const CgpuShaderReflection* shaderReflection = &ishader->reflection;
-    size_t bindingCount = shaderReflection->bindings.size();
+    const CgpuShaderReflectionDescriptorSet& descriptorSet = shaderReflection->descriptorSets[CGPU_DESCRIPTOR_SET_INDEX];
+    const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
+
+    size_t bindingCount = bindings.size();
 
     std::vector<VkDescriptorBindingFlagsEXT> bindingFlags(bindingCount);
     descriptorSetLayoutBindings.resize(bindingCount);
 
     for (uint32_t i = 0; i < bindingCount; i++)
     {
-      const CgpuShaderReflectionBinding& bindingReflection = shaderReflection->bindings[i];
+      const CgpuShaderReflectionBinding& bindingReflection = bindings[i];
 
       VkDescriptorSetLayoutBinding layoutBinding = {
         .binding = bindingReflection.binding,
@@ -1897,9 +1902,12 @@ namespace gtl
     uint32_t asCount = 0;
 
     const CgpuShaderReflection* shaderReflection = &ishader->reflection;
-    for (uint32_t i = 0; i < shaderReflection->bindings.size(); i++)
+    const CgpuShaderReflectionDescriptorSet& descriptorSet = shaderReflection->descriptorSets[CGPU_DESCRIPTOR_SET_INDEX];
+    const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
+
+    for (uint32_t i = 0; i < bindings.size(); i++)
     {
-      const CgpuShaderReflectionBinding* binding = &shaderReflection->bindings[i];
+      const CgpuShaderReflectionBinding* binding = &bindings[i];
 
       switch (binding->descriptorType)
       {
@@ -2804,9 +2812,12 @@ cleanup_fail:
 
     /* FIXME: this has quadratic complexity */
     const CgpuShaderReflection* reflection = &ishader->reflection;
-    for (uint32_t i = 0; i < reflection->bindings.size(); i++)
+    const CgpuShaderReflectionDescriptorSet& descriptorSet = reflection->descriptorSets[CGPU_DESCRIPTOR_SET_INDEX];
+    const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
+
+    for (uint32_t i = 0; i < bindings.size(); i++)
     {
-      const CgpuShaderReflectionBinding* binding = &reflection->bindings[i];
+      const CgpuShaderReflectionBinding* binding = &bindings[i];
 
       VkImageLayout newLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       if (binding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
