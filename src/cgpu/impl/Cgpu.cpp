@@ -1513,14 +1513,14 @@ namespace gtl
     return true;
   }
 
-  static bool cgpuCreateIBufferAligned(CgpuIDevice* idevice,
-                                       CgpuBufferUsageFlags usage,
-                                       CgpuMemoryPropertyFlags memoryProperties,
-                                       uint64_t size,
-                                       uint64_t alignment,
-                                       CgpuIBuffer* ibuffer,
-                                       const char* debugName,
-                                       VmaPool memoryPool = VK_NULL_HANDLE)
+  static bool cgpuCreateIBuffer(CgpuIDevice* idevice,
+                                CgpuBufferUsageFlags usage,
+                                CgpuMemoryPropertyFlags memoryProperties,
+                                uint64_t size,
+                                uint64_t alignment,
+                                CgpuIBuffer* ibuffer,
+                                const char* debugName,
+                                VmaPool memoryPool = VK_NULL_HANDLE)
   {
     VkBufferCreateInfo bufferInfo = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -1577,10 +1577,9 @@ namespace gtl
     return true;
   }
 
-  static bool cgpuCreateBufferAligned(CgpuDevice device,
-                                      CgpuBufferCreateInfo createInfo,
-                                      uint64_t alignment,
-                                      CgpuBuffer* buffer)
+  bool cgpuCreateBuffer(CgpuDevice device,
+                        CgpuBufferCreateInfo createInfo,
+                        CgpuBuffer* buffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
@@ -1590,7 +1589,8 @@ namespace gtl
 
     assert(createInfo.size > 0);
 
-    if (!cgpuCreateIBufferAligned(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size, alignment, ibuffer, createInfo.debugName))
+    if (!cgpuCreateIBuffer(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size,
+                           createInfo.alignment, ibuffer, createInfo.debugName))
     {
       iinstance->ibufferStore.free(handle);
       CGPU_RETURN_ERROR("failed to create buffer");
@@ -1603,15 +1603,6 @@ namespace gtl
 
     buffer->handle = handle;
     return true;
-  }
-
-  bool cgpuCreateBuffer(CgpuDevice device,
-                        CgpuBufferCreateInfo createInfo,
-                        CgpuBuffer* buffer)
-  {
-    uint64_t alignment = 0;
-
-    return cgpuCreateBufferAligned(device, createInfo, alignment, buffer);
   }
 
   static void cgpuDestroyIBuffer(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
@@ -2138,8 +2129,8 @@ namespace gtl
     CgpuBufferUsageFlags bufferUsageFlags = CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR;
     CgpuMemoryPropertyFlags bufferMemPropFlags = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
 
-    if (!cgpuCreateIBufferAligned(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize,
-                                  idevice->properties.shaderGroupBaseAlignment, &ipipeline->sbt, "[SBT]"))
+    if (!cgpuCreateIBuffer(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize,
+                           idevice->properties.shaderGroupBaseAlignment, &ipipeline->sbt, "[SBT]"))
     {
       CGPU_RETURN_ERROR("failed to create sbt buffer");
     }
@@ -2421,11 +2412,11 @@ cleanup_fail:
                                                            &asBuildSizesInfo);
 
     // Create AS buffer & AS object
-    if (!cgpuCreateIBufferAligned(idevice,
-                                  CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE,
-                                  CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                                  asBuildSizesInfo.accelerationStructureSize, 0,
-                                  iasBuffer, "[AS buffer]"))
+    if (!cgpuCreateIBuffer(idevice,
+                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE,
+                           CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                           asBuildSizesInfo.accelerationStructureSize, 0,
+                           iasBuffer, "[AS buffer]"))
     {
       CGPU_RETURN_ERROR("failed to create AS buffer");
     }
@@ -2449,13 +2440,13 @@ cleanup_fail:
 
     // Set up device-local scratch buffer
     CgpuIBuffer iscratchBuffer;
-    if (!cgpuCreateIBufferAligned(idevice,
-                                  CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
-                                  CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                                  asBuildSizesInfo.buildScratchSize,
-                                  idevice->properties.minAccelerationStructureScratchOffsetAlignment,
-                                  &iscratchBuffer, "[AS scratch buffer]",
-                                  idevice->asScratchMemoryPool))
+    if (!cgpuCreateIBuffer(idevice,
+                           CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
+                           CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                           asBuildSizesInfo.buildScratchSize,
+                           idevice->properties.minAccelerationStructureScratchOffsetAlignment,
+                           &iscratchBuffer, "[AS scratch buffer]",
+                           idevice->asScratchMemoryPool))
     {
       cgpuDestroyIBuffer(idevice, iasBuffer);
       idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, *as, nullptr);
@@ -2594,11 +2585,11 @@ cleanup_fail:
     CGPU_RESOLVE_TLAS({ handle }, itlas);
 
     // Create instance buffer & copy into it
-    if (!cgpuCreateIBufferAligned(idevice,
-                                  CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                                  CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
-                                  (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
-                                  16/*required by spec*/, &itlas->instances, createInfo.debugName))
+    if (!cgpuCreateIBuffer(idevice,
+                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
+                           CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+                           (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
+                           16/*required by spec*/, &itlas->instances, createInfo.debugName))
     {
       iinstance->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to create TLAS instances buffer");

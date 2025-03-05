@@ -307,6 +307,7 @@ namespace gtl
     CgpuMemoryPropertyFlags memoryProperties;
     uint64_t size;
     const char* debugName = nullptr;
+    uint32_t alignment = 0; // no explicit alignment
   };
 
   struct CgpuShaderCreateInfo
