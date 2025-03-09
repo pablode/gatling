@@ -2088,7 +2088,8 @@ cleanup:
       rp::BINDING_INDEX_AOV_OBJECT_ID,
       rp::BINDING_INDEX_AOV_DEPTH,
       rp::BINDING_INDEX_AOV_FACE_ID,
-      rp::BINDING_INDEX_AOV_INSTANCE_ID
+      rp::BINDING_INDEX_AOV_INSTANCE_ID,
+      rp::BINDING_INDEX_AOV_DOUBLE_SIDED
     };
 
     for (const GiAovBinding& binding : params.aovBindings)

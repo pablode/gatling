@@ -135,6 +135,7 @@ void main()
     vec2 hit_bc = baryCoord;
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
     bool isLeftHanded = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_FLIP_FACING) != 0);
+    bool isDoubleSided = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED) != 0);
 
     /* 2. Set up shading state. */
     State shading_state; // Shading_state_material
@@ -212,6 +213,9 @@ void main()
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
       int instanceId = InstanceIds[gl_InstanceID];
       InstanceIdAov[pixelIndex] = instanceId;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
+      DoubleSidedAov[pixelIndex] = isDoubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
 #endif
     }
 

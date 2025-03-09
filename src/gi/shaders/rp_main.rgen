@@ -395,6 +395,9 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
   InstanceIdAov[pixelIndex] = ClearValuesI[AOV_ID_INSTANCE_ID].x;
 #endif
+#if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
+  DoubleSidedAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_DOUBLE_SIDED].rgb;
+#endif
 }
 
 void main()

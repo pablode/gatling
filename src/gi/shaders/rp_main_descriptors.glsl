@@ -69,6 +69,9 @@ layout(binding = BINDING_INDEX_AOV_FACE_ID, std430) writeonly buffer FaceIdBuffe
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
 layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) writeonly buffer InstanceIdBuffer { int InstanceIdAov[]; };
 #endif
+#if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
+layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, std430) writeonly buffer DoubleSidedBuffer { vec3 DoubleSidedAov[]; };
+#endif
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
   BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
