@@ -194,8 +194,9 @@ namespace gtl
 
   GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc);
   void giSetMeshTransform(GiMesh* mesh, const float* mat4x4);
-  void giSetMeshInstanceTransforms(GiMesh* mesh, uint32_t count, const float (*transforms)[4][4]);
+  void giSetMeshInstanceTransforms(GiMesh* mesh, uint32_t count, const float(*transforms)[4][4]);
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars);
+  void giSetMeshInstanceIds(GiMesh* mesh, uint32_t count, int* ids);
   void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat);
   void giSetMeshVisibility(GiMesh* mesh, bool visible);
   void giDestroyMesh(GiMesh* mesh);

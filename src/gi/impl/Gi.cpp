@@ -132,6 +132,7 @@ namespace gtl
     bool flipFacing;
     int id;
     std::vector<glm::mat3x4> instanceTransforms;
+    std::vector<int> instanceIds;
     std::vector<GiPrimvarData> instancerPrimvars; // TODO: compress with blosc
     const GiMaterial* material = nullptr;
     GiScene* scene;
@@ -598,6 +599,18 @@ fail:
     {
       std::lock_guard guard(scene->mutex);
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+    }
+  }
+
+  void giSetMeshInstanceIds(GiMesh* mesh, uint32_t count, int* ids)
+  {
+    mesh->instanceIds.resize(count);
+    memcpy(mesh->instanceIds.data(), ids, count * sizeof(int));
+
+    GiScene* scene = mesh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
     }
   }
 
@@ -1071,11 +1084,10 @@ fail_cleanup:
       totalIndicesSize += mesh->cpuData.faceCount * sizeof(uint32_t) * 3;
       totalVerticesSize += mesh->cpuData.vertexCount * sizeof(rp::FVertex);
 
-      int instanceId = 0;
-      for (const glm::mat3x4& t : mesh->instanceTransforms)
+      for (size_t i = 0; i < mesh->instanceTransforms.size(); i++)
       {
         // Create BLAS instance for TLAS.
-        glm::mat3x4 transform = glm::mat3x4(glm::mat4(mesh->transform) * glm::mat4(t));
+        glm::mat3x4 transform = glm::mat3x4(glm::mat4(mesh->transform) * glm::mat4(mesh->instanceTransforms[i]));
 
         CgpuBlasInstance blasInstance;
         blasInstance.as = data->blas;
@@ -1085,7 +1097,7 @@ fail_cleanup:
 
         blasInstances.push_back(blasInstance);
         blasPayloads.push_back(data->payload);
-        instanceIds.push_back(instanceId++);
+        instanceIds.push_back(mesh->instanceIds[i]);
       }
     }
   }

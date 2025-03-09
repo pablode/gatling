@@ -531,11 +531,13 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
     VtMatrix4fArray transforms;
     std::vector<GiPrimvarData> instancerPrimvars;
+    VtIntArray instanceIds;
 
     if (instancerId.IsEmpty())
     {
       transforms.resize(1);
       transforms[0] = GfMatrix4f(1.0);
+      instanceIds = VtIntArray(1, 0);
     }
     else
     {
@@ -544,6 +546,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
       transforms = instancer->ComputeFlattenedTransforms(id);
       instancerPrimvars = instancer->ComputeFlattenedPrimvars(id);
+      instanceIds = sceneDelegate->GetInstanceIndices(instancerId, id);
     }
 
     auto transformsSize = uint32_t(transforms.size());
@@ -553,11 +556,13 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     {
       giSetMeshInstanceTransforms(_baseMesh, transformsSize, transformsData);
       giSetMeshInstancerPrimvars(_baseMesh, instancerPrimvars);
+      giSetMeshInstanceIds(_baseMesh, instanceIds.size(), instanceIds.data());
     }
     for (GiMesh* m : _subMeshes)
     {
       giSetMeshInstanceTransforms(m, transformsSize, transformsData);
       giSetMeshInstancerPrimvars(m, instancerPrimvars);
+      giSetMeshInstanceIds(m, instanceIds.size(), instanceIds.data());
     }
   }
 
