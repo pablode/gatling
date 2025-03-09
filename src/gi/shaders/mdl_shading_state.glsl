@@ -87,8 +87,8 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     state.animation_time = 0.0;
     state.text_coords[0] = vec3(uv, 0.0);
 #ifdef SCENE_TRANSFORMS
-    state.world_to_object = mat4(gl_WorldToObjectEXT);
-    state.object_to_world = mat4(gl_ObjectToWorldEXT);
+    state.world_to_object = mat4(gl_WorldToObject3x4EXT);
+    state.object_to_world = mat4(gl_ObjectToWorld3x4EXT);
 #endif
 #if SCENE_DATA_COUNT > 0
     state.renderer_state = rendererState;
