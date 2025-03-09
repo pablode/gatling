@@ -517,6 +517,50 @@ void _PatchDefaultGeomprops(mx::DocumentPtr document)
   }
 }
 
+// OpenUSD uses the "primvar:" prefix for primvar namespacing, but it is not required in
+// shading networks. Strip the substring to ensure correct primvar resolution.
+void _PatchGeompropPrimvarPrefix(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node)
+    {
+      continue;
+    }
+
+    const mx::string& category = node->getCategory();
+    if (category != "geompropvalue")
+    {
+      continue;
+    }
+
+    mx::InputPtr input = node->getActiveInput("geomprop");
+    if (!input)
+    {
+      continue;
+    }
+
+    mx::ValuePtr value = input->getValue();
+    if (!value || !value->isA<std::string>())
+    {
+      continue;
+    }
+
+    const static std::string PRIMVAR_PREFIX = "primvar:";
+
+    std::string geomprop = value->asA<std::string>();
+
+    if (geomprop.find(PRIMVAR_PREFIX) == 0)
+    {
+      std::string newGeomprop = geomprop.substr(PRIMVAR_PREFIX.length());
+      input->setValue(newGeomprop);
+    }
+  }
+}
+
 namespace gtl
 {
   void McMtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
@@ -553,5 +597,7 @@ namespace gtl
     _PatchColorNodes(document);
 
     _PatchDefaultGeomprops(document);
+
+    _PatchGeompropPrimvarPrefix(document);
   }
 }
