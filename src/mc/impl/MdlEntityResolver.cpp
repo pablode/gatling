@@ -18,6 +18,7 @@
 #include "MdlEntityResolver.h"
 
 #include <string>
+#include <string.h>
 #include <assert.h>
 #include <filesystem>
 
@@ -89,7 +90,11 @@ namespace gtl
     constexpr static const char* MDL_FILE_EXT = ".mdl";
 
     const mi::base::IInterface* boxedUserData = nullptr;
-    mi::Sint32 result = context->get_option("user_data", &boxedUserData);
+    mi::Sint32 result = -1;
+    if (context)
+    {
+      result = context->get_option("user_data", &boxedUserData);
+    }
 
     mi::base::Handle<const McMdlEntityResolverUserData> userData((boxedUserData && result == 0) ?
       boxedUserData->get_interface<McMdlEntityResolverUserData>() : nullptr);

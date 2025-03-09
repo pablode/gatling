@@ -77,7 +77,7 @@ namespace gtl
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
       McMdlEntityResolverUserData* userData = new McMdlEntityResolverUserData();
-      userData->dirPrefix = fileDir.c_str();
+      userData->dirPrefix = fileDir;
 
       context->set_option("user_data", userData); // pass to entity resolver
 
