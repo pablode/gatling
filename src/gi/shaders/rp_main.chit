@@ -253,13 +253,16 @@ void main()
     /* 4. Add Emission */
 #ifdef IS_EMISSIVE
     {
-        shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0); // account for geometry flip
+        if (isDoubleSided)
+        {
+            shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0); // account for geometry flip
+        }
 
         Edf_evaluate_data edf_evaluate_data;
         edf_evaluate_data.k1 = -gl_WorldRayDirectionEXT;
         edf_evaluate_data.pdf = 0.0;
 
-        if (isFrontFace)
+        if (isFrontFace || !isDoubleSided)
         {
             mdl_edf_emission_init(shading_state);
             mdl_edf_emission_evaluate(edf_evaluate_data, shading_state);
@@ -277,7 +280,7 @@ void main()
         {
             vec3 emission_intensity = vec3(0.0);
 
-            if (isFrontFace)
+            if (isFrontFace || !isDoubleSided)
             {
                 emission_intensity = mdl_edf_emission_intensity(shading_state);
             }
@@ -293,7 +296,10 @@ void main()
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }
 
-        shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0);
+        if (isDoubleSided)
+        {
+            shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0);
+        }
     }
 #endif
 
@@ -302,7 +308,7 @@ void main()
 
     // init once and share between *_evaluate and *_sample calls
 #if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
-    if (thinWalled && !isFrontFace)
+    if (!isDoubleSided && thinWalled && !isFrontFace)
     {
         mdl_backface_bsdf_scattering_init(shading_state);
     }
@@ -326,7 +332,7 @@ void main()
 #endif
 
 #if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
-        if (thinWalled && !isFrontFace)
+        if (!isDoubleSided && thinWalled && !isFrontFace)
         {
             mdl_backface_bsdf_scattering_sample(bsdf_sample_data, shading_state);
         }
