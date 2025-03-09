@@ -121,6 +121,7 @@ namespace gtl
     const std::vector<GiFace>&        faces;
     const std::vector<int>&           faceIds;
     int                               id;
+    bool                              isDoubleSided;
     bool                              isLeftHanded;
     const char*                       name;
     uint32_t                          maxFaceId;

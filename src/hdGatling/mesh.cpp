@@ -1046,6 +1046,7 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
       .faces = subMesh.faces,
       .faceIds = subMesh.faceIds,
       .id = GetPrimId(),
+      .isDoubleSided = IsDoubleSided(sceneDelegate),
       .isLeftHanded = isLeftHanded,
       .name = id.GetText(),
       .maxFaceId = (uint32_t) subMesh.maxFaceId,

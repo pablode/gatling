@@ -129,6 +129,7 @@ namespace gtl
   struct GiMesh
   {
     glm::mat3x4 transform;
+    bool doubleSided;
     bool flipFacing;
     int id;
     std::vector<glm::mat3x4> instanceTransforms;
@@ -560,6 +561,7 @@ fail:
   {
     GiMesh* mesh = new GiMesh {
       .transform = glm::mat3x4(1.0f),
+      .doubleSided = desc.isDoubleSided,
       .flipFacing = desc.isLeftHanded,
       .id = desc.id,
       .scene = scene,
@@ -1039,6 +1041,10 @@ fail:
           if (mesh->flipFacing)
           {
             bitfield |= rp::BLAS_PAYLOAD_BITFLAG_FLIP_FACING;
+          }
+          if (mesh->doubleSided)
+          {
+            bitfield |= rp::BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED;
           }
 
           uint64_t vertexBufferSize = (vertexBufferOffset/* account for align */ - indexBufferOffset/* account for preamble */);
