@@ -85,6 +85,8 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_UsdUVTexture)
   (ND_convert_color3_vector3)
   (ND_convert_vector3_color3)
+  (ND_convert_float_color3)
+  (ND_convert_float_vector3)
   (periodic)
   (srgb_texture)
   (lin_rec709)
@@ -123,9 +125,12 @@ static std::unordered_map<TfToken, TfToken, TfToken::HashFunctor> _usdMtlxNodeTy
 // But also external MaterialX-HdShade networks may exhibit this behaviour. An in-the-wild example is the Karma
 // tutorial 'A Beautiful Game': https://www.sidefx.com/tutorials/karma-a-beautiful-game/ rendered within Houdini.
 //
+// Another issue with an implicit color3 <-> float conversion was spotted in a network authored for Karma.
+// Oliver Markowski's 2DGS scene: https://drive.google.com/file/d/1BobpWU-V7ITh11TqaG2YTpruxYzILSUQ/view
+//
 // We implement this patch on the MaterialX document level too, however we replicate it here so that HdMtlx does not
 // throw validation errors due to mismatching NodeDefs.
-void _PatchMaterialXColor3Vector3Mismatches(HdMaterialNetwork2& network)
+void _PatchMaterialXColor3FloatMismatches(HdMaterialNetwork2& network)
 {
   SdrRegistry& sdrRegistry = SdrRegistry::GetInstance();
 
@@ -193,9 +198,10 @@ void _PatchMaterialXColor3Vector3Mismatches(HdMaterialNetwork2& network)
         bool isUpstreamFloat3 = (upstreamOutputType == SdfValueTypeNames->Float3) ||
                                 (upstreamOutputType == SdfValueTypeNames->Vector3f) ||
                                 (upstreamOutputType == SdfValueTypeNames->Normal3f);
+        bool isUpstreamFloat = (upstreamOutputType == SdfValueTypeNames->Float);
 
-        bool mismatchCase1 = (isInputColor3 && isUpstreamFloat3);
-        bool mismatchCase2 = (isInputFloat3 && isUpstreamColor3);
+        bool mismatchCase1 = isInputColor3 && (isUpstreamFloat3 || isUpstreamFloat);
+        bool mismatchCase2 = isInputFloat3 && (isUpstreamColor3 || isUpstreamFloat);
 
         if (!mismatchCase1 && !mismatchCase2)
         {
@@ -209,13 +215,72 @@ void _PatchMaterialXColor3Vector3Mismatches(HdMaterialNetwork2& network)
           convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
         }
 
+        TfToken nodeTypeId;
+        if (mismatchCase1)
+        {
+          nodeTypeId = isUpstreamFloat ? _tokens->ND_convert_float_color3 : _tokens->ND_convert_vector3_color3;
+        }
+        else
+        {
+          nodeTypeId = isUpstreamFloat ? _tokens->ND_convert_float_vector3 : _tokens->ND_convert_color3_vector3;
+        }
+
         HdMaterialNode2 convertNode;
-        convertNode.nodeTypeId = mismatchCase1 ? _tokens->ND_convert_vector3_color3 : _tokens->ND_convert_color3_vector3;
+        convertNode.nodeTypeId = nodeTypeId;
         convertNode.inputConnections[_tokens->in] = { { upstreamNodePath, connection.upstreamOutputName } };
         network.nodes[convertNodePath] = convertNode;
 
         connection.upstreamNode = convertNodePath;
         connection.upstreamOutputName = _tokens->out;
+      }
+    }
+  }
+}
+
+// In following Houdini-authored network, the '1' integer literal seems to work for boolean values:
+// https://drive.google.com/file/d/1BobpWU-V7ITh11TqaG2YTpruxYzILSUQ/view (Oliver Markowski's 2DGS scene)
+void _PatchMaterialXBoolValueMismatches(HdMaterialNetwork2& network)
+{
+  SdrRegistry& sdrRegistry = SdrRegistry::GetInstance();
+
+  for (auto& pathNodePair : network.nodes)
+  {
+    HdMaterialNode2& node = pathNodePair.second;
+
+    SdrShaderNodeConstPtr sdrNode = sdrRegistry.GetShaderNodeByIdentifierAndType(node.nodeTypeId, HdGatlingDiscoveryTypes->mtlx);
+    if (!sdrNode)
+    {
+      continue;
+    }
+
+    auto& parameters = node.parameters;
+
+    for (auto& param : parameters)
+    {
+      SdrShaderPropertyConstPtr sdrInput = sdrNode->GetShaderInput(param.first);
+
+      if (!sdrInput)
+      {
+        continue;
+      }
+
+      auto ndrSdfType = sdrInput->GetTypeAsSdfType();
+#if PXR_VERSION > 2408
+      SdfValueTypeName inputType = ndrSdfType.GetSdfType();
+#else
+      SdfValueTypeName inputType = ndrSdfType.first;
+#endif
+      if (inputType != SdfValueTypeNames->Bool)
+      {
+        continue;
+      }
+
+      VtValue value = param.second;
+
+      if (value.IsHolding<int>())
+      {
+        int i = value.UncheckedGet<int>();
+        param.second = VtValue(bool(i));
       }
     }
   }
@@ -474,7 +539,9 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(GiScene* scene, cons
     return nullptr;
   }
 
-  _PatchMaterialXColor3Vector3Mismatches(mtlxNetwork);
+  _PatchMaterialXBoolValueMismatches(mtlxNetwork);
+
+  _PatchMaterialXColor3FloatMismatches(mtlxNetwork);
 
   mx::DocumentPtr doc = _CreateMaterialXDocumentFromNetwork(id, mtlxNetwork);
   if (!doc)
