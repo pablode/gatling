@@ -132,6 +132,7 @@ namespace gtl
     bool flipFacing;
     int id;
     std::vector<glm::mat3x4> instanceTransforms;
+    std::vector<GiPrimvarData> instancerPrimvars; // TODO: compress with blosc
     const GiMaterial* material = nullptr;
     GiScene* scene;
     GiMeshData cpuData;
@@ -600,6 +601,18 @@ fail:
     }
   }
 
+  void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars)
+  {
+    mesh->instancerPrimvars = instancerPrimvars;
+    mesh->gpuData.reset();
+
+    GiScene* scene = mesh->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+    }
+  }
+
   void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat)
   {
     McMaterial* newMcMat = mat->mcMat;
@@ -800,10 +813,18 @@ fail:
           {
             const char* sceneDataName = sceneDataNames[i];
 
+            // FIXME: we should check if scene data and primvar types match to prevent crashes
             const GiPrimvarData* primvar = nullptr;
-            for (const GiPrimvarData& p : meshPrimvars)
+            for (const GiPrimvarData& p : mesh->instancerPrimvars)
             {
-              // FIXME: we should check if scene data and primvar types match to prevent crashes
+              if (p.name == sceneDataName && !p.data.empty())
+              {
+                primvar = &p;
+                break;
+              }
+            }
+            for (const GiPrimvarData& p : meshPrimvars) // override instancer primvars
+            {
               if (p.name == sceneDataName && !p.data.empty())
               {
                 primvar = &p;

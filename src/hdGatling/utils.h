@@ -17,33 +17,17 @@
 
 #pragma once
 
-#include <pxr/imaging/hd/instancer.h>
+#include <pxr/base/vt/value.h>
+#include <pxr/imaging/hd/types.h>
 
 #include <gtl/gi/Gi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdGatlingInstancer final : public HdInstancer
-{
-public:
-  HdGatlingInstancer(HdSceneDelegate* delegate,
-                     const SdfPath& id);
+bool HdGatlingIsPrimvarTypeSupported(const VtValue& value);
 
-  ~HdGatlingInstancer() override;
+gtl::GiPrimvarType HdGatlingGetGiPrimvarType(HdType type);
 
-public:
-  VtMatrix4fArray ComputeFlattenedTransforms(const SdfPath& prototypeId);
-
-  std::vector<gtl::GiPrimvarData> ComputeFlattenedPrimvars(const SdfPath& prototypeId);
-
-  void Sync(HdSceneDelegate* sceneDelegate,
-            HdRenderParam* renderParam,
-            HdDirtyBits* dirtyBits) override;
-
-private:
-  std::vector<gtl::GiPrimvarData> MakeGiPrimvars(const SdfPath& prototypeId);
-
-  TfHashMap<TfToken, VtValue, TfToken::HashFunctor> _primvarMap;
-};
+void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values);
 
 PXR_NAMESPACE_CLOSE_SCOPE

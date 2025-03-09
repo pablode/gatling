@@ -28,6 +28,8 @@ add_library(
   renderPass.h
   tokens.cpp
   tokens.h
+  utils.cpp
+  utils.h
 )
 
 set_target_properties(

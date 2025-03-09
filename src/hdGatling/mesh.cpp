@@ -18,6 +18,7 @@
 #include "mesh.h"
 #include "material.h"
 #include "instancer.h"
+#include "utils.h"
 
 #include <pxr/base/gf/matrix4f.h>
 #include <pxr/imaging/hd/meshUtil.h>
@@ -327,19 +328,6 @@ namespace
     }
   }
 
-  bool _PrimvarTypeSupported(const VtValue& value)
-  {
-    return value.IsHolding<VtVec4fArray>() ||
-           value.IsHolding<VtVec3fArray>() ||
-           value.IsHolding<VtVec2fArray>() ||
-           value.IsHolding<VtFloatArray>() ||
-           value.IsHolding<VtVec4iArray>() ||
-           value.IsHolding<VtVec3iArray>() ||
-           value.IsHolding<VtVec2iArray>() ||
-           value.IsHolding<VtBoolArray>() ||
-           value.IsHolding<VtIntArray>();
-  }
-
   template<typename T>
   VtValue _ExpandBufferElements(const HdVtBufferSource& buffer, size_t elementExpansion)
   {
@@ -542,6 +530,8 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     HdInstancer::_SyncInstancerAndParents(renderIndex, instancerId);
 
     VtMatrix4fArray transforms;
+    std::vector<GiPrimvarData> instancerPrimvars;
+
     if (instancerId.IsEmpty())
     {
       transforms.resize(1);
@@ -552,7 +542,8 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
       HdInstancer* boxedInstancer = renderIndex.GetInstancer(instancerId);
       HdGatlingInstancer* instancer = static_cast<HdGatlingInstancer*>(boxedInstancer);
 
-      transforms = instancer->ComputeInstanceTransforms(id);
+      transforms = instancer->ComputeFlattenedTransforms(id);
+      instancerPrimvars = instancer->ComputeFlattenedPrimvars(id);
     }
 
     auto transformsSize = uint32_t(transforms.size());
@@ -561,10 +552,12 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     if (_baseMesh)
     {
       giSetMeshInstanceTransforms(_baseMesh, transformsSize, transformsData);
+      giSetMeshInstancerPrimvars(_baseMesh, instancerPrimvars);
     }
     for (GiMesh* m : _subMeshes)
     {
       giSetMeshInstanceTransforms(m, transformsSize, transformsData);
+      giSetMeshInstancerPrimvars(m, instancerPrimvars);
     }
   }
 
@@ -622,7 +615,7 @@ void HdGatlingMesh::_AnalyzePrimvars(HdSceneDelegate* sceneDelegate,
     {
       VtValue value = GetPrimvar(sceneDelegate, primvar.name);
 
-      if (!_PrimvarTypeSupported(value))
+      if (!HdGatlingIsPrimvarTypeSupported(value))
       {
         continue;
       }
@@ -653,7 +646,7 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   VtValue boxedValues = GetPrimvar(sceneDelegate, primvarDesc.name);
   HdType type = HdGetValueTupleType(boxedValues).type;
 
-  if (!_PrimvarTypeSupported(boxedValues))
+  if (!HdGatlingIsPrimvarTypeSupported(boxedValues))
   {
     return std::nullopt;
   }
@@ -661,15 +654,7 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   // Gi doesn't natively support bool primvars; convert them to ints
   if (type == HdTypeBool)
   {
-    auto boolArray = boxedValues.Get<VtBoolArray>();
-    VtIntArray intArray(boolArray.size());
-
-    for (int i = 0; i < boolArray.size(); i++)
-    {
-      intArray[i] = boolArray[i] ? 1 : 0;
-    }
-
-    boxedValues = VtValue(std::move(intArray));
+    HdGatlingConvertVtBoolArrayToVtIntArray(boxedValues);
     type = HdTypeInt32;
   }
 
@@ -798,38 +783,6 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
       continue;
     }
 
-    GiPrimvarType type;
-    switch (p.type)
-    {
-    case HdTypeFloat:
-      type = GiPrimvarType::Float;
-      break;
-    case HdTypeFloatVec2:
-      type = GiPrimvarType::Vec2;
-      break;
-    case HdTypeFloatVec3:
-      type = GiPrimvarType::Vec3;
-      break;
-    case HdTypeFloatVec4:
-      type = GiPrimvarType::Vec4;
-      break;
-    case HdTypeInt32:
-      type = GiPrimvarType::Int;
-      break;
-    case HdTypeInt32Vec2:
-      type = GiPrimvarType::Int2;
-      break;
-    case HdTypeInt32Vec3:
-      type = GiPrimvarType::Int3;
-      break;
-    case HdTypeInt32Vec4:
-      type = GiPrimvarType::Int4;
-      break;
-    default:
-      TF_WARN("primvar type %i of %s in %s is unsupported", int(p.type), id.GetText(), name.GetText());
-      continue;
-    }
-
     uint32_t dataSize = HdDataSizeOfTupleType(HdGetValueTupleType(p.indexMatchingData));
 
     std::vector<uint8_t> data(dataSize);
@@ -852,7 +805,7 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
 
     result.push_back(GiPrimvarData{
       .name = name.GetString(),
-      .type = type,
+      .type = HdGatlingGetGiPrimvarType(p.type),
       .interpolation = interpolation,
       .data = data
     });

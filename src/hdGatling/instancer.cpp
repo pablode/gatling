@@ -16,12 +16,15 @@
 //
 
 #include "instancer.h"
+#include "utils.h"
 
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/base/gf/matrix4f.h>
 #include <pxr/base/gf/quath.h>
 #include <pxr/base/gf/quatf.h>
 #include <pxr/base/gf/quatd.h>
+
+using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -90,7 +93,114 @@ namespace
   };
 }
 
-VtMatrix4fArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& prototypeId)
+std::vector<GiPrimvarData> HdGatlingInstancer::ComputeFlattenedPrimvars(const SdfPath& prototypeId)
+{
+  HdSceneDelegate* sceneDelegate = GetDelegate();
+
+  std::vector<GiPrimvarData> primvars = MakeGiPrimvars(prototypeId);
+
+  const SdfPath& parentId = GetParentId();
+  if (parentId.IsEmpty())
+  {
+    return primvars;
+  }
+
+  const HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
+  HdInstancer* boxedParentInstancer = renderIndex.GetInstancer(parentId);
+  HdGatlingInstancer* parentInstancer = static_cast<HdGatlingInstancer*>(boxedParentInstancer);
+
+  const SdfPath& id = GetId();
+  std::vector<GiPrimvarData> parentPrimvars = parentInstancer->ComputeFlattenedPrimvars(id);
+
+  // primvar inheritance: only add local primvars if they don't exist yet
+  size_t oldPrimvarsSize = primvars.size();
+  for (size_t i = 0; i < parentPrimvars.size(); i++)
+  {
+    bool exists = false;
+    for (size_t j = 0; j < oldPrimvarsSize; j++)
+    {
+      if (primvars[j].name == parentPrimvars[i].name)
+      {
+        exists = true;
+        break;
+      }
+    }
+
+    if (!exists)
+    {
+      primvars.push_back(parentPrimvars[i]);
+    }
+  }
+
+  return primvars;
+}
+
+std::vector<GiPrimvarData> HdGatlingInstancer::MakeGiPrimvars(const SdfPath& prototypeId)
+{
+  std::vector<GiPrimvarData> primvars;
+
+  for (int i = 0; i < int(HdInterpolationCount); i++)
+  {
+    HdSceneDelegate* sceneDelegate = GetDelegate();
+
+    const SdfPath& id = GetId();
+    HdInterpolation interpolation = (HdInterpolation) i;
+
+    const auto& primvarDescs = sceneDelegate->GetPrimvarDescriptors(id, interpolation);
+
+    for (const HdPrimvarDescriptor& primvar : primvarDescs)
+    {
+      const TfToken& name = primvar.name;
+
+      // don't process transformation primvars
+      const TfTokenVector& builtinPrimvars = GetBuiltinPrimvarNames();
+      if (std::find(builtinPrimvars.begin(), builtinPrimvars.end(), name) != builtinPrimvars.end())
+      {
+        continue;
+      }
+
+      VtValue values = sceneDelegate->Get(id, primvar.name);
+
+      if (!HdGatlingIsPrimvarTypeSupported(values))
+      {
+        continue;
+      }
+
+      HdType type = HdGetValueTupleType(values).type;
+
+      // Gi doesn't natively support bool primvars; convert them to ints
+      if (type == HdTypeBool)
+      {
+        HdGatlingConvertVtBoolArrayToVtIntArray(values);
+        type = HdTypeInt32;
+      }
+
+      uint32_t dataSize = HdDataSizeOfTupleType(HdGetValueTupleType(values));
+
+      std::vector<uint8_t> data(dataSize);
+      const uint8_t* srcPtr = (uint8_t*) HdGetValueData(values);
+      memcpy(&data[0], srcPtr, data.size());
+
+      // see https://openusd.org/dev/api/class_usd_geom_point_instancer.html#UsdGeomPointInstancer_primvars
+      GiPrimvarInterpolation giInterpolation = GiPrimvarInterpolation::Instance;
+      if (interpolation == HdInterpolationUniform || interpolation == HdInterpolationConstant)
+      {
+        giInterpolation = GiPrimvarInterpolation::Constant;
+      }
+
+      primvars.push_back(GiPrimvarData{
+        .name = name.GetString(),
+        .type = HdGatlingGetGiPrimvarType(type),
+        .interpolation = giInterpolation,
+        .data = data
+      });
+    }
+  }
+
+  return primvars;
+}
+
+VtMatrix4fArray HdGatlingInstancer::ComputeFlattenedTransforms(const SdfPath& prototypeId)
 {
   HdSceneDelegate* sceneDelegate = GetDelegate();
 
@@ -211,7 +321,7 @@ VtMatrix4fArray HdGatlingInstancer::ComputeInstanceTransforms(const SdfPath& pro
   HdInstancer* boxedParentInstancer = renderIndex.GetInstancer(parentId);
   HdGatlingInstancer* parentInstancer = static_cast<HdGatlingInstancer*>(boxedParentInstancer);
 
-  VtMatrix4fArray parentTransforms = parentInstancer->ComputeInstanceTransforms(id);
+  VtMatrix4fArray parentTransforms = parentInstancer->ComputeFlattenedTransforms(id);
 
   VtMatrix4fArray transformProducts;
   transformProducts.resize(parentTransforms.size() * transforms.size());
