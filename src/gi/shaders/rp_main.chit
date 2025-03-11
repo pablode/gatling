@@ -225,9 +225,9 @@ void main()
 
     if (mediumIdx > 0)
     {
-        vec3 transmittance;
-        float distance = gl_HitTEXT;
+        float distance = gl_HitTEXT * PC.metersPerSceneUnit;
 
+        vec3 transmittance;
 #if MEDIUM_STACK_SIZE == 0
         vec3 sigma_a = mdl_volume_absorption_coefficient(shading_state);
 

@@ -182,6 +182,8 @@ vec3 evaluate_sample(uint pixelIndex,
 
                 float s = sampleDistance(albedo, rayPayload.throughput, m.sigma_t, xi.x, rayPayload.walkSegmentPdf);
 
+                s *= PC.metersPerSceneUnit;
+
                 tMax = -log(1.0 - xi.y) / s; // collision free distance (mean free path)
             }
         }

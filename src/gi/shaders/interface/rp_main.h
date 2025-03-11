@@ -111,7 +111,8 @@ struct PushConstants
   GI_UINT  clipRangePacked;
   GI_FLOAT sensorExposure;
   GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
-  /* 2 floats free */
+  GI_FLOAT metersPerSceneUnit;
+  /* 1 float free */
 };
 
 const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);

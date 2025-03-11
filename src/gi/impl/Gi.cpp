@@ -1790,7 +1790,8 @@ cleanup:
     }
 
     if (ra.mediumStackSize != rb.mediumStackSize ||
-        ra.nextEventEstimation != rb.nextEventEstimation)
+        ra.nextEventEstimation != rb.nextEventEstimation ||
+        ra.metersPerSceneUnit != rb.metersPerSceneUnit)
     {
       flags |= GiSceneDirtyFlags::DirtyRtPipeline;
     }
@@ -2066,7 +2067,8 @@ cleanup:
       .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
       .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
       .sensorExposure                 = params.camera.exposure,
-      .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength
+      .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength,
+      .metersPerSceneUnit             = renderSettings.metersPerSceneUnit
     };
 
     std::vector<CgpuBufferBinding> buffers;

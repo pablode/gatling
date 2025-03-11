@@ -35,7 +35,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((mediumStackSize, "medium-stack-size"))                   \
   ((maxVolumeWalkLength, "max-volume-walk-length"))          \
   ((jitteredSampling, "jittered-sampling"))                  \
-  ((clippingPlanes, "clipping-planes"))
+  ((clippingPlanes, "clipping-planes"))                      \
+  ((metersPerSceneUnit, "meters-per-scene-unit"))
 
 // mtlx node identifier is given by UsdMtlx.
 #define HD_GATLING_NODE_IDENTIFIER_TOKENS            \

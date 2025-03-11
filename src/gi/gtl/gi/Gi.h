@@ -143,6 +143,7 @@ namespace gtl
     float    maxSampleValue;
     uint32_t maxVolumeWalkLength;
     uint32_t mediumStackSize;
+    float    metersPerSceneUnit;
     bool     nextEventEstimation;
     bool     progressiveAccumulation;
     uint32_t rrBounceOffset;
