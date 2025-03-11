@@ -157,7 +157,12 @@ namespace gtl
         }
         case mi::neuraylib::ITarget_code::Texture_shape_bsdf_data: {
           mi::Size width, height, depth;
-          const mi::Float32* dataPtr = targetCode->get_texture_df_data(i, width, height, depth);
+          const char* pixelType;
+          const mi::Float32* dataPtr = targetCode->get_texture_df_data(i, width, height, depth
+#if MI_NEURAYLIB_API_VERSION >= 56
+            , pixelType
+#endif
+          );
           assert(dataPtr);
 
           textureResource.is3dImage = true;
