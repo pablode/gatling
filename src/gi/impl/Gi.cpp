@@ -878,11 +878,21 @@ fail:
 
           if (!primvar)
           {
-            preamble.sceneDataInfos[i] = UINT32_MAX; // mark as invalid
+            preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
             continue;
           }
 
-          uint32_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &payloadBufferSize);
+          uint64_t newPayloadBufferSize = payloadBufferSize;
+          uint32_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
+
+          if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset || sceneDataOffset == rp::SCENE_DATA_OFFSET_MASK)
+          {
+            GB_ERROR("max scene data offset exceeded");
+            preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
+            continue;
+          }
+
+          payloadBufferSize = newPayloadBufferSize;
           sceneDataOffsets[i] = sceneDataOffset;
 
           uint32_t stride = 0;
@@ -988,12 +998,12 @@ fail:
 
         for (size_t i = 0; i < primvars.size(); i++)
         {
-          const GiPrimvarData* s = primvars[i];
-          if (!s)
+          if (preamble.sceneDataInfos[i] == rp::SCENE_DATA_INVALID)
           {
             continue;
           }
 
+          const GiPrimvarData* s = primvars[i];
           if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer, sceneDataOffsets[i]))
           {
             GB_ERROR("failed to stage BLAS primvar");

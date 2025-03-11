@@ -272,7 +272,7 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
     }
 
     mdl_renderer_state rs = state.renderer_state;
-    return rs.sceneDataInfos[scene_data_id - 1] != UINT32_MAX;
+    return rs.sceneDataInfos[scene_data_id - 1] != SCENE_DATA_INVALID;
 #endif
     return false;
 }
