@@ -1306,13 +1306,13 @@ cleanup:
       // 1. Generate GLSL from MDL
       struct HitShaderCompInfo
       {
-        GiGlslShaderGen::MaterialGenInfo genInfo;
-        uint32_t texOffset = 0;
         std::vector<uint8_t> spv;
         std::vector<uint8_t> shadowSpv;
       };
       struct HitGroupCompInfo
       {
+        GiGlslShaderGen::MaterialGenInfo genInfo;
+        uint32_t texOffset = 0;
         HitShaderCompInfo closestHitInfo;
         std::optional<HitShaderCompInfo> anyHitInfo;
       };
@@ -1326,31 +1326,19 @@ cleanup:
       {
         const McMaterial* material = materials[i]->mcMat;
 
-        HitGroupCompInfo groupInfo;
+        GiGlslShaderGen::MaterialGenInfo genInfo;
+        if (!s_shaderGen->generateMaterialInfo(*material, genInfo))
         {
-          GiGlslShaderGen::MaterialGenInfo genInfo;
-          if (!s_shaderGen->generateMaterialShadingGenInfo(*material, genInfo))
-          {
-            threadWorkFailed = true;
-            continue;
-          }
-
-          HitShaderCompInfo hitInfo;
-          hitInfo.genInfo = genInfo;
-          groupInfo.closestHitInfo = hitInfo;
+          threadWorkFailed = true;
+          continue;
         }
+
+        HitGroupCompInfo groupInfo;
+        groupInfo.genInfo = genInfo;
+
         if (material->hasCutoutTransparency)
         {
-          GiGlslShaderGen::MaterialGenInfo genInfo;
-          if (!s_shaderGen->generateMaterialOpacityGenInfo(*material, genInfo))
-          {
-            threadWorkFailed = true;
-            continue;
-          }
-
-          HitShaderCompInfo hitInfo;
-          hitInfo.genInfo = genInfo;
-          groupInfo.anyHitInfo = hitInfo;
+          groupInfo.anyHitInfo = HitShaderCompInfo{};
         }
 
         hitGroupCompInfos[i] = groupInfo;
@@ -1363,41 +1351,33 @@ cleanup:
       // 2. Sum up texture resources & calculate per-material index offsets.
       for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
       {
-        const auto allocTextureOffsets = [&](HitShaderCompInfo& compInfo)
+        const GiGlslShaderGen::MaterialGenInfo& genInfo = groupInfo.genInfo;
+
+        uint32_t texCount = 0;
+        for (const McTextureDescription& tr : genInfo.textureDescriptions)
         {
-          uint32_t texCount = 0;
-          for (const McTextureDescription& tr : compInfo.genInfo.textureDescriptions)
-          {
-            texCount++;
-            textureDescriptions.push_back(tr);
-          }
+          texCount++;
+          textureDescriptions.push_back(tr);
+        }
 
-          if (texCount > 0)
-          {
-            OffsetAllocator::Allocation allocation = texAllocator.allocate(texCount);
-            compInfo.texOffset = allocation.offset;
-          }
-
-          texCount = 0;
-          for (const McTextureDescription& tr : compInfo.genInfo.textureDescriptions)
-          {
-            if (tr.is3dImage)
-            {
-              imageOffsets3d.push_back(compInfo.texOffset + texCount);
-            }
-            else
-            {
-              imageOffsets2d.push_back(compInfo.texOffset + texCount);
-            }
-            texCount++;
-          }
-        };
-
-        allocTextureOffsets(groupInfo.closestHitInfo);
-
-        if (groupInfo.anyHitInfo)
+        if (texCount > 0)
         {
-          allocTextureOffsets(*groupInfo.anyHitInfo);
+          OffsetAllocator::Allocation allocation = texAllocator.allocate(texCount);
+          groupInfo.texOffset = allocation.offset;
+        }
+
+        texCount = 0;
+        for (const McTextureDescription& tr : genInfo.textureDescriptions)
+        {
+          if (tr.is3dImage)
+          {
+            imageOffsets3d.push_back(groupInfo.texOffset + texCount);
+          }
+          else
+          {
+            imageOffsets2d.push_back(groupInfo.texOffset + texCount);
+          }
+          texCount++;
         }
       }
 
@@ -1436,8 +1416,8 @@ cleanup:
             .isThinWalled = material->isThinWalled,
             .nextEventEstimation = renderSettings.nextEventEstimation,
             .sceneDataCount = sceneDataCount,
-            .shadingGlsl = compInfo.closestHitInfo.genInfo.glslSource,
-            .textureIndexOffset = compInfo.closestHitInfo.texOffset
+            .shadingGlsl = compInfo.genInfo.glslSource,
+            .textureIndexOffset = compInfo.texOffset
           };
 
           if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
@@ -1455,9 +1435,9 @@ cleanup:
             .commonParams = commonParams,
             .enableSceneTransforms = material->requiresSceneTransforms,
             .cameraPositionSceneDataIndex = material->cameraPositionSceneDataIndex,
-            .opacityEvalGlsl = compInfo.anyHitInfo->genInfo.glslSource,
+            .opacityEvalGlsl = compInfo.genInfo.glslSource,
             .sceneDataCount = sceneDataCount,
-            .textureIndexOffset = compInfo.anyHitInfo->texOffset
+            .textureIndexOffset = compInfo.texOffset
           };
 
           hitParams.shadowTest = false;

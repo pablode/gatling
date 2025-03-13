@@ -167,40 +167,24 @@ namespace gtl
     return true;
   }
 
-  bool GiGlslShaderGen::generateMaterialShadingGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
+  bool GiGlslShaderGen::generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    auto dfFlags = McDfFlags::Scattering | McDfFlags::VolumeAbsorption | McDfFlags::VolumeScattering | McDfFlags::Ior;
-
-    if (material.isEmissive)
-    {
-      dfFlags |= McDfFlags::Emission | McDfFlags::EmissionIntensity;
-    }
-
-    if (material.isThinWalled)
-    {
-      dfFlags |= McDfFlags::ThinWalled | McDfFlags::BackfaceScattering;
-
-      if (material.isEmissive)
-      {
-        dfFlags |= McDfFlags::BackfaceEmission | McDfFlags::BackfaceEmissionIntensity;
-      }
-    }
+    std::unordered_map<McDf, const char*> dfs = {
+      { McDf::Scattering, "mdl_bsdf_scattering" },
+      { McDf::Emission,"mdl_edf_emission" },
+      { McDf::EmissionIntensity,"mdl_edf_emission_intensity" },
+      { McDf::ThinWalled,"mdl_thin_walled" },
+      { McDf::VolumeAbsorption,"mdl_volume_absorption_coefficient" },
+      { McDf::VolumeScattering,"mdl_volume_scattering_coefficient" },
+      { McDf::CutoutOpacity,"mdl_cutout_opacity" },
+      { McDf::Ior,"mdl_ior" },
+      { McDf::BackfaceScattering,"mdl_backface_bsdf_scattering" },
+      { McDf::BackfaceEmission,"mdl_backface_edf_emission" },
+      { McDf::BackfaceEmissionIntensity,"mdl_backface_edf_emission_intensity" }
+    };
 
     McGlslGenResult genResult;
-    if (!m_mcBackend->genGlsl(*material.mdlMaterial, McDfFlags(dfFlags), genResult))
-    {
-      return false;
-    }
-
-    return _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, m_shaderPath, genInfo);
-  }
-
-  bool GiGlslShaderGen::generateMaterialOpacityGenInfo(const McMaterial& material, MaterialGenInfo& genInfo)
-  {
-    McDfFlags dfFlags = McDfFlags::CutoutOpacity;
-
-    McGlslGenResult genResult;
-    if (!m_mcBackend->genGlsl(*material.mdlMaterial, dfFlags, genResult))
+    if (!m_mcBackend->genGlsl(*material.mdlMaterial, dfs, genResult))
     {
       return false;
     }

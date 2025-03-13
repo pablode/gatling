@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 #include <gtl/gb/Enum.h>
 
@@ -47,22 +48,23 @@ namespace gtl
     std::vector<McTextureDescription> textureDescriptions;
   };
 
-  enum class McDfFlags
+  enum class McDf
   {
-    Scattering                = (1 <<  0),
-    Emission                  = (1 <<  1),
-    EmissionIntensity         = (1 <<  2),
-    ThinWalled                = (1 <<  3),
-    VolumeAbsorption          = (1 <<  4),
-    VolumeScattering          = (1 <<  5),
-    CutoutOpacity             = (1 <<  6),
-    Ior                       = (1 <<  7),
-    BackfaceScattering        = (1 <<  8),
-    BackfaceEmission          = (1 <<  9),
-    BackfaceEmissionIntensity = (1 << 10),
-    FLAG_COUNT                = 11
+    Scattering,
+    Emission,
+    EmissionIntensity,
+    ThinWalled,
+    VolumeAbsorption,
+    VolumeScattering,
+    CutoutOpacity,
+    Ior,
+    BackfaceScattering,
+    BackfaceEmission,
+    BackfaceEmissionIntensity,
+    COUNT
   };
-  GB_DECLARE_ENUM_BITOPS(McDfFlags)
+
+  using McDfMap = std::unordered_map<McDf, const char*>;
 
   class McBackend
   {
@@ -70,7 +72,7 @@ namespace gtl
     bool init(McRuntime& runtime);
 
     bool genGlsl(const McMdlMaterial& material,
-                 McDfFlags dfFlags,
+                 McDfMap dfMap,
                  McGlslGenResult& result);
 
   private:

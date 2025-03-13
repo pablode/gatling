@@ -35,18 +35,18 @@ namespace fs = std::filesystem;
 
 namespace gtl
 {
-  const static std::array<mi::neuraylib::Target_function_description, size_t(McDfFlags::FLAG_COUNT)> FUNC_DESCS = {
-    mi::neuraylib::Target_function_description("surface.scattering", "mdl_bsdf_scattering"),
-    mi::neuraylib::Target_function_description("surface.emission.emission", "mdl_edf_emission"),
-    mi::neuraylib::Target_function_description("surface.emission.intensity", "mdl_edf_emission_intensity"),
-    mi::neuraylib::Target_function_description("thin_walled", "mdl_thin_walled"),
-    mi::neuraylib::Target_function_description("volume.absorption_coefficient", "mdl_volume_absorption_coefficient"),
-    mi::neuraylib::Target_function_description("volume.scattering_coefficient", "mdl_volume_scattering_coefficient"),
-    mi::neuraylib::Target_function_description("geometry.cutout_opacity", "mdl_cutout_opacity"),
-    mi::neuraylib::Target_function_description("ior", "mdl_ior"),
-    mi::neuraylib::Target_function_description("backface.scattering", "mdl_backface_bsdf_scattering"),
-    mi::neuraylib::Target_function_description("backface.emission.emission", "mdl_backface_edf_emission"),
-    mi::neuraylib::Target_function_description("backface.emission.intensity", "mdl_backface_edf_emission_intensity")
+  const static std::array<const char*, size_t(McDf::COUNT)> DF_NAMES = {
+    "surface.scattering",
+    "surface.emission.emission",
+    "surface.emission.intensity",
+    "thin_walled",
+    "volume.absorption_coefficient",
+    "volume.scattering_coefficient",
+    "geometry.cutout_opacity",
+    "ior",
+    "backface.scattering",
+    "backface.emission.emission",
+    "backface.emission.intensity"
   };
 
   class McBackend::_Impl
@@ -263,16 +263,14 @@ namespace gtl
     return true;
   }
 
-  bool McBackend::genGlsl(const McMdlMaterial& material, McDfFlags dfFlags, McGlslGenResult& result)
+  bool McBackend::genGlsl(const McMdlMaterial& material, McDfMap dfMap, McGlslGenResult& result)
   {
-    GbSmallVector<mi::neuraylib::Target_function_description, size_t(McDfFlags::FLAG_COUNT)> fDescs;
+    std::vector<mi::neuraylib::Target_function_description> fDescs;
+    fDescs.reserve(size_t(McDf::COUNT));
 
-    for (size_t i = 0; i < size_t(McDfFlags::FLAG_COUNT); i++)
+    for (const auto& kv : dfMap)
     {
-      if (size_t(dfFlags) & (1 << i))
-      {
-        fDescs.push_back(FUNC_DESCS[i]);
-      }
+      fDescs.push_back(mi::neuraylib::Target_function_description(DF_NAMES[size_t(kv.first)], kv.second));
     }
 
     return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source, result.textureDescriptions);
