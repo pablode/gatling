@@ -73,7 +73,7 @@ jobs:
     - name: Install Mesa & Vulkan packages
       if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}
       run: |
-        sudo add-apt-repository ppa:kisak/kisak-mesa
+        sudo add-apt-repository ppa:kisak/turtle
         sudo apt update
         sudo apt upgrade
         sudo apt-get install mesa-utils xvfb qt5-default libgl1-mesa-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers
