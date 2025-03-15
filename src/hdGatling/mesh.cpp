@@ -499,7 +499,9 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
 
     _CreateGiMeshes(sceneDelegate);
 
-    (*dirtyBits) |= HdChangeTracker::DirtyMaterialId; // force material assignment
+    // force sync properties
+    (*dirtyBits) |= HdChangeTracker::DirtyMaterialId | HdChangeTracker::DirtyVisibility |
+      HdChangeTracker::DirtyInstancer | HdChangeTracker::DirtyInstanceIndex | HdChangeTracker::DirtyTransform;
   }
 
   if (!_baseMesh && _subMeshes.empty())
