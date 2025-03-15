@@ -445,7 +445,7 @@ namespace
 
 HdGatlingMesh::HdGatlingMesh(const SdfPath& id,
                              GiScene* scene,
-                             const GiMaterial* defaultMaterial)
+                             GiMaterial* defaultMaterial)
   : HdMesh(id)
   , _scene(scene)
   , _defaultMaterial(defaultMaterial)
@@ -589,7 +589,7 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     // Because Hydra syncs Rprims last, it is guaranteed that the material has been processed
     auto* materialPrim = static_cast<HdGatlingMaterial*>(renderIndex.GetSprim(HdPrimTypeTokens->material, materialId));
 
-    const GiMaterial* giMat = materialPrim ? materialPrim->GetGiMaterial() : nullptr;
+    GiMaterial* giMat = materialPrim ? materialPrim->GetGiMaterial() : nullptr;
 
     if (!giMat)
     {
@@ -1078,7 +1078,7 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
 
       auto* materialPrim = static_cast<HdGatlingMaterial*>(renderIndex.GetSprim(HdPrimTypeTokens->material, geomSubset.materialId));
 
-      const GiMaterial* giMat = materialPrim ? materialPrim->GetGiMaterial() : nullptr;
+      GiMaterial* giMat = materialPrim ? materialPrim->GetGiMaterial() : nullptr;
 
       if (!giMat)
       {

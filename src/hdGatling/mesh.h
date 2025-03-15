@@ -33,7 +33,7 @@ class HdGatlingMesh final : public HdMesh
 public:
   HdGatlingMesh(const SdfPath& id,
                 GiScene* scene,
-                const GiMaterial* defaultMaterial);
+                GiMaterial* defaultMaterial);
 
   ~HdGatlingMesh() override;
 
@@ -89,7 +89,7 @@ private:
   std::vector<GiMesh*> _subMeshes;
 
   GiScene* _scene;
-  const GiMaterial* _defaultMaterial;
+  GiMaterial* _defaultMaterial;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

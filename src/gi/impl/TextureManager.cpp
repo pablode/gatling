@@ -62,7 +62,11 @@ namespace gtl
 
   GiTextureManager::~GiTextureManager()
   {
-    assert(m_imageCache.empty());
+    // TODO: use DelayedResourceDestroyer
+    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
+    {
+      cgpuDestroyImage(m_device, it->second);
+    }
   }
 
   void GiTextureManager::destroy()
@@ -198,30 +202,6 @@ namespace gtl
     m_stager.flush();
 
     return true;
-  }
-
-  void GiTextureManager::destroyUncachedImages(const std::vector<CgpuImage>& images)
-  {
-    for (CgpuImage image : images)
-    {
-      bool isCached = false;
-
-      for (const auto& pathImagePair : m_imageCache)
-      {
-        CgpuImage cachedImage = pathImagePair.second;
-
-        if (cachedImage.handle == image.handle)
-        {
-          isCached = true;
-          break;
-        }
-      }
-
-      if (!isCached)
-      {
-        cgpuDestroyImage(m_device, image);
-      }
-    }
   }
 
   void GiTextureManager::evictAndDestroyCachedImage(CgpuImage image)

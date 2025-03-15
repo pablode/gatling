@@ -200,7 +200,7 @@ namespace gtl
   void giSetMeshInstanceTransforms(GiMesh* mesh, uint32_t count, const float(*transforms)[4][4]);
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars);
   void giSetMeshInstanceIds(GiMesh* mesh, uint32_t count, int* ids);
-  void giSetMeshMaterial(GiMesh* mesh, const GiMaterial* mat);
+  void giSetMeshMaterial(GiMesh* mesh, GiMaterial* mat);
   void giSetMeshVisibility(GiMesh* mesh, bool visible);
   void giDestroyMesh(GiMesh* mesh);
 

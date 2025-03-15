@@ -94,7 +94,7 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   _giMaterial = _materialNetworkCompiler.CompileNetwork(_giScene, id, network);
 }
 
-const GiMaterial* HdGatlingMaterial::GetGiMaterial() const
+GiMaterial* HdGatlingMaterial::GetGiMaterial() const
 {
   return _giMaterial;
 }

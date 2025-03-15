@@ -47,7 +47,7 @@ public:
             HdDirtyBits* dirtyBits) override;
 
 public:
-  const gtl::GiMaterial* GetGiMaterial() const;
+  gtl::GiMaterial* GetGiMaterial() const;
 
 private:
   const MaterialNetworkCompiler& _materialNetworkCompiler;

@@ -48,8 +48,6 @@ namespace gtl
                               std::vector<CgpuImage>& images2d,
                               std::vector<CgpuImage>& images3d);
 
-    void destroyUncachedImages(const std::vector<CgpuImage>& images);
-
     void evictAndDestroyCachedImage(CgpuImage image);
 
   private:
