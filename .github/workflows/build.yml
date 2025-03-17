@@ -76,7 +76,7 @@ jobs:
         sudo add-apt-repository ppa:kisak/turtle
         sudo apt update
         sudo apt upgrade
-        sudo apt-get install mesa-utils xvfb qt5-default libgl1-mesa-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers
+        sudo apt-get install mesa-utils xvfb qtbase5-dev libgl1-mesa-dev libvulkan-dev vulkan-tools mesa-vulkan-drivers
 
     - name: Set up graphical environment variables
       if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}

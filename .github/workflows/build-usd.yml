@@ -39,7 +39,7 @@ jobs:
       matrix:
         include:
         - name: Ubuntu / GCC
-          image: ubuntu-20.04
+          image: ubuntu-22.04
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
@@ -49,7 +49,7 @@ jobs:
           executable-suffix:
 
         - name: Ubuntu / clang
-          image: ubuntu-20.04
+          image: ubuntu-22.04
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           # Don't upload clang build results -- we already have GCC's

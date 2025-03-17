@@ -18,6 +18,7 @@
 #pragma once
 
 #include <vector>
+#include <stddef.h>
 
 namespace gtl
 {
