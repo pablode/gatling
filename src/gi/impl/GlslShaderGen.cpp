@@ -169,18 +169,18 @@ namespace gtl
 
   bool GiGlslShaderGen::generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo)
   {
-    std::unordered_map<McDf, const char*> dfs = {
+    const std::unordered_map<McDf, const char*> dfs = {
       { McDf::Scattering, "mdl_bsdf_scattering" },
-      { McDf::Emission,"mdl_edf_emission" },
-      { McDf::EmissionIntensity,"mdl_edf_emission_intensity" },
-      { McDf::ThinWalled,"mdl_thin_walled" },
-      { McDf::VolumeAbsorption,"mdl_volume_absorption_coefficient" },
-      { McDf::VolumeScattering,"mdl_volume_scattering_coefficient" },
-      { McDf::CutoutOpacity,"mdl_cutout_opacity" },
-      { McDf::Ior,"mdl_ior" },
-      { McDf::BackfaceScattering,"mdl_backface_bsdf_scattering" },
-      { McDf::BackfaceEmission,"mdl_backface_edf_emission" },
-      { McDf::BackfaceEmissionIntensity,"mdl_backface_edf_emission_intensity" }
+      { McDf::Emission, "mdl_edf_emission" },
+      { McDf::EmissionIntensity, "mdl_edf_emission_intensity" },
+      { McDf::ThinWalled, "mdl_thin_walled" },
+      { McDf::VolumeAbsorption, "mdl_volume_absorption_coefficient" },
+      { McDf::VolumeScattering, "mdl_volume_scattering_coefficient" },
+      { McDf::CutoutOpacity, "mdl_cutout_opacity" },
+      { McDf::Ior, "mdl_ior" },
+      { McDf::BackfaceScattering, "mdl_backface_bsdf_scattering" },
+      { McDf::BackfaceEmission, "mdl_backface_edf_emission" },
+      { McDf::BackfaceEmissionIntensity, "mdl_backface_edf_emission_intensity" }
     };
 
     McGlslGenResult genResult;
