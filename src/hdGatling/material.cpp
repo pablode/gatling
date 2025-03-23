@@ -62,16 +62,17 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
     return;
   }
 
+  if (_giMaterial)
+  {
+    giDestroyMaterial(_giMaterial);
+    _giMaterial = nullptr;
+  }
+
   const SdfPath& id = GetId();
   const VtValue& resource = sceneDelegate->GetMaterialResource(id);
 
   if (!resource.IsHolding<HdMaterialNetworkMap>())
   {
-    if (_giMaterial)
-    {
-      giDestroyMaterial(_giMaterial);
-      _giMaterial = nullptr;
-    }
     return;
   }
 
@@ -82,12 +83,6 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   if (isVolume)
   {
     TF_WARN("Volume %s unsupported", id.GetText());
-
-    if (_giMaterial)
-    {
-      giDestroyMaterial(_giMaterial);
-      _giMaterial = nullptr;
-    }
     return;
   }
 
