@@ -402,6 +402,12 @@ namespace gtl
     }
   }
 
+  template<typename T>
+  static T cgpuPadToAlignment(T value, T alignment)
+  {
+      return (value + (alignment - 1)) & ~(alignment - 1);
+  }
+
   /* API method implementation. */
 
 #ifndef NDEBUG
@@ -1522,11 +1528,15 @@ namespace gtl
                                 const char* debugName,
                                 VmaPool memoryPool = VK_NULL_HANDLE)
   {
+    constexpr static uint64_t BASE_ALIGNMENT = 4;
+
+    uint64_t newSize = cgpuPadToAlignment(size, BASE_ALIGNMENT); // required for vkCmdFillBuffer to clear whole range
+
     VkBufferCreateInfo bufferInfo = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .size = size,
+      .size = newSize,
       .usage = (VkBufferUsageFlags) usage,
       .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
@@ -1537,30 +1547,17 @@ namespace gtl
     allocCreateInfo.requiredFlags = (VkMemoryPropertyFlags) memoryProperties;
     allocCreateInfo.pool = memoryPool;
 
-    VkResult result;
-    if (alignment > 0)
-    {
-      result = vmaCreateBufferWithAlignment(
-        idevice->allocator,
-        &bufferInfo,
-        &allocCreateInfo,
-        alignment,
-        &ibuffer->buffer,
-        &ibuffer->allocation,
-        nullptr
-      );
-    }
-    else
-    {
-      result = vmaCreateBuffer(
-        idevice->allocator,
-        &bufferInfo,
-        &allocCreateInfo,
-        &ibuffer->buffer,
-        &ibuffer->allocation,
-        nullptr
-      );
-    }
+    size_t newAlignment = cgpuPadToAlignment(alignment, BASE_ALIGNMENT); // for performance
+
+    VkResult result = vmaCreateBufferWithAlignment(
+      idevice->allocator,
+      &bufferInfo,
+      &allocCreateInfo,
+      newAlignment,
+      &ibuffer->buffer,
+      &ibuffer->allocation,
+      nullptr
+    );
 
     if (result != VK_SUCCESS)
     {
@@ -1572,7 +1569,7 @@ namespace gtl
       vmaSetAllocationName(idevice->allocator, ibuffer->allocation, debugName);
     }
 
-    ibuffer->size = size;
+    ibuffer->size = newSize;
 
     return true;
   }
@@ -2095,11 +2092,6 @@ namespace gtl
     return true;
   }
 
-  static uint32_t cgpuAlignSize(uint32_t size, uint32_t alignment)
-  {
-      return (size + (alignment - 1)) & ~(alignment - 1);
-  }
-
   static bool cgpuCreateRtPipelineSbt(CgpuIDevice* idevice,
                                       CgpuIPipeline* ipipeline,
                                       uint32_t groupCount,
@@ -2107,14 +2099,14 @@ namespace gtl
                                       uint32_t hitGroupCount)
   {
     uint32_t handleSize = idevice->properties.shaderGroupHandleSize;
-    uint32_t alignedHandleSize = cgpuAlignSize(handleSize, idevice->properties.shaderGroupHandleAlignment);
+    uint32_t alignedHandleSize = cgpuPadToAlignment(handleSize, idevice->properties.shaderGroupHandleAlignment);
 
-    ipipeline->sbtRgen.stride = cgpuAlignSize(alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtRgen.stride = cgpuPadToAlignment(alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
     ipipeline->sbtRgen.size = ipipeline->sbtRgen.stride; // Special raygen condition: size must be equal to stride
     ipipeline->sbtMiss.stride = alignedHandleSize;
-    ipipeline->sbtMiss.size = cgpuAlignSize(missShaderCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtMiss.size = cgpuPadToAlignment(missShaderCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
     ipipeline->sbtHit.stride = alignedHandleSize;
-    ipipeline->sbtHit.size = cgpuAlignSize(hitGroupCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtHit.size = cgpuPadToAlignment(hitGroupCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
 
     uint32_t firstGroup = 0;
     uint32_t dataSize = handleSize * groupCount;
