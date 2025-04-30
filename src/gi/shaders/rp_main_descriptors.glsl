@@ -10,9 +10,6 @@ layout(binding = BINDING_INDEX_DISK_LIGHTS, std430) readonly buffer DiskLightBuf
 
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 
-layout(binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
-layout(binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
-
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
 
 layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) readonly buffer BlasPayloadBuffer {
@@ -72,6 +69,10 @@ layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) writeonly buffer Instanc
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
 layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, std430) writeonly buffer DoubleSidedBuffer { vec3 DoubleSidedAov[]; };
 #endif
+
+layout(set = 1, binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
+
+layout(set = 2, binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
   BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment

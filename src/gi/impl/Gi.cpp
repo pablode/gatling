@@ -2269,16 +2269,17 @@ cleanup:
 
     CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
 
-    CgpuBindings bindings = {
+    CgpuBindings bindings0 = {
       .bufferCount = (uint32_t) buffers.size(),
       .buffers = buffers.data(),
-      .imageCount = (uint32_t) images.size(),
-      .images = images.data(),
       .samplerCount = imageCount ? 1u : 0u,
       .samplers = &sampler,
       .tlasCount = 1u,
       .tlases = &as
     };
+
+    CgpuBindings bindings1 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
+    CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
 
     if (shaderCache->imageBindings2d.size() > rp::MAX_TEXTURE_COUNT || shaderCache->imageBindings3d.size() > rp::MAX_TEXTURE_COUNT)
     {
@@ -2293,9 +2294,11 @@ cleanup:
     if (!cgpuBeginCommandBuffer(commandBuffer))
       goto cleanup;
 
-    cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 0/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
+    cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings);
+    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings0);
+    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 1/*descriptorSetIndex*/, &bindings1);
+    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 2/*descriptorSetIndex*/, &bindings2);
 
     cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline);
 
