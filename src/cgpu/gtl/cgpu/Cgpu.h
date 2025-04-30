@@ -25,6 +25,7 @@ namespace gtl
 {
   constexpr static const uint64_t CGPU_WHOLE_SIZE = ~0ULL;
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
+  constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 4;
 
   typedef uint32_t CgpuBufferUsageFlags;
 
@@ -729,6 +730,7 @@ namespace gtl
   void cgpuCmdTransitionShaderImageLayouts(
     CgpuCommandBuffer commandBuffer,
     CgpuShader shader,
+    uint32_t descriptorSetIndex,
     uint32_t imageCount,
     const CgpuImageBinding* images
   );
@@ -736,6 +738,7 @@ namespace gtl
   void cgpuCmdUpdateBindings(
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
+    uint32_t descriptorSetIndex,
     const CgpuBindings* bindings
   );
 

@@ -2293,9 +2293,9 @@ cleanup:
     if (!cgpuBeginCommandBuffer(commandBuffer))
       goto cleanup;
 
-    cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, (uint32_t) images.size(), images.data());
+    cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 0/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, &bindings);
+    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings);
 
     cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline);
 

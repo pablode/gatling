@@ -67,8 +67,6 @@ namespace gtl
                                                                             VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                                                                             VK_SHADER_STAGE_MISS_BIT_KHR;
 
-  constexpr static const uint32_t CGPU_DESCRIPTOR_SET_INDEX = 0; // TODO: support multiple descriptor sets
-
   constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
 
   /* Internal structures. */
@@ -113,9 +111,10 @@ namespace gtl
     VkPipeline                                pipeline;
     VkPipelineLayout                          layout;
     VkDescriptorPool                          descriptorPool;
-    VkDescriptorSet                           descriptorSet;
-    VkDescriptorSetLayout                     descriptorSetLayout;
-    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+    uint32_t                                  descriptorSetCount;
+    VkDescriptorSet                           descriptorSets[CGPU_MAX_DESCRIPTOR_SET_COUNT];
+    VkDescriptorSetLayout                     descriptorSetLayouts[CGPU_MAX_DESCRIPTOR_SET_COUNT];
+    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings[CGPU_MAX_DESCRIPTOR_SET_COUNT];
     VkPipelineBindPoint                       bindPoint;
     VkStridedDeviceAddressRegionKHR           sbtRgen;
     VkStridedDeviceAddressRegionKHR           sbtMiss;
@@ -125,11 +124,12 @@ namespace gtl
 
   struct CgpuIPipelineLibrary
   {
-    VkDescriptorPool descriptorPool;
-    VkDescriptorSetLayout descriptorSetLayout;
-    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings;
-    VkPipelineLayout layout;
-    VkPipeline pipeline;
+    VkDescriptorPool                          descriptorPool;
+    uint32_t                                  descriptorSetCount;
+    VkDescriptorSetLayout                     descriptorSetLayouts[CGPU_MAX_DESCRIPTOR_SET_COUNT];
+    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings[CGPU_MAX_DESCRIPTOR_SET_COUNT];
+    VkPipelineLayout                          layout;
+    VkPipeline                                pipeline;
   };
 
   struct CgpuIShader
@@ -1202,8 +1202,9 @@ namespace gtl
     return true;
   }
 
-  static bool cgpuCreatePipelineLayout(CgpuIDevice* idevice,
-                                       VkDescriptorSetLayout descriptorSetLayout,
+  static void cgpuCreatePipelineLayout(CgpuIDevice* idevice,
+                                       VkDescriptorSetLayout* descriptorSetLayouts,
+                                       uint32_t descriptorSetCount,
                                        CgpuIShader* ishader,
                                        VkShaderStageFlags stageFlags,
                                        VkPipelineLayout* pipelineLayout)
@@ -1211,42 +1212,37 @@ namespace gtl
     VkPushConstantRange pushConstRange = {
       .stageFlags = stageFlags,
       .offset = 0,
-      .size = ishader->reflection.pushConstantsSize,
+      .size = ishader->reflection.pushConstantsSize
     };
 
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .setLayoutCount = 1,
-      .pSetLayouts = &descriptorSetLayout,
+      .setLayoutCount = descriptorSetCount,
+      .pSetLayouts = descriptorSetLayouts,
       .pushConstantRangeCount = pushConstRange.size ? 1u : 0u,
-      .pPushConstantRanges = &pushConstRange,
+      .pPushConstantRanges = &pushConstRange
     };
 
-    VkPipelineLayout layout;
-    if(idevice->table.vkCreatePipelineLayout(idevice->logicalDevice,
-                                             &pipelineLayoutCreateInfo,
-                                             nullptr,
-                                             pipelineLayout) != VK_SUCCESS)
-    {
-      return false;
-    }
+    VkResult result = idevice->table.vkCreatePipelineLayout(idevice->logicalDevice,
+                                                            &pipelineLayoutCreateInfo,
+                                                            nullptr,
+                                                            pipelineLayout);
 
-    return true;
+    if (result != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to create pipeline layout");
+    }
   }
 
-  static bool cgpuCreatePipelineDescriptorSet(CgpuIDevice* idevice,
-                                              CgpuIShader* ishader,
+  static void cgpuCreatePipelineDescriptorSet(CgpuIDevice* idevice,
+                                              const std::vector<CgpuShaderReflectionBinding>& bindings,
                                               VkShaderStageFlags stageFlags,
                                               VkDescriptorPool& descriptorPool,
                                               VkDescriptorSetLayout& descriptorSetLayout,
                                               std::vector<VkDescriptorSetLayoutBinding>& descriptorSetLayoutBindings)
   {
-    const CgpuShaderReflection* shaderReflection = &ishader->reflection;
-    const CgpuShaderReflectionDescriptorSet& descriptorSet = shaderReflection->descriptorSets[CGPU_DESCRIPTOR_SET_INDEX];
-    const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
-
     size_t bindingCount = bindings.size();
 
     std::vector<VkDescriptorBindingFlagsEXT> bindingFlags(bindingCount);
@@ -1290,11 +1286,36 @@ namespace gtl
       &descriptorSetLayout
     );
 
-    if (result != VK_SUCCESS) {
-      CGPU_RETURN_ERROR("failed to create descriptor set layout");
+    if (result != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to create descriptor set layout");
+    }
+  }
+
+  static void cgpuCreatePipelineDescriptorSets(CgpuIDevice* idevice,
+                                               CgpuIShader* ishader,
+                                               VkShaderStageFlags stageFlags,
+                                               VkDescriptorPool& descriptorPool,
+                                               VkDescriptorSetLayout* descriptorSetLayouts,
+                                               std::vector<VkDescriptorSetLayoutBinding>* descriptorSetLayoutBindings,
+                                               uint32_t& descriptorSetCount)
+  {
+    const CgpuShaderReflection* shaderReflection = &ishader->reflection;
+    const std::vector<CgpuShaderReflectionDescriptorSet>& descriptorSets = shaderReflection->descriptorSets;
+
+    descriptorSetCount = uint32_t(descriptorSets.size());
+    if (descriptorSetCount >= CGPU_MAX_DESCRIPTOR_SET_COUNT)
+    {
+      CGPU_FATAL("max descriptor set count exceeded");
     }
 
-    return true;
+    for (uint32_t i = 0; i < descriptorSetCount; i++)
+    {
+      const CgpuShaderReflectionDescriptorSet& descriptorSet = descriptorSets[i];
+      const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
+
+      cgpuCreatePipelineDescriptorSet(idevice, bindings, stageFlags, descriptorPool, descriptorSetLayouts[i], descriptorSetLayoutBindings[i]);
+    }
   }
 
   static bool cgpuCreateRtPipelineLibrary(CgpuIDevice* idevice,
@@ -1306,23 +1327,16 @@ namespace gtl
   {
     CgpuIPipelineLibrary& library = ishader->pipelineLibrary;
 
-    if (!cgpuCreatePipelineDescriptorSet(idevice, ishader, stageFlags,
-                                         library.descriptorPool,
-                                         library.descriptorSetLayout,
-                                         library.descriptorSetLayoutBindings))
-    {
-      GB_ERROR("unable to create pipeline library descriptor set");
-      return false;
-    }
+    cgpuCreatePipelineDescriptorSets(
+      idevice, ishader, stageFlags,
+      library.descriptorPool,
+      library.descriptorSetLayouts,
+      library.descriptorSetLayoutBindings,
+      library.descriptorSetCount
+    );
 
-    if (!cgpuCreatePipelineLayout(idevice, library.descriptorSetLayout, ishader, stageFlags, &library.layout))
-    {
-      idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, library.descriptorPool, nullptr);
-      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, library.descriptorSetLayout, nullptr);
-
-      GB_ERROR("unable to create pipeline library layout");
-      return false;
-    }
+    cgpuCreatePipelineLayout(idevice, library.descriptorSetLayouts, library.descriptorSetCount,
+                             ishader, stageFlags, &library.layout);
 
     VkPipelineShaderStageCreateInfo stageCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1368,8 +1382,10 @@ namespace gtl
     {
       idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, library.layout, nullptr);
       idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, library.descriptorPool, nullptr);
-      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, library.descriptorSetLayout, nullptr);
-
+      for (uint32_t i = 0; i < library.descriptorSetCount; i++)
+      {
+        idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, library.descriptorSetLayouts[i], nullptr);
+      }
       GB_ERROR("failed to create RT pipeline library");
       return false;
     }
@@ -1511,7 +1527,10 @@ namespace gtl
     const CgpuIPipelineLibrary& library = ishader->pipelineLibrary;
     idevice->table.vkDestroyPipeline(idevice->logicalDevice, library.pipeline, nullptr);
     idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, library.layout, nullptr);
-    idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, library.descriptorSetLayout, nullptr);
+    for (uint32_t i = 0; i < library.descriptorSetCount; i++)
+    {
+      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, library.descriptorSetLayouts[i], nullptr);
+    }
     idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, library.descriptorPool, nullptr);
 
     if (ishader->module != VK_NULL_HANDLE)
@@ -1881,18 +1900,21 @@ namespace gtl
     return true;
   }
 
-  static bool cgpuCreatePipelineDescriptors(CgpuIDevice* idevice,
+  static void cgpuCreatePipelineDescriptors(CgpuIDevice* idevice,
                                             CgpuIShader* ishader,
                                             VkShaderStageFlags stageFlags,
                                             CgpuIPipeline* ipipeline)
   {
-    if (!cgpuCreatePipelineDescriptorSet(idevice, ishader, stageFlags,
-                                         ipipeline->descriptorPool,
-                                         ipipeline->descriptorSetLayout,
-                                         ipipeline->descriptorSetLayoutBindings))
-    {
-      return false;
-    }
+    cgpuCreatePipelineDescriptorSets(
+      idevice, ishader, stageFlags,
+      ipipeline->descriptorPool,
+      ipipeline->descriptorSetLayouts,
+      ipipeline->descriptorSetLayoutBindings,
+      ipipeline->descriptorSetCount
+    );
+
+    const CgpuShaderReflection* shaderReflection = &ishader->reflection;
+    const std::vector<CgpuShaderReflectionDescriptorSet>& descriptorSets = shaderReflection->descriptorSets;
 
     uint32_t uniformBufferCount = 0;
     uint32_t storageBufferCount = 0;
@@ -1901,30 +1923,26 @@ namespace gtl
     uint32_t samplerCount = 0;
     uint32_t asCount = 0;
 
-    const CgpuShaderReflection* shaderReflection = &ishader->reflection;
-    const CgpuShaderReflectionDescriptorSet& descriptorSet = shaderReflection->descriptorSets[CGPU_DESCRIPTOR_SET_INDEX];
-    const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
-
-    for (uint32_t i = 0; i < bindings.size(); i++)
+    for (const CgpuShaderReflectionDescriptorSet& descriptorSet : descriptorSets)
     {
-      const CgpuShaderReflectionBinding* binding = &bindings[i];
+      const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
 
-      switch (binding->descriptorType)
+      for (uint32_t i = 0; i < bindings.size(); i++)
       {
-      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: storageBufferCount += binding->count; break;
-      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: uniformBufferCount += binding->count; break;
-      case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storageImageCount += binding->count; break;
-      case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampledImageCount += binding->count; break;
-      case VK_DESCRIPTOR_TYPE_SAMPLER: samplerCount += binding->count; break;
-      case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: asCount += binding->count; break;
-      default: {
-        idevice->table.vkDestroyDescriptorSetLayout(
-          idevice->logicalDevice,
-          ipipeline->descriptorSetLayout,
-          nullptr
-        );
-        CGPU_RETURN_ERROR("invalid descriptor type");
-      }
+        const CgpuShaderReflectionBinding* binding = &bindings[i];
+
+        switch (binding->descriptorType)
+        {
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: storageBufferCount += binding->count; break;
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: uniformBufferCount += binding->count; break;
+        case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storageImageCount += binding->count; break;
+        case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampledImageCount += binding->count; break;
+        case VK_DESCRIPTOR_TYPE_SAMPLER: samplerCount += binding->count; break;
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: asCount += binding->count; break;
+        default: {
+          CGPU_FATAL("invalid descriptor type");
+        }
+        }
       }
     }
 
@@ -1972,9 +1990,9 @@ namespace gtl
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .maxSets = 1,
+      .maxSets = CGPU_MAX_DESCRIPTOR_SET_COUNT,
       .poolSizeCount = poolSizeCount,
-      .pPoolSizes = poolSizes,
+      .pPoolSizes = poolSizes
     };
 
     VkResult result = idevice->table.vkCreateDescriptorPool(
@@ -1983,36 +2001,29 @@ namespace gtl
       nullptr,
       &ipipeline->descriptorPool
     );
-    if (result != VK_SUCCESS) {
-      idevice->table.vkDestroyDescriptorSetLayout(
-        idevice->logicalDevice,
-        ipipeline->descriptorSetLayout,
-        nullptr
-      );
-      CGPU_RETURN_ERROR("failed to create descriptor pool");
+    if (result != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to create descriptor pool");
     }
 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
       .pNext = nullptr,
       .descriptorPool = ipipeline->descriptorPool,
-      .descriptorSetCount = 1,
-      .pSetLayouts = &ipipeline->descriptorSetLayout,
+      .descriptorSetCount = ipipeline->descriptorSetCount,
+      .pSetLayouts = ipipeline->descriptorSetLayouts,
     };
 
     result = idevice->table.vkAllocateDescriptorSets(
       idevice->logicalDevice,
       &descriptorSetAllocateInfo,
-      &ipipeline->descriptorSet
+      ipipeline->descriptorSets
     );
 
-    if (result != VK_SUCCESS) {
-      idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
-      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayout, nullptr);
-      CGPU_RETURN_ERROR("failed to allocate descriptor set");
+    if (result != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to allocate descriptor set");
     }
-
-    return true;
   }
 
   bool cgpuCreateComputePipeline(CgpuDevice device,
@@ -2026,19 +2037,10 @@ namespace gtl
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
-    if (!cgpuCreatePipelineDescriptors(idevice, ishader, VK_SHADER_STAGE_COMPUTE_BIT, ipipeline))
-    {
-      iinstance->ipipelineStore.free(handle);
-      CGPU_RETURN_ERROR("failed to create descriptor set layout");
-    }
+    cgpuCreatePipelineDescriptors(idevice, ishader, VK_SHADER_STAGE_COMPUTE_BIT, ipipeline);
 
-    if (!cgpuCreatePipelineLayout(idevice, ipipeline->descriptorSetLayout, ishader, VK_SHADER_STAGE_COMPUTE_BIT, &ipipeline->layout))
-    {
-      iinstance->ipipelineStore.free(handle);
-      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayout, nullptr);
-      idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
-      CGPU_RETURN_ERROR("failed to create pipeline layout");
-    }
+    cgpuCreatePipelineLayout(idevice, ipipeline->descriptorSetLayouts, ipipeline->descriptorSetCount,
+                             ishader, VK_SHADER_STAGE_COMPUTE_BIT, &ipipeline->layout);
 
     VkPipelineShaderStageCreateInfo pipelineShaderStageCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -2071,21 +2073,12 @@ namespace gtl
 
     if (result != VK_SUCCESS) {
       iinstance->ipipelineStore.free(handle);
-      idevice->table.vkDestroyPipelineLayout(
-        idevice->logicalDevice,
-        ipipeline->layout,
-        nullptr
-      );
-      idevice->table.vkDestroyDescriptorSetLayout(
-        idevice->logicalDevice,
-        ipipeline->descriptorSetLayout,
-        nullptr
-      );
-      idevice->table.vkDestroyDescriptorPool(
-        idevice->logicalDevice,
-        ipipeline->descriptorPool,
-        nullptr
-      );
+      idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, ipipeline->layout, nullptr);
+      for (uint32_t i = 0; i < ipipeline->descriptorSetCount; i++)
+      {
+        idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
+      }
+      idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
       CGPU_RETURN_ERROR("failed to create compute pipeline");
     }
 
@@ -2239,14 +2232,10 @@ namespace gtl
     // Create descriptor and pipeline layout.
     CGPU_RESOLVE_SHADER(createInfo.rgenShader, irgenShader);
 
-    if (!cgpuCreatePipelineDescriptors(idevice, irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, ipipeline))
-    {
-      goto cleanup_fail;
-    }
-    if (!cgpuCreatePipelineLayout(idevice, ipipeline->descriptorSetLayout, irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, &ipipeline->layout))
-    {
-      goto cleanup_fail;
-    }
+    cgpuCreatePipelineDescriptors(idevice, irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, ipipeline);
+
+    cgpuCreatePipelineLayout(idevice, ipipeline->descriptorSetLayouts, ipipeline->descriptorSetCount,
+                             irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, &ipipeline->layout);
 
     // Create pipeline.
     {
@@ -2343,10 +2332,12 @@ namespace gtl
 
 cleanup_fail:
     idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, ipipeline->layout, nullptr);
-    idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayout, nullptr);
+    for (uint32_t i = 0; i < ipipeline->descriptorSetCount; i++)
+    {
+      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
+    }
     idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
     iinstance->ipipelineStore.free(handle);
-
     CGPU_RETURN_ERROR("failed to create rt pipeline");
   }
 
@@ -2363,8 +2354,10 @@ cleanup_fail:
     idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
     idevice->table.vkDestroyPipeline(idevice->logicalDevice, ipipeline->pipeline, nullptr);
     idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, ipipeline->layout, nullptr);
-    idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayout, nullptr);
-
+    for (uint32_t i = 0; i < ipipeline->descriptorSetCount; i++)
+    {
+      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
+    }
     iinstance->ipipelineStore.free(pipeline.handle);
 
     return true;
@@ -2782,7 +2775,6 @@ cleanup_fail:
     );
 
     uint32_t firstDescriptorSet = 0;
-    uint32_t descriptorSetCount = 1;
     uint32_t dynamicOffsetCount = 0;
     const uint32_t* dynamicOffsets = nullptr;
 
@@ -2791,8 +2783,8 @@ cleanup_fail:
       ipipeline->bindPoint,
       ipipeline->layout,
       firstDescriptorSet,
-      descriptorSetCount,
-      &ipipeline->descriptorSet,
+      ipipeline->descriptorSetCount,
+      &ipipeline->descriptorSets[firstDescriptorSet],
       dynamicOffsetCount,
       dynamicOffsets
     );
@@ -2800,6 +2792,7 @@ cleanup_fail:
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
                                            CgpuShader shader,
+                                           uint32_t descriptorSetIndex,
                                            uint32_t imageCount,
                                            const CgpuImageBinding* images)
   {
@@ -2810,11 +2803,17 @@ cleanup_fail:
     std::vector<VkImageMemoryBarrier2KHR> barriers;
     barriers.reserve(64);
 
-    /* FIXME: this has quadratic complexity */
     const CgpuShaderReflection* reflection = &ishader->reflection;
-    const CgpuShaderReflectionDescriptorSet& descriptorSet = reflection->descriptorSets[CGPU_DESCRIPTOR_SET_INDEX];
+    const std::vector<CgpuShaderReflectionDescriptorSet>& descriptorSets = reflection->descriptorSets;
+    if (descriptorSetIndex >= descriptorSets.size())
+    {
+      CGPU_FATAL("descriptor set index out of bounds");
+    }
+
+    const CgpuShaderReflectionDescriptorSet& descriptorSet = descriptorSets[descriptorSetIndex];
     const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
 
+    /* NOTE: this has quadratic complexity */
     for (uint32_t i = 0; i < bindings.size(); i++)
     {
       const CgpuShaderReflectionBinding* binding = &bindings[i];
@@ -2914,11 +2913,10 @@ cleanup_fail:
     }
   }
 
-  // TODO: add bind group resource type
   void cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
                              CgpuPipeline pipeline,
-                             const CgpuBindings* bindings
-  )
+                             uint32_t descriptorSetIndex,
+                             const CgpuBindings* bindings)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
@@ -2936,14 +2934,20 @@ cleanup_fail:
     std::vector<VkWriteDescriptorSet> writeDescriptorSets;
     writeDescriptorSets.reserve(512);
 
-    for (uint32_t i = 0; i < ipipeline->descriptorSetLayoutBindings.size(); i++)
+    if (descriptorSetIndex >= ipipeline->descriptorSetCount)
     {
-      const VkDescriptorSetLayoutBinding* layoutBinding = &ipipeline->descriptorSetLayoutBindings[i];
+      CGPU_FATAL("descriptor set index out of bounds");
+    }
+    const std::vector<VkDescriptorSetLayoutBinding>& layoutBindings = ipipeline->descriptorSetLayoutBindings[descriptorSetIndex];
+
+    for (uint32_t i = 0; i < layoutBindings.size(); i++)
+    {
+      const VkDescriptorSetLayoutBinding* layoutBinding = &layoutBindings[i];
 
       VkWriteDescriptorSet writeDescriptorSet = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = nullptr,
-        .dstSet = ipipeline->descriptorSet,
+        .dstSet = ipipeline->descriptorSets[descriptorSetIndex],
         .dstBinding = layoutBinding->binding,
         .dstArrayElement = 0,
         .descriptorCount = layoutBinding->descriptorCount,
