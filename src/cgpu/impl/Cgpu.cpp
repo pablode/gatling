@@ -1431,7 +1431,8 @@ namespace gtl
         &ishader->module
       );
 
-      if (result != VK_SUCCESS) {
+      if (result != VK_SUCCESS)
+      {
         CGPU_RETURN_ERROR("failed to create shader module");
       }
 
@@ -1443,7 +1444,6 @@ namespace gtl
     else if (!cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS,
                                           createInfo.maxRayPayloadSize, createInfo.maxRayHitAttributeSize))
     {
-      idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
       CGPU_RETURN_ERROR("failed to create pipeline library");
     }
 
