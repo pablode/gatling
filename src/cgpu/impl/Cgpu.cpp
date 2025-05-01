@@ -62,6 +62,11 @@ namespace gtl
 
   constexpr static const uint32_t CGPU_MIN_VK_API_VERSION = VK_API_VERSION_1_1;
 
+  constexpr static const uint32_t CGPU_VENDOR_ID_AMD = 0x1002;
+  constexpr static const uint32_t CGPU_VENDOR_ID_NVIDIA = 0x10DE;
+  constexpr static const uint32_t CGPU_VENDOR_ID_INTEL = 0x8086;
+  constexpr static const uint32_t CGPU_VENDOR_ID_MESA = VK_VENDOR_ID_MESA;
+
   constexpr static const VkShaderStageFlags CGPU_RT_PIPELINE_ACCESS_FLAGS = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
                                                                             VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
                                                                             VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
@@ -134,7 +139,7 @@ namespace gtl
 
   struct CgpuIShader
   {
-    VkShaderModule module = VK_NULL_HANDLE; // null for RT pipeline
+    VkShaderModule module = VK_NULL_HANDLE; // null when RT pipeline library is used
     CgpuShaderReflection reflection;
     VkShaderStageFlagBits stageFlags;
     CgpuIPipelineLibrary pipelineLibrary;
@@ -259,26 +264,25 @@ namespace gtl
 
   static CgpuPhysicalDeviceFeatures cgpuTranslatePhysicalDeviceFeatures(const VkPhysicalDeviceFeatures* vkFeatures)
   {
-    CgpuPhysicalDeviceFeatures features = {
-      .textureCompressionBC = bool(vkFeatures->textureCompressionBC),
-      .pipelineStatisticsQuery = bool(vkFeatures->pipelineStatisticsQuery),
-      .shaderImageGatherExtended = bool(vkFeatures->shaderImageGatherExtended),
-      .shaderStorageImageExtendedFormats = bool(vkFeatures->shaderStorageImageExtendedFormats),
-      .shaderStorageImageReadWithoutFormat = bool(vkFeatures->shaderStorageImageReadWithoutFormat),
-      .shaderStorageImageWriteWithoutFormat = bool(vkFeatures->shaderStorageImageWriteWithoutFormat),
-      .shaderUniformBufferArrayDynamicIndexing = bool(vkFeatures->shaderUniformBufferArrayDynamicIndexing),
-      .shaderSampledImageArrayDynamicIndexing = bool(vkFeatures->shaderSampledImageArrayDynamicIndexing),
-      .shaderStorageBufferArrayDynamicIndexing = bool(vkFeatures->shaderStorageBufferArrayDynamicIndexing),
-      .shaderStorageImageArrayDynamicIndexing = bool(vkFeatures->shaderStorageImageArrayDynamicIndexing),
-      .shaderFloat64 = bool(vkFeatures->shaderFloat64),
-      .shaderInt64 = bool(vkFeatures->shaderInt64),
-      .shaderInt16 = bool(vkFeatures->shaderInt16),
-      .sparseBinding = bool(vkFeatures->sparseBinding),
-      .sparseResidencyBuffer = bool(vkFeatures->sparseResidencyBuffer),
-      .sparseResidencyImage2D = bool(vkFeatures->sparseResidencyImage2D),
-      .sparseResidencyImage3D = bool(vkFeatures->sparseResidencyImage3D),
-      .sparseResidencyAliased = bool(vkFeatures->sparseResidencyAliased),
-    };
+    CgpuPhysicalDeviceFeatures features = {};
+    features.textureCompressionBC = bool(vkFeatures->textureCompressionBC);
+    features.pipelineStatisticsQuery = bool(vkFeatures->pipelineStatisticsQuery);
+    features.shaderImageGatherExtended = bool(vkFeatures->shaderImageGatherExtended);
+    features.shaderStorageImageExtendedFormats = bool(vkFeatures->shaderStorageImageExtendedFormats);
+    features.shaderStorageImageReadWithoutFormat = bool(vkFeatures->shaderStorageImageReadWithoutFormat);
+    features.shaderStorageImageWriteWithoutFormat = bool(vkFeatures->shaderStorageImageWriteWithoutFormat);
+    features.shaderUniformBufferArrayDynamicIndexing = bool(vkFeatures->shaderUniformBufferArrayDynamicIndexing);
+    features.shaderSampledImageArrayDynamicIndexing = bool(vkFeatures->shaderSampledImageArrayDynamicIndexing);
+    features.shaderStorageBufferArrayDynamicIndexing = bool(vkFeatures->shaderStorageBufferArrayDynamicIndexing);
+    features.shaderStorageImageArrayDynamicIndexing = bool(vkFeatures->shaderStorageImageArrayDynamicIndexing);
+    features.shaderFloat64 = bool(vkFeatures->shaderFloat64);
+    features.shaderInt64 = bool(vkFeatures->shaderInt64);
+    features.shaderInt16 = bool(vkFeatures->shaderInt16);
+    features.sparseBinding = bool(vkFeatures->sparseBinding);
+    features.sparseResidencyBuffer = bool(vkFeatures->sparseResidencyBuffer);
+    features.sparseResidencyImage2D = bool(vkFeatures->sparseResidencyImage2D);
+    features.sparseResidencyImage3D = bool(vkFeatures->sparseResidencyImage3D);
+    features.sparseResidencyAliased = bool(vkFeatures->sparseResidencyAliased);
     return features;
   }
 
@@ -391,13 +395,13 @@ namespace gtl
   {
     switch (deviceId)
     {
-    case 0x1002:
+    case CGPU_VENDOR_ID_AMD:
       return "AMD";
-    case 0x10DE:
+    case CGPU_VENDOR_ID_NVIDIA:
       return "NVIDIA";
-    case 0x8086:
+    case CGPU_VENDOR_ID_INTEL:
       return "Intel";
-    case VK_VENDOR_ID_MESA:
+    case CGPU_VENDOR_ID_MESA:
       return "Mesa";
     default:
       return nullptr;
@@ -684,7 +688,7 @@ namespace gtl
     std::vector<VkExtensionProperties> extensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
-    std::array<const char*, 16> requiredExtensions = {
+    std::array<const char*, 14> requiredExtensions = {
       VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
       VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
       VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -695,8 +699,6 @@ namespace gtl
       VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
       VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
       VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-      VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME,
-      VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME,
       VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
       VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, // required by VK_KHR_maintenance5
       VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, // required by VK_KHR_dynamic_rendering
@@ -731,6 +733,17 @@ namespace gtl
       GB_LOG("extension {} enabled", extName);
       return true;
     };
+
+    // Whitelist pipeline libraries as they are not mature on Intel and AMD.
+    if (deviceProperties.properties.vendorID == CGPU_VENDOR_ID_NVIDIA ||
+        deviceProperties.properties.vendorID == CGPU_VENDOR_ID_MESA)
+    {
+      if (enableOptionalExtension(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) &&
+          enableOptionalExtension(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME))
+      {
+        idevice->features.pipelineLibraries = true;
+      }
+    }
 
     if (enableOptionalExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) &&
         enableOptionalExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME))
@@ -835,21 +848,26 @@ namespace gtl
       pNext = &invocationReorderFeatures;
     }
 
+    VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT libraryGroupHandleFeatures = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_EXT,
+      .pNext = pNext,
+      .pipelineLibraryGroupHandles = VK_TRUE
+    };
+
+    if (idevice->features.pipelineLibraries)
+    {
+      pNext = &libraryGroupHandleFeatures;
+    }
+
     VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
       .pNext = pNext,
       .maintenance5 = VK_TRUE
     };
 
-    VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT libraryGroupHandlesFeatures = {
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_EXT,
-      .pNext = &maintenance5Features,
-      .pipelineLibraryGroupHandles = VK_TRUE
-    };
-
     VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timelineSemaphoreFeatures = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-      .pNext = &libraryGroupHandlesFeatures,
+      .pNext = &maintenance5Features,
       .timelineSemaphore = VK_TRUE
     };
 
@@ -1429,7 +1447,7 @@ namespace gtl
      .pCode = (uint32_t*) createInfo.source,
     };
 
-    if (createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_COMPUTE)
+    if (!idevice->features.pipelineLibraries || createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_COMPUTE)
     {
       VkResult result = idevice->table.vkCreateShaderModule(
         idevice->logicalDevice,
@@ -1445,7 +1463,7 @@ namespace gtl
 
       if (iinstance->debugUtilsEnabled && createInfo.debugName)
       {
-        cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t)ishader->module, createInfo.debugName);
+        cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t) ishader->module, createInfo.debugName);
       }
     }
     else if (!cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS,
@@ -2184,7 +2202,7 @@ namespace gtl
 
     memset(ipipeline, 0, sizeof(CgpuIPipeline));
 
-    // Gather groups
+    // Gather groups.
     size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups(groupCount);
 
@@ -2236,7 +2254,7 @@ namespace gtl
       }
     }
 
-    // Create descriptor and pipeline layout.
+    // Create descriptor backing and pipeline layout.
     CGPU_RESOLVE_SHADER(createInfo.rgenShader, irgenShader);
 
     cgpuCreatePipelineDescriptors(idevice, irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, ipipeline);
@@ -2244,35 +2262,86 @@ namespace gtl
     cgpuCreatePipelineLayout(idevice, ipipeline->descriptorSetLayouts, ipipeline->descriptorSetCount,
                              irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, &ipipeline->layout);
 
-    // Create pipeline.
+    // Collect pipeline libraries OR stages.
+    std::vector<VkPipeline> libraries;
+    std::vector<VkPipelineShaderStageCreateInfo> stages;
+    if (idevice->features.pipelineLibraries)
     {
+      libraries.reserve(groupCount * 2);
+
+      libraries.push_back(irgenShader->pipelineLibrary.pipeline);
+
       const auto getShaderPipelineHandle = [](CgpuShader shader) {
         CGPU_RESOLVE_SHADER(shader, ishader);
         return ishader->pipelineLibrary.pipeline;
       };
 
-      std::vector<VkPipeline> libraries;
-      libraries.reserve(groupCount);
-
-      libraries.push_back(irgenShader->pipelineLibrary.pipeline);
       for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
       {
         libraries.push_back(getShaderPipelineHandle(createInfo.missShaders[i]));
       }
+
       for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
       {
         CgpuShader closestHitShader = createInfo.hitGroups[i].closestHitShader;
-        CgpuShader anyHitShader = createInfo.hitGroups[i].anyHitShader;
         if (closestHitShader.handle)
         {
           libraries.push_back(getShaderPipelineHandle(closestHitShader));
         }
+
+        CgpuShader anyHitShader = createInfo.hitGroups[i].anyHitShader;
         if (anyHitShader.handle)
         {
           libraries.push_back(getShaderPipelineHandle(anyHitShader));
         }
       }
+    }
+    else
+    {
+      stages.reserve(groupCount * 2);
 
+      auto pushStage = [&stages](VkShaderStageFlagBits stage, VkShaderModule module) {
+        assert(module);
+        VkPipelineShaderStageCreateInfo stageCreateInfo = {
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          .pNext = nullptr,
+          .flags = 0,
+          .stage = stage,
+          .module = module,
+          .pName = CGPU_SHADER_ENTRY_POINT,
+          .pSpecializationInfo = nullptr,
+        };
+        stages.push_back(stageCreateInfo);
+      };
+
+      pushStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR, irgenShader->module);
+
+      for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
+      {
+        CGPU_RESOLVE_SHADER(createInfo.missShaders[i], imissShader);
+        pushStage(VK_SHADER_STAGE_MISS_BIT_KHR, imissShader->module);
+      }
+
+      for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
+      {
+        const CgpuRtHitGroup* hitGroup = &createInfo.hitGroups[i];
+
+        if (hitGroup->closestHitShader.handle)
+        {
+          CGPU_RESOLVE_SHADER(hitGroup->closestHitShader, iclosestHitShader);
+          pushStage(iclosestHitShader->stageFlags, iclosestHitShader->module);
+        }
+
+        if (hitGroup->anyHitShader.handle)
+        {
+          CGPU_RESOLVE_SHADER(hitGroup->anyHitShader, ianyHitShader);
+          pushStage(ianyHitShader->stageFlags, ianyHitShader->module);
+        }
+      }
+    }
+
+    // Create pipeline.
+    {
       uint32_t groupCount = hitStageAndGroupOffset + createInfo.hitGroupCount;
 
       VkPipelineLibraryCreateInfoKHR libraryCreateInfo {
@@ -2296,13 +2365,13 @@ namespace gtl
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
         .pNext = nullptr,
         .flags = 0,
-        .stageCount = 0,
-        .pStages = nullptr,
+        .stageCount = (uint32_t) stages.size(),
+        .pStages = stages.data(),
         .groupCount = (uint32_t) groups.size(),
         .pGroups = groups.data(),
         .maxPipelineRayRecursionDepth = 1,
-        .pLibraryInfo = &libraryCreateInfo,
-        .pLibraryInterface = &interfaceCreateInfo,
+        .pLibraryInfo = idevice->features.pipelineLibraries ? &libraryCreateInfo : nullptr,
+        .pLibraryInterface = idevice->features.pipelineLibraries ? &interfaceCreateInfo : nullptr,
         .pDynamicState = nullptr,
         .layout = ipipeline->layout,
         .basePipelineHandle = VK_NULL_HANDLE,
