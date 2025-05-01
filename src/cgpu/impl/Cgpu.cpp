@@ -1245,22 +1245,29 @@ namespace gtl
   {
     size_t bindingCount = bindings.size();
 
-    std::vector<VkDescriptorBindingFlagsEXT> bindingFlags(bindingCount);
+    std::vector<VkDescriptorBindingFlagsEXT> bindingFlags(bindingCount, 0);
     descriptorSetLayoutBindings.resize(bindingCount);
 
     for (uint32_t i = 0; i < bindingCount; i++)
     {
       const CgpuShaderReflectionBinding& bindingReflection = bindings[i];
+      VkDescriptorType descriptorType = (VkDescriptorType) bindingReflection.descriptorType;
 
       VkDescriptorSetLayoutBinding layoutBinding = {
         .binding = bindingReflection.binding,
-        .descriptorType = (VkDescriptorType) bindingReflection.descriptorType,
+        .descriptorType = descriptorType,
         .descriptorCount = bindingReflection.count,
         .stageFlags = stageFlags,
         .pImmutableSamplers = nullptr,
       };
 
-      bindingFlags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+      if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+          descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+          descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+      {
+        bindingFlags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT;
+      }
+
       descriptorSetLayoutBindings[i] = layoutBinding;
     }
 
