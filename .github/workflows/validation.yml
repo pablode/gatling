@@ -19,7 +19,7 @@ jobs:
       cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
 
   build-2502:
-    name: Build gatling for USD v25.02 (Release)
+    name: Build for USD v25.02
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
@@ -29,7 +29,7 @@ jobs:
       upload-test-artifacts: true
 
   build-2411:
-    name: Build gatling for USD v24.11 (Release)
+    name: Build for USD v24.11
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
@@ -39,7 +39,7 @@ jobs:
       upload-test-artifacts: true
 
   build-2408:
-    name: Build gatling for USD v24.08 (Release)
+    name: Build for USD v24.08
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
@@ -49,7 +49,7 @@ jobs:
       upload-test-artifacts: true
 
   build-2405:
-    name: Build gatling for USD v24.05 (Release)
+    name: Build for USD v24.05
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
@@ -57,7 +57,7 @@ jobs:
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
 
   build-2403:
-    name: Build gatling for USD v24.03 (Release)
+    name: Build for USD v24.03
     needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:

@@ -1,4 +1,4 @@
-name: Build gatling for Houdini 20
+name: Build for Houdini 20
 
 on:
   workflow_call:
@@ -10,26 +10,19 @@ on:
         default: "MDL-SDK"
 
 jobs:
-  build-mdl-sdk:
-    name: Build MDL SDK
-    uses: pablode/MDL-SDK/.github/workflows/main.yml@GA-2023.0.4-ubuntu22
-    with:
-      cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
-
   build:
-    name: Build Houdini 20 for ${{ matrix.name }}
-    needs: build-mdl-sdk
+    name: ${{ matrix.name }}
 
     strategy:
       matrix:
         include:
-        - name: Ubuntu / GCC
+        - name: Ubuntu (GCC)
           image: ubuntu-22.04
           usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           archive-name: gatling_Houdini20_Linux_x64
 
-        - name: Windows / MSVC
+        - name: Windows (MSVC)
           image: windows-2019
           usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"

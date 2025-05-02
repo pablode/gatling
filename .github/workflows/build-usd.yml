@@ -1,5 +1,3 @@
-name: Build gatling for USD
-
 on:
   workflow_call:
     inputs:
@@ -33,12 +31,12 @@ on:
 
 jobs:
   build:
-    name: Build USD v${{ inputs.usd-version }} for ${{ matrix.name }} (${{ inputs.build-config }})
+    name: ${{ matrix.name }}
 
     strategy:
       matrix:
         include:
-        - name: Ubuntu / GCC
+        - name: Ubuntu (GCC)
           image: ubuntu-22.04
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
@@ -48,7 +46,7 @@ jobs:
           run-graphical-tests: ${{ inputs.run-graphical-tests }}
           executable-suffix:
 
-        - name: Ubuntu / clang
+        - name: Ubuntu (clang)
           image: ubuntu-22.04
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
@@ -58,7 +56,7 @@ jobs:
           run-graphical-tests: false
           executable-suffix:
 
-        - name: Windows / MSVC
+        - name: Windows (MSVC)
           image: windows-2019
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
