@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+blender_version_min = "4.3.0"
+
+id = "hydra_gatling"
+license = [ "SPDX:GPL-3.0-or-later" ]
+maintainer = "Pablo Delgado"
+name = "Hydra Gatling render engine"
+tagline = "A cross-platform GPU path tracer with hardware ray tracing"
+version = "0.5.0"
+type = "add-on"
+
+website = "https://github.com/pablode/gatling"
+platforms = [ "windows-x64" ]
