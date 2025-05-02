@@ -16,12 +16,6 @@ jobs:
     strategy:
       matrix:
         include:
-        - name: Ubuntu (GCC)
-          image: ubuntu-22.04
-          usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Linux_x64.tar.gz"
-          usd-install-path: "/home/runner/work/USD/USD/INSTALL"
-          archive-name: gatling_Houdini20_Linux_x64
-
         - name: Windows (MSVC)
           image: windows-2019
           usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Windows_x64.tar.gz"
