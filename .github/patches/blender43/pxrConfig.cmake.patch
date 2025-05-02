@@ -1,0 +1,12 @@
+44c44
+<         find_package(Python3 "3.11.7" EXACT COMPONENTS Development REQUIRED)
+---
+>         find_package(Python3 "3.11.9" EXACT COMPONENTS Development REQUIRED)
+76a77,80
+> find_package(TBB REQUIRED)
+> find_package(OpenSubdiv REQUIRED)
+> find_package(Boost COMPONENTS python311 REQUIRED)
+> 
+97a102,103
+> 
+> include_directories(${PXR_INCLUDE_DIRS})

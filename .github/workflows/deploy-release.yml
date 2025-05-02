@@ -65,9 +65,16 @@ jobs:
     with:
       mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
 
+  build-blender43:
+    name: Build for Blender 4.3
+    needs: build-mdl-sdk
+    uses: ./.github/workflows/build-blender43.yml
+    with:
+      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+
   deploy-release:
     name: Deploy Release
-    needs: [build-usd2502, build-usd2411, build-usd2408, build-usd2405, build-usd2403, build-houdini20]
+    needs: [build-usd2502, build-usd2411, build-usd2408, build-usd2405, build-usd2403, build-houdini20, build-blender43]
     runs-on: ubuntu-latest
 
     steps:
@@ -83,5 +90,6 @@ jobs:
           body: "TBD"
           files: |
             *.tar.gz
+            *.zip
           fail_on_unmatched_files: true
           draft: true
