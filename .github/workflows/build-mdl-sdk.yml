@@ -1,0 +1,83 @@
+name: Build MDL SDK
+
+on:
+  workflow_call:
+    inputs:
+      cache-key-prefix:
+        required: true
+        type: string
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # Prevent OOM
+  VCPKG_MAX_CONCURRENCY: 1
+
+jobs:
+  build:
+    name: Build MDL SDK for ${{ matrix.name }}
+    runs-on: ${{ matrix.image }}
+
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+        - name: Ubuntu (GCC)
+          os-family: ubuntu
+          image: ubuntu-22.04
+          package-path: /usr/local/share/vcpkg/packages/mdl-sdk_x64-linux
+
+        - name: Windows 10 (MSVC)
+          os-family: windows
+          image: windows-2022
+          package-path: C:/vcpkg/packages/mdl-sdk_x64-windows
+
+    steps:
+    - name: Restore cache
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: MDL-SDK
+        key: ${{ inputs.cache-key-prefix }}_${{ matrix.image }}
+
+    - name: Free up disk space
+      if: steps.restore.outputs.cache-hit != 'true' && runner.os == 'Linux'
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        sudo rm -rf /opt/ghc
+
+    - name: Use C drive to avoid OOM
+      if: steps.restore.outputs.cache-hit != 'true' && runner.os == 'Windows'
+      shell: cmd
+      run: |
+        mkdir vcpkg
+        mklink /J vcpkg\buildtrees C:\vcpkg_buildtrees
+
+    - name: Create vcpkg manifest
+      if: steps.restore.outputs.cache-hit != 'true'
+      run: |
+        echo '{
+          "builtin-baseline": "96d5fb3de135b86d7222c53f2352ca92827a156b",
+          "dependencies": [ "mdl-sdk" ],
+          "overrides": [
+            { "name": "mdl-sdk", "version": "${{ vars.MDL_SDK_VERSION }}" }
+          ]
+        }' > vcpkg.json
+
+    - name: Install MDL SDK
+      if: steps.restore.outputs.cache-hit != 'true'
+      run: vcpkg install
+
+    - name: Move installed files
+      if: steps.restore.outputs.cache-hit != 'true'
+      run: mv ${{ matrix.package-path }} MDL-SDK
+
+    - name: Save vcpkg cache
+      if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: MDL-SDK
+        key: ${{ inputs.cache-key-prefix }}_${{ matrix.image }}

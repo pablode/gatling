@@ -57,14 +57,14 @@ jobs:
           executable-suffix:
 
         - name: Windows (MSVC)
-          image: windows-2019
+          image: windows-2022
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
           archive-name: gatling_USD${{ inputs.usd-version }}_Windows_x64
-          cmake-params: -G"Visual Studio 16 2019" -Ax64
+          cmake-params: -G"Visual Studio 17 2022" -Ax64
           run-graphical-tests: false
-          executable-suffix: '.exe'
+          executable-suffix: ".exe"
 
     uses: ./.github/workflows/build.yml
     with:
