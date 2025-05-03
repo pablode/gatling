@@ -55,9 +55,6 @@ jobs:
     name: Build gatling
     runs-on: ${{ inputs.image }}
 
-    env:
-      mdl-sdk-dir: "MDL-SDK/INSTALL"
-
     steps:
     - name: Check out repository
       uses: actions/checkout@v4
@@ -119,7 +116,7 @@ jobs:
       id: restore-mdl-sdk
       uses: actions/cache/restore@v4
       with:
-        path: "${{ env.mdl-sdk-dir }}"
+        path: MDL-SDK
         key: ${{ inputs.mdl-sdk-cache-key }}
         fail-on-cache-miss: true
 
@@ -132,7 +129,7 @@ jobs:
       run: |
         cmake .. \
           -DUSD_ROOT=${{ inputs.usd-install-path }} \
-          -DMDL_ROOT=../${{ env.mdl-sdk-dir }} \
+          -DMDL_ROOT=../MDL-SDK \
           -DCMAKE_BUILD_TYPE=${{ inputs.build-config }} \
           -DCMAKE_INSTALL_PREFIX="$PWD/../INSTALL" \
           ${{ inputs.cmake-params }}

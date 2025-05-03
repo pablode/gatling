@@ -18,9 +18,9 @@ jobs:
     name: Build gatling
 
     env:
-      mdl-sdk-dir: "MDL-SDK/INSTALL"
       archive-name: gatling_Blender4.3_Windows_x64
 
+    # NOTE: make sure to adjust occurrence below
     runs-on: windows-2019
 
     steps:
@@ -54,7 +54,7 @@ jobs:
       id: restore-mdl-sdk
       uses: actions/cache/restore@v4
       with:
-        path: "${{ env.mdl-sdk-dir }}"
+        path: MDL-SDK
         key: ${{ inputs.mdl-sdk-cache-key-prefix }}_windows-2019
         fail-on-cache-miss: true
 
@@ -75,7 +75,7 @@ jobs:
           -DPXR_CMAKE_DIR=../DEPS/usd \
           -DTBB_ROOT=../DEPS/tbb \
           -DUSD_ROOT=../DEPS/usd \
-          -DMDL_ROOT=../${{ env.mdl-sdk-dir }} \
+          -DMDL_ROOT=../MDL-SDK \
           -DCMAKE_INSTALL_PREFIX="$PWD/../INSTALL/render_delegate" \
           -DCMAKE_BUILD_TYPE=Release \
           -DBoost_USE_STATIC_LIBS=OFF \

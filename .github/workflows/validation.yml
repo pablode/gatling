@@ -14,9 +14,9 @@ on:
 jobs:
   build-mdl-sdk:
     name: Build MDL SDK
-    uses: pablode/MDL-SDK/.github/workflows/main.yml@GA-2023.0.4-ubuntu22
+    uses: ./.github/workflows/build-mdl-sdk.yml
     with:
-      cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
 
   build-2502:
     name: Build for USD v25.02
@@ -24,7 +24,7 @@ jobs:
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 25.02
-      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       run-graphical-tests: true
       upload-test-artifacts: true
 
@@ -34,7 +34,7 @@ jobs:
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 24.11
-      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       run-graphical-tests: true
       upload-test-artifacts: true
 
@@ -44,7 +44,7 @@ jobs:
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 24.08
-      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       run-graphical-tests: true
       upload-test-artifacts: true
 
@@ -54,7 +54,7 @@ jobs:
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 24.05
-      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
 
   build-2403:
     name: Build for USD v24.03
@@ -62,4 +62,4 @@ jobs:
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 24.03
-      mdl-sdk-cache-key-prefix: ${{ vars.MDL_SDK_CACHE_KEY_PREFIX }}
+      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
