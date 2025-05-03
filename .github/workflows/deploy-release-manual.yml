@@ -1,0 +1,20 @@
+name: Deploy Release (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version-name:
+        required: true
+        type: string
+        default: 'Version XXX'
+      tag-name:
+        required: true
+        type: string
+
+jobs:
+  deploy-release:
+    name: Deploy release
+    uses: ./.github/workflows/deploy-release.yml
+    with:
+      version-name: ${{ inputs.version-name }}
+      tag-name: ${{ inputs.tag-name }}
