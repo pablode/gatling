@@ -1,0 +1,17 @@
+name: Deploy Release (Weekly)
+
+on:
+  schedule:
+    # Run every sunday at 18:00 UTC (8 PM CET)
+    - cron: '0 18 * * 0'
+
+jobs:
+  deploy-release:
+    name: Deploy release
+    uses: ./.github/workflows/deploy-release.yml
+    with:
+      version-name: Weekly
+      tag-name: weekly
+      release-notes: 'Weekly build of the master branch.'
+      # NOTE: will be enabled later
+      #publish-prerelease: true

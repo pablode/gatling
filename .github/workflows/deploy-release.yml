@@ -1,7 +1,22 @@
 name: Deploy Release
 
 on:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      version-name:
+        required: true
+        type: string
+      tag-name:
+        required: true
+        type: string
+      release-notes:
+        required: false
+        type: string
+        default: 'TBD'
+      publish-prerelease:
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build-mdl-sdk:
@@ -83,13 +98,16 @@ jobs:
         with:
           merge-multiple: true
 
-      - name: Deploy draft release
+      - name: Deploy release
         uses: softprops/action-gh-release@d4e8205d7e959a9107da6396278b2f1f07af0f9b
         with:
-          name: "Version XXX"
-          body: "TBD"
+          name: ${{ inputs.version-name }}
+          body: ${{ inputs.release-notes }}
           files: |
             *.tar.gz
             *.zip
           fail_on_unmatched_files: true
-          draft: true
+          tag_name: ${{ inputs.tag-name }}
+          prerelease: ${{ inputs.publish-prerelease }}
+          draft: ${{ ! inputs.publish-prerelease }}
+          make_latest: true
