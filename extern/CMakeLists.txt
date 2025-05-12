@@ -159,3 +159,9 @@ add_subdirectory(c-blosc2)
 #
 add_library(OffsetAllocator STATIC OffsetAllocator/offsetAllocator.cpp)
 target_include_directories(OffsetAllocator PUBLIC OffsetAllocator)
+
+#
+# xxHash
+#
+add_library(xxHash STATIC xxHash/xxhash.c)
+target_include_directories(xxHash PUBLIC xxHash)
