@@ -734,9 +734,8 @@ namespace gtl
       return true;
     };
 
-    // Whitelist pipeline libraries as they are not mature on Intel and AMD.
-    if (deviceProperties.properties.vendorID == CGPU_VENDOR_ID_NVIDIA ||
-        deviceProperties.properties.vendorID == CGPU_VENDOR_ID_MESA)
+    // Currently RT pipeline libraries as we use them only correctly work on NVIDIA.
+    if (deviceProperties.properties.vendorID == CGPU_VENDOR_ID_NVIDIA)
     {
       if (enableOptionalExtension(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) &&
           enableOptionalExtension(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME))
