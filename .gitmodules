@@ -61,3 +61,6 @@
 [submodule "extern/OffsetAllocator"]
 	path = extern/OffsetAllocator
 	url = https://github.com/sebbbi/OffsetAllocator.git
+[submodule "extern/xxHash"]
+	path = extern/xxHash
+	url = https://github.com/Cyan4973/xxHash.git
