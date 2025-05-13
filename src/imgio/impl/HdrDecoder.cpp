@@ -61,7 +61,7 @@ namespace gtl
       }
     }
 
-    delete hdrData;
+    stbi_image_free(hdrData);
     return ImgioError::None;
   }
 }
