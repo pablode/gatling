@@ -146,28 +146,11 @@ TF_REGISTRY_FUNCTION(TfType)
 
 HdGatlingRendererPlugin::HdGatlingRendererPlugin()
 {
-#if PXR_VERSION > 2311
-  mx::DocumentPtr mtlxStdLib = HdMtlxStdLibraries();
-#else
-  mx::DocumentPtr mtlxStdLib = _LoadMtlxStdLib();
-#endif
-
-  _isSupported = _TryInitGi(mtlxStdLib);
-
-  if (!_isSupported)
-  {
-    return;
-  }
-
-  _materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxStdLib);
-
-  _arAssetReader = std::make_unique<ArAssetReader>();
-  giRegisterAssetReader(_arAssetReader.get());
 }
 
 HdGatlingRendererPlugin::~HdGatlingRendererPlugin()
 {
-  if (!_isSupported)
+  if (!_isInitialized)
   {
     return;
   }
@@ -185,7 +168,28 @@ HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate()
 
 HdRenderDelegate* HdGatlingRendererPlugin::CreateRenderDelegate(const HdRenderSettingsMap& settingsMap)
 {
-  if (!_isSupported)
+  if (!_hasTriedToInitialize)
+  {
+    _hasTriedToInitialize = true;
+
+#if PXR_VERSION > 2311
+    mx::DocumentPtr mtlxStdLib = HdMtlxStdLibraries();
+#else
+    mx::DocumentPtr mtlxStdLib = _LoadMtlxStdLib();
+#endif
+
+    if (_TryInitGi(mtlxStdLib))
+    {
+      _materialNetworkCompiler = std::make_unique<MaterialNetworkCompiler>(mtlxStdLib);
+
+      _arAssetReader = std::make_unique<ArAssetReader>();
+      giRegisterAssetReader(_arAssetReader.get());
+
+      _isInitialized = true;
+    }
+  }
+
+  if (!_isInitialized)
   {
     return nullptr;
   }
@@ -203,12 +207,20 @@ void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDeleg
 }
 
 #if PXR_VERSION >= 2302
-bool HdGatlingRendererPlugin::IsSupported([[maybe_unused]] bool gpuEnabled) const
+bool HdGatlingRendererPlugin::IsSupported(bool gpuEnabled) const
 #else
 bool HdGatlingRendererPlugin::IsSupported() const
 #endif
 {
-  return _isSupported;
+  // Note: we just assume that the renderer is supported on the system here because usdview
+  // (and possibly other applications) instantiate the renderer plugin multiple times,
+  // checking for support.
+  //
+  // As performing a real GPU capability check here or in the constructor would at least double
+  // the loading time, we instead assume support and do the actual check when the render delegate
+  // is requested. Thankfully, returning null in case it's not supported has the same effect as
+  // returning false in this function.
+  return (!_hasTriedToInitialize && gpuEnabled) || (_hasTriedToInitialize && _isInitialized);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -46,7 +46,8 @@ public:
 private:
   std::unique_ptr<class MaterialNetworkCompiler> _materialNetworkCompiler;
   std::unique_ptr<class ArAssetReader> _arAssetReader;
-  bool _isSupported;
+  bool _hasTriedToInitialize = false;
+  bool _isInitialized = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
