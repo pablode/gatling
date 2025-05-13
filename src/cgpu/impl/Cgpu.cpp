@@ -1342,7 +1342,7 @@ namespace gtl
     }
   }
 
-  static bool cgpuCreateRtPipelineLibrary(CgpuIDevice* idevice,
+  static void cgpuCreateRtPipelineLibrary(CgpuIDevice* idevice,
                                           const VkShaderModuleCreateInfo& moduleCreateInfo,
                                           CgpuIShader* ishader,
                                           VkShaderStageFlags stageFlags,
@@ -1404,20 +1404,11 @@ namespace gtl
                                                       nullptr,
                                                       &library.pipeline) != VK_SUCCESS)
     {
-      idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, library.layout, nullptr);
-      idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, library.descriptorPool, nullptr);
-      for (uint32_t i = 0; i < library.descriptorSetCount; i++)
-      {
-        idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, library.descriptorSetLayouts[i], nullptr);
-      }
-      GB_ERROR("failed to create RT pipeline library");
-      return false;
+      CGPU_FATAL("failed to create RT pipeline library");
     }
-
-    return true;
   }
 
-  static bool cgpuCreateShader(CgpuIDevice* idevice,
+  static void cgpuCreateShader(CgpuIDevice* idevice,
                                const CgpuShaderCreateInfo& createInfo,
                                CgpuIShader* ishader)
   {
@@ -1425,7 +1416,7 @@ namespace gtl
 
     if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
     {
-      CGPU_RETURN_ERROR("failed to reflect shader");
+      CGPU_FATAL("failed to reflect shader");
     }
 
 #ifndef NDEBUG
@@ -1457,7 +1448,7 @@ namespace gtl
 
       if (result != VK_SUCCESS)
       {
-        CGPU_RETURN_ERROR("failed to create shader module");
+        CGPU_FATAL("failed to create shader module");
       }
 
       if (iinstance->debugUtilsEnabled && createInfo.debugName)
@@ -1465,13 +1456,11 @@ namespace gtl
         cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t) ishader->module, createInfo.debugName);
       }
     }
-    else if (!cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS,
-                                          createInfo.maxRayPayloadSize, createInfo.maxRayHitAttributeSize))
+    else
     {
-      CGPU_RETURN_ERROR("failed to create pipeline library");
+      cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS,
+                                  createInfo.maxRayPayloadSize, createInfo.maxRayHitAttributeSize);
     }
-
-    return true;
   }
 
   bool cgpuCreateShader(CgpuDevice device,
@@ -1484,11 +1473,7 @@ namespace gtl
 
     CGPU_RESOLVE_SHADER(*shader, ishader);
 
-    if (!cgpuCreateShader(idevice, createInfo, ishader))
-    {
-      iinstance->ishaderStore.free(shader->handle);
-      return false;
-    }
+    cgpuCreateShader(idevice, createInfo, ishader);
 
     return true;
   }
@@ -1514,33 +1499,13 @@ namespace gtl
       ishaders[i] = ishader;
     }
 
-    std::atomic<int> errorCount = false;
-
 #pragma omp parallel for schedule(dynamic, 1)
     for (int i = 0; i < int(shaderCount); i++)
     {
-      if (!cgpuCreateShader(idevice, createInfos[i], ishaders[i]))
-      {
-        errorCount++;
-      }
+      cgpuCreateShader(idevice, createInfos[i], ishaders[i]);
     }
 
-    if (errorCount == 0)
-    {
-      return true;
-    }
-
-    for (uint32_t i = 0; i < shaderCount; i++)
-    {
-      CgpuShader shader = shaders[i];
-      if (shader.handle)
-      {
-        cgpuDestroyShader(device, shader);
-      }
-      iinstance->ishaderStore.free(shader.handle);
-    }
-
-    return false;
+    return true;
   }
 
   bool cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
@@ -1672,8 +1637,9 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    if (vmaMapMemory(idevice->allocator, ibuffer->allocation, mappedMem) != VK_SUCCESS) {
-      CGPU_RETURN_ERROR("failed to map buffer memory");
+    if (vmaMapMemory(idevice->allocator, ibuffer->allocation, mappedMem) != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to map buffer memory");
     }
     return true;
   }
@@ -1845,8 +1811,9 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_IMAGE(image, iimage);
 
-    if (vmaMapMemory(idevice->allocator, iimage->allocation, mappedMem) != VK_SUCCESS) {
-      CGPU_RETURN_ERROR("failed to map image memory");
+    if (vmaMapMemory(idevice->allocator, iimage->allocation, mappedMem) != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to map image memory");
     }
     return true;
   }
@@ -2095,15 +2062,9 @@ namespace gtl
       &ipipeline->pipeline
     );
 
-    if (result != VK_SUCCESS) {
-      iinstance->ipipelineStore.free(handle);
-      idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, ipipeline->layout, nullptr);
-      for (uint32_t i = 0; i < ipipeline->descriptorSetCount; i++)
-      {
-        idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
-      }
-      idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
-      CGPU_RETURN_ERROR("failed to create compute pipeline");
+    if (result != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to create compute pipeline");
     }
 
     if (iinstance->debugUtilsEnabled && createInfo.debugName)
@@ -2139,7 +2100,7 @@ namespace gtl
     std::vector<uint8_t> handleData(dataSize);
     if (idevice->table.vkGetRayTracingShaderGroupHandlesKHR(idevice->logicalDevice, ipipeline->pipeline, firstGroup, groupCount, handleData.size(), handleData.data()) != VK_SUCCESS)
     {
-      CGPU_RETURN_ERROR("failed to create sbt handles");
+      CGPU_FATAL("failed to create sbt handles");
     }
 
     VkDeviceSize sbtSize = ipipeline->sbtRgen.size + ipipeline->sbtMiss.size + ipipeline->sbtHit.size;
@@ -2158,8 +2119,9 @@ namespace gtl
     ipipeline->sbtHit.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size + ipipeline->sbtMiss.size;
 
     uint8_t* sbtMem;
-    if (vmaMapMemory(idevice->allocator, ipipeline->sbt.allocation, (void**)&sbtMem) != VK_SUCCESS) {
-      CGPU_RETURN_ERROR("failed to map buffer memory");
+    if (vmaMapMemory(idevice->allocator, ipipeline->sbt.allocation, (void**)&sbtMem) != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to map buffer memory");
     }
 
     uint32_t handleCount = 0;
@@ -2668,9 +2630,7 @@ cleanup_fail:
       uint8_t* mapped_mem;
       if (vmaMapMemory(idevice->allocator, itlas->instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
       {
-        iinstance->itlasStore.free(handle);
-        cgpuDestroyIBuffer(idevice, &itlas->instances);
-        CGPU_RETURN_ERROR("failed to map buffer memory");
+        CGPU_FATAL("failed to map buffer memory");
       }
 
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
@@ -2783,14 +2743,11 @@ cleanup_fail:
       .commandBufferCount = 1,
     };
 
-    VkResult result = idevice->table.vkAllocateCommandBuffers(
-      idevice->logicalDevice,
-      &cmdbufAllocInfo,
-      &icommandBuffer->commandBuffer
-    );
-    if (result != VK_SUCCESS) {
-      iinstance->icommandBufferStore.free(handle);
-      CGPU_RETURN_ERROR("failed to allocate command buffer");
+    if (idevice->table.vkAllocateCommandBuffers(idevice->logicalDevice,
+                                                &cmdbufAllocInfo,
+                                                &icommandBuffer->commandBuffer) != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to allocate command buffer");
     }
 
     commandBuffer->handle = handle;
@@ -3608,12 +3565,15 @@ cleanup_fail:
       .pSemaphores = semaphores.data(),
       .pValues = semaphoreValues.data()
     };
+
     VkResult result = idevice->table.vkWaitSemaphoresKHR(
       idevice->logicalDevice,
       &waitInfo,
       timeoutNs
     );
-    if (result != VK_SUCCESS) {
+
+    if (result != VK_SUCCESS)
+    {
       CGPU_RETURN_ERROR("failed to wait for semaphores");
     }
     return true;
@@ -3682,7 +3642,8 @@ cleanup_fail:
       VK_NULL_HANDLE
     );
 
-    if (result != VK_SUCCESS) {
+    if (result != VK_SUCCESS)
+    {
       CGPU_RETURN_ERROR("failed to submit command buffer");
     }
     return true;
