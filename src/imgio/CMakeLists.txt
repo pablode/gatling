@@ -11,6 +11,8 @@ set(IMGIO_SRCS
   impl/JpegDecoder.cpp
   impl/PngDecoder.h
   impl/PngDecoder.cpp
+  impl/TgaDecoder.h
+  impl/TgaDecoder.cpp
   impl/TiffDecoder.h
   impl/TiffDecoder.cpp
 )

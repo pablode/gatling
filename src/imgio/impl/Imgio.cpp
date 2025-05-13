@@ -21,6 +21,7 @@
 #include "ExrDecoder.h"
 #include "HdrDecoder.h"
 #include "TiffDecoder.h"
+#include "TgaDecoder.h"
 
 #include <stdlib.h>
 
@@ -48,6 +49,11 @@ namespace gtl
     if (r == ImgioError::UnsupportedEncoding)
     {
       r = ImgioTiffDecoder::decode(size, data, img);
+    }
+
+    if (r == ImgioError::UnsupportedEncoding)
+    {
+      r = ImgioTgaDecoder::decode(size, data, img);
     }
 
     return r;

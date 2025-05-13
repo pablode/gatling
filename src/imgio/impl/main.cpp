@@ -84,3 +84,8 @@ TEST_CASE("LoadOriented.Jpg")
 {
   _LoadOriented("4c.jpg", REF_4C_JPG);
 }
+
+TEST_CASE("LoadOriented.Tga")
+{
+  _LoadOriented("4c.tga", REF_4C);
+}
