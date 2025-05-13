@@ -74,6 +74,23 @@ namespace gtl
 
   constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
 
+  static const std::array<const char*, 14> CGPU_REQUIRED_EXTENSIONS = {
+    VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+    VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
+    VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
+    VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
+    VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+    VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
+    VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME, // required by VK_KHR_spirv_1_4
+    VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
+    VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+    VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
+    VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
+    VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, // required by VK_KHR_maintenance5
+    VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, // required by VK_KHR_dynamic_rendering
+    VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME // required by VK_KHR_depth_stencil_resolve
+  };
+
   /* Internal structures. */
 
   struct CgpuIDevice
@@ -568,6 +585,85 @@ namespace gtl
     iinstance.reset();
   }
 
+  static VkPhysicalDevice cgpuSelectBestGpu(const VkPhysicalDevice* devices, size_t count)
+  {
+    int bestScore = -1;
+    int bestGpu = -1;
+
+    for (size_t i = 0; i < count; i++)
+    {
+      const VkPhysicalDevice& device = devices[i];
+
+      VkPhysicalDeviceProperties properties;
+      vkGetPhysicalDeviceProperties(device, &properties);
+
+      // Check for required extensions
+      uint32_t extensionCount;
+      vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+      std::vector<VkExtensionProperties> extensions(extensionCount);
+      vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, extensions.data());
+
+      bool unsupportedExtension = false;
+      for (uint32_t j = 0; j < CGPU_REQUIRED_EXTENSIONS.size(); j++)
+      {
+        const char* extension = CGPU_REQUIRED_EXTENSIONS[j];
+
+        if (!cgpuFindExtension(extension, extensionCount, extensions.data()))
+        {
+          GB_LOG("GPU [{}] {} does not support {}; skipping", i, properties.deviceName, extension);
+          unsupportedExtension = true;
+        }
+      }
+
+      if (unsupportedExtension)
+      {
+        continue;
+      }
+
+      // Check device type
+      int score = 0;
+
+      if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+      {
+        score += 10000;
+      }
+      else if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)
+      {
+        score += 8000; // can be a masked dGPU
+      }
+      else
+      {
+        // Not ideal, but not a deal breaker.
+      }
+
+      // Check VRAM
+      VkPhysicalDeviceMemoryProperties memoryProperties;
+      vkGetPhysicalDeviceMemoryProperties(device, &memoryProperties);
+
+      uint64_t vramSize = 0;
+      for (size_t i = 0; i < memoryProperties.memoryHeapCount; i++)
+      {
+        const VkMemoryHeap& heap = memoryProperties.memoryHeaps[i];
+
+        if (heap.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+        {
+          vramSize += uint64_t(heap.size);
+        }
+      }
+
+      score += vramSize / uint64_t(1024 * 1024 * 1024); // bytes to gigabytes
+
+      if (score > bestScore)
+      {
+        bestScore = score;
+        bestGpu = i;
+      }
+    }
+
+    return bestScore > 0 ? devices[bestGpu] : VK_NULL_HANDLE;
+  }
+
   static VkResult cgpuCreateMemoryPool(VmaPool& pool,
                                        VmaAllocator allocator,
                                        VkBufferUsageFlags bufferUsage,
@@ -615,15 +711,20 @@ namespace gtl
       iinstance->ideviceStore.free(handle);
       CGPU_RETURN_ERROR("no physical device found");
     }
-    else if (physDeviceCount > 1)
-    {
-      GB_WARN("more than one device found -- choosing first one");
-    }
 
     GbSmallVector<VkPhysicalDevice, 4> physicalDevices(physDeviceCount);
     vkEnumeratePhysicalDevices(iinstance->instance, &physDeviceCount, physicalDevices.data());
 
-    idevice->physicalDevice = physicalDevices[0];
+    // Select GPU using simple scoring system (dGPU > integrated).
+    if (VkPhysicalDevice device = cgpuSelectBestGpu(physicalDevices.data(), physicalDevices.size()); device != VK_NULL_HANDLE)
+    {
+      idevice->physicalDevice = device;
+    }
+    else
+    {
+      GB_ERROR("no suitable physical device found!");
+      return false;
+    }
 
     VkPhysicalDeviceFeatures features;
     vkGetPhysicalDeviceFeatures(idevice->physicalDevice, &features);
@@ -688,37 +789,10 @@ namespace gtl
     std::vector<VkExtensionProperties> extensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, extensions.data());
 
-    std::array<const char*, 14> requiredExtensions = {
-      VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-      VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
-      VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
-      VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
-      VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
-      VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
-      VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME, // required by VK_KHR_spirv_1_4
-      VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
-      VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-      VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
-      VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
-      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, // required by VK_KHR_maintenance5
-      VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, // required by VK_KHR_dynamic_rendering
-      VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME // required by VK_KHR_depth_stencil_resolve
-    };
-
-    GbSmallVector<const char*, 8> enabledExtensions;
-    for (uint32_t i = 0; i < requiredExtensions.size(); i++)
+    GbSmallVector<const char*, 16> enabledExtensions;
+    for (uint32_t i = 0; i < CGPU_REQUIRED_EXTENSIONS.size(); i++)
     {
-      const char* extension = requiredExtensions[i];
-
-      if (!cgpuFindExtension(extension, extensionCount, extensions.data()))
-      {
-        iinstance->ideviceStore.free(handle);
-
-        GB_ERROR("extension {} not supported", extension);
-        return false;
-      }
-
-      enabledExtensions.push_back(extension);
+      enabledExtensions.push_back(CGPU_REQUIRED_EXTENSIONS[i]);
     }
 
     const auto enableOptionalExtension = [&](const char* extName)
