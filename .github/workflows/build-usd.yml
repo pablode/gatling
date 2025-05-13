@@ -41,7 +41,7 @@ jobs:
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
-          archive-name: gatling_USD${{ inputs.usd-version }}_Linux_x64
+          archive-name: gatling_USD${{ inputs.usd-version }}_Ubuntu22.04_x64
           cmake-params:
           run-graphical-tests: ${{ inputs.run-graphical-tests }}
           executable-suffix:
