@@ -555,7 +555,12 @@ namespace gtl
     uint32_t maxRayDispatchInvocationCount;
     uint32_t shaderGroupHandleAlignment;
     uint32_t maxRayHitAttributeSize;
+    uint32_t vendorID;
+    uint32_t deviceID;
+    uint32_t driverVersion;
+    uint8_t uuid[VK_UUID_SIZE];
   };
+  // TODO: sort members alphabetically? also do so in translate function?
 
   struct CgpuWaitSemaphoreInfo
   {

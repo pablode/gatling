@@ -22,6 +22,7 @@ target_link_libraries(
     volk
     VulkanMemoryAllocator
     spirv-reflect-static
+    xxHash
 )
 
 set_target_properties(

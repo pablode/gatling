@@ -29,6 +29,7 @@
 #include <atomic>
 
 #include <volk.h>
+#include <xxhash.h>
 
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
@@ -73,6 +74,8 @@ namespace gtl
                                                                             VK_SHADER_STAGE_MISS_BIT_KHR;
 
   constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
+
+  constexpr static const uint32_t CGPU_PIPELINE_CACHE_MAGIC = 0x47544C5Fu; // 'GTL_'
 
   /* Internal structures. */
 
@@ -136,6 +139,24 @@ namespace gtl
     VkPipelineLayout                          layout;
     VkPipeline                                pipeline;
   };
+
+  struct CgpuIPipelineCacheHeader
+  {
+    uint32_t magic;
+// TODO: rename data -> payload to avoid abiguity?
+    uint32_t dataSize;
+    uint32_t dataHashHighBits;
+    uint32_t dataHashLowBits;
+
+    uint32_t vendorID;
+    uint32_t deviceID;
+    uint32_t driverVersion;
+    uint32_t driverABI;
+
+    uint8_t uuid[VK_UUID_SIZE];
+  };
+  // It is Important that the compiler does not insert padding
+  static_assert(sizeof(CgpuIPipelineCacheHeader) == 48);
 
   struct CgpuIShader
   {
@@ -286,6 +307,7 @@ namespace gtl
     return features;
   }
 
+// TODO: normal properties are missing here.. ?
   static CgpuPhysicalDeviceProperties cgpuTranslatePhysicalDeviceProperties(const VkPhysicalDeviceLimits* vkLimits,
                                                                             const VkPhysicalDeviceSubgroupProperties* vkSubgroupProps,
                                                                             const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vkAsProps,
@@ -596,6 +618,160 @@ namespace gtl
 
     return vmaCreatePool(allocator, &poolCreateInfo, &pool);
   }
+
+/**
+  struct CgpuIPipelineCacheHeader
+  {
+    uint32_t magic;
+    uint32_t dataSize;
+    uint64_t dataHash;
+
+    uint32_t vendorID;
+    uint32_t deviceID;
+    uint32_t driverVersion;
+    uint32_t driverABI;
+
+    uint8_t uuid[VK_UUID_SIZE];
+  };
+**/
+
+  // TODO: expose in public API
+  // TODO: in Gi, log warning if saving fails
+  bool cgpuSerializePipelineCache(const CgpuIDevice* idevice,
+                                  VkPipelineCache pipelineCache,
+                                  std::vector<uint8_t>& data)
+  {
+    // Retrieve binary cache from Vulkan.
+    size_t payloadSize;
+    if (vkGetPipelineCacheData(idevice->logicalDevice,
+                               pipelineCache,
+                               &payloadSize,
+                               nullptr) != VK_SUCCESS)
+    {
+      return false;
+    }
+
+    uint32_t payloadOffset = sizeof(CgpuIPipelineCacheHeader);
+    data.resize(payloadOffset + payloadSize);
+
+    if (vkGetPipelineCacheData(idevice->logicalDevice,
+                               pipelineCache,
+                               &payloadSize,
+                               &data[payloadOffset]) != VK_SUCCESS)
+    {
+      return false;
+    }
+
+    // Create and write header.
+    const VkPhysicalDeviceProperties& deviceProperties = idevice->properties;
+    
+    uint64_t dataHash = XXH64(&data[payloadOffset], payloadSize, 0/*hash seed*/);
+
+    CgpuIPipelineCacheHeader header{
+      .magic = CGPU_PIPELINE_CACHE_MAGIC,
+      .dataSize = uint32_t(payloadSize),
+      .dataHashHighBits = uint32_t(dataHash >> 32),
+      .dataHashLowBits = uint32_t(dataHash),
+      .vendorID = deviceProperties.vendorID,
+      .deviceID = deviceProperties.deviceID,
+      .driverVersion = deviceProperties.driverVersion,
+      .driverABI = sizeof(void*)
+    };
+    memcpy(header.uuid, deviceProperties.pipelineCacheUUID, VK_UUID_SIZE);
+
+    memcpy(&data[0], &header, payloadOffset);
+    return true;
+  }
+
+  // TODO: call this from createDevice()
+  VkPipelineCache cgpuRestorePipelineCache(const CgpuIDevice* idevice,
+                                           // TODO: looks like it makes sense to store this data in idevice
+                                           const VkPhysicalDeviceProperties& deviceProperties,
+                                           size_t size,
+                                           const char* data)
+  {
+    if (size <= sizeof(CgpuIPipelineCacheHeader))
+    {
+      return VK_NULL_HANDLE;
+    }
+
+    CgpuIPipelineCacheHeader header;
+    memcpy(&header, data, sizeof(header));
+
+    // Determine if we can reuse the cache.
+    if (header.magic != CGPU_PIPELINE_CACHE_MAGIC ||
+        header.vendorID != deviceProperties.vendorID ||
+        header.deviceID != deviceProperties.deviceID ||
+        header.driverABI != sizeof(void*) ||
+        memcmp(header.uuid, deviceProperties.pipelineCacheUUID, VK_UUID_SIZE) != 0)
+    {
+      return VK_NULL_HANDLE;
+    }
+
+    // Verify data integrity.
+    const char* payload = &data[sizeof(header)];
+    {
+      uint64_t referenceHash = (uint64_t(header.dataHashHighBits) << 32) | header.dataHashLowBits;
+
+      uint64_t hashSeed = 0;
+      uint64_t dataHash = XXH64(payload, header.dataSize, hashSeed);
+
+      if (dataHash != referenceHash)
+      {
+        return VK_NULL_HANDLE;
+      }
+    }
+
+    // Create the cache, if driver agrees.
+    VkPipelineCacheCreateInfo cacheCreateInfo = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .initialDataSize = header.dataSize,
+      .pInitialData = payload
+    };
+
+    VkPipelineCache pipelineCache;
+    if (idevice->table.vkCreatePipelineCache(idevice->logicalDevice,
+                                             &cacheCreateInfo,
+                                             nullptr,
+                                             &pipelineCache) != VK_SUCCESS)
+    {
+      return VK_NULL_HANDLE;
+    }
+
+    return pipelineCache;
+  }
+
+/*
+  VkPipelineCache cgpuRestorePipelineCache(size_t size, const char* data)
+  {
+    if (size <= CgpuIPipelineCacheHeader::MEMBER_SIZE)
+    {
+      return VK_NULL_HANDLE;
+    }
+
+    CgpuIPipelineCacheHeader header;
+
+    size_t i = 0;
+
+#define READ_FIELD(NAME)
+    memcpy(&header.NAME, &data[i += sizeof(header.NAME)], sizeof(header.NAME));
+
+    READ_FIELD(magic);
+    READ_FIELD(dataSize);
+    READ_FIELD(dataHeash);
+    READ_FIELD(vendorID);
+    READ_FIELD(deviceID);
+    READ_FIELD(driverVersion);
+    READ_FIELD(driverABI);
+#undef READ_FIELD
+
+    memcpy((uint8_t*) header.uuid, &data[i += VK_UUID_SIZE], VK_UUID_SIZE);
+
+
+  }
+*/
 
   bool cgpuCreateDevice(CgpuDevice* device)
   {
