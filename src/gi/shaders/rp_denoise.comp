@@ -1,0 +1,8 @@
+layout (local_size_x = 32) in;
+
+layout(binding = 0, std430) writeonly buffer OutputBuffer { vec4 framebuffer[]; };
+
+void main()
+{
+  framebuffer[gl_GlobalInvocationID.x] = vec4(1, 0, 0, 1);
+}

@@ -290,4 +290,19 @@ namespace gtl
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::AnyHit, source, spv);
   }
+
+  bool GiGlslShaderGen::generateDenoisingSpirv(std::vector<uint8_t>& spv)
+  {
+    GiGlslStitcher stitcher;
+    stitcher.appendVersion();
+
+    fs::path filePath = m_shaderPath / "rp_denoise.comp";
+    if (!stitcher.appendSourceFile(filePath))
+    {
+      return false;
+    }
+
+    std::string source = stitcher.source();
+    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::Compute, source, spv);
+  }
 }

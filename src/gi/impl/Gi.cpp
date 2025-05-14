@@ -112,6 +112,7 @@ namespace gtl
     std::vector<const GiMaterial*> materials;
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
+    CgpuPipeline                   denoisePipeline;
     CgpuShader                     rgenShader;
     GiScene*                       scene;
     bool                           resetSampleOffset = true;
@@ -1332,6 +1333,7 @@ cleanup:
 
     GiShaderCache* cache = nullptr;
     CgpuPipeline pipeline;
+    CgpuPipeline denoisePipeline;
     CgpuShader rgenShader;
     std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
@@ -1755,6 +1757,34 @@ cleanup:
       }
     }
 
+    // Create denoising pipeline
+    {
+      std::vector<uint8_t> spv;
+      if (!s_shaderGen->generateDenoisingSpirv(spv))
+      {
+        goto cleanup;
+      }
+
+      CgpuShader shader;
+      if (!cgpuCreateShader(s_device, {
+                              .size = spv.size(),
+                              .source = spv.data(),
+                              .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
+                              .maxRayPayloadSize = maxRayPayloadSize,
+                              .maxRayHitAttributeSize = maxRayHitAttributeSize
+                            }, &shader))
+      {
+        goto cleanup;
+      }
+
+      if (!cgpuCreateComputePipeline(s_device, { .shader = shader , .debugName = "Denoiser" }, &denoisePipeline))
+      {
+        goto cleanup;
+      }
+
+      cgpuDestroyShader(s_device, shader);
+    }
+
     cache = new GiShaderCache;
     cache->aovMask = aovMask;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
@@ -1768,6 +1798,7 @@ cleanup:
     }
     cache->missShaders = missShaders;
     cache->pipeline = pipeline;
+    cache->denoisePipeline = denoisePipeline;
     cache->rgenShader = rgenShader;
     cache->scene = scene;
 
@@ -1792,6 +1823,10 @@ cleanup:
       {
         cgpuDestroyPipeline(s_device, pipeline);
       }
+      if (denoisePipeline.handle)
+      {
+        cgpuDestroyPipeline(s_device, denoisePipeline);
+      }
       for (GiMaterialGpuData& gpuData : newMaterialGpuDatas)
       {
         giDestroyMaterialGpuData(scene, gpuData);
@@ -1815,6 +1850,7 @@ cleanup:
       cgpuDestroyShader(s_device, shader);
     }
     cgpuDestroyPipeline(s_device, cache->pipeline);
+    cgpuDestroyPipeline(s_device, cache->denoisePipeline);
     delete cache;
   }
 
@@ -1895,6 +1931,25 @@ cleanup:
 
     return flags;
   }
+
+
+
+  // simple function that just writes red into the color AOV
+  void oidnDenoisePass(const GiAovBinding* colorBinding,
+                       const GiShaderCache* shaderCache,
+                       CgpuCommandBuffer commandBuffer)
+  {
+    CgpuBufferBinding buffer = { .binding = 0, .buffer = colorBinding->renderBuffer->deviceMem };
+
+    CgpuBindings bindings0 = { .bufferCount = 1, .buffers = &buffer };
+    cgpuCmdUpdateBindings(commandBuffer, shaderCache->denoisePipeline, 0/*descriptorSetIndex*/, &bindings0);
+
+    cgpuCmdBindPipeline(commandBuffer, shaderCache->denoisePipeline);
+
+    cgpuCmdDispatch(commandBuffer, 2048, 1, 1);
+  }
+
+
 
   GiStatus giRender(const GiRenderParams& params)
   {
@@ -2314,6 +2369,45 @@ cleanup:
 
     cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
 
+
+
+    // <DUMMY DENOISING PASS>
+    {
+      const GiAovBinding* colorBinding = nullptr;
+
+      for (const GiAovBinding& binding : params.aovBindings)
+      {
+        if (binding.aovId != GiAovId::Color)
+        {
+          continue;
+        }
+
+        colorBinding = &binding;
+        break;
+      }
+      assert(colorBinding); // TODO
+
+      CgpuBufferMemoryBarrier bufferBarrier {
+        .buffer = colorBinding->renderBuffer->deviceMem,
+        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
+        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+      };
+
+      CgpuPipelineBarrier barrier = {
+        .bufferBarrierCount = 1,
+        .bufferBarriers = &bufferBarrier
+      };
+      cgpuCmdPipelineBarrier(commandBuffer, &barrier);
+
+      oidnDenoisePass(colorBinding, shaderCache, commandBuffer);
+    }
+    // </DUMMY DENOISING PASS>
+
+
+
+
     // Copy device to host memory.
     {
       GbSmallVector<CgpuBufferMemoryBarrier, 5> preBarriers;
@@ -2329,7 +2423,8 @@ cleanup:
 
         preBarriers[i] = CgpuBufferMemoryBarrier {
           .buffer = renderBuffer->deviceMem,
-          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
+          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER |
+                          CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
           .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
           .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
           .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ

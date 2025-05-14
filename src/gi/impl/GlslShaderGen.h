@@ -112,6 +112,8 @@ namespace gtl
     bool generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv);
     bool generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv);
 
+    bool generateDenoisingSpirv(std::vector<uint8_t>& spv);
+
   private:
     std::shared_ptr<McBackend> m_mcBackend;
     std::shared_ptr<GiGlslShaderCompiler> m_shaderCompiler;
