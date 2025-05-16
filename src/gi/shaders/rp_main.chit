@@ -281,10 +281,10 @@ void main()
 
       // TODO: both aux AOVs should be anti-aliased via accumulation
 
-      // TODO: wrong coordinate system? Traverse research shows pic with pos range and Y+ up
+      // TODO: wrong coordinate system? I swapped it..
       OidnAov[pixelIndex * 9 + 3] = bsdf_aux_data.normal.x;
-      OidnAov[pixelIndex * 9 + 4] = bsdf_aux_data.normal.y;
-      OidnAov[pixelIndex * 9 + 5] = bsdf_aux_data.normal.z;
+      OidnAov[pixelIndex * 9 + 4] = bsdf_aux_data.normal.z;
+      OidnAov[pixelIndex * 9 + 5] = bsdf_aux_data.normal.y;
 
       // TODO: add glossy?
       // TODO: add dedicated AOV for debugging / composite

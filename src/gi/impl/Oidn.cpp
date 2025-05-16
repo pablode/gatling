@@ -17,6 +17,7 @@
 
 #include "Oidn.h"
 #include "GlslShaderGen.h"
+#include "interface/rp_oidn.h"
 
 #include <gtl/ggpu/DelayedResourceDestroyer.h>
 
@@ -28,6 +29,8 @@
 
 namespace gtl
 {
+  namespace rp = shader_interface::rp_oidn;
+
   struct GiOidnState
   {
     std::unique_ptr<OffsetAllocator::Allocator> offsetAllocator;
@@ -142,6 +145,11 @@ namespace gtl
   // TODO: for starters, copy 3 channels of input AOV to color AOV (viz aux normal & albedo)
   void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer, CgpuBuffer rgbResult)
   {
+    rp::PushConstants pushData = {
+      .imageWidth = state->imageWidth,
+      .imageHeight = state->imageHeight
+    };
+
     std::array<CgpuBufferBinding, 2> bufferBindings = {
       CgpuBufferBinding{ .binding = 0, .buffer = state->dataBuffer },
       CgpuBufferBinding{ .binding = 1, .buffer = rgbResult }
@@ -152,8 +160,9 @@ namespace gtl
 
     cgpuCmdBindPipeline(commandBuffer, state->basicPipeline);
 
-    // TODO: kernel size via rp_denoise.h interface header
-    size_t dispatchSize = (state->imageWidth * state->imageHeight) / 128 / 2; // TODO: tmp
+    cgpuCmdPushConstants(commandBuffer, state->basicPipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+
+    size_t dispatchSize = (state->imageWidth * state->imageHeight) / rp::WG_SIZE_X;
     cgpuCmdDispatch(commandBuffer, dispatchSize, 1, 1);
   }
 }
