@@ -134,6 +134,7 @@ namespace gtl
   struct GiRenderSettings
   {
     bool     clippingPlanes;
+    bool     denoise;
     bool     depthOfField;
     bool     domeLightCameraVisible;
     bool     filterImportanceSampling;

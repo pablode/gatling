@@ -203,6 +203,13 @@ namespace gtl
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
 
+  struct GiDenoiserState
+  {
+    CgpuBuffer inputBuffer;
+    uint32_t imageWidth = 0;
+    uint32_t imageHeight = 0;
+  };
+
   struct GiScene
   {
     GgpuDenseDataStore sphereLights;
@@ -224,6 +231,7 @@ namespace gtl
     uint32_t sampleOffset = 0;
     CgpuBuffer sceneParams;
     OffsetAllocator::Allocator texAllocator{rp::MAX_TEXTURE_COUNT};
+    GiDenoiserState denoiserState;
   };
 
   struct GiRenderBuffer
@@ -1313,6 +1321,11 @@ cleanup:
       aovMask |= (1 << int(binding.aovId));
     }
 
+    if (renderSettings.denoise)
+    {
+      aovMask |= (1 << 16/*OIDN, internal*/);
+    }
+
     std::set<GiMaterial*> materialSet;
     for (auto* m : scene->meshes)
     {
@@ -1924,7 +1937,8 @@ cleanup:
     }
 
     if (ra.mediumStackSize != rb.mediumStackSize ||
-        ra.nextEventEstimation != rb.nextEventEstimation)
+        ra.nextEventEstimation != rb.nextEventEstimation ||
+        ra.denoise != rb.denoise)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersAll;
     }
@@ -1934,21 +1948,52 @@ cleanup:
 
 
 
-  // simple function that just writes red into the color AOV
-  void oidnDenoisePass(const GiAovBinding* colorBinding,
+  // <OIDN stuff>
+  void oidnEnsureState(GiScene* scene, const GiAovBinding* colorBinding)
+  {
+    GiDenoiserState& denoiserState = scene->denoiserState;
+
+    uint32_t width = colorBinding->renderBuffer->width;
+    uint32_t height = colorBinding->renderBuffer->height;
+    if (width != denoiserState.imageWidth || height != denoiserState.imageHeight)
+    {
+      if (denoiserState.inputBuffer.handle)
+      {
+        cgpuDestroyBuffer(s_device, denoiserState.inputBuffer);
+      }
+
+      size_t size = width * height * 9/*channels*/ * sizeof(float);
+      if (!cgpuCreateBuffer(s_device, { .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
+                                                 CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                                        .size = size }, &denoiserState.inputBuffer))
+      {
+        GB_ERROR("can't create denoiser image!");
+        exit(-1); // TODO
+      }
+    }
+  }
+
+// TODO: for starters, copy 3 channels of input AOV to color AOV (viz aux normal & albedo)
+  void oidnDenoisePass(GiScene* scene,
+                       const GiAovBinding* colorBinding,
                        const GiShaderCache* shaderCache,
                        CgpuCommandBuffer commandBuffer)
   {
-    CgpuBufferBinding buffer = { .binding = 0, .buffer = colorBinding->renderBuffer->deviceMem };
+    GiDenoiserState& denoiserState = scene->denoiserState;
 
-    CgpuBindings bindings0 = { .bufferCount = 1, .buffers = &buffer };
+    std::array<CgpuBufferBinding, 2> bufferBindings = {
+      CgpuBufferBinding{ .binding = 0, .buffer = denoiserState.inputBuffer },
+      CgpuBufferBinding{ .binding = 1, .buffer = colorBinding->renderBuffer->deviceMem }
+    };
+
+    CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
     cgpuCmdUpdateBindings(commandBuffer, shaderCache->denoisePipeline, 0/*descriptorSetIndex*/, &bindings0);
 
     cgpuCmdBindPipeline(commandBuffer, shaderCache->denoisePipeline);
 
-    cgpuCmdDispatch(commandBuffer, 2048, 1, 1);
+    cgpuCmdDispatch(commandBuffer, 4096*2, 1, 1);
   }
-
+  // </OIDN stuff>
 
 
   GiStatus giRender(const GiRenderParams& params)
@@ -2300,6 +2345,29 @@ cleanup:
       buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
     }
 
+    // <OIDN AOV>
+    const GiAovBinding* colorBinding = nullptr;
+
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      if (binding.aovId != GiAovId::Color)
+      {
+        continue;
+      }
+
+      colorBinding = &binding;
+      break;
+    }
+    assert(colorBinding); // TODO
+
+    if (renderSettings.denoise)
+    {
+      oidnEnsureState(scene, colorBinding);
+
+      buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_OIDN, .buffer = scene->denoiserState.inputBuffer });
+    }
+    // </OIDN AOV>
+
     size_t imageCount = shaderCache->imageBindings2d.size() + shaderCache->imageBindings3d.size() + 2/* dome lights */;
 
     std::vector<CgpuImageBinding> images;
@@ -2372,21 +2440,8 @@ cleanup:
 
 
     // <DUMMY DENOISING PASS>
+    if (renderSettings.denoise)
     {
-      const GiAovBinding* colorBinding = nullptr;
-
-      for (const GiAovBinding& binding : params.aovBindings)
-      {
-        if (binding.aovId != GiAovId::Color)
-        {
-          continue;
-        }
-
-        colorBinding = &binding;
-        break;
-      }
-      assert(colorBinding); // TODO
-
       CgpuBufferMemoryBarrier bufferBarrier {
         .buffer = colorBinding->renderBuffer->deviceMem,
         .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
@@ -2401,7 +2456,7 @@ cleanup:
       };
       cgpuCmdPipelineBarrier(commandBuffer, &barrier);
 
-      oidnDenoisePass(colorBinding, shaderCache, commandBuffer);
+      oidnDenoisePass(scene, colorBinding, shaderCache, commandBuffer);
     }
     // </DUMMY DENOISING PASS>
 
@@ -2541,6 +2596,13 @@ cleanup:
       cgpuDestroyBuffer(s_device, scene->sceneParams);
     }
     cgpuDestroyImage(s_device, scene->fallbackDomeLightTexture);
+
+    // TODO: function to destroy GiDenoiserState
+    CgpuBuffer denoiserInputBuffer = scene->denoiserState.inputBuffer;
+    if (denoiserInputBuffer.handle)
+    {
+      cgpuDestroyBuffer(s_device, denoiserInputBuffer);
+    }
     delete scene;
   }
 

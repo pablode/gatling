@@ -1,8 +1,14 @@
 layout (local_size_x = 32) in;
 
-layout(binding = 0, std430) writeonly buffer OutputBuffer { vec4 framebuffer[]; };
+layout(binding = 0, std430) readonly buffer InputBuffer { float inPixels[]; };
+layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
 
 void main()
 {
-  framebuffer[gl_GlobalInvocationID.x] = vec4(1, 0, 0, 1);
+  int inIdx = int(gl_GlobalInvocationID.x) * 9;
+  int outIdx = int(gl_GlobalInvocationID.x) * 4;
+
+  int channelOffset = 6; // 3 = normals, 6 = albedo
+  for (int i = 0; i < 3; i++)
+    outPixels[outIdx + i] = inPixels[inIdx + channelOffset + i];
 }

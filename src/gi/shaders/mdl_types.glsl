@@ -196,8 +196,10 @@ struct Bsdf_auxiliary_data {
     vec3 ior2;                      ///< mutual input: IOR other side
     vec3 k1;                        ///< mutual input: outgoing direction
 
-    vec3 albedo;                    ///< output: albedo
-    vec3 normal;                    ///< output: normal
+    vec3 albedo_diffuse;            //< output: (diffuse part of the) albedo
+    vec3 albedo_glossy;             //< output: (glossy part of the) albedo
+    vec3 normal;                    //< output: normal
+    vec3 roughness;                 //< output: glossy roughness_u, glossy roughness_v, bsdf_weight
 };
 
 /// Input and output structure for EDF sampling data.

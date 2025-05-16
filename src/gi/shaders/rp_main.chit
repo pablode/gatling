@@ -9,6 +9,9 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64: require
 #extension GL_EXT_buffer_reference: require
 
+// TODO: needed?
+#define ENABLE_AUXILIARY
+
 #if SCENE_DATA_COUNT > 0
 #include "mdl_renderer_state.glsl"
 #define RENDERER_STATE_TYPE mdl_renderer_state
@@ -249,6 +252,47 @@ void main()
 
     const vec3 iorCurrent = (isFrontFace || thinWalled) ? prevMediumIor : vec3(BSDF_USE_MATERIAL_IOR);
     const vec3 iorOther = (isFrontFace || thinWalled) ? vec3(BSDF_USE_MATERIAL_IOR) : nextMediumIor;
+
+#if (AOV_MASK & AOV_BIT_OIDN) != 0
+    if (bounce == 0)
+    {
+      // TODO: always calc at the top
+      uint imageWidth = PC.imageDims & 0xFFFFu;
+      uint pixelIndex = gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * imageWidth; // only for AOVs
+
+      Bsdf_auxiliary_data bsdf_aux_data;
+      bsdf_aux_data.ior1 = vec3(iorCurrent);
+      bsdf_aux_data.ior2 = vec3(iorOther);
+      bsdf_aux_data.k1 = -gl_WorldRayDirectionEXT;
+
+      // TODO: zero-init needed?
+      bsdf_aux_data.normal = vec3(0.0);
+      bsdf_aux_data.albedo_diffuse = vec3(0.0);
+      bsdf_aux_data.albedo_glossy = vec3(0.0);
+
+      if (isFrontFace)
+      {
+        mdl_bsdf_scattering_auxiliary(bsdf_aux_data, shading_state);
+      }
+      else
+      {
+        mdl_backface_bsdf_scattering_auxiliary(bsdf_aux_data, shading_state);
+      }
+
+      // TODO: both aux AOVs should be anti-aliased via accumulation
+
+      // TODO: wrong coordinate system? Traverse research shows pic with pos range and Y+ up
+      OidnAov[pixelIndex * 9 + 3] = bsdf_aux_data.normal.x;
+      OidnAov[pixelIndex * 9 + 4] = bsdf_aux_data.normal.y;
+      OidnAov[pixelIndex * 9 + 5] = bsdf_aux_data.normal.z;
+
+      // TODO: add glossy?
+      // TODO: add dedicated AOV for debugging / composite
+      OidnAov[pixelIndex * 9 + 6] = bsdf_aux_data.albedo_diffuse.x; //+ bsdf_aux_data.albedo_glossy.x;
+      OidnAov[pixelIndex * 9 + 7] = bsdf_aux_data.albedo_diffuse.y; //+ bsdf_aux_data.albedo_glossy.y;
+      OidnAov[pixelIndex * 9 + 8] = bsdf_aux_data.albedo_diffuse.z; //+ bsdf_aux_data.albedo_glossy.z;
+    }
+#endif
 
     /* 4. Add Emission */
 #ifdef IS_EMISSIVE

@@ -57,6 +57,7 @@ namespace gtl
       m_backend = backend;
       m_backend->set_option("enable_exceptions", "off");
       m_backend->set_option("use_renderer_adapt_normal", "on");
+      m_backend->set_option("enable_auxiliary", "on"); // TODO: make dependent on 'denoise' render setting
 
       m_logger = mi::base::Handle<McMdlLogger>(runtime.getLogger());
       m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
@@ -273,6 +274,9 @@ namespace gtl
       fDescs.push_back(mi::neuraylib::Target_function_description(DF_NAMES[size_t(kv.first)], kv.second));
     }
 
-    return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source, result.textureDescriptions);
+    auto r = m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source, result.textureDescriptions);
+
+//fprintf(stderr, "%s\n", result.source.c_str());
+  return r;
   }
 }

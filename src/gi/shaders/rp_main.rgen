@@ -400,6 +400,11 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
   DoubleSidedAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_DOUBLE_SIDED].rgb;
 #endif
+  // TODO: probably not needed
+#if (AOV_MASK & AOV_BIT_OIDN) != 0
+  for (int i = 0; i < 9; i++)
+    OidnAov[pixelIndex*9+i] = ClearValuesF[AOV_ID_OIDN].x;
+#endif
 }
 
 void main()
@@ -515,5 +520,11 @@ void main()
 #endif
 
     ColorAov[pixel_index] = vec4(pixel_color, 1.0);
+#endif
+
+#if (AOV_MASK & AOV_BIT_OIDN) != 0
+    OidnAov[pixel_index * 9 + 0] = pixel_color.r;
+    OidnAov[pixel_index * 9 + 1] = pixel_color.g;
+    OidnAov[pixel_index * 9 + 2] = pixel_color.b;
 #endif
 }

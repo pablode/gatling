@@ -18,6 +18,7 @@
 #define AOV_ID_FACE_ID 13
 #define AOV_ID_INSTANCE_ID 14
 #define AOV_ID_DEBUG_DOUBLE_SIDED 15
+#define AOV_ID_OIDN 16
 
 // Mask bits.
 #define AOV_BIT_COLOR 1
@@ -36,5 +37,7 @@
 #define AOV_BIT_FACE_ID 8192
 #define AOV_BIT_INSTANCE_ID 16384
 #define AOV_BIT_DEBUG_DOUBLE_SIDED 32768
+// TODO
+#define AOV_BIT_OIDN (32768*2)
 
 #endif
