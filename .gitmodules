@@ -61,3 +61,9 @@
 [submodule "extern/OffsetAllocator"]
 	path = extern/OffsetAllocator
 	url = https://github.com/sebbbi/OffsetAllocator.git
+[submodule "extern/--recurse"]
+	path = extern/--recurse
+	url = https://github.com/RenderKit/oidn-weights
+[submodule "extern/oidn-weights"]
+	path = extern/oidn-weights
+	url = https://github.com/RenderKit/oidn-weights
