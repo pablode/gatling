@@ -14,6 +14,8 @@ add_library(
   impl/Mmap.cpp
   impl/MeshProcessing.h
   impl/MeshProcessing.cpp
+  impl/Oidn.cpp
+  impl/Oidn.h
   impl/TextureManager.h
   impl/TextureManager.cpp
   impl/Turbo.h

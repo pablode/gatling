@@ -1,4 +1,4 @@
-layout (local_size_x = 32) in;
+layout (local_size_x = 128) in;
 
 layout(binding = 0, std430) readonly buffer InputBuffer { float inPixels[]; };
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
