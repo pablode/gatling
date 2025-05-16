@@ -162,7 +162,8 @@ namespace gtl
 
     cgpuCmdPushConstants(commandBuffer, state->basicPipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
 
-    size_t dispatchSize = (state->imageWidth * state->imageHeight) / rp::WG_SIZE_X;
-    cgpuCmdDispatch(commandBuffer, dispatchSize, 1, 1);
+    uint32_t wgCountX = (state->imageWidth + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
+    uint32_t wgCountY = (state->imageHeight + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
+    cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
   }
 }

@@ -2,7 +2,7 @@
 
 #include "interface/rp_oidn.h"
 
-layout (local_size_x = WG_SIZE_X) in;
+layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
 layout(binding = 0, std430) readonly buffer InputBuffer { float inPixels[]; };
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
@@ -11,14 +11,42 @@ layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
 void main()
 {
-  uint pixelCount = PC.imageWidth * PC.imageHeight;
-  if (gl_GlobalInvocationID.x >= pixelCount)
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
-  int inIdx = int(gl_GlobalInvocationID.x) * 9;
-  int outIdx = int(gl_GlobalInvocationID.x) * 4;
+  int inIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * 9;
+  int outIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * 4;
 
+#if 0 // viz input channels
   int channelOffset = 6; // 3 = normals, 6 = albedo
   for (int i = 0; i < 3; i++)
     outPixels[outIdx + i] = inPixels[inIdx + channelOffset + i];
+#elif 0 // upsample
+  if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
+    return;
+
+  int outIdx0 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 4;
+  int outIdx1 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 4;
+  int outIdx2 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 4;
+  int outIdx3 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 4;
+
+  for (int i = 0; i < 3; i++)
+  {
+    outPixels[outIdx0 + i] = inPixels[inIdx + i];
+    outPixels[outIdx1 + i] = inPixels[inIdx + i];
+    outPixels[outIdx2 + i] = inPixels[inIdx + i];
+    outPixels[outIdx3 + i] = inPixels[inIdx + i];
+  }
+#else // downsample
+  if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
+    return;
+
+  int inIdx0 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 9;
+  int inIdx1 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 9;
+  int inIdx2 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 9;
+  int inIdx3 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 9;
+
+  for (int i = 0; i < 3; i++)
+    outPixels[outIdx + i] = (inPixels[inIdx0 + i] + inPixels[inIdx1 + i] + inPixels[inIdx2 + i] + inPixels[inIdx3 + i]) * 0.25;
+#endif
 }
