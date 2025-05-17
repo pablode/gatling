@@ -18,6 +18,8 @@ add_library(
   impl/Oidn.h
   impl/TextureManager.h
   impl/TextureManager.cpp
+  impl/Tza.h
+  impl/Tza.cpp
   impl/Turbo.h
 )
 
