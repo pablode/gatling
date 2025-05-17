@@ -175,6 +175,8 @@ namespace gtl
   // TODO: for starters, copy 3 channels of input AOV to color AOV (viz aux normal & albedo)
   void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer, CgpuBuffer rgbResult)
   {
+    // TODO: apparently the input W, H need to be aligned to 16 pixels !
+
     rp::PushConstants pushData = {
       .imageWidth = state->imageWidth,
       .imageHeight = state->imageHeight,
