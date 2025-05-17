@@ -107,10 +107,13 @@ namespace gtl
       uint32_t textureIndexOffset;
     };
 
+    enum class OidnOp { Convolve, MaxPool, Upsample };
+
     struct OidnParams
     {
       int inChannelCount;
       int outChannelCount;
+      OidnOp op = OidnOp::Convolve; // TODO (later): convolution + post op
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);

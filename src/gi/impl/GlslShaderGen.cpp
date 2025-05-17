@@ -298,6 +298,18 @@ namespace gtl
 
     stitcher.appendDefine("IN_CHANNEL_COUNT", params.inChannelCount);
     stitcher.appendDefine("OUT_CHANNEL_COUNT", params.outChannelCount);
+    if (params.op == OidnOp::Convolve)
+    {
+      stitcher.appendDefine("OP_CONVOLVE");
+    }
+    else if (params.op == OidnOp::MaxPool)
+    {
+      stitcher.appendDefine("OP_MAX_POOL");
+    }
+    else if (params.op == OidnOp::Upsample)
+    {
+      stitcher.appendDefine("OP_UPSAMPLE");
+    }
 
     fs::path filePath = m_shaderPath / "rp_denoise.comp";
     if (!stitcher.appendSourceFile(filePath))

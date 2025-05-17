@@ -11,6 +11,8 @@ layout(binding = 2, std430) readonly buffer WeightsBuffer { float16_t weights[];
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
+#define KERNEL_SIZE 3
+
 void main()
 {
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
@@ -23,7 +25,10 @@ void main()
   //int channelOffset = 0; // 3 = normals, 6 = albedo
   //for (int i = 0; i < 3; i++)
   //  outPixels[outIdx + i] = inPixels[inIdx + channelOffset + i];
-#elif 0 // upsample
+  //return;
+#endif
+
+#ifdef OP_UPSAMPLE
   if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
     return;
 
@@ -39,7 +44,8 @@ void main()
     outPixels[outIdx2 + i] = inPixels[inIdx + i];
     outPixels[outIdx3 + i] = inPixels[inIdx + i];
   }
-#elif 0 // downsample
+#endif
+#ifdef OP_MAX_POOL
   if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
     return;
 
@@ -48,13 +54,14 @@ void main()
   int inIdx2 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
   int inIdx3 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
 
-  // TODO: don't forget we want to max pool instead of avg
   for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
-    outPixels[outIdx + i] = (inPixels[inIdx0 + i] + inPixels[inIdx1 + i] + inPixels[inIdx2 + i] + inPixels[inIdx3 + i]) * 0.25;
-#else // convolution
-
-#define KERNEL_SIZE 3
-
+  {
+    float max1 = max(inPixels[inIdx0 + i], inPixels[inIdx1 + i]);
+    float max2 = max(inPixels[inIdx2 + i], inPixels[inIdx3 + i]);
+    outPixels[outIdx + i] = max(max1, max2);
+  }
+#endif
+#ifdef OP_CONVOLVE
   for (int k = 0; k < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); k++)
   {
     float result = 0.0;
