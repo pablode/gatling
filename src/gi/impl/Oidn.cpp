@@ -20,6 +20,7 @@
 #include "interface/rp_oidn.h"
 
 #include <gtl/ggpu/DelayedResourceDestroyer.h>
+#include <gtl/ggpu/Stager.h>
 
 #include <offsetAllocator.hpp>
 
@@ -36,8 +37,9 @@ namespace gtl
     std::unique_ptr<OffsetAllocator::Allocator> offsetAllocator;
 
     CgpuPipeline basicPipeline; // tmp
+    CgpuBuffer weightsBuffer;
 
-    CgpuBuffer dataBuffer;
+    CgpuBuffer dataBuffer; // image slices
     size_t bufferSize = 0;
     uint32_t imageWidth = 0;
     uint32_t imageHeight = 0;
@@ -77,13 +79,32 @@ namespace gtl
 
   GiOidnState* giOidnCreateState(CgpuDevice device,
                                  GiGlslShaderGen& shaderGen,
+                                 GgpuStager& stager,
                                  GgpuDelayedResourceDestroyer& resourceDestroyer)
   {
+    const std::array<float, 9> weights = {
+      // sobol operator (x dir)
+      -1.0f, 0.0f, 1.0f,
+      -2.0f, 0.0f, 2.0f,
+      -1.0f, 0.0f, 1.0f
+    };
+    uint32_t weightsSize = weights.size() * sizeof(float);
+
+    CgpuBuffer weightsBuffer;
+    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+    if (!cgpuCreateBuffer(device, { .usage = bufferUsage, .size = weightsSize }, &weightsBuffer) ||
+        !stager.stageToBuffer((const uint8_t*) weights.data(), weightsSize, weightsBuffer) ||
+        !stager.flush()/*optional*/)
+    {
+      EXIT_FATAL("failed to upload weights");
+    }
+
     CgpuPipeline basicPipeline = giOidnCreatePipelines(device, shaderGen);
 
     return new GiOidnState {
       .offsetAllocator = std::make_unique<OffsetAllocator::Allocator>(0),
       .basicPipeline = basicPipeline,
+      .weightsBuffer = weightsBuffer,
       .resourceDestroyer = resourceDestroyer
     };
   }
@@ -97,6 +118,10 @@ namespace gtl
     if (state->basicPipeline.handle)
     {
       state->resourceDestroyer.enqueueDestruction(state->basicPipeline);
+    }
+    if (state->weightsBuffer.handle)
+    {
+      state->resourceDestroyer.enqueueDestruction(state->weightsBuffer);
     }
     delete state;
   }
@@ -120,10 +145,10 @@ namespace gtl
       cgpuDestroyBuffer(device, state->dataBuffer);
     }
 
-    if (!cgpuCreateBuffer(device, { .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
-                                             CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
-                                             CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                                    .size = requiredMemory }, &state->dataBuffer))
+    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
+                                       CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
+                                       CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+    if (!cgpuCreateBuffer(device, { .usage = bufferUsage, .size = requiredMemory }, &state->dataBuffer))
     {
       EXIT_FATAL("failed to allocate OIDN buffer");
       fprintf(stderr,"%zu MB\n", requiredMemory / (1024*1024));
@@ -150,9 +175,10 @@ namespace gtl
       .imageHeight = state->imageHeight
     };
 
-    std::array<CgpuBufferBinding, 2> bufferBindings = {
+    std::array<CgpuBufferBinding, 3> bufferBindings = {
       CgpuBufferBinding{ .binding = 0, .buffer = state->dataBuffer },
-      CgpuBufferBinding{ .binding = 1, .buffer = rgbResult }
+      CgpuBufferBinding{ .binding = 1, .buffer = rgbResult },
+      CgpuBufferBinding{ .binding = 2, .buffer = state->weightsBuffer }
     };
 
     CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };

@@ -6,6 +6,7 @@ layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
 layout(binding = 0, std430) readonly buffer InputBuffer { float inPixels[]; };
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
+layout(binding = 2, std430) readonly buffer WeightsBuffer { float weights[]; };
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 

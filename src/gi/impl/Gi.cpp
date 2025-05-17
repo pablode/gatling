@@ -2272,7 +2272,7 @@ cleanup:
     {
       if (!scene->denoiserState)
       {
-        scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen, *s_delayedResourceDestroyer);
+        scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen, *s_stager, *s_delayedResourceDestroyer);
       }
 
       bool b = giOidnUpdateState(scene->denoiserState, s_device, imageWidth, imageHeight);

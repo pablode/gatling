@@ -26,11 +26,13 @@ namespace gtl
 {
   class GiGlslShaderGen;
   class GgpuDelayedResourceDestroyer;
+  class GgpuStager;
 
   struct GiOidnState;
 
   GiOidnState* giOidnCreateState(CgpuDevice device,
                                  GiGlslShaderGen& shaderGen,
+                                 GgpuStager& stager,
                                  GgpuDelayedResourceDestroyer& resourceDestroyer);
 
   void giOidnDestroyState(GiOidnState* state);

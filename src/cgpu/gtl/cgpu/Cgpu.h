@@ -736,6 +736,7 @@ namespace gtl
     const CgpuImageBinding* images
   );
 
+  // TODO: reorder args so that index can be = 0 by default
   void cgpuCmdUpdateBindings(
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
