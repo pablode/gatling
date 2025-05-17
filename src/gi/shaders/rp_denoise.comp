@@ -11,31 +11,28 @@ layout(binding = 2, std430) readonly buffer WeightsBuffer { float16_t weights[];
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
-// TODO: expose input later width as DEFINE (3 vs 9)
-// TODO: hardcode only color layer for now
-
 void main()
 {
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
-  int inIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * 9;
-  int outIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * 4;
+  int inIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * IN_CHANNEL_COUNT;
+  int outIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * OUT_CHANNEL_COUNT;
 
 #if 0 // viz input channels
-  int channelOffset = 6; // 3 = normals, 6 = albedo
-  for (int i = 0; i < 3; i++)
-    outPixels[outIdx + i] = inPixels[inIdx + channelOffset + i];
+  //int channelOffset = 0; // 3 = normals, 6 = albedo
+  //for (int i = 0; i < 3; i++)
+  //  outPixels[outIdx + i] = inPixels[inIdx + channelOffset + i];
 #elif 0 // upsample
   if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
     return;
 
-  int outIdx0 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 4;
-  int outIdx1 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 4;
-  int outIdx2 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 4;
-  int outIdx3 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 4;
+  int outIdx0 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * OUT_CHANNEL_COUNT;
+  int outIdx1 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * OUT_CHANNEL_COUNT;
+  int outIdx2 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * OUT_CHANNEL_COUNT;
+  int outIdx3 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * OUT_CHANNEL_COUNT;
 
-  for (int i = 0; i < 3; i++)
+  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
   {
     outPixels[outIdx0 + i] = inPixels[inIdx + i];
     outPixels[outIdx1 + i] = inPixels[inIdx + i];
@@ -46,18 +43,19 @@ void main()
   if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
     return;
 
-  int inIdx0 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 9;
-  int inIdx1 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * 9;
-  int inIdx2 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 9;
-  int inIdx3 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * 9;
+  int inIdx0 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  int inIdx1 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  int inIdx2 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  int inIdx3 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
 
-  for (int i = 0; i < 3; i++)
+  // TODO: don't forget we want to max pool instead of avg
+  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
     outPixels[outIdx + i] = (inPixels[inIdx0 + i] + inPixels[inIdx1 + i] + inPixels[inIdx2 + i] + inPixels[inIdx3 + i]) * 0.25;
 #else // convolution
 
 #define KERNEL_SIZE 3
 
-  for (int k = 0; k < 3/*channels*/; k++)
+  for (int k = 0; k < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); k++)
   {
     float result = 0.0;
 
@@ -68,7 +66,7 @@ void main()
       coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
       coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
 
-      int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * 9 + k;
+      int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * IN_CHANNEL_COUNT + k;
 
       float s = inPixels[inIndexIj];
       float w = float(weights[PC.weightsOffset + i + j * KERNEL_SIZE]);

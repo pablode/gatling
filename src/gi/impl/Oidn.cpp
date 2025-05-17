@@ -64,8 +64,8 @@ namespace gtl
   static CgpuPipeline giOidnCreatePipelines(CgpuDevice device, GiGlslShaderGen& shaderGen)
   {
     GiGlslShaderGen::OidnParams params = {
-      .inChannelCount = 9,
-      .outChannelCount = 3
+      .inChannelCount = 3,
+      .outChannelCount = 4
     };
 
     std::vector<uint8_t> spv;
@@ -190,7 +190,7 @@ GB_LOG("tensorOffseEncConv2: {}", state->tensorOffseEncConv2);
 
   bool giOidnUpdateState(GiOidnState* state, CgpuDevice device, uint32_t imageWidth, uint32_t imageHeight)
   {
-    size_t requiredMemory = imageWidth * imageHeight * 9 * sizeof(float); // TODO: only covers input AOV
+    size_t requiredMemory = imageWidth * imageHeight * 3 * sizeof(float); // TODO: only covers input AOV
 
     if (state->bufferSize >= requiredMemory && state->imageWidth == imageWidth && state->imageHeight == imageHeight)
     {

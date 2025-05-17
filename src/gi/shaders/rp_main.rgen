@@ -402,8 +402,8 @@ void clearAovs(uint pixelIndex)
 #endif
   // TODO: probably not needed
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
-  for (int i = 0; i < 9; i++)
-    OidnAov[pixelIndex*9+i] = ClearValuesF[AOV_ID_OIDN].x;
+  //for (int i = 0; i < 9; i++)
+  //  OidnAov[pixelIndex*9+i] = ClearValuesF[AOV_ID_OIDN].x;
 #endif
 }
 
@@ -523,8 +523,9 @@ void main()
 #endif
 
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
-    OidnAov[pixel_index * 9 + 0] = pixel_color.r;
-    OidnAov[pixel_index * 9 + 1] = pixel_color.g;
-    OidnAov[pixel_index * 9 + 2] = pixel_color.b;
+    const int IN_CHANNEL_COUNT = 3; // 9
+    OidnAov[pixel_index * IN_CHANNEL_COUNT + 0] = pixel_color.r;
+    OidnAov[pixel_index * IN_CHANNEL_COUNT + 1] = pixel_color.g;
+    OidnAov[pixel_index * IN_CHANNEL_COUNT + 2] = pixel_color.b;
 #endif
 }

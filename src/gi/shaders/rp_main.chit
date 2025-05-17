@@ -282,15 +282,15 @@ void main()
       // TODO: both aux AOVs should be anti-aliased via accumulation
 
       // TODO: wrong coordinate system? I swapped it..
-      OidnAov[pixelIndex * 9 + 3] = bsdf_aux_data.normal.x;
-      OidnAov[pixelIndex * 9 + 4] = bsdf_aux_data.normal.z;
-      OidnAov[pixelIndex * 9 + 5] = bsdf_aux_data.normal.y;
+      //OidnAov[pixelIndex * 9 + 3] = bsdf_aux_data.normal.x;
+      //OidnAov[pixelIndex * 9 + 4] = bsdf_aux_data.normal.z;
+      //OidnAov[pixelIndex * 9 + 5] = bsdf_aux_data.normal.y;
 
       // TODO: add glossy?
       // TODO: add dedicated AOV for debugging / composite
-      OidnAov[pixelIndex * 9 + 6] = bsdf_aux_data.albedo_diffuse.x; //+ bsdf_aux_data.albedo_glossy.x;
-      OidnAov[pixelIndex * 9 + 7] = bsdf_aux_data.albedo_diffuse.y; //+ bsdf_aux_data.albedo_glossy.y;
-      OidnAov[pixelIndex * 9 + 8] = bsdf_aux_data.albedo_diffuse.z; //+ bsdf_aux_data.albedo_glossy.z;
+      //OidnAov[pixelIndex * 9 + 6] = bsdf_aux_data.albedo_diffuse.x; //+ bsdf_aux_data.albedo_glossy.x;
+      //OidnAov[pixelIndex * 9 + 7] = bsdf_aux_data.albedo_diffuse.y; //+ bsdf_aux_data.albedo_glossy.y;
+      //OidnAov[pixelIndex * 9 + 8] = bsdf_aux_data.albedo_diffuse.z; //+ bsdf_aux_data.albedo_glossy.z;
     }
 #endif
 
