@@ -39,7 +39,7 @@ namespace gtl
     return value;
   }
 
-  GiTensorDescriptions giTzaParseTensors(const uint8_t* data, size_t size)
+  GiTzaTensorDescriptions giTzaParseTensors(const uint8_t* data, size_t size)
   {
     const uint8_t* ptr = &data[0];
     const uint8_t* end = &data[size];
@@ -77,7 +77,7 @@ namespace gtl
     //   u8 | data type char
     //  u64 | data offset
     //  u8* | data
-    GiTensorDescriptions descs;
+    GiTzaTensorDescriptions descs;
 
     GB_DEBUG("parsing {} tensors:", tensorCount);
 

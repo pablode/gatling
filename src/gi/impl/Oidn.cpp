@@ -21,12 +21,9 @@
 
 #include <gtl/ggpu/DelayedResourceDestroyer.h>
 #include <gtl/ggpu/Stager.h>
+#include <gtl/gb/Log.h>
 
 #include <offsetAllocator.hpp>
-
-#define EXIT_FATAL(msg) \
-  fprintf(stderr, "%s:%i: %s\n", __FILE__, int(__LINE__), msg); \
-  exit(-1);
 
 namespace gtl
 {
@@ -37,16 +34,31 @@ namespace gtl
     std::unique_ptr<OffsetAllocator::Allocator> offsetAllocator;
 
     CgpuPipeline basicPipeline; // tmp
-    CgpuBuffer weightsBuffer;
+    CgpuBuffer tensorBuffer;
 
     CgpuBuffer dataBuffer; // image slices
     size_t bufferSize = 0;
     uint32_t imageWidth = 0;
     uint32_t imageHeight = 0;
 
-    uint32_t bufferOffsetInput = 0;
+    uint64_t tensorOffseEncConv0;
+    uint64_t tensorOffseEncConv1;
+    uint64_t tensorOffseEncConv2;
+    uint64_t tensorOffseEncConv3;
+    uint64_t tensorOffseEncConv4;
+    uint64_t tensorOffseEncConv5a;
+    uint64_t tensorOffseEncConv5b;
+    uint64_t tensorOffseDecConv4a;
+    uint64_t tensorOffseDecConv4b;
+    uint64_t tensorOffseDecConv3a;
+    uint64_t tensorOffseDecConv3b;
+    uint64_t tensorOffseDecConv2a;
+    uint64_t tensorOffseDecConv2b;
+    uint64_t tensorOffseDecConv1a;
+    uint64_t tensorOffseDecConv1b;
+    uint64_t tensorOffseDecConv0;
 
-    GgpuDelayedResourceDestroyer& resourceDestroyer;
+    GgpuDelayedResourceDestroyer resourceDestroyer;
   };
 
   static CgpuPipeline giOidnCreatePipelines(CgpuDevice device, GiGlslShaderGen& shaderGen)
@@ -59,7 +71,7 @@ namespace gtl
     std::vector<uint8_t> spv;
     if (!shaderGen.generateDenoisingSpirv(params, spv))
     {
-      EXIT_FATAL("failed to compile OIDN shader");
+      GB_FATAL("failed to compile OIDN shader");
     }
 
     CgpuShader shader;
@@ -69,13 +81,13 @@ namespace gtl
                             .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE
                           }, &shader))
     {
-      EXIT_FATAL("failed to create OIDN shader");
+      GB_FATAL("failed to create OIDN shader");
     }
 
     CgpuPipeline pipeline;
     if (!cgpuCreateComputePipeline(device, { .shader = shader , .debugName = "OIDN_Basic" }, &pipeline))
     {
-      EXIT_FATAL("failed to create OIDN pipeline");
+      GB_FATAL("failed to create OIDN pipeline");
     }
 
     cgpuDestroyShader(device, shader);
@@ -85,33 +97,78 @@ namespace gtl
   GiOidnState* giOidnCreateState(CgpuDevice device,
                                  GiGlslShaderGen& shaderGen,
                                  GgpuStager& stager,
-                                 GgpuDelayedResourceDestroyer& resourceDestroyer)
+                                 GgpuDelayedResourceDestroyer& resourceDestroyer,
+                                 const GiTzaTensorDescriptions& tensorDescriptions,
+                                 const uint8_t* tensorData)
   {
-    const std::array<float, 9> weights = {
-      // sobol operator (x dir)
-      -1.0f, 0.0f, 1.0f,
-      -2.0f, 0.0f, 2.0f,
-      -1.0f, 0.0f, 1.0f
-    };
-    uint32_t weightsSize = weights.size() * sizeof(float);
+    const std::vector<const char*> TENSOR_NAMES = { "enc_conv0", "enc_conv1", "enc_conv2", "enc_conv3",
+      "enc_conv4", "enc_conv5a", "enc_conv5b", "dec_conv4a", "dec_conv4b", "dec_conv3a", "dec_conv3b",
+      "dec_conv2a", "dec_conv2b", "dec_conv1a", "dec_conv1b", "dec_conv0" };
 
-    CgpuBuffer weightsBuffer;
-    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-    if (!cgpuCreateBuffer(device, { .usage = bufferUsage, .size = weightsSize }, &weightsBuffer) ||
-        !stager.stageToBuffer((const uint8_t*) weights.data(), weightsSize, weightsBuffer) ||
-        !stager.flush()/*optional*/)
+    size_t tensorBufferSize = 0;
+    for (const char* name : TENSOR_NAMES)
     {
-      EXIT_FATAL("failed to upload weights");
+auto newName = std::string(name) + ".weight";
+assert(tensorDescriptions.count(newName) > 0);
+      const GiTzaTensorDescription& desc = tensorDescriptions.at(newName);
+      tensorBufferSize += (desc.dataSize + 4 - 1) / 4  * 4;
     }
+
+    CgpuBuffer tensorBuffer;
+    CgpuBufferUsageFlags tensorBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+    if (!cgpuCreateBuffer(device, { .usage = tensorBufferUsage, .size = tensorBufferSize }, &tensorBuffer))
+    {
+GB_LOG("tensor buffer size: {}", tensorBufferSize);
+      GB_FATAL("failed to alloc tensor buffer");
+    }
+
+    uint64_t nextTensorOffset = 0;
+    const auto uploadTensor = [&](const char* name) {
+      const GiTzaTensorDescription& desc = tensorDescriptions.at(std::string(name) + ".weight");
+      uint64_t tensorOffset = (nextTensorOffset + 4 - 1) / 4 * 4;
+      uint64_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
+
+      bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, tensorBuffer, tensorOffset);
+      if (!s) GB_FATAL("failed to stage OIDN tensor");
+
+      nextTensorOffset += desc.dataSize;
+      return tensorOffset;
+    };
 
     CgpuPipeline basicPipeline = giOidnCreatePipelines(device, shaderGen);
 
-    return new GiOidnState {
+    auto* state = new GiOidnState {
       .offsetAllocator = std::make_unique<OffsetAllocator::Allocator>(0),
       .basicPipeline = basicPipeline,
-      .weightsBuffer = weightsBuffer,
+      .tensorBuffer = tensorBuffer,
       .resourceDestroyer = resourceDestroyer
     };
+
+    state->tensorOffseEncConv0 = uploadTensor("enc_conv0");
+    state->tensorOffseEncConv1 = uploadTensor("enc_conv1");
+    state->tensorOffseEncConv2 = uploadTensor("enc_conv2");
+    state->tensorOffseEncConv3 = uploadTensor("enc_conv3");
+    state->tensorOffseEncConv4 = uploadTensor("enc_conv4");
+    state->tensorOffseEncConv5a = uploadTensor("enc_conv5a");
+    state->tensorOffseEncConv5b = uploadTensor("enc_conv5b");
+    state->tensorOffseDecConv4a = uploadTensor("dec_conv4a");
+    state->tensorOffseDecConv4b = uploadTensor("dec_conv4b");
+    state->tensorOffseDecConv3a = uploadTensor("dec_conv3a");
+    state->tensorOffseDecConv3b = uploadTensor("dec_conv3b");
+    state->tensorOffseDecConv2a = uploadTensor("dec_conv2a");
+    state->tensorOffseDecConv2b = uploadTensor("dec_conv2b");
+    state->tensorOffseDecConv1a = uploadTensor("dec_conv1a");
+    state->tensorOffseDecConv1b = uploadTensor("dec_conv1b");
+    state->tensorOffseDecConv0 = uploadTensor("dec_conv0");
+
+// TODO: temp
+GB_LOG("tensorOffseEncConv0: {}", state->tensorOffseEncConv0);
+GB_LOG("tensorOffseEncConv1: {}", state->tensorOffseEncConv1);
+GB_LOG("tensorOffseEncConv2: {}", state->tensorOffseEncConv2);
+
+    stager.flush(); // optional
+
+    return state;
   }
 
   void giOidnDestroyState(GiOidnState* state)
@@ -124,9 +181,9 @@ namespace gtl
     {
       state->resourceDestroyer.enqueueDestruction(state->basicPipeline);
     }
-    if (state->weightsBuffer.handle)
+    if (state->tensorBuffer.handle)
     {
-      state->resourceDestroyer.enqueueDestruction(state->weightsBuffer);
+      state->resourceDestroyer.enqueueDestruction(state->tensorBuffer);
     }
     delete state;
   }
@@ -155,7 +212,7 @@ namespace gtl
                                        CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
     if (!cgpuCreateBuffer(device, { .usage = bufferUsage, .size = requiredMemory }, &state->dataBuffer))
     {
-      EXIT_FATAL("failed to allocate OIDN buffer");
+      GB_FATAL("failed to allocate OIDN buffer");
       fprintf(stderr,"%zu MB\n", requiredMemory / (1024*1024));
       return false;
     }
@@ -186,7 +243,7 @@ namespace gtl
     std::array<CgpuBufferBinding, 3> bufferBindings = {
       CgpuBufferBinding{ .binding = 0, .buffer = state->dataBuffer },
       CgpuBufferBinding{ .binding = 1, .buffer = rgbResult },
-      CgpuBufferBinding{ .binding = 2, .buffer = state->weightsBuffer }
+      CgpuBufferBinding{ .binding = 2, .buffer = state->tensorBuffer }
     };
 
     CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };

@@ -22,6 +22,8 @@
 
 #include <gtl/cgpu/Cgpu.h>
 
+#include "Tza.h"
+
 namespace gtl
 {
   class GiGlslShaderGen;
@@ -33,7 +35,9 @@ namespace gtl
   GiOidnState* giOidnCreateState(CgpuDevice device,
                                  GiGlslShaderGen& shaderGen,
                                  GgpuStager& stager,
-                                 GgpuDelayedResourceDestroyer& resourceDestroyer);
+                                 GgpuDelayedResourceDestroyer& resourceDestroyer,
+                                 const GiTzaTensorDescriptions& tensorDescriptions,
+                                 const uint8_t* tensorData);
 
   void giOidnDestroyState(GiOidnState* state);
 

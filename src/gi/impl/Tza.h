@@ -23,6 +23,7 @@
 
 namespace gtl
 {
+  // TODO: remove support for layouts & data types that we do not use
   enum class GiTzaTensorLayout { x, oihw };
 
   enum class GiTzaTensorDataType { Float16, Float32 };
@@ -36,8 +37,8 @@ namespace gtl
     uint64_t dataSize;
   };
 
-  using GiTensorDescriptions = std::unordered_map<std::string, GiTzaTensorDescription>;
+  using GiTzaTensorDescriptions = std::unordered_map<std::string, GiTzaTensorDescription>;
 
-  GiTensorDescriptions giTzaParseTensors(const uint8_t* data, size_t size);
+  GiTzaTensorDescriptions giTzaParseTensors(const uint8_t* data, size_t size);
 }
 

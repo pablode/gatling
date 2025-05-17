@@ -2286,9 +2286,10 @@ cleanup:
         auto tensorData = (const uint8_t*) giMmap(oidnWeightsFile, 0, tensorSize);
         if (!tensorData) GB_FATAL("can't read OIDN weights");
 
-        GiTensorDescriptions tensorDescs = giTzaParseTensors(tensorData, tensorSize);
+        GiTzaTensorDescriptions tensorDescs = giTzaParseTensors(tensorData, tensorSize);
 // TODO: pass tensor desc + data buffer in this function to upload to GPU
-        scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen, *s_stager, *s_delayedResourceDestroyer);
+        scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen,
+*s_stager, *s_delayedResourceDestroyer, tensorDescs, tensorData);
 
         giMunmap(oidnWeightsFile, (void*) tensorData);
         giFileClose(oidnWeightsFile);
