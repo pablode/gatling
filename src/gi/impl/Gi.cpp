@@ -26,6 +26,8 @@
 #include "GlslShaderGen.h"
 #include "MeshProcessing.h"
 #include "Oidn.h"
+#include "Tza.h"
+#include "Mmap.h"
 #include "interface/rp_main.h"
 
 #include <stdlib.h>
@@ -252,6 +254,7 @@ namespace gtl
   std::unique_ptr<GiTextureManager> s_texSys;
   std::atomic_bool s_forceShaderCacheInvalid = false;
   std::atomic_bool s_resetSampleOffset = false;
+  std::string s_resourcePath;
 
 #ifdef GI_SHADER_HOTLOADING
   class ShaderFileListener : public efsw::FileWatchListener
@@ -362,6 +365,7 @@ namespace gtl
     // Use shaders dir in source tree for auto-reloading
     std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
 #endif
+    s_resourcePath = params.mdlRuntimePath;
 
     mx::DocumentPtr mtlxStdLib = std::static_pointer_cast<mx::Document>(params.mtlxStdLib);
     if (!mtlxStdLib)
@@ -2272,7 +2276,22 @@ cleanup:
     {
       if (!scene->denoiserState)
       {
+        std::string filePath = GB_FMT("{}/{}", s_resourcePath, GI_OIDN_WEIGHTS_FILE);
+
+        GiFile* oidnWeightsFile;
+        bool s = giFileOpen(filePath.c_str(), GiFileUsage::Read, &oidnWeightsFile);
+        if (!s) GB_FATAL("can't read OIDN weights");
+
+        size_t tensorSize = giFileSize(oidnWeightsFile);
+        auto tensorData = (const uint8_t*) giMmap(oidnWeightsFile, 0, tensorSize);
+        if (!tensorData) GB_FATAL("can't read OIDN weights");
+
+        GiTensorDescriptions tensorDescs = giTzaParseTensors(tensorData, tensorSize);
+// TODO: pass tensor desc + data buffer in this function to upload to GPU
         scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen, *s_stager, *s_delayedResourceDestroyer);
+
+        giMunmap(oidnWeightsFile, (void*) tensorData);
+        giFileClose(oidnWeightsFile);
       }
 
       bool b = giOidnUpdateState(scene->denoiserState, s_device, imageWidth, imageHeight);

@@ -29,8 +29,7 @@ namespace gtl
 
   struct GiTzaTensorDescription
   {
-    std::vector<int> dimensions; // CHW / OIHW
-    std::vector<int> paddedDimensions;
+    std::vector<int> dimensions; // CHW or OIHW
     GiTzaTensorLayout layout;
     GiTzaTensorDataType dataType;
     uint64_t dataOffset;

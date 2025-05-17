@@ -40,6 +40,7 @@ target_compile_definitions(
     GI_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     GI_VERSION_PATCH=${PROJECT_VERSION_PATCH}
     GI_SHADER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+    GI_OIDN_WEIGHTS_FILE="${GTL_OIDN_WEIGHTS_FILE}"
 )
 
 target_link_libraries(
@@ -71,18 +72,18 @@ set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 install(
   FILES "${MDL_SHARED_LIB}"
-  DESTINATION "./hdGatling/resources"
+  DESTINATION "${GTL_HDGATLING_RESOURCES_DIR}"
   COMPONENT hdGatling
 )
 
 install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
-  DESTINATION "./hdGatling/resources"
+  DESTINATION "${GTL_HDGATLING_RESOURCES_DIR}"
   COMPONENT hdGatling
 )
 
 install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
-  DESTINATION "./hdGatling/resources/mdl"
+  DESTINATION "${GTL_HDGATLING_RESOURCES_DIR}/mdl"
   COMPONENT hdGatling
 )

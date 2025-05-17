@@ -159,3 +159,12 @@ add_subdirectory(c-blosc2)
 #
 add_library(OffsetAllocator STATIC OffsetAllocator/offsetAllocator.cpp)
 target_include_directories(OffsetAllocator PUBLIC OffsetAllocator)
+
+#
+# oidn-weights
+#
+install(
+  FILES "${CMAKE_CURRENT_SOURCE_DIR}/oidn-weights/${GTL_OIDN_WEIGHTS_FILE}"
+  DESTINATION "${GTL_HDGATLING_RESOURCES_DIR}"
+  COMPONENT hdGatling
+)
