@@ -67,7 +67,7 @@ void main()
       int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * 9 + k;
 
       float s = inPixels[inIndexIj];
-      float w = weights[i + j * KERNEL_SIZE];
+      float w = weights[PC.weightsOffset + i + j * KERNEL_SIZE];
 
       result += s * w;
     }

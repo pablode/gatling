@@ -177,7 +177,8 @@ namespace gtl
   {
     rp::PushConstants pushData = {
       .imageWidth = state->imageWidth,
-      .imageHeight = state->imageHeight
+      .imageHeight = state->imageHeight,
+      .weightsOffset = 0 // TODO: per kernel
     };
 
     std::array<CgpuBufferBinding, 3> bufferBindings = {
