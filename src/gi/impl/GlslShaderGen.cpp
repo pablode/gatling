@@ -291,10 +291,13 @@ namespace gtl
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::AnyHit, source, spv);
   }
 
-  bool GiGlslShaderGen::generateDenoisingSpirv(std::vector<uint8_t>& spv)
+  bool GiGlslShaderGen::generateDenoisingSpirv(const OidnParams& params, std::vector<uint8_t>& spv)
   {
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
+
+    stitcher.appendDefine("IN_CHANNEL_COUNT", params.inChannelCount);
+    stitcher.appendDefine("OUT_CHANNEL_COUNT", params.outChannelCount);
 
     fs::path filePath = m_shaderPath / "rp_denoise.comp";
     if (!stitcher.appendSourceFile(filePath))

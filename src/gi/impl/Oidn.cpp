@@ -51,8 +51,13 @@ namespace gtl
 
   static CgpuPipeline giOidnCreatePipelines(CgpuDevice device, GiGlslShaderGen& shaderGen)
   {
+    GiGlslShaderGen::OidnParams params = {
+      .inChannelCount = 9,
+      .outChannelCount = 3
+    };
+
     std::vector<uint8_t> spv;
-    if (!shaderGen.generateDenoisingSpirv(spv))
+    if (!shaderGen.generateDenoisingSpirv(params, spv))
     {
       EXIT_FATAL("failed to compile OIDN shader");
     }
