@@ -22,76 +22,155 @@
 #include <gtl/ggpu/DelayedResourceDestroyer.h>
 #include <gtl/ggpu/Stager.h>
 #include <gtl/gb/Log.h>
-
-#include <offsetAllocator.hpp>
+#include <gtl/gb/Fmt.h>
 
 namespace gtl
 {
   namespace rp = shader_interface::rp_oidn;
 
+  struct GiOidnPipelines
+  {
+    CgpuPipeline debug;
+
+    CgpuPipeline conv3_32;
+    CgpuPipeline conv32_32;
+    CgpuPipeline maxPool32;
+    CgpuPipeline conv32_48;
+    CgpuPipeline maxPool48;
+    CgpuPipeline conv48_64;
+    CgpuPipeline maxPool64;
+    CgpuPipeline conv64_80;
+    CgpuPipeline maxPool80;
+    CgpuPipeline conv80_96;
+    CgpuPipeline upsample96;
+    CgpuPipeline conv160_112;
+    CgpuPipeline conv112_112;
+    CgpuPipeline upsample112;
+    CgpuPipeline conv160_96;
+    CgpuPipeline conv96_96;
+    CgpuPipeline conv128_64;
+    CgpuPipeline conv64_64;
+    CgpuPipeline upsample64;
+    CgpuPipeline conv73_64;
+    CgpuPipeline conv64_32;
+    CgpuPipeline conv32_3;
+  };
+
+  struct GiOidnBufferOffsets
+  {
+    uint32_t encConv0_weight;
+    uint32_t encConv0_bias;
+    uint32_t encConv1_weight;
+    uint32_t encConv1_bias;
+    uint32_t encConv2_weight;
+    uint32_t encConv2_bias;
+    uint32_t encConv3_weight;
+    uint32_t encConv3_bias;
+    uint32_t encConv4_weight;
+    uint32_t encConv4_bias;
+    uint32_t encConv5a_weight;
+    uint32_t encConv5a_bias;
+    uint32_t encConv5b_weight;
+    uint32_t encConv5b_bias;
+    uint32_t decConv4a_weight;
+    uint32_t decConv4a_bias;
+    uint32_t decConv4b_weight;
+    uint32_t decConv4b_bias;
+    uint32_t decConv3a_weight;
+    uint32_t decConv3a_bias;
+    uint32_t decConv3b_weight;
+    uint32_t decConv3b_bias;
+    uint32_t decConv2a_weight;
+    uint32_t decConv2a_bias;
+    uint32_t decConv2b_weight;
+    uint32_t decConv2b_bias;
+    uint32_t decConv1a_weight;
+    uint32_t decConv1a_bias;
+    uint32_t decConv1b_weight;
+    uint32_t decConv1b_bias;
+    uint32_t decConv0_weight;
+    uint32_t decConv0_bias;
+  };
+
   struct GiOidnState
   {
-    std::unique_ptr<OffsetAllocator::Allocator> offsetAllocator;
+    GiOidnPipelines pipelines;
+    GiOidnBufferOffsets offsets;
 
-    CgpuPipeline basicPipeline; // tmp
-    CgpuBuffer tensorBuffer;
+    CgpuBuffer weightBuffer;
+    CgpuBuffer biasBuffer;
 
     CgpuBuffer dataBuffer; // image slices
     size_t bufferSize = 0;
     uint32_t imageWidth = 0;
     uint32_t imageHeight = 0;
 
-    uint64_t tensorOffseEncConv0;
-    uint64_t tensorOffseEncConv1;
-    uint64_t tensorOffseEncConv2;
-    uint64_t tensorOffseEncConv3;
-    uint64_t tensorOffseEncConv4;
-    uint64_t tensorOffseEncConv5a;
-    uint64_t tensorOffseEncConv5b;
-    uint64_t tensorOffseDecConv4a;
-    uint64_t tensorOffseDecConv4b;
-    uint64_t tensorOffseDecConv3a;
-    uint64_t tensorOffseDecConv3b;
-    uint64_t tensorOffseDecConv2a;
-    uint64_t tensorOffseDecConv2b;
-    uint64_t tensorOffseDecConv1a;
-    uint64_t tensorOffseDecConv1b;
-    uint64_t tensorOffseDecConv0;
-
     GgpuDelayedResourceDestroyer resourceDestroyer;
   };
 
-  static CgpuPipeline giOidnCreatePipelines(CgpuDevice device, GiGlslShaderGen& shaderGen)
+  static GiOidnPipelines giOidnCreatePipelines(CgpuDevice device, GiGlslShaderGen& shaderGen)
   {
-    GiGlslShaderGen::OidnParams params = {
-      .inChannelCount = 3,
-      .outChannelCount = 4
+    auto createPipeline = [&](const GiGlslShaderGen::OidnParams params)
+    {
+      std::vector<uint8_t> spv;
+      if (!shaderGen.generateDenoisingSpirv(params, spv))
+      {
+        GB_FATAL("failed to compile OIDN shader");
+      }
+
+      CgpuShader shader;
+      if (!cgpuCreateShader(device, {
+                              .size = spv.size(),
+                              .source = spv.data(),
+                              .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE
+                            }, &shader))
+      {
+        GB_FATAL("failed to create OIDN shader");
+      }
+
+      const char* opName = nullptr;
+      if (params.op == GiGlslShaderGen::OidnOp::Convolve) opName = "Convolve";
+      if (params.op == GiGlslShaderGen::OidnOp::MaxPool) opName = "MaxPool";
+      if (params.op == GiGlslShaderGen::OidnOp::Upsample) opName = "Upsample";
+      std::string debugName = GB_FMT("Oidn_{}_{}->{}", opName, params.inChannelCount, params.outChannelCount);
+      GB_LOG(" {}", debugName);
+
+      CgpuPipeline pipeline;
+      if (!cgpuCreateComputePipeline(device, { .shader = shader , .debugName = debugName.c_str() }, &pipeline))
+      {
+        GB_FATAL("failed to create OIDN pipeline");
+      }
+
+      cgpuDestroyShader(device, shader);
+      return pipeline;
     };
 
-    std::vector<uint8_t> spv;
-    if (!shaderGen.generateDenoisingSpirv(params, spv))
-    {
-      GB_FATAL("failed to compile OIDN shader");
-    }
-
-    CgpuShader shader;
-    if (!cgpuCreateShader(device, {
-                            .size = spv.size(),
-                            .source = spv.data(),
-                            .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE
-                          }, &shader))
-    {
-      GB_FATAL("failed to create OIDN shader");
-    }
-
-    CgpuPipeline pipeline;
-    if (!cgpuCreateComputePipeline(device, { .shader = shader , .debugName = "OIDN_Basic" }, &pipeline))
-    {
-      GB_FATAL("failed to create OIDN pipeline");
-    }
-
-    cgpuDestroyShader(device, shader);
-    return pipeline;
+    GB_LOG("creating OIDN pipelines:");
+    return GiOidnPipelines{
+      .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 4 }),
+      .conv3_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 32 }),
+      .conv32_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32 }),
+      .maxPool32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
+      .conv32_48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 48 }),
+      .maxPool48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 48, .op = GiGlslShaderGen::OidnOp::MaxPool }),
+      .conv48_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 64 }),
+      .maxPool64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::MaxPool }),
+      .conv64_80 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 80 }),
+      .maxPool80 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 80, .outChannelCount = 80, .op = GiGlslShaderGen::OidnOp::MaxPool }),
+      .conv80_96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 80, .outChannelCount = 96 }),
+      .upsample96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Upsample }),
+      .conv160_112 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 160, .outChannelCount = 112 }),
+      .conv112_112 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 112, .outChannelCount = 112 }),
+      .upsample112 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 112, .outChannelCount = 112, .op = GiGlslShaderGen::OidnOp::Upsample }),
+      .conv160_96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 160, .outChannelCount = 96 }),
+      .conv96_96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96 }),
+      .conv128_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 128, .outChannelCount = 64 }),
+      .conv64_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64 }),
+      .upsample64 =createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Upsample }),
+      .conv73_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 73, .outChannelCount = 64 }),
+      .conv64_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 32 }),
+      .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 })
+    };
   }
 
   GiOidnState* giOidnCreateState(CgpuDevice device,
@@ -105,68 +184,114 @@ namespace gtl
       "enc_conv4", "enc_conv5a", "enc_conv5b", "dec_conv4a", "dec_conv4b", "dec_conv3a", "dec_conv3b",
       "dec_conv2a", "dec_conv2b", "dec_conv1a", "dec_conv1b", "dec_conv0" };
 
-    size_t tensorBufferSize = 0;
+    size_t weightBufferSize = 0;
     for (const char* name : TENSOR_NAMES)
     {
-auto newName = std::string(name) + ".weight";
-assert(tensorDescriptions.count(newName) > 0);
+      auto newName = std::string(name) + ".weight";
+      assert(tensorDescriptions.count(newName) > 0);
       const GiTzaTensorDescription& desc = tensorDescriptions.at(newName);
-      tensorBufferSize += (desc.dataSize + 4 - 1) / 4  * 4;
+      weightBufferSize += (desc.dataSize + 4 - 1) / 4  * 4;
+    }
+    size_t biasBufferSize = 0;
+    for (const char* name : TENSOR_NAMES)
+    {
+      auto newName = std::string(name) + ".bias";
+      assert(tensorDescriptions.count(newName) > 0);
+      const GiTzaTensorDescription& desc = tensorDescriptions.at(newName);
+      biasBufferSize += (desc.dataSize + 4 - 1) / 4  * 4;
     }
 
-    CgpuBuffer tensorBuffer;
     CgpuBufferUsageFlags tensorBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-    if (!cgpuCreateBuffer(device, { .usage = tensorBufferUsage, .size = tensorBufferSize }, &tensorBuffer))
+
+    CgpuBuffer weightBuffer, biasBuffer;
+    if (!cgpuCreateBuffer(device, { .usage = tensorBufferUsage, .size = weightBufferSize }, &weightBuffer) ||
+        !cgpuCreateBuffer(device, { .usage = tensorBufferUsage, .size = biasBufferSize }, &biasBuffer))
     {
-GB_LOG("tensor buffer size: {}", tensorBufferSize);
       GB_FATAL("failed to alloc tensor buffer");
     }
 
-    uint64_t nextTensorOffset = 0;
-    const auto uploadTensor = [&](const char* name) {
-      const GiTzaTensorDescription& desc = tensorDescriptions.at(std::string(name) + ".weight");
-      uint64_t tensorOffset = (nextTensorOffset + 4 - 1) / 4 * 4;
-      uint64_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
+    uint32_t nextWeightOffset = 0;
+    const auto uploadWeights = [&](const char* name) {
+      assert(tensorDescriptions.count(name) > 0);
+      const GiTzaTensorDescription& desc = tensorDescriptions.at(name);
+      uint32_t dataOffset = (nextWeightOffset + 4 - 1) / 4 * 4;
+      uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
 
-      bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, tensorBuffer, tensorOffset);
-      if (!s) GB_FATAL("failed to stage OIDN tensor");
+      bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, weightBuffer, dataOffset);
+      if (!s) GB_FATAL("failed to stage data");
 
-      nextTensorOffset += desc.dataSize;
-      return tensorOffset;
+      nextWeightOffset += desc.dataSize;
+      return dataOffset;
     };
 
-    CgpuPipeline basicPipeline = giOidnCreatePipelines(device, shaderGen);
+    uint32_t nextBiasOffset = 0;
+    const auto uploadBiases = [&](const char* name) {
+      assert(tensorDescriptions.count(name) > 0);
+      const GiTzaTensorDescription& desc = tensorDescriptions.at(name);
+      uint32_t dataOffset = (nextBiasOffset + 4 - 1) / 4 * 4;
+      uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
 
-    auto* state = new GiOidnState {
-      .offsetAllocator = std::make_unique<OffsetAllocator::Allocator>(0),
-      .basicPipeline = basicPipeline,
-      .tensorBuffer = tensorBuffer,
-      .resourceDestroyer = resourceDestroyer
+      bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, biasBuffer, dataOffset);
+      if (!s) GB_FATAL("failed to stage data");
+
+      nextBiasOffset += desc.dataSize;
+      return dataOffset;
     };
 
-    state->tensorOffseEncConv0 = uploadTensor("enc_conv0");
-    state->tensorOffseEncConv1 = uploadTensor("enc_conv1");
-    state->tensorOffseEncConv2 = uploadTensor("enc_conv2");
-    state->tensorOffseEncConv3 = uploadTensor("enc_conv3");
-    state->tensorOffseEncConv4 = uploadTensor("enc_conv4");
-    state->tensorOffseEncConv5a = uploadTensor("enc_conv5a");
-    state->tensorOffseEncConv5b = uploadTensor("enc_conv5b");
-    state->tensorOffseDecConv4a = uploadTensor("dec_conv4a");
-    state->tensorOffseDecConv4b = uploadTensor("dec_conv4b");
-    state->tensorOffseDecConv3a = uploadTensor("dec_conv3a");
-    state->tensorOffseDecConv3b = uploadTensor("dec_conv3b");
-    state->tensorOffseDecConv2a = uploadTensor("dec_conv2a");
-    state->tensorOffseDecConv2b = uploadTensor("dec_conv2b");
-    state->tensorOffseDecConv1a = uploadTensor("dec_conv1a");
-    state->tensorOffseDecConv1b = uploadTensor("dec_conv1b");
-    state->tensorOffseDecConv0 = uploadTensor("dec_conv0");
+    GiOidnBufferOffsets offsets = {
+      .encConv0_weight = uploadWeights("enc_conv0.weight"),
+      .encConv0_bias = uploadBiases("enc_conv0.bias"),
+      .encConv1_weight = uploadWeights("enc_conv1.weight"),
+      .encConv1_bias = uploadBiases("enc_conv1.bias"),
+      .encConv2_weight = uploadWeights("enc_conv2.weight"),
+      .encConv2_bias = uploadBiases("enc_conv2.bias"),
+      .encConv3_weight = uploadWeights("enc_conv3.weight"),
+      .encConv3_bias = uploadBiases("enc_conv3.bias"),
+      .encConv4_weight = uploadWeights("enc_conv4.weight"),
+      .encConv4_bias = uploadBiases("enc_conv4.bias"),
+      .encConv5a_weight = uploadWeights("enc_conv5a.weight"),
+      .encConv5a_bias = uploadBiases("enc_conv5a.bias"),
+      .encConv5b_weight = uploadWeights("enc_conv5b.weight"),
+      .encConv5b_bias = uploadBiases("enc_conv5b.bias"),
+      .decConv4a_weight = uploadWeights("dec_conv4a.weight"),
+      .decConv4a_bias = uploadBiases("dec_conv4a.bias"),
+      .decConv4b_weight = uploadWeights("dec_conv4b.weight"),
+      .decConv4b_bias = uploadBiases("dec_conv4b.bias"),
+      .decConv3a_weight = uploadWeights("dec_conv3a.weight"),
+      .decConv3a_bias = uploadBiases("dec_conv3a.bias"),
+      .decConv3b_weight = uploadWeights("dec_conv3b.weight"),
+      .decConv3b_bias = uploadBiases("dec_conv3b.bias"),
+      .decConv2a_weight = uploadWeights("dec_conv2a.weight"),
+      .decConv2a_bias = uploadBiases("dec_conv2a.bias"),
+      .decConv2b_weight = uploadWeights("dec_conv2b.weight"),
+      .decConv2b_bias = uploadBiases("dec_conv2b.bias"),
+      .decConv1a_weight = uploadWeights("dec_conv1a.weight"),
+      .decConv1a_bias = uploadBiases("dec_conv1a.bias"),
+      .decConv1b_weight = uploadWeights("dec_conv1b.weight"),
+      .decConv1b_bias = uploadBiases("dec_conv1b.bias"),
+      .decConv0_weight = uploadWeights("dec_conv0.weight"),
+      .decConv0_bias = uploadBiases("dec_conv0.bias")
+    };
 
 // TODO: temp
-GB_LOG("tensorOffseEncConv0: {}", state->tensorOffseEncConv0);
-GB_LOG("tensorOffseEncConv1: {}", state->tensorOffseEncConv1);
-GB_LOG("tensorOffseEncConv2: {}", state->tensorOffseEncConv2);
+GB_LOG("encConv0_weight: {}", offsets.encConv0_weight);
+GB_LOG("encConv0_bias: {}", offsets.encConv0_bias);
+GB_LOG("encConv1_weight: {}", offsets.encConv1_weight);
+GB_LOG("encConv1_bias: {}", offsets.encConv1_bias);
+GB_LOG("encConv2_weight: {}", offsets.encConv2_weight);
+GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
+
+    GiOidnPipelines pipelines = giOidnCreatePipelines(device, shaderGen);
 
     stager.flush(); // optional
+
+    auto* state = new GiOidnState {
+      .pipelines = pipelines,
+      .offsets = offsets,
+      .weightBuffer = weightBuffer,
+      .biasBuffer = biasBuffer,
+      .resourceDestroyer = resourceDestroyer
+    };
 
     return state;
   }
@@ -177,14 +302,8 @@ GB_LOG("tensorOffseEncConv2: {}", state->tensorOffseEncConv2);
     {
       state->resourceDestroyer.enqueueDestruction(state->dataBuffer);
     }
-    if (state->basicPipeline.handle)
-    {
-      state->resourceDestroyer.enqueueDestruction(state->basicPipeline);
-    }
-    if (state->tensorBuffer.handle)
-    {
-      state->resourceDestroyer.enqueueDestruction(state->tensorBuffer);
-    }
+    // TODO: destroy pipelines
+    // TODO: destroy buffers
     delete state;
   }
 
@@ -217,7 +336,6 @@ GB_LOG("tensorOffseEncConv2: {}", state->tensorOffseEncConv2);
       return false;
     }
 
-    state->offsetAllocator = std::make_unique<OffsetAllocator::Allocator>(requiredMemory);
     state->bufferSize = requiredMemory;
     state->imageWidth = imageWidth;
     state->imageHeight = imageHeight;
@@ -240,18 +358,21 @@ GB_LOG("tensorOffseEncConv2: {}", state->tensorOffseEncConv2);
       .weightsOffset = 0 // TODO: per kernel
     };
 
-    std::array<CgpuBufferBinding, 3> bufferBindings = {
+    std::array<CgpuBufferBinding, 4> bufferBindings = {
       CgpuBufferBinding{ .binding = 0, .buffer = state->dataBuffer },
       CgpuBufferBinding{ .binding = 1, .buffer = rgbResult },
-      CgpuBufferBinding{ .binding = 2, .buffer = state->tensorBuffer }
+      CgpuBufferBinding{ .binding = 2, .buffer = state->weightBuffer },
+      CgpuBufferBinding{ .binding = 3, .buffer = state->biasBuffer }
     };
 
+    auto debugPipeline = state->pipelines.debug;
+
     CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
-    cgpuCmdUpdateBindings(commandBuffer, state->basicPipeline, 0/*descriptorSetIndex*/, &bindings0);
+    cgpuCmdUpdateBindings(commandBuffer, debugPipeline, 0/*descriptorSetIndex*/, &bindings0);
 
-    cgpuCmdBindPipeline(commandBuffer, state->basicPipeline);
+    cgpuCmdBindPipeline(commandBuffer, debugPipeline);
 
-    cgpuCmdPushConstants(commandBuffer, state->basicPipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+    cgpuCmdPushConstants(commandBuffer, debugPipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
 
     uint32_t wgCountX = (state->imageWidth + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
     uint32_t wgCountY = (state->imageHeight + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;

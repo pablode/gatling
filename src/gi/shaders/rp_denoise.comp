@@ -7,7 +7,8 @@ layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
 layout(binding = 0, std430) readonly buffer InputBuffer { float inPixels[]; };
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
-layout(binding = 2, std430) readonly buffer WeightsBuffer { float16_t weights[]; };
+layout(binding = 2, std430) readonly buffer WeightBuffer { float16_t weights[]; };
+layout(binding = 3, std430) readonly buffer BiasBuffer { float16_t biases[]; };
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
@@ -76,9 +77,10 @@ void main()
       int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * IN_CHANNEL_COUNT + k;
 
       float s = inPixels[inIndexIj];
-      float w = float(weights[PC.weightsOffset + i + j * KERNEL_SIZE]);
 
-      result += s * w;
+      uint wbIdx = PC.weightsOffset + i + j * KERNEL_SIZE;
+
+      result += s * float(weights[wbIdx]) + float(biases[wbIdx]);
     }
 
     outPixels[outIdx + k] = abs(result);
