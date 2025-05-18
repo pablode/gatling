@@ -318,10 +318,10 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
     // TODO: destroy buffers with delayedResourceDestroyer
 
-    uint64_t pool0Size = (imageWidth/1) * (imageHeight/1) * sizeof(float) * 3;
-    uint64_t pool1Size = (imageWidth/2) * (imageHeight/2) * sizeof(float) * 32;
-    uint64_t pool2Size = (imageWidth/4) * (imageHeight/4) * sizeof(float) * 48;
-    uint64_t pool3Size = (imageWidth/8) * (imageHeight/8) * sizeof(float) * 64;
+    uint64_t pool0Size = (imageWidth/1) * (imageHeight/1) * sizeof(float)/2 * 3;
+    uint64_t pool1Size = (imageWidth/2) * (imageHeight/2) * sizeof(float)/2 * 32;
+    uint64_t pool2Size = (imageWidth/4) * (imageHeight/4) * sizeof(float)/2 * 48;
+    uint64_t pool3Size = (imageWidth/8) * (imageHeight/8) * sizeof(float)/2 * 64;
 
     CgpuBufferUsageFlags pool0BufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
                                             CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
@@ -340,8 +340,7 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
       GB_FATAL("failed to allocate OIDN buffer");
     }
 
-    //uint64_t pingPongSliceSize = imageWidth * imageHeight * sizeof(float) * 73/*max usage*/;
-    uint64_t pingPongSliceSize = imageWidth * imageHeight * sizeof(float) * 32/*max usage*/;//TODO: temp for lavapipe
+    uint64_t pingPongSliceSize = imageWidth * imageHeight * sizeof(float)/2 * 73/*max usage*/;
     CgpuBufferUsageFlags pingPongBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
                                                CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC; // TODO: only needed for debug viz
     if (!cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = pingPongSliceSize }, &state->pingPongData[0]) ||
@@ -430,8 +429,8 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
       };
       cgpuCmdPipelineBarrier(commandBuffer, &barrier);
 
-      uint64_t dstOffset = outDimsOffset * imageWidth * imageHeight * sizeof(float);
-      uint64_t size = imageWidth * imageHeight * sizeof(float) * dims;
+      uint64_t dstOffset = outDimsOffset * imageWidth * imageHeight * sizeof(float)/2;
+      uint64_t size = imageWidth * imageHeight * sizeof(float)/2 * dims;
       cgpuCmdCopyBuffer(commandBuffer, inBuffer, 0, outBuffer, dstOffset, size);
     };
 

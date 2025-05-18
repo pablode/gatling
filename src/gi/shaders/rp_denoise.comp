@@ -1,12 +1,17 @@
 #extension GL_GOOGLE_include_directive: require
 #extension GL_EXT_shader_16bit_storage: require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 
 #include "interface/rp_oidn.h"
 
 layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
-layout(binding = 0, std430) readonly buffer InputBuffer { float inPixels[]; };
+layout(binding = 0, std430) readonly buffer InputBuffer { float16_t inPixels[]; };
+#ifdef OP_COPY_CHANNELS
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
+#else
+layout(binding = 1, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
+#endif
 layout(binding = 2, std430) readonly buffer WeightBuffer { float16_t weights[]; };
 layout(binding = 3, std430) readonly buffer BiasBuffer { float16_t biases[]; };
 
@@ -57,8 +62,8 @@ void main()
 
   for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
   {
-    float max1 = max(inPixels[inIdx0 + i], inPixels[inIdx1 + i]);
-    float max2 = max(inPixels[inIdx2 + i], inPixels[inIdx3 + i]);
+    float16_t max1 = max(inPixels[inIdx0 + i], inPixels[inIdx1 + i]);
+    float16_t max2 = max(inPixels[inIdx2 + i], inPixels[inIdx3 + i]);
     outPixels[outIdx + i] = max(max1, max2);
   }
 #endif
@@ -74,12 +79,15 @@ void main()
       coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
       coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
 
+// TODO: might not be correct yet
+      result += float(biases[PC.biasOffset + i + (j*KERNEL_SIZE)+ 1/*TODO:enable*/ * k * (KERNEL_SIZE*KERNEL_SIZE)]);
+
       for (int h = 0; h < IN_CHANNEL_COUNT; h++)
       {
         int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * IN_CHANNEL_COUNT + h;
 
 // TODO: might not be correct yet
-float w  = float(weights[PC.weightOffset + (k + i) * IN_CHANNEL_COUNT + j * IN_CHANNEL_COUNT + h]);
+float w = float(weights[PC.weightOffset + (k + i) * IN_CHANNEL_COUNT + j * IN_CHANNEL_COUNT + h]);
 
         //uint wbIdx = i + j * KERNEL_SIZE
         //             + (h * KERNEL_SIZE * KERNEL_SIZE )
@@ -87,17 +95,17 @@ float w  = float(weights[PC.weightOffset + (k + i) * IN_CHANNEL_COUNT + j * IN_C
         //             ;
         //float w = float(weights[PC.weightOffset + wbIdx]);
 
-        result += inPixels[inIndexIj] * w;
+        result += float(inPixels[inIndexIj]) * w;
       }
     }
 
-    outPixels[outIdx + k] = result + float(biases[PC.biasOffset + k]);
+    outPixels[outIdx + k] = float16_t(result);
   }
 #endif
 #ifdef OP_COPY_CHANNELS
   for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
   {
-    outPixels[outIdx + i] = inPixels[inIdx + i];
+    outPixels[outIdx + i] = float(inPixels[inIdx + i]);
   }
 #endif
 }
