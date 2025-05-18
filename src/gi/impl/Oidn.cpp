@@ -357,32 +357,41 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
   void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer, CgpuBuffer rgbResult)
   {
     // TODO: apparently the input W, H need to be aligned to 16 pixels !
+   const auto& pipelines = state->pipelines;
+   const auto& offsets = state->offsets;
 
-    rp::PushConstants pushData = {
-      .imageWidth = state->imageWidth,
-      .imageHeight = state->imageHeight,
-      .weightOffset = 0, // TODO: per kernel
-      .biasOffset = 0 // TODO: per kernel
+   uint32_t dispatchSizeX = state->imageWidth;
+   uint32_t dispatchSizeY = state->imageHeight;
+
+   auto dispatchConvolution = [&](CgpuPipeline pipeline, uint32_t weightOffset, uint32_t biasOffset,
+                                  CgpuBuffer inBuffer, CgpuBuffer outBuffer)
+   {
+     rp::PushConstants pushData = {
+       .imageWidth = state->imageWidth,
+       .imageHeight = state->imageHeight,
+       .weightOffset = 0, // TODO: per kernel
+       .biasOffset = 0 // TODO: per kernel
+     };
+
+     std::array<CgpuBufferBinding, 4> bufferBindings = {
+       CgpuBufferBinding{ .binding = 0, .buffer = inBuffer },
+       CgpuBufferBinding{ .binding = 1, .buffer = outBuffer },
+       CgpuBufferBinding{ .binding = 2, .buffer = state->weightBuffer },
+       CgpuBufferBinding{ .binding = 3, .buffer = state->biasBuffer }
+     };
+
+     CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
+     cgpuCmdUpdateBindings(commandBuffer, pipeline, 0/*descriptorSetIndex*/, &bindings0);
+
+     cgpuCmdBindPipeline(commandBuffer, pipeline);
+
+     cgpuCmdPushConstants(commandBuffer, pipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+
+     uint32_t wgCountX = (dispatchSizeX + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
+     uint32_t wgCountY = (dispatchSizeY + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
+     cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
     };
 
-    std::array<CgpuBufferBinding, 4> bufferBindings = {
-      CgpuBufferBinding{ .binding = 0, .buffer = state->pool0 },
-      CgpuBufferBinding{ .binding = 1, .buffer = rgbResult },
-      CgpuBufferBinding{ .binding = 2, .buffer = state->weightBuffer },
-      CgpuBufferBinding{ .binding = 3, .buffer = state->biasBuffer }
-    };
-
-    auto debugPipeline = state->pipelines.debug;
-
-    CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
-    cgpuCmdUpdateBindings(commandBuffer, debugPipeline, 0/*descriptorSetIndex*/, &bindings0);
-
-    cgpuCmdBindPipeline(commandBuffer, debugPipeline);
-
-    cgpuCmdPushConstants(commandBuffer, debugPipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
-
-    uint32_t wgCountX = (state->imageWidth + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
-    uint32_t wgCountY = (state->imageHeight + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
-    cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
+    dispatchConvolution(pipelines.debug, 0, 0, state->pool0, rgbResult);
   }
 }
