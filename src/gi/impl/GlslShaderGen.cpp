@@ -310,6 +310,10 @@ namespace gtl
     {
       stitcher.appendDefine("OP_UPSAMPLE");
     }
+    else if (params.op == OidnOp::CopyChannels)
+    {
+      stitcher.appendDefine("OP_COPY_CHANNELS");
+    }
 
     fs::path filePath = m_shaderPath / "rp_denoise.comp";
     if (!stitcher.appendSourceFile(filePath))

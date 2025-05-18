@@ -107,7 +107,7 @@ namespace gtl
       uint32_t textureIndexOffset;
     };
 
-    enum class OidnOp { Convolve, MaxPool, Upsample };
+    enum class OidnOp { Convolve, MaxPool, Upsample, CopyChannels };
 
     struct OidnParams
     {

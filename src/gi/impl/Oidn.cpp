@@ -137,6 +137,7 @@ namespace gtl
       if (params.op == GiGlslShaderGen::OidnOp::Convolve) opName = "Convolve";
       if (params.op == GiGlslShaderGen::OidnOp::MaxPool) opName = "MaxPool";
       if (params.op == GiGlslShaderGen::OidnOp::Upsample) opName = "Upsample";
+      if (params.op == GiGlslShaderGen::OidnOp::CopyChannels) opName = "CopyChannels";
       std::string debugName = GB_FMT("Oidn_{}_{}->{}", opName, params.inChannelCount, params.outChannelCount);
       GB_LOG(" {}", debugName);
 
@@ -152,7 +153,7 @@ namespace gtl
 
     GB_LOG("creating OIDN pipelines:");
     return GiOidnPipelines{
-      .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 4 }),
+      .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels }),
       .conv3_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 32 }),
       .conv32_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32 }),
       .maxPool32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
@@ -369,8 +370,8 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     uint32_t imageWidth = state->imageWidth;
     uint32_t imageHeight = state->imageHeight;
 
-    auto dispatchConvolution = [&](CgpuPipeline pipeline, uint32_t weightOffset, uint32_t biasOffset,
-                                   CgpuBuffer inBuffer, CgpuBuffer outBuffer)
+    auto dispatchPipeline = [&](CgpuPipeline pipeline, uint32_t weightOffset, uint32_t biasOffset,
+                                CgpuBuffer inBuffer, CgpuBuffer outBuffer)
     {
       CgpuBufferMemoryBarrier bufferBarrier {
         .buffer = inBuffer,
@@ -388,8 +389,8 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
       cgpuCmdPipelineBarrier(commandBuffer, &barrier);
 
       rp::PushConstants pushData = {
-        .imageWidth = state->imageWidth,
-        .imageHeight = state->imageHeight,
+        .imageWidth = imageWidth,
+        .imageHeight = imageHeight,
         .weightOffset = weightOffset,
         .biasOffset = biasOffset
       };
@@ -437,8 +438,8 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     uint32_t i = 0;
     const auto pingPong = state->pingPongData;
 
-    dispatchConvolution(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
+    dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
 
-    joinChannels(pingPong[0], rgbResult, 0, 3);
+    dispatchPipeline(pipelines.debug, 0, 0, pingPong[0], rgbResult); // debug viz to color AOV
   }
 }

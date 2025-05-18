@@ -78,13 +78,26 @@ void main()
       {
         int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * IN_CHANNEL_COUNT + h;
 
-        uint wbIdx = i + j * KERNEL_SIZE + (k * KERNEL_SIZE * KERNEL_SIZE);
-        result += inPixels[inIndexIj] * float(weights[PC.weightOffset + wbIdx]) +
-                                        float(biases[PC.biasOffset + wbIdx]);
+// TODO: might not be correct yet
+float w  = float(weights[PC.weightOffset + (k + i) * IN_CHANNEL_COUNT + j * IN_CHANNEL_COUNT + h]);
+
+        //uint wbIdx = i + j * KERNEL_SIZE
+        //             + (h * KERNEL_SIZE * KERNEL_SIZE )
+        //             + (k * KERNEL_SIZE * KERNEL_SIZE * IN_CHANNEL_COUNT)
+        //             ;
+        //float w = float(weights[PC.weightOffset + wbIdx]);
+
+        result += inPixels[inIndexIj] * w;
       }
     }
 
-    outPixels[outIdx + k] = result;
+    outPixels[outIdx + k] = result + float(biases[PC.biasOffset + k]);
+  }
+#endif
+#ifdef OP_COPY_CHANNELS
+  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
+  {
+    outPixels[outIdx + i] = inPixels[inIdx + i];
   }
 #endif
 }
