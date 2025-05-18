@@ -78,9 +78,9 @@ void main()
 
       float s = inPixels[inIndexIj];
 
-      uint wbIdx = PC.weightsOffset + i + j * KERNEL_SIZE;
+      uint wbIdx = i + j * KERNEL_SIZE;
 
-      result += s * float(weights[wbIdx]) + float(biases[wbIdx]);
+      result += s * float(weights[PC.weightOffset + wbIdx]) + float(biases[PC.biasOffset + wbIdx]);
     }
 
     outPixels[outIdx + k] = abs(result);

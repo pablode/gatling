@@ -100,10 +100,13 @@ namespace gtl
     CgpuBuffer weightBuffer;
     CgpuBuffer biasBuffer;
 
-    CgpuBuffer dataBuffer; // image slices
-    size_t bufferSize = 0;
     uint32_t imageWidth = 0;
     uint32_t imageHeight = 0;
+
+    CgpuBuffer pool0;
+    CgpuBuffer pool1;
+    CgpuBuffer pool2;
+    CgpuBuffer pool3;
 
     GgpuDelayedResourceDestroyer resourceDestroyer;
   };
@@ -298,10 +301,6 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
   void giOidnDestroyState(GiOidnState* state)
   {
-    if (state->dataBuffer.handle)
-    {
-      state->resourceDestroyer.enqueueDestruction(state->dataBuffer);
-    }
     // TODO: destroy pipelines
     // TODO: destroy buffers
     delete state;
@@ -309,34 +308,31 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
   bool giOidnUpdateState(GiOidnState* state, CgpuDevice device, uint32_t imageWidth, uint32_t imageHeight)
   {
-    size_t requiredMemory = imageWidth * imageHeight * 3 * sizeof(float); // TODO: only covers input AOV
-
-    if (state->bufferSize >= requiredMemory && state->imageWidth == imageWidth && state->imageHeight == imageHeight)
+    if (state->imageWidth == imageWidth && state->imageHeight == imageHeight)
     {
-      return true; // nothing to do
+      return true;
     }
 
-    if (state->dataBuffer.handle)
-    {
-      state->resourceDestroyer.enqueueDestruction(state->dataBuffer);
-    }
+    // TODO: destroy buffers with delayedResourceDestroyer
 
-    if (state->dataBuffer.handle)
-    {
-      cgpuDestroyBuffer(device, state->dataBuffer);
-    }
+    size_t channelSize = imageWidth * imageHeight * sizeof(float);
 
-    CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
-                                       CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
-                                       CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-    if (!cgpuCreateBuffer(device, { .usage = bufferUsage, .size = requiredMemory }, &state->dataBuffer))
+    CgpuBufferUsageFlags pool0BufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
+                                            CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
+                                            CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+    if (!cgpuCreateBuffer(device, { .usage = pool0BufferUsage, .size = channelSize * 3 }, &state->pool0))
     {
       GB_FATAL("failed to allocate OIDN buffer");
-      fprintf(stderr,"%zu MB\n", requiredMemory / (1024*1024));
-      return false;
     }
 
-    state->bufferSize = requiredMemory;
+    CgpuBufferUsageFlags poolNBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC;
+    if (!cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 32 }, &state->pool1) ||
+        !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 48 }, &state->pool2) ||
+        !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 64 }, &state->pool3))
+    {
+      GB_FATAL("failed to allocate OIDN buffer");
+    }
+
     state->imageWidth = imageWidth;
     state->imageHeight = imageHeight;
     return true;
@@ -344,7 +340,7 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
   CgpuBuffer giOidnGetInputBuffer(GiOidnState* state)
   {
-    return state->dataBuffer;
+    return state->pool0;
   }
 
   // TODO: for starters, copy 3 channels of input AOV to color AOV (viz aux normal & albedo)
@@ -355,11 +351,12 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     rp::PushConstants pushData = {
       .imageWidth = state->imageWidth,
       .imageHeight = state->imageHeight,
-      .weightsOffset = 0 // TODO: per kernel
+      .weightOffset = 0, // TODO: per kernel
+      .biasOffset = 0 // TODO: per kernel
     };
 
     std::array<CgpuBufferBinding, 4> bufferBindings = {
-      CgpuBufferBinding{ .binding = 0, .buffer = state->dataBuffer },
+      CgpuBufferBinding{ .binding = 0, .buffer = state->pool0 },
       CgpuBufferBinding{ .binding = 1, .buffer = rgbResult },
       CgpuBufferBinding{ .binding = 2, .buffer = state->weightBuffer },
       CgpuBufferBinding{ .binding = 3, .buffer = state->biasBuffer }

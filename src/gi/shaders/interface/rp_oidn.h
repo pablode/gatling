@@ -29,7 +29,8 @@ struct PushConstants
 {
   GI_UINT imageWidth;
   GI_UINT imageHeight;
-  GI_UINT weightsOffset; // offset of kernel into the weights buffer
+  GI_UINT weightOffset; // offset of kernel into the weights buffer
+  GI_UINT biasOffset;
 };
 
 // set 0
