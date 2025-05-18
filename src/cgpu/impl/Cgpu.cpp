@@ -1616,6 +1616,11 @@ namespace gtl
 
     uint64_t newSize = cgpuPadToAlignment(size, BASE_ALIGNMENT); // required for vkCmdFillBuffer to clear whole range
 
+    if (newSize > idevice->properties.maxStorageBufferRange)
+    {
+      CGPU_RETURN_ERROR("max buffer size exceeded");
+    }
+
     VkBufferCreateInfo bufferInfo = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext = nullptr,

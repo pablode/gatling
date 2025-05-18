@@ -2378,24 +2378,9 @@ cleanup:
     // <DENOISING PASS>
     if (renderSettings.denoise)
     {
-      CgpuBufferMemoryBarrier bufferBarrier {
-        .buffer = colorBinding->renderBuffer->deviceMem,
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
-      };
-
-      CgpuPipelineBarrier barrier = {
-        .bufferBarrierCount = 1,
-        .bufferBarriers = &bufferBarrier
-      };
-      cgpuCmdPipelineBarrier(commandBuffer, &barrier);
-
       giOidnRender(scene->denoiserState, commandBuffer, colorBinding->renderBuffer->deviceMem );
     }
     // </DENOISING PASS>
-
 
 
 
@@ -2953,7 +2938,8 @@ cleanup:
 
     CgpuBuffer deviceMem;
     if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
+                                     CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*TODO: oidn debug viz via join (can replace with shader write)*/,
                             .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                             .size = bufferSize,
                             .debugName = "RenderBufferGpu"

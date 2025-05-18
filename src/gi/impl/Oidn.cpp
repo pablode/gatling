@@ -317,28 +317,34 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
     // TODO: destroy buffers with delayedResourceDestroyer
 
-    size_t channelSize = imageWidth * imageHeight * sizeof(float);
+    uint64_t pool0Size = (imageWidth/1) * (imageHeight/1) * sizeof(float) * 3;
+    uint64_t pool1Size = (imageWidth/2) * (imageHeight/2) * sizeof(float) * 32;
+    uint64_t pool2Size = (imageWidth/4) * (imageHeight/4) * sizeof(float) * 48;
+    uint64_t pool3Size = (imageWidth/8) * (imageHeight/8) * sizeof(float) * 64;
 
     CgpuBufferUsageFlags pool0BufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
                                             CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
                                             CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-    if (!cgpuCreateBuffer(device, { .usage = pool0BufferUsage, .size = channelSize * 3 }, &state->pool0))
+    if (!cgpuCreateBuffer(device, { .usage = pool0BufferUsage, .size = pool0Size }, &state->pool0))
     {
       GB_FATAL("failed to allocate OIDN buffer");
     }
 
     // NOTE: at Full HD, a single of the buffers is ~1.2GB
     CgpuBufferUsageFlags poolNBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC;
-    if (!cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 32 }, &state->pool1) ||
-        !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 48 }, &state->pool2) ||
-        !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 64 }, &state->pool3))
+    if (!cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool1Size }, &state->pool1) ||
+        !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool2Size }, &state->pool2) ||
+        !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool3Size }, &state->pool3))
     {
       GB_FATAL("failed to allocate OIDN buffer");
     }
 
-    CgpuBufferUsageFlags pingPongBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER;
-    if (!cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = channelSize * 160 }, &state->pingPongData[0]) ||
-        !cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = channelSize * 160 }, &state->pingPongData[1]))
+    //uint64_t pingPongSliceSize = imageWidth * imageHeight * sizeof(float) * 73/*max usage*/;
+    uint64_t pingPongSliceSize = imageWidth * imageHeight * sizeof(float) * 32/*max usage*/;//TODO: temp for lavapipe
+    CgpuBufferUsageFlags pingPongBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
+                                               CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC; // TODO: only needed for debug viz
+    if (!cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = pingPongSliceSize }, &state->pingPongData[0]) ||
+        !cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = pingPongSliceSize }, &state->pingPongData[1]))
     {
       GB_FATAL("failed to allocate OIDN buffer");
     }
@@ -357,41 +363,82 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
   void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer, CgpuBuffer rgbResult)
   {
     // TODO: apparently the input W, H need to be aligned to 16 pixels !
-   const auto& pipelines = state->pipelines;
-   const auto& offsets = state->offsets;
+    const auto& pipelines = state->pipelines;
+    const auto& offsets = state->offsets;
 
-   uint32_t dispatchSizeX = state->imageWidth;
-   uint32_t dispatchSizeY = state->imageHeight;
+    uint32_t imageWidth = state->imageWidth;
+    uint32_t imageHeight = state->imageHeight;
 
-   auto dispatchConvolution = [&](CgpuPipeline pipeline, uint32_t weightOffset, uint32_t biasOffset,
-                                  CgpuBuffer inBuffer, CgpuBuffer outBuffer)
-   {
-     rp::PushConstants pushData = {
-       .imageWidth = state->imageWidth,
-       .imageHeight = state->imageHeight,
-       .weightOffset = 0, // TODO: per kernel
-       .biasOffset = 0 // TODO: per kernel
-     };
+    auto dispatchConvolution = [&](CgpuPipeline pipeline, uint32_t weightOffset, uint32_t biasOffset,
+                                   CgpuBuffer inBuffer, CgpuBuffer outBuffer)
+    {
+      CgpuBufferMemoryBarrier bufferBarrier {
+        .buffer = inBuffer,
+        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER |
+                        CGPU_PIPELINE_STAGE_FLAG_TRANSFER, // TODO: minimize
+        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
+        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+      };
 
-     std::array<CgpuBufferBinding, 4> bufferBindings = {
-       CgpuBufferBinding{ .binding = 0, .buffer = inBuffer },
-       CgpuBufferBinding{ .binding = 1, .buffer = outBuffer },
-       CgpuBufferBinding{ .binding = 2, .buffer = state->weightBuffer },
-       CgpuBufferBinding{ .binding = 3, .buffer = state->biasBuffer }
-     };
+      CgpuPipelineBarrier barrier = {
+        .bufferBarrierCount = 1,
+        .bufferBarriers = &bufferBarrier
+      };
+      cgpuCmdPipelineBarrier(commandBuffer, &barrier);
 
-     CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
-     cgpuCmdUpdateBindings(commandBuffer, pipeline, 0/*descriptorSetIndex*/, &bindings0);
+      rp::PushConstants pushData = {
+        .imageWidth = state->imageWidth,
+        .imageHeight = state->imageHeight,
+        .weightOffset = weightOffset,
+        .biasOffset = biasOffset
+      };
 
-     cgpuCmdBindPipeline(commandBuffer, pipeline);
+      std::array<CgpuBufferBinding, 4> bufferBindings = {
+        CgpuBufferBinding{ .binding = 0, .buffer = inBuffer },
+        CgpuBufferBinding{ .binding = 1, .buffer = outBuffer },
+        CgpuBufferBinding{ .binding = 2, .buffer = state->weightBuffer },
+        CgpuBufferBinding{ .binding = 3, .buffer = state->biasBuffer }
+      };
 
-     cgpuCmdPushConstants(commandBuffer, pipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+      CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
+      cgpuCmdUpdateBindings(commandBuffer, pipeline, 0/*descriptorSetIndex*/, &bindings0);
 
-     uint32_t wgCountX = (dispatchSizeX + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
-     uint32_t wgCountY = (dispatchSizeY + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
-     cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
+      cgpuCmdBindPipeline(commandBuffer, pipeline);
+
+      cgpuCmdPushConstants(commandBuffer, pipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+
+      uint32_t wgCountX = (imageWidth + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
+      uint32_t wgCountY = (imageHeight + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
+      cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
     };
 
-    dispatchConvolution(pipelines.debug, 0, 0, state->pool0, rgbResult);
+    auto joinChannels = [&](CgpuBuffer inBuffer, CgpuBuffer outBuffer, uint32_t outDimsOffset, uint32_t dims)
+    {
+      CgpuBufferMemoryBarrier bufferBarrier {
+        .buffer = inBuffer,
+        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER |
+                        CGPU_PIPELINE_STAGE_FLAG_TRANSFER, // TODO: minimize
+        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
+        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
+        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_PIPELINE_STAGE_FLAG_TRANSFER // TODO: minimize
+      };
+      CgpuPipelineBarrier barrier = {
+        .bufferBarrierCount = 1,
+        .bufferBarriers = &bufferBarrier
+      };
+      cgpuCmdPipelineBarrier(commandBuffer, &barrier);
+
+      uint64_t dstOffset = outDimsOffset * imageWidth * imageHeight * sizeof(float);
+      uint64_t size = imageWidth * imageHeight * sizeof(float) * dims;
+      cgpuCmdCopyBuffer(commandBuffer, inBuffer, 0, outBuffer, dstOffset, size);
+    };
+
+    uint32_t i = 0;
+    const auto pingPong = state->pingPongData;
+
+    dispatchConvolution(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
+
+    joinChannels(pingPong[0], rgbResult, 0, 3);
   }
 }

@@ -63,7 +63,7 @@ void main()
   }
 #endif
 #ifdef OP_CONVOLVE
-  for (int k = 0; k < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); k++)
+  for (int k = 0; k < OUT_CHANNEL_COUNT; k++)
   {
     float result = 0.0;
 
@@ -74,16 +74,17 @@ void main()
       coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
       coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
 
-      int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * IN_CHANNEL_COUNT + k;
+      for (int h = 0; h < IN_CHANNEL_COUNT; h++)
+      {
+        int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * IN_CHANNEL_COUNT + h;
 
-      float s = inPixels[inIndexIj];
-
-      uint wbIdx = i + j * KERNEL_SIZE;
-
-      result += s * float(weights[PC.weightOffset + wbIdx]) + float(biases[PC.biasOffset + wbIdx]);
+        uint wbIdx = i + j * KERNEL_SIZE + (k * KERNEL_SIZE * KERNEL_SIZE);
+        result += inPixels[inIndexIj] * float(weights[PC.weightOffset + wbIdx]) +
+                                        float(biases[PC.biasOffset + wbIdx]);
+      }
     }
 
-    outPixels[outIdx + k] = abs(result);
+    outPixels[outIdx + k] = result;
   }
 #endif
 }
