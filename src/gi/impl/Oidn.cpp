@@ -31,7 +31,6 @@ namespace gtl
   struct GiOidnPipelines
   {
     CgpuPipeline debug;
-
     CgpuPipeline conv3_32;
     CgpuPipeline conv32_32;
     CgpuPipeline maxPool32;
@@ -57,6 +56,7 @@ namespace gtl
     CgpuPipeline conv67_64;
     CgpuPipeline conv64_32;
     CgpuPipeline conv32_3;
+    CgpuPipeline copyToOutput;
   };
 
   struct GiOidnBufferOffsets
@@ -156,7 +156,7 @@ namespace gtl
 
     GB_LOG("creating OIDN pipelines:");
     return GiOidnPipelines{
-      .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels }),
+      .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::Upsample }),
       .conv3_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 32 }),
       .conv32_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32 }),
       .maxPool32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
@@ -180,7 +180,8 @@ namespace gtl
       .upsample64 =createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Upsample }),
       .conv67_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 67, .outChannelCount = 64 }),
       .conv64_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 32 }),
-      .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 })
+      .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 }),
+      .copyToOutput = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels })
     };
   }
 
@@ -201,7 +202,7 @@ namespace gtl
       auto newName = std::string(name) + ".weight";
       assert(tensorDescriptions.count(newName) > 0);
       const GiTzaTensorDescription& desc = tensorDescriptions.at(newName);
-      weightBufferSize += (desc.dataSize + 4 - 1) / 4  * 4;
+      weightBufferSize += (desc.dataSize + 4 - 1) / 4  * 4; // required align
     }
     size_t biasBufferSize = 0;
     for (const char* name : TENSOR_NAMES)
@@ -209,7 +210,7 @@ namespace gtl
       auto newName = std::string(name) + ".bias";
       assert(tensorDescriptions.count(newName) > 0);
       const GiTzaTensorDescription& desc = tensorDescriptions.at(newName);
-      biasBufferSize += (desc.dataSize + 4 - 1) / 4  * 4;
+      biasBufferSize += (desc.dataSize + 4 - 1) / 4  * 4; // required align
     }
 
     CgpuBufferUsageFlags tensorBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
@@ -225,7 +226,7 @@ namespace gtl
     const auto uploadWeights = [&](const char* name) {
       assert(tensorDescriptions.count(name) > 0);
       const GiTzaTensorDescription& desc = tensorDescriptions.at(name);
-      uint32_t dataOffset = (nextWeightOffset + 4 - 1) / 4 * 4;
+      uint32_t dataOffset = (nextWeightOffset + 4 - 1) / 4 * 4; // required align
       uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
 
       bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, weightBuffer, dataOffset);
@@ -239,7 +240,7 @@ namespace gtl
     const auto uploadBiases = [&](const char* name) {
       assert(tensorDescriptions.count(name) > 0);
       const GiTzaTensorDescription& desc = tensorDescriptions.at(name);
-      uint32_t dataOffset = (nextBiasOffset + 4 - 1) / 4 * 4;
+      uint32_t dataOffset = (nextBiasOffset + 4 - 1) / 4 * 4; // required align
       uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
 
       bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, biasBuffer, dataOffset);
@@ -320,6 +321,10 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     {
       return true;
     }
+
+// TODO: need to align to 16 bytes
+//imageWidth = (imageWidth+15)/16*16;
+//imageHeight = (imageHeight+15)/16*16;
 
     // TODO: destroy buffers with delayedResourceDestroyer
 
@@ -443,6 +448,15 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     uint32_t i = 0;
     const auto pingPong = state->pingPongData;
 
+#if 0
+    dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
+    dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.debug2, 0, 0, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.conv32_32, offsets.encConv1_weight, offsets.encConv1_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.debug, 0, 0, pingPong[1], rgbResult); // debug viz to color AOV
+return;
+#endif
+
     // l0
     dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
     dispatchPipeline(pipelines.conv32_32, offsets.encConv1_weight, offsets.encConv1_bias, pingPong[0], pingPong[1]);
@@ -499,12 +513,15 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     imageWidth *= 2;
     imageHeight *= 2;
 
+GB_LOG("iw_new: {}, iw_old: {}", imageWidth, state->imageWidth);
+GB_LOG("ih_new: {}, ih_old: {}", imageHeight, state->imageHeight);
+
     // l0
     joinChannels(state->pool0, pingPong[1], 64, 3);
     dispatchPipeline(pipelines.conv67_64, offsets.decConv1a_weight, offsets.decConv1a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv64_32, offsets.decConv1b_weight, offsets.decConv1b_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[1], pingPong[0]);
 
-    dispatchPipeline(pipelines.debug, 0, 0, pingPong[0], rgbResult); // debug viz to color AOV
+    dispatchPipeline(pipelines.copyToOutput, 0, 0, pingPong[0], rgbResult); // debug viz to color AOV
   }
 }

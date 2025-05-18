@@ -24,8 +24,9 @@ void main()
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
-  int inIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * IN_CHANNEL_COUNT;
-  int outIdx = int(gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * PC.imageWidth) * OUT_CHANNEL_COUNT;
+  int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
+  int inIdx = pixelIdx * IN_CHANNEL_COUNT;
+  int outIdx = pixelIdx * OUT_CHANNEL_COUNT;
 
 #if 0 // viz input channels
   //int channelOffset = 0; // 3 = normals, 6 = albedo
