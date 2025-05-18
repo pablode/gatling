@@ -42,16 +42,19 @@ namespace gtl
     CgpuPipeline conv64_80;
     CgpuPipeline maxPool80;
     CgpuPipeline conv80_96;
-    CgpuPipeline upsample96;
+    CgpuPipeline upsample96a;
+    CgpuPipeline upsample96b;
     CgpuPipeline conv160_112;
     CgpuPipeline conv112_112;
     CgpuPipeline upsample112;
     CgpuPipeline conv160_96;
-    CgpuPipeline conv96_96;
+    // avoid descriptor set binding woes...
+    CgpuPipeline conv96_96a;
+    CgpuPipeline conv96_96b;
     CgpuPipeline conv128_64;
     CgpuPipeline conv64_64;
     CgpuPipeline upsample64;
-    CgpuPipeline conv73_64;
+    CgpuPipeline conv67_64;
     CgpuPipeline conv64_32;
     CgpuPipeline conv32_3;
   };
@@ -153,7 +156,7 @@ namespace gtl
 
     GB_LOG("creating OIDN pipelines:");
     return GiOidnPipelines{
-      .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels }),
+      .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels }),
       .conv3_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 32 }),
       .conv32_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32 }),
       .maxPool32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
@@ -164,16 +167,18 @@ namespace gtl
       .conv64_80 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 80 }),
       .maxPool80 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 80, .outChannelCount = 80, .op = GiGlslShaderGen::OidnOp::MaxPool }),
       .conv80_96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 80, .outChannelCount = 96 }),
-      .upsample96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Upsample }),
+      .upsample96a = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Upsample }),
+      .upsample96b = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Upsample }),
       .conv160_112 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 160, .outChannelCount = 112 }),
       .conv112_112 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 112, .outChannelCount = 112 }),
       .upsample112 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 112, .outChannelCount = 112, .op = GiGlslShaderGen::OidnOp::Upsample }),
       .conv160_96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 160, .outChannelCount = 96 }),
-      .conv96_96 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96 }),
+      .conv96_96a = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96 }),
+      .conv96_96b = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96 }),
       .conv128_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 128, .outChannelCount = 64 }),
       .conv64_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64 }),
       .upsample64 =createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Upsample }),
-      .conv73_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 73, .outChannelCount = 64 }),
+      .conv67_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 67, .outChannelCount = 64 }),
       .conv64_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 32 }),
       .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 })
     };
@@ -342,6 +347,7 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
     uint64_t pingPongSliceSize = imageWidth * imageHeight * sizeof(float)/2 * 73/*max usage*/;
     CgpuBufferUsageFlags pingPongBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER |
+                                               CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST | // for join
                                                CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC; // TODO: only needed for debug viz
     if (!cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = pingPongSliceSize }, &state->pingPongData[0]) ||
         !cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = pingPongSliceSize }, &state->pingPongData[1]))
@@ -437,7 +443,67 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     uint32_t i = 0;
     const auto pingPong = state->pingPongData;
 
+    // l0
     dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
+    dispatchPipeline(pipelines.conv32_32, offsets.encConv1_weight, offsets.encConv1_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[1], state->pool1);
+    imageWidth /= 2;
+    imageHeight /= 2;
+
+    // l1
+    dispatchPipeline(pipelines.conv32_48, offsets.encConv2_weight, offsets.encConv2_bias, state->pool1, pingPong[0]);
+    dispatchPipeline(pipelines.maxPool48, 0, 0, pingPong[0], state->pool2);
+    imageWidth /= 2;
+    imageHeight /= 2;
+
+    // l2
+    dispatchPipeline(pipelines.conv48_64, offsets.encConv3_weight, offsets.encConv3_bias, state->pool2, pingPong[0]);
+    dispatchPipeline(pipelines.maxPool64, 0, 0, pingPong[0], state->pool3);
+    imageWidth /= 2;
+    imageHeight /= 2;
+
+    // l3
+    dispatchPipeline(pipelines.conv64_80, offsets.encConv4_weight, offsets.encConv4_bias, state->pool3, pingPong[0]);
+    dispatchPipeline(pipelines.maxPool80, 0, 0, pingPong[0], pingPong[1]);
+    imageWidth /= 2;
+    imageHeight /= 2;
+
+    // l4
+    dispatchPipeline(pipelines.conv80_96, offsets.encConv5a_weight, offsets.encConv5a_bias, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.conv96_96a, offsets.encConv5b_weight, offsets.encConv5b_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample96a, 0, 0, pingPong[1], pingPong[0]);
+    imageWidth *= 2;
+    imageHeight *= 2;
+
+    // l3
+    joinChannels(state->pool3, pingPong[0], 96, 64);
+    dispatchPipeline(pipelines.conv160_112, offsets.decConv4a_weight, offsets.decConv4a_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.conv112_112, offsets.decConv4b_weight, offsets.decConv4b_bias, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[0], pingPong[1]);
+    imageWidth *= 2;
+    imageHeight *= 2;
+
+    // l2
+    joinChannels(state->pool2, pingPong[1], 112, 48);
+    dispatchPipeline(pipelines.conv160_96, offsets.decConv3a_weight, offsets.decConv3a_bias, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.conv96_96b, offsets.decConv3b_weight, offsets.decConv3b_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample96b, 0, 0, pingPong[1], pingPong[0]);
+    imageWidth *= 2;
+    imageHeight *= 2;
+
+    // l1
+    joinChannels(state->pool1, pingPong[0], 96, 32);
+    dispatchPipeline(pipelines.conv128_64, offsets.decConv2a_weight, offsets.decConv2a_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.conv64_64, offsets.decConv2b_weight, offsets.decConv2b_bias, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[0], pingPong[1]);
+    imageWidth *= 2;
+    imageHeight *= 2;
+
+    // l0
+    joinChannels(state->pool0, pingPong[1], 64, 3);
+    dispatchPipeline(pipelines.conv67_64, offsets.decConv1a_weight, offsets.decConv1a_bias, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.conv64_32, offsets.decConv1b_weight, offsets.decConv1b_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[1], pingPong[0]);
 
     dispatchPipeline(pipelines.debug, 0, 0, pingPong[0], rgbResult); // debug viz to color AOV
   }
