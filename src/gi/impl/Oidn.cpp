@@ -108,6 +108,8 @@ namespace gtl
     CgpuBuffer pool2;
     CgpuBuffer pool3;
 
+    CgpuBuffer pingPongData[2];
+
     GgpuDelayedResourceDestroyer resourceDestroyer;
   };
 
@@ -325,10 +327,18 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
       GB_FATAL("failed to allocate OIDN buffer");
     }
 
+    // NOTE: at Full HD, a single of the buffers is ~1.2GB
     CgpuBufferUsageFlags poolNBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC;
     if (!cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 32 }, &state->pool1) ||
         !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 48 }, &state->pool2) ||
         !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = channelSize * 64 }, &state->pool3))
+    {
+      GB_FATAL("failed to allocate OIDN buffer");
+    }
+
+    CgpuBufferUsageFlags pingPongBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER;
+    if (!cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = channelSize * 160 }, &state->pingPongData[0]) ||
+        !cgpuCreateBuffer(device, { .usage = pingPongBufferUsage, .size = channelSize * 160 }, &state->pingPongData[1]))
     {
       GB_FATAL("failed to allocate OIDN buffer");
     }
