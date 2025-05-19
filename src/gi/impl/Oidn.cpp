@@ -57,6 +57,10 @@ namespace gtl
     CgpuPipeline conv64_32;
     CgpuPipeline conv32_3;
     CgpuPipeline copyToOutput;
+    CgpuPipeline join96_64;
+    CgpuPipeline join112_48;
+    CgpuPipeline join96_32;
+    CgpuPipeline join64_3;
   };
 
   struct GiOidnBufferOffsets
@@ -141,6 +145,7 @@ namespace gtl
       if (params.op == GiGlslShaderGen::OidnOp::MaxPool) opName = "MaxPool";
       if (params.op == GiGlslShaderGen::OidnOp::Upsample) opName = "Upsample";
       if (params.op == GiGlslShaderGen::OidnOp::CopyChannels) opName = "CopyChannels";
+      if (params.op == GiGlslShaderGen::OidnOp::Join) opName = "Join";
       std::string debugName = GB_FMT("Oidn_{}_{}->{}", opName, params.inChannelCount, params.outChannelCount);
       GB_LOG(" {}", debugName);
 
@@ -181,7 +186,11 @@ namespace gtl
       .conv67_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 67, .outChannelCount = 64 }),
       .conv64_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 32 }),
       .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 }),
-      .copyToOutput = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels })
+      .copyToOutput = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels }),
+      .join96_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Join }),
+      .join112_48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 112, .op = GiGlslShaderGen::OidnOp::Join }),
+      .join96_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Join }),
+      .join64_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Join })
     };
   }
 
@@ -490,7 +499,7 @@ return;
     dispatchPipeline(pipelines.upsample96a, 0, 0, pingPong[1], pingPong[0]);
 
     // l3
-    joinChannels(state->pool3, pingPong[0], 96, 64);
+    dispatchPipeline(pipelines.join96_64, 0, 0, state->pool3, pingPong[0]);
     dispatchPipeline(pipelines.conv160_112, offsets.decConv4a_weight, offsets.decConv4a_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv112_112, offsets.decConv4b_weight, offsets.decConv4b_bias, pingPong[1], pingPong[0]);
     imageWidth *= 2;
@@ -498,7 +507,7 @@ return;
     dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[0], pingPong[1]);
 
     // l2
-    joinChannels(state->pool2, pingPong[1], 112, 48);
+    dispatchPipeline(pipelines.join112_48, 0, 0, state->pool2, pingPong[1]);
     dispatchPipeline(pipelines.conv160_96, offsets.decConv3a_weight, offsets.decConv3a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv96_96b, offsets.decConv3b_weight, offsets.decConv3b_bias, pingPong[0], pingPong[1]);
     imageWidth *= 2;
@@ -506,7 +515,7 @@ return;
     dispatchPipeline(pipelines.upsample96b, 0, 0, pingPong[1], pingPong[0]);
 
     // l1
-    joinChannels(state->pool1, pingPong[0], 96, 32);
+    dispatchPipeline(pipelines.join96_32, 0, 0, state->pool1, pingPong[0]);
     dispatchPipeline(pipelines.conv128_64, offsets.decConv2a_weight, offsets.decConv2a_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv64_64, offsets.decConv2b_weight, offsets.decConv2b_bias, pingPong[1], pingPong[0]);
     imageWidth *= 2;
@@ -514,7 +523,7 @@ return;
     dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[0], pingPong[1]);
 
     // l0
-    joinChannels(state->pool0, pingPong[1], 64, 3);
+    dispatchPipeline(pipelines.join64_3, 0, 0, state->pool0, pingPong[1]);
     dispatchPipeline(pipelines.conv67_64, offsets.decConv1a_weight, offsets.decConv1a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv64_32, offsets.decConv1b_weight, offsets.decConv1b_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[1], pingPong[0]);
