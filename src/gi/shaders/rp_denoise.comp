@@ -10,14 +10,13 @@ layout(binding = 0, std430) readonly buffer InputBuffer { float16_t inPixels[]; 
 #ifdef OP_COPY_CHANNELS
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
 #else
-#ifdef OP_JOIN
-layout(binding = 1, std430) buffer OutputBuffer { float16_t outPixels[]; };
-#else
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
-#endif
 #endif
 layout(binding = 2, std430) readonly buffer WeightBuffer { float16_t weights[]; };
 layout(binding = 3, std430) readonly buffer BiasBuffer { float16_t biases[]; };
+#ifdef OP_JOIN
+layout(binding = 4, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
+#endif
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
@@ -122,13 +121,13 @@ void main()
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
-  for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
-  {
-    channelCache[i] = outPixels[pixelIdx * OUT_CHANNEL_COUNT + i];
-  }
   for (int i = 0; i < IN_CHANNEL_COUNT; i++)
   {
-    channelCache[OUT_CHANNEL_COUNT + i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
+    channelCache[i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
+  }
+  for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
+  {
+    channelCache[IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
   }
 
   const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;

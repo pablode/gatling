@@ -187,10 +187,10 @@ namespace gtl
       .conv64_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 32 }),
       .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 }),
       .copyToOutput = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels }),
-      .join96_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Join }),
-      .join112_48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 112, .op = GiGlslShaderGen::OidnOp::Join }),
-      .join96_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 96, .op = GiGlslShaderGen::OidnOp::Join }),
-      .join64_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Join })
+      .join96_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Join }),
+      .join112_48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 112, .outChannelCount = 48, .op = GiGlslShaderGen::OidnOp::Join }),
+      .join96_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::Join }),
+      .join64_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 3, .op = GiGlslShaderGen::OidnOp::Join })
     };
   }
 
@@ -433,26 +433,48 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
       cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
     };
 
-    auto joinChannels = [&](CgpuBuffer inBuffer, CgpuBuffer outBuffer, uint32_t outDimsOffset, uint32_t dims)
+    auto joinChannels = [&](CgpuPipeline pipeline, CgpuBuffer inBuffer, CgpuBuffer inBuffer2, CgpuBuffer outBuffer)
     {
       CgpuBufferMemoryBarrier bufferBarrier {
         .buffer = inBuffer,
         .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER |
                         CGPU_PIPELINE_STAGE_FLAG_TRANSFER, // TODO: minimize
         .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_PIPELINE_STAGE_FLAG_TRANSFER // TODO: minimize
+        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
       };
+
       CgpuPipelineBarrier barrier = {
         .bufferBarrierCount = 1,
         .bufferBarriers = &bufferBarrier
       };
       cgpuCmdPipelineBarrier(commandBuffer, &barrier);
 
-      uint64_t dstOffset = outDimsOffset * imageWidth * imageHeight * sizeof(float)/2;
-      uint64_t size = imageWidth * imageHeight * sizeof(float)/2 * dims;
-      cgpuCmdCopyBuffer(commandBuffer, inBuffer, 0, outBuffer, dstOffset, size);
+      rp::PushConstants pushData = {
+        .imageWidth = imageWidth,
+        .imageHeight = imageHeight
+      };
+
+      std::array<CgpuBufferBinding, 5> bufferBindings = {
+        CgpuBufferBinding{ .binding = 0, .buffer = inBuffer },
+        CgpuBufferBinding{ .binding = 1, .buffer = outBuffer },
+        CgpuBufferBinding{ .binding = 2, .buffer = state->weightBuffer },
+        CgpuBufferBinding{ .binding = 3, .buffer = state->biasBuffer },
+        CgpuBufferBinding{ .binding = 4, .buffer = inBuffer2 }
+      };
+
+      CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
+      cgpuCmdUpdateBindings(commandBuffer, pipeline, 0/*descriptorSetIndex*/, &bindings0);
+
+      cgpuCmdBindPipeline(commandBuffer, pipeline);
+
+      cgpuCmdPushConstants(commandBuffer, pipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+
+      uint32_t wgCountX = (imageWidth + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
+      uint32_t wgCountY = (imageHeight + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
+      cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
     };
+
 
     uint32_t i = 0;
     const auto pingPong = state->pingPongData;
@@ -499,15 +521,15 @@ return;
     dispatchPipeline(pipelines.upsample96a, 0, 0, pingPong[1], pingPong[0]);
 
     // l3
-    dispatchPipeline(pipelines.join96_64, 0, 0, state->pool3, pingPong[0]);
-    dispatchPipeline(pipelines.conv160_112, offsets.decConv4a_weight, offsets.decConv4a_bias, pingPong[0], pingPong[1]);
-    dispatchPipeline(pipelines.conv112_112, offsets.decConv4b_weight, offsets.decConv4b_bias, pingPong[1], pingPong[0]);
+    joinChannels(pipelines.join96_64, pingPong[0], state->pool3, pingPong[1]);
+    dispatchPipeline(pipelines.conv160_112, offsets.decConv4a_weight, offsets.decConv4a_bias, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.conv112_112, offsets.decConv4b_weight, offsets.decConv4b_bias, pingPong[0], pingPong[1]);
     imageWidth *= 2;
     imageHeight *= 2;
-    dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[1], pingPong[0]);
 
     // l2
-    dispatchPipeline(pipelines.join112_48, 0, 0, state->pool2, pingPong[1]);
+    joinChannels(pipelines.join112_48, pingPong[0], state->pool2, pingPong[1]);
     dispatchPipeline(pipelines.conv160_96, offsets.decConv3a_weight, offsets.decConv3a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv96_96b, offsets.decConv3b_weight, offsets.decConv3b_bias, pingPong[0], pingPong[1]);
     imageWidth *= 2;
@@ -515,15 +537,15 @@ return;
     dispatchPipeline(pipelines.upsample96b, 0, 0, pingPong[1], pingPong[0]);
 
     // l1
-    dispatchPipeline(pipelines.join96_32, 0, 0, state->pool1, pingPong[0]);
-    dispatchPipeline(pipelines.conv128_64, offsets.decConv2a_weight, offsets.decConv2a_bias, pingPong[0], pingPong[1]);
-    dispatchPipeline(pipelines.conv64_64, offsets.decConv2b_weight, offsets.decConv2b_bias, pingPong[1], pingPong[0]);
+    joinChannels(pipelines.join96_32, pingPong[0], state->pool1, pingPong[1]);
+    dispatchPipeline(pipelines.conv128_64, offsets.decConv2a_weight, offsets.decConv2a_bias, pingPong[1], pingPong[0]);
+    dispatchPipeline(pipelines.conv64_64, offsets.decConv2b_weight, offsets.decConv2b_bias, pingPong[0], pingPong[1]);
     imageWidth *= 2;
     imageHeight *= 2;
-    dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[1], pingPong[0]);
 
     // l0
-    dispatchPipeline(pipelines.join64_3, 0, 0, state->pool0, pingPong[1]);
+    joinChannels(pipelines.join64_3, pingPong[0], state->pool0, pingPong[1]);
     dispatchPipeline(pipelines.conv67_64, offsets.decConv1a_weight, offsets.decConv1a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv64_32, offsets.decConv1b_weight, offsets.decConv1b_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[1], pingPong[0]);
