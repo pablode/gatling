@@ -31,9 +31,11 @@ namespace gtl
   struct GiOidnPipelines
   {
     CgpuPipeline debug;
+    CgpuPipeline debug2;
     CgpuPipeline conv3_32;
     CgpuPipeline conv32_32;
     CgpuPipeline maxPool32;
+    CgpuPipeline maxPool32_debug;
     CgpuPipeline conv32_48;
     CgpuPipeline maxPool48;
     CgpuPipeline conv48_64;
@@ -162,9 +164,11 @@ namespace gtl
     GB_LOG("creating OIDN pipelines:");
     return GiOidnPipelines{
       .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::Upsample }),
+      .debug2 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::Upsample }),
       .conv3_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 32 }),
       .conv32_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32 }),
       .maxPool32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
+      .maxPool32_debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
       .conv32_48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 48 }),
       .maxPool48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 48, .op = GiGlslShaderGen::OidnOp::MaxPool }),
       .conv48_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 48, .outChannelCount = 64 }),
@@ -480,11 +484,43 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     const auto pingPong = state->pingPongData;
 
 #if 0
+    imageWidth /= 2;
+    imageHeight /= 2;
+    imageWidth /= 2;
+    imageHeight /= 2;
+    imageWidth /= 2;
+    imageHeight /= 2;
+    imageWidth /= 2;
+    imageHeight /= 2;
+    imageWidth *= 2;
+    imageHeight *= 2;
+    imageWidth *= 2;
+    imageHeight *= 2;
+    imageWidth *= 2;
+    imageHeight *= 2;
+    imageWidth *= 2;
+    imageHeight *= 2;
+GB_LOG("iw_new: {}, iw_old: {}", imageWidth, state->imageWidth);
+GB_LOG("ih_new: {}, ih_old: {}", imageHeight, state->imageHeight);
+#endif
+#if 0
+    dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]); // 3->32
+    dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[0], pingPong[1]); // downsample
+    imageWidth /= 2;
+    imageHeight /= 2;
+    dispatchPipeline(pipelines.maxPool32_debug, 0, 0, pingPong[1], pingPong[0]); // downsample
+    dispatchPipeline(pipelines.debug, 0, 0, pingPong[0], pingPong[1]); // upsample
+    imageWidth *= 2;
+    imageHeight *= 2;
+    dispatchPipeline(pipelines.debug2, 0, 0, pingPong[1], pingPong[0]); // upsample
+    dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[0], pingPong[1]); // 32->3
+    dispatchPipeline(pipelines.copyToOutput, 0, 0, pingPong[1], rgbResult); // debug viz to color AOV
+return;
+#endif
+#if 0
     dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
-    dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[0], pingPong[1]);
-    dispatchPipeline(pipelines.debug2, 0, 0, pingPong[1], pingPong[0]);
-    dispatchPipeline(pipelines.conv32_32, offsets.encConv1_weight, offsets.encConv1_bias, pingPong[0], pingPong[1]);
-    dispatchPipeline(pipelines.debug, 0, 0, pingPong[1], rgbResult); // debug viz to color AOV
+    dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.copyToOutput, 0, 0, pingPong[1], rgbResult); // debug viz to color AOV
 return;
 #endif
 
