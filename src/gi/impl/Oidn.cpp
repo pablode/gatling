@@ -227,13 +227,13 @@ namespace gtl
       assert(tensorDescriptions.count(name) > 0);
       const GiTzaTensorDescription& desc = tensorDescriptions.at(name);
       uint32_t dataOffset = (nextWeightOffset + 4 - 1) / 4 * 4; // required align
-      uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
+      uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4; // TODO: this can read OOB...
 
       bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, weightBuffer, dataOffset);
       if (!s) GB_FATAL("failed to stage data");
 
-      nextWeightOffset += desc.dataSize;
-      return dataOffset;
+      nextWeightOffset += dataSize;
+      return dataOffset / 2;
     };
 
     uint32_t nextBiasOffset = 0;
@@ -241,13 +241,13 @@ namespace gtl
       assert(tensorDescriptions.count(name) > 0);
       const GiTzaTensorDescription& desc = tensorDescriptions.at(name);
       uint32_t dataOffset = (nextBiasOffset + 4 - 1) / 4 * 4; // required align
-      uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4;
+      uint32_t dataSize = (desc.dataSize + 4 - 1) / 4 * 4; // TODO: see above
 
       bool s = stager.stageToBuffer(&tensorData[desc.dataOffset], dataSize, biasBuffer, dataOffset);
       if (!s) GB_FATAL("failed to stage data");
 
-      nextBiasOffset += desc.dataSize;
-      return dataOffset;
+      nextBiasOffset += dataSize;
+      return dataOffset / 2;
     };
 
     GiOidnBufferOffsets offsets = {
@@ -485,36 +485,33 @@ return;
     // l4
     dispatchPipeline(pipelines.conv80_96, offsets.encConv5a_weight, offsets.encConv5a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv96_96a, offsets.encConv5b_weight, offsets.encConv5b_bias, pingPong[0], pingPong[1]);
-    dispatchPipeline(pipelines.upsample96a, 0, 0, pingPong[1], pingPong[0]);
     imageWidth *= 2;
     imageHeight *= 2;
+    dispatchPipeline(pipelines.upsample96a, 0, 0, pingPong[1], pingPong[0]);
 
     // l3
     joinChannels(state->pool3, pingPong[0], 96, 64);
     dispatchPipeline(pipelines.conv160_112, offsets.decConv4a_weight, offsets.decConv4a_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv112_112, offsets.decConv4b_weight, offsets.decConv4b_bias, pingPong[1], pingPong[0]);
-    dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[0], pingPong[1]);
     imageWidth *= 2;
     imageHeight *= 2;
+    dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[0], pingPong[1]);
 
     // l2
     joinChannels(state->pool2, pingPong[1], 112, 48);
     dispatchPipeline(pipelines.conv160_96, offsets.decConv3a_weight, offsets.decConv3a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv96_96b, offsets.decConv3b_weight, offsets.decConv3b_bias, pingPong[0], pingPong[1]);
-    dispatchPipeline(pipelines.upsample96b, 0, 0, pingPong[1], pingPong[0]);
     imageWidth *= 2;
     imageHeight *= 2;
+    dispatchPipeline(pipelines.upsample96b, 0, 0, pingPong[1], pingPong[0]);
 
     // l1
     joinChannels(state->pool1, pingPong[0], 96, 32);
     dispatchPipeline(pipelines.conv128_64, offsets.decConv2a_weight, offsets.decConv2a_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv64_64, offsets.decConv2b_weight, offsets.decConv2b_bias, pingPong[1], pingPong[0]);
-    dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[0], pingPong[1]);
     imageWidth *= 2;
     imageHeight *= 2;
-
-GB_LOG("iw_new: {}, iw_old: {}", imageWidth, state->imageWidth);
-GB_LOG("ih_new: {}, ih_old: {}", imageHeight, state->imageHeight);
+    dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[0], pingPong[1]);
 
     // l0
     joinChannels(state->pool0, pingPong[1], 64, 3);

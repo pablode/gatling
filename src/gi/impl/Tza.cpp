@@ -133,10 +133,10 @@ namespace gtl
 
       auto dataOffset = _giTzaRead<uint64_t>(ptr, end);
 
-      uint64_t dataSize = 0;
+      uint64_t dataSize = 1;
       for (uint32_t i = 0; i < dimCount; i++)
       {
-        dataSize += dimensions[i];
+        dataSize *= dimensions[i];
       }
       dataSize *= (dataType == GiTzaTensorDataType::Float32 ? 4 : 2);
  

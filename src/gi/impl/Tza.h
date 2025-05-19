@@ -23,14 +23,15 @@
 
 namespace gtl
 {
-  // TODO: remove support for layouts & data types that we do not use
+  // TODO: validate weights oihw, biases x layouts on upload
   enum class GiTzaTensorLayout { x, oihw };
 
+  // TODO: only support f16
   enum class GiTzaTensorDataType { Float16, Float32 };
 
   struct GiTzaTensorDescription
   {
-    std::vector<int> dimensions; // CHW or OIHW
+    std::vector<int> dimensions;
     GiTzaTensorLayout layout;
     GiTzaTensorDataType dataType;
     uint64_t dataOffset;

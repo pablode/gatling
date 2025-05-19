@@ -25,8 +25,6 @@ void main()
     return;
 
   int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
-  int inIdx = pixelIdx * IN_CHANNEL_COUNT;
-  int outIdx = pixelIdx * OUT_CHANNEL_COUNT;
 
 #if 0 // viz input channels
   //int channelOffset = 0; // 3 = normals, 6 = albedo
@@ -39,33 +37,35 @@ void main()
   if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
     return;
 
-  int outIdx0 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * OUT_CHANNEL_COUNT;
-  int outIdx1 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * OUT_CHANNEL_COUNT;
-  int outIdx2 = int(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * OUT_CHANNEL_COUNT;
-  int outIdx3 = int(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * OUT_CHANNEL_COUNT;
+  uint outIdx0 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
+  uint outIdx1 = uint(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
+  uint outIdx2 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
+  uint outIdx3 = uint(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
 
-  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
+  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++) // TODO: should be the same
   {
-    outPixels[outIdx0 + i] = inPixels[inIdx + i];
-    outPixels[outIdx1 + i] = inPixels[inIdx + i];
-    outPixels[outIdx2 + i] = inPixels[inIdx + i];
-    outPixels[outIdx3 + i] = inPixels[inIdx + i];
+    float16_t f = inPixels[pixelIdx *IN_CHANNEL_COUNT+i];
+    outPixels[outIdx0 + i] = f;
+    outPixels[outIdx1 + i] = f;
+    outPixels[outIdx2 + i] = f;
+    outPixels[outIdx3 + i] = f;
   }
 #endif
 #ifdef OP_MAX_POOL
   if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
     return;
 
-  int inIdx0 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
-  int inIdx1 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
-  int inIdx2 = int(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
-  int inIdx3 = int(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  uint inIdx0 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  uint inIdx1 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  uint inIdx2 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  uint inIdx3 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
+  int pIdx = int(gl_GlobalInvocationID.y * PC.imageWidth/2 + gl_GlobalInvocationID.x);
 
   for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
   {
     float16_t max1 = max(inPixels[inIdx0 + i], inPixels[inIdx1 + i]);
     float16_t max2 = max(inPixels[inIdx2 + i], inPixels[inIdx3 + i]);
-    outPixels[outIdx + i] = max(max1, max2);
+    outPixels[pIdx *OUT_CHANNEL_COUNT+i] = max(max1, max2);
   }
 #endif
 #ifdef OP_CONVOLVE
@@ -83,11 +83,13 @@ void main()
       coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
       coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
 
+      int pIdx = int(coord.y * PC.imageWidth + coord.x);
+
       for (int h = 0; h < IN_CHANNEL_COUNT; h++) // TODO: rename -> ic
       {
-        int inIndexIj = int(coord.x + coord.y * PC.imageWidth) * IN_CHANNEL_COUNT + h;
+        uint inIndexIj = pIdx * IN_CHANNEL_COUNT + h;
 
-        int weightIndex = ((k * IN_CHANNEL_COUNT + h) * (KERNEL_SIZE*KERNEL_SIZE)) + (j * KERNEL_SIZE + i);
+        uint weightIndex = (k * IN_CHANNEL_COUNT * 3 * 3) + (h * 3*3) + (j*3 + i); // OIHW
 
         float weight = float(weights[PC.weightOffset + weightIndex]);
 
@@ -97,16 +99,17 @@ void main()
 
     result += float(biases[PC.biasOffset + k]);
 
-    outPixels[outIdx + k] = float16_t(result);
+    outPixels[pixelIdx * OUT_CHANNEL_COUNT + k] = float16_t(result);
   }
 #endif
 #ifdef OP_COPY_CHANNELS
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
-  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
+  for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
   {
-    outPixels[outIdx + i] = float(inPixels[inIdx + i]);
+    float f = (i < IN_CHANNEL_COUNT) ? float(inPixels[pixelIdx * IN_CHANNEL_COUNT + i]) : 0.0;
+    outPixels[pixelIdx * OUT_CHANNEL_COUNT + i] = f;
   }
 #endif
 }
