@@ -40,7 +40,7 @@ void main()
 #endif
 
 #ifdef OP_UPSAMPLE
-  if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
   uint outIdx0 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
@@ -58,7 +58,7 @@ void main()
   }
 #endif
 #ifdef OP_MAX_POOL
-  if (gl_GlobalInvocationID.x >= (PC.imageWidth / 2) || gl_GlobalInvocationID.y >= (PC.imageHeight / 2))
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
   uint inIdx0 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
