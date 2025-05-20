@@ -12,15 +12,17 @@ layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; }
 #else
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
 #endif
-layout(binding = 2, std430) readonly buffer WeightBuffer { float16_t weights[]; };
-layout(binding = 3, std430) readonly buffer BiasBuffer { float16_t biases[]; };
+layout(binding = 2, std430) readonly buffer WeightBuffer { float weights[]; };
+layout(binding = 3, std430) readonly buffer BiasBuffer { float biases[]; };
 #ifdef OP_JOIN
 layout(binding = 4, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
 #endif
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
+#ifdef OP_JOIN
 shared float16_t channelCache[160/*max depth*/];
+#endif
 
 #define KERNEL_SIZE 3
 
@@ -60,11 +62,11 @@ void main()
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
-  uint inIdx0 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
-  uint inIdx1 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth) * IN_CHANNEL_COUNT;
-  uint inIdx2 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
-  uint inIdx3 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth) * IN_CHANNEL_COUNT;
-  int pIdx = int(gl_GlobalInvocationID.y * PC.imageWidth/2 + gl_GlobalInvocationID.x);
+  uint inIdx0 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
+  uint inIdx1 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
+  uint inIdx2 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
+  uint inIdx3 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
+  int pIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
 
   for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
   {
@@ -94,7 +96,11 @@ void main()
       {
         uint inIndexIj = pIdx * IN_CHANNEL_COUNT + h;
 
-        uint weightIndex = (k * IN_CHANNEL_COUNT * 3 * 3) + (h * 3*3) + (j*3 + i); // OIHW
+#if 1 // OIHW
+uint weightIndex = (k * IN_CHANNEL_COUNT * 3 * 3) + (h * 3*3) + (j*3 + i);
+#else // HWIO
+uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + h) * OUT_CHANNEL_COUNT + k;
+#endif
 
         float weight = float(weights[PC.weightOffset + weightIndex]);
 
@@ -103,6 +109,8 @@ void main()
     }
 
     result += float(biases[PC.biasOffset + k]);
+
+    result = max(result, 0.0);//ReLU
 
     outPixels[pixelIdx * OUT_CHANNEL_COUNT + k] = float16_t(result);
   }

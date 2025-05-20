@@ -79,7 +79,7 @@ namespace gtl
     //  u8* | data
     GiTzaTensorDescriptions descs;
 
-    GB_DEBUG("parsing {} tensors:", tensorCount);
+    GB_LOG("parsing {} tensors:", tensorCount);
 
     for (uint32_t i = 0; i < tensorCount; i++)
     {
@@ -134,15 +134,17 @@ namespace gtl
       auto dataOffset = _giTzaRead<uint64_t>(ptr, end);
 
       uint64_t dataSize = 1;
+GB_LOG("----");
       for (uint32_t i = 0; i < dimCount; i++)
       {
+GB_LOG("  {}", dimensions[i]);
         dataSize *= dimensions[i];
       }
       dataSize *= (dataType == GiTzaTensorDataType::Float32 ? 4 : 2);
  
       _giTzaCheckBounds(&data[dataOffset], end, dataSize);
 
-      GB_DEBUG(" {} ({}, {}, {})", name, dimCount, layoutStr, dataTypeChar);
+      GB_LOG(" {} ({}, {}, {})", name, dimCount, layoutStr, dataTypeChar);
 
       descs[name] = GiTzaTensorDescription{
         .dimensions = dimensions,

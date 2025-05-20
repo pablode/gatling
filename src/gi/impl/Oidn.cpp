@@ -186,7 +186,7 @@ namespace gtl
       .conv96_96b = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 96 }),
       .conv128_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 128, .outChannelCount = 64 }),
       .conv64_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64 }),
-      .upsample64 =createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Upsample }),
+      .upsample64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Upsample }),
       .conv67_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 67, .outChannelCount = 64 }),
       .conv64_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 32 }),
       .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 }),
@@ -217,6 +217,7 @@ namespace gtl
       const GiTzaTensorDescription& desc = tensorDescriptions.at(newName);
       weightBufferSize += (desc.dataSize + 4 - 1) / 4  * 4; // required align
     }
+weightBufferSize*=2; // just to be sure. TODO: bc it does not incorporate padding introduced below
     size_t biasBufferSize = 0;
     for (const char* name : TENSOR_NAMES)
     {
@@ -225,6 +226,7 @@ namespace gtl
       const GiTzaTensorDescription& desc = tensorDescriptions.at(newName);
       biasBufferSize += (desc.dataSize + 4 - 1) / 4  * 4; // required align
     }
+biasBufferSize*=2; //just to be sure
 
     CgpuBufferUsageFlags tensorBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
 
@@ -246,7 +248,7 @@ namespace gtl
       if (!s) GB_FATAL("failed to stage data");
 
       nextWeightOffset += dataSize;
-      return dataOffset / 2;
+      return dataOffset/4;
     };
 
     uint32_t nextBiasOffset = 0;
@@ -260,7 +262,7 @@ namespace gtl
       if (!s) GB_FATAL("failed to stage data");
 
       nextBiasOffset += dataSize;
-      return dataOffset / 2;
+      return dataOffset/4;
     };
 
     GiOidnBufferOffsets offsets = {
@@ -505,6 +507,8 @@ GB_LOG("ih_new: {}, ih_old: {}", imageHeight, state->imageHeight);
 #endif
 #if 0
     dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]); // 3->32
+    imageWidth /= 2;
+    imageHeight /= 2;
     dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[0], pingPong[1]); // downsample
     imageWidth /= 2;
     imageHeight /= 2;
@@ -513,13 +517,9 @@ GB_LOG("ih_new: {}, ih_old: {}", imageHeight, state->imageHeight);
     imageWidth *= 2;
     imageHeight *= 2;
     dispatchPipeline(pipelines.debug2, 0, 0, pingPong[1], pingPong[0]); // upsample
+    imageWidth *= 2;
+    imageHeight *= 2;
     dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[0], pingPong[1]); // 32->3
-    dispatchPipeline(pipelines.copyToOutput, 0, 0, pingPong[1], rgbResult); // debug viz to color AOV
-return;
-#endif
-#if 0
-    dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
-    dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.copyToOutput, 0, 0, pingPong[1], rgbResult); // debug viz to color AOV
 return;
 #endif
@@ -527,58 +527,58 @@ return;
     // l0
     dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
     dispatchPipeline(pipelines.conv32_32, offsets.encConv1_weight, offsets.encConv1_bias, pingPong[0], pingPong[1]);
-    dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[1], state->pool1);
     imageWidth /= 2;
     imageHeight /= 2;
+    dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[1], state->pool1);
 
     // l1
     dispatchPipeline(pipelines.conv32_48, offsets.encConv2_weight, offsets.encConv2_bias, state->pool1, pingPong[0]);
-    dispatchPipeline(pipelines.maxPool48, 0, 0, pingPong[0], state->pool2);
     imageWidth /= 2;
     imageHeight /= 2;
+    dispatchPipeline(pipelines.maxPool48, 0, 0, pingPong[0], state->pool2);
 
     // l2
     dispatchPipeline(pipelines.conv48_64, offsets.encConv3_weight, offsets.encConv3_bias, state->pool2, pingPong[0]);
-    dispatchPipeline(pipelines.maxPool64, 0, 0, pingPong[0], state->pool3);
     imageWidth /= 2;
     imageHeight /= 2;
+    dispatchPipeline(pipelines.maxPool64, 0, 0, pingPong[0], state->pool3);
 
     // l3
     dispatchPipeline(pipelines.conv64_80, offsets.encConv4_weight, offsets.encConv4_bias, state->pool3, pingPong[0]);
-    dispatchPipeline(pipelines.maxPool80, 0, 0, pingPong[0], pingPong[1]);
     imageWidth /= 2;
     imageHeight /= 2;
+    dispatchPipeline(pipelines.maxPool80, 0, 0, pingPong[0], pingPong[1]);
 
     // l4
     dispatchPipeline(pipelines.conv80_96, offsets.encConv5a_weight, offsets.encConv5a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv96_96a, offsets.encConv5b_weight, offsets.encConv5b_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample96a, 0, 0, pingPong[1], pingPong[0]);
     imageWidth *= 2;
     imageHeight *= 2;
-    dispatchPipeline(pipelines.upsample96a, 0, 0, pingPong[1], pingPong[0]);
 
     // l3
     joinChannels(pipelines.join96_64, pingPong[0], state->pool3, pingPong[1]);
     dispatchPipeline(pipelines.conv160_112, offsets.decConv4a_weight, offsets.decConv4a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv112_112, offsets.decConv4b_weight, offsets.decConv4b_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[1], pingPong[0]);
     imageWidth *= 2;
     imageHeight *= 2;
-    dispatchPipeline(pipelines.upsample112, 0, 0, pingPong[1], pingPong[0]);
 
     // l2
     joinChannels(pipelines.join112_48, pingPong[0], state->pool2, pingPong[1]);
     dispatchPipeline(pipelines.conv160_96, offsets.decConv3a_weight, offsets.decConv3a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv96_96b, offsets.decConv3b_weight, offsets.decConv3b_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample96b, 0, 0, pingPong[1], pingPong[0]);
     imageWidth *= 2;
     imageHeight *= 2;
-    dispatchPipeline(pipelines.upsample96b, 0, 0, pingPong[1], pingPong[0]);
 
     // l1
     joinChannels(pipelines.join96_32, pingPong[0], state->pool1, pingPong[1]);
     dispatchPipeline(pipelines.conv128_64, offsets.decConv2a_weight, offsets.decConv2a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv64_64, offsets.decConv2b_weight, offsets.decConv2b_bias, pingPong[0], pingPong[1]);
+    dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[1], pingPong[0]);
     imageWidth *= 2;
     imageHeight *= 2;
-    dispatchPipeline(pipelines.upsample64, 0, 0, pingPong[1], pingPong[0]);
 
     // l0
     joinChannels(pipelines.join64_3, pingPong[0], state->pool0, pingPong[1]);
