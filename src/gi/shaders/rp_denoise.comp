@@ -20,10 +20,6 @@ layout(binding = 4, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
-#ifdef OP_JOIN
-shared float16_t channelCache[160/*max depth*/];
-#endif
-
 #define KERNEL_SIZE 3
 
 void main()
@@ -129,20 +125,31 @@ uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + h) * OUT_CHANNEL_COUNT + 
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
+  // TODO: super slow! maybe replace with memory copy?
+
+ //for (int i = 0; i < IN_CHANNEL_COUNT; i++)
+ //{
+ //  channelCache[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
+ //}
+ //for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
+ //{
+ //  channelCache[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
+ //}
+
+ const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;
+
+ //for (int i = 0; i < RES_CHANNEL_COUNT; i++)
+ //{
+ //  outPixels[pixelIdx * RES_CHANNEL_COUNT + i] = channelCache[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][i];
+ //}
+
   for (int i = 0; i < IN_CHANNEL_COUNT; i++)
   {
-    channelCache[i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
+    outPixels[pixelIdx * RES_CHANNEL_COUNT + i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
   }
   for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
   {
-    channelCache[IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
-  }
-
-  const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;
-
-  for (int i = 0; i < RES_CHANNEL_COUNT; i++)
-  {
-    outPixels[pixelIdx * RES_CHANNEL_COUNT + i] = channelCache[i];
+    outPixels[pixelIdx * RES_CHANNEL_COUNT + IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
   }
 #endif
 }
