@@ -119,6 +119,8 @@ namespace gtl
 
     CgpuBuffer pingPongData[2];
 
+    CgpuBuffer outputImage;
+
     GgpuDelayedResourceDestroyer resourceDestroyer;
   };
 
@@ -375,6 +377,12 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
       GB_FATAL("failed to allocate OIDN buffer");
     }
 
+    uint32_t outputImageSize = (imageWidth * imageHeight) * sizeof(float) * 4;
+    if (!cgpuCreateBuffer(device, { .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC, .size = outputImageSize }, &state->outputImage))
+    {
+      GB_FATAL("failed to allocate OIDN buffer");
+    }
+
     state->imageWidth = imageWidth;
     state->imageHeight = imageHeight;
     return true;
@@ -385,8 +393,13 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
     return state->pool0;
   }
 
+  CgpuBuffer giOidnGetOutputBuffer(GiOidnState* state)
+  {
+    return state->outputImage;
+  }
+
   // TODO: for starters, copy 3 channels of input AOV to color AOV (viz aux normal & albedo)
-  void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer, CgpuBuffer rgbResult)
+  void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer)
   {
     // TODO: apparently the input W, H need to be aligned to 16 pixels !
     const auto& pipelines = state->pipelines;
@@ -586,6 +599,20 @@ return;
     dispatchPipeline(pipelines.conv64_32, offsets.decConv1b_weight, offsets.decConv1b_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[1], pingPong[0]);
 
-    dispatchPipeline(pipelines.copyToOutput, 0, 0, pingPong[0], rgbResult); // debug viz to color AOV
+    dispatchPipeline(pipelines.copyToOutput, 0, 0, pingPong[0], state->outputImage); // debug viz to color AOV
+
+    CgpuBufferMemoryBarrier bufferBarrier {
+      .buffer = state->outputImage,
+      .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+      .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+      .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
+      .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ
+    };
+
+    CgpuPipelineBarrier barrier = {
+      .bufferBarrierCount = 1,
+      .bufferBarriers = &bufferBarrier
+    };
+    cgpuCmdPipelineBarrier(commandBuffer, &barrier);
   }
 }

@@ -44,6 +44,7 @@ namespace gtl
   bool giOidnUpdateState(GiOidnState* state, CgpuDevice device, uint32_t imageWidth, uint32_t imageHeight);
 
   CgpuBuffer giOidnGetInputBuffer(GiOidnState* state);
+  CgpuBuffer giOidnGetOutputBuffer(GiOidnState* state);
 
-  void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer, CgpuBuffer rgbResult);
+  void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer);
 }

@@ -2378,7 +2378,7 @@ cleanup:
     // <DENOISING PASS>
     if (renderSettings.denoise)
     {
-      giOidnRender(scene->denoiserState, commandBuffer, colorBinding->renderBuffer->deviceMem );
+      giOidnRender(scene->denoiserState, commandBuffer );
     }
     // </DENOISING PASS>
 
@@ -2426,7 +2426,9 @@ cleanup:
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-        cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
+        CgpuBuffer deviceMem = (binding.aovId == GiAovId::Color && renderSettings.denoise ) ? giOidnGetOutputBuffer(scene->denoiserState) : renderBuffer->deviceMem; 
+
+        cgpuCmdCopyBuffer(commandBuffer, deviceMem, 0, renderBuffer->hostMem);
 
         if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
           goto cleanup;
