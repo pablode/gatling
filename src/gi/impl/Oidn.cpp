@@ -32,7 +32,7 @@ namespace gtl
   {
     CgpuPipeline debug;
     CgpuPipeline debug2;
-    CgpuPipeline conv3_32;
+    CgpuPipeline conv9_32;
     CgpuPipeline conv32_32;
     CgpuPipeline maxPool32;
     CgpuPipeline maxPool32_debug;
@@ -55,14 +55,14 @@ namespace gtl
     CgpuPipeline conv128_64;
     CgpuPipeline conv64_64;
     CgpuPipeline upsample64;
-    CgpuPipeline conv67_64;
+    CgpuPipeline conv73_64;
     CgpuPipeline conv64_32;
     CgpuPipeline conv32_3;
     CgpuPipeline copyToOutput;
     CgpuPipeline join96_64;
     CgpuPipeline join112_48;
     CgpuPipeline join96_32;
-    CgpuPipeline join64_3;
+    CgpuPipeline join64_9;
   };
 
   struct GiOidnBufferOffsets
@@ -167,7 +167,7 @@ namespace gtl
     return GiOidnPipelines{
       .debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::Upsample }),
       .debug2 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::Upsample }),
-      .conv3_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 32 }),
+      .conv9_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 9, .outChannelCount = 32 }),
       .conv32_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32 }),
       .maxPool32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
       .maxPool32_debug = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::MaxPool }),
@@ -189,14 +189,14 @@ namespace gtl
       .conv128_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 128, .outChannelCount = 64 }),
       .conv64_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64 }),
       .upsample64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Upsample }),
-      .conv67_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 67, .outChannelCount = 64 }),
+      .conv73_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 73, .outChannelCount = 64 }),
       .conv64_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 32 }),
       .conv32_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 32, .outChannelCount = 3 }),
       .copyToOutput = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 3, .outChannelCount = 4, .op = GiGlslShaderGen::OidnOp::CopyChannels }),
       .join96_64 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 64, .op = GiGlslShaderGen::OidnOp::Join }),
       .join112_48 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 112, .outChannelCount = 48, .op = GiGlslShaderGen::OidnOp::Join }),
       .join96_32 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 96, .outChannelCount = 32, .op = GiGlslShaderGen::OidnOp::Join }),
-      .join64_3 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 3, .op = GiGlslShaderGen::OidnOp::Join })
+      .join64_9 = createPipeline(GiGlslShaderGen::OidnParams{ .inChannelCount = 64, .outChannelCount = 9, .op = GiGlslShaderGen::OidnOp::Join })
     };
   }
 
@@ -345,7 +345,7 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
     // TODO: destroy buffers with delayedResourceDestroyer
 
-    uint64_t pool0Size = (imageWidth/1) * (imageHeight/1) * sizeof(float)/2 * 3;
+    uint64_t pool0Size = (imageWidth/1) * (imageHeight/1) * sizeof(float)/2 * 9;
     uint64_t pool1Size = (imageWidth/2) * (imageHeight/2) * sizeof(float)/2 * 32;
     uint64_t pool2Size = (imageWidth/4) * (imageHeight/4) * sizeof(float)/2 * 48;
     uint64_t pool3Size = (imageWidth/8) * (imageHeight/8) * sizeof(float)/2 * 64;
@@ -519,7 +519,7 @@ GB_LOG("iw_new: {}, iw_old: {}", imageWidth, state->imageWidth);
 GB_LOG("ih_new: {}, ih_old: {}", imageHeight, state->imageHeight);
 #endif
 #if 0
-    dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]); // 3->32
+    dispatchPipeline(pipelines.conv9_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]); // 3->32
     imageWidth /= 2;
     imageHeight /= 2;
     dispatchPipeline(pipelines.maxPool32, 0, 0, pingPong[0], pingPong[1]); // downsample
@@ -538,7 +538,7 @@ return;
 #endif
 
     // l0
-    dispatchPipeline(pipelines.conv3_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
+    dispatchPipeline(pipelines.conv9_32, offsets.encConv0_weight, offsets.encConv0_bias, state->pool0, pingPong[0]);
     dispatchPipeline(pipelines.conv32_32, offsets.encConv1_weight, offsets.encConv1_bias, pingPong[0], pingPong[1]);
     imageWidth /= 2;
     imageHeight /= 2;
@@ -594,8 +594,8 @@ return;
     imageHeight *= 2;
 
     // l0
-    joinChannels(pipelines.join64_3, pingPong[0], state->pool0, pingPong[1]);
-    dispatchPipeline(pipelines.conv67_64, offsets.decConv1a_weight, offsets.decConv1a_bias, pingPong[1], pingPong[0]);
+    joinChannels(pipelines.join64_9, pingPong[0], state->pool0, pingPong[1]);
+    dispatchPipeline(pipelines.conv73_64, offsets.decConv1a_weight, offsets.decConv1a_bias, pingPong[1], pingPong[0]);
     dispatchPipeline(pipelines.conv64_32, offsets.decConv1b_weight, offsets.decConv1b_bias, pingPong[0], pingPong[1]);
     dispatchPipeline(pipelines.conv32_3, offsets.decConv0_weight, offsets.decConv0_bias, pingPong[1], pingPong[0]);
 
