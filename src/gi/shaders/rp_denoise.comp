@@ -29,17 +29,7 @@ void main()
 
   int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
 
-#if 0 // viz input channels
-  //int channelOffset = 0; // 3 = normals, 6 = albedo
-  //for (int i = 0; i < 3; i++)
-  //  outPixels[outIdx + i] = inPixels[inIdx + channelOffset + i];
-  //return;
-#endif
-
 #ifdef OP_UPSAMPLE
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
-    return;
-
   uint outIdx0 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
   uint outIdx1 = uint(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
   uint outIdx2 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
@@ -55,9 +45,6 @@ void main()
   }
 #endif
 #ifdef OP_MAX_POOL
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
-    return;
-
   uint inIdx0 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
   uint inIdx1 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
   uint inIdx2 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
@@ -75,12 +62,12 @@ void main()
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
-  for (int k = 0; k < OUT_CHANNEL_COUNT; k++) // TODO: rename -> oc
+  for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
   {
-    float result = 0.0;
+    float16_t result = float16_t(0.0);
 
-    for (int i = 0; i < KERNEL_SIZE; i++)
-    for (int j = 0; j < KERNEL_SIZE; j++)
+    for (uint i = 0; i < KERNEL_SIZE; i++)
+    for (uint j = 0; j < KERNEL_SIZE; j++)
     {
       ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_SIZE/2);
       coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
@@ -88,33 +75,30 @@ void main()
 
       int pIdx = int(coord.y * PC.imageWidth + coord.x);
 
-      for (int h = 0; h < IN_CHANNEL_COUNT; h++) // TODO: rename -> ic
+      for (uint ic = 0; ic < IN_CHANNEL_COUNT; ic++)
       {
-        uint inIndexIj = pIdx * IN_CHANNEL_COUNT + h;
+        uint inIndexIj = pIdx * IN_CHANNEL_COUNT + ic;
 
 #if 1 // OIHW
-uint weightIndex = (k * IN_CHANNEL_COUNT * 3 * 3) + (h * 3*3) + (j*3 + i);
+uint weightIndex = (oc * IN_CHANNEL_COUNT * 3 * 3) + (ic * 3*3) + (j*3 + i);
 #else // HWIO
-uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + h) * OUT_CHANNEL_COUNT + k;
+uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + ic) * OUT_CHANNEL_COUNT + oc;
 #endif
 
-        float weight = float(weights[PC.weightOffset + weightIndex]);
+        float16_t weight = float16_t(weights[PC.weightOffset + weightIndex]);
 
-        result += float(inPixels[inIndexIj]) * weight;
+        result += inPixels[inIndexIj] * weight;
       }
     }
 
-    result += float(biases[PC.biasOffset + k]);
+    result += float16_t(biases[PC.biasOffset + oc]);
 
-    result = max(result, 0.0);//ReLU
+    result = max(result, float16_t(0.0));//ReLU
 
-    outPixels[pixelIdx * OUT_CHANNEL_COUNT + k] = float16_t(result);
+    outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = result;
   }
 #endif
 #ifdef OP_COPY_CHANNELS
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
-    return;
-
   for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
   {
     float f = (i < IN_CHANNEL_COUNT) ? float(inPixels[pixelIdx * IN_CHANNEL_COUNT + i]) : 0.0;
@@ -122,26 +106,7 @@ uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + h) * OUT_CHANNEL_COUNT + 
   }
 #endif
 #ifdef OP_JOIN
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
-    return;
-
-  // TODO: super slow! maybe replace with memory copy?
-
- //for (int i = 0; i < IN_CHANNEL_COUNT; i++)
- //{
- //  channelCache[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
- //}
- //for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
- //{
- //  channelCache[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
- //}
-
- const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;
-
- //for (int i = 0; i < RES_CHANNEL_COUNT; i++)
- //{
- //  outPixels[pixelIdx * RES_CHANNEL_COUNT + i] = channelCache[gl_GlobalInvocationID.x][gl_GlobalInvocationID.y][i];
- //}
+  const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;
 
   for (int i = 0; i < IN_CHANNEL_COUNT; i++)
   {
