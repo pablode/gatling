@@ -454,18 +454,28 @@ GB_LOG("encConv2_bias: {}", offsets.encConv2_bias);
 
     auto joinChannels = [&](CgpuPipeline pipeline, CgpuBuffer inBuffer, CgpuBuffer inBuffer2, CgpuBuffer outBuffer)
     {
-      CgpuBufferMemoryBarrier bufferBarrier {
-        .buffer = inBuffer,
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER |
-                        CGPU_PIPELINE_STAGE_FLAG_TRANSFER, // TODO: minimize
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+      CgpuBufferMemoryBarrier bufferBarriers[2] = {
+        CgpuBufferMemoryBarrier{
+          .buffer = inBuffer,
+          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER |
+                          CGPU_PIPELINE_STAGE_FLAG_TRANSFER, // TODO: minimize
+          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
+          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+        },
+        CgpuBufferMemoryBarrier{
+          .buffer = inBuffer2,
+          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER |
+                          CGPU_PIPELINE_STAGE_FLAG_TRANSFER, // TODO: minimize
+          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE, // TODO: minimize
+          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+        }
       };
 
       CgpuPipelineBarrier barrier = {
-        .bufferBarrierCount = 1,
-        .bufferBarriers = &bufferBarrier
+        .bufferBarrierCount = 2,
+        .bufferBarriers = &bufferBarriers[0]
       };
       cgpuCmdPipelineBarrier(commandBuffer, &barrier);
 
