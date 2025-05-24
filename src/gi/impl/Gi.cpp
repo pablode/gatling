@@ -1318,7 +1318,7 @@ cleanup:
       aovMask |= (1 << int(binding.aovId));
     }
 
-    if (renderSettings.denoiseColorAov)
+    if (renderSettings.denoiseColorAov && bool(aovMask & (1 << int(GiAovId::Color))))
     {
       aovMask |= (1 << 16/*OIDN, internal*/);
     }
@@ -2258,21 +2258,18 @@ cleanup:
     }
 
     // <OIDN AOV>
-    const GiAovBinding* colorBinding = nullptr;
+    bool enableDenoiser = false;
 
     for (const GiAovBinding& binding : params.aovBindings)
     {
-      if (binding.aovId != GiAovId::Color)
+      if (binding.aovId == GiAovId::Color)
       {
-        continue;
+        enableDenoiser = renderSettings.denoiseColorAov;
+        break;
       }
-
-      colorBinding = &binding;
-      break;
     }
-    assert(colorBinding); // TODO
 
-    if (renderSettings.denoiseColorAov)
+    if (enableDenoiser)
     {
       if (!scene->denoiserState)
       {
@@ -2287,20 +2284,26 @@ cleanup:
         if (!tensorData) GB_FATAL("can't read OIDN weights");
 
         GiTzaTensorDescriptions tensorDescs = giTzaParseTensors(tensorData, tensorSize);
-// TODO: pass tensor desc + data buffer in this function to upload to GPU
+
         scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen,
-*s_stager, *s_delayedResourceDestroyer, tensorDescs, tensorData);
+          *s_stager, *s_delayedResourceDestroyer, tensorDescs, tensorData);
+        // TODO: handle failure
 
         giMunmap(oidnWeightsFile, (void*) tensorData);
         giFileClose(oidnWeightsFile);
       }
 
       bool b = giOidnUpdateState(scene->denoiserState, s_device, imageWidth, imageHeight);
-      assert(b);
+      assert(b); // TODO: handle
 
       CgpuBuffer oidnBuffer = giOidnGetInputBuffer(scene->denoiserState);
 
       buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_OIDN, .buffer = oidnBuffer });
+    }
+    else if (scene->denoiserState)
+    {
+      giOidnDestroyState(scene->denoiserState);
+      scene->denoiserState = nullptr;
     }
     // </OIDN AOV>
 
@@ -2373,16 +2376,11 @@ cleanup:
 
     cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
 
-
-
-    // <DENOISING PASS>
-    if (renderSettings.denoiseColorAov)
+    // Denoise color AOV.
+    if (enableDenoiser)
     {
-      giOidnRender(scene->denoiserState, commandBuffer );
+      giOidnRender(scene->denoiserState, commandBuffer);
     }
-    // </DENOISING PASS>
-
-
 
     // Copy device to host memory.
     {
