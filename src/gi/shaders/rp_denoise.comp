@@ -21,6 +21,8 @@ layout(binding = 4, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
 #define KERNEL_SIZE 3
+#define KERNEL_SIZE_SQ (KERNEL_SIZE * KERNEL_SIZE)
+#define KERNEL_BIAS (KERNEL_SIZE / 2)
 
 void main()
 {
@@ -35,9 +37,9 @@ void main()
   uint outIdx2 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
   uint outIdx3 = uint(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
 
-  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++) // TODO: should be the same
+  for (int i = 0; i < IN_CHANNEL_COUNT; i++) // same as OUT_CHANNEL_COUNT
   {
-    float16_t f = inPixels[pixelIdx *IN_CHANNEL_COUNT+i];
+    float16_t f = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
     outPixels[outIdx0 + i] = f;
     outPixels[outIdx1 + i] = f;
     outPixels[outIdx2 + i] = f;
@@ -49,19 +51,15 @@ void main()
   uint inIdx1 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
   uint inIdx2 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
   uint inIdx3 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
-  int pIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
 
-  for (int i = 0; i < min(IN_CHANNEL_COUNT, OUT_CHANNEL_COUNT); i++)
+  for (int i = 0; i < OUT_CHANNEL_COUNT; i++) // same as IN_CHANNEL_COUNT
   {
     float16_t max1 = max(inPixels[inIdx0 + i], inPixels[inIdx1 + i]);
     float16_t max2 = max(inPixels[inIdx2 + i], inPixels[inIdx3 + i]);
-    outPixels[pIdx *OUT_CHANNEL_COUNT+i] = max(max1, max2);
+    outPixels[pixelIdx * OUT_CHANNEL_COUNT + i] = max(max1, max2);
   }
 #endif
 #ifdef OP_CONVOLVE
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
-    return;
-
   for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
   {
     float16_t result = float16_t(0.0);
@@ -69,21 +67,19 @@ void main()
     for (uint i = 0; i < KERNEL_SIZE; i++)
     for (uint j = 0; j < KERNEL_SIZE; j++)
     {
-      ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_SIZE/2);
+      ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
       coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
       coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
 
-      int pIdx = int(coord.y * PC.imageWidth + coord.x);
+      int coordIdx = int(coord.y * PC.imageWidth + coord.x);
 
       for (uint ic = 0; ic < IN_CHANNEL_COUNT; ic++)
       {
-        uint inIndexIj = pIdx * IN_CHANNEL_COUNT + ic;
+        uint inIndexIj = coordIdx * IN_CHANNEL_COUNT + ic;
 
-#if 1 // OIHW
-uint weightIndex = (oc * IN_CHANNEL_COUNT * 3 * 3) + (ic * 3*3) + (j*3 + i);
-#else // HWIO
-uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + ic) * OUT_CHANNEL_COUNT + oc;
-#endif
+        uint weightIndex = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
+
+        //uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + ic) * OUT_CHANNEL_COUNT + oc; // HWIO
 
         float16_t weight = float16_t(weights[PC.weightOffset + weightIndex]);
 
@@ -93,7 +89,7 @@ uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + ic) * OUT_CHANNEL_COUNT +
 
     result += float16_t(biases[PC.biasOffset + oc]);
 
-    result = max(result, float16_t(0.0));//ReLU
+    result = max(result, float16_t(0.0)); // ReLU activation
 
     outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = result;
   }
