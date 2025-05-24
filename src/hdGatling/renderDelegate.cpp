@@ -102,7 +102,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max volume walk length", HdGatlingSettingsTokens->maxVolumeWalkLength, VtValue{7} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Jittered sampling", HdGatlingSettingsTokens->jitteredSampling, VtValue{false} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Meters per scene unit", HdGatlingSettingsTokens->metersPerSceneUnit, VtValue{1.0f} });
-  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Denoising", HdGatlingSettingsTokens->denoising, VtValue{false} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Denoise Color AOV", HdGatlingSettingsTokens->denoiseColorAov, VtValue{false} });
 
   _debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressiveAccumulation, VtValue{true} });
 

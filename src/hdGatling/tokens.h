@@ -37,7 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((jitteredSampling, "jittered-sampling"))                  \
   ((clippingPlanes, "clipping-planes"))                      \
   ((metersPerSceneUnit, "meters-per-scene-unit"))            \
-  ((denoising, "denoising"))
+  ((denoiseColorAov, "denoise-color-aov"))
 
 // mtlx node identifier is given by UsdMtlx.
 #define HD_GATLING_NODE_IDENTIFIER_TOKENS            \

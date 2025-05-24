@@ -1318,7 +1318,7 @@ cleanup:
       aovMask |= (1 << int(binding.aovId));
     }
 
-    if (renderSettings.denoise)
+    if (renderSettings.denoiseColorAov)
     {
       aovMask |= (1 << 16/*OIDN, internal*/);
     }
@@ -1900,7 +1900,7 @@ cleanup:
 
     if (ra.mediumStackSize != rb.mediumStackSize ||
         ra.nextEventEstimation != rb.nextEventEstimation ||
-        ra.denoise != rb.denoise)
+        ra.denoiseColorAov != rb.denoiseColorAov)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersAll;
     }
@@ -2272,7 +2272,7 @@ cleanup:
     }
     assert(colorBinding); // TODO
 
-    if (renderSettings.denoise)
+    if (renderSettings.denoiseColorAov)
     {
       if (!scene->denoiserState)
       {
@@ -2376,7 +2376,7 @@ cleanup:
 
 
     // <DENOISING PASS>
-    if (renderSettings.denoise)
+    if (renderSettings.denoiseColorAov)
     {
       giOidnRender(scene->denoiserState, commandBuffer );
     }
@@ -2426,7 +2426,11 @@ cleanup:
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-        CgpuBuffer deviceMem = (binding.aovId == GiAovId::Color && renderSettings.denoise ) ? giOidnGetOutputBuffer(scene->denoiserState) : renderBuffer->deviceMem; 
+        CgpuBuffer deviceMem = renderBuffer->deviceMem;
+        if (binding.aovId == GiAovId::Color && renderSettings.denoiseColorAov)
+        {
+          deviceMem = giOidnGetOutputBuffer(scene->denoiserState);
+        }
 
         cgpuCmdCopyBuffer(commandBuffer, deviceMem, 0, renderBuffer->hostMem);
 
