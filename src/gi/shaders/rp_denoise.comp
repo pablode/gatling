@@ -12,7 +12,7 @@ layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; }
 #else
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
 #endif
-layout(binding = 2, std430) readonly buffer TensorBuffer { float tensors[]; };
+layout(binding = 2, std430) readonly buffer TensorBuffer { float16_t tensors[]; };
 #ifdef OP_JOIN
 layout(binding = 3, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
 #endif
@@ -80,13 +80,13 @@ void main()
 
         //uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + ic) * OUT_CHANNEL_COUNT + oc; // HWIO
 
-        float16_t weight = float16_t(tensors[PC.weightOffset + weightIndex]);
+        float16_t weight = tensors[PC.weightOffset + weightIndex];
 
         result += inPixels[inIndexIj] * weight;
       }
     }
 
-    result += float16_t(tensors[PC.biasOffset + oc]);
+    result += tensors[PC.biasOffset + oc];
 
     result = max(result, float16_t(0.0)); // ReLU activation
 

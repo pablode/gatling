@@ -24,7 +24,7 @@ endforeach()
 
 set(GTL_TEST_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/TEST")
 set(GTL_HDGATLING_RESOURCES_DIR "./hdGatling/resources")
-set(GTL_OIDN_WEIGHTS_FILE "rt_hdr_alb_nrm.tza")
+set(GTL_OIDN_WEIGHTS_FILE "rt_hdr.tza")
 
 option(GTL_VERBOSE "Enable verbose logging." OFF)
 

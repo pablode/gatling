@@ -203,8 +203,8 @@ namespace gtl
           .pipeline = pipeline,
           .input1 = input,
           .output = output,
-          .weightOffset = c.tensorOffsets[weightName] / 4,
-          .biasOffset = c.tensorOffsets[biasName] / 4,
+          .weightOffset = c.tensorOffsets[weightName] / 2,
+          .biasOffset = c.tensorOffsets[biasName] / 2,
           .op = op
         });
       };

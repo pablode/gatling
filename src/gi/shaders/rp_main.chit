@@ -254,7 +254,7 @@ void main()
     const vec3 iorCurrent = (isFrontFace || thinWalled) ? prevMediumIor : vec3(BSDF_USE_MATERIAL_IOR);
     const vec3 iorOther = (isFrontFace || thinWalled) ? vec3(BSDF_USE_MATERIAL_IOR) : nextMediumIor;
 
-#if (AOV_MASK & AOV_BIT_OIDN) != 0
+#if (AOV_MASK & AOV_BIT_OIDN) != 0 && 0
     if (bounce == 0)
     {
       // TODO: always calc at the top
