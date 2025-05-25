@@ -401,10 +401,14 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
   DoubleSidedAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_DOUBLE_SIDED].rgb;
 #endif
-  // TODO: probably not needed
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
-  //for (int i = 0; i < 9; i++)
-  //  OidnAov[pixelIndex*9+i] = ClearValuesF[AOV_ID_OIDN].x;
+  if (PC.sampleOffset == 0)
+  {
+    for (int i = 0; i < 9; i++)
+    {
+      OidnAov[pixelIndex * 9 + i] = float16_t(0.0);
+    }
+  }
 #endif
 }
 
