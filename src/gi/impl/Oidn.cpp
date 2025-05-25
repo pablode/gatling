@@ -24,9 +24,257 @@
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Fmt.h>
 
+#include <functional>
+
 namespace gtl
 {
   namespace rp = shader_interface::rp_oidn;
+
+#if 1
+  class GiOidnNet
+  {
+  private:
+    enum class Buffer
+    {
+      Pool0, Pool1, Pool2, Pool3, Output, LastOut, New
+    };
+
+    enum class PostOp
+    {
+      None, MaxPool, Upsample
+    };
+
+    struct PipelineStep
+    {
+      CgpuPipeline pipeline;
+      Buffer input1;
+      Buffer input2;
+      Buffer output;
+      uint32_t weightOffset;
+      uint32_t biasOffset;
+      GiGlslShaderGen::OidnOp op;
+    };
+
+  private:
+    CgpuBuffer m_pool0;
+    CgpuBuffer m_pool1;
+    CgpuBuffer m_pool2;
+    CgpuBuffer m_pool3;
+    CgpuBuffer m_scratchBuffer;
+    CgpuBuffer m_outputLayer;
+
+    CgpuBuffer m_tensorBuffer;
+
+    std::vector<PipelineStep> m_steps;
+
+    uint32_t m_imageWidth; // 16 byte aligned
+    uint32_t imageHeight; // 16 byte aligned
+    float m_maxScratchMemFactor; // to be multiplied by resolution
+
+    GgpuDelayedResourceDestroyer& m_resourceDestroyer;
+
+  private:
+    struct BuildContext
+    {
+      CgpuDevice device;
+      GiGlslShaderGen& shaderGen;
+      GgpuStager& stager;
+      const GiTzaTensorDescriptions& tensorDescriptions;
+      const uint8_t* tensorData;
+
+      int depth = 0; // track up- and downsampling
+      std::unordered_map<std::string, uint32_t> tensorOffsets;
+    };
+
+    void uploadTensors(BuildContext& c)
+    {
+      // create buffer
+      uint32_t bufferSize = 0;
+      for (const auto& ntPair : c.tensorDescriptions)
+      {
+        const auto& tensorDesc = ntPair.second;
+
+        bufferSize += (tensorDesc.dataSize + 4 - 1) / 4 * 4; // Vk requires 4 byte size
+      }
+
+      CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+      if (!cgpuCreateBuffer(c.device, { .usage = bufferUsage, .size = bufferSize }, &m_tensorBuffer))
+      {
+        GB_FATAL("failed to alloc tensor buffer");
+      }
+
+      // upload data
+      uint32_t dataOffset = 0;
+      for (const auto& ntPair : c.tensorDescriptions)
+      {
+        const auto& tensorDesc = ntPair.second;
+
+        uint32_t dataSize = (tensorDesc.dataSize + 4 - 1) / 4 * 4; // Vk requires 4 byte size
+
+        c.tensorOffsets[ntPair.first] = dataOffset;
+
+        if (!c.stager.stageToBuffer(&c.tensorData[tensorDesc.dataOffset], dataSize, m_tensorBuffer, dataOffset))
+        {
+          GB_FATAL("failed to upload tensor");
+        }
+
+        dataOffset += dataSize;
+      }
+    }
+
+    std::string makeConvPipelineDebugName(int inDims, int outDims, GiGlslShaderGen::OidnOp op)
+    {
+      const char* opStr = "";
+      if (op == GiGlslShaderGen::OidnOp::Convolve) { opStr = "Convolve"; }
+      if (op == GiGlslShaderGen::OidnOp::MaxPool) { opStr = "MaxPool"; }
+      if (op == GiGlslShaderGen::OidnOp::Upsample) { opStr = "Upsample"; }
+      if (op == GiGlslShaderGen::OidnOp::CopyChannels) { opStr = "CopyChannels"; }
+      if (op == GiGlslShaderGen::OidnOp::Join) { opStr = "Join"; }
+
+      return GB_FMT("Oidn_{}_->{}", opStr, inDims, outDims);
+    }
+
+    void addConvReLU(BuildContext& c, Buffer input, Buffer output, std::string_view tensor, PostOp postOp = PostOp::None)
+    {
+      auto pushPipeline = [&](GiGlslShaderGen::OidnOp op)
+      {
+        std::string weightName = GB_FMT("{}.weight", tensor);
+        std::string biasName = GB_FMT("{}.bias", tensor);
+
+        auto ntIt = c.tensorDescriptions.find(weightName);
+        if (ntIt == c.tensorDescriptions.end())
+        {
+          GB_FATAL("tensor not loaded");
+        }
+
+        const auto& tensorDesc = ntIt->second;
+        int inDims = tensorDesc.dimensions[1]; // OIHW
+        int outDims = tensorDesc.dimensions[0];
+
+        std::string debugName = makeConvPipelineDebugName(inDims, outDims, op);
+
+        GiGlslShaderGen::OidnParams sgParams{
+          .inChannelCount = inDims,
+          .outChannelCount = outDims,
+          .op = op
+        };
+
+        std::vector<uint8_t> spv;
+        if (!c.shaderGen.generateDenoisingSpirv(sgParams, spv))
+        {
+          GB_FATAL("failed to compile OIDN shader");
+        }
+
+        CgpuShader shader;
+        if (!cgpuCreateShader(c.device, { .size = spv.size(), .source = spv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE }, &shader))
+        {
+          GB_FATAL("failed to create OIDN shader");
+        }
+
+        CgpuPipeline pipeline;
+        if (!cgpuCreateComputePipeline(c.device, { .shader = shader , .debugName = debugName.c_str() }, &pipeline))
+        {
+          GB_FATAL("failed to create OIDN pipeline");
+        }
+        cgpuDestroyShader(c.device, shader);
+
+        if (op == GiGlslShaderGen::OidnOp::MaxPool)
+        {
+          c.depth++;
+        }
+        else if (op == GiGlslShaderGen::OidnOp::Upsample)
+        {
+          c.depth--;
+        }
+
+        m_steps.push_back(PipelineStep{
+          .pipeline = pipeline,
+          .input1 = input,
+          .output = output,
+          .weightOffset = c.tensorOffsets[weightName],
+          .biasOffset = c.tensorOffsets[biasName],
+          .op = op
+        });
+      };
+
+      // TODO: currently the post ops are separate steps
+      pushPipeline(GiGlslShaderGen::OidnOp::Convolve);
+
+      if (postOp == PostOp::MaxPool)
+      {
+        pushPipeline(GiGlslShaderGen::OidnOp::MaxPool);
+      }
+      else if (postOp == PostOp::Upsample)
+      {
+        pushPipeline(GiGlslShaderGen::OidnOp::Upsample);
+      }
+      else if (postOp != PostOp::None)
+      {
+        GB_FATAL("post op not handled");
+      }
+    }
+
+    void addJoin(BuildContext& c, Buffer input1, Buffer input2, Buffer output)
+    {
+    }
+
+  public:
+    GiOidnNet(CgpuDevice device,
+           GiGlslShaderGen& shaderGen,
+           GgpuStager& stager,
+           GgpuDelayedResourceDestroyer& resourceDestroyer,
+           const GiTzaTensorDescriptions& tensorDescs,
+           const uint8_t* tensorData)
+      : m_resourceDestroyer(resourceDestroyer)
+    {
+      BuildContext c{ device, shaderGen, stager, tensorDescs, tensorData};
+
+      uploadTensors(c);
+
+      addConvReLU(c, Buffer::Pool0, Buffer::New, "enc_conv0");
+      addConvReLU(c, Buffer::LastOut, Buffer::Pool1, "enc_conv1", PostOp::MaxPool);
+      addConvReLU(c, Buffer::Pool1, Buffer::Pool2, "enc_conv2", PostOp::MaxPool);
+      addConvReLU(c, Buffer::Pool2, Buffer::Pool3, "enc_conv3", PostOp::MaxPool);
+      addConvReLU(c, Buffer::Pool3, Buffer::New, "enc_conv4", PostOp::MaxPool);
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "enc_conv5a");
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "enc_conv5b", PostOp::Upsample);
+      addJoin(c, Buffer::LastOut, Buffer::Pool3, Buffer::New);
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv4a");
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv4b", PostOp::Upsample);
+      addJoin(c, Buffer::LastOut, Buffer::Pool2, Buffer::New);
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv3a");
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv3b", PostOp::Upsample);
+      addJoin(c, Buffer::LastOut, Buffer::Pool1, Buffer::New);
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv2a");
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv2b", PostOp::Upsample);
+      addJoin(c, Buffer::LastOut, Buffer::Pool0, Buffer::New);
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv1a");
+      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv1b");
+      addConvReLU(c, Buffer::LastOut, Buffer::Output, "dec_conv0");
+
+      if (c.depth != 0) { GB_FATAL("invalid network architecture"); }
+    }
+
+// TODO: need getters for Pool0 and Ouput. alloc before use.
+//       -> explicit updateState
+
+    void runInference()
+    {
+      // TODO
+    }
+  };
+#endif
+
+
+
+
+
+
+
+
+
+
+
 
   struct GiOidnPipelines
   {
