@@ -359,6 +359,16 @@ namespace gtl
       if (c.depth != 0) { GB_FATAL("invalid network architecture"); }
     }
 
+    ~GiOidnNet()
+    {
+      m_resourceDestroyer.enqueueDestruction(m_pool0, m_pool1, m_pool2, m_pool3, m_scratchMem[0], m_scratchMem[1], m_outputPool, m_tensorBuffer);
+
+      for (const PipelineStep& step : m_steps)
+      {
+        m_resourceDestroyer.enqueueDestruction(step.pipeline);
+      }
+    }
+
     // TODO: need to call this before getting pool0 outside (e.g. in giRender at the start of frame)
     void updateViewport(CgpuDevice device, uint32_t width, uint32_t height)
     {
@@ -527,10 +537,7 @@ namespace gtl
                                  const GiTzaTensorDescriptions& tensorDescriptions,
                                  const uint8_t* tensorData)
   {
-    GiOidnNet net(device, shaderGen, stager, resourceDestroyer, tensorDescriptions, tensorData);
-    net.updateViewport(device, 128, 128);
-
-    return new GiOidnState{ std::move(net) };
+    return new GiOidnState { GiOidnNet { device, shaderGen, stager, resourceDestroyer, tensorDescriptions, tensorData } };
   }
 
   void giOidnDestroyState(GiOidnState* state)
