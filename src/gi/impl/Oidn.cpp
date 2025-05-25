@@ -149,7 +149,7 @@ namespace gtl
         }
 
         const auto& tensorDesc = ntIt->second;
-        int inDims = tensorDesc.dimensions[1]; // OIHW
+        int inDims = (op == GiGlslShaderGen::OidnOp::Convolve) ? tensorDesc.dimensions[1] : tensorDesc.dimensions[0]; // OIHW
         int outDims = (op == GiGlslShaderGen::OidnOp::CopyChannels) ? 4/*rgba*/ : tensorDesc.dimensions[0];
 
         std::string debugName = makeConvPipelineDebugName(inDims, outDims, op);
@@ -203,8 +203,8 @@ namespace gtl
           .pipeline = pipeline,
           .input1 = input,
           .output = output,
-          .weightOffset = c.tensorOffsets[weightName],
-          .biasOffset = c.tensorOffsets[biasName],
+          .weightOffset = c.tensorOffsets[weightName] / 4,
+          .biasOffset = c.tensorOffsets[biasName] / 4,
           .op = op
         });
       };
@@ -262,7 +262,7 @@ namespace gtl
       }
 
       CgpuPipeline pipeline;
-      std::string pipelineDebugName = GB_FMT("Oidn_Join_{}x{}->{}", in1Dims, in2Dims, outDims);
+      std::string pipelineDebugName = GB_FMT("Oidn_Join_{}+{}->{}", in1Dims, in2Dims, in1Dims + in2Dims);
       if (!cgpuCreateComputePipeline(c.device, { .shader = shader , .debugName = pipelineDebugName.c_str() }, &pipeline))
       {
         GB_FATAL("failed to create OIDN pipeline");
