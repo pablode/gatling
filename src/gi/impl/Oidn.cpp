@@ -36,7 +36,7 @@ namespace gtl
   private:
     enum class Buffer
     {
-      Pool0, Pool1, Pool2, Pool3, Output, LastOut, New
+      Pool0, Pool1, Pool2, Pool3, Output, Scratch, COUNT
     };
 
     enum class PostOp
@@ -60,18 +60,19 @@ namespace gtl
     CgpuBuffer m_pool1;
     CgpuBuffer m_pool2;
     CgpuBuffer m_pool3;
-    CgpuBuffer m_scratchBuffer;
-    CgpuBuffer m_outputLayer;
+    CgpuBuffer m_scratchMem;
+    CgpuBuffer m_outputPool;
 
     CgpuBuffer m_tensorBuffer;
 
     std::vector<PipelineStep> m_steps;
 
     uint32_t m_imageWidth; // 16 byte aligned
-    uint32_t imageHeight; // 16 byte aligned
-    float m_maxScratchMemFactor; // to be multiplied by resolution
+    uint32_t m_imageHeight; // 16 byte aligned
 
     GgpuDelayedResourceDestroyer& m_resourceDestroyer;
+
+    uint32_t m_bufferSizeMuls[int(Buffer::COUNT)];
 
   private:
     struct BuildContext
@@ -149,7 +150,7 @@ namespace gtl
 
         const auto& tensorDesc = ntIt->second;
         int inDims = tensorDesc.dimensions[1]; // OIHW
-        int outDims = tensorDesc.dimensions[0];
+        int outDims = tensorDesc.dimensions[0]; // TODO: consider join
 
         std::string debugName = makeConvPipelineDebugName(inDims, outDims, op);
 
@@ -178,6 +179,8 @@ namespace gtl
         }
         cgpuDestroyShader(c.device, shader);
 
+        uint32_t inSizeMul = inDims * std::pow(2, c.depth) * sizeof(float)/2;
+
         if (op == GiGlslShaderGen::OidnOp::MaxPool)
         {
           c.depth++;
@@ -186,6 +189,12 @@ namespace gtl
         {
           c.depth--;
         }
+
+        uint32_t outTypeSize = (op == GiGlslShaderGen::OidnOp::CopyChannels) ? 4/*f32*/ : 2/*f16*/;
+        uint32_t outSizeMul = outDims * std::pow(2, c.depth) * outTypeSize;
+
+        m_bufferSizeMuls[int(input)] = std::max(m_bufferSizeMuls[int(input)], inSizeMul);
+        m_bufferSizeMuls[int(output)] = std::max(m_bufferSizeMuls[int(output)], outSizeMul);
 
         m_steps.push_back(PipelineStep{
           .pipeline = pipeline,
@@ -216,6 +225,46 @@ namespace gtl
 
     void addJoin(BuildContext& c, Buffer input1, Buffer input2, Buffer output)
     {
+      // TODO: remove this function? add PostOp => handling above?
+    }
+
+    void reallocBuffers(CgpuDevice device, uint32_t width, uint32_t height)
+    {
+      // TODO: destroy old buffers
+
+      uint64_t pixelCount = width * height;
+      uint64_t pool0Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool0)];
+
+      CgpuBufferUsageFlags pool0Usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
+                                              CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+      if (!cgpuCreateBuffer(device, { .usage = pool0Usage, .size = pool0Size }, &m_pool0))
+      {
+        GB_FATAL("failed to allocate OIDN buffer");
+      }
+
+      uint64_t pool1Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool1)];
+      uint64_t pool2Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool2)];
+      uint64_t pool3Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool3)];
+      CgpuBufferUsageFlags poolNBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC;
+      if (!cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool1Size }, &m_pool1) ||
+          !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool2Size }, &m_pool2) ||
+          !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool3Size }, &m_pool3))
+      {
+        GB_FATAL("failed to allocate OIDN buffer");
+      }
+
+      uint64_t scratchSize = pixelCount * m_bufferSizeMuls[int(Buffer::Scratch)];
+      CgpuBufferUsageFlags scratchUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*join*/;
+      if (!cgpuCreateBuffer(device, { .usage = scratchUsage, .size = scratchSize }, &m_scratchMem))
+      {
+        GB_FATAL("failed to allocate OIDN buffer");
+      }
+
+      uint64_t outputSize = pixelCount * m_bufferSizeMuls[int(Buffer::Output)];
+      if (!cgpuCreateBuffer(device, { .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC, .size = outputSize }, &m_outputPool))
+      {
+        GB_FATAL("failed to allocate OIDN buffer");
+      }
     }
 
   public:
@@ -231,34 +280,60 @@ namespace gtl
 
       uploadTensors(c);
 
-      addConvReLU(c, Buffer::Pool0, Buffer::New, "enc_conv0");
-      addConvReLU(c, Buffer::LastOut, Buffer::Pool1, "enc_conv1", PostOp::MaxPool);
+      for (uint32_t& sizeMul :  m_bufferSizeMuls)
+      {
+        sizeMul = 0;
+      }
+
+      addConvReLU(c, Buffer::Pool0, Buffer::Scratch, "enc_conv0");
+      addConvReLU(c, Buffer::Scratch, Buffer::Pool1, "enc_conv1", PostOp::MaxPool);
       addConvReLU(c, Buffer::Pool1, Buffer::Pool2, "enc_conv2", PostOp::MaxPool);
       addConvReLU(c, Buffer::Pool2, Buffer::Pool3, "enc_conv3", PostOp::MaxPool);
-      addConvReLU(c, Buffer::Pool3, Buffer::New, "enc_conv4", PostOp::MaxPool);
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "enc_conv5a");
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "enc_conv5b", PostOp::Upsample);
-      addJoin(c, Buffer::LastOut, Buffer::Pool3, Buffer::New);
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv4a");
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv4b", PostOp::Upsample);
-      addJoin(c, Buffer::LastOut, Buffer::Pool2, Buffer::New);
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv3a");
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv3b", PostOp::Upsample);
-      addJoin(c, Buffer::LastOut, Buffer::Pool1, Buffer::New);
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv2a");
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv2b", PostOp::Upsample);
-      addJoin(c, Buffer::LastOut, Buffer::Pool0, Buffer::New);
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv1a");
-      addConvReLU(c, Buffer::LastOut, Buffer::New, "dec_conv1b");
-      addConvReLU(c, Buffer::LastOut, Buffer::Output, "dec_conv0");
+      addConvReLU(c, Buffer::Pool3, Buffer::Scratch, "enc_conv4", PostOp::MaxPool);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "enc_conv5a");
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "enc_conv5b", PostOp::Upsample);
+      addJoin(c, Buffer::Scratch, Buffer::Pool3, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv4a");
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv4b", PostOp::Upsample);
+      addJoin(c, Buffer::Scratch, Buffer::Pool2, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3a");
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3b", PostOp::Upsample);
+      addJoin(c, Buffer::Scratch, Buffer::Pool1, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2a");
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2b", PostOp::Upsample);
+      addJoin(c, Buffer::Scratch, Buffer::Pool0, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1a");
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1b");
+      addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0");
 
       if (c.depth != 0) { GB_FATAL("invalid network architecture"); }
     }
 
-// TODO: need getters for Pool0 and Ouput. alloc before use.
-//       -> explicit updateState
+    // TODO: need to call this before getting pool0 outside
+    void updateViewport(CgpuDevice device, uint32_t width, uint32_t height)
+    {
+      if (width == m_imageWidth && height == m_imageHeight)
+      {
+        return;
+      }
 
-    void runInference()
+      reallocBuffers(device, width, height);
+
+      m_imageWidth = width;
+      m_imageHeight = height;
+    }
+
+    CgpuBuffer getInputBuffer() const
+    {
+      return m_pool0;
+    }
+
+    CgpuBuffer getOutputBuffer() const
+    {
+      return m_outputPool;
+    }
+
+    void runInference(uint32_t width, uint32_t height)
     {
       // TODO
     }
