@@ -474,13 +474,13 @@ namespace gtl
         };
 
         std::vector<CgpuBufferBinding> bufferBindings = {
-          CgpuBufferBinding{.binding = 0, .buffer = inBuffer1 },
-          CgpuBufferBinding{.binding = 1, .buffer = outBuffer },
-          CgpuBufferBinding{.binding = 2, .buffer = m_tensorBuffer }
+          CgpuBufferBinding{.binding = rp::BINDING_INDEX_INPUT_BUF1, .buffer = inBuffer1 },
+          CgpuBufferBinding{.binding = rp::BINDING_INDEX_OUTPUT_BUF, .buffer = outBuffer },
+          CgpuBufferBinding{.binding = rp::BINDING_INDEX_TENSOR_BUF, .buffer = m_tensorBuffer }
         };
         if (step.op == GiGlslShaderGen::OidnOp::Join)
         {
-          bufferBindings.push_back(CgpuBufferBinding{ .binding = 3, .buffer = inBuffer2 });
+          bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_INPUT_BUF2, .buffer = inBuffer2 });
         }
 
         CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };

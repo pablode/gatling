@@ -23,19 +23,21 @@
 GI_INTERFACE_BEGIN(rp_oidn)
 
 const GI_UINT WG_SIZE_X = 16;
-const GI_UINT WG_SIZE_Y = 8;
+const GI_UINT WG_SIZE_Y = 12;
 
 struct PushConstants
 {
   GI_UINT imageWidth;
   GI_UINT imageHeight;
-  GI_UINT weightOffset; // offset of kernel into the weights buffer
+  GI_UINT weightOffset;
   GI_UINT biasOffset;
 };
 
 // set 0
-//GI_BINDING_INDEX(SCENE_PARAMS,    0)
-//GI_BINDING_INDEX(SPHERE_LIGHTS,   1)
+GI_BINDING_INDEX(INPUT_BUF1, 0)
+GI_BINDING_INDEX(OUTPUT_BUF, 1)
+GI_BINDING_INDEX(TENSOR_BUF, 2)
+GI_BINDING_INDEX(INPUT_BUF2, 3)
 
 GI_INTERFACE_END()
 
