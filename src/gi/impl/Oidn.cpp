@@ -52,6 +52,7 @@ namespace gtl
       uint32_t weightOffset;
       uint32_t biasOffset;
       GiGlslShaderGen::OidnOp op;
+      uint32_t outDims;
     };
 
   private:
@@ -205,7 +206,8 @@ namespace gtl
           .output = output,
           .weightOffset = c.tensorOffsets[weightName] / 2,
           .biasOffset = c.tensorOffsets[biasName] / 2,
-          .op = op
+          .op = op,
+          .outDims = uint32_t(outDims)
         });
       };
 

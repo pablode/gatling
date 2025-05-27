@@ -1,6 +1,7 @@
 #extension GL_GOOGLE_include_directive: require
 #extension GL_EXT_shader_16bit_storage: require
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
+#extension GL_EXT_control_flow_attributes: require
 
 #include "interface/rp_oidn.h"
 
@@ -23,14 +24,18 @@ layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 #define KERNEL_SIZE_SQ (KERNEL_SIZE * KERNEL_SIZE)
 #define KERNEL_BIAS (KERNEL_SIZE / 2)
 
+#ifdef OP_CONVOLVE
+shared float16_t sh_window[WG_SIZE_Y + 2][WG_SIZE_X + 2];
+shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][OUT_CHANNEL_COUNT];
+#endif
+
 void main()
 {
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
-    return;
-
   int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
 
 #ifdef OP_UPSAMPLE
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
+
   uint outIdx0 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
   uint outIdx1 = uint(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
   uint outIdx2 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
@@ -46,6 +51,8 @@ void main()
   }
 #endif
 #ifdef OP_MAX_POOL
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
+
   uint inIdx0 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
   uint inIdx1 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
   uint inIdx2 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
@@ -59,6 +66,11 @@ void main()
   }
 #endif
 #ifdef OP_CONVOLVE
+
+#if 0
+  // naive
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
+
   for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
   {
     float16_t result = float16_t(0.0);
@@ -76,9 +88,9 @@ void main()
       {
         uint inIndexIj = coordIdx * IN_CHANNEL_COUNT + ic;
 
-        uint weightIndex = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
-
         //uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + ic) * OUT_CHANNEL_COUNT + oc; // HWIO
+
+        uint weightIndex = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
 
         float16_t weight = tensors[PC.weightOffset + weightIndex];
 
@@ -92,8 +104,75 @@ void main()
 
     outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = result;
   }
+
+#elif 1
+  // shared mem v1
+  ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(WG_SIZE_X, WG_SIZE_Y);
+
+  for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
+    sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] = float16_t(0.0);
+
+  barrier();
+
+  [[unroll]]
+  for (uint ic = 0; ic < IN_CHANNEL_COUNT; ic++)
+  {
+    for (int y = 0; y <= 1; y++)
+    for (int x = 0; x <= 1; x++)
+    {
+      int lx = int(gl_LocalInvocationID.x) + x * int(WG_SIZE_X);
+      int ly = int(gl_LocalInvocationID.y) + y * int(WG_SIZE_Y);
+
+      if (lx < int(WG_SIZE_X + 2) && ly < int(WG_SIZE_Y + 2))
+      {
+        ivec2 coord = wgBase + ivec2(lx - 1, ly - 1);
+        coord = clamp(coord, ivec2(0), ivec2(PC.imageWidth - 1, PC.imageHeight - 1));
+        uint inPixelIdx = uint(coord.y * PC.imageWidth + coord.x) * IN_CHANNEL_COUNT + ic;
+
+        sh_window[ly][lx] = inPixels[inPixelIdx];
+      }
+    }
+
+    barrier();
+
+    for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
+    {
+      float16_t result = float16_t(0.0);
+
+      for (uint j = 0; j < KERNEL_SIZE; j++)
+      for (uint i = 0; i < KERNEL_SIZE; i++)
+      {
+        ivec2 lCoord = ivec2(gl_LocalInvocationID.xy) + ivec2(i, j);
+
+        uint weightIndex = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
+        float16_t weight = tensors[PC.weightOffset + weightIndex];
+
+        result += sh_window[lCoord.y][lCoord.x] * weight;
+      }
+
+      sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] += result;
+    }
+  }
+
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
+    return;
+
+  for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
+  {
+    float16_t result = sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc];
+
+    result += tensors[PC.biasOffset + oc];
+
+    result = max(result, float16_t(0.0)); // ReLU activation
+
+    outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = result;
+  }
+#endif
+
 #endif
 #ifdef OP_COPY_CHANNELS
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
+
   for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
   {
     float f = (i < IN_CHANNEL_COUNT) ? float(inPixels[pixelIdx * IN_CHANNEL_COUNT + i]) : 0.0;
@@ -101,6 +180,8 @@ void main()
   }
 #endif
 #ifdef OP_JOIN
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
+
   const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;
 
   for (int i = 0; i < IN_CHANNEL_COUNT; i++)
