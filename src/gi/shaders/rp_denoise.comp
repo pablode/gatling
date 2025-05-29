@@ -67,51 +67,6 @@ void main()
 #endif
 #ifdef OP_CONVOLVE
 
-#if 0
-  // naive
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
-
-  for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
-  {
-    float16_t result = float16_t(0.0);
-
-    for (uint i = 0; i < KERNEL_SIZE; i++)
-    for (uint j = 0; j < KERNEL_SIZE; j++)
-    {
-      ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
-      coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
-      coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
-
-      int coordIdx = int(coord.y * PC.imageWidth + coord.x);
-
-      for (uint ic = 0; ic < IN_CHANNEL_COUNT; ic++)
-      {
-        uint inIndexIj = coordIdx * IN_CHANNEL_COUNT + ic;
-
-        //uint weightIndex = (((j * 3 + i) * IN_CHANNEL_COUNT) + ic) * OUT_CHANNEL_COUNT + oc; // HWIO
-
-        uint weightIndex = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
-
-        float16_t weight = tensors[PC.weightOffset + weightIndex];
-
-        result += inPixels[inIndexIj] * weight;
-      }
-    }
-
-    result += tensors[PC.biasOffset + oc];
-
-    result = max(result, float16_t(0.0)); // ReLU activation
-
-#ifdef OUT_CHANNEL_F32
-    float convertedResult = float(result);
-#else
-    float16_t convertedResult = result;
-#endif
-
-    outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
-  }
-
-#elif 1
   // shared mem v1
   ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(WG_SIZE_X, WG_SIZE_Y);
 
@@ -184,7 +139,6 @@ void main()
 
     outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
   }
-#endif
 
 #endif
 #ifdef OP_CONCAT
