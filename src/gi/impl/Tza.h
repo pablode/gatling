@@ -27,8 +27,6 @@ namespace gtl
 
   struct GiTzaTensorDescription
   {
-    // TODO: validate that HW are 3 and 3! don't support anything else
-    // TODO: check that large net does not use larger kernels..
     std::vector<int> dimensions; // OIHW
     GiTzaTensorLayout layout;
     uint64_t dataOffset;

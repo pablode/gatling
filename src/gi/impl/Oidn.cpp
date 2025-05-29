@@ -80,6 +80,7 @@ namespace gtl
     {
       uint32_t offset;
       GiTzaTensorLayout layout;
+      std::vector<int> dimensions; // OIHW
     };
 
     struct BuildContext
@@ -119,7 +120,7 @@ namespace gtl
 
         uint32_t dataSize = (tensorDesc.dataSize + 4 - 1) / 4 * 4; // Vk requires 4 byte size
 
-        c.tensorUploads[ntPair.first] = TensorUpload{ dataOffset, tensorDesc.layout };
+        c.tensorUploads[ntPair.first] = TensorUpload{ dataOffset, tensorDesc.layout, tensorDesc.dimensions };
 
         if (!c.stager.stageToBuffer(&c.tensorData[tensorDesc.dataOffset], dataSize, m_tensorBuffer, dataOffset))
         {
@@ -212,6 +213,7 @@ namespace gtl
 
         if (weights.layout != GiTzaTensorLayout::oihw) { GB_FATAL("unexpected tensor layout"); }
         if (bias.layout != GiTzaTensorLayout::x) { GB_FATAL("unexpected tensor layout"); }
+        if (weights.dimensions.size() != 4 || weights.dimensions[2] != 3 || weights.dimensions[3] != 3) { GB_FATAL("unsupported kernel dimensions"); }
 
         m_steps.push_back(PipelineStep{
           .pipeline = pipeline,
