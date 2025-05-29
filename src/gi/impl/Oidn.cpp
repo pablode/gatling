@@ -76,6 +76,12 @@ namespace gtl
     uint32_t m_bufferLastDims[int(Buffer::COUNT)];
 
   private:
+    struct TensorUpload
+    {
+      uint32_t offset;
+      GiTzaTensorLayout layout;
+    };
+
     struct BuildContext
     {
       CgpuDevice device;
@@ -85,7 +91,7 @@ namespace gtl
       const uint8_t* tensorData;
 
       int depth = 0; // track up- and downsampling
-      std::unordered_map<std::string, uint32_t> tensorOffsets;
+      std::unordered_map<std::string, TensorUpload> tensorUploads;
     };
 
     void uploadTensors(BuildContext& c)
@@ -113,7 +119,7 @@ namespace gtl
 
         uint32_t dataSize = (tensorDesc.dataSize + 4 - 1) / 4 * 4; // Vk requires 4 byte size
 
-        c.tensorOffsets[ntPair.first] = dataOffset;
+        c.tensorUploads[ntPair.first] = TensorUpload{ dataOffset, tensorDesc.layout };
 
         if (!c.stager.stageToBuffer(&c.tensorData[tensorDesc.dataOffset], dataSize, m_tensorBuffer, dataOffset))
         {
@@ -201,12 +207,18 @@ namespace gtl
         m_bufferLastDims[int(input)] = inDims;
         m_bufferLastDims[int(output)] = outDims;
 
+        const TensorUpload& weights = c.tensorUploads[weightName];
+        const TensorUpload& bias = c.tensorUploads[biasName];
+
+        if (weights.layout != GiTzaTensorLayout::oihw) { GB_FATAL("unexpected tensor layout"); }
+        if (bias.layout != GiTzaTensorLayout::x) { GB_FATAL("unexpected tensor layout"); }
+
         m_steps.push_back(PipelineStep{
           .pipeline = pipeline,
           .input1 = input,
           .output = output,
-          .weightOffset = c.tensorOffsets[weightName] / 2,
-          .biasOffset = c.tensorOffsets[biasName] / 2,
+          .weightOffset = weights.offset / 2,
+          .biasOffset = bias.offset / 2,
           .op = op,
           .outDims = uint32_t(outDims)
         });

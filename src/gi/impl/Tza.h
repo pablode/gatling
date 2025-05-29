@@ -23,7 +23,6 @@
 
 namespace gtl
 {
-  // TODO: validate weights oihw, biases x layouts on upload
   enum class GiTzaTensorLayout { x, oihw };
 
   // TODO: only support f16 once we switch to v2.3
@@ -32,7 +31,7 @@ namespace gtl
   struct GiTzaTensorDescription
   {
     // TODO: validate that HW are 3 and 3! don't support anything else
-    // TODO: make sure that large net does not use larger kernels..
+    // TODO: check that large net does not use larger kernels..
     std::vector<int> dimensions; // OIHW
     GiTzaTensorLayout layout;
     GiTzaTensorDataType dataType;
