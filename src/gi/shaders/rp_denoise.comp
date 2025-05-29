@@ -123,8 +123,8 @@ void main()
   [[unroll]]
   for (uint ic = 0; ic < IN_CHANNEL_COUNT; ic++)
   {
-    for (int y = 0; y <= 1; y++)
-    for (int x = 0; x <= 1; x++)
+    [[unroll]] for (int y = 0; y <= 1; y++)
+    [[unroll]] for (int x = 0; x <= 1; x++)
     {
       int lx = int(gl_LocalInvocationID.x) + x * int(WG_SIZE_X);
       int ly = int(gl_LocalInvocationID.y) + y * int(WG_SIZE_Y);
@@ -141,22 +141,27 @@ void main()
 
     barrier();
 
+    [[unroll]]
     for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
     {
+      uint weightIndexOffset = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ); // OIHW
+
       float16_t result = float16_t(0.0);
 
-      for (uint j = 0; j < KERNEL_SIZE; j++)
-      for (uint i = 0; i < KERNEL_SIZE; i++)
+      [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
+      [[unroll]] for (uint i = 0; i < KERNEL_SIZE; i++)
       {
         ivec2 lCoord = ivec2(gl_LocalInvocationID.xy) + ivec2(i, j);
 
-        uint weightIndex = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
+        uint weightIndex = weightIndexOffset + (j * KERNEL_SIZE + i);
         float16_t weight = tensors[PC.weightOffset + weightIndex];
 
         result += sh_window[lCoord.y][lCoord.x] * weight;
       }
 
       sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] += result;
+
+      barrier(); // TODO: artifacts without. why?
     }
   }
 
