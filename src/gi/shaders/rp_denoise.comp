@@ -14,7 +14,7 @@ layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; }
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
 #endif
 layout(binding = 2, std430) readonly buffer TensorBuffer { float16_t tensors[]; };
-#ifdef OP_JOIN
+#ifdef OP_CONCAT
 layout(binding = 3, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
 #endif
 
@@ -179,7 +179,7 @@ void main()
     outPixels[pixelIdx * OUT_CHANNEL_COUNT + i] = f;
   }
 #endif
-#ifdef OP_JOIN
+#ifdef OP_CONCAT
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
 
   const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;

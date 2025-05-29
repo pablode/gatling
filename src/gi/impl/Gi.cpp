@@ -2943,7 +2943,7 @@ cleanup:
     CgpuBuffer deviceMem;
     if (!cgpuCreateBuffer(s_device, {
                             .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
-                                     CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*TODO: oidn debug viz via join (can replace with shader write)*/,
+                                     CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*TODO: replace OIDN->renderBuffer transfer with direct shader write*/,
                             .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                             .size = bufferSize,
                             .debugName = "RenderBufferGpu"

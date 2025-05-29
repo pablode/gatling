@@ -314,9 +314,9 @@ namespace gtl
     {
       stitcher.appendDefine("OP_COPY_CHANNELS");
     }
-    else if (params.op == OidnOp::Join)
+    else if (params.op == OidnOp::Concat)
     {
-      stitcher.appendDefine("OP_JOIN");
+      stitcher.appendDefine("OP_CONCAT");
     }
 
     fs::path filePath = m_shaderPath / "rp_denoise.comp";

@@ -131,7 +131,7 @@ namespace gtl
       if (op == GiGlslShaderGen::OidnOp::MaxPool) { opStr = "MaxPool"; }
       if (op == GiGlslShaderGen::OidnOp::Upsample) { opStr = "Upsample"; }
       if (op == GiGlslShaderGen::OidnOp::CopyChannels) { opStr = "CopyChannels"; }
-      if (op == GiGlslShaderGen::OidnOp::Join) { opStr = "Join"; }
+      if (op == GiGlslShaderGen::OidnOp::Concat) { opStr = "Concat"; }
 
       return GB_FMT("Oidn_{}_{}->{}", opStr, inDims, outDims);
     }
@@ -238,7 +238,7 @@ namespace gtl
       }
     }
 
-    void addJoin(BuildContext& c, Buffer input1, Buffer input2, Buffer output)
+    void addConcat(BuildContext& c, Buffer input1, Buffer input2, Buffer output)
     {
       int in1Dims = m_bufferLastDims[int(input1)];
       int in2Dims = m_bufferLastDims[int(input2)];
@@ -248,7 +248,7 @@ namespace gtl
       GiGlslShaderGen::OidnParams sgParams{
         .inChannelCount = in1Dims,
         .outChannelCount = in2Dims, // NOTE: out summed in shader
-        .op = GiGlslShaderGen::OidnOp::Join
+        .op = GiGlslShaderGen::OidnOp::Concat
       };
 
       std::vector<uint8_t> spv;
@@ -264,7 +264,7 @@ namespace gtl
       }
 
       CgpuPipeline pipeline;
-      std::string pipelineDebugName = GB_FMT("Oidn_Join_{}+{}->{}", in1Dims, in2Dims, in1Dims + in2Dims);
+      std::string pipelineDebugName = GB_FMT("Oidn_Concat_{}+{}->{}", in1Dims, in2Dims, in1Dims + in2Dims);
       if (!cgpuCreateComputePipeline(c.device, { .shader = shader , .debugName = pipelineDebugName.c_str() }, &pipeline))
       {
         GB_FATAL("failed to create OIDN pipeline");
@@ -276,7 +276,7 @@ namespace gtl
         .input1 = input1,
         .input2 = input2,
         .output = output,
-        .op = GiGlslShaderGen::OidnOp::Join
+        .op = GiGlslShaderGen::OidnOp::Concat
       });
     }
 
@@ -305,7 +305,7 @@ namespace gtl
       }
 
       uint64_t scratchSize = pixelCount * m_bufferSizeMuls[int(Buffer::Scratch)];
-      CgpuBufferUsageFlags scratchUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*join*/;
+      CgpuBufferUsageFlags scratchUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*concat*/;
       if (!cgpuCreateBuffer(device, { .usage = scratchUsage, .size = scratchSize }, &m_scratchMem[0]) ||
           !cgpuCreateBuffer(device, { .usage = scratchUsage, .size = scratchSize }, &m_scratchMem[1]))
       {
@@ -344,16 +344,16 @@ namespace gtl
       addConvReLU(c, Buffer::Pool3, Buffer::Scratch, "enc_conv4", PostOp::MaxPool);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "enc_conv5a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "enc_conv5b", PostOp::Upsample);
-      addJoin(c, Buffer::Scratch, Buffer::Pool3, Buffer::Scratch);
+      addConcat(c, Buffer::Scratch, Buffer::Pool3, Buffer::Scratch);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv4a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv4b", PostOp::Upsample);
-      addJoin(c, Buffer::Scratch, Buffer::Pool2, Buffer::Scratch);
+      addConcat(c, Buffer::Scratch, Buffer::Pool2, Buffer::Scratch);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3b", PostOp::Upsample);
-      addJoin(c, Buffer::Scratch, Buffer::Pool1, Buffer::Scratch);
+      addConcat(c, Buffer::Scratch, Buffer::Pool1, Buffer::Scratch);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2b", PostOp::Upsample);
-      addJoin(c, Buffer::Scratch, Buffer::Pool0, Buffer::Scratch);
+      addConcat(c, Buffer::Scratch, Buffer::Pool0, Buffer::Scratch);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1b");
       addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", PostOp::CopyToOutput);
@@ -428,7 +428,7 @@ namespace gtl
 
         CgpuBuffer inBuffer1 = resolveInputBuffer(step.input1);
         CgpuBuffer inBuffer2;
-        if (step.op == GiGlslShaderGen::OidnOp::Join)
+        if (step.op == GiGlslShaderGen::OidnOp::Concat)
         {
           inBuffer2 = resolveInputBuffer(step.input2);
         }
@@ -442,7 +442,7 @@ namespace gtl
           .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
           .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
         });
-        if (step.op == GiGlslShaderGen::OidnOp::Join)
+        if (step.op == GiGlslShaderGen::OidnOp::Concat)
         {
           bufferBarriers.push_back(CgpuBufferMemoryBarrier{
             .buffer = inBuffer2,
@@ -478,7 +478,7 @@ namespace gtl
           CgpuBufferBinding{.binding = rp::BINDING_INDEX_OUTPUT_BUF, .buffer = outBuffer },
           CgpuBufferBinding{.binding = rp::BINDING_INDEX_TENSOR_BUF, .buffer = m_tensorBuffer }
         };
-        if (step.op == GiGlslShaderGen::OidnOp::Join)
+        if (step.op == GiGlslShaderGen::OidnOp::Concat)
         {
           bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_INPUT_BUF2, .buffer = inBuffer2 });
         }
