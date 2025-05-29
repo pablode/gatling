@@ -308,6 +308,7 @@ namespace gtl
     }
     else if (params.op == OidnOp::Upsample)
     {
+      stitcher.appendDefine("OP_CONVOLVE");
       stitcher.appendDefine("OP_UPSAMPLE");
     }
     else if (params.op == OidnOp::Concat)

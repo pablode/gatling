@@ -231,6 +231,11 @@ namespace gtl
         pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::WriteBackRgba32);
         return;
       }
+      else if (postOp == PostOp::Upsample)
+      {
+        pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::Upsample);
+        return;
+      }
       else if (postOp == PostOp::None)
       {
         pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::Convolve);
@@ -239,14 +244,10 @@ namespace gtl
 
       pushPipeline(initialInput, Buffer::Scratch, GiGlslShaderGen::OidnOp::Convolve);
 
-      // TODO: currently most post ops are separate steps
+      // TODO: this post op is still a separate step
       if (postOp == PostOp::MaxPool)
       {
         pushPipeline(Buffer::Scratch, finalOutput, GiGlslShaderGen::OidnOp::MaxPool);
-      }
-      else if (postOp == PostOp::Upsample)
-      {
-        pushPipeline(Buffer::Scratch, finalOutput, GiGlslShaderGen::OidnOp::Upsample);
       }
       else
       {

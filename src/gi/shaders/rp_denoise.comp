@@ -33,23 +33,6 @@ void main()
 {
   int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
 
-#ifdef OP_UPSAMPLE
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
-
-  uint outIdx0 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
-  uint outIdx1 = uint(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
-  uint outIdx2 = uint(gl_GlobalInvocationID.x*2 + 0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
-  uint outIdx3 = uint(gl_GlobalInvocationID.x*2 + 1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * OUT_CHANNEL_COUNT;
-
-  for (int i = 0; i < IN_CHANNEL_COUNT; i++) // same as OUT_CHANNEL_COUNT
-  {
-    float16_t f = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
-    outPixels[outIdx0 + i] = f;
-    outPixels[outIdx1 + i] = f;
-    outPixels[outIdx2 + i] = f;
-    outPixels[outIdx3 + i] = f;
-  }
-#endif
 #ifdef OP_MAX_POOL
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
 
@@ -123,6 +106,13 @@ void main()
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;
 
+#ifdef OP_UPSAMPLE
+  uint outIdx0 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 0) * PC.imageWidth * 2) * OUT_CHANNEL_COUNT;
+  uint outIdx1 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 0) * PC.imageWidth * 2) * OUT_CHANNEL_COUNT;
+  uint outIdx2 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 1) * PC.imageWidth * 2) * OUT_CHANNEL_COUNT;
+  uint outIdx3 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 1) * PC.imageWidth * 2) * OUT_CHANNEL_COUNT;
+#endif
+
   for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
   {
     float16_t result = sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc];
@@ -137,7 +127,14 @@ void main()
     float16_t convertedResult = result;
 #endif
 
+#ifdef OP_UPSAMPLE
+    outPixels[outIdx0 + oc] = convertedResult;
+    outPixels[outIdx1 + oc] = convertedResult;
+    outPixels[outIdx2 + oc] = convertedResult;
+    outPixels[outIdx3 + oc] = convertedResult;
+#else
     outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
+#endif
   }
 
 #endif
