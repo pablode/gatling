@@ -40,7 +40,7 @@ namespace gtl
 
     enum class PostOp
     {
-      None, MaxPool, Upsample, CopyToOutput
+      None, MaxPool, Upsample, WriteBackRgba32
     };
 
     struct PipelineStep
@@ -124,14 +124,15 @@ namespace gtl
       }
     }
 
-    std::string makeConvPipelineDebugName(int inDims, int outDims, GiGlslShaderGen::OidnOp op)
+    std::string makeConvolutionPipelineDebugName(int inDims, int outDims, GiGlslShaderGen::OidnOp op)
     {
       const char* opStr = "";
       if (op == GiGlslShaderGen::OidnOp::Convolve) { opStr = "Convolve"; }
-      if (op == GiGlslShaderGen::OidnOp::MaxPool) { opStr = "MaxPool"; }
-      if (op == GiGlslShaderGen::OidnOp::Upsample) { opStr = "Upsample"; }
-      if (op == GiGlslShaderGen::OidnOp::CopyChannels) { opStr = "CopyChannels"; }
-      if (op == GiGlslShaderGen::OidnOp::Concat) { opStr = "Concat"; }
+      else if (op == GiGlslShaderGen::OidnOp::MaxPool) { opStr = "MaxPool"; }
+      else if (op == GiGlslShaderGen::OidnOp::Upsample) { opStr = "Upsample"; }
+      else if (op == GiGlslShaderGen::OidnOp::Concat) { opStr = "Concat"; }
+      else if (op == GiGlslShaderGen::OidnOp::WriteBackRgba32) { opStr = "WriteBackRgba32"; }
+      else { GB_FATAL("Unhandled OIDN post op"); }
 
       return GB_FMT("Oidn_{}_{}->{}", opStr, inDims, outDims);
     }
@@ -150,10 +151,10 @@ namespace gtl
         }
 
         const auto& tensorDesc = ntIt->second;
-        int inDims = (op == GiGlslShaderGen::OidnOp::Convolve) ? tensorDesc.dimensions[1] : tensorDesc.dimensions[0]; // OIHW
-        int outDims = (op == GiGlslShaderGen::OidnOp::CopyChannels) ? 4/*rgba*/ : tensorDesc.dimensions[0];
+        int inDims = (op == GiGlslShaderGen::OidnOp::Convolve || op == GiGlslShaderGen::OidnOp::WriteBackRgba32) ? tensorDesc.dimensions[1] : tensorDesc.dimensions[0]; // OIHW
+        int outDims = (op == GiGlslShaderGen::OidnOp::WriteBackRgba32) ? 4 : tensorDesc.dimensions[0];
 
-        std::string debugName = makeConvPipelineDebugName(inDims, outDims, op);
+        std::string debugName = makeConvolutionPipelineDebugName(inDims, outDims, op);
 
         GiGlslShaderGen::OidnParams sgParams{
           .inChannelCount = inDims,
@@ -191,7 +192,7 @@ namespace gtl
           c.depth--;
         }
 
-        uint32_t outTypeSize = (op == GiGlslShaderGen::OidnOp::CopyChannels) ? sizeof(float) : (sizeof(float) / 2);
+        uint32_t outTypeSize = (op == GiGlslShaderGen::OidnOp::WriteBackRgba32) ? sizeof(float) : (sizeof(float) / 2);
         uint32_t outSizeMul = outDims / std::pow(2, c.depth) * outTypeSize;
 
         m_bufferSizeMuls[int(input)] = std::max(m_bufferSizeMuls[int(input)], inSizeMul);
@@ -211,8 +212,12 @@ namespace gtl
         });
       };
 
-      // TODO: currently the post ops are separate steps
-      if (postOp == PostOp::None)
+      if (postOp == PostOp::WriteBackRgba32)
+      {
+        pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::WriteBackRgba32);
+        return;
+      }
+      else if (postOp == PostOp::None)
       {
         pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::Convolve);
         return;
@@ -220,6 +225,7 @@ namespace gtl
 
       pushPipeline(initialInput, Buffer::Scratch, GiGlslShaderGen::OidnOp::Convolve);
 
+      // TODO: currently most post ops are separate steps
       if (postOp == PostOp::MaxPool)
       {
         pushPipeline(Buffer::Scratch, finalOutput, GiGlslShaderGen::OidnOp::MaxPool);
@@ -227,10 +233,6 @@ namespace gtl
       else if (postOp == PostOp::Upsample)
       {
         pushPipeline(Buffer::Scratch, finalOutput, GiGlslShaderGen::OidnOp::Upsample);
-      }
-      else if (postOp == PostOp::CopyToOutput)
-      {
-        pushPipeline(Buffer::Scratch, finalOutput, GiGlslShaderGen::OidnOp::CopyChannels);
       }
       else
       {
@@ -356,7 +358,7 @@ namespace gtl
       addConcat(c, Buffer::Scratch, Buffer::Pool0, Buffer::Scratch);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1b");
-      addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", PostOp::CopyToOutput);
+      addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", PostOp::WriteBackRgba32);
 
       if (c.depth != 0) { GB_FATAL("invalid network architecture"); }
     }

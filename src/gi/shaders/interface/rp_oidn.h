@@ -23,7 +23,7 @@
 GI_INTERFACE_BEGIN(rp_oidn)
 
 const GI_UINT WG_SIZE_X = 16;
-const GI_UINT WG_SIZE_Y = 12;
+const GI_UINT WG_SIZE_Y = 8;
 
 struct PushConstants
 {

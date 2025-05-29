@@ -310,13 +310,14 @@ namespace gtl
     {
       stitcher.appendDefine("OP_UPSAMPLE");
     }
-    else if (params.op == OidnOp::CopyChannels)
-    {
-      stitcher.appendDefine("OP_COPY_CHANNELS");
-    }
     else if (params.op == OidnOp::Concat)
     {
       stitcher.appendDefine("OP_CONCAT");
+    }
+    else if (params.op == OidnOp::WriteBackRgba32)
+    {
+      stitcher.appendDefine("OP_CONVOLVE");
+      stitcher.appendDefine("OUT_CHANNEL_F32");
     }
 
     fs::path filePath = m_shaderPath / "rp_denoise.comp";

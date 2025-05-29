@@ -8,7 +8,7 @@
 layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
 layout(binding = 0, std430) readonly buffer InputBuffer { float16_t inPixels[]; };
-#ifdef OP_COPY_CHANNELS
+#ifdef OUT_CHANNEL_F32
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
 #else
 layout(binding = 1, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
@@ -102,7 +102,13 @@ void main()
 
     result = max(result, float16_t(0.0)); // ReLU activation
 
-    outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = result;
+#ifdef OUT_CHANNEL_F32
+    float convertedResult = float(result);
+#else
+    float16_t convertedResult = result;
+#endif
+
+    outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
   }
 
 #elif 1
@@ -165,19 +171,16 @@ void main()
 
     result = max(result, float16_t(0.0)); // ReLU activation
 
-    outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = result;
+#ifdef OUT_CHANNEL_F32
+    float convertedResult = float(result);
+#else
+    float16_t convertedResult = result;
+#endif
+
+    outPixels[pixelIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
   }
 #endif
 
-#endif
-#ifdef OP_COPY_CHANNELS
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
-
-  for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
-  {
-    float f = (i < IN_CHANNEL_COUNT) ? float(inPixels[pixelIdx * IN_CHANNEL_COUNT + i]) : 0.0;
-    outPixels[pixelIdx * OUT_CHANNEL_COUNT + i] = f;
-  }
 #endif
 #ifdef OP_CONCAT
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
