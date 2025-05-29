@@ -21,6 +21,7 @@
 
 #include <gtl/ggpu/DelayedResourceDestroyer.h>
 #include <gtl/ggpu/Stager.h>
+#include <gtl/gb/Enum.h>
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Fmt.h>
 
@@ -30,17 +31,21 @@ namespace gtl
 {
   namespace rp = shader_interface::rp_oidn;
 
+  using GiOidnPostOp = GiGlslShaderGen::OidnPostOp;
+
+  // TODO: replace with GiOidnPostOp above once concat has been switched to post op
+  enum class PostOp : int
+  {
+    None = 0, MaxPool = 1, Upsample = 2, WriteBackRgba32 = 4
+  };
+  GB_DECLARE_ENUM_BITOPS(PostOp) // TODO: remvoe
+
   class GiOidnNet
   {
   private:
     enum class Buffer
     {
       Pool0, Pool1, Pool2, Pool3, Output, Scratch, COUNT
-    };
-
-    enum class PostOp
-    {
-      None, MaxPool, Upsample, WriteBackRgba32
     };
 
     struct PipelineStep
@@ -51,7 +56,7 @@ namespace gtl
       Buffer output;
       uint32_t weightOffset;
       uint32_t biasOffset;
-      GiGlslShaderGen::OidnOp op;
+      GiOidnPostOp postOp;
       uint32_t outDims;
     };
 
@@ -131,22 +136,21 @@ namespace gtl
       }
     }
 
-    std::string makeConvolutionPipelineDebugName(int inDims, int outDims, GiGlslShaderGen::OidnOp op)
+    std::string makeConvolutionPipelineDebugName(int inDims, int outDims, GiOidnPostOp postOp)
     {
-      const char* opStr = "";
-      if (op == GiGlslShaderGen::OidnOp::Convolve) { opStr = "Convolve"; }
-      else if (op == GiGlslShaderGen::OidnOp::MaxPool) { opStr = "MaxPool"; }
-      else if (op == GiGlslShaderGen::OidnOp::Upsample) { opStr = "Upsample"; }
-      else if (op == GiGlslShaderGen::OidnOp::Concat) { opStr = "Concat"; }
-      else if (op == GiGlslShaderGen::OidnOp::WriteBackRgba32) { opStr = "WriteBackRgba32"; }
-      else { GB_FATAL("Unhandled OIDN post op"); }
+      std::string opStr;
+      if (bool(postOp & GiOidnPostOp::MaxPool)) { opStr += "_MaxPool"; }
+      else if (bool(postOp & GiOidnPostOp::Upsample)) { opStr += "_Upsample"; }
+      else if (bool(postOp & GiOidnPostOp::Concat)) { opStr += "_Concat"; }
+      else if (bool(postOp & GiOidnPostOp::WriteBackRgba32)) { opStr += "_WriteBackRgba32"; }
+      else if (postOp != GiOidnPostOp::None) { GB_FATAL("Unhandled OIDN post op"); }
 
-      return GB_FMT("Oidn_{}_{}->{}", opStr, inDims, outDims);
+      return GB_FMT("Oidn_{}->{}{}", inDims, outDims, opStr);
     }
 
     void addConvReLU(BuildContext& c, Buffer initialInput, Buffer finalOutput, std::string_view tensor, PostOp postOp = PostOp::None)
     {
-      auto pushPipeline = [&](Buffer input, Buffer output, GiGlslShaderGen::OidnOp op)
+      auto pushPipeline = [&](Buffer input, Buffer output, GiOidnPostOp postOp)
       {
         std::string weightName = GB_FMT("{}.weight", tensor);
         std::string biasName = GB_FMT("{}.bias", tensor);
@@ -157,16 +161,21 @@ namespace gtl
           GB_FATAL("tensor not loaded");
         }
 
-        const auto& tensorDesc = ntIt->second;
-        int inDims = (op == GiGlslShaderGen::OidnOp::Convolve || op == GiGlslShaderGen::OidnOp::WriteBackRgba32) ? tensorDesc.dimensions[1] : tensorDesc.dimensions[0]; // OIHW
-        int outDims = (op == GiGlslShaderGen::OidnOp::WriteBackRgba32) ? 4 : tensorDesc.dimensions[0];
+        if (bool(postOp & GiOidnPostOp::Upsample) && bool(postOp & GiOidnPostOp::MaxPool))
+        {
+          GB_FATAL("unsupported post op combination");
+        }
 
-        std::string debugName = makeConvolutionPipelineDebugName(inDims, outDims, op);
+        const auto& tensorDesc = ntIt->second;
+        int inDims = tensorDesc.dimensions[1]; // OIHW
+        int outDims = bool(postOp & GiOidnPostOp::WriteBackRgba32) ? 4 : tensorDesc.dimensions[0];
+
+        std::string debugName = makeConvolutionPipelineDebugName(inDims, outDims, postOp);
 
         GiGlslShaderGen::OidnParams sgParams{
           .inChannelCount = inDims,
           .outChannelCount = outDims,
-          .op = op
+          .postOp = postOp
         };
 
         std::vector<uint8_t> spv;
@@ -190,16 +199,16 @@ namespace gtl
 
         uint32_t inSizeMul = inDims / std::pow(2, c.depth) * sizeof(float)/2;
 
-        if (op == GiGlslShaderGen::OidnOp::MaxPool)
+        if (bool(postOp & GiOidnPostOp::MaxPool))
         {
           c.depth++;
         }
-        else if (op == GiGlslShaderGen::OidnOp::Upsample)
+        else if (bool(postOp & GiOidnPostOp::Upsample))
         {
           c.depth--;
         }
 
-        uint32_t outTypeSize = (op == GiGlslShaderGen::OidnOp::WriteBackRgba32) ? sizeof(float) : (sizeof(float) / 2);
+        uint32_t outTypeSize = bool(postOp & GiOidnPostOp::WriteBackRgba32) ? sizeof(float) : (sizeof(float) / 2);
         uint32_t outSizeMul = outDims / std::pow(2, c.depth) * outTypeSize;
 
         m_bufferSizeMuls[int(input)] = std::max(m_bufferSizeMuls[int(input)], inSizeMul);
@@ -221,38 +230,27 @@ namespace gtl
           .output = output,
           .weightOffset = weights.offset / 2,
           .biasOffset = bias.offset / 2,
-          .op = op,
+          .postOp = postOp,
           .outDims = uint32_t(outDims)
         });
       };
 
-      if (postOp == PostOp::WriteBackRgba32)
+      GiOidnPostOp nPostOp = GiOidnPostOp::None;
+
+      if (bool(postOp & PostOp::WriteBackRgba32))
       {
-        pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::WriteBackRgba32);
-        return;
+        nPostOp = GiOidnPostOp::WriteBackRgba32;
       }
-      else if (postOp == PostOp::Upsample)
+      else if (bool(postOp & PostOp::Upsample))
       {
-        pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::Upsample);
-        return;
+        nPostOp = GiOidnPostOp::Upsample;
       }
-      else if (postOp == PostOp::None)
+      else if (bool(postOp & PostOp::MaxPool))
       {
-        pushPipeline(initialInput, finalOutput, GiGlslShaderGen::OidnOp::Convolve);
-        return;
+        nPostOp = GiOidnPostOp::MaxPool;
       }
 
-      pushPipeline(initialInput, Buffer::Scratch, GiGlslShaderGen::OidnOp::Convolve);
-
-      // TODO: this post op is still a separate step
-      if (postOp == PostOp::MaxPool)
-      {
-        pushPipeline(Buffer::Scratch, finalOutput, GiGlslShaderGen::OidnOp::MaxPool);
-      }
-      else
-      {
-        GB_FATAL("post op not handled");
-      }
+      pushPipeline(initialInput, finalOutput, nPostOp);
     }
 
     void addConcat(BuildContext& c, Buffer input1, Buffer input2, Buffer output)
@@ -265,7 +263,7 @@ namespace gtl
       GiGlslShaderGen::OidnParams sgParams{
         .inChannelCount = in1Dims,
         .outChannelCount = in2Dims, // NOTE: out summed in shader
-        .op = GiGlslShaderGen::OidnOp::Concat
+        .postOp = GiOidnPostOp::Concat
       };
 
       std::vector<uint8_t> spv;
@@ -293,7 +291,7 @@ namespace gtl
         .input1 = input1,
         .input2 = input2,
         .output = output,
-        .op = GiGlslShaderGen::OidnOp::Concat
+        .postOp = GiOidnPostOp::Concat
       });
     }
 
@@ -445,7 +443,7 @@ namespace gtl
 
         CgpuBuffer inBuffer1 = resolveInputBuffer(step.input1);
         CgpuBuffer inBuffer2;
-        if (step.op == GiGlslShaderGen::OidnOp::Concat)
+        if (bool(step.postOp & GiOidnPostOp::Concat))
         {
           inBuffer2 = resolveInputBuffer(step.input2);
         }
@@ -459,7 +457,7 @@ namespace gtl
           .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
           .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
         });
-        if (step.op == GiGlslShaderGen::OidnOp::Concat)
+        if (bool(step.postOp & GiOidnPostOp::Concat))
         {
           bufferBarriers.push_back(CgpuBufferMemoryBarrier{
             .buffer = inBuffer2,
@@ -495,7 +493,7 @@ namespace gtl
           CgpuBufferBinding{.binding = rp::BINDING_INDEX_OUTPUT_BUF, .buffer = outBuffer },
           CgpuBufferBinding{.binding = rp::BINDING_INDEX_TENSOR_BUF, .buffer = m_tensorBuffer }
         };
-        if (step.op == GiGlslShaderGen::OidnOp::Concat)
+        if (bool(step.postOp & GiOidnPostOp::Concat))
         {
           bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_INPUT_BUF2, .buffer = inBuffer2 });
         }
@@ -507,17 +505,16 @@ namespace gtl
 
         cgpuCmdPushConstants(commandBuffer, step.pipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
 
-        if (step.op == GiGlslShaderGen::OidnOp::MaxPool)
-        {
-          imageWidth /= 2;
-          imageHeight /= 2;
-        }
-
         uint32_t wgCountX = (imageWidth + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
         uint32_t wgCountY = (imageHeight + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
         cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
 
-        if (step.op == GiGlslShaderGen::OidnOp::Upsample)
+        if (bool(step.postOp & GiOidnPostOp::MaxPool))
+        {
+          imageWidth /= 2;
+          imageHeight /= 2;
+        }
+        else if (bool(step.postOp & GiOidnPostOp::Upsample))
         {
           imageWidth *= 2;
           imageHeight *= 2;

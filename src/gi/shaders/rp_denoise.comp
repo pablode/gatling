@@ -24,31 +24,29 @@ layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 #define KERNEL_SIZE_SQ (KERNEL_SIZE * KERNEL_SIZE)
 #define KERNEL_BIAS (KERNEL_SIZE / 2)
 
-#ifdef OP_CONVOLVE
+#ifndef OP_CONCAT
 shared float16_t sh_window[WG_SIZE_Y + 2][WG_SIZE_X + 2];
 shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][OUT_CHANNEL_COUNT];
 #endif
 
 void main()
 {
-  int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
-
-#ifdef OP_MAX_POOL
+#ifdef OP_CONCAT
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
 
-  uint inIdx0 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
-  uint inIdx1 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 0) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
-  uint inIdx2 = uint(gl_GlobalInvocationID.x*2+0 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
-  uint inIdx3 = uint(gl_GlobalInvocationID.x*2+1 + (gl_GlobalInvocationID.y*2 + 1) * PC.imageWidth*2) * IN_CHANNEL_COUNT;
+  const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;
 
-  for (int i = 0; i < OUT_CHANNEL_COUNT; i++) // same as IN_CHANNEL_COUNT
+  int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
+
+  for (int i = 0; i < IN_CHANNEL_COUNT; i++)
   {
-    float16_t max1 = max(inPixels[inIdx0 + i], inPixels[inIdx1 + i]);
-    float16_t max2 = max(inPixels[inIdx2 + i], inPixels[inIdx3 + i]);
-    outPixels[pixelIdx * OUT_CHANNEL_COUNT + i] = max(max1, max2);
+    outPixels[pixelIdx * RES_CHANNEL_COUNT + i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
   }
-#endif
-#ifdef OP_CONVOLVE
+  for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
+  {
+    outPixels[pixelIdx * RES_CHANNEL_COUNT + IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
+  }
+#else
 
   // shared mem v1
   ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(WG_SIZE_X, WG_SIZE_Y);
@@ -115,11 +113,35 @@ void main()
 
   for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
   {
-    float16_t result = sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc];
+    float16_t result;
+
+#ifndef OP_MAX_POOL
+    int pixelIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
+
+    result = sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc];
 
     result += tensors[PC.biasOffset + oc];
 
     result = max(result, float16_t(0.0)); // ReLU activation
+#else
+    // TODO: this leads to thread divergence; we can instead discard whole warp (respect tile size)
+    if (bool(gl_LocalInvocationID.x & 1) || bool(gl_LocalInvocationID.y & 1)) continue;
+
+    int pixelIdx = int(gl_GlobalInvocationID.y /2 * PC.imageWidth / 2 + gl_GlobalInvocationID.x / 2);
+
+    f16vec4 results = f16vec4(
+      sh_results[gl_LocalInvocationID.y + 0][gl_LocalInvocationID.x + 0][oc],
+      sh_results[gl_LocalInvocationID.y + 1][gl_LocalInvocationID.x + 0][oc],
+      sh_results[gl_LocalInvocationID.y + 0][gl_LocalInvocationID.x + 1][oc],
+      sh_results[gl_LocalInvocationID.y + 1][gl_LocalInvocationID.x + 1][oc]
+    );
+
+    results += f16vec4(tensors[PC.biasOffset + oc]);
+
+    float16_t maxPool = max(max(results.x, results.y), max(results.z, results.w));
+
+    result = max(float16_t(0.0) /*ReLU*/, maxPool);
+#endif
 
 #ifdef OUT_CHANNEL_F32
     float convertedResult = float(result);
@@ -137,19 +159,5 @@ void main()
 #endif
   }
 
-#endif
-#ifdef OP_CONCAT
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight) return;
-
-  const uint RES_CHANNEL_COUNT = OUT_CHANNEL_COUNT + IN_CHANNEL_COUNT;
-
-  for (int i = 0; i < IN_CHANNEL_COUNT; i++)
-  {
-    outPixels[pixelIdx * RES_CHANNEL_COUNT + i] = inPixels[pixelIdx * IN_CHANNEL_COUNT + i];
-  }
-  for (int i = 0; i < OUT_CHANNEL_COUNT; i++)
-  {
-    outPixels[pixelIdx * RES_CHANNEL_COUNT + IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
-  }
 #endif
 }

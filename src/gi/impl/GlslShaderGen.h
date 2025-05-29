@@ -24,6 +24,7 @@
 #include <memory>
 #include <filesystem>
 
+#include <gtl/gb/Enum.h>
 #include <gtl/mc/Backend.h>
 
 namespace fs = std::filesystem;
@@ -107,13 +108,20 @@ namespace gtl
       uint32_t textureIndexOffset;
     };
 
-    enum class OidnOp { Convolve, MaxPool, Upsample, Concat, WriteBackRgba32 };
+    enum class OidnPostOp : uint32_t
+    {
+      None            = 0,
+      MaxPool         = (1 << 0),
+      Upsample        = (1 << 1),
+      Concat          = (1 << 2),
+      WriteBackRgba32 = (1 << 3)
+    };
 
     struct OidnParams
     {
       int inChannelCount;
       int outChannelCount;
-      OidnOp op = OidnOp::Convolve; // TODO (later): convolution + post op
+      OidnPostOp postOp = OidnPostOp::None;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);
@@ -128,4 +136,6 @@ namespace gtl
     std::shared_ptr<GiGlslShaderCompiler> m_shaderCompiler;
     fs::path m_shaderPath;
   };
+
+  GB_DECLARE_ENUM_BITOPS(GiGlslShaderGen::OidnPostOp)
 }

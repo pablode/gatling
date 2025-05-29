@@ -298,26 +298,21 @@ namespace gtl
 
     stitcher.appendDefine("IN_CHANNEL_COUNT", params.inChannelCount);
     stitcher.appendDefine("OUT_CHANNEL_COUNT", params.outChannelCount);
-    if (params.op == OidnOp::Convolve)
-    {
-      stitcher.appendDefine("OP_CONVOLVE");
-    }
-    else if (params.op == OidnOp::MaxPool)
+
+    if ((params.postOp & OidnPostOp::MaxPool) != OidnPostOp::None)
     {
       stitcher.appendDefine("OP_MAX_POOL");
     }
-    else if (params.op == OidnOp::Upsample)
+    if ((params.postOp & OidnPostOp::Upsample) != OidnPostOp::None)
     {
-      stitcher.appendDefine("OP_CONVOLVE");
       stitcher.appendDefine("OP_UPSAMPLE");
     }
-    else if (params.op == OidnOp::Concat)
+    if ((params.postOp & OidnPostOp::Concat) != OidnPostOp::None)
     {
       stitcher.appendDefine("OP_CONCAT");
     }
-    else if (params.op == OidnOp::WriteBackRgba32)
+    if ((params.postOp & OidnPostOp::WriteBackRgba32) != OidnPostOp::None)
     {
-      stitcher.appendDefine("OP_CONVOLVE");
       stitcher.appendDefine("OUT_CHANNEL_F32");
     }
 
