@@ -116,32 +116,20 @@ namespace gtl
       }
 
       auto dataTypeChar = _giTzaRead<char>(ptr, end);
-
-      GiTzaTensorDataType dataType;
-      if (dataTypeChar == 'f')
+      if (dataTypeChar != 'h')
       {
-        dataType = GiTzaTensorDataType::Float32;
-      }
-      else if (dataTypeChar == 'h')
-      {
-        dataType = GiTzaTensorDataType::Float16;
-      }
-      else
-      {
-        GB_FATAL("unsupported data type");
+        GB_FATAL("unsupported tensor data type");
       }
 
       auto dataOffset = _giTzaRead<uint64_t>(ptr, end);
 
       uint64_t dataSize = 1;
-GB_LOG("----");
       for (uint32_t i = 0; i < dimCount; i++)
       {
-GB_LOG("  {}", dimensions[i]);
         dataSize *= dimensions[i];
       }
-      dataSize *= (dataType == GiTzaTensorDataType::Float32 ? 4 : 2);
- 
+      dataSize *= sizeof(float) / 2; // only support half
+
       _giTzaCheckBounds(&data[dataOffset], end, dataSize);
 
       GB_LOG(" {} ({}, {}, {})", name, dimCount, layoutStr, dataTypeChar);
@@ -149,7 +137,6 @@ GB_LOG("  {}", dimensions[i]);
       descs[name] = GiTzaTensorDescription{
         .dimensions = dimensions,
         .layout = layout,
-        .dataType = dataType,
         .dataOffset = dataOffset,
         .dataSize = dataSize
       };

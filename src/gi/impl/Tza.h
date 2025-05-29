@@ -25,16 +25,12 @@ namespace gtl
 {
   enum class GiTzaTensorLayout { x, oihw };
 
-  // TODO: only support f16 once we switch to v2.3
-  enum class GiTzaTensorDataType { Float16, Float32 };
-
   struct GiTzaTensorDescription
   {
     // TODO: validate that HW are 3 and 3! don't support anything else
     // TODO: check that large net does not use larger kernels..
     std::vector<int> dimensions; // OIHW
     GiTzaTensorLayout layout;
-    GiTzaTensorDataType dataType;
     uint64_t dataOffset;
     uint64_t dataSize;
   };
