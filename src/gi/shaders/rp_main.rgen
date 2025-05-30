@@ -527,8 +527,8 @@ void main()
 
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
     const int CHANNEL_COUNT = 3;
-    OidnAov[pixel_index * CHANNEL_COUNT + 0] = float16_t(pixel_color.r*1.0f);
-    OidnAov[pixel_index * CHANNEL_COUNT + 1] = float16_t(pixel_color.g*1.0f);
-    OidnAov[pixel_index * CHANNEL_COUNT + 2] = float16_t(pixel_color.b*1.0f);
+    OidnAov[pixel_index * CHANNEL_COUNT + 0] = float16_t(pixel_color.r);
+    OidnAov[pixel_index * CHANNEL_COUNT + 1] = float16_t(pixel_color.g);
+    OidnAov[pixel_index * CHANNEL_COUNT + 2] = float16_t(pixel_color.b);
 #endif
 }
