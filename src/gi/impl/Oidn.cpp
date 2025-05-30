@@ -67,6 +67,8 @@ namespace gtl
 
     uint32_t m_imageWidth = 0; // 16px multiple
     uint32_t m_imageHeight = 0; // 16px multiple
+    uint32_t m_wgSizeX;
+    uint32_t m_wgSizeY;
 
     GgpuDelayedResourceDestroyer& m_resourceDestroyer;
 
@@ -189,6 +191,8 @@ namespace gtl
       }
 
       GiGlslShaderGen::OidnParams sgParams{
+        .wgSizeX = int(m_wgSizeX),
+        .wgSizeY = int(m_wgSizeY),
         .in1ChannelCount = in1Dims,
         .outChannelCount = outDims,
         .convChannelCount = convDims,
@@ -307,14 +311,20 @@ namespace gtl
       : m_resourceDestroyer(resourceDestroyer)
     {
       CgpuPhysicalDeviceProperties deviceProperties;
-      cgpuGetPhysicalDeviceProperties(device, &deviceProperties);
+      cgpuGetPhysicalDeviceProperties(device, deviceProperties);
+
+      uint32_t shmemSize = deviceProperties.maxComputeSharedMemorySize;
+
+      if (shmemSize >= 65536) { m_wgSizeX = 24; m_wgSizeY = 16; }
+      else if (shmemSize >= 49152) { m_wgSizeX = 16; m_wgSizeY = 16; }
+      else { m_wgSizeX = 16; m_wgSizeY = 8; }
+
+      for (uint32_t& i : m_bufferLastDims) { i = 0; }
+      for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
 
       BuildContext c{ device, shaderGen, stager, tensorDescs, tensorData, deviceProperties.vendorId };
 
       uploadTensors(c);
-
-      for (uint32_t& i : m_bufferLastDims) { i = 0; }
-      for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
 
       addConvReLU(c, Buffer::Pool0, Buffer::Scratch, "enc_conv0");
       addConvReLU(c, Buffer::Scratch, Buffer::Pool1, "enc_conv1", GiOidnPostOp::MaxPool);
@@ -465,8 +475,8 @@ namespace gtl
 
         cgpuCmdPushConstants(commandBuffer, step.pipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
 
-        uint32_t wgCountX = (imageWidth + rp::WG_SIZE_X - 1) / rp::WG_SIZE_X;
-        uint32_t wgCountY = (imageHeight + rp::WG_SIZE_Y - 1) / rp::WG_SIZE_Y;
+        uint32_t wgCountX = (imageWidth + m_wgSizeX - 1) / m_wgSizeX;
+        uint32_t wgCountY = (imageHeight + m_wgSizeY - 1) / m_wgSizeY;
         cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
 
         if (bool(step.postOp & GiOidnPostOp::MaxPool))

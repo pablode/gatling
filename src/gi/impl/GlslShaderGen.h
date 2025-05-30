@@ -119,6 +119,8 @@ namespace gtl
 
     struct OidnParams
     {
+      int wgSizeX;
+      int wgSizeY;
       int in1ChannelCount;
       int in2ChannelCount = 0;
       int outChannelCount;

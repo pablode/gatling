@@ -300,6 +300,8 @@ namespace gtl
     stitcher.appendDefine("OUT_CHANNEL_COUNT", params.outChannelCount);
     stitcher.appendDefine("CONV_CHANNEL_COUNT", params.convChannelCount);
     stitcher.appendDefine("CONV_IMPL", params.convolutionImpl);
+    stitcher.appendDefine("WG_SIZE_X", params.wgSizeX);
+    stitcher.appendDefine("WG_SIZE_Y", params.wgSizeY);
 
     if (bool(params.postOp & OidnPostOp::MaxPool))
     {

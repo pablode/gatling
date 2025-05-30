@@ -22,9 +22,6 @@
 
 GI_INTERFACE_BEGIN(rp_oidn)
 
-const GI_UINT WG_SIZE_X = 16;
-const GI_UINT WG_SIZE_Y = 8;
-
 #ifdef __cplusplus
 const GI_INT CONV_IMPL_SEQ = 0;
 const GI_INT CONV_IMPL_SHMEM = 1;
