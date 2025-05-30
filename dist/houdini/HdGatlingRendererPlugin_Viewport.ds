@@ -107,4 +107,34 @@
         parmtag { "uiscope" "viewport toolbar" }
         parmtag { "uiicon" "BUTTONS_cut" } // BUTTONS_box
     }
+
+    parm {
+        name    "mediumStackSize"
+        label   "Medium stack size"
+        type    int
+        default { 0 }
+        range   { 0! 16 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "maxVolumeWalkLength"
+        label   "Max volume walk length"
+        type    int
+        default { 7 }
+        range   { 0! 64 }
+        parmtag { "spare_category" "Sampling" }
+        parmtag { "uiscope" "viewport" }
+    }
+
+    parm {
+        name    "denoiseColorAov"
+        label   "Denoise color AOV"
+        type    toggle
+        default { 0 }
+        parmtag { "spare_category" "Shading" }
+        parmtag { "uiscope" "viewport toolbar" }
+        parmtag { "uiicon" "VIEW_display_denoise" }
+    }
 }

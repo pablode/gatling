@@ -61,9 +61,10 @@ class ViewportRenderProperties(bpy.types.PropertyGroup):
         name="Max volume walk length",
         default=7, min=1,
     )
-    progressive_accumulation: bpy.props.BoolProperty(
-        name="Progressive accumulation",
-        default=True,
+    # progressive_accumulation: debug feature, keep always on
+    denoise_color_aov: bpy.props.BoolProperty(
+        name="Denoise Color AOV",
+        default=False,
     )
 
 
@@ -104,9 +105,9 @@ class FinalRenderProperties(bpy.types.PropertyGroup):
         name="Max volume walk length",
         default=7, min=1,
     )
-    progressive_accumulation: bpy.props.BoolProperty(
-        name="Progressive accumulation",
-        default=False,
+    denoise_color_aov: bpy.props.BoolProperty(
+        name="Denoise Color AOV",
+        default=True,
     )
 
 
