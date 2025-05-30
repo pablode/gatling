@@ -1,6 +1,7 @@
 name: Deploy Release (Weekly)
 
 on:
+  push:
   schedule:
     # Run every sunday at 18:00 UTC (8 PM CET)
     - cron: '0 18 * * 0'
