@@ -17,7 +17,6 @@
 
 #include "ShaderReflection.h"
 
-#include <volk.h>
 #include <spirv_reflect.h>
 #include <stdlib.h>
 #include <assert.h>

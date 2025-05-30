@@ -32,6 +32,8 @@
 
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
+#include <gtl/gb/LinearDataStore.h>
+#include <gtl/gb/SmallVector.h>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -51,10 +53,6 @@
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
-
-#include <gtl/gb/LinearDataStore.h>
-#include <gtl/gb/SmallVector.h>
-#include <gtl/gb/Log.h>
 
 namespace gtl
 {
@@ -279,99 +277,98 @@ namespace gtl
 
   /* Helper methods. */
 
-  static CgpuPhysicalDeviceFeatures cgpuTranslatePhysicalDeviceFeatures(const VkPhysicalDeviceFeatures* vkFeatures)
+  static CgpuPhysicalDeviceFeatures cgpuTranslatePhysicalDeviceFeatures(const VkPhysicalDeviceFeatures& vkFeatures)
   {
-    CgpuPhysicalDeviceFeatures features = {};
-    features.textureCompressionBC = bool(vkFeatures->textureCompressionBC);
-    features.pipelineStatisticsQuery = bool(vkFeatures->pipelineStatisticsQuery);
-    features.shaderImageGatherExtended = bool(vkFeatures->shaderImageGatherExtended);
-    features.shaderStorageImageExtendedFormats = bool(vkFeatures->shaderStorageImageExtendedFormats);
-    features.shaderStorageImageReadWithoutFormat = bool(vkFeatures->shaderStorageImageReadWithoutFormat);
-    features.shaderStorageImageWriteWithoutFormat = bool(vkFeatures->shaderStorageImageWriteWithoutFormat);
-    features.shaderUniformBufferArrayDynamicIndexing = bool(vkFeatures->shaderUniformBufferArrayDynamicIndexing);
-    features.shaderSampledImageArrayDynamicIndexing = bool(vkFeatures->shaderSampledImageArrayDynamicIndexing);
-    features.shaderStorageBufferArrayDynamicIndexing = bool(vkFeatures->shaderStorageBufferArrayDynamicIndexing);
-    features.shaderStorageImageArrayDynamicIndexing = bool(vkFeatures->shaderStorageImageArrayDynamicIndexing);
-    features.shaderFloat64 = bool(vkFeatures->shaderFloat64);
-    features.shaderInt64 = bool(vkFeatures->shaderInt64);
-    features.shaderInt16 = bool(vkFeatures->shaderInt16);
-    features.sparseBinding = bool(vkFeatures->sparseBinding);
-    features.sparseResidencyBuffer = bool(vkFeatures->sparseResidencyBuffer);
-    features.sparseResidencyImage2D = bool(vkFeatures->sparseResidencyImage2D);
-    features.sparseResidencyImage3D = bool(vkFeatures->sparseResidencyImage3D);
-    features.sparseResidencyAliased = bool(vkFeatures->sparseResidencyAliased);
-    return features;
+    return CgpuPhysicalDeviceFeatures {
+      .pipelineStatisticsQuery = bool(vkFeatures.pipelineStatisticsQuery),
+      .shaderFloat64 = bool(vkFeatures.shaderFloat64),
+      .shaderImageGatherExtended = bool(vkFeatures.shaderImageGatherExtended),
+      .shaderInt16 = bool(vkFeatures.shaderInt16),
+      .shaderInt64 = bool(vkFeatures.shaderInt64),
+      .shaderSampledImageArrayDynamicIndexing = bool(vkFeatures.shaderSampledImageArrayDynamicIndexing),
+      .shaderStorageBufferArrayDynamicIndexing = bool(vkFeatures.shaderStorageBufferArrayDynamicIndexing),
+      .shaderStorageImageArrayDynamicIndexing = bool(vkFeatures.shaderStorageImageArrayDynamicIndexing),
+      .shaderStorageImageExtendedFormats = bool(vkFeatures.shaderStorageImageExtendedFormats),
+      .shaderStorageImageReadWithoutFormat = bool(vkFeatures.shaderStorageImageReadWithoutFormat),
+      .shaderStorageImageWriteWithoutFormat = bool(vkFeatures.shaderStorageImageWriteWithoutFormat),
+      .shaderUniformBufferArrayDynamicIndexing = bool(vkFeatures.shaderUniformBufferArrayDynamicIndexing),
+      .sparseBinding = bool(vkFeatures.sparseBinding),
+      .sparseResidencyAliased = bool(vkFeatures.sparseResidencyAliased),
+      .sparseResidencyBuffer = bool(vkFeatures.sparseResidencyBuffer),
+      .sparseResidencyImage2D = bool(vkFeatures.sparseResidencyImage2D),
+      .sparseResidencyImage3D = bool(vkFeatures.sparseResidencyImage3D),
+      .textureCompressionBC = bool(vkFeatures.textureCompressionBC)
+    };
   }
 
-  static CgpuPhysicalDeviceProperties cgpuTranslatePhysicalDeviceProperties(const VkPhysicalDeviceLimits* vkLimits,
-                                                                            const VkPhysicalDeviceSubgroupProperties* vkSubgroupProps,
-                                                                            const VkPhysicalDeviceAccelerationStructurePropertiesKHR* vkAsProps,
-                                                                            const VkPhysicalDeviceRayTracingPipelinePropertiesKHR* vkRtPipelineProps)
+  static CgpuPhysicalDeviceProperties cgpuTranslatePhysicalDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
+                                                                            const VkPhysicalDeviceSubgroupProperties& vkSubgroupProps,
+                                                                            const VkPhysicalDeviceAccelerationStructurePropertiesKHR& vkAsProps,
+                                                                            const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps)
   {
-    CgpuPhysicalDeviceProperties properties = {
-      .maxImageDimension1D = vkLimits->maxImageDimension1D,
-      .maxImageDimension2D = vkLimits->maxImageDimension2D,
-      .maxImageDimension3D = vkLimits->maxImageDimension3D,
-      .maxImageDimensionCube = vkLimits->maxImageDimensionCube,
-      .maxImageArrayLayers = vkLimits->maxImageArrayLayers,
-      .maxUniformBufferRange = vkLimits->maxUniformBufferRange,
-      .maxStorageBufferRange = vkLimits->maxStorageBufferRange,
-      .maxPushConstantsSize = vkLimits->maxPushConstantsSize,
-      .maxMemoryAllocationCount = vkLimits->maxMemoryAllocationCount,
-      .maxSamplerAllocationCount = vkLimits->maxSamplerAllocationCount,
-      .bufferImageGranularity = vkLimits->bufferImageGranularity,
-      .sparseAddressSpaceSize = vkLimits->sparseAddressSpaceSize,
-      .maxBoundDescriptorSets = vkLimits->maxBoundDescriptorSets,
-      .maxPerStageDescriptorSamplers = vkLimits->maxPerStageDescriptorSamplers,
-      .maxPerStageDescriptorUniformBuffers = vkLimits->maxPerStageDescriptorUniformBuffers,
-      .maxPerStageDescriptorStorageBuffers = vkLimits->maxPerStageDescriptorStorageBuffers,
-      .maxPerStageDescriptorSampledImages = vkLimits->maxPerStageDescriptorSampledImages,
-      .maxPerStageDescriptorStorageImages = vkLimits->maxPerStageDescriptorStorageImages,
-      .maxPerStageDescriptorInputAttachments = vkLimits->maxPerStageDescriptorInputAttachments,
-      .maxPerStageResources = vkLimits->maxPerStageResources,
-      .maxDescriptorSetSamplers = vkLimits->maxDescriptorSetSamplers,
-      .maxDescriptorSetUniformBuffers = vkLimits->maxDescriptorSetUniformBuffers,
-      .maxDescriptorSetUniformBuffersDynamic = vkLimits->maxDescriptorSetUniformBuffersDynamic,
-      .maxDescriptorSetStorageBuffers = vkLimits->maxDescriptorSetStorageBuffers,
-      .maxDescriptorSetStorageBuffersDynamic = vkLimits->maxDescriptorSetStorageBuffersDynamic,
-      .maxDescriptorSetSampledImages = vkLimits->maxDescriptorSetSampledImages,
-      .maxDescriptorSetStorageImages = vkLimits->maxDescriptorSetStorageImages,
-      .maxDescriptorSetInputAttachments = vkLimits->maxDescriptorSetInputAttachments,
-      .maxComputeSharedMemorySize = vkLimits->maxComputeSharedMemorySize,
-      .maxComputeWorkGroupCount = { vkLimits->maxComputeWorkGroupCount[0], vkLimits->maxComputeWorkGroupCount[1], vkLimits->maxComputeWorkGroupCount[2] },
-      .maxComputeWorkGroupInvocations = vkLimits->maxComputeWorkGroupInvocations,
-      .maxComputeWorkGroupSize = { vkLimits->maxComputeWorkGroupSize[0], vkLimits->maxComputeWorkGroupSize[1], vkLimits->maxComputeWorkGroupSize[2] },
-      .mipmapPrecisionBits = vkLimits->mipmapPrecisionBits,
-      .maxSamplerLodBias = vkLimits->maxSamplerLodBias,
-      .maxSamplerAnisotropy = vkLimits->maxSamplerAnisotropy,
-      .minMemoryMapAlignment = vkLimits->minMemoryMapAlignment,
-      .minUniformBufferOffsetAlignment = vkLimits->minUniformBufferOffsetAlignment,
-      .minStorageBufferOffsetAlignment = vkLimits->minStorageBufferOffsetAlignment,
-      .minTexelOffset = vkLimits->minTexelOffset,
-      .maxTexelOffset = vkLimits->maxTexelOffset,
-      .minTexelGatherOffset = vkLimits->minTexelGatherOffset,
-      .maxTexelGatherOffset = vkLimits->maxTexelGatherOffset,
-      .minInterpolationOffset = vkLimits->minInterpolationOffset,
-      .maxInterpolationOffset = vkLimits->maxInterpolationOffset,
-      .subPixelInterpolationOffsetBits = vkLimits->subPixelInterpolationOffsetBits,
-      .maxSampleMaskWords = vkLimits->maxSampleMaskWords,
-      .timestampComputeAndGraphics = bool(vkLimits->timestampComputeAndGraphics),
-      .timestampPeriod = vkLimits->timestampPeriod,
-      .discreteQueuePriorities = vkLimits->discreteQueuePriorities,
-      .optimalBufferCopyOffsetAlignment = vkLimits->optimalBufferCopyOffsetAlignment,
-      .optimalBufferCopyRowPitchAlignment = vkLimits->optimalBufferCopyRowPitchAlignment,
-      .nonCoherentAtomSize = vkLimits->nonCoherentAtomSize,
-      .subgroupSize = vkSubgroupProps->subgroupSize,
-      .minAccelerationStructureScratchOffsetAlignment = vkAsProps->minAccelerationStructureScratchOffsetAlignment,
-      .shaderGroupHandleSize = vkRtPipelineProps->shaderGroupHandleSize,
-      .maxShaderGroupStride = vkRtPipelineProps->maxShaderGroupStride,
-      .shaderGroupBaseAlignment = vkRtPipelineProps->shaderGroupBaseAlignment,
-      .shaderGroupHandleCaptureReplaySize = vkRtPipelineProps->shaderGroupHandleCaptureReplaySize,
-      .maxRayDispatchInvocationCount = vkRtPipelineProps->maxRayDispatchInvocationCount,
-      .shaderGroupHandleAlignment = vkRtPipelineProps->shaderGroupHandleAlignment,
-      .maxRayHitAttributeSize = vkRtPipelineProps->maxRayHitAttributeSize,
+    return CgpuPhysicalDeviceProperties {
+      .bufferImageGranularity = vkLimits.bufferImageGranularity,
+      .discreteQueuePriorities = vkLimits.discreteQueuePriorities,
+      .maxBoundDescriptorSets = vkLimits.maxBoundDescriptorSets,
+      .maxComputeSharedMemorySize = vkLimits.maxComputeSharedMemorySize,
+      .maxComputeWorkGroupCount = { vkLimits.maxComputeWorkGroupCount[0], vkLimits.maxComputeWorkGroupCount[1], vkLimits.maxComputeWorkGroupCount[2] },
+      .maxComputeWorkGroupInvocations = vkLimits.maxComputeWorkGroupInvocations,
+      .maxComputeWorkGroupSize = { vkLimits.maxComputeWorkGroupSize[0], vkLimits.maxComputeWorkGroupSize[1], vkLimits.maxComputeWorkGroupSize[2] },
+      .maxDescriptorSetInputAttachments = vkLimits.maxDescriptorSetInputAttachments,
+      .maxDescriptorSetSampledImages = vkLimits.maxDescriptorSetSampledImages,
+      .maxDescriptorSetSamplers = vkLimits.maxDescriptorSetSamplers,
+      .maxDescriptorSetStorageBuffers = vkLimits.maxDescriptorSetStorageBuffers,
+      .maxDescriptorSetStorageBuffersDynamic = vkLimits.maxDescriptorSetStorageBuffersDynamic,
+      .maxDescriptorSetStorageImages = vkLimits.maxDescriptorSetStorageImages,
+      .maxDescriptorSetUniformBuffers = vkLimits.maxDescriptorSetUniformBuffers,
+      .maxDescriptorSetUniformBuffersDynamic = vkLimits.maxDescriptorSetUniformBuffersDynamic,
+      .maxImageArrayLayers = vkLimits.maxImageArrayLayers,
+      .maxImageDimension1D = vkLimits.maxImageDimension1D,
+      .maxImageDimension2D = vkLimits.maxImageDimension2D,
+      .maxImageDimension3D = vkLimits.maxImageDimension3D,
+      .maxImageDimensionCube = vkLimits.maxImageDimensionCube,
+      .maxInterpolationOffset = vkLimits.maxInterpolationOffset,
+      .maxMemoryAllocationCount = vkLimits.maxMemoryAllocationCount,
+      .maxPerStageDescriptorInputAttachments = vkLimits.maxPerStageDescriptorInputAttachments,
+      .maxPerStageDescriptorSampledImages = vkLimits.maxPerStageDescriptorSampledImages,
+      .maxPerStageDescriptorSamplers = vkLimits.maxPerStageDescriptorSamplers,
+      .maxPerStageDescriptorStorageBuffers = vkLimits.maxPerStageDescriptorStorageBuffers,
+      .maxPerStageDescriptorStorageImages = vkLimits.maxPerStageDescriptorStorageImages,
+      .maxPerStageDescriptorUniformBuffers = vkLimits.maxPerStageDescriptorUniformBuffers,
+      .maxPerStageResources = vkLimits.maxPerStageResources,
+      .maxPushConstantsSize = vkLimits.maxPushConstantsSize,
+      .maxRayDispatchInvocationCount = vkRtPipelineProps.maxRayDispatchInvocationCount,
+      .maxRayHitAttributeSize = vkRtPipelineProps.maxRayHitAttributeSize,
+      .maxSampleMaskWords = vkLimits.maxSampleMaskWords,
+      .maxSamplerAllocationCount = vkLimits.maxSamplerAllocationCount,
+      .maxSamplerAnisotropy = vkLimits.maxSamplerAnisotropy,
+      .maxSamplerLodBias = vkLimits.maxSamplerLodBias,
+      .maxShaderGroupStride = vkRtPipelineProps.maxShaderGroupStride,
+      .maxStorageBufferRange = vkLimits.maxStorageBufferRange,
+      .maxTexelGatherOffset = vkLimits.maxTexelGatherOffset,
+      .maxTexelOffset = vkLimits.maxTexelOffset,
+      .maxUniformBufferRange = vkLimits.maxUniformBufferRange,
+      .minAccelerationStructureScratchOffsetAlignment = vkAsProps.minAccelerationStructureScratchOffsetAlignment,
+      .minInterpolationOffset = vkLimits.minInterpolationOffset,
+      .minMemoryMapAlignment = vkLimits.minMemoryMapAlignment,
+      .minStorageBufferOffsetAlignment = vkLimits.minStorageBufferOffsetAlignment,
+      .minTexelGatherOffset = vkLimits.minTexelGatherOffset,
+      .minTexelOffset = vkLimits.minTexelOffset,
+      .minUniformBufferOffsetAlignment = vkLimits.minUniformBufferOffsetAlignment,
+      .mipmapPrecisionBits = vkLimits.mipmapPrecisionBits,
+      .nonCoherentAtomSize = vkLimits.nonCoherentAtomSize,
+      .optimalBufferCopyOffsetAlignment = vkLimits.optimalBufferCopyOffsetAlignment,
+      .optimalBufferCopyRowPitchAlignment = vkLimits.optimalBufferCopyRowPitchAlignment,
+      .shaderGroupBaseAlignment = vkRtPipelineProps.shaderGroupBaseAlignment,
+      .shaderGroupHandleAlignment = vkRtPipelineProps.shaderGroupHandleAlignment,
+      .shaderGroupHandleCaptureReplaySize = vkRtPipelineProps.shaderGroupHandleCaptureReplaySize,
+      .shaderGroupHandleSize = vkRtPipelineProps.shaderGroupHandleSize,
+      .sparseAddressSpaceSize = vkLimits.sparseAddressSpaceSize,
+      .subPixelInterpolationOffsetBits = vkLimits.subPixelInterpolationOffsetBits,
+      .subgroupSize = vkSubgroupProps.subgroupSize,
+      .timestampComputeAndGraphics = bool(vkLimits.timestampComputeAndGraphics),
+      .timestampPeriod = vkLimits.timestampPeriod
     };
-    return properties;
   }
 
   static VkSamplerAddressMode cgpuTranslateAddressMode(CgpuSamplerAddressMode mode)
@@ -728,7 +725,7 @@ namespace gtl
 
     VkPhysicalDeviceFeatures features;
     vkGetPhysicalDeviceFeatures(idevice->physicalDevice, &features);
-    idevice->features = cgpuTranslatePhysicalDeviceFeatures(&features);
+    idevice->features = cgpuTranslatePhysicalDeviceFeatures(features);
 
     VkPhysicalDeviceAccelerationStructurePropertiesKHR asProperties = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
@@ -781,7 +778,7 @@ namespace gtl
     }
 
     const VkPhysicalDeviceLimits* limits = &deviceProperties.properties.limits;
-    idevice->properties = cgpuTranslatePhysicalDeviceProperties(limits, &subgroupProperties, &asProperties, &rtPipelineProperties);
+    idevice->properties = cgpuTranslatePhysicalDeviceProperties(*limits, subgroupProperties, asProperties, rtPipelineProperties);
 
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, nullptr);
@@ -3766,18 +3763,18 @@ cleanup_fail:
   }
 
   bool cgpuGetPhysicalDeviceFeatures(CgpuDevice device,
-                                     CgpuPhysicalDeviceFeatures* features)
+                                     CgpuPhysicalDeviceFeatures& features)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    memcpy(features, &idevice->features, sizeof(CgpuPhysicalDeviceFeatures));
+    memcpy(&features, &idevice->features, sizeof(CgpuPhysicalDeviceFeatures));
     return true;
   }
 
   bool cgpuGetPhysicalDeviceProperties(CgpuDevice device,
-                                       CgpuPhysicalDeviceProperties* properties)
+                                       CgpuPhysicalDeviceProperties& properties)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    memcpy(properties, &idevice->properties, sizeof(CgpuPhysicalDeviceProperties));
+    memcpy(&properties, &idevice->properties, sizeof(CgpuPhysicalDeviceProperties));
     return true;
   }
 }

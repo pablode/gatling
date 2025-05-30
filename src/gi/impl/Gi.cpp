@@ -379,10 +379,10 @@ namespace gtl
     if (!cgpuCreateDevice(&s_device))
       goto fail;
 
-    if (!cgpuGetPhysicalDeviceFeatures(s_device, &s_deviceFeatures))
+    if (!cgpuGetPhysicalDeviceFeatures(s_device, s_deviceFeatures))
       goto fail;
 
-    if (!cgpuGetPhysicalDeviceProperties(s_device, &s_deviceProperties))
+    if (!cgpuGetPhysicalDeviceProperties(s_device, s_deviceProperties))
       goto fail;
 
     if (!cgpuCreateSampler(s_device, {
