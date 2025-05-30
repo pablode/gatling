@@ -86,10 +86,12 @@ void main()
       if (lx < int(WG_SIZE_X + 2) && ly < int(WG_SIZE_Y + 2))
       {
         ivec2 coord = wgBase + ivec2(lx - 1, ly - 1);
-        coord = clamp(coord, ivec2(0), ivec2(PC.imageWidth - 1, PC.imageHeight - 1));
+
         uint inPixelIdx = uint(coord.y * PC.imageWidth + coord.x) * IN1_CHANNEL_COUNT + ic;
 
-        sh_window[ly][lx] = inPixels[inPixelIdx];
+        bool oob = any(greaterThanEqual(uvec2(coord), uvec2(PC.imageWidth, PC.imageHeight)));
+
+        sh_window[ly][lx] = oob ? float16_t(0.0) : inPixels[inPixelIdx];
       }
     }
 
