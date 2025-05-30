@@ -25,7 +25,9 @@ layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 #define KERNEL_BIAS (KERNEL_SIZE / 2)
 
 #ifndef OP_CONCAT
+#if CONV_IMPL == CONV_IMPL_SHMEM
 shared float16_t sh_window[WG_SIZE_Y + 2][WG_SIZE_X + 2];
+#endif
 shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][OUT_CHANNEL_COUNT];
 #endif
 
@@ -47,6 +49,42 @@ void main()
     outPixels[pixelIdx * RES_CHANNEL_COUNT + IN_CHANNEL_COUNT + i] = inPixels2[pixelIdx * OUT_CHANNEL_COUNT + i];
   }
 #else
+
+
+#if CONV_IMPL == CONV_IMPL_SEQ
+
+  // naive
+  for (uint oc = 0; oc < OUT_CHANNEL_COUNT; oc++)
+  {
+    float16_t result = float16_t(0.0);
+
+    for (uint i = 0; i < KERNEL_SIZE; i++)
+    for (uint j = 0; j < KERNEL_SIZE; j++)
+    {
+      ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
+      coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
+      coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
+
+      int coordIdx = int(coord.y * PC.imageWidth + coord.x);
+
+      for (uint ic = 0; ic < IN_CHANNEL_COUNT; ic++)
+      {
+        uint inIndexIj = coordIdx * IN_CHANNEL_COUNT + ic;
+
+        uint weightIndex = (oc * IN_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
+
+        float16_t weight = tensors[PC.weightOffset + weightIndex];
+
+        result += inPixels[inIndexIj] * weight;
+      }
+    }
+
+    sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] = result;
+
+    barrier(); // TODO: artifacts without. why?
+  }
+
+#elif CONV_IMPL == CONV_IMPL_SHMEM
 
   // shared mem v1
   ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(WG_SIZE_X, WG_SIZE_Y);
@@ -100,6 +138,13 @@ void main()
       barrier(); // TODO: artifacts without. why?
     }
   }
+
+#else
+
+#error Unsupported convolution mode.
+
+#endif
+
 
   if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
     return;

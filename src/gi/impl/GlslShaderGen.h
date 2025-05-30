@@ -121,6 +121,7 @@ namespace gtl
     {
       int inChannelCount;
       int outChannelCount;
+      int convolutionImpl;
       OidnPostOp postOp = OidnPostOp::None;
     };
 

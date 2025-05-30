@@ -299,6 +299,8 @@ namespace gtl
     stitcher.appendDefine("IN_CHANNEL_COUNT", params.inChannelCount);
     stitcher.appendDefine("OUT_CHANNEL_COUNT", params.outChannelCount);
 
+    stitcher.appendDefine("CONV_IMPL", params.convolutionImpl);
+
     if ((params.postOp & OidnPostOp::MaxPool) != OidnPostOp::None)
     {
       stitcher.appendDefine("OP_MAX_POOL");

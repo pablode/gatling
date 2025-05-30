@@ -25,6 +25,9 @@ GI_INTERFACE_BEGIN(rp_oidn)
 const GI_UINT WG_SIZE_X = 16;
 const GI_UINT WG_SIZE_Y = 8;
 
+const GI_INT CONV_IMPL_SEQ = 0;
+const GI_INT CONV_IMPL_SHMEM = 1;
+
 struct PushConstants
 {
   GI_UINT imageWidth;

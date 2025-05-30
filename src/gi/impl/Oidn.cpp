@@ -95,6 +95,7 @@ namespace gtl
       GgpuStager& stager;
       const GiTzaTensorDescriptions& tensorDescriptions;
       const uint8_t* tensorData;
+      uint32_t vendorId;
 
       int depth = 0; // track up- and downsampling
       std::unordered_map<std::string, TensorUpload> tensorUploads;
@@ -172,9 +173,18 @@ namespace gtl
 
         std::string debugName = makeConvolutionPipelineDebugName(inDims, outDims, postOp);
 
+        int convImpl = rp::CONV_IMPL_SHMEM;
+        if (c.vendorId == CGPU_VENDOR_ID_MESA)
+        {
+          // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
+          // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
+          convImpl = rp::CONV_IMPL_SEQ;
+        }
+
         GiGlslShaderGen::OidnParams sgParams{
           .inChannelCount = inDims,
           .outChannelCount = outDims,
+          .convolutionImpl = convImpl,
           .postOp = postOp
         };
 
@@ -343,7 +353,10 @@ namespace gtl
            const uint8_t* tensorData)
       : m_resourceDestroyer(resourceDestroyer)
     {
-      BuildContext c{ device, shaderGen, stager, tensorDescs, tensorData};
+      CgpuPhysicalDeviceProperties deviceProperties;
+      cgpuGetPhysicalDeviceProperties(device, &deviceProperties);
+
+      BuildContext c{ device, shaderGen, stager, tensorDescs, tensorData, deviceProperties.vendorId };
 
       uploadTensors(c);
 
