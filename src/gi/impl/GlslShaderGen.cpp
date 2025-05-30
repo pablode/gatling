@@ -296,24 +296,26 @@ namespace gtl
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
-    stitcher.appendDefine("IN_CHANNEL_COUNT", params.inChannelCount);
+    stitcher.appendDefine("IN1_CHANNEL_COUNT", params.in1ChannelCount);
     stitcher.appendDefine("OUT_CHANNEL_COUNT", params.outChannelCount);
+    stitcher.appendDefine("CONV_CHANNEL_COUNT", params.convChannelCount);
 
     stitcher.appendDefine("CONV_IMPL", params.convolutionImpl);
 
-    if ((params.postOp & OidnPostOp::MaxPool) != OidnPostOp::None)
+    if (bool(params.postOp & OidnPostOp::MaxPool))
     {
       stitcher.appendDefine("OP_MAX_POOL");
     }
-    if ((params.postOp & OidnPostOp::Upsample) != OidnPostOp::None)
+    if (bool(params.postOp & OidnPostOp::Upsample))
     {
       stitcher.appendDefine("OP_UPSAMPLE");
     }
-    if ((params.postOp & OidnPostOp::Concat) != OidnPostOp::None)
+    if (bool(params.postOp & OidnPostOp::Concat))
     {
       stitcher.appendDefine("OP_CONCAT");
+      stitcher.appendDefine("IN2_CHANNEL_COUNT", params.in2ChannelCount);
     }
-    if ((params.postOp & OidnPostOp::WriteBackRgba32) != OidnPostOp::None)
+    if (bool(params.postOp & OidnPostOp::WriteBackRgba32))
     {
       stitcher.appendDefine("OUT_CHANNEL_F32");
     }

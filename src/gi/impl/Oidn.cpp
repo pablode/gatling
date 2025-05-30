@@ -33,19 +33,12 @@ namespace gtl
 
   using GiOidnPostOp = GiGlslShaderGen::OidnPostOp;
 
-  // TODO: replace with GiOidnPostOp above once concat has been switched to post op
-  enum class PostOp : int
-  {
-    None = 0, MaxPool = 1, Upsample = 2, WriteBackRgba32 = 4
-  };
-  GB_DECLARE_ENUM_BITOPS(PostOp) // TODO: remvoe
-
   class GiOidnNet
   {
   private:
     enum class Buffer
     {
-      Pool0, Pool1, Pool2, Pool3, Output, Scratch, COUNT
+      Invalid, Pool0, Pool1, Pool2, Pool3, Output, Scratch, COUNT
     };
 
     struct PipelineStep
@@ -77,8 +70,8 @@ namespace gtl
 
     GgpuDelayedResourceDestroyer& m_resourceDestroyer;
 
-    uint32_t m_bufferSizeMuls[int(Buffer::COUNT)];
-    uint32_t m_bufferLastDims[int(Buffer::COUNT)];
+    std::array<uint32_t, int(Buffer::COUNT)> m_bufferSizeMuls;
+    std::array<uint32_t, int(Buffer::COUNT)> m_bufferLastDims;
 
   private:
     struct TensorUpload
@@ -149,132 +142,63 @@ namespace gtl
       return GB_FMT("Oidn_{}->{}{}", inDims, outDims, opStr);
     }
 
-    void addConvReLU(BuildContext& c, Buffer initialInput, Buffer finalOutput, std::string_view tensor, PostOp postOp = PostOp::None)
+    void addConvReLU(BuildContext& c, Buffer input1, Buffer output, std::string_view tensor, GiOidnPostOp postOp = GiOidnPostOp::None, Buffer input2 = Buffer::Invalid)
     {
-      auto pushPipeline = [&](Buffer input, Buffer output, GiOidnPostOp postOp)
+      std::string weightName = GB_FMT("{}.weight", tensor);
+      std::string biasName = GB_FMT("{}.bias", tensor);
+
+      auto ntIt = c.tensorDescriptions.find(weightName);
+      if (ntIt == c.tensorDescriptions.end())
       {
-        std::string weightName = GB_FMT("{}.weight", tensor);
-        std::string biasName = GB_FMT("{}.bias", tensor);
-
-        auto ntIt = c.tensorDescriptions.find(weightName);
-        if (ntIt == c.tensorDescriptions.end())
-        {
-          GB_FATAL("tensor not loaded");
-        }
-
-        if (bool(postOp & GiOidnPostOp::Upsample) && bool(postOp & GiOidnPostOp::MaxPool))
-        {
-          GB_FATAL("unsupported post op combination");
-        }
-
-        const auto& tensorDesc = ntIt->second;
-        int inDims = tensorDesc.dimensions[1]; // OIHW
-        int outDims = bool(postOp & GiOidnPostOp::WriteBackRgba32) ? 4 : tensorDesc.dimensions[0];
-
-        std::string debugName = makeConvolutionPipelineDebugName(inDims, outDims, postOp);
-
-        int convImpl = rp::CONV_IMPL_SHMEM;
-        if (c.vendorId == CGPU_VENDOR_ID_MESA)
-        {
-          // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
-          // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
-          convImpl = rp::CONV_IMPL_SEQ;
-        }
-
-        GiGlslShaderGen::OidnParams sgParams{
-          .inChannelCount = inDims,
-          .outChannelCount = outDims,
-          .convolutionImpl = convImpl,
-          .postOp = postOp
-        };
-
-        std::vector<uint8_t> spv;
-        if (!c.shaderGen.generateDenoisingSpirv(sgParams, spv))
-        {
-          GB_FATAL("failed to compile OIDN shader");
-        }
-
-        CgpuShader shader;
-        if (!cgpuCreateShader(c.device, { .size = spv.size(), .source = spv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE }, &shader))
-        {
-          GB_FATAL("failed to create OIDN shader");
-        }
-
-        CgpuPipeline pipeline;
-        if (!cgpuCreateComputePipeline(c.device, { .shader = shader , .debugName = debugName.c_str() }, &pipeline))
-        {
-          GB_FATAL("failed to create OIDN pipeline");
-        }
-        cgpuDestroyShader(c.device, shader);
-
-        uint32_t inSizeMul = inDims / std::pow(2, c.depth) * sizeof(float)/2;
-
-        if (bool(postOp & GiOidnPostOp::MaxPool))
-        {
-          c.depth++;
-        }
-        else if (bool(postOp & GiOidnPostOp::Upsample))
-        {
-          c.depth--;
-        }
-
-        uint32_t outTypeSize = bool(postOp & GiOidnPostOp::WriteBackRgba32) ? sizeof(float) : (sizeof(float) / 2);
-        uint32_t outSizeMul = outDims / std::pow(2, c.depth) * outTypeSize;
-
-        m_bufferSizeMuls[int(input)] = std::max(m_bufferSizeMuls[int(input)], inSizeMul);
-        m_bufferSizeMuls[int(output)] = std::max(m_bufferSizeMuls[int(output)], outSizeMul);
-
-        m_bufferLastDims[int(input)] = inDims;
-        m_bufferLastDims[int(output)] = outDims;
-
-        const TensorUpload& weights = c.tensorUploads[weightName];
-        const TensorUpload& bias = c.tensorUploads[biasName];
-
-        if (weights.layout != GiTzaTensorLayout::oihw) { GB_FATAL("unexpected tensor layout"); }
-        if (bias.layout != GiTzaTensorLayout::x) { GB_FATAL("unexpected tensor layout"); }
-        if (weights.dimensions.size() != 4 || weights.dimensions[2] != 3 || weights.dimensions[3] != 3) { GB_FATAL("unsupported kernel dimensions"); }
-
-        m_steps.push_back(PipelineStep{
-          .pipeline = pipeline,
-          .input1 = input,
-          .output = output,
-          .weightOffset = weights.offset / 2,
-          .biasOffset = bias.offset / 2,
-          .postOp = postOp,
-          .outDims = uint32_t(outDims)
-        });
-      };
-
-      GiOidnPostOp nPostOp = GiOidnPostOp::None;
-
-      if (bool(postOp & PostOp::WriteBackRgba32))
-      {
-        nPostOp = GiOidnPostOp::WriteBackRgba32;
-      }
-      else if (bool(postOp & PostOp::Upsample))
-      {
-        nPostOp = GiOidnPostOp::Upsample;
-      }
-      else if (bool(postOp & PostOp::MaxPool))
-      {
-        nPostOp = GiOidnPostOp::MaxPool;
+        GB_FATAL("tensor not loaded");
       }
 
-      pushPipeline(initialInput, finalOutput, nPostOp);
-    }
+      if ((bool(postOp & GiOidnPostOp::Upsample) && bool(postOp & GiOidnPostOp::MaxPool)) ||
+          (bool(postOp & GiOidnPostOp::Concat) && bool(postOp & GiOidnPostOp::WriteBackRgba32)))
+      {
+        GB_FATAL("unsupported post op combination");
+      }
 
-    void addConcat(BuildContext& c, Buffer input1, Buffer input2, Buffer output)
-    {
-      int in1Dims = m_bufferLastDims[int(input1)];
+      const auto& tensorDesc = ntIt->second;
+
+      int in1Dims = tensorDesc.dimensions[1]; // OIHW
       int in2Dims = m_bufferLastDims[int(input2)];
-      int outDims = m_bufferLastDims[int(output)];
-      assert(in1Dims > 0 && in2Dims > 0 && outDims > 0);
+      int convDims = tensorDesc.dimensions[0];
+      int outDims = bool(postOp & GiOidnPostOp::WriteBackRgba32) ? 4 : convDims;
+
+      if (uint32_t lastDims = m_bufferLastDims[int(input1)]; lastDims != 0 && in1Dims != lastDims)
+      {
+        GB_FATAL("layer dimension mismatch");
+      }
+
+      if (bool(postOp & GiOidnPostOp::Concat))
+      {
+        if (in2Dims == 0) { GB_FATAL("join not preceeded by convolution"); };
+        if (input2 == Buffer::Invalid) { GB_FATAL("join with invalid second input buffer"); };
+        outDims += in2Dims;
+      }
+
+      std::string debugName = makeConvolutionPipelineDebugName(in1Dims, outDims, postOp);
+
+      int convImpl = rp::CONV_IMPL_SHMEM;
+      if (c.vendorId == CGPU_VENDOR_ID_MESA)
+      {
+        // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
+        // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
+        convImpl = rp::CONV_IMPL_SEQ;
+      }
 
       GiGlslShaderGen::OidnParams sgParams{
-        .inChannelCount = in1Dims,
-        .outChannelCount = in2Dims, // NOTE: out summed in shader
-        .postOp = GiOidnPostOp::Concat
+        .in1ChannelCount = in1Dims,
+        .outChannelCount = outDims,
+        .convChannelCount = convDims,
+        .convolutionImpl = convImpl,
+        .postOp = postOp
       };
+      if (bool(postOp & GiOidnPostOp::Concat))
+      {
+        sgParams.in2ChannelCount = in2Dims;
+      }
 
       std::vector<uint8_t> spv;
       if (!c.shaderGen.generateDenoisingSpirv(sgParams, spv))
@@ -289,19 +213,48 @@ namespace gtl
       }
 
       CgpuPipeline pipeline;
-      std::string pipelineDebugName = GB_FMT("Oidn_Concat_{}+{}->{}", in1Dims, in2Dims, in1Dims + in2Dims);
-      if (!cgpuCreateComputePipeline(c.device, { .shader = shader , .debugName = pipelineDebugName.c_str() }, &pipeline))
+      if (!cgpuCreateComputePipeline(c.device, { .shader = shader , .debugName = debugName.c_str() }, &pipeline))
       {
         GB_FATAL("failed to create OIDN pipeline");
       }
       cgpuDestroyShader(c.device, shader);
+
+      uint32_t inSizeMul = in1Dims / std::pow(2, c.depth) * sizeof(float)/2;
+
+      if (bool(postOp & GiOidnPostOp::MaxPool))
+      {
+        c.depth++;
+      }
+      else if (bool(postOp & GiOidnPostOp::Upsample))
+      {
+        c.depth--;
+      }
+
+      uint32_t outTypeSize = bool(postOp & GiOidnPostOp::WriteBackRgba32) ? sizeof(float) : (sizeof(float) / 2);
+      uint32_t outSizeMul = outDims / std::pow(2, c.depth) * outTypeSize;
+
+      m_bufferSizeMuls[int(input1)] = std::max(m_bufferSizeMuls[int(input1)], inSizeMul);
+      m_bufferSizeMuls[int(output)] = std::max(m_bufferSizeMuls[int(output)], outSizeMul);
+
+      m_bufferLastDims[int(input1)] = in1Dims;
+      m_bufferLastDims[int(output)] = outDims;
+
+      const TensorUpload& weights = c.tensorUploads[weightName];
+      const TensorUpload& bias = c.tensorUploads[biasName];
+
+      if (weights.layout != GiTzaTensorLayout::oihw) { GB_FATAL("unexpected tensor layout"); }
+      if (bias.layout != GiTzaTensorLayout::x) { GB_FATAL("unexpected tensor layout"); }
+      if (weights.dimensions.size() != 4 || weights.dimensions[2] != 3 || weights.dimensions[3] != 3) { GB_FATAL("unsupported kernel dimensions"); }
 
       m_steps.push_back(PipelineStep{
         .pipeline = pipeline,
         .input1 = input1,
         .input2 = input2,
         .output = output,
-        .postOp = GiOidnPostOp::Concat
+        .weightOffset = weights.offset / 2,
+        .biasOffset = bias.offset / 2,
+        .postOp = postOp,
+        .outDims = uint32_t(outDims)
       });
     }
 
@@ -360,31 +313,25 @@ namespace gtl
 
       uploadTensors(c);
 
-      for (uint32_t& sizeMul :  m_bufferSizeMuls)
-      {
-        sizeMul = 0;
-      }
+      for (uint32_t& i : m_bufferLastDims) { i = 0; }
+      for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
 
       addConvReLU(c, Buffer::Pool0, Buffer::Scratch, "enc_conv0");
-      addConvReLU(c, Buffer::Scratch, Buffer::Pool1, "enc_conv1", PostOp::MaxPool);
-      addConvReLU(c, Buffer::Pool1, Buffer::Pool2, "enc_conv2", PostOp::MaxPool);
-      addConvReLU(c, Buffer::Pool2, Buffer::Pool3, "enc_conv3", PostOp::MaxPool);
-      addConvReLU(c, Buffer::Pool3, Buffer::Scratch, "enc_conv4", PostOp::MaxPool);
+      addConvReLU(c, Buffer::Scratch, Buffer::Pool1, "enc_conv1", GiOidnPostOp::MaxPool);
+      addConvReLU(c, Buffer::Pool1, Buffer::Pool2, "enc_conv2", GiOidnPostOp::MaxPool);
+      addConvReLU(c, Buffer::Pool2, Buffer::Pool3, "enc_conv3", GiOidnPostOp::MaxPool);
+      addConvReLU(c, Buffer::Pool3, Buffer::Scratch, "enc_conv4", GiOidnPostOp::MaxPool);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "enc_conv5a");
-      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "enc_conv5b", PostOp::Upsample);
-      addConcat(c, Buffer::Scratch, Buffer::Pool3, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "enc_conv5b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat, Buffer::Pool3);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv4a");
-      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv4b", PostOp::Upsample);
-      addConcat(c, Buffer::Scratch, Buffer::Pool2, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv4b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat, Buffer::Pool2);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3a");
-      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3b", PostOp::Upsample);
-      addConcat(c, Buffer::Scratch, Buffer::Pool1, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat, Buffer::Pool1);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2a");
-      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2b", PostOp::Upsample);
-      addConcat(c, Buffer::Scratch, Buffer::Pool0, Buffer::Scratch);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat, Buffer::Pool0);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1b");
-      addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", PostOp::WriteBackRgba32);
+      addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", GiOidnPostOp::WriteBackRgba32);
 
       if (c.depth != 0) { GB_FATAL("invalid network architecture"); }
     }

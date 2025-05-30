@@ -119,8 +119,10 @@ namespace gtl
 
     struct OidnParams
     {
-      int inChannelCount;
+      int in1ChannelCount;
+      int in2ChannelCount = 0;
       int outChannelCount;
+      int convChannelCount;
       int convolutionImpl;
       OidnPostOp postOp = OidnPostOp::None;
     };
