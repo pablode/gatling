@@ -53,7 +53,7 @@ namespace gtl
 
   struct CgpuIBuffer
   {
-    // TODO
+    MTL::Buffer* buffer;
     uint64_t size;
   };
 
@@ -320,6 +320,16 @@ namespace gtl
     return true;
   }
 
+  static MTL::ResourceOptions cgpuMakeResourceOptions(CgpuMemoryPropertyFlags memoryProperties)
+  {
+    if (memoryProperties == CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
+    {
+      return MTL::ResourceStorageModePrivate;
+    }
+
+    return MTL::ResourceStorageModeShared;
+  }
+
   bool cgpuCreateBuffer(CgpuDevice device,
                         CgpuBufferCreateInfo createInfo,
                         CgpuBuffer* buffer)
@@ -330,16 +340,26 @@ namespace gtl
 
     CGPU_RESOLVE_BUFFER({ handle }, ibuffer);
 
-    assert(createInfo.size > 0);
+    constexpr static uint64_t BASE_ALIGNMENT = 4;
+    uint64_t size = cgpuPadToAlignment(createInfo.size, BASE_ALIGNMENT); // for performance
+    assert(size > 0);
 
-    if (!cgpuCreateIBuffer(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size,
-                           createInfo.alignment, ibuffer, createInfo.debugName))
+    MTL::ResourceOptions options = cgpuMakeResourceOptions(createInfo.memoryProperties);
+
+    MTL::Buffer* mtlBuffer = idevice->device->newBuffer(nullptr, NS::UInteger(size), options);
+    if (!mtlBuffer)
     {
       iinstance->ibufferStore.free(handle);
       CGPU_RETURN_ERROR("failed to create buffer");
     }
 
-    // TODO: set debug label
+    if (createInfo.debugName)
+    {
+      mtlBuffer->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+    }
+
+    ibuffer->size = size;
+    ibuffer->buffer = mtlBuffer;
 
     buffer->handle = handle;
     return true;
@@ -356,6 +376,8 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
     cgpuDestroyIBuffer(idevice, ibuffer);
+
+    ibuffer->buffer->release();
 
     iinstance->ibufferStore.free(buffer.handle);
 
