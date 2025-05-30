@@ -27,6 +27,11 @@ namespace gtl
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
   constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 4;
 
+  constexpr static const uint32_t CGPU_VENDOR_ID_AMD = 0x1002;
+  constexpr static const uint32_t CGPU_VENDOR_ID_NVIDIA = 0x10DE;
+  constexpr static const uint32_t CGPU_VENDOR_ID_INTEL = 0x8086;
+  constexpr static const uint32_t CGPU_VENDOR_ID_MESA = 0x10005;
+
   typedef uint32_t CgpuBufferUsageFlags;
 
   enum CgpuBufferUsageFlagBits
@@ -555,6 +560,7 @@ namespace gtl
     uint32_t subgroupSize;
     bool     timestampComputeAndGraphics;
     float    timestampPeriod;
+    uint32_t vendorId;
   };
 
   struct CgpuWaitSemaphoreInfo

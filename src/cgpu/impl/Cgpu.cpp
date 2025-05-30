@@ -60,11 +60,6 @@ namespace gtl
 
   constexpr static const uint32_t CGPU_MIN_VK_API_VERSION = VK_API_VERSION_1_1;
 
-  constexpr static const uint32_t CGPU_VENDOR_ID_AMD = 0x1002;
-  constexpr static const uint32_t CGPU_VENDOR_ID_NVIDIA = 0x10DE;
-  constexpr static const uint32_t CGPU_VENDOR_ID_INTEL = 0x8086;
-  constexpr static const uint32_t CGPU_VENDOR_ID_MESA = VK_VENDOR_ID_MESA;
-
   constexpr static const VkShaderStageFlags CGPU_RT_PIPELINE_ACCESS_FLAGS = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
                                                                             VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
                                                                             VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
@@ -302,6 +297,7 @@ namespace gtl
   }
 
   static CgpuPhysicalDeviceProperties cgpuTranslatePhysicalDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
+                                                                            const VkPhysicalDeviceProperties& vkProperties,
                                                                             const VkPhysicalDeviceSubgroupProperties& vkSubgroupProps,
                                                                             const VkPhysicalDeviceAccelerationStructurePropertiesKHR& vkAsProps,
                                                                             const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps)
@@ -367,7 +363,8 @@ namespace gtl
       .subPixelInterpolationOffsetBits = vkLimits.subPixelInterpolationOffsetBits,
       .subgroupSize = vkSubgroupProps.subgroupSize,
       .timestampComputeAndGraphics = bool(vkLimits.timestampComputeAndGraphics),
-      .timestampPeriod = vkLimits.timestampPeriod
+      .timestampPeriod = vkLimits.timestampPeriod,
+      .vendorId = vkProperties.vendorID
     };
   }
 
@@ -405,9 +402,9 @@ namespace gtl
     return pipelineStageFlags;
   }
 
-  static const char* cgpuGetVendorName(uint32_t deviceId)
+  static const char* cgpuGetVendorName(uint32_t vendorId)
   {
-    switch (deviceId)
+    switch (vendorId)
     {
     case CGPU_VENDOR_ID_AMD:
       return "AMD";
@@ -778,7 +775,7 @@ namespace gtl
     }
 
     const VkPhysicalDeviceLimits* limits = &deviceProperties.properties.limits;
-    idevice->properties = cgpuTranslatePhysicalDeviceProperties(*limits, subgroupProperties, asProperties, rtPipelineProperties);
+    idevice->properties = cgpuTranslatePhysicalDeviceProperties(*limits, deviceProperties.properties, subgroupProperties, asProperties, rtPipelineProperties);
 
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, nullptr);
