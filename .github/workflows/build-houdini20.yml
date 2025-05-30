@@ -31,6 +31,6 @@ jobs:
       usd-install-path: ${{ matrix.usd-install-path }}
       upload-install-artifacts: true
       archive-name: ${{ matrix.archive-name }}
-      mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}
+      mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_windows-2022
       cmake-params: ${{ matrix.cmake-params }} -DPLUGINFO_LIBPATH_PREFIX=../../usd
       houdini-packaging: true
