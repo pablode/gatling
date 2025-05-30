@@ -159,3 +159,9 @@ add_subdirectory(c-blosc2)
 #
 add_library(OffsetAllocator STATIC OffsetAllocator/offsetAllocator.cpp)
 target_include_directories(OffsetAllocator PUBLIC OffsetAllocator)
+
+#
+# metal-cpp
+#
+add_library(metal-cpp INTERFACE)
+target_include_directories(metal-cpp INTERFACE metal-cpp/SingleHeader)
