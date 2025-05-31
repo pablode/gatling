@@ -32,6 +32,8 @@
 #include <gtl/gb/LinearDataStore.h>
 #include <gtl/gb/SmallVector.h>
 
+#include <spirv_cross_c.h>
+
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 #define MTK_PRIVATE_IMPLEMENTATION
@@ -72,7 +74,7 @@ namespace gtl
 
   struct CgpuIShader
   {
-    // TODO
+    MTL::Library* library;
     CgpuShaderReflection reflection;
   };
 
@@ -104,6 +106,7 @@ namespace gtl
 
   struct CgpuIInstance
   {
+    spvc_context spvcContext;
     GbLinearDataStore<CgpuIDevice, 32> ideviceStore;
     GbLinearDataStore<CgpuIBuffer, 16> ibufferStore;
     GbLinearDataStore<CgpuIImage, 128> iimageStore;
@@ -184,6 +187,12 @@ namespace gtl
 #define CGPU_RESOLVE_BLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIBlas, cgpuResolveBlas)
 #define CGPU_RESOLVE_TLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
 
+#define CHK_MTL(X, E)    \
+  if (!X) {              \
+    GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, error->localizedDescription()->utf8String(), error->code()); \
+    exit(EXIT_FAILURE);  \
+  }
+
   /* Helper methods. */
 
   // TODO
@@ -214,12 +223,23 @@ namespace gtl
   bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
   {
     iinstance = std::make_unique<CgpuIInstance>();
+
+    if (spvc_result r = spvc_context_create(&iinstance->spvcContext); r != SPVC_SUCCESS)
+    {
+      CGPU_FATAL("failed to init SPIRV-Cross");
+    }
+
+    spvc_context_set_error_callback(iinstance->spvcContext, [](void *userdata, const char *error) {
+      GB_ERROR("[SPVC] {}", error);
+    }, nullptr);
+
     return true;
   }
 
   void cgpuTerminate()
   {
-    // TODO
+    spvc_context_destroy(iinstance->spvcContext);
+
     iinstance.reset();
   }
 
@@ -257,24 +277,66 @@ namespace gtl
     return true;
   }
 
+  static bool cgpuCreateShader(CgpuIDevice* idevice,
+                               const CgpuShaderCreateInfo& createInfo,
+                               CgpuIShader* ishader)
+  {
+    if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
+    {
+      CGPU_FATAL("failed to reflect shader");
+    }
+
+#define CHK_SPVC(X) \
+  if (spvc_result r = X; r != SPVC_SUCCESS) {                            \
+    GB_ERROR("{}:{}: SPIRV-Cross error {}", __FILE__, __LINE__, int(r)); \
+    exit(EXIT_FAILURE);                                                  \
+  }
+
+    spvc_compiler spvcCompiler;
+    {
+      spvc_parsed_ir ir;
+      CHK_SPVC(spvc_context_parse_spirv(iinstance->spvcContext, (const SpvId*) createInfo.source, createInfo.size, &ir));
+      CHK_SPVC(spvc_context_create_compiler(iinstance->spvcContext, SPVC_BACKEND_MSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &spvcCompiler));
+
+      spvc_compiler_options spvcCompilerOptions;
+      CHK_SPVC(spvc_compiler_create_compiler_options(spvcCompiler, &spvcCompilerOptions));
+      CHK_SPVC(spvc_compiler_options_set_uint(spvcCompilerOptions, SPVC_COMPILER_OPTION_MSL_PLATFORM, SPVC_MSL_PLATFORM_MACOS));
+      CHK_SPVC(spvc_compiler_install_compiler_options(spvcCompiler, spvcCompilerOptions));
+    }
+
+    const char* mslSrc; // owned by context
+    CHK_SPVC(spvc_compiler_compile(spvcCompiler, &mslSrc));
+
+#undef CHK_SPVC
+
+    MTL::CompileOptions* compileOptions = MTL::CompileOptions::alloc();
+#ifndef NDEBUG
+    compileOptions->setEnableLogging(true);
+#endif
+
+    NS::Error* error;
+    NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);
+    MTL::Library* library = idevice->device->newLibrary(mslStr, compileOptions, &error);
+    CHK_MTL(library, error);
+
+    compileOptions->release();
+
+    ishader->library = library;
+    return true; // TODO: for shader hotloading, errors shouldn't be fatal
+  }
+
   bool cgpuCreateShader(CgpuDevice device,
                         CgpuShaderCreateInfo createInfo,
                         CgpuShader* shader)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->ishaderStore.allocate();
+    shader->handle = iinstance->ishaderStore.allocate();
 
     CGPU_RESOLVE_SHADER(*shader, ishader);
 
-    if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
-    {
-      CGPU_FATAL("failed to reflect shader");
-    }
+    cgpuCreateShader(idevice, createInfo, ishader);
 
-    // TODO
-
-    shader->handle = handle;
     return true;
   }
 
@@ -302,7 +364,7 @@ namespace gtl
 #pragma omp parallel for schedule(dynamic, 1)
     for (int i = 0; i < int(shaderCount); i++)
     {
-      //cgpuCreateShader(idevice, createInfos[i], ishaders[i]); // TODO
+      cgpuCreateShader(idevice, createInfos[i], ishaders[i]);
     }
 
     return true;
@@ -313,7 +375,7 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SHADER(shader, ishader);
 
-    // TODO
+    ishader->library->release();
 
     iinstance->ishaderStore.free(shader.handle);
 

@@ -29,6 +29,7 @@ if (APPLE)
     cgpu
     PRIVATE
       metal-cpp
+      spirv-cross-c
       "-framework Metal"
       "-framework MetalKit"
       "-framework Foundation"

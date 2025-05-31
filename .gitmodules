@@ -64,3 +64,6 @@
 [submodule "extern/metal-cpp"]
 	path = extern/metal-cpp
 	url = https://github.com/bkaradzic/metal-cpp.git
+[submodule "extern/SPIRV-Cross"]
+	path = extern/SPIRV-Cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
