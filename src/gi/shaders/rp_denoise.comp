@@ -42,8 +42,11 @@ void main()
     for (uint j = 0; j < KERNEL_SIZE; j++)
     {
       ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
-      coord.x = max(0, min(coord.x, int(PC.imageWidth) - 1));
-      coord.y = max(0, min(coord.y, int(PC.imageHeight) - 1));
+
+      if (any(greaterThanEqual(uvec2(coord), uvec2(PC.imageWidth, PC.imageHeight))))
+      {
+        continue; // oob
+      }
 
       int coordIdx = int(coord.y * PC.imageWidth + coord.x);
 
