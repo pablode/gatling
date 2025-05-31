@@ -3547,6 +3547,16 @@ cleanup_fail:
                                      width, height, 1);
   }
 
+  void cgpuCmdFillBuffer(CgpuCommandBuffer commandBuffer, CgpuBuffer buffer, uint64_t dstOffset, uint64_t size, uint8_t data)
+  {
+    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
+    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
+
+    uint64_t rangeSize = (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size;
+    idevice->table.vkCmdFillBuffer(icommandBuffer->commandBuffer, ibuffer->buffer, dstOffset, rangeSize, data);
+  }
+
   void cgpuEndCommandBuffer(CgpuCommandBuffer commandBuffer)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);

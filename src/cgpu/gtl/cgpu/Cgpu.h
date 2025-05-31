@@ -813,6 +813,14 @@ namespace gtl
     uint32_t height
   );
 
+  void cgpuCmdFillBuffer(
+    CgpuCommandBuffer commandBuffer,
+    CgpuBuffer buffer,
+    uint64_t dstOffset = 0,
+    uint64_t size = CGPU_WHOLE_SIZE,
+    uint8_t data = 0
+  );
+
   void cgpuEndCommandBuffer(
     CgpuCommandBuffer commandBuffer
   );
