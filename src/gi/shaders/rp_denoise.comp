@@ -7,15 +7,15 @@
 
 layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
-layout(binding = 0, std430) readonly buffer InputBuffer { float16_t inPixels[]; };
+layout(binding = BINDING_INDEX_INPUT_BUF1, std430) readonly buffer InputBuffer { float16_t inPixels[]; };
 #ifdef OUT_CHANNEL_F32
-layout(binding = 1, std430) writeonly buffer OutputBuffer { float outPixels[]; };
+layout(binding = BINDING_INDEX_OUTPUT_BUF, std430) writeonly buffer OutputBuffer { float outPixels[]; };
 #else
-layout(binding = 1, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
+layout(binding = BINDING_INDEX_OUTPUT_BUF, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
 #endif
-layout(binding = 2, std430) readonly buffer TensorBuffer { float16_t tensors[]; };
+layout(binding = BINDING_INDEX_TENSOR_BUF, std430) readonly buffer TensorBuffer { float16_t tensors[]; };
 #ifdef OP_CONCAT
-layout(binding = 3, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
+layout(binding = BINDING_INDEX_INPUT_BUF2, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
 #endif
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
