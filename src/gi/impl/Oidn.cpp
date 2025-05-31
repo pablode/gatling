@@ -18,6 +18,7 @@
 #include "Oidn.h"
 #include "GlslShaderGen.h"
 #include "interface/rp_oidn.h"
+#include "interface/rp_max_luminance.h"
 
 #include <gtl/ggpu/DelayedResourceDestroyer.h>
 #include <gtl/ggpu/Stager.h>
@@ -30,6 +31,7 @@
 namespace gtl
 {
   namespace rp = shader_interface::rp_oidn;
+  namespace rp_ml = shader_interface::rp_max_luminance;
 
   using GiOidnPostOp = GiGlslShaderGen::OidnPostOp;
 
@@ -139,6 +141,8 @@ namespace gtl
       else if (bool(postOp & GiOidnPostOp::Upsample)) { opStr += "_Upsample"; }
       else if (bool(postOp & GiOidnPostOp::Concat)) { opStr += "_Concat"; }
       else if (bool(postOp & GiOidnPostOp::WriteBackRgba32)) { opStr += "_WriteBackRgba32"; }
+      else if (bool(postOp & GiOidnPostOp::ScaleInputInv)) { opStr += "_ScaleInputInv"; }
+      else if (bool(postOp & GiOidnPostOp::ScaleOutput)) { opStr += "_ScaleOutput"; }
       else if (postOp != GiOidnPostOp::None) { GB_FATAL("Unhandled OIDN post op"); }
 
       return GB_FMT("Oidn_{}->{}{}", inDims, outDims, opStr);
@@ -326,7 +330,7 @@ namespace gtl
 
       uploadTensors(c);
 
-      addConvReLU(c, Buffer::Pool0, Buffer::Scratch, "enc_conv0");
+      addConvReLU(c, Buffer::Pool0, Buffer::Scratch, "enc_conv0", GiOidnPostOp::ScaleInputInv);
       addConvReLU(c, Buffer::Scratch, Buffer::Pool1, "enc_conv1", GiOidnPostOp::MaxPool);
       addConvReLU(c, Buffer::Pool1, Buffer::Pool2, "enc_conv2", GiOidnPostOp::MaxPool);
       addConvReLU(c, Buffer::Pool2, Buffer::Pool3, "enc_conv3", GiOidnPostOp::MaxPool);
@@ -341,7 +345,7 @@ namespace gtl
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat, Buffer::Pool0);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1b");
-      addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", GiOidnPostOp::WriteBackRgba32);
+      addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", GiOidnPostOp::ScaleOutput | GiOidnPostOp::WriteBackRgba32);
 
       if (c.depth != 0) { GB_FATAL("invalid network architecture"); }
     }
@@ -380,7 +384,7 @@ namespace gtl
       return m_outputPool;
     }
 
-    void runInference(CgpuCommandBuffer commandBuffer)
+    void runInference(CgpuCommandBuffer commandBuffer, CgpuBuffer valueScaleBuffer)
     {
       uint32_t scratchIdx = 0; // ping pong
 
@@ -467,6 +471,10 @@ namespace gtl
         {
           bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_INPUT_BUF2, .buffer = inBuffer2 });
         }
+        if (bool(step.postOp & GiOidnPostOp::ScaleInputInv) || bool(step.postOp & GiOidnPostOp::ScaleOutput))
+        {
+          bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_VALUE_SCALE_BUF, .buffer = valueScaleBuffer });
+        }
 
         CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
         cgpuCmdUpdateBindings(commandBuffer, step.pipeline, 0/*descriptorSetIndex*/, &bindings0);
@@ -514,6 +522,11 @@ namespace gtl
   struct GiOidnState
   {
     GiOidnNet net;
+// TODO: it is not clear if luminance reduction belongs here
+    CgpuPipeline maxLuminanceReduction;
+    CgpuBuffer maxLuminanceBuffer;
+uint32_t imageWidth=0;
+uint32_t imageHeight=0;
   };
 
   GiOidnState* giOidnCreateState(CgpuDevice device,
@@ -523,16 +536,49 @@ namespace gtl
                                  const GiTzaTensorDescriptions& tensorDescriptions,
                                  const uint8_t* tensorData)
   {
-    return new GiOidnState { GiOidnNet { device, shaderGen, stager, resourceDestroyer, tensorDescriptions, tensorData } };
+    std::vector<uint8_t> spv;
+    if (!shaderGen.generateMaxLuminanceReductionSpirv(spv))
+    {
+      GB_FATAL("failed to compile shader");
+    }
+
+    CgpuShader shader;
+    if (!cgpuCreateShader(device, { .size = spv.size(), .source = spv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE }, &shader))
+    {
+      GB_FATAL("failed to create shader");
+    }
+
+    CgpuPipeline pipeline;
+    if (!cgpuCreateComputePipeline(device, { .shader = shader , .debugName = "Max luminance reduction" }, &pipeline))
+    {
+      GB_FATAL("failed to create pipeline");
+    }
+    cgpuDestroyShader(device, shader);
+
+    CgpuBuffer buffer;
+    CgpuBufferUsageFlags usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
+    if (!cgpuCreateBuffer(device, { .usage = usage, .size = sizeof(float) }, &buffer))
+    {
+      GB_FATAL("failed to allocate OIDN buffer");
+    }
+
+    return new GiOidnState {
+      GiOidnNet { device, shaderGen, stager, resourceDestroyer, tensorDescriptions, tensorData },
+      pipeline,
+      buffer
+    };
   }
 
   void giOidnDestroyState(GiOidnState* state)
   {
+    // TODO: destroy maxL buffer, pipeline
     delete state;
   }
 
   bool giOidnUpdateState(GiOidnState* state, CgpuDevice device, uint32_t imageWidth, uint32_t imageHeight)
   {
+state->imageWidth = imageWidth;
+state->imageHeight = imageHeight;
     state->net.updateViewport(device, imageWidth, imageHeight);
     return true;
   }
@@ -549,6 +595,52 @@ namespace gtl
 
   void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer)
   {
-    state->net.runInference(commandBuffer);
+    cgpuCmdFillBuffer(commandBuffer, state->maxLuminanceBuffer);
+
+    CgpuBufferMemoryBarrier bufferBarriers[2] = {
+      {
+        .buffer = state->net.getInputBuffer(),
+        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
+        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ
+      },
+      {
+        .buffer = state->maxLuminanceBuffer,
+        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
+        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE,
+        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
+        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+      }
+    };
+
+    CgpuPipelineBarrier barrier = {
+      .bufferBarrierCount = 2,
+      .bufferBarriers = bufferBarriers
+    };
+    cgpuCmdPipelineBarrier(commandBuffer, &barrier);
+
+    rp_ml::PushConstants pushData = {
+      .imageWidth = state->imageWidth,
+      .imageHeight = state->imageHeight
+    };
+
+    std::vector<CgpuBufferBinding> bufferBindings = {
+      CgpuBufferBinding{.binding = rp_ml::BINDING_INDEX_INPUT_BUF, .buffer = state->net.getInputBuffer() },
+      CgpuBufferBinding{.binding = rp_ml::BINDING_INDEX_OUTPUT_BUF, .buffer = state->maxLuminanceBuffer }
+    };
+
+    CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
+    cgpuCmdUpdateBindings(commandBuffer, state->maxLuminanceReduction, 0/*descriptorSetIndex*/, &bindings0);
+
+    cgpuCmdBindPipeline(commandBuffer, state->maxLuminanceReduction);
+
+    cgpuCmdPushConstants(commandBuffer, state->maxLuminanceReduction, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+
+    uint32_t wgCountX = (state->imageWidth + rp_ml::WG_SIZE_X - 1) / rp_ml::WG_SIZE_X;
+    uint32_t wgCountY = (state->imageHeight + rp_ml::WG_SIZE_Y - 1) / rp_ml::WG_SIZE_Y;
+    cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
+
+    state->net.runInference(commandBuffer, state->maxLuminanceBuffer);
   }
 }

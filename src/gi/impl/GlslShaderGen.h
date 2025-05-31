@@ -114,7 +114,11 @@ namespace gtl
       MaxPool         = (1 << 0),
       Upsample        = (1 << 1),
       Concat          = (1 << 2),
-      WriteBackRgba32 = (1 << 3)
+      WriteBackRgba32 = (1 << 3),
+      // TODO: this is not a post op. -> rename enum?
+      ScaleInputInv   = (1 << 4),
+      ScaleOutput     = (1 << 5)
+// TODO: rename -> ScaleLuminance(Inv)
     };
 
     struct OidnParams
@@ -135,6 +139,7 @@ namespace gtl
     bool generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv);
 
     bool generateDenoisingSpirv(const OidnParams& params, std::vector<uint8_t>& spv);
+    bool generateMaxLuminanceReductionSpirv(std::vector<uint8_t>& spv);
 
   private:
     std::shared_ptr<McBackend> m_mcBackend;

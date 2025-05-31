@@ -17,6 +17,10 @@ layout(binding = BINDING_INDEX_TENSOR_BUF, std430) readonly buffer TensorBuffer 
 #ifdef OP_CONCAT
 layout(binding = BINDING_INDEX_INPUT_BUF2, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
 #endif
+// TODO: in hindsight, it would be much nicer to rename this to MaxLuminanceBuffer & maxLuminance
+#if defined(SCALE_INPUT_INV) || defined(SCALE_OUTPUT)
+layout(binding = BINDING_INDEX_VALUE_SCALE_BUF, std430) readonly buffer ValueScaleBuffer { float valueScale; };
+#endif
 
 layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
@@ -31,6 +35,10 @@ shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][CONV_CHANNEL_COUNT];
 
 void main()
 {
+#ifdef SCALE_INPUT_INV
+  float16_t invValueScale = float16_t(1.0 / valueScale);
+#endif
+
 #if CONV_IMPL == CONV_IMPL_SEQ
 
   // naive
@@ -58,7 +66,13 @@ void main()
 
         float16_t weight = tensors[PC.weightOffset + weightIndex];
 
-        result += inPixels[inIndexIj] * weight;
+        float16_t inValue = inPixels[inIndexIj];
+
+#ifdef SCALE_INPUT_INV
+        inValue *= invValueScale;
+#endif
+
+        result += inValue * weight;
       }
     }
 
@@ -94,7 +108,13 @@ void main()
 
         bool oob = any(greaterThanEqual(uvec2(coord), uvec2(PC.imageWidth, PC.imageHeight)));
 
-        sh_window[ly][lx] = oob ? float16_t(0.0) : inPixels[inPixelIdx];
+        float16_t inValue = oob ? float16_t(0.0) : inPixels[inPixelIdx];
+
+#ifdef SCALE_INPUT_INV
+        inValue *= invValueScale;
+#endif
+
+        sh_window[ly][lx] = inValue;
       }
     }
 
@@ -177,6 +197,10 @@ void main()
     float16_t maxPool = max(max(results.x, results.y), max(results.z, results.w));
 
     result = max(float16_t(0.0) /*ReLU*/, maxPool);
+#endif
+
+#ifdef SCALE_OUTPUT
+    result *= float16_t(valueScale);
 #endif
 
 #ifdef OUT_CHANNEL_F32

@@ -15,35 +15,25 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#ifndef RP_OIDN_H
-#define RP_OIDN_H
+#ifndef RP_MAX_LUMINANCE_H
+#define RP_MAX_LUMINANCE_H
 
 #include "interface/gtl.h"
 
-GI_INTERFACE_BEGIN(rp_oidn)
+GI_INTERFACE_BEGIN(rp_max_luminance)
 
-#ifdef __cplusplus
-const GI_INT CONV_IMPL_SEQ = 0;
-const GI_INT CONV_IMPL_SHMEM = 1;
-#else
-#define CONV_IMPL_SEQ 0
-#define CONV_IMPL_SHMEM 1
-#endif
+const GI_UINT WG_SIZE_X = 32;
+const GI_UINT WG_SIZE_Y = 32;
 
 struct PushConstants
 {
   GI_UINT imageWidth;
   GI_UINT imageHeight;
-  GI_UINT weightOffset;
-  GI_UINT biasOffset;
 };
 
 // set 0
-GI_BINDING_INDEX(INPUT_BUF1, 0)
+GI_BINDING_INDEX(INPUT_BUF, 0)
 GI_BINDING_INDEX(OUTPUT_BUF, 1)
-GI_BINDING_INDEX(TENSOR_BUF, 2)
-GI_BINDING_INDEX(INPUT_BUF2, 3)
-GI_BINDING_INDEX(VALUE_SCALE_BUF, 4)
 
 GI_INTERFACE_END()
 

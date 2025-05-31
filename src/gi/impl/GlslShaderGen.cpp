@@ -320,8 +320,31 @@ namespace gtl
     {
       stitcher.appendDefine("OUT_CHANNEL_F32");
     }
+    if (bool(params.postOp & OidnPostOp::ScaleInputInv))
+    {
+      stitcher.appendDefine("SCALE_INPUT_INV");
+    }
+    if (bool(params.postOp & OidnPostOp::ScaleOutput))
+    {
+      stitcher.appendDefine("SCALE_OUTPUT");
+    }
 
     fs::path filePath = m_shaderPath / "rp_denoise.comp";
+    if (!stitcher.appendSourceFile(filePath))
+    {
+      return false;
+    }
+
+    std::string source = stitcher.source();
+    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::Compute, source, spv);
+  }
+
+  bool GiGlslShaderGen::generateMaxLuminanceReductionSpirv(std::vector<uint8_t>& spv)
+  {
+    GiGlslStitcher stitcher;
+    stitcher.appendVersion();
+
+    fs::path filePath = m_shaderPath / "rp_max_luminance.comp";
     if (!stitcher.appendSourceFile(filePath))
     {
       return false;
