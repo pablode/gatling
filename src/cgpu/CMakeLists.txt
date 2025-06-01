@@ -31,7 +31,6 @@ if (APPLE)
       metal-cpp
       spirv-cross-c
       "-framework Metal"
-      "-framework MetalKit"
       "-framework Foundation"
   )
 else()
