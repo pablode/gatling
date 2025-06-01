@@ -43,8 +43,7 @@ namespace gtl
 {
   /* Constants. */
 
-  // TODO
-  // constexpr static const uint32_t CGPU_SOMETHING = 123;
+  constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(2, 3, 0);
 
   /* Internal structures. */
 
@@ -318,6 +317,7 @@ namespace gtl
       spvc_compiler_options spvcCompilerOptions;
       CHK_SPVC(spvc_compiler_create_compiler_options(spvcCompiler, &spvcCompilerOptions));
       CHK_SPVC(spvc_compiler_options_set_uint(spvcCompilerOptions, SPVC_COMPILER_OPTION_MSL_PLATFORM, SPVC_MSL_PLATFORM_MACOS));
+      CHK_SPVC(spvc_compiler_options_set_uint(spvcCompilerOptions, SPVC_COMPILER_OPTION_MSL_VERSION, SPVC_MSL_VERSION));
       CHK_SPVC(spvc_compiler_install_compiler_options(spvcCompiler, spvcCompilerOptions));
     }
 
