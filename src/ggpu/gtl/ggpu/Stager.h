@@ -47,6 +47,7 @@ namespace gtl
 
   private:
     CgpuDevice m_device;
+    uint32_t m_maxBufferUpdateSize;
 
     uint32_t m_writeableHalf = 0;
     CgpuBuffer m_stagingBuffer;

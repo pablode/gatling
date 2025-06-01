@@ -909,10 +909,7 @@ namespace gtl
                            CgpuBuffer dstBuffer,
                            uint64_t dstOffset)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
-
-    // TODO: emulate vs. expose availability in feature flags
+    CGPU_FATAL("command not supported"); // because maxBufferUpdateSize is 0.
   }
 
   void cgpuCmdCopyBuffer(CgpuCommandBuffer commandBuffer,
@@ -1156,6 +1153,11 @@ namespace gtl
                                        CgpuPhysicalDeviceProperties& properties)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
+
+    properties = CgpuPhysicalDeviceProperties {
+      .maxBufferUpdateSize = 0 // not supported by Metal backend
+    };
+
     return false; // TODO
   }
 }

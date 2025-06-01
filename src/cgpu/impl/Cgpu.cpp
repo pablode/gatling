@@ -310,6 +310,7 @@ namespace gtl
       .bufferImageGranularity = vkLimits.bufferImageGranularity,
       .discreteQueuePriorities = vkLimits.discreteQueuePriorities,
       .maxBoundDescriptorSets = vkLimits.maxBoundDescriptorSets,
+      .maxBufferUpdateSize = 65535, // according to Vulkan spec
       .maxComputeSharedMemorySize = vkLimits.maxComputeSharedMemorySize,
       .maxComputeWorkGroupCount = { vkLimits.maxComputeWorkGroupCount[0], vkLimits.maxComputeWorkGroupCount[1], vkLimits.maxComputeWorkGroupCount[2] },
       .maxComputeWorkGroupInvocations = vkLimits.maxComputeWorkGroupInvocations,

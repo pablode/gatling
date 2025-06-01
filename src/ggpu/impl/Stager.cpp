@@ -29,6 +29,10 @@ namespace gtl
   GgpuStager::GgpuStager(CgpuDevice device)
     : m_device(device)
   {
+    CgpuPhysicalDeviceProperties deviceProperties;
+    cgpuGetPhysicalDeviceProperties(device, deviceProperties);
+
+    m_maxBufferUpdateSize = deviceProperties.maxBufferUpdateSize;
   }
 
   GgpuStager::~GgpuStager()
@@ -133,7 +137,7 @@ fail:
       return true;
     }
 
-    if (size <= 65535)
+    if (size <= m_maxBufferUpdateSize)
     {
       m_commandsPending = true;
 

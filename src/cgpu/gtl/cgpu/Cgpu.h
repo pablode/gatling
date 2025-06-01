@@ -497,6 +497,7 @@ namespace gtl
     uint64_t bufferImageGranularity;
     uint32_t discreteQueuePriorities;
     uint32_t maxBoundDescriptorSets;
+    uint32_t maxBufferUpdateSize;
     uint32_t maxComputeSharedMemorySize;
     uint32_t maxComputeWorkGroupCount[3];
     uint32_t maxComputeWorkGroupInvocations;
