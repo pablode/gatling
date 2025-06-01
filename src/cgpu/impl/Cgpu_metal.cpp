@@ -912,7 +912,7 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
 
-    // TODO
+    // TODO: emulate vs. expose availability in feature flags
   }
 
   void cgpuCmdCopyBuffer(CgpuCommandBuffer commandBuffer,
@@ -926,7 +926,10 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(srcBuffer, isrcBuffer);
     CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
 
-    // TODO
+    MTL::BlitCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToBlit(icommandBuffer);
+
+    uint64_t rangeSize = (size == CGPU_WHOLE_SIZE) ? std::min(isrcBuffer->size, idstBuffer->size) : size;
+    encoder->copyFromBuffer(isrcBuffer->buffer, srcOffset, idstBuffer->buffer, dstOffset, rangeSize);
   }
 
   void cgpuCmdCopyBufferToImage(CgpuCommandBuffer commandBuffer,
@@ -938,7 +941,28 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
     CGPU_RESOLVE_IMAGE(image, iimage);
 
-    // TODO
+    MTL::BlitCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToBlit(icommandBuffer);
+
+    uint32_t bytesPerPixel = 4; // TODO: from helper function
+    uint32_t srcBytesPerRow = iimage->width * bytesPerPixel;
+    uint32_t srcBytesPerImage = iimage->width * iimage->height * iimage->depth * bytesPerPixel;
+    MTL::Size srcSize(desc->texelExtentX, desc->texelExtentY, desc->texelExtentZ);
+
+    uint32_t dstSlice = 0;
+    uint32_t dstMipmapLevel = 0;
+    MTL::Origin dstOrigin(desc->texelOffsetX, desc->texelOffsetY, desc->texelOffsetZ);
+
+    encoder->copyFromBuffer(
+      ibuffer->buffer,
+      desc->bufferOffset,
+      srcBytesPerRow,
+      srcBytesPerImage,
+      srcSize,
+      iimage->texture,
+      dstSlice,
+      dstMipmapLevel,
+      dstOrigin
+    );
   }
 
   void cgpuCmdPushConstants(CgpuCommandBuffer commandBuffer,
