@@ -60,7 +60,7 @@ namespace gtl
 
   struct CgpuIImage
   {
-    // TODO
+    MTL::Texture* texture;
     uint32_t width;
     uint32_t height;
     uint32_t depth;
@@ -189,6 +189,12 @@ namespace gtl
 #define CHK_MTL(X, E)    \
   if (!X) {              \
     GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, error->localizedDescription()->utf8String(), error->code()); \
+    exit(EXIT_FAILURE);  \
+  }
+
+#define CHK_MTL_NP(X)    \
+  if (!X) {              \
+    GB_ERROR("{}:{}: metal returned nullptr", __FILE__, __LINE__); \
     exit(EXIT_FAILURE);  \
   }
 
@@ -462,6 +468,33 @@ namespace gtl
     return ibuffer->buffer->gpuAddress();
   }
 
+  static MTL::TextureUsage cgpuTranslateImageUsage(CgpuImageUsageFlags usage)
+  {
+    MTL::TextureUsage mtlUsage = MTL::TextureUsageUnknown;
+
+    if (bool(usage & CGPU_IMAGE_USAGE_FLAG_SAMPLED))
+    {
+      mtlUsage |= MTL::TextureUsageShaderRead;
+    }
+    if (bool(usage & CGPU_IMAGE_USAGE_FLAG_STORAGE))
+    {
+      // TODO: increase granularity of cgpu flags
+      mtlUsage |= MTL::TextureUsageShaderRead | MTL::TextureUsageShaderWrite;
+    }
+
+    return mtlUsage;
+  }
+
+  static MTL::PixelFormat cgpuTranslateImageFormat(CgpuImageFormat format)
+  {
+    // TODO: cover missing formats using LUT
+    if (format == CGPU_IMAGE_FORMAT_R32_SFLOAT)
+    {
+      return MTL::PixelFormatR32Float;
+    }
+    return MTL::PixelFormatRGBA8Unorm;
+  }
+
   bool cgpuCreateImage(CgpuDevice device,
                        CgpuImageCreateInfo createInfo,
                        CgpuImage* image)
@@ -472,14 +505,43 @@ namespace gtl
 
     CGPU_RESOLVE_IMAGE({ handle }, iimage);
 
-    // TODO
+    MTL::TextureUsage usage = cgpuTranslateImageUsage(createInfo.usage);
+    MTL::PixelFormat pixelFormat = cgpuTranslateImageFormat(createInfo.format);
+    bool mipmapped = false;
 
+    MTL::TextureDescriptor* descriptor = MTL::TextureDescriptor::alloc()->init();
+    CHK_MTL_NP(descriptor);
+
+    descriptor->setTextureType(createInfo.is3d ? MTL::TextureType3D : MTL::TextureType2D);
+    descriptor->setPixelFormat(pixelFormat);
+    descriptor->setWidth(createInfo.width);
+    descriptor->setHeight(createInfo.height);
+    descriptor->setDepth(createInfo.depth);
+    descriptor->setUsage(usage);
+    descriptor->setStorageMode(MTL::StorageModePrivate);
+
+    MTL::Texture* texture = idevice->device->newTexture(descriptor);
+
+    descriptor->release();
+
+    if (!texture)
+    {
+      iinstance->iimageStore.free(handle);
+      CGPU_RETURN_ERROR("failed to create image");
+    }
+
+    if (createInfo.debugName)
+    {
+      texture->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+    }
+
+    iimage->texture = texture;
     iimage->width = createInfo.width;
     iimage->height = createInfo.height;
     iimage->depth = createInfo.is3d ? createInfo.depth : 1;
 
     image->handle = handle;
-    return false;
+    return true;
   }
 
   bool cgpuDestroyImage(CgpuDevice device, CgpuImage image)
@@ -487,7 +549,7 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_IMAGE(image, iimage);
 
-    // TODO
+    iimage->texture->release();
 
     iinstance->iimageStore.free(image.handle);
 
