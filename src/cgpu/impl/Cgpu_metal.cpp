@@ -100,7 +100,7 @@ namespace gtl
 
   struct CgpuISampler
   {
-    // TODO
+    MTL::SamplerState* sampler;
   };
 
   struct CgpuIInstance
@@ -566,12 +566,47 @@ namespace gtl
 
     CGPU_RESOLVE_SAMPLER({ handle }, isampler);
 
-    // TODO: don't forget MDL clip wrap mode (see Vulkan impl)
+    const auto translateAddressMode = [](CgpuSamplerAddressMode m)
+    {
+      switch (m)
+      {
+      case CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE:
+        return MTL::SamplerAddressModeClampToEdge;
+      case CGPU_SAMPLER_ADDRESS_MODE_REPEAT:
+        return MTL::SamplerAddressModeRepeat;
+      case CGPU_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT:
+        return MTL::SamplerAddressModeMirrorRepeat;
+      case CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK:
+        return MTL::SamplerAddressModeClampToBorderColor;
+      default:
+        CGPU_FATAL("sampler address mode not handled");
+      }
+    };
 
-    // TODO
+    MTL::SamplerDescriptor* descriptor = MTL::SamplerDescriptor::alloc()->init();
+
+    descriptor->setSAddressMode(translateAddressMode(createInfo.addressModeU));
+    descriptor->setTAddressMode(translateAddressMode(createInfo.addressModeV));
+    descriptor->setRAddressMode(translateAddressMode(createInfo.addressModeW));
+    descriptor->setMinFilter(MTL::SamplerMinMagFilterLinear);
+    descriptor->setMagFilter(MTL::SamplerMinMagFilterLinear);
+    descriptor->setNormalizedCoordinates(false);
+    descriptor->setBorderColor(MTL::SamplerBorderColorOpaqueBlack);
+
+    MTL::SamplerState* mtlSampler = idevice->device->newSamplerState(descriptor);
+
+    descriptor->release();
+
+    if (!mtlSampler)
+    {
+      iinstance->isamplerStore.free(handle);
+      CGPU_RETURN_ERROR("failed to create sampler");
+    }
+
+    isampler->sampler = mtlSampler;
 
     sampler->handle = handle;
-    return false;
+    return true;
   }
 
   bool cgpuDestroySampler(CgpuDevice device, CgpuSampler sampler)
@@ -579,13 +614,11 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SAMPLER(sampler, isampler);
 
-    // TODO
+    isampler->sampler->release();
 
     iinstance->isamplerStore.free(sampler.handle);
-
     return false;
   }
-
 
   bool cgpuCreateComputePipeline(CgpuDevice device,
                                  CgpuComputePipelineCreateInfo createInfo,
