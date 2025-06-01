@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <array>
 #include <memory>
+#include <variant>
 
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
@@ -86,7 +87,7 @@ namespace gtl
   struct CgpuICommandBuffer
   {
     MTL::CommandBuffer* commandBuffer;
-    MTL::ComputeCommandEncoder* encoder;
+    std::variant<std::monostate, MTL::ComputeCommandEncoder*, MTL::BlitCommandEncoder*> encoder;
   };
 
   struct CgpuIBlas
@@ -815,6 +816,7 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER({ handle }, icommandBuffer);
 
     icommandBuffer->commandBuffer = idevice->queue->commandBuffer();
+    icommandBuffer->encoder = std::monostate{};
 
     commandBuffer->handle = handle;
     return true;
@@ -830,14 +832,45 @@ namespace gtl
     return true;
   }
 
+  static MTL::BlitCommandEncoder* cgpuTransitionCommandBufferEncoderToBlit(CgpuICommandBuffer* icommandBuffer)
+  {
+    if (auto* computeEncoder = std::get_if<MTL::ComputeCommandEncoder*>(&icommandBuffer->encoder); computeEncoder)
+    {
+      (*computeEncoder)->endEncoding();
+      (*computeEncoder)->release();
+
+      icommandBuffer->encoder = std::monostate{};
+    }
+
+    if (std::holds_alternative<std::monostate>(icommandBuffer->encoder))
+    {
+      icommandBuffer->encoder = icommandBuffer->commandBuffer->blitCommandEncoder();
+    }
+
+    return std::get<MTL::BlitCommandEncoder*>(icommandBuffer->encoder);
+  }
+
+  static MTL::ComputeCommandEncoder* cgpuTransitionCommandBufferEncoderToCompute(CgpuICommandBuffer* icommandBuffer)
+  {
+    if (auto* blitEncoder = std::get_if<MTL::ComputeCommandEncoder*>(&icommandBuffer->encoder); blitEncoder)
+    {
+      (*blitEncoder)->endEncoding();
+      (*blitEncoder)->release();
+
+      icommandBuffer->encoder = std::monostate{};
+    }
+
+    if (std::holds_alternative<std::monostate>(icommandBuffer->encoder))
+    {
+      icommandBuffer->encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
+    }
+
+    return std::get<MTL::ComputeCommandEncoder*>(icommandBuffer->encoder);
+  }
+
   bool cgpuBeginCommandBuffer(CgpuCommandBuffer commandBuffer)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-
-    icommandBuffer->encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
-    CHK_MTL_NP(icommandBuffer->encoder);
-
-    return true;
+    return true; // No-op
   }
 
   void cgpuCmdBindPipeline(CgpuCommandBuffer commandBuffer, CgpuPipeline pipeline)
@@ -845,7 +878,9 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    icommandBuffer->encoder->setComputePipelineState(ipipeline->pipeline);
+    MTL::ComputeCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToCompute(icommandBuffer);
+
+    encoder->setComputePipelineState(ipipeline->pipeline);
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
@@ -914,8 +949,10 @@ namespace gtl
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
+    MTL::ComputeCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToCompute(icommandBuffer);
+
     uint32_t slot = 0;
-    icommandBuffer->encoder->setBytes(data, size, slot);
+    encoder->setBytes(data, size, slot);
   }
 
   static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
@@ -923,9 +960,11 @@ namespace gtl
                               uint32_t dim_y,
                               uint32_t dim_z)
   {
+    MTL::ComputeCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToCompute(icommandBuffer);
+
     MTL::Size groupsPerGrid(dim_x, dim_y, dim_x);
     MTL::Size threadsPerGroup(32, 32, 1); // TODO: retrieve this from the bound pipeline
-    icommandBuffer->encoder->dispatchThreadgroups(groupsPerGrid, threadsPerGroup);
+    encoder->dispatchThreadgroups(groupsPerGrid, threadsPerGroup);
   }
 
   void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
@@ -993,8 +1032,18 @@ namespace gtl
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    icommandBuffer->encoder->endEncoding();
-    icommandBuffer->encoder->release();
+    if (auto* encoder = std::get_if<MTL::ComputeCommandEncoder*>(&icommandBuffer->encoder); encoder)
+    {
+      (*encoder)->endEncoding();
+      (*encoder)->release();
+    }
+    else if (auto* encoder = std::get_if<MTL::BlitCommandEncoder*>(&icommandBuffer->encoder); encoder)
+    {
+      (*encoder)->endEncoding();
+      (*encoder)->release();
+    }
+
+    icommandBuffer->encoder = std::monostate{};
   }
 
   bool cgpuCreateSemaphore(CgpuDevice device, CgpuSemaphore* semaphore, uint64_t initialValue)
