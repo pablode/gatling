@@ -312,7 +312,7 @@ namespace gtl
     spvc_compiler spvcCompiler;
     {
       spvc_parsed_ir ir;
-      CHK_SPVC(spvc_context_parse_spirv(iinstance->spvcContext, (const SpvId*) createInfo.source, createInfo.size, &ir));
+      CHK_SPVC(spvc_context_parse_spirv(iinstance->spvcContext, (const SpvId*) createInfo.source, createInfo.size / sizeof(SpvId), &ir));
       CHK_SPVC(spvc_context_create_compiler(iinstance->spvcContext, SPVC_BACKEND_MSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &spvcCompiler));
 
       spvc_compiler_options spvcCompilerOptions;
