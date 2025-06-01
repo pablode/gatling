@@ -1877,27 +1877,6 @@ namespace gtl
     return true;
   }
 
-  bool cgpuMapImage(CgpuDevice device, CgpuImage image, void** mappedMem)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_IMAGE(image, iimage);
-
-    if (vmaMapMemory(idevice->allocator, iimage->allocation, mappedMem) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to map image memory");
-    }
-    return true;
-  }
-
-  bool cgpuUnmapImage(CgpuDevice device, CgpuImage image)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_IMAGE(image, iimage);
-
-    vmaUnmapMemory(idevice->allocator, iimage->allocation);
-    return true;
-  }
-
   bool cgpuCreateSampler(CgpuDevice device,
                          CgpuSamplerCreateInfo createInfo,
                          CgpuSampler* sampler)

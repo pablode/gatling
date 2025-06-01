@@ -556,24 +556,6 @@ namespace gtl
     return false;
   }
 
-  bool cgpuMapImage(CgpuDevice device, CgpuImage image, void** mappedMem)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_IMAGE(image, iimage);
-
-    // TODO
-    return false;
-  }
-
-  bool cgpuUnmapImage(CgpuDevice device, CgpuImage image)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_IMAGE(image, iimage);
-
-    // TODO
-    return false;
-  }
-
   bool cgpuCreateSampler(CgpuDevice device,
                          CgpuSamplerCreateInfo createInfo,
                          CgpuSampler* sampler)
