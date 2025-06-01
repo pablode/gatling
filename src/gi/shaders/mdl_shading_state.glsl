@@ -20,11 +20,14 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec3 p_1 = v_1.field1.xyz;
     vec3 p_2 = v_2.field1.xyz;
 
+    mat4 worldToObject = InstanceTransforms[gl_InstanceID];
+    mat4 objectToWorld = transpose(worldToObject);
+
     vec3 localPos = bc.x * p_0 + bc.y * p_1 + bc.z * p_2;
-    vec3 pos = vec3(gl_ObjectToWorldEXT * vec4(localPos, 1.0));
+    vec3 pos = vec3(objectToWorld * vec4(localPos, 1.0));
 
     vec3 geomNormal = normalize(cross(p_1 - p_0, p_2 - p_0));
-    geomNormal = normalize(vec3(geomNormal * gl_WorldToObjectEXT));
+    geomNormal = normalize((vec4(geomNormal, 0.0) * worldToObject).xyz);
 
     // Shading normal
     vec3 n_0 = decode_direction(floatBitsToUint(v_0.field2.x));
@@ -32,7 +35,7 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec3 n_2 = decode_direction(floatBitsToUint(v_2.field2.x));
 
     vec3 localNormal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
-    vec3 normal = normalize(vec3(localNormal * gl_WorldToObjectEXT));
+    vec3 normal = normalize((vec4(localNormal, 0.0) * worldToObject).xyz);
 
     // Flip normals to side of the incident ray
     isFrontFace = dot(geomNormal, -gl_WorldRayDirectionEXT) >= 0.0;
@@ -49,7 +52,7 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec4 t_2 = vec4(decode_direction(floatBitsToUint(v_2.field2.y)), v_2.field1.w);
 
     vec3 localTangent = normalize(bc.x * t_0.xyz + bc.y * t_1.xyz + bc.z * t_2.xyz);
-    vec3 tangent = normalize(vec3(gl_ObjectToWorldEXT * vec4(localTangent, 0.0)));
+    vec3 tangent = normalize(vec3(objectToWorld * vec4(localTangent, 0.0)));
     // Re-orthonomalize to improve shading of surfaces with shared vertices
     // https://learnopengl.com/Advanced-Lighting/Normal-Mapping (bottom)
     tangent = normalize(tangent - dot(tangent, normal) * normal);
@@ -87,8 +90,8 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     state.animation_time = 0.0;
     state.text_coords[0] = vec3(uv, 0.0);
 #ifdef SCENE_TRANSFORMS
-    state.world_to_object = mat4(gl_WorldToObject3x4EXT);
-    state.object_to_world = mat4(gl_ObjectToWorld3x4EXT);
+    state.world_to_object = worldToObject;
+    state.object_to_world = objectToWorld;
 #endif
 #if SCENE_DATA_COUNT > 0
     state.renderer_state = rendererState;

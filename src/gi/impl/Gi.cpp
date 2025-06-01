@@ -92,6 +92,7 @@ namespace gtl
   {
     CgpuBuffer blasPayloadsBuffer;
     CgpuBuffer instanceIdsBuffer;
+    CgpuBuffer instanceTransformsBuffer;
     GiScene*   scene;
     CgpuTlas   tlas;
   };
@@ -1177,6 +1178,7 @@ fail_cleanup:
     uint64_t verticesSize = 0;
     CgpuBuffer blasPayloadsBuffer;
     CgpuBuffer instanceIdsBuffer;
+    CgpuBuffer instanceTransformsBuffer;
 
     _giBuildGeometryStructures(scene, shaderCache, blasInstances, blasPayloads, instanceIds, indicesSize, verticesSize);
 
@@ -1222,6 +1224,33 @@ fail_cleanup:
       }
     }
 
+    // Upload instance transforms.
+    {
+      std::vector<glm::mat4> transforms;
+      transforms.reserve(blasInstances.size());
+
+      for (const auto& i : blasInstances) { transforms.push_back(glm::mat4(glm::make_mat3x4((const float*) i.transform))); }
+
+      uint64_t bufferSize = (transforms.empty() ? 1 : transforms.size()) * sizeof(glm::mat4);
+
+      if (!cgpuCreateBuffer(s_device, {
+                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
+                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                              .size = bufferSize,
+                              .debugName = "InstanceTransforms"
+                            }, &instanceTransformsBuffer))
+      {
+        GB_ERROR("failed to create instance IDs buffer");
+        goto cleanup;
+      }
+
+      if (!transforms.empty() && !s_stager->stageToBuffer((uint8_t*) transforms.data(), bufferSize, instanceTransformsBuffer))
+      {
+        GB_ERROR("failed to upload instance IDs");
+        goto cleanup;
+      }
+    }
+
     // Upload instance IDs.
     {
       uint64_t bufferSize = (instanceIds.empty() ? 1 : instanceIds.size()) * sizeof(int);
@@ -1244,10 +1273,12 @@ fail_cleanup:
       }
     }
 
+
     // Fill cache struct.
     bvh = new GiBvh;
     bvh->blasPayloadsBuffer = blasPayloadsBuffer;
     bvh->instanceIdsBuffer = instanceIdsBuffer;
+    bvh->instanceTransformsBuffer = instanceTransformsBuffer;
     bvh->scene = scene;
     bvh->tlas = tlas;
 
@@ -1277,6 +1308,7 @@ cleanup:
     cgpuDestroyTlas(s_device, bvh->tlas);
     cgpuDestroyBuffer(s_device, bvh->blasPayloadsBuffer);
     cgpuDestroyBuffer(s_device, bvh->instanceIdsBuffer);
+    cgpuDestroyBuffer(s_device, bvh->instanceTransformsBuffer);
     delete bvh;
   }
 
@@ -2216,6 +2248,7 @@ cleanup:
     buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
     buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
     buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_IDS, .buffer = bvh->instanceIdsBuffer });
+    buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_TRANSFORMS, .buffer = bvh->instanceTransformsBuffer });
 
     buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_F, .buffer = scene->aovDefaultValues });
     buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_I, .buffer = scene->aovDefaultValues });

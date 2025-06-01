@@ -17,6 +17,7 @@ layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) readonly buffer BlasPayloa
 };
 
 layout(binding = BINDING_INDEX_INSTANCE_IDS, std430) readonly buffer InstanceIdsBuffer { int InstanceIds[]; };
+layout(binding = BINDING_INDEX_INSTANCE_TRANSFORMS, std430) readonly buffer InstanceTransformsBuffer { mat4 InstanceTransforms[]; };
 
 layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_F, std430) readonly buffer ClearValueBufferF { vec4 ClearValuesF[]; };
 layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_I, std430) readonly buffer ClearValueBufferI { ivec4 ClearValuesI[]; };

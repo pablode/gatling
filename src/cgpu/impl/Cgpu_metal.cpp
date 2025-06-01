@@ -69,6 +69,7 @@ namespace gtl
 
   struct CgpuIPipeline
   {
+    // TODO
     MTL::ComputePipelineState* pipeline;
   };
 
