@@ -427,22 +427,14 @@ namespace gtl
     return true;
   }
 
-  static void cgpuDestroyIBuffer(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
-  {
-    // TODO
-  }
-
   bool cgpuDestroyBuffer(CgpuDevice device, CgpuBuffer buffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    cgpuDestroyIBuffer(idevice, ibuffer);
-
     ibuffer->buffer->release();
 
     iinstance->ibufferStore.free(buffer.handle);
-
     return true;
   }
 
@@ -451,8 +443,8 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    // TODO
-    return false;
+    *mappedMem = ibuffer->buffer->contents();
+    return true;
   }
 
   bool cgpuUnmapBuffer(CgpuDevice device, CgpuBuffer buffer)
@@ -460,14 +452,15 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    // TODO
-    return false;
+    // Nothing to do.
+    return true;
   }
 
   uint64_t cgpuGetBufferAddress(CgpuDevice device, CgpuBuffer buffer)
   {
-    // TODO
-    return 0;
+    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
+
+    return ibuffer->buffer->gpuAddress();
   }
 
   bool cgpuCreateImage(CgpuDevice device,
@@ -897,11 +890,11 @@ namespace gtl
                              uint64_t offset,
                              uint64_t size)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    // TODO
-    return false;
+    NS::Range range(offset, size);
+    ibuffer->buffer->didModifyRange(range);
+    return true;
   }
 
   bool cgpuInvalidateMappedMemory(CgpuDevice device,
@@ -909,11 +902,8 @@ namespace gtl
                                   uint64_t offset,
                                   uint64_t size)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-
-    // TODO
-    return false;
+    // No equivalent.
+    return true;
   }
 
   bool cgpuGetPhysicalDeviceFeatures(CgpuDevice device,
