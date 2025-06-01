@@ -50,6 +50,7 @@ namespace gtl
   struct CgpuIDevice
   {
     MTL::Device* device;
+    MTL::CommandQueue* queue;
   };
 
   struct CgpuIBuffer
@@ -68,7 +69,7 @@ namespace gtl
 
   struct CgpuIPipeline
   {
-    // TODO
+    MTL::ComputePipelineState* pipeline;
   };
 
   struct CgpuIShader
@@ -84,8 +85,8 @@ namespace gtl
 
   struct CgpuICommandBuffer
   {
-    // TODO
-    CgpuDevice device;
+    MTL::CommandBuffer* commandBuffer;
+    MTL::ComputeCommandEncoder* encoder;
   };
 
   struct CgpuIBlas
@@ -257,6 +258,7 @@ namespace gtl
 
     // TODO: select best device suitable
     MTL::Device* mtlDevice = MTL::CreateSystemDefaultDevice();
+    CHK_MTL_NP(mtlDevice);
 
     if (!mtlDevice->supportsFamily(MTL::GPUFamilyApple9))
     {
@@ -269,14 +271,21 @@ namespace gtl
 
     // TODO: check device capabilities
 
+    MTL::CommandQueue* queue = mtlDevice->newCommandQueue();
+    CHK_MTL_NP(queue);
+
     idevice->device = mtlDevice;
-    return false;
+    idevice->queue = queue;
+
+    device->handle = handle;
+    return true;
   }
 
   bool cgpuDestroyDevice(CgpuDevice device)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
+    idevice->queue->release();
     idevice->device->release();
 
     iinstance->ideviceStore.free(device.handle);
@@ -805,18 +814,17 @@ namespace gtl
 
     CGPU_RESOLVE_COMMAND_BUFFER({ handle }, icommandBuffer);
 
-    // TODO
+    icommandBuffer->commandBuffer = idevice->queue->commandBuffer();
 
     commandBuffer->handle = handle;
-    return false;
+    return true;
   }
 
   bool cgpuDestroyCommandBuffer(CgpuDevice device, CgpuCommandBuffer commandBuffer)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    // TODO
+    icommandBuffer->commandBuffer->release();
 
     iinstance->icommandBufferStore.free(commandBuffer.handle);
     return true;
@@ -825,19 +833,19 @@ namespace gtl
   bool cgpuBeginCommandBuffer(CgpuCommandBuffer commandBuffer)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
-    // TODO: is this a no-op?
+    icommandBuffer->encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
+    CHK_MTL_NP(icommandBuffer->encoder);
+
     return true;
   }
 
   void cgpuCmdBindPipeline(CgpuCommandBuffer commandBuffer, CgpuPipeline pipeline)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    // TODO
+    icommandBuffer->encoder->setComputePipelineState(ipipeline->pipeline);
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
@@ -846,7 +854,7 @@ namespace gtl
                                            uint32_t imageCount,
                                            const CgpuImageBinding* images)
   {
-    // TODO
+    // Not needed for Metal.
   }
 
   void cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
@@ -855,7 +863,6 @@ namespace gtl
                              const CgpuBindings* bindings)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
     // TODO
@@ -868,7 +875,6 @@ namespace gtl
                            uint64_t dstOffset)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
 
     // TODO
@@ -882,7 +888,6 @@ namespace gtl
                          uint64_t size)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_BUFFER(srcBuffer, isrcBuffer);
     CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
 
@@ -895,7 +900,6 @@ namespace gtl
                                 const CgpuBufferImageCopyDesc* desc)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
     CGPU_RESOLVE_IMAGE(image, iimage);
 
@@ -909,10 +913,19 @@ namespace gtl
                             const void* data)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    // TODO
+    uint32_t slot = 0;
+    icommandBuffer->encoder->setBytes(data, size, slot);
+  }
+
+  static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
+                              uint32_t dim_x,
+                              uint32_t dim_y,
+                              uint32_t dim_z)
+  {
+    MTL::Size groupsPerGrid(dim_x, dim_y, dim_x);
+    MTL::Size threadsPerGroup(32, 32, 1); // TODO: retrieve this from the bound pipeline
+    icommandBuffer->encoder->dispatchThreadgroups(groupsPerGrid, threadsPerGroup);
   }
 
   void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
@@ -921,18 +934,14 @@ namespace gtl
                        uint32_t dim_z)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
-    // TODO
+    cgpuCmdDispatch(icommandBuffer, dim_x, dim_y, dim_z);
   }
 
   void cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
                               const CgpuPipelineBarrier* barrier)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-
-    // TODO: no-op?
+    // Not available in Metal API.
   }
 
   void cgpuCmdResetTimestamps(CgpuCommandBuffer commandBuffer,
@@ -940,7 +949,6 @@ namespace gtl
                               uint32_t count)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
     // TODO
   }
@@ -949,7 +957,6 @@ namespace gtl
                              uint32_t timestampIndex)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
     // TODO
   }
@@ -961,11 +968,11 @@ namespace gtl
                              bool waitUntilAvailable)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
     uint32_t lastIndex = offset + count;
-    if (lastIndex >= CGPU_MAX_TIMESTAMP_QUERIES) {
+    if (lastIndex >= CGPU_MAX_TIMESTAMP_QUERIES)
+    {
       CGPU_FATAL("max timestamp query count exceeded!");
     }
 
@@ -975,18 +982,19 @@ namespace gtl
   void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, CgpuPipeline rtPipeline, uint32_t width, uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_PIPELINE(rtPipeline, ipipeline);
 
     // TODO
+
+    cgpuCmdDispatch(icommandBuffer, width, height, 1);
   }
 
   void cgpuEndCommandBuffer(CgpuCommandBuffer commandBuffer)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
-    // TODO: no-op?
+    icommandBuffer->encoder->endEncoding();
+    icommandBuffer->encoder->release();
   }
 
   bool cgpuCreateSemaphore(CgpuDevice device, CgpuSemaphore* semaphore, uint64_t initialValue)
@@ -1021,7 +1029,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    // TODO
+    // TODO (see below)
     return true;
   }
 
@@ -1035,8 +1043,12 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    // TODO
-    return false;
+    icommandBuffer->commandBuffer->commit();
+
+    // TODO: either emulate semaphore or revert back to split sync primitives
+    icommandBuffer->commandBuffer->waitUntilCompleted();
+
+    return true;
   }
 
   bool cgpuFlushMappedMemory(CgpuDevice device,
