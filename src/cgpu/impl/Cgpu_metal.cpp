@@ -95,7 +95,8 @@ namespace gtl
 
   struct CgpuITlas
   {
-    // TODO
+    MTL::AccelerationStructure* as;
+    MTL::Buffer* buffer;
   };
 
   struct CgpuISampler
@@ -186,11 +187,11 @@ namespace gtl
 #define CGPU_RESOLVE_BLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIBlas, cgpuResolveBlas)
 #define CGPU_RESOLVE_TLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
 
+#define LOG_MTL_ERR(E) \
+  if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, error->localizedDescription()->utf8String(), error->code()); }
+
 #define CHK_MTL(X, E)    \
-  if (!X) {              \
-    GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, error->localizedDescription()->utf8String(), error->code()); \
-    exit(EXIT_FAILURE);  \
-  }
+  if (!X) { LOG_MTL_ERR(E); exit(EXIT_FAILURE); }
 
 #define CHK_MTL_NP(X)    \
   if (!X) {              \
@@ -691,10 +692,86 @@ namespace gtl
 
     CGPU_RESOLVE_TLAS({ handle }, itlas);
 
-    // TODO
+    // Upload instance buffer.
+    MTL::Buffer* instanceBuffer;
+    {
+      std::vector<MTL::AccelerationStructureInstanceDescriptor> instances(createInfo.instanceCount);
+
+      for (uint32_t i = 0; i < createInfo.instanceCount; i++)
+      {
+        const CgpuBlasInstance& instance = createInfo.instances[i];
+
+        MTL::AccelerationStructureInstanceDescriptor& d = instances[i];
+        d.options = MTL::AccelerationStructureInstanceOptionNone; // TODO: propagate opaque flag
+        d.mask = 0xFF;
+        d.intersectionFunctionTableOffset = instance.hitGroupIndex;
+        d.accelerationStructureIndex = i;
+        memcpy(&d.transformationMatrix, instance.transform, sizeof(instance.transform)); // TODO: might be transposed
+      }
+
+      uint64_t bufferSize = sizeof(MTL::AccelerationStructureInstanceDescriptor) * instances.size();
+
+      instanceBuffer = idevice->device->newBuffer(bufferSize, MTL::ResourceStorageModeShared);
+      CHK_MTL_NP(instanceBuffer);
+
+      memcpy(instanceBuffer->contents(), instances.data(), bufferSize);
+      instanceBuffer->didModifyRange(NS::Range::Make(0, bufferSize));
+    }
+
+    MTL::InstanceAccelerationStructureDescriptor* descriptor = MTL::InstanceAccelerationStructureDescriptor::alloc()->init();
+    CHK_MTL_NP(descriptor);
+    descriptor->setInstanceDescriptorBuffer(instanceBuffer);
+    descriptor->setInstanceDescriptorStride(sizeof(MTL::AccelerationStructureInstanceDescriptor));
+    descriptor->setInstanceCount(createInfo.instanceCount);
+
+    // Build TLAS.
+    MTL::Buffer* tlasBuffer;
+    MTL::AccelerationStructure* as;
+    // TODO: improve error handling
+    {
+      MTL::AccelerationStructureSizes sizes = idevice->device->accelerationStructureSizes(descriptor);
+
+      tlasBuffer = idevice->device->newBuffer(sizes.accelerationStructureSize, MTL::ResourceStorageModePrivate);
+      CHK_MTL_NP(tlasBuffer);
+
+      as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
+      CHK_MTL_NP(as);
+
+      MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
+      CHK_MTL_NP(scratchBuffer);
+
+      MTL::CommandQueue* commandQueue = idevice->device->newCommandQueue();
+      CHK_MTL_NP(commandQueue);
+      MTL::CommandBuffer* commandBuffer = commandQueue->commandBuffer();
+      CHK_MTL_NP(commandBuffer);
+
+      MTL::AccelerationStructureCommandEncoder* encoder = commandBuffer->accelerationStructureCommandEncoder();
+      CHK_MTL_NP(encoder);
+
+      uint32_t scratchBufferOffset = 0;
+      encoder->buildAccelerationStructure(as, descriptor, scratchBuffer, scratchBufferOffset);
+      encoder->endEncoding();
+
+      commandBuffer->commit();
+      commandBuffer->waitUntilCompleted();
+
+      NS::Error* error = commandBuffer->error();
+      LOG_MTL_ERR(error);
+
+      commandBuffer->release();
+      commandQueue->release();
+
+      scratchBuffer->release();
+    }
+
+    descriptor->release();
+    instanceBuffer->release();
+
+    itlas->as = as;
+    itlas->buffer = tlasBuffer;
 
     tlas->handle = handle;
-    return false;
+    return true;
   }
 
   bool cgpuDestroyBlas(CgpuDevice device, CgpuBlas blas)
@@ -713,7 +790,8 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_TLAS(tlas, itlas);
 
-    // TODO
+    itlas->as->release();
+    itlas->buffer->release();
 
     iinstance->itlasStore.free(tlas.handle);
     return true;
