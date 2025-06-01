@@ -423,7 +423,7 @@ namespace gtl
 
     MTL::ResourceOptions options = cgpuMakeResourceOptions(createInfo.memoryProperties);
 
-    MTL::Buffer* mtlBuffer = idevice->device->newBuffer(nullptr, NS::UInteger(size), options);
+    MTL::Buffer* mtlBuffer = idevice->device->newBuffer(size, options);
     if (!mtlBuffer)
     {
       iinstance->ibufferStore.free(handle);
@@ -1191,18 +1191,48 @@ namespace gtl
                                      CgpuPhysicalDeviceFeatures& features)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    return false; // TODO
+
+    features = CgpuPhysicalDeviceFeatures {
+      .debugPrintf = false,
+      .pageableDeviceLocalMemory = false,
+      .pipelineLibraries = false,
+      .pipelineStatisticsQuery = false,
+      .rayTracingInvocationReorder = false,
+      .rayTracingValidation = false,
+      .shaderClock = true,
+      .shaderFloat64 = false,
+      .shaderImageGatherExtended = false,
+      .shaderInt16 = true,
+      .shaderInt64 = false,
+      .shaderSampledImageArrayDynamicIndexing = true,
+      .shaderStorageBufferArrayDynamicIndexing = true,
+      .shaderStorageImageArrayDynamicIndexing = true,
+      .shaderStorageImageExtendedFormats = false,
+      .shaderStorageImageReadWithoutFormat = false,
+      .shaderStorageImageWriteWithoutFormat = false,
+      .shaderUniformBufferArrayDynamicIndexing = false,
+      .sparseBinding = false,
+      .sparseResidencyAliased = false,
+      .sparseResidencyBuffer = false,
+      .sparseResidencyImage2D = false,
+      .sparseResidencyImage3D = false,
+      .textureCompressionBC = idevice->device->supportsBCTextureCompression()
+    };
+
+    return true;
   }
 
+  // TODO: init device member instead
   bool cgpuGetPhysicalDeviceProperties(CgpuDevice device,
                                        CgpuPhysicalDeviceProperties& properties)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
     properties = CgpuPhysicalDeviceProperties {
-      .maxBufferUpdateSize = 0 // not supported by Metal backend
+      .maxBufferUpdateSize = 0, // not supported by Metal backend
+      .maxComputeSharedMemorySize = uint32_t(idevice->device->maxThreadgroupMemoryLength())
     };
 
-    return false; // TODO
+    return true;
   }
 }
