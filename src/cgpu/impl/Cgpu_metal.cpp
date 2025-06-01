@@ -92,7 +92,8 @@ namespace gtl
 
   struct CgpuIBlas
   {
-    // TODO
+    MTL::AccelerationStructure* as;
+    MTL::Buffer* buffer;
   };
 
   struct CgpuITlas
@@ -388,13 +389,11 @@ namespace gtl
 
   bool cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SHADER(shader, ishader);
 
     ishader->library->release();
 
     iinstance->ishaderStore.free(shader.handle);
-
     return true;
   }
 
@@ -445,7 +444,6 @@ namespace gtl
 
   bool cgpuDestroyBuffer(CgpuDevice device, CgpuBuffer buffer)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
     ibuffer->buffer->release();
@@ -557,13 +555,11 @@ namespace gtl
 
   bool cgpuDestroyImage(CgpuDevice device, CgpuImage image)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_IMAGE(image, iimage);
 
     iimage->texture->release();
 
     iinstance->iimageStore.free(image.handle);
-
     return false;
   }
 
@@ -622,7 +618,6 @@ namespace gtl
 
   bool cgpuDestroySampler(CgpuDevice device, CgpuSampler sampler)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SAMPLER(sampler, isampler);
 
     isampler->sampler->release();
@@ -664,16 +659,15 @@ namespace gtl
 
   bool cgpuDestroyPipeline(CgpuDevice device, CgpuPipeline pipeline)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
     // TODO
 
     iinstance->ipipelineStore.free(pipeline.handle);
-
     return false;
   }
 
+  // TODO: improve error handling
   bool cgpuCreateBlas(CgpuDevice device,
                       CgpuBlasCreateInfo createInfo,
                       CgpuBlas* blas)
@@ -686,7 +680,62 @@ namespace gtl
 
     CGPU_RESOLVE_BLAS({ handle }, iblas);
 
-    // TODO
+    auto* triDesc = MTL::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
+    triDesc->setVertexBuffer(ivertexBuffer->buffer);
+    triDesc->setVertexStride(sizeof(float) * 3);
+    triDesc->setIndexBuffer(iindexBuffer->buffer);
+    triDesc->setIndexType(MTL::IndexTypeUInt32);
+    triDesc->setTriangleCount(createInfo.triangleCount);
+    triDesc->setOpaque(createInfo.isOpaque);
+
+    auto* blasDesc = MTL::PrimitiveAccelerationStructureDescriptor::alloc()->init();
+    CHK_MTL_NP(blasDesc);
+
+    NS::Array* geoDescs = NS::Array::array(triDesc);
+    CHK_MTL_NP(geoDescs);
+    blasDesc->setGeometryDescriptors(geoDescs);
+
+    MTL::AccelerationStructureSizes sizes = idevice->device->accelerationStructureSizes(blasDesc);
+
+    MTL::Buffer* blasBuffer = idevice->device->newBuffer(sizes.accelerationStructureSize, MTL::ResourceStorageModePrivate);
+    CHK_MTL_NP(blasBuffer);
+
+    MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
+    CHK_MTL_NP(scratchBuffer);
+
+    MTL::AccelerationStructure* as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
+    CHK_MTL_NP(as);
+
+    MTL::CommandBuffer* commandBuffer = idevice->queue->commandBuffer();
+    CHK_MTL_NP(commandBuffer);
+    MTL::AccelerationStructureCommandEncoder* encoder = commandBuffer->accelerationStructureCommandEncoder();
+    CHK_MTL_NP(encoder);
+
+    uint32_t scratchBufferOffset = 0;
+    encoder->buildAccelerationStructure(as, blasDesc, scratchBuffer, scratchBufferOffset);
+    encoder->endEncoding();
+    encoder->release();
+
+    commandBuffer->commit();
+    commandBuffer->waitUntilCompleted();
+
+    NS::Error* error = commandBuffer->error();
+    LOG_MTL_ERR(error);
+
+    commandBuffer->release();
+
+    scratchBuffer->release();
+    geoDescs->release();
+    blasDesc->release();
+    triDesc->release();
+
+    if (createInfo.debugName)
+    {
+      as->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+    }
+
+    iblas->as = as;
+    iblas->buffer = blasBuffer;
 
     blas->handle = handle;
     return false;
@@ -750,9 +799,7 @@ namespace gtl
       MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
       CHK_MTL_NP(scratchBuffer);
 
-      MTL::CommandQueue* commandQueue = idevice->device->newCommandQueue();
-      CHK_MTL_NP(commandQueue);
-      MTL::CommandBuffer* commandBuffer = commandQueue->commandBuffer();
+      MTL::CommandBuffer* commandBuffer = idevice->queue->commandBuffer();
       CHK_MTL_NP(commandBuffer);
 
       MTL::AccelerationStructureCommandEncoder* encoder = commandBuffer->accelerationStructureCommandEncoder();
@@ -761,6 +808,7 @@ namespace gtl
       uint32_t scratchBufferOffset = 0;
       encoder->buildAccelerationStructure(as, descriptor, scratchBuffer, scratchBufferOffset);
       encoder->endEncoding();
+      encoder->release();
 
       commandBuffer->commit();
       commandBuffer->waitUntilCompleted();
@@ -769,7 +817,6 @@ namespace gtl
       LOG_MTL_ERR(error);
 
       commandBuffer->release();
-      commandQueue->release();
 
       scratchBuffer->release();
     }
@@ -786,10 +833,10 @@ namespace gtl
 
   bool cgpuDestroyBlas(CgpuDevice device, CgpuBlas blas)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BLAS(blas, iblas);
 
-    // TODO
+    iblas->as->release();
+    iblas->buffer->release();
 
     iinstance->iblasStore.free(blas.handle);
     return true;
@@ -797,7 +844,6 @@ namespace gtl
 
   bool cgpuDestroyTlas(CgpuDevice device, CgpuTlas tlas)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_TLAS(tlas, itlas);
 
     itlas->as->release();
@@ -1083,7 +1129,6 @@ namespace gtl
 
   bool cgpuDestroySemaphore(CgpuDevice device, CgpuSemaphore semaphore)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SEMAPHORE(semaphore, isemaphore);
 
     // TODO
