@@ -562,7 +562,7 @@ namespace gtl
     iimage->texture->release();
 
     iinstance->iimageStore.free(image.handle);
-    return false;
+    return true;
   }
 
   bool cgpuCreateSampler(CgpuDevice device,
@@ -625,7 +625,7 @@ namespace gtl
     isampler->sampler->release();
 
     iinstance->isamplerStore.free(sampler.handle);
-    return false;
+    return true;
   }
 
   bool cgpuCreateComputePipeline(CgpuDevice device,
@@ -764,7 +764,7 @@ namespace gtl
     iblas->buffer = blasBuffer;
 
     blas->handle = handle;
-    return false;
+    return true;
   }
 
   bool cgpuCreateTlas(CgpuDevice device,
