@@ -43,7 +43,7 @@ namespace gtl
 {
   /* Constants. */
 
-  constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(2, 3, 0);
+  constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(3, 1, 0);
 
   /* Internal structures. */
 
