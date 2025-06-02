@@ -196,6 +196,7 @@ namespace gtl
 #define CHK_MTL(X, E)    \
   if (!X) { LOG_MTL_ERR(E); exit(EXIT_FAILURE); }
 
+// TODO: replace with proper error handling in some cases
 #define CHK_MTL_NP(X)    \
   if (!X) {              \
     GB_ERROR("{}:{}: metal returned nullptr", __FILE__, __LINE__); \
@@ -693,7 +694,6 @@ namespace gtl
     return true;
   }
 
-  // TODO: improve error handling
   bool cgpuCreateBlas(CgpuDevice device,
                       CgpuBlasCreateInfo createInfo,
                       CgpuBlas* blas)
@@ -813,7 +813,6 @@ namespace gtl
     // Build TLAS.
     MTL::Buffer* tlasBuffer;
     MTL::AccelerationStructure* as;
-    // TODO: improve error handling
     {
       MTL::AccelerationStructureSizes sizes = idevice->device->accelerationStructureSizes(descriptor);
 
