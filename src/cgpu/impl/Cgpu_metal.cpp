@@ -598,7 +598,7 @@ namespace gtl
     descriptor->setRAddressMode(translateAddressMode(createInfo.addressModeW));
     descriptor->setMinFilter(MTL::SamplerMinMagFilterLinear);
     descriptor->setMagFilter(MTL::SamplerMinMagFilterLinear);
-    descriptor->setNormalizedCoordinates(false);
+    descriptor->setNormalizedCoordinates(true);
     descriptor->setBorderColor(MTL::SamplerBorderColorOpaqueBlack);
 
     MTL::SamplerState* mtlSampler = idevice->device->newSamplerState(descriptor);
