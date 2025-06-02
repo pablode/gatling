@@ -44,6 +44,7 @@ namespace gtl
   /* Constants. */
 
   constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(3, 1, 0);
+  constexpr static const char* SPVC_MSL_ENTRY_POINT = "main0";
 
   /* Internal structures. */
 
@@ -69,8 +70,7 @@ namespace gtl
 
   struct CgpuIPipeline
   {
-    // TODO
-    MTL::ComputePipelineState* pipeline;
+    MTL::ComputePipelineState* state;
   };
 
   struct CgpuIShader
@@ -638,10 +638,34 @@ namespace gtl
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
-    // TODO
+    NS::String* entryFuncName = NS::String::string(SPVC_MSL_ENTRY_POINT, NS::UTF8StringEncoding);
+    MTL::Function* entryFunc = ishader->library->newFunction(entryFuncName);
+
+    auto* descriptor = MTL::ComputePipelineDescriptor::alloc()->init();
+    CHK_MTL_NP(descriptor);
+
+    descriptor->setComputeFunction(entryFunc);
+#ifndef NDEBUG
+    descriptor->setShaderValidation(MTL::ShaderValidationEnabled);
+#endif
+    if (createInfo.debugName)
+    {
+      descriptor->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+    }
+
+    NS::Error* error;
+    MTL::PipelineOption options = MTL::PipelineOptionNone; // TODO: consider values
+    MTL::ComputePipelineState* state = idevice->device->newComputePipelineState(descriptor, options, nullptr, &error);
+    CHK_MTL_NP(state);
+    LOG_MTL_ERR(error);
+
+    entryFunc->release();
+    descriptor->release();
+
+    ipipeline->state = state;
 
     pipeline->handle = handle;
-    return false;
+    return true;
   }
 
   bool cgpuCreateRtPipeline(CgpuDevice device,
@@ -655,6 +679,7 @@ namespace gtl
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
     // TODO
+
     return false;
   }
 
@@ -662,10 +687,10 @@ namespace gtl
   {
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    // TODO
+    ipipeline->state->release();
 
     iinstance->ipipelineStore.free(pipeline.handle);
-    return false;
+    return true;
   }
 
   // TODO: improve error handling
@@ -928,7 +953,7 @@ namespace gtl
 
     MTL::ComputeCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToCompute(icommandBuffer);
 
-    encoder->setComputePipelineState(ipipeline->pipeline);
+    encoder->setComputePipelineState(ipipeline->state);
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
