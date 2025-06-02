@@ -755,17 +755,18 @@ namespace gtl
     // Upload instance buffer.
     MTL::Buffer* instanceBuffer;
     {
-      std::vector<MTL::AccelerationStructureInstanceDescriptor> instances(createInfo.instanceCount);
+      std::vector<MTL::AccelerationStructureUserIDInstanceDescriptor> instances(createInfo.instanceCount);
 
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
       {
         const CgpuBlasInstance& instance = createInfo.instances[i];
 
-        MTL::AccelerationStructureInstanceDescriptor& d = instances[i];
+        MTL::AccelerationStructureUserIDInstanceDescriptor& d = instances[i];
         d.options = MTL::AccelerationStructureInstanceOptionNone; // TODO: propagate opaque flag
-        d.mask = 0xFF;
+        d.mask = 0xFFFFFFFF;
         d.intersectionFunctionTableOffset = instance.hitGroupIndex;
         d.accelerationStructureIndex = i;
+        d.userID = instance.instanceCustomIndex;;
         memcpy(&d.transformationMatrix, instance.transform, sizeof(instance.transform)); // TODO: might be transposed
       }
 
