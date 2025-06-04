@@ -24,8 +24,7 @@ GI_INTERFACE_BEGIN(rp_main)
 
 struct SceneParams
 {
-  GI_UINT texture2dCount;
-  GI_UINT texture3dCount;
+  GI_UINT textureCount;
   GI_UINT sphereLightCount;
   GI_UINT distantLightCount;
   GI_UINT rectLightCount;

@@ -107,8 +107,7 @@ namespace gtl
     uint32_t                       aovMask;
     bool                           domeLightCameraVisible;
     OffsetAllocator::Allocation    domeLightsAllocation;
-    std::vector<GiImageBinding>    imageBindings2d;
-    std::vector<GiImageBinding>    imageBindings3d;
+    std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
@@ -122,8 +121,7 @@ namespace gtl
     CgpuShader closestHit;
     std::vector<CgpuShader> anyHits; // optional
     OffsetAllocator::Allocation texOffsetAllocation;
-    std::vector<CgpuImage> images2d;
-    std::vector<CgpuImage> images3d;
+    std::vector<CgpuImage> images;
   };
 
   struct GiMaterial
@@ -1337,8 +1335,7 @@ cleanup:
     std::vector<CgpuRtHitGroup> hitGroups;
     std::vector<CgpuShader> missShaders;
     std::vector<McTextureDescription> textureDescriptions;
-    std::vector<GiImageBinding> imageBindings2d;
-    std::vector<GiImageBinding> imageBindings3d;
+    std::vector<GiImageBinding> imageBindings;
     std::vector<HitGroupCompInfo> hitGroupCompInfos;
     std::vector<const GiMaterial*> cachedMaterials;
 
@@ -1411,15 +1408,13 @@ cleanup:
       }
 
       // 3. Upload textures and assign images to new material GPU data.
-      std::vector<CgpuImage> images2d;
-      std::vector<CgpuImage> images3d;
-      if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images2d, images3d))
+      std::vector<CgpuImage> images;
+      if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images))
       {
         goto cleanup;
       }
 
-      uint32_t image2dCounter = 0;
-      uint32_t image3dCounter = 0;
+      uint32_t imageCounter = 0;
       newMaterialGpuDatas.reserve(hitGroupCompInfos.size());
       for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
       {
@@ -1435,14 +1430,7 @@ cleanup:
         }
         for (const McTextureDescription& tr : genInfo.textureDescriptions)
         {
-          if (tr.is3dImage)
-          {
-            gpuData.images3d.push_back(images3d[image3dCounter++]);
-          }
-          else
-          {
-            gpuData.images2d.push_back(images2d[image2dCounter++]);
-          }
+          gpuData.images.push_back(images[imageCounter++]);
         }
         newMaterialGpuDatas.push_back(gpuData);
       }
@@ -1743,14 +1731,9 @@ cleanup:
       uint32_t texOffset = gpuData.texOffsetAllocation.offset;
 
       uint32_t texCount = 0;
-      for (CgpuImage img : gpuData.images2d)
+      for (CgpuImage img : gpuData.images)
       {
-        imageBindings2d.push_back({ .image = img, .index = texOffset + texCount });
-        texCount++;
-      }
-      for (CgpuImage img : gpuData.images3d)
-      {
-        imageBindings3d.push_back({ .image = img, .index = texOffset + texCount });
+        imageBindings.push_back({ .image = img, .index = texOffset + texCount });
         texCount++;
       }
     }
@@ -1759,8 +1742,7 @@ cleanup:
     cache->aovMask = aovMask;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
     cache->domeLightsAllocation = domeLightsAllocation;
-    cache->imageBindings2d = std::move(imageBindings2d);
-    cache->imageBindings3d = std::move(imageBindings3d);
+    cache->imageBindings = std::move(imageBindings);
     cache->materials.resize(materials.size());
     for (uint32_t i = 0; i < cache->materials.size(); i++)
     {
@@ -2047,8 +2029,7 @@ cleanup:
                                  scene->rectLights.elementCount() + scene->diskLights.elementCount();
 
       rp::SceneParams sceneParams = {
-        .texture2dCount = (uint32_t) shaderCache->imageBindings2d.size(),
-        .texture3dCount = (uint32_t) shaderCache->imageBindings3d.size(),
+        .textureCount = (uint32_t) shaderCache->imageBindings.size(),
         .sphereLightCount = scene->sphereLights.elementCount(),
         .distantLightCount = scene->distantLights.elementCount(),
         .rectLightCount = scene->rectLights.elementCount(),
@@ -2245,7 +2226,7 @@ cleanup:
       buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
     }
 
-    size_t imageCount = shaderCache->imageBindings2d.size() + shaderCache->imageBindings3d.size() + 2/* dome lights */;
+    size_t imageCount = shaderCache->imageBindings.size() + 2/* dome lights */;
 
     std::vector<CgpuImageBinding> images;
     images.reserve(imageCount);
@@ -2257,13 +2238,9 @@ cleanup:
     images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture,
                        .index = shaderCache->domeLightsAllocation.offset + 1 });
 
-    for (const GiImageBinding& b : shaderCache->imageBindings2d)
+    for (const GiImageBinding& b : shaderCache->imageBindings)
     {
       assert(b.index != 0 && b.index != 1); // reserved for dome lights
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = b.image, .index = b.index });
-    }
-    for (const GiImageBinding& b : shaderCache->imageBindings3d)
-    {
       images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = b.image, .index = b.index });
     }
 
@@ -2281,7 +2258,7 @@ cleanup:
     CgpuBindings bindings1 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
     CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
 
-    if (shaderCache->imageBindings2d.size() > rp::MAX_TEXTURE_COUNT || shaderCache->imageBindings3d.size() > rp::MAX_TEXTURE_COUNT)
+    if (shaderCache->imageBindings.size() > rp::MAX_TEXTURE_COUNT)
     {
       GB_ERROR("max number of textures exceeded");
       goto cleanup;

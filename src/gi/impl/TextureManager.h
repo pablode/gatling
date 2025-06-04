@@ -45,8 +45,7 @@ namespace gtl
                                  bool flushImmediately = true);
 
     bool loadTextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
-                              std::vector<CgpuImage>& images2d,
-                              std::vector<CgpuImage>& images3d);
+                                 std::vector<CgpuImage>& images);
 
     void evictAndDestroyCachedImage(CgpuImage image);
 

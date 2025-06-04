@@ -120,8 +120,7 @@ namespace gtl
   }
 
   bool GiTextureManager::loadTextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
-                                                 std::vector<CgpuImage>& images2d,
-                                                 std::vector<CgpuImage>& images3d)
+                                                 std::vector<CgpuImage>& images)
   {
     size_t texCount = textureDescriptions.size();
 
@@ -132,8 +131,7 @@ namespace gtl
 
     GB_LOG("staging {} images", texCount);
 
-    images2d.reserve(texCount);
-    images3d.reserve(texCount);
+    images.reserve(texCount);
 
     bool result;
 
@@ -149,8 +147,6 @@ namespace gtl
       createInfo.is3d = textureResource.is3dImage;
       createInfo.format = textureResource.isFloat ? CGPU_IMAGE_FORMAT_R32_SFLOAT : CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
       createInfo.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
-
-      auto& imageVector = createInfo.is3d ? images3d : images2d;
 
       const char* filePath = textureResource.filePath.c_str();
       if (strcmp(filePath, "") == 0)
@@ -174,13 +170,13 @@ namespace gtl
         result = m_stager.stageToImage(payload.data(), payloadSize, image, createInfo.width, createInfo.height, createInfo.depth);
         if (!result) return false;
 
-        imageVector.push_back(image);
+        images.push_back(image);
         continue;
       }
 
       if (loadTextureFromFilePath(filePath, image, textureResource.is3dImage, false))
       {
-        imageVector.push_back(image);
+        images.push_back(image);
         continue;
       }
 
@@ -196,7 +192,7 @@ namespace gtl
       result = m_stager.stageToImage(black, 4, image, 1, 1, 1);
       if (!result) return false;
 
-      imageVector.push_back(image);
+      images.push_back(image);
     }
 
     m_stager.flush();
