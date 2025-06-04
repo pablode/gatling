@@ -566,6 +566,13 @@ fail:
     {
       cgpuDestroyShader(s_device, shader);
     }
+    for (CgpuImage image : gpuData.images)
+    {
+      if (!s_texSys->isCached(image))
+      {
+        cgpuDestroyImage(s_device, image);
+      }
+    }
   }
 
   void giDestroyMaterial(GiMaterial* mat)

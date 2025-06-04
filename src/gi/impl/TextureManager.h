@@ -49,6 +49,8 @@ namespace gtl
 
     void evictAndDestroyCachedImage(CgpuImage image);
 
+    bool isCached(CgpuImage image) const;
+
   private:
     CgpuDevice m_device;
     GiAssetReader& m_assetReader;

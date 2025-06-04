@@ -163,6 +163,7 @@ namespace gtl
         createInfo.width = textureResource.width;
         createInfo.height = textureResource.height;
         createInfo.depth = textureResource.depth;
+        createInfo.debugName = "[Payload texture]";
 
         if (!cgpuCreateImage(m_device, createInfo, &image))
           return false;
@@ -217,5 +218,17 @@ namespace gtl
     }
 
     assert(false);
+  }
+
+  bool GiTextureManager::isCached(CgpuImage image) const
+  {
+    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
+    {
+      if (it->second.handle == image.handle)
+      {
+        return true;
+      }
+    }
+    return false;
   }
 }
