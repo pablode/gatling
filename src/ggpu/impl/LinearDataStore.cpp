@@ -132,8 +132,7 @@ namespace gtl
         goto cleanup;
 
       signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-      if (!cgpuSubmitCommandBuffer(m_device, commandBuffer, 1, &signalSemaphoreInfo))
-        goto cleanup;
+      cgpuSubmitCommandBuffer(m_device, commandBuffer, 1, &signalSemaphoreInfo);
 
       waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
       if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))

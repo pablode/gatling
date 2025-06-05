@@ -65,8 +65,7 @@ namespace gtl
     if (!cgpuCreateSemaphore(m_device, &m_semaphore))
       goto fail;
 
-    if (!cgpuMapBuffer(m_device, m_stagingBuffer, (void**) &m_mappedMem))
-      goto fail;
+    cgpuMapBuffer(m_device, m_stagingBuffer, (void**) &m_mappedMem);
 
     if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
       goto fail;
@@ -108,12 +107,10 @@ fail:
     cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
 
     uint32_t halfOffset = m_writeableHalf * BUFFER_HALF_SIZE;
-    if (!cgpuFlushMappedMemory(m_device, m_stagingBuffer, halfOffset, halfOffset + m_stagedBytes))
-      return false;
+    cgpuFlushMappedMemory(m_device, m_stagingBuffer, halfOffset, halfOffset + m_stagedBytes);
 
     CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
-    if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo))
-      return false;
+    cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo);
 
     m_stagedBytes = 0;
     m_commandsPending = false;

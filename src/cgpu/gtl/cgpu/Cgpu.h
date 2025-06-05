@@ -354,7 +354,7 @@ namespace gtl
     CgpuDevice* device
   );
 
-  bool cgpuDestroyDevice(
+  void cgpuDestroyDevice(
     CgpuDevice device
   );
 
@@ -371,7 +371,7 @@ namespace gtl
     CgpuShader* shaders
   );
 
-  bool cgpuDestroyShader(
+  void cgpuDestroyShader(
     CgpuDevice device,
     CgpuShader shader
   );
@@ -382,18 +382,18 @@ namespace gtl
     CgpuBuffer* buffer
   );
 
-  bool cgpuDestroyBuffer(
+  void cgpuDestroyBuffer(
     CgpuDevice device,
     CgpuBuffer buffer
   );
 
-  bool cgpuMapBuffer(
+  void cgpuMapBuffer(
     CgpuDevice device,
     CgpuBuffer buffer,
     void** mappedMem
   );
 
-  bool cgpuUnmapBuffer(
+  void cgpuUnmapBuffer(
     CgpuDevice device,
     CgpuBuffer buffer
   );
@@ -409,7 +409,7 @@ namespace gtl
     CgpuImage* image
   );
 
-  bool cgpuDestroyImage(
+  void cgpuDestroyImage(
     CgpuDevice device,
     CgpuImage image
   );
@@ -420,24 +420,24 @@ namespace gtl
     CgpuSampler* sampler
   );
 
-  bool cgpuDestroySampler(
+  void cgpuDestroySampler(
     CgpuDevice device,
     CgpuSampler sampler
   );
 
-  bool cgpuCreateComputePipeline(
+  void cgpuCreateComputePipeline(
     CgpuDevice device,
     CgpuComputePipelineCreateInfo createInfo,
     CgpuPipeline* pipeline
   );
 
-  bool cgpuCreateRtPipeline(
+  void cgpuCreateRtPipeline(
     CgpuDevice device,
     CgpuRtPipelineCreateInfo createInfo,
     CgpuPipeline* pipeline
   );
 
-  bool cgpuDestroyPipeline(
+  void cgpuDestroyPipeline(
     CgpuDevice device,
     CgpuPipeline pipeline
   );
@@ -454,12 +454,12 @@ namespace gtl
     CgpuTlas* tlas
   );
 
-  bool cgpuDestroyBlas(
+  void cgpuDestroyBlas(
     CgpuDevice device,
     CgpuBlas blas
   );
 
-  bool cgpuDestroyTlas(
+  void cgpuDestroyTlas(
     CgpuDevice device,
     CgpuTlas tlas
   );
@@ -575,7 +575,7 @@ namespace gtl
     CgpuCommandBuffer commandBuffer
   );
 
-  bool cgpuDestroyCommandBuffer(
+  void cgpuDestroyCommandBuffer(
     CgpuDevice device,
     CgpuCommandBuffer commandBuffer
   );
@@ -586,7 +586,7 @@ namespace gtl
     uint64_t initialValue = 0
   );
 
-  bool cgpuDestroySemaphore(
+  void cgpuDestroySemaphore(
     CgpuDevice device,
     CgpuSemaphore semaphore
   );
@@ -598,7 +598,7 @@ namespace gtl
     uint64_t timeoutNs = UINT64_MAX
   );
 
-  bool cgpuSubmitCommandBuffer(
+  void cgpuSubmitCommandBuffer(
     CgpuDevice device,
     CgpuCommandBuffer commandBuffer,
     uint32_t signalSemaphoreInfoCount = 0,
@@ -607,26 +607,26 @@ namespace gtl
     CgpuWaitSemaphoreInfo* waitSemaphoreInfos = nullptr
   );
 
-  bool cgpuFlushMappedMemory(
+  void cgpuFlushMappedMemory(
     CgpuDevice device,
     CgpuBuffer buffer,
     uint64_t offset,
     uint64_t size
   );
 
-  bool cgpuInvalidateMappedMemory(
+  void cgpuInvalidateMappedMemory(
     CgpuDevice device,
     CgpuBuffer buffer,
     uint64_t offset,
     uint64_t size
   );
 
-  bool cgpuGetDeviceFeatures(
+  void cgpuGetDeviceFeatures(
     CgpuDevice device,
     CgpuDeviceFeatures& features
   );
 
-  bool cgpuGetDeviceProperties(
+  void cgpuGetDeviceProperties(
     CgpuDevice device,
     CgpuDeviceProperties& limits
   );

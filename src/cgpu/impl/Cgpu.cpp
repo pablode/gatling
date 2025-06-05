@@ -1238,7 +1238,7 @@ namespace gtl
     return true;
   }
 
-  bool cgpuDestroyDevice(CgpuDevice device)
+  void cgpuDestroyDevice(CgpuDevice device)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
@@ -1257,7 +1257,6 @@ namespace gtl
     idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
     iinstance->ideviceStore.free(device.handle);
-    return true;
   }
 
   static void cgpuCreatePipelineLayout(CgpuIDevice* idevice,
@@ -1549,7 +1548,7 @@ namespace gtl
     return true;
   }
 
-  bool cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
+  void cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SHADER(shader, ishader);
@@ -1569,8 +1568,6 @@ namespace gtl
     }
 
     iinstance->ishaderStore.free(shader.handle);
-
-    return true;
   }
 
   static bool cgpuCreateIBuffer(CgpuIDevice* idevice,
@@ -1666,7 +1663,7 @@ namespace gtl
     vmaDestroyBuffer(idevice->allocator, ibuffer->buffer, ibuffer->allocation);
   }
 
-  bool cgpuDestroyBuffer(CgpuDevice device, CgpuBuffer buffer)
+  void cgpuDestroyBuffer(CgpuDevice device, CgpuBuffer buffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
@@ -1674,11 +1671,9 @@ namespace gtl
     cgpuDestroyIBuffer(idevice, ibuffer);
 
     iinstance->ibufferStore.free(buffer.handle);
-
-    return true;
   }
 
-  bool cgpuMapBuffer(CgpuDevice device, CgpuBuffer buffer, void** mappedMem)
+  void cgpuMapBuffer(CgpuDevice device, CgpuBuffer buffer, void** mappedMem)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
@@ -1687,16 +1682,14 @@ namespace gtl
     {
       CGPU_FATAL("failed to map buffer memory");
     }
-    return true;
   }
 
-  bool cgpuUnmapBuffer(CgpuDevice device, CgpuBuffer buffer)
+  void cgpuUnmapBuffer(CgpuDevice device, CgpuBuffer buffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
     vmaUnmapMemory(idevice->allocator, ibuffer->allocation);
-    return true;
   }
 
   static VkDeviceAddress cgpuGetBufferDeviceAddress(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
@@ -1834,7 +1827,7 @@ namespace gtl
     return true;
   }
 
-  bool cgpuDestroyImage(CgpuDevice device, CgpuImage image)
+  void cgpuDestroyImage(CgpuDevice device, CgpuImage image)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_IMAGE(image, iimage);
@@ -1848,8 +1841,6 @@ namespace gtl
     vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
 
     iinstance->iimageStore.free(image.handle);
-
-    return true;
   }
 
   bool cgpuCreateSampler(CgpuDevice device,
@@ -1904,7 +1895,7 @@ namespace gtl
     return true;
   }
 
-  bool cgpuDestroySampler(CgpuDevice device, CgpuSampler sampler)
+  void cgpuDestroySampler(CgpuDevice device, CgpuSampler sampler)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SAMPLER(sampler, isampler);
@@ -1912,8 +1903,6 @@ namespace gtl
     idevice->table.vkDestroySampler(idevice->logicalDevice, isampler->sampler, nullptr);
 
     iinstance->isamplerStore.free(sampler.handle);
-
-    return true;
   }
 
   static void cgpuCreatePipelineDescriptors(CgpuIDevice* idevice,
@@ -2042,7 +2031,7 @@ namespace gtl
     }
   }
 
-  bool cgpuCreateComputePipeline(CgpuDevice device,
+  void cgpuCreateComputePipeline(CgpuDevice device,
                                  CgpuComputePipelineCreateInfo createInfo,
                                  CgpuPipeline* pipeline)
   {
@@ -2100,10 +2089,9 @@ namespace gtl
     ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
 
     pipeline->handle = handle;
-    return true;
   }
 
-  static bool cgpuCreateRtPipelineSbt(CgpuIDevice* idevice,
+  static void cgpuCreateRtPipelineSbt(CgpuIDevice* idevice,
                                       CgpuIPipeline* ipipeline,
                                       uint32_t groupCount,
                                       uint32_t missShaderCount,
@@ -2137,7 +2125,7 @@ namespace gtl
     if (!cgpuCreateIBuffer(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize,
                            properties.shaderGroupBaseAlignment, &ipipeline->sbt, "[SBT]"))
     {
-      CGPU_RETURN_ERROR("failed to create sbt buffer");
+      CGPU_FATAL("failed to create sbt buffer");
     }
 
     VkDeviceAddress sbtDeviceAddress = cgpuGetBufferDeviceAddress(idevice, &ipipeline->sbt);
@@ -2175,10 +2163,9 @@ namespace gtl
     }
 
     vmaUnmapMemory(idevice->allocator, ipipeline->sbt.allocation);
-    return true;
   }
 
-  bool cgpuCreateRtPipeline(CgpuDevice device,
+  void cgpuCreateRtPipeline(CgpuDevice device,
                             CgpuRtPipelineCreateInfo createInfo,
                             CgpuPipeline* pipeline)
   {
@@ -2374,16 +2361,13 @@ namespace gtl
                                                         nullptr,
                                                         &ipipeline->pipeline) != VK_SUCCESS)
       {
-        goto cleanup_fail;
+        CGPU_FATAL("failed to create RT pipeline");
       }
 
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
       // Create the SBT.
-      if (!cgpuCreateRtPipelineSbt(idevice, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount))
-      {
-        goto cleanup_fail;
-      }
+      cgpuCreateRtPipelineSbt(idevice, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
 
       if (iinstance->debugUtilsEnabled && createInfo.debugName)
       {
@@ -2391,21 +2375,10 @@ namespace gtl
       }
 
       pipeline->handle = handle;
-      return true;
     }
-
-cleanup_fail:
-    idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, ipipeline->layout, nullptr);
-    for (uint32_t i = 0; i < ipipeline->descriptorSetCount; i++)
-    {
-      idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
-    }
-    idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
-    iinstance->ipipelineStore.free(handle);
-    CGPU_RETURN_ERROR("failed to create rt pipeline");
   }
 
-  bool cgpuDestroyPipeline(CgpuDevice device, CgpuPipeline pipeline)
+  void cgpuDestroyPipeline(CgpuDevice device, CgpuPipeline pipeline)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
@@ -2423,8 +2396,6 @@ cleanup_fail:
       idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
     }
     iinstance->ipipelineStore.free(pipeline.handle);
-
-    return true;
   }
 
   static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
@@ -2727,7 +2698,7 @@ cleanup_fail:
     return true;
   }
 
-  bool cgpuDestroyBlas(CgpuDevice device, CgpuBlas blas)
+  void cgpuDestroyBlas(CgpuDevice device, CgpuBlas blas)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BLAS(blas, iblas);
@@ -2736,10 +2707,9 @@ cleanup_fail:
     cgpuDestroyIBuffer(idevice, &iblas->buffer);
 
     iinstance->iblasStore.free(blas.handle);
-    return true;
   }
 
-  bool cgpuDestroyTlas(CgpuDevice device, CgpuTlas tlas)
+  void cgpuDestroyTlas(CgpuDevice device, CgpuTlas tlas)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_TLAS(tlas, itlas);
@@ -2749,7 +2719,6 @@ cleanup_fail:
     cgpuDestroyIBuffer(idevice, &itlas->buffer);
 
     iinstance->itlasStore.free(tlas.handle);
-    return true;
   }
 
   bool cgpuCreateCommandBuffer(CgpuDevice device, CgpuCommandBuffer* commandBuffer)
@@ -2781,7 +2750,7 @@ cleanup_fail:
     return true;
   }
 
-  bool cgpuDestroyCommandBuffer(CgpuDevice device, CgpuCommandBuffer commandBuffer)
+  void cgpuDestroyCommandBuffer(CgpuDevice device, CgpuCommandBuffer commandBuffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
@@ -2794,7 +2763,6 @@ cleanup_fail:
     );
 
     iinstance->icommandBufferStore.free(commandBuffer.handle);
-    return true;
   }
 
   bool cgpuBeginCommandBuffer(CgpuCommandBuffer commandBuffer)
@@ -3558,7 +3526,7 @@ cleanup_fail:
     return true;
   }
 
-  bool cgpuDestroySemaphore(CgpuDevice device, CgpuSemaphore semaphore)
+  void cgpuDestroySemaphore(CgpuDevice device, CgpuSemaphore semaphore)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SEMAPHORE(semaphore, isemaphore);
@@ -3570,7 +3538,6 @@ cleanup_fail:
     );
 
     iinstance->isemaphoreStore.free(semaphore.handle);
-    return true;
   }
 
   bool cgpuWaitSemaphores(CgpuDevice device,
@@ -3616,7 +3583,7 @@ cleanup_fail:
     return true;
   }
 
-  bool cgpuSubmitCommandBuffer(CgpuDevice device,
+  void cgpuSubmitCommandBuffer(CgpuDevice device,
                                CgpuCommandBuffer commandBuffer,
                                uint32_t signalSemaphoreInfoCount,
                                CgpuSignalSemaphoreInfo* signalSemaphoreInfos,
@@ -3641,17 +3608,13 @@ cleanup_fail:
           .semaphore = isemaphore->semaphore,
           .value = semaphoreInfos[i].value,
           .stageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-          .deviceIndex = 0, // only relevant if in device group
+          .deviceIndex = 0 // only relevant if in device group
         };
       }
-      return true;
     };
 
-    if (!createSubmitInfos(signalSemaphoreInfoCount, signalSemaphoreInfos, signalSubmitInfos) ||
-        !createSubmitInfos(waitSemaphoreInfoCount, waitSemaphoreInfos, waitSubmitInfos))
-    {
-      CGPU_RETURN_ERROR_INVALID_HANDLE;
-    }
+    createSubmitInfos(signalSemaphoreInfoCount, signalSemaphoreInfos, signalSubmitInfos);
+    createSubmitInfos(waitSemaphoreInfoCount, waitSemaphoreInfos, waitSubmitInfos);
 
     VkCommandBufferSubmitInfo commandBufferSubmitInfo = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO,
@@ -3672,21 +3635,16 @@ cleanup_fail:
       .pSignalSemaphoreInfos = signalSubmitInfos.data()
     };
 
-    VkResult result = idevice->table.vkQueueSubmit2KHR(
-      idevice->computeQueue,
-      1,
-      &submitInfo,
-      VK_NULL_HANDLE
-    );
-
-    if (result != VK_SUCCESS)
+    if (idevice->table.vkQueueSubmit2KHR(idevice->computeQueue,
+                                         1,
+                                         &submitInfo,
+                                         VK_NULL_HANDLE) != VK_SUCCESS)
     {
-      CGPU_RETURN_ERROR("failed to submit command buffer");
+      CGPU_FATAL("failed to submit command buffer");
     }
-    return true;
   }
 
-  bool cgpuFlushMappedMemory(CgpuDevice device,
+  void cgpuFlushMappedMemory(CgpuDevice device,
                              CgpuBuffer buffer,
                              uint64_t offset,
                              uint64_t size)
@@ -3694,20 +3652,16 @@ cleanup_fail:
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    VkResult result = vmaFlushAllocation(
-      idevice->allocator,
-      ibuffer->allocation,
-      offset,
-      (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size
-    );
-
-    if (result != VK_SUCCESS) {
-      CGPU_RETURN_ERROR("failed to flush mapped memory");
+    if (vmaFlushAllocation(idevice->allocator,
+                           ibuffer->allocation,
+                           offset,
+                           (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size) != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to flush mapped memory");
     }
-    return true;
   }
 
-  bool cgpuInvalidateMappedMemory(CgpuDevice device,
+  void cgpuInvalidateMappedMemory(CgpuDevice device,
                                   CgpuBuffer buffer,
                                   uint64_t offset,
                                   uint64_t size)
@@ -3715,30 +3669,24 @@ cleanup_fail:
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    VkResult result = vmaInvalidateAllocation(
-      idevice->allocator,
-      ibuffer->allocation,
-      offset,
-      (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size
-    );
-
-    if (result != VK_SUCCESS) {
-      CGPU_RETURN_ERROR("failed to invalidate mapped memory");
+    if (vmaInvalidateAllocation(idevice->allocator,
+                                ibuffer->allocation,
+                                offset,
+                                (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size) != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to invalidate mapped memory");
     }
-    return true;
   }
 
-  bool cgpuGetDeviceFeatures(CgpuDevice device, CgpuDeviceFeatures& features)
+  void cgpuGetDeviceFeatures(CgpuDevice device, CgpuDeviceFeatures& features)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     memcpy(&features, &idevice->features, sizeof(CgpuDeviceFeatures));
-    return true;
   }
 
-  bool cgpuGetDeviceProperties(CgpuDevice device, CgpuDeviceProperties& properties)
+  void cgpuGetDeviceProperties(CgpuDevice device, CgpuDeviceProperties& properties)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     memcpy(&properties, &idevice->properties, sizeof(CgpuDeviceProperties));
-    return true;
   }
 }

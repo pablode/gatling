@@ -113,7 +113,9 @@ namespace gtl
 
     m_hostBuffer.resize(newSize, commandBuffer);
 
-    return cgpuMapBuffer(device, m_hostBuffer.buffer(), (void**) &m_mappedHostMem);
+    cgpuMapBuffer(device, m_hostBuffer.buffer(), (void**) &m_mappedHostMem);
+
+    return true;
   }
 
   bool GgpuSyncBuffer::commitChanges()

@@ -377,11 +377,8 @@ namespace gtl
     if (!cgpuCreateDevice(&s_device))
       goto fail;
 
-    if (!cgpuGetDeviceFeatures(s_device, s_deviceFeatures))
-      goto fail;
-
-    if (!cgpuGetDeviceProperties(s_device, s_deviceProperties))
-      goto fail;
+    cgpuGetDeviceFeatures(s_device, s_deviceFeatures);
+    cgpuGetDeviceProperties(s_device, s_deviceProperties);
 
     if (!cgpuCreateSampler(s_device, {
                             .addressModeU = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -1709,18 +1706,15 @@ cleanup:
       GB_LOG("creating RT pipeline..");
       fflush(stdout);
 
-      if (!cgpuCreateRtPipeline(s_device, {
-                                  .rgenShader = rgenShader,
-                                  .missShaderCount = (uint32_t) missShaders.size(),
-                                  .missShaders = missShaders.data(),
-                                  .hitGroupCount = (uint32_t) hitGroups.size(),
-                                  .hitGroups = hitGroups.data(),
-                                  .maxRayPayloadSize = maxRayPayloadSize,
-                                  .maxRayHitAttributeSize = maxRayHitAttributeSize
-                                }, &pipeline))
-      {
-        goto cleanup;
-      }
+      cgpuCreateRtPipeline(s_device, {
+        .rgenShader = rgenShader,
+        .missShaderCount = (uint32_t)missShaders.size(),
+        .missShaders = missShaders.data(),
+        .hitGroupCount = (uint32_t)hitGroups.size(),
+        .hitGroups = hitGroups.data(),
+        .maxRayPayloadSize = maxRayPayloadSize,
+        .maxRayHitAttributeSize = maxRayHitAttributeSize
+      }, &pipeline);
     }
 
     // Assign GPU data to materials.
@@ -2341,8 +2335,7 @@ cleanup:
 
         cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
 
-        if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
-          goto cleanup;
+        cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE);
       }
 
       CgpuPipelineBarrier postBarrier = {
@@ -2360,8 +2353,7 @@ cleanup:
       goto cleanup;
 
     signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-    if (!cgpuSubmitCommandBuffer(s_device, commandBuffer, 1, &signalSemaphoreInfo))
-      goto cleanup;
+    cgpuSubmitCommandBuffer(s_device, commandBuffer, 1, &signalSemaphoreInfo);
 
     waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
     if (!cgpuWaitSemaphores(s_device, 1, &waitSemaphoreInfo))
@@ -2868,12 +2860,7 @@ cleanup:
     }
 
     void* mappedMem;
-    if (!cgpuMapBuffer(s_device, hostMem, &mappedMem))
-    {
-      cgpuDestroyBuffer(s_device, hostMem);
-      cgpuDestroyBuffer(s_device, deviceMem);
-      return nullptr;
-    }
+    cgpuMapBuffer(s_device, hostMem, &mappedMem);
 
     return new GiRenderBuffer {
       .deviceMem = deviceMem,
