@@ -235,7 +235,7 @@ namespace gtl
 
   bool s_cgpuInitialized = false;
   CgpuDevice s_device;
-  CgpuPhysicalDeviceFeatures s_deviceFeatures;
+  CgpuDeviceFeatures s_deviceFeatures;
   CgpuDeviceProperties s_deviceProperties;
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
@@ -377,7 +377,7 @@ namespace gtl
     if (!cgpuCreateDevice(&s_device))
       goto fail;
 
-    if (!cgpuGetPhysicalDeviceFeatures(s_device, s_deviceFeatures))
+    if (!cgpuGetDeviceFeatures(s_device, s_deviceFeatures))
       goto fail;
 
     if (!cgpuGetDeviceProperties(s_device, s_deviceProperties))

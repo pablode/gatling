@@ -104,13 +104,21 @@ namespace gtl
     float    timestampPeriod;
   };
 
+  struct CgpuIDeviceFeatures
+  {
+    bool pageableDeviceLocalMemory;
+    bool pipelineLibraries;
+    bool rayTracingValidation;
+  };
+
   struct CgpuIDevice
   {
     VmaAllocator               allocator;
     VmaPool                    asScratchMemoryPool;
     VkQueue                    computeQueue;
     VkCommandPool              commandPool;
-    CgpuPhysicalDeviceFeatures features;
+    CgpuDeviceFeatures         features;
+    CgpuIDeviceFeatures        internalFeatures;
     CgpuIDeviceProperties      internalProperties;
     VkDevice                   logicalDevice;
     VkPhysicalDevice           physicalDevice;
@@ -290,30 +298,6 @@ namespace gtl
 #define CGPU_RESOLVE_TLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
 
   /* Helper methods. */
-
-  static CgpuPhysicalDeviceFeatures cgpuTranslatePhysicalDeviceFeatures(const VkPhysicalDeviceFeatures& vkFeatures)
-  {
-    return CgpuPhysicalDeviceFeatures {
-      .pipelineStatisticsQuery = bool(vkFeatures.pipelineStatisticsQuery),
-      .shaderFloat64 = bool(vkFeatures.shaderFloat64),
-      .shaderImageGatherExtended = bool(vkFeatures.shaderImageGatherExtended),
-      .shaderInt16 = bool(vkFeatures.shaderInt16),
-      .shaderInt64 = bool(vkFeatures.shaderInt64),
-      .shaderSampledImageArrayDynamicIndexing = bool(vkFeatures.shaderSampledImageArrayDynamicIndexing),
-      .shaderStorageBufferArrayDynamicIndexing = bool(vkFeatures.shaderStorageBufferArrayDynamicIndexing),
-      .shaderStorageImageArrayDynamicIndexing = bool(vkFeatures.shaderStorageImageArrayDynamicIndexing),
-      .shaderStorageImageExtendedFormats = bool(vkFeatures.shaderStorageImageExtendedFormats),
-      .shaderStorageImageReadWithoutFormat = bool(vkFeatures.shaderStorageImageReadWithoutFormat),
-      .shaderStorageImageWriteWithoutFormat = bool(vkFeatures.shaderStorageImageWriteWithoutFormat),
-      .shaderUniformBufferArrayDynamicIndexing = bool(vkFeatures.shaderUniformBufferArrayDynamicIndexing),
-      .sparseBinding = bool(vkFeatures.sparseBinding),
-      .sparseResidencyAliased = bool(vkFeatures.sparseResidencyAliased),
-      .sparseResidencyBuffer = bool(vkFeatures.sparseResidencyBuffer),
-      .sparseResidencyImage2D = bool(vkFeatures.sparseResidencyImage2D),
-      .sparseResidencyImage3D = bool(vkFeatures.sparseResidencyImage3D),
-      .textureCompressionBC = bool(vkFeatures.textureCompressionBC)
-    };
-  }
 
   static CgpuDeviceProperties cgpuTranslateDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
                                                             const VkPhysicalDeviceSubgroupProperties& vkSubgroupProps,
@@ -698,7 +682,14 @@ namespace gtl
 
     VkPhysicalDeviceFeatures features;
     vkGetPhysicalDeviceFeatures(idevice->physicalDevice, &features);
-    idevice->features = cgpuTranslatePhysicalDeviceFeatures(features);
+
+    idevice->features = CgpuDeviceFeatures {
+      // partly filled below
+      .shaderFloat64 = bool(features.shaderFloat64),
+      .shaderInt16 = bool(features.shaderInt16),
+      .textureCompressionBC = bool(features.textureCompressionBC)
+    };
+    idevice->internalFeatures = {}; // same
 
     VkPhysicalDeviceAccelerationStructurePropertiesKHR asProperties = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
@@ -790,14 +781,14 @@ namespace gtl
       if (enableOptionalExtension(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) &&
           enableOptionalExtension(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME))
       {
-        idevice->features.pipelineLibraries = true;
+        idevice->internalFeatures.pipelineLibraries = true;
       }
     }
 
     if (enableOptionalExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) &&
         enableOptionalExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME))
     {
-      idevice->features.pageableDeviceLocalMemory = true;
+      idevice->internalFeatures.pageableDeviceLocalMemory = true;
     }
 
     const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
@@ -824,7 +815,7 @@ namespace gtl
     // This feature requires env var NV_ALLOW_RAYTRACING_VALIDATION=1 to be set.
     if (iinstance->debugUtilsEnabled && enableOptionalExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
     {
-      idevice->features.rayTracingValidation = true;
+      idevice->internalFeatures.rayTracingValidation = true;
     }
 #endif
 
@@ -858,7 +849,7 @@ namespace gtl
       .pageableDeviceLocalMemory = VK_TRUE,
     };
 
-    if (idevice->features.pageableDeviceLocalMemory)
+    if (idevice->internalFeatures.pageableDeviceLocalMemory)
     {
       pNext = &pageableMemoryFeatures;
     }
@@ -881,7 +872,7 @@ namespace gtl
       .rayTracingValidation = VK_TRUE
     };
 
-    if (idevice->features.rayTracingValidation)
+    if (idevice->internalFeatures.rayTracingValidation)
     {
       pNext = &rayTracingValidationFeatures;
     }
@@ -903,7 +894,7 @@ namespace gtl
       .pipelineLibraryGroupHandles = VK_TRUE
     };
 
-    if (idevice->features.pipelineLibraries)
+    if (idevice->internalFeatures.pipelineLibraries)
     {
       pNext = &libraryGroupHandleFeatures;
     }
@@ -1487,7 +1478,7 @@ namespace gtl
      .pCode = (uint32_t*) createInfo.source,
     };
 
-    if (!idevice->features.pipelineLibraries || createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_COMPUTE)
+    if (!idevice->internalFeatures.pipelineLibraries || createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_COMPUTE)
     {
       VkResult result = idevice->table.vkCreateShaderModule(
         idevice->logicalDevice,
@@ -2262,7 +2253,7 @@ namespace gtl
     // Collect pipeline libraries OR stages.
     std::vector<VkPipeline> libraries;
     std::vector<VkPipelineShaderStageCreateInfo> stages;
-    if (idevice->features.pipelineLibraries)
+    if (idevice->internalFeatures.pipelineLibraries)
     {
       libraries.reserve(groupCount * 2);
 
@@ -2367,8 +2358,8 @@ namespace gtl
         .groupCount = (uint32_t) groups.size(),
         .pGroups = groups.data(),
         .maxPipelineRayRecursionDepth = 1,
-        .pLibraryInfo = idevice->features.pipelineLibraries ? &libraryCreateInfo : nullptr,
-        .pLibraryInterface = idevice->features.pipelineLibraries ? &interfaceCreateInfo : nullptr,
+        .pLibraryInfo = idevice->internalFeatures.pipelineLibraries ? &libraryCreateInfo : nullptr,
+        .pLibraryInterface = idevice->internalFeatures.pipelineLibraries ? &interfaceCreateInfo : nullptr,
         .pDynamicState = nullptr,
         .layout = ipipeline->layout,
         .basePipelineHandle = VK_NULL_HANDLE,
@@ -3737,16 +3728,14 @@ cleanup_fail:
     return true;
   }
 
-  bool cgpuGetPhysicalDeviceFeatures(CgpuDevice device,
-                                     CgpuPhysicalDeviceFeatures& features)
+  bool cgpuGetDeviceFeatures(CgpuDevice device, CgpuDeviceFeatures& features)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    memcpy(&features, &idevice->features, sizeof(CgpuPhysicalDeviceFeatures));
+    memcpy(&features, &idevice->features, sizeof(CgpuDeviceFeatures));
     return true;
   }
 
-  bool cgpuGetDeviceProperties(CgpuDevice device,
-                               CgpuDeviceProperties& properties)
+  bool cgpuGetDeviceProperties(CgpuDevice device, CgpuDeviceProperties& properties)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
     memcpy(&properties, &idevice->properties, sizeof(CgpuDeviceProperties));

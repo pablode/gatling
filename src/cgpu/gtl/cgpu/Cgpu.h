@@ -300,31 +300,13 @@ namespace gtl
     const CgpuImageMemoryBarrier* imageBarriers = nullptr;
   };
 
-  struct CgpuPhysicalDeviceFeatures
+  struct CgpuDeviceFeatures
   {
     bool debugPrintf;
-    bool pageableDeviceLocalMemory;
-    bool pipelineLibraries;
-    bool pipelineStatisticsQuery;
     bool rayTracingInvocationReorder;
-    bool rayTracingValidation;
     bool shaderClock;
     bool shaderFloat64;
-    bool shaderImageGatherExtended;
     bool shaderInt16;
-    bool shaderInt64;
-    bool shaderSampledImageArrayDynamicIndexing;
-    bool shaderStorageBufferArrayDynamicIndexing;
-    bool shaderStorageImageArrayDynamicIndexing;
-    bool shaderStorageImageExtendedFormats;
-    bool shaderStorageImageReadWithoutFormat;
-    bool shaderStorageImageWriteWithoutFormat;
-    bool shaderUniformBufferArrayDynamicIndexing;
-    bool sparseBinding;
-    bool sparseResidencyAliased;
-    bool sparseResidencyBuffer;
-    bool sparseResidencyImage2D;
-    bool sparseResidencyImage3D;
     bool textureCompressionBC;
   };
 
@@ -639,9 +621,9 @@ namespace gtl
     uint64_t size
   );
 
-  bool cgpuGetPhysicalDeviceFeatures(
+  bool cgpuGetDeviceFeatures(
     CgpuDevice device,
-    CgpuPhysicalDeviceFeatures& features
+    CgpuDeviceFeatures& features
   );
 
   bool cgpuGetDeviceProperties(
