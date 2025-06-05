@@ -3358,18 +3358,18 @@ cleanup_fail:
   }
 
   void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
-                       uint32_t dim_x,
-                       uint32_t dim_y,
-                       uint32_t dim_z)
+                       uint32_t dimX,
+                       uint32_t dimY,
+                       uint32_t dimZ)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
     idevice->table.vkCmdDispatch(
       icommandBuffer->commandBuffer,
-      dim_x,
-      dim_y,
-      dim_z
+      dimX,
+      dimY,
+      dimZ
     );
   }
 

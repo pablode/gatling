@@ -1244,7 +1244,7 @@ fail_cleanup:
 
       if (!instanceIds.empty() && !s_stager->stageToBuffer((uint8_t*) instanceIds.data(), bufferSize, instanceIdsBuffer))
       {
-        GB_ERROR("failed to upload addresses to instance IDs buffer");
+        GB_ERROR("failed to upload instance IDs");
         goto cleanup;
       }
     }
