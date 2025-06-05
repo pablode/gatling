@@ -236,7 +236,7 @@ namespace gtl
   bool s_cgpuInitialized = false;
   CgpuDevice s_device;
   CgpuPhysicalDeviceFeatures s_deviceFeatures;
-  CgpuPhysicalDeviceProperties s_deviceProperties;
+  CgpuDeviceProperties s_deviceProperties;
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
   std::unique_ptr<GgpuDelayedResourceDestroyer> s_delayedResourceDestroyer;
@@ -380,7 +380,7 @@ namespace gtl
     if (!cgpuGetPhysicalDeviceFeatures(s_device, s_deviceFeatures))
       goto fail;
 
-    if (!cgpuGetPhysicalDeviceProperties(s_device, s_deviceProperties))
+    if (!cgpuGetDeviceProperties(s_device, s_deviceProperties))
       goto fail;
 
     if (!cgpuCreateSampler(s_device, {

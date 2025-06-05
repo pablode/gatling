@@ -328,69 +328,12 @@ namespace gtl
     bool textureCompressionBC;
   };
 
-  struct CgpuPhysicalDeviceProperties
+  struct CgpuDeviceProperties
   {
-    uint64_t bufferImageGranularity;
-    uint32_t discreteQueuePriorities;
-    uint32_t maxBoundDescriptorSets;
     uint32_t maxComputeSharedMemorySize;
-    uint32_t maxComputeWorkGroupCount[3];
-    uint32_t maxComputeWorkGroupInvocations;
-    uint32_t maxComputeWorkGroupSize[3];
-    uint32_t maxDescriptorSetInputAttachments;
-    uint32_t maxDescriptorSetSampledImages;
-    uint32_t maxDescriptorSetSamplers;
-    uint32_t maxDescriptorSetStorageBuffers;
-    uint32_t maxDescriptorSetStorageBuffersDynamic;
-    uint32_t maxDescriptorSetStorageImages;
-    uint32_t maxDescriptorSetUniformBuffers;
-    uint32_t maxDescriptorSetUniformBuffersDynamic;
-    uint32_t maxImageArrayLayers;
-    uint32_t maxImageDimension1D;
-    uint32_t maxImageDimension2D;
-    uint32_t maxImageDimension3D;
-    uint32_t maxImageDimensionCube;
-    float    maxInterpolationOffset;
-    uint32_t maxMemoryAllocationCount;
-    uint32_t maxPerStageDescriptorInputAttachments;
-    uint32_t maxPerStageDescriptorSampledImages;
-    uint32_t maxPerStageDescriptorSamplers;
-    uint32_t maxPerStageDescriptorStorageBuffers;
-    uint32_t maxPerStageDescriptorStorageImages;
-    uint32_t maxPerStageDescriptorUniformBuffers;
-    uint32_t maxPerStageResources;
     uint32_t maxPushConstantsSize;
-    uint32_t maxRayDispatchInvocationCount;
     uint32_t maxRayHitAttributeSize;
-    uint32_t maxSampleMaskWords;
-    uint32_t maxSamplerAllocationCount;
-    float    maxSamplerAnisotropy;
-    float    maxSamplerLodBias;
-    uint32_t maxShaderGroupStride;
-    uint32_t maxStorageBufferRange;
-    uint32_t maxTexelGatherOffset;
-    uint32_t maxTexelOffset;
-    uint32_t maxUniformBufferRange;
-    uint64_t minAccelerationStructureScratchOffsetAlignment;
-    float    minInterpolationOffset;
-    size_t   minMemoryMapAlignment;
-    uint64_t minStorageBufferOffsetAlignment;
-    int32_t  minTexelGatherOffset;
-    int32_t  minTexelOffset;
-    uint64_t minUniformBufferOffsetAlignment;
-    uint32_t mipmapPrecisionBits;
-    uint64_t nonCoherentAtomSize;
-    uint64_t optimalBufferCopyOffsetAlignment;
-    uint64_t optimalBufferCopyRowPitchAlignment;
-    uint32_t shaderGroupBaseAlignment;
-    uint32_t shaderGroupHandleAlignment;
-    uint32_t shaderGroupHandleCaptureReplaySize;
-    uint32_t shaderGroupHandleSize;
-    uint64_t sparseAddressSpaceSize;
-    uint32_t subPixelInterpolationOffsetBits;
     uint32_t subgroupSize;
-    bool     timestampComputeAndGraphics;
-    float    timestampPeriod;
   };
 
   struct CgpuWaitSemaphoreInfo
@@ -701,8 +644,8 @@ namespace gtl
     CgpuPhysicalDeviceFeatures& features
   );
 
-  bool cgpuGetPhysicalDeviceProperties(
+  bool cgpuGetDeviceProperties(
     CgpuDevice device,
-    CgpuPhysicalDeviceProperties& limits
+    CgpuDeviceProperties& limits
   );
 }

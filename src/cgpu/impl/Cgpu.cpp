@@ -91,19 +91,33 @@ namespace gtl
 
   /* Internal structures. */
 
+  struct CgpuIDeviceProperties
+  {
+    uint64_t minAccelerationStructureScratchOffsetAlignment;
+    size_t   minMemoryMapAlignment;
+    uint64_t minStorageBufferOffsetAlignment;
+    uint64_t optimalBufferCopyOffsetAlignment;
+    uint64_t optimalBufferCopyRowPitchAlignment;
+    uint32_t shaderGroupBaseAlignment;
+    uint32_t shaderGroupHandleAlignment;
+    uint32_t shaderGroupHandleSize;
+    float    timestampPeriod;
+  };
+
   struct CgpuIDevice
   {
-    VmaAllocator                 allocator;
-    VmaPool                      asScratchMemoryPool;
-    VkQueue                      computeQueue;
-    VkCommandPool                commandPool;
-    CgpuPhysicalDeviceFeatures   features;
-    VkDevice                     logicalDevice;
-    VkPhysicalDevice             physicalDevice;
-    VkPipelineCache              pipelineCache;
-    CgpuPhysicalDeviceProperties properties;
-    VolkDeviceTable              table;
-    VkQueryPool                  timestampPool;
+    VmaAllocator               allocator;
+    VmaPool                    asScratchMemoryPool;
+    VkQueue                    computeQueue;
+    VkCommandPool              commandPool;
+    CgpuPhysicalDeviceFeatures features;
+    CgpuIDeviceProperties      internalProperties;
+    VkDevice                   logicalDevice;
+    VkPhysicalDevice           physicalDevice;
+    VkPipelineCache            pipelineCache;
+    CgpuDeviceProperties       properties;
+    VolkDeviceTable            table;
+    VkQueryPool                timestampPool;
   };
 
   struct CgpuIBuffer
@@ -301,72 +315,31 @@ namespace gtl
     };
   }
 
-  static CgpuPhysicalDeviceProperties cgpuTranslatePhysicalDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
-                                                                            const VkPhysicalDeviceSubgroupProperties& vkSubgroupProps,
-                                                                            const VkPhysicalDeviceAccelerationStructurePropertiesKHR& vkAsProps,
-                                                                            const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps)
+  static CgpuDeviceProperties cgpuTranslateDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
+                                                            const VkPhysicalDeviceSubgroupProperties& vkSubgroupProps,
+                                                            const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps)
   {
-    return CgpuPhysicalDeviceProperties {
-      .bufferImageGranularity = vkLimits.bufferImageGranularity,
-      .discreteQueuePriorities = vkLimits.discreteQueuePriorities,
-      .maxBoundDescriptorSets = vkLimits.maxBoundDescriptorSets,
+    return CgpuDeviceProperties {
       .maxComputeSharedMemorySize = vkLimits.maxComputeSharedMemorySize,
-      .maxComputeWorkGroupCount = { vkLimits.maxComputeWorkGroupCount[0], vkLimits.maxComputeWorkGroupCount[1], vkLimits.maxComputeWorkGroupCount[2] },
-      .maxComputeWorkGroupInvocations = vkLimits.maxComputeWorkGroupInvocations,
-      .maxComputeWorkGroupSize = { vkLimits.maxComputeWorkGroupSize[0], vkLimits.maxComputeWorkGroupSize[1], vkLimits.maxComputeWorkGroupSize[2] },
-      .maxDescriptorSetInputAttachments = vkLimits.maxDescriptorSetInputAttachments,
-      .maxDescriptorSetSampledImages = vkLimits.maxDescriptorSetSampledImages,
-      .maxDescriptorSetSamplers = vkLimits.maxDescriptorSetSamplers,
-      .maxDescriptorSetStorageBuffers = vkLimits.maxDescriptorSetStorageBuffers,
-      .maxDescriptorSetStorageBuffersDynamic = vkLimits.maxDescriptorSetStorageBuffersDynamic,
-      .maxDescriptorSetStorageImages = vkLimits.maxDescriptorSetStorageImages,
-      .maxDescriptorSetUniformBuffers = vkLimits.maxDescriptorSetUniformBuffers,
-      .maxDescriptorSetUniformBuffersDynamic = vkLimits.maxDescriptorSetUniformBuffersDynamic,
-      .maxImageArrayLayers = vkLimits.maxImageArrayLayers,
-      .maxImageDimension1D = vkLimits.maxImageDimension1D,
-      .maxImageDimension2D = vkLimits.maxImageDimension2D,
-      .maxImageDimension3D = vkLimits.maxImageDimension3D,
-      .maxImageDimensionCube = vkLimits.maxImageDimensionCube,
-      .maxInterpolationOffset = vkLimits.maxInterpolationOffset,
-      .maxMemoryAllocationCount = vkLimits.maxMemoryAllocationCount,
-      .maxPerStageDescriptorInputAttachments = vkLimits.maxPerStageDescriptorInputAttachments,
-      .maxPerStageDescriptorSampledImages = vkLimits.maxPerStageDescriptorSampledImages,
-      .maxPerStageDescriptorSamplers = vkLimits.maxPerStageDescriptorSamplers,
-      .maxPerStageDescriptorStorageBuffers = vkLimits.maxPerStageDescriptorStorageBuffers,
-      .maxPerStageDescriptorStorageImages = vkLimits.maxPerStageDescriptorStorageImages,
-      .maxPerStageDescriptorUniformBuffers = vkLimits.maxPerStageDescriptorUniformBuffers,
-      .maxPerStageResources = vkLimits.maxPerStageResources,
       .maxPushConstantsSize = vkLimits.maxPushConstantsSize,
-      .maxRayDispatchInvocationCount = vkRtPipelineProps.maxRayDispatchInvocationCount,
       .maxRayHitAttributeSize = vkRtPipelineProps.maxRayHitAttributeSize,
-      .maxSampleMaskWords = vkLimits.maxSampleMaskWords,
-      .maxSamplerAllocationCount = vkLimits.maxSamplerAllocationCount,
-      .maxSamplerAnisotropy = vkLimits.maxSamplerAnisotropy,
-      .maxSamplerLodBias = vkLimits.maxSamplerLodBias,
-      .maxShaderGroupStride = vkRtPipelineProps.maxShaderGroupStride,
-      .maxStorageBufferRange = vkLimits.maxStorageBufferRange,
-      .maxTexelGatherOffset = vkLimits.maxTexelGatherOffset,
-      .maxTexelOffset = vkLimits.maxTexelOffset,
-      .maxUniformBufferRange = vkLimits.maxUniformBufferRange,
+      .subgroupSize = vkSubgroupProps.subgroupSize
+    };
+  }
+
+  static CgpuIDeviceProperties cgpuTranslateInternalDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
+                                                                     const VkPhysicalDeviceAccelerationStructurePropertiesKHR& vkAsProps,
+                                                                     const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps)
+  {
+    return CgpuIDeviceProperties {
       .minAccelerationStructureScratchOffsetAlignment = vkAsProps.minAccelerationStructureScratchOffsetAlignment,
-      .minInterpolationOffset = vkLimits.minInterpolationOffset,
       .minMemoryMapAlignment = vkLimits.minMemoryMapAlignment,
       .minStorageBufferOffsetAlignment = vkLimits.minStorageBufferOffsetAlignment,
-      .minTexelGatherOffset = vkLimits.minTexelGatherOffset,
-      .minTexelOffset = vkLimits.minTexelOffset,
-      .minUniformBufferOffsetAlignment = vkLimits.minUniformBufferOffsetAlignment,
-      .mipmapPrecisionBits = vkLimits.mipmapPrecisionBits,
-      .nonCoherentAtomSize = vkLimits.nonCoherentAtomSize,
       .optimalBufferCopyOffsetAlignment = vkLimits.optimalBufferCopyOffsetAlignment,
       .optimalBufferCopyRowPitchAlignment = vkLimits.optimalBufferCopyRowPitchAlignment,
       .shaderGroupBaseAlignment = vkRtPipelineProps.shaderGroupBaseAlignment,
       .shaderGroupHandleAlignment = vkRtPipelineProps.shaderGroupHandleAlignment,
-      .shaderGroupHandleCaptureReplaySize = vkRtPipelineProps.shaderGroupHandleCaptureReplaySize,
       .shaderGroupHandleSize = vkRtPipelineProps.shaderGroupHandleSize,
-      .sparseAddressSpaceSize = vkLimits.sparseAddressSpaceSize,
-      .subPixelInterpolationOffsetBits = vkLimits.subPixelInterpolationOffsetBits,
-      .subgroupSize = vkSubgroupProps.subgroupSize,
-      .timestampComputeAndGraphics = bool(vkLimits.timestampComputeAndGraphics),
       .timestampPeriod = vkLimits.timestampPeriod
     };
   }
@@ -783,8 +756,8 @@ namespace gtl
       return false;
     }
 
-    const VkPhysicalDeviceLimits* limits = &deviceProperties.properties.limits;
-    idevice->properties = cgpuTranslatePhysicalDeviceProperties(*limits, subgroupProperties, asProperties, rtPipelineProperties);
+    idevice->properties = cgpuTranslateDeviceProperties(limits, subgroupProperties, rtPipelineProperties);
+    idevice->internalProperties = cgpuTranslateInternalDeviceProperties(limits, asProperties, rtPipelineProperties);
 
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(idevice->physicalDevice, nullptr, &extensionCount, nullptr);
@@ -1232,7 +1205,7 @@ namespace gtl
     result = cgpuCreateMemoryPool(idevice->asScratchMemoryPool, idevice->allocator,
                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                                   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                  idevice->properties.minAccelerationStructureScratchOffsetAlignment);
+                                  idevice->internalProperties.minAccelerationStructureScratchOffsetAlignment);
 
     if (result != VK_SUCCESS)
     {
@@ -1641,7 +1614,7 @@ namespace gtl
 
     if (bool(memoryProperties & CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE))
     {
-      newAlignment = cgpuPadToAlignment(newAlignment, idevice->properties.minMemoryMapAlignment);
+      newAlignment = cgpuPadToAlignment(newAlignment, idevice->internalProperties.minMemoryMapAlignment);
     }
 
     VkResult result = vmaCreateBufferWithAlignment(
@@ -2145,15 +2118,17 @@ namespace gtl
                                       uint32_t missShaderCount,
                                       uint32_t hitGroupCount)
   {
-    uint32_t handleSize = idevice->properties.shaderGroupHandleSize;
-    uint32_t alignedHandleSize = cgpuPadToAlignment(handleSize, idevice->properties.shaderGroupHandleAlignment);
+    const CgpuIDeviceProperties& properties = idevice->internalProperties;
 
-    ipipeline->sbtRgen.stride = cgpuPadToAlignment(alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    uint32_t handleSize = properties.shaderGroupHandleSize;
+    uint32_t alignedHandleSize = cgpuPadToAlignment(handleSize, properties.shaderGroupHandleAlignment);
+
+    ipipeline->sbtRgen.stride = cgpuPadToAlignment(alignedHandleSize, properties.shaderGroupBaseAlignment);
     ipipeline->sbtRgen.size = ipipeline->sbtRgen.stride; // Special raygen condition: size must be equal to stride
     ipipeline->sbtMiss.stride = alignedHandleSize;
-    ipipeline->sbtMiss.size = cgpuPadToAlignment(missShaderCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtMiss.size = cgpuPadToAlignment(missShaderCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
     ipipeline->sbtHit.stride = alignedHandleSize;
-    ipipeline->sbtHit.size = cgpuPadToAlignment(hitGroupCount * alignedHandleSize, idevice->properties.shaderGroupBaseAlignment);
+    ipipeline->sbtHit.size = cgpuPadToAlignment(hitGroupCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
 
     uint32_t firstGroup = 0;
     uint32_t dataSize = handleSize * groupCount;
@@ -2169,7 +2144,7 @@ namespace gtl
     CgpuMemoryPropertyFlags bufferMemPropFlags = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
 
     if (!cgpuCreateIBuffer(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize,
-                           idevice->properties.shaderGroupBaseAlignment, &ipipeline->sbt, "[SBT]"))
+                           properties.shaderGroupBaseAlignment, &ipipeline->sbt, "[SBT]"))
     {
       CGPU_RETURN_ERROR("failed to create sbt buffer");
     }
@@ -2535,7 +2510,7 @@ cleanup_fail:
                            CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
                            CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                            asBuildSizesInfo.buildScratchSize,
-                           idevice->properties.minAccelerationStructureScratchOffsetAlignment,
+                           idevice->internalProperties.minAccelerationStructureScratchOffsetAlignment,
                            &iscratchBuffer, "[AS scratch buffer]",
                            idevice->asScratchMemoryPool))
     {
@@ -3069,7 +3044,7 @@ cleanup_fail:
 
           CGPU_RESOLVE_BUFFER(bufferBinding->buffer, ibuffer);
 
-          if ((bufferBinding->offset % idevice->properties.minStorageBufferOffsetAlignment) != 0)
+          if ((bufferBinding->offset % idevice->internalProperties.minStorageBufferOffsetAlignment) != 0)
           {
             CGPU_FATAL("buffer binding offset not aligned");
           }
@@ -3770,11 +3745,11 @@ cleanup_fail:
     return true;
   }
 
-  bool cgpuGetPhysicalDeviceProperties(CgpuDevice device,
-                                       CgpuPhysicalDeviceProperties& properties)
+  bool cgpuGetDeviceProperties(CgpuDevice device,
+                               CgpuDeviceProperties& properties)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    memcpy(&properties, &idevice->properties, sizeof(CgpuPhysicalDeviceProperties));
+    memcpy(&properties, &idevice->properties, sizeof(CgpuDeviceProperties));
     return true;
   }
 }
