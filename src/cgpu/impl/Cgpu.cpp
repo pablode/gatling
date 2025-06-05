@@ -93,7 +93,7 @@ namespace gtl
 
   struct CgpuIDeviceProperties
   {
-    uint64_t minAccelerationStructureScratchOffsetAlignment;
+    uint32_t minAccelerationStructureScratchOffsetAlignment;
     size_t   minMemoryMapAlignment;
     uint64_t minStorageBufferOffsetAlignment;
     uint64_t optimalBufferCopyOffsetAlignment;
@@ -606,12 +606,12 @@ namespace gtl
         }
       }
 
-      score += vramSize / uint64_t(1024 * 1024 * 1024); // bytes to gigabytes
+      score += int(vramSize / uint64_t(1024 * 1024 * 1024)); // bytes to gigabytes
 
       if (score > bestScore)
       {
         bestScore = score;
-        bestGpu = i;
+        bestGpu = int(i);
       }
     }
 
