@@ -489,17 +489,6 @@ namespace gtl
     CgpuImage image
   );
 
-  bool cgpuMapImage(
-    CgpuDevice device,
-    CgpuImage image,
-    void** mappedMem
-  );
-
-  bool cgpuUnmapImage(
-    CgpuDevice device,
-    CgpuImage image
-  );
-
   bool cgpuCreateSampler(
     CgpuDevice device,
     CgpuSamplerCreateInfo createInfo,
