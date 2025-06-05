@@ -1633,6 +1633,11 @@ namespace gtl
 
     size_t newAlignment = cgpuPadToAlignment(alignment, BASE_ALIGNMENT); // for performance
 
+    if (bool(memoryProperties & CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE))
+    {
+      newAlignment = cgpuPadToAlignment(newAlignment, idevice->properties.minMemoryMapAlignment);
+    }
+
     VkResult result = vmaCreateBufferWithAlignment(
       idevice->allocator,
       &bufferInfo,
