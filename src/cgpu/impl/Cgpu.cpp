@@ -745,6 +745,12 @@ namespace gtl
     };
 
     vkGetPhysicalDeviceProperties2(idevice->physicalDevice, &deviceProperties);
+    const VkPhysicalDeviceLimits& limits = deviceProperties.properties.limits;
+
+    if (!limits.timestampComputeAndGraphics)
+    {
+      CGPU_FATAL("timestampComputeAndGraphics device limit not supported");
+    }
 
     GB_LOG("Vulkan device properties:");
     uint32_t apiVersion = deviceProperties.properties.apiVersion;
