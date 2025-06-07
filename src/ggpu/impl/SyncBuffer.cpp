@@ -36,7 +36,7 @@ namespace gtl
                      CgpuMemoryProperties::DeviceLocal)
     , m_hostBuffer(m_device,
                    delayedResourceDestroyer,
-                   CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
+                   CgpuBufferUsage::TransferSrc,
                    CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent)
   {
   }
