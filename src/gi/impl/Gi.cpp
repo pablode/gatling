@@ -928,7 +928,14 @@ fail:
           }
 
           uint64_t newPayloadBufferSize = payloadBufferSize;
-          uint32_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
+          uint64_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
+
+          if (sceneDataOffset >= UINT32_MAX)
+          {
+            GB_ERROR("scene data too large");
+            preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
+            continue;
+          }
 
           if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset || sceneDataOffset == rp::SCENE_DATA_OFFSET_MASK)
           {
@@ -938,7 +945,7 @@ fail:
           }
 
           payloadBufferSize = newPayloadBufferSize;
-          sceneDataOffsets[i] = sceneDataOffset;
+          sceneDataOffsets[i] = uint32_t(sceneDataOffset);
 
           uint32_t stride = 0;
           switch (primvar->type)
@@ -969,7 +976,7 @@ fail:
           assert(stride < 4);
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
 
-          uint32_t info = ((sceneDataOffset / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
+          uint32_t info = ((uint32_t(sceneDataOffset) / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
                           (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
                           (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
           preamble.sceneDataInfos[i] = info;
@@ -1425,7 +1432,7 @@ cleanup:
         GiMaterial* material = groupInfo.material;
 
         const GiGlslShaderGen::MaterialGenInfo& genInfo = groupInfo.genInfo;
-        size_t texCount = genInfo.textureDescriptions.size();
+        auto texCount = uint32_t(genInfo.textureDescriptions.size());
 
         GiMaterialGpuData gpuData;
         if (texCount > 0)
