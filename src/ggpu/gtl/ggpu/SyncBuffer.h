@@ -33,18 +33,10 @@ namespace gtl
   class GgpuSyncBuffer
   {
   public:
-    enum class UpdateStrategy
-    {
-      PersistentMapping,
-      OptimalStaging
-    };
-
-  public:
     GgpuSyncBuffer(CgpuDevice device,
                    GgpuStager& stager,
                    GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                    uint64_t elementSize,
-                   UpdateStrategy updateStrategy = UpdateStrategy::OptimalStaging,
                    CgpuBufferUsage bufferUsage = CgpuBufferUsage::Storage);
 
     ~GgpuSyncBuffer();
@@ -78,7 +70,6 @@ namespace gtl
     CgpuDevice m_device;
     GgpuStager& m_stager;
     uint64_t m_elementSize;
-    UpdateStrategy m_updateStrategy;
 
     uint64_t m_size = 0;
     GgpuResizableBuffer m_deviceBuffer; // only for OptimalStaging strategy

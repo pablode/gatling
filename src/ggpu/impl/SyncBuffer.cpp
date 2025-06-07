@@ -26,12 +26,10 @@ namespace gtl
                                  GgpuStager& stager,
                                  GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                                  uint64_t elementSize,
-                                 UpdateStrategy updateStrategy,
                                  CgpuBufferUsage bufferUsage)
     : m_device(device)
     , m_stager(stager)
     , m_elementSize(elementSize)
-    , m_updateStrategy(updateStrategy)
     , m_deviceBuffer(m_device,
                      delayedResourceDestroyer,
                      bufferUsage | CgpuBufferUsage::TransferDst,
@@ -39,10 +37,8 @@ namespace gtl
     , m_hostBuffer(m_device,
                    delayedResourceDestroyer,
                    CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
-                   CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent |
-                     (updateStrategy == UpdateStrategy::PersistentMapping ? CgpuMemoryProperties::DeviceLocal : CgpuMemoryProperties(0)))
+                   CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent)
   {
-
   }
 
   GgpuSyncBuffer::~GgpuSyncBuffer()
@@ -71,8 +67,7 @@ namespace gtl
 
   CgpuBuffer GgpuSyncBuffer::buffer() const
   {
-    return m_updateStrategy == UpdateStrategy::PersistentMapping ?
-      m_hostBuffer.buffer() : m_deviceBuffer.buffer();
+    return m_deviceBuffer.buffer();
   }
 
   uint64_t GgpuSyncBuffer::byteSize() const
@@ -106,10 +101,7 @@ namespace gtl
     }
 
     // Resize buffers.
-    if (m_updateStrategy == UpdateStrategy::OptimalStaging)
-    {
-      m_deviceBuffer.resize(newSize, commandBuffer);
-    }
+    m_deviceBuffer.resize(newSize, commandBuffer);
 
     m_hostBuffer.resize(newSize, commandBuffer);
 
@@ -130,11 +122,6 @@ namespace gtl
     {
       assert(false);
       return false;
-    }
-
-    if (m_updateStrategy == UpdateStrategy::PersistentMapping)
-    {
-      return true;
     }
 
     // Vulkan spec conformance: offset and size must be multiples of 4.
