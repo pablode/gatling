@@ -145,8 +145,8 @@ namespace gtl
 
       CgpuImageCreateInfo createInfo;
       createInfo.is3d = textureResource.is3dImage;
-      createInfo.format = textureResource.isFloat ? CGPU_IMAGE_FORMAT_R32_SFLOAT : CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-      createInfo.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
+      createInfo.format = textureResource.isFloat ? CgpuImageFormat::R32Sfloat : CgpuImageFormat::R8G8B8A8Unorm;
+      createInfo.usage = CgpuImageUsage::Sampled | CgpuImageUsage::TransferDst;
 
       const char* filePath = textureResource.filePath.c_str();
       if (strcmp(filePath, "") == 0)

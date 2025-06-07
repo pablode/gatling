@@ -21,99 +21,93 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include <gtl/gb/Enum.h>
+
 namespace gtl
 {
   constexpr static const uint64_t CGPU_WHOLE_SIZE = ~0ULL;
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
   constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 4;
 
-  typedef uint32_t CgpuBufferUsageFlags;
-
-  enum CgpuBufferUsageFlagBits
+  enum class CgpuBufferUsage
   {
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC = 0x00000001,
-    CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST = 0x00000002,
-    CGPU_BUFFER_USAGE_FLAG_UNIFORM_BUFFER = 0x00000010,
-    CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER = 0x00000020,
-    CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS = 0x00020000,
-    CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT = 0x00080000,
-    CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE = 0x00100000,
-    CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR = 0x00000400
+    TransferSrc = 0x00000001,
+    TransferDst = 0x00000002,
+    Storage = 0x00000020,
+    ShaderDeviceAddress = 0x00020000,
+    AccelerationStructureBuild = 0x00080000,
+    AccelerationStructureStorage = 0x00100000,
+    ShaderBindingTable = 0x00000400
+  };
+  GB_DECLARE_ENUM_BITOPS(CgpuBufferUsage);
+
+  enum class CgpuMemoryProperties
+  {
+    DeviceLocal = 0x00000001,
+    HostVisible = 0x00000002,
+    HostCoherent = 0x00000004,
+    HostCached = 0x00000008
+  };
+  GB_DECLARE_ENUM_BITOPS(CgpuMemoryProperties);
+
+  enum class CgpuImageUsage
+  {
+    TransferSrc = 0x00000001,
+    TransferDst = 0x00000002,
+    Sampled = 0x00000004,
+    Storage = 0x00000008
+  };
+  GB_DECLARE_ENUM_BITOPS(CgpuImageUsage);
+
+  enum class CgpuImageFormat
+  {
+    Undefined = 0,
+    R8G8B8A8Unorm = 37,
+    R32Sfloat = 100
   };
 
-  typedef uint32_t CgpuMemoryPropertyFlags;
-
-  enum CgpuMemoryPropertyFlagBits
+  enum class CgpuMemoryAccess
   {
-    CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL = 0x00000001,
-    CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE = 0x00000002,
-    CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT = 0x00000004,
-    CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED = 0x00000008
+    ShaderRead = 0x00000020,
+    ShaderWrite = 0x00000040,
+    TransferRead = 0x00000800,
+    TransferWrite = 0x00001000,
+    HostRead = 0x00002000,
+    HostWrite = 0x00004000,
+    MemoryRead = 0x00008000,
+    MemoryWrite = 0x00010000,
+    AccelerationStructureRead = 0x00200000,
+    AccelerationStructureWrite = 0x00400000
+  };
+  GB_DECLARE_ENUM_BITOPS(CgpuMemoryAccess);
+
+  enum class CgpuSamplerAddressMode
+  {
+    ClampToEdge = 0,
+    Repeat = 1,
+    MirrorRepeat = 2,
+    ClampToBlack = 3
   };
 
-  typedef uint32_t CgpuImageUsageFlags;
-
-  enum CgpuImageUsageFlagBits
+  enum class CgpuShaderStage
   {
-    CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC = 0x00000001,
-    CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST = 0x00000002,
-    CGPU_IMAGE_USAGE_FLAG_SAMPLED = 0x00000004,
-    CGPU_IMAGE_USAGE_FLAG_STORAGE = 0x00000008
+    Compute = 0x00000020,
+    RayGen = 0x00000100,
+    AnyHit = 0x00000200,
+    ClosestHit = 0x00000400,
+    Miss = 0x00000800
   };
+  GB_DECLARE_ENUM_BITOPS(CgpuShaderStage);
 
-  enum CgpuImageFormat
+  enum class CgpuPipelineStage
   {
-    CGPU_IMAGE_FORMAT_UNDEFINED = 0,
-    CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM = 37,
-    CGPU_IMAGE_FORMAT_R32_SFLOAT = 100
+    ComputeShader = 0x00000800,
+    Transfer = 0x00001000,
+    Host = 0x00004000,
+    RayTracingShader = 0x00200000,
+    AccelerationStructureBuild = 0x02000000
   };
-
-  typedef uint32_t CgpuMemoryAccessFlags;
-
-  enum CgpuMemoryAccessFlagBits
-  {
-    CGPU_MEMORY_ACCESS_FLAG_UNIFORM_READ = 0x00000008,
-    CGPU_MEMORY_ACCESS_FLAG_SHADER_READ = 0x00000020,
-    CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE = 0x00000040,
-    CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ = 0x00000800,
-    CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE = 0x00001000,
-    CGPU_MEMORY_ACCESS_FLAG_HOST_READ = 0x00002000,
-    CGPU_MEMORY_ACCESS_FLAG_HOST_WRITE = 0x00004000,
-    CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ = 0x00008000,
-    CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE = 0x00010000,
-    CGPU_MEMORY_ACCESS_FLAG_ACCELERATION_STRUCTURE_READ = 0x00200000,
-    CGPU_MEMORY_ACCESS_FLAG_ACCELERATION_STRUCTURE_WRITE = 0x00400000,
-  };
-
-  enum CgpuSamplerAddressMode
-  {
-    CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE = 0,
-    CGPU_SAMPLER_ADDRESS_MODE_REPEAT = 1,
-    CGPU_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT = 2,
-    CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK = 3
-  };
-
-  typedef uint32_t CgpuShaderStageFlags;
-
-  enum CgpuShaderStageFlagBits
-  {
-    CGPU_SHADER_STAGE_FLAG_COMPUTE = 0x00000020,
-    CGPU_SHADER_STAGE_FLAG_RAYGEN = 0x00000100,
-    CGPU_SHADER_STAGE_FLAG_ANY_HIT = 0x00000200,
-    CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT = 0x00000400,
-    CGPU_SHADER_STAGE_FLAG_MISS = 0x00000800
-  };
-
-  typedef uint32_t CgpuPipelineStageFlags;
-
-  enum CgpuPipelineStageFlagBits
-  {
-    CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER = 0x00000800,
-    CGPU_PIPELINE_STAGE_FLAG_TRANSFER = 0x00001000,
-    CGPU_PIPELINE_STAGE_FLAG_HOST = 0x00004000,
-    CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER = 0x00200000,
-    CGPU_PIPELINE_STAGE_FLAG_ACCELERATION_STRUCTURE_BUILD = 0x02000000,
-  };
+  GB_DECLARE_ENUM_BITOPS(CgpuPipelineStage);
 
   struct CgpuInstance      { uint64_t handle = 0; };
   struct CgpuDevice        { uint64_t handle = 0; };
@@ -133,15 +127,15 @@ namespace gtl
     uint32_t height;
     bool is3d = false;
     uint32_t depth = 1;
-    CgpuImageFormat format = CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-    CgpuImageUsageFlags usage = CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST | CGPU_IMAGE_USAGE_FLAG_SAMPLED;
+    CgpuImageFormat format = CgpuImageFormat::R8G8B8A8Unorm;
+    CgpuImageUsage usage = CgpuImageUsage::TransferDst | CgpuImageUsage::Sampled;
     const char* debugName = nullptr;
   };
 
   struct CgpuBufferCreateInfo
   {
-    CgpuBufferUsageFlags usage;
-    CgpuMemoryPropertyFlags memoryProperties;
+    CgpuBufferUsage usage;
+    CgpuMemoryProperties memoryProperties;
     uint64_t size;
     const char* debugName = nullptr;
     uint32_t alignment = 0; // no explicit alignment
@@ -151,7 +145,7 @@ namespace gtl
   {
     uint64_t size;
     const uint8_t* source;
-    CgpuShaderStageFlags stageFlags;
+    CgpuShaderStage stageFlags;
     const char* debugName = nullptr;
     uint32_t maxRayPayloadSize = 0; // for RT shaders
     uint32_t maxRayHitAttributeSize = 0; // for RT shaders
@@ -265,19 +259,19 @@ namespace gtl
 
   struct CgpuMemoryBarrier
   {
-    CgpuPipelineStageFlags srcStageMask;
-    CgpuMemoryAccessFlags srcAccessMask;
-    CgpuPipelineStageFlags dstStageMask;
-    CgpuMemoryAccessFlags dstAccessMask;
+    CgpuPipelineStage srcStageMask;
+    CgpuMemoryAccess srcAccessMask;
+    CgpuPipelineStage dstStageMask;
+    CgpuMemoryAccess dstAccessMask;
   };
 
   struct CgpuBufferMemoryBarrier
   {
     CgpuBuffer buffer;
-    CgpuPipelineStageFlags srcStageMask;
-    CgpuMemoryAccessFlags srcAccessMask;
-    CgpuPipelineStageFlags dstStageMask;
-    CgpuMemoryAccessFlags dstAccessMask;
+    CgpuPipelineStage srcStageMask;
+    CgpuMemoryAccess srcAccessMask;
+    CgpuPipelineStage dstStageMask;
+    CgpuMemoryAccess dstAccessMask;
     uint64_t offset = 0;
     uint64_t size = CGPU_WHOLE_SIZE;
   };
@@ -285,9 +279,9 @@ namespace gtl
   struct CgpuImageMemoryBarrier
   {
     CgpuImage image;
-    CgpuPipelineStageFlags srcStageMask;
-    CgpuPipelineStageFlags dstStageMask;
-    CgpuMemoryAccessFlags accessMask;
+    CgpuPipelineStage srcStageMask;
+    CgpuPipelineStage dstStageMask;
+    CgpuMemoryAccess accessMask;
   };
 
   struct CgpuPipelineBarrier
@@ -520,7 +514,7 @@ namespace gtl
   void cgpuCmdPushConstants(
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
-    CgpuShaderStageFlags stageFlags,
+    CgpuShaderStage stageFlags,
     uint32_t size,
     const void* data
   );

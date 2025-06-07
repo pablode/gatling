@@ -23,8 +23,8 @@ namespace gtl
 {
   GgpuResizableBuffer::GgpuResizableBuffer(CgpuDevice device,
                                            GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
-                                           CgpuBufferUsageFlags usageFlags,
-                                           CgpuMemoryPropertyFlags memoryProperties)
+                                           CgpuBufferUsage usageFlags,
+                                           CgpuMemoryProperties memoryProperties)
     : m_device(device)
     , m_delayedResourceDestroyer(delayedResourceDestroyer)
     , m_usageFlags(usageFlags)

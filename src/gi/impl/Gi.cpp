@@ -381,9 +381,9 @@ namespace gtl
     cgpuGetDeviceProperties(s_device, s_deviceProperties);
 
     if (!cgpuCreateSampler(s_device, {
-                            .addressModeU = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-                            .addressModeV = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-                            .addressModeW = CGPU_SAMPLER_ADDRESS_MODE_REPEAT
+                            .addressModeU = CgpuSamplerAddressMode::Repeat,
+                            .addressModeV = CgpuSamplerAddressMode::Repeat,
+                            .addressModeW = CgpuSamplerAddressMode::Repeat
                           }, &s_texSampler))
     {
       goto fail;
@@ -994,8 +994,8 @@ fail:
 
         // Create data buffers
         if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                                .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::TransferDst,
+                                .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                                 .size = payloadBufferSize,
                                 .debugName = "BlasPayloadBuffer"
                               }, &payloadBuffer))
@@ -1005,8 +1005,8 @@ fail:
         }
 
         if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                                .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached,
                                 .size = tmpPositionBufferSize,
                                 .debugName = "BlasVertexPositionsTmp"
                               }, &tmpPositionBuffer))
@@ -1016,8 +1016,8 @@ fail:
         }
 
         if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                                .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached,
                                 .size = tmpIndexBufferSize,
                                 .debugName = "BlasIndicesTmp"
                               }, &tmpIndexBuffer))
@@ -1214,8 +1214,8 @@ fail_cleanup:
       uint64_t bufferSize = (blasPayloads.empty() ? 1 : blasPayloads.size()) * sizeof(rp::BlasPayload);
 
       if (!cgpuCreateBuffer(s_device, {
-                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                               .size = bufferSize,
                               .debugName = "BlasPayloadAddresses"
                             }, &blasPayloadsBuffer))
@@ -1236,8 +1236,8 @@ fail_cleanup:
       uint64_t bufferSize = (instanceIds.empty() ? 1 : instanceIds.size()) * sizeof(int);
 
       if (!cgpuCreateBuffer(s_device, {
-                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                               .size = bufferSize,
                               .debugName = "InstanceIds"
                             }, &instanceIdsBuffer))
@@ -1533,13 +1533,13 @@ cleanup:
         // regular hit group
         {
           const std::vector<uint8_t>& cSpv = compInfo.closestHitInfo.spv;
-          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT,
+          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CgpuShaderStage::ClosestHit,
                                   .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
 
           if (compInfo.anyHitInfo)
           {
             const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->spv;
-            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT,
+            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
                                     .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
           }
         }
@@ -1548,7 +1548,7 @@ cleanup:
         if (compInfo.anyHitInfo)
         {
           const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->shadowSpv;
-          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT,
+          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
                                   .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
         }
       }
@@ -1645,7 +1645,7 @@ cleanup:
       if (!cgpuCreateShader(s_device, {
                               .size = spv.size(),
                               .source = spv.data(),
-                              .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN,
+                              .stageFlags = CgpuShaderStage::RayGen,
                               .maxRayPayloadSize = maxRayPayloadSize,
                               .maxRayHitAttributeSize = maxRayHitAttributeSize
                             }, &rgenShader))
@@ -1673,7 +1673,7 @@ cleanup:
         if (!cgpuCreateShader(s_device, {
                                 .size = spv.size(),
                                 .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
+                                .stageFlags = CgpuShaderStage::Miss,
                                 .maxRayPayloadSize = maxRayPayloadSize,
                                 .maxRayHitAttributeSize = maxRayHitAttributeSize
                               }, &missShader))
@@ -1696,7 +1696,7 @@ cleanup:
         if (!cgpuCreateShader(s_device, {
                                 .size = spv.size(),
                                 .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
+                                .stageFlags = CgpuShaderStage::Miss,
                                 .maxRayPayloadSize = maxRayPayloadSize,
                                 .maxRayHitAttributeSize = maxRayHitAttributeSize
                               }, &missShader))
@@ -1990,8 +1990,8 @@ cleanup:
 
       size_t conservativeSize = int(GiAovId::COUNT) * GI_MAX_AOV_COMP_SIZE;
       if (!cgpuCreateBuffer(s_device, {
-                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                               .size = conservativeSize,
                               .debugName = "AovDefaults"
                             }, &scene->aovDefaultValues))
@@ -2048,8 +2048,8 @@ cleanup:
       if (!scene->sceneParams.handle)
       {
         if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                                .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                                .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                                 .size = sizeof(sceneParams),
                                 .debugName = "SceneParams"
                               }, &scene->sceneParams))
@@ -2289,10 +2289,10 @@ cleanup:
 
     // Trace rays.
     {
-      CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_FLAG_RAYGEN |
-                                              CGPU_SHADER_STAGE_FLAG_MISS |
-                                              CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT |
-                                              CGPU_SHADER_STAGE_FLAG_ANY_HIT;
+      CgpuShaderStage pushShaderStages = CgpuShaderStage::RayGen |
+                                         CgpuShaderStage::Miss |
+                                         CgpuShaderStage::ClosestHit |
+                                         CgpuShaderStage::AnyHit;
 
       cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
     }
@@ -2314,18 +2314,18 @@ cleanup:
 
         preBarriers[i] = CgpuBufferMemoryBarrier {
           .buffer = renderBuffer->deviceMem,
-          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
-          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ
+          .srcStageMask = CgpuPipelineStage::RayTracingShader,
+          .srcAccessMask = CgpuMemoryAccess::ShaderWrite,
+          .dstStageMask = CgpuPipelineStage::Transfer,
+          .dstAccessMask = CgpuMemoryAccess::TransferRead
         };
 
         postBarriers[i] = CgpuBufferMemoryBarrier {
           .buffer = renderBuffer->hostMem,
-          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
-          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_HOST_READ
+          .srcStageMask = CgpuPipelineStage::Transfer,
+          .srcAccessMask = CgpuMemoryAccess::TransferWrite,
+          .dstStageMask = CgpuPipelineStage::Host,
+          .dstAccessMask = CgpuMemoryAccess::HostRead
         };
       }
 
@@ -2845,8 +2845,8 @@ cleanup:
 
     CgpuBuffer deviceMem;
     if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                            .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
+                            .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                             .size = bufferSize,
                             .debugName = "RenderBufferGpu"
                           }, &deviceMem))
@@ -2856,8 +2856,8 @@ cleanup:
 
     CgpuBuffer hostMem;
     if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+                            .usage = CgpuBufferUsage::TransferDst,
+                            .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached,
                             .size = bufferSize,
                             .debugName = "RenderBufferCpu"
                           }, &hostMem))

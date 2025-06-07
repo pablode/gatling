@@ -332,15 +332,15 @@ namespace gtl
   {
     switch (mode)
     {
-    case CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    case CGPU_SAMPLER_ADDRESS_MODE_REPEAT: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    case CGPU_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-    case CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    case CgpuSamplerAddressMode::ClampToEdge: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    case CgpuSamplerAddressMode::Repeat: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    case CgpuSamplerAddressMode::MirrorRepeat: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+    case CgpuSamplerAddressMode::ClampToBlack: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     default: return VK_SAMPLER_ADDRESS_MODE_MAX_ENUM;
     }
   }
 
-  static VkPipelineStageFlags2KHR cgpuPipelineStageFlagsFromShaderStageFlags(VkShaderStageFlags shaderStageFlags)
+  static VkPipelineStageFlags2KHR CgpuPipelineStageFromShaderStageFlags(VkShaderStageFlags shaderStageFlags)
   {
     VkPipelineStageFlags2KHR pipelineStageFlags = VK_PIPELINE_STAGE_2_NONE_KHR;
 
@@ -1460,7 +1460,7 @@ namespace gtl
     }
 
 #ifndef NDEBUG
-    if (createInfo.stageFlags != CGPU_SHADER_STAGE_FLAG_COMPUTE)
+    if (createInfo.stageFlags != CgpuShaderStage::Compute)
     {
       assert(createInfo.maxRayPayloadSize > 0);
       assert(createInfo.maxRayHitAttributeSize > 0);
@@ -1477,7 +1477,7 @@ namespace gtl
      .pCode = (uint32_t*) createInfo.source,
     };
 
-    if (!idevice->internalFeatures.pipelineLibraries || createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_COMPUTE)
+    if (!idevice->internalFeatures.pipelineLibraries || createInfo.stageFlags == CgpuShaderStage::Compute)
     {
       VkResult result = idevice->table.vkCreateShaderModule(
         idevice->logicalDevice,
@@ -1571,8 +1571,8 @@ namespace gtl
   }
 
   static bool cgpuCreateIBuffer(CgpuIDevice* idevice,
-                                CgpuBufferUsageFlags usage,
-                                CgpuMemoryPropertyFlags memoryProperties,
+                                CgpuBufferUsage usage,
+                                CgpuMemoryProperties memoryProperties,
                                 uint64_t size,
                                 uint64_t alignment,
                                 CgpuIBuffer* ibuffer,
@@ -1600,7 +1600,7 @@ namespace gtl
 
     size_t newAlignment = cgpuPadToAlignment(alignment, BASE_ALIGNMENT); // for performance
 
-    if (bool(memoryProperties & CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE))
+    if (bool(memoryProperties & CgpuMemoryProperties::HostVisible))
     {
       newAlignment = cgpuPadToAlignment(newAlignment, idevice->internalProperties.minMemoryMapAlignment);
     }
@@ -1723,7 +1723,7 @@ namespace gtl
 
     // FIXME: check device support
     VkImageTiling vkImageTiling = VK_IMAGE_TILING_OPTIMAL;
-    if (!createInfo.is3d && ((createInfo.usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_SRC) | (createInfo.usage & CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST)))
+    if (!createInfo.is3d && bool((createInfo.usage & CgpuImageUsage::TransferSrc) | (createInfo.usage & CgpuImageUsage::TransferDst)))
     {
       vkImageTiling = VK_IMAGE_TILING_LINEAR;
     }
@@ -1854,9 +1854,9 @@ namespace gtl
     CGPU_RESOLVE_SAMPLER({ handle }, isampler);
 
     // Emulate MDL's clip wrap mode if necessary; use optimal mode (according to ARM) if not.
-    bool clampToBlack = (createInfo.addressModeU == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
-                        (createInfo.addressModeV == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK) ||
-                        (createInfo.addressModeW == CGPU_SAMPLER_ADDRESS_MODE_CLAMP_TO_BLACK);
+    bool clampToBlack = (createInfo.addressModeU == CgpuSamplerAddressMode::ClampToBlack) ||
+                        (createInfo.addressModeV == CgpuSamplerAddressMode::ClampToBlack) ||
+                        (createInfo.addressModeW == CgpuSamplerAddressMode::ClampToBlack);
 
     VkSamplerCreateInfo samplerCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -2119,8 +2119,8 @@ namespace gtl
     }
 
     VkDeviceSize sbtSize = ipipeline->sbtRgen.size + ipipeline->sbtMiss.size + ipipeline->sbtHit.size;
-    CgpuBufferUsageFlags bufferUsageFlags = CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_SHADER_BINDING_TABLE_BIT_KHR;
-    CgpuMemoryPropertyFlags bufferMemPropFlags = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
+    CgpuBufferUsage bufferUsageFlags = CgpuBufferUsage::TransferSrc | CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::ShaderBindingTable;
+    CgpuMemoryProperties bufferMemPropFlags = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached;
 
     if (!cgpuCreateIBuffer(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize,
                            properties.shaderGroupBaseAlignment, &ipipeline->sbt, "[SBT]"))
@@ -2441,8 +2441,8 @@ namespace gtl
 
     // Create AS buffer & AS object
     if (!cgpuCreateIBuffer(idevice,
-                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_STORAGE,
-                           CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                           CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureStorage,
+                           CgpuMemoryProperties::DeviceLocal,
                            asBuildSizesInfo.accelerationStructureSize, 0,
                            iasBuffer, "[AS buffer]"))
     {
@@ -2469,8 +2469,8 @@ namespace gtl
     // Set up device-local scratch buffer
     CgpuIBuffer iscratchBuffer;
     if (!cgpuCreateIBuffer(idevice,
-                           CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS,
-                           CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+                           CgpuBufferUsage::Storage | CgpuBufferUsage::ShaderDeviceAddress,
+                           CgpuMemoryProperties::DeviceLocal,
                            asBuildSizesInfo.buildScratchSize,
                            idevice->internalProperties.minAccelerationStructureScratchOffsetAlignment,
                            &iscratchBuffer, "[AS scratch buffer]",
@@ -2614,8 +2614,8 @@ namespace gtl
 
     // Create instance buffer & copy into it
     if (!cgpuCreateIBuffer(idevice,
-                           CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                           CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT,
+                           CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
+                           CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent,
                            (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
                            16/*required by spec*/, &itlas->instances, createInfo.debugName))
     {
@@ -2904,9 +2904,9 @@ namespace gtl
         VkImageMemoryBarrier2KHR barrier = {
           .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2_KHR,
           .pNext = nullptr,
-          .srcStageMask = cgpuPipelineStageFlagsFromShaderStageFlags(ishader->stageFlags),
+          .srcStageMask = CgpuPipelineStageFromShaderStageFlags(ishader->stageFlags),
           .srcAccessMask = iimage->accessMask,
-          .dstStageMask = cgpuPipelineStageFlagsFromShaderStageFlags(ishader->stageFlags),
+          .dstStageMask = CgpuPipelineStageFromShaderStageFlags(ishader->stageFlags),
           .dstAccessMask = accessMask,
           .oldLayout = oldLayout,
           .newLayout = newLayout,
@@ -3263,7 +3263,7 @@ namespace gtl
 
   void cgpuCmdPushConstants(CgpuCommandBuffer commandBuffer,
                             CgpuPipeline pipeline,
-                            CgpuShaderStageFlags stageFlags,
+                            CgpuShaderStage stageFlags,
                             uint32_t size,
                             const void* data)
   {
