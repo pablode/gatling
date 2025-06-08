@@ -54,7 +54,7 @@ namespace gtl
 
     quill::BackendOptions options;
     options.thread_name = "GbLog";
-    quill::Backend::start(options);
+    quill::Backend::start<quill::FrontendOptions>(options, quill::SignalHandlerOptions{});
   }
 
   quill::Logger* gbGetLogger()
