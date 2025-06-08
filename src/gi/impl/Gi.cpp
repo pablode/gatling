@@ -126,7 +126,7 @@ namespace gtl
 
   struct GiMaterial
   {
-    McMaterial* mcMat;
+    McMaterial* mcMat = nullptr;
     std::string name;
     GiScene* scene;
     std::optional<GiMaterialGpuData> gpuData;
@@ -575,14 +575,25 @@ fail:
   void giDestroyMaterial(GiMaterial* mat)
   {
     GiScene* scene = mat->scene;
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
-
-    if (mat->gpuData)
     {
-      giDestroyMaterialGpuData(scene, *mat->gpuData);
-    }
+      std::lock_guard guard(scene->mutex);
 
-    scene->materials.erase(mat);
+      if (mat->gpuData)
+      {
+        giDestroyMaterialGpuData(scene, *mat->gpuData);
+      }
+
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
+      scene->materials.erase(mat);
+
+      for (GiMesh* m : scene->meshes)
+      {
+        if (m->material == mat)
+        {
+          m->material = nullptr;
+        }
+      }
+    }
 
     delete mat->mcMat;
     delete mat;
@@ -678,16 +689,20 @@ fail:
     McMaterial* newMcMat = mat->mcMat;
     McMaterial* oldMcMat = mesh->material ? mesh->material->mcMat : nullptr;
 
+    bool transparencyChanged = bool(newMcMat) ^ bool(oldMcMat);
+    bool primvarsChanged = bool(newMcMat) ^ bool(oldMcMat);
+
     GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::DirtyPipeline;
-    if (oldMcMat)
+    if (oldMcMat && newMcMat)
     {
       // material data such as alpha is used in the BVH build
-      bool transparencyChanged = newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency;
+      transparencyChanged |= (newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency);
 
       const auto& newPrimvarNames = newMcMat->sceneDataNames;
       const auto& oldPrimvarNames = oldMcMat->sceneDataNames;
 
-      bool primvarsChanged = newPrimvarNames.size() != oldPrimvarNames.size();
+      primvarsChanged |= newPrimvarNames.size() != oldPrimvarNames.size();
+
       if (!primvarsChanged)
       {
         for (size_t i = 0; i < newPrimvarNames.size(); i++)
@@ -699,12 +714,12 @@ fail:
           }
         }
       }
+    }
 
-      if (transparencyChanged || primvarsChanged)
-      {
-        dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
-        mesh->gpuData.reset();
-      }
+    if (transparencyChanged || primvarsChanged)
+    {
+      dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+      mesh->gpuData.reset();
     }
 
     mesh->material = mat;
