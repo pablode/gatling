@@ -98,7 +98,7 @@ namespace gtl
 
   struct GiImageBinding
   {
-    CgpuImage image;
+    GiImagePtr image;
     uint32_t index;
   };
 
@@ -121,7 +121,7 @@ namespace gtl
     CgpuShader closestHit;
     std::vector<CgpuShader> anyHits; // optional
     OffsetAllocator::Allocation texOffsetAllocation;
-    std::vector<CgpuImage> images;
+    std::vector<GiImagePtr> images;
   };
 
   struct GiMaterial
@@ -206,7 +206,7 @@ namespace gtl
     GgpuDenseDataStore distantLights;
     GgpuDenseDataStore rectLights;
     GgpuDenseDataStore diskLights;
-    CgpuImage domeLightTexture;
+    GiImagePtr domeLightTexture;
     GiDomeLight* domeLight = nullptr; // weak ptr
     glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
     CgpuImage fallbackDomeLightTexture;
@@ -415,7 +415,7 @@ namespace gtl
     s_aggregateAssetReader = std::make_unique<GiAggregateAssetReader>();
     s_aggregateAssetReader->addAssetReader(s_mmapAssetReader.get());
 
-    s_texSys = std::make_unique<GiTextureManager>(s_device, *s_aggregateAssetReader, *s_stager);
+    s_texSys = std::make_unique<GiTextureManager>(s_device, *s_aggregateAssetReader, *s_stager, *s_delayedResourceDestroyer);
 
 #ifdef GI_SHADER_HOTLOADING
     s_fileWatcher = std::make_unique<efsw::FileWatcher>();
@@ -562,13 +562,6 @@ fail:
     for (CgpuShader shader : gpuData.anyHits)
     {
       cgpuDestroyShader(s_device, shader);
-    }
-    for (CgpuImage image : gpuData.images)
-    {
-      if (!s_texSys->isCached(image))
-      {
-        cgpuDestroyImage(s_device, image);
-      }
     }
   }
 
@@ -1434,7 +1427,7 @@ cleanup:
       }
 
       // 3. Upload textures and assign images to new material GPU data.
-      std::vector<CgpuImage> images;
+      std::vector<GiImagePtr> images;
       if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images))
       {
         goto cleanup;
@@ -1754,7 +1747,7 @@ cleanup:
       uint32_t texOffset = gpuData.texOffsetAllocation.offset;
 
       uint32_t texCount = 0;
-      for (CgpuImage img : gpuData.images)
+      for (GiImagePtr img : gpuData.images)
       {
         imageBindings.push_back({ .image = img, .index = texOffset + texCount });
         texCount++;
@@ -1964,9 +1957,15 @@ cleanup:
         bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyShadersHit) ||
         bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyShadersMiss))
     {
-      if (scene->shaderCache) _giDestroyShaderCache(scene->shaderCache);
+      GiShaderCache* oldShaderCache = scene->shaderCache;
 
       scene->shaderCache = _giCreateShaderCache(params);
+
+      if (oldShaderCache)
+      {
+        // Delay destruction to reuse images
+        _giDestroyShaderCache(oldShaderCache);
+      }
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyShadersRgen;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyShadersHit;
@@ -2106,11 +2105,11 @@ cleanup:
 
     if (scene->domeLight != params.domeLight)
     {
-      if (scene->domeLightTexture.handle &&
-          scene->domeLightTexture.handle != scene->fallbackDomeLightTexture.handle)
+      if (scene->domeLightTexture &&
+          scene->domeLightTexture->handle != scene->fallbackDomeLightTexture.handle)
       {
-        s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
-        scene->domeLightTexture.handle = 0;
+        // TODO: free dome light memory immediately, before allocting new texture
+        scene->domeLightTexture.reset();
       }
       scene->domeLight = nullptr;
 
@@ -2121,7 +2120,10 @@ cleanup:
 
         bool is3dImage = false;
         bool flushImmediately = false;
-        if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, flushImmediately))
+
+        scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, is3dImage, flushImmediately);
+
+        if (!scene->domeLightTexture)
         {
           GB_ERROR("unable to load dome light texture at {}", filePath);
         }
@@ -2136,7 +2138,7 @@ cleanup:
       // Use fallback texture in case no dome light is set. We still have an explicit binding
       // for the fallback texture because we need the background color in case the textured
       // dome light is not supposed to be seen by the camera ('domeLightCameraVisible' option).
-      scene->domeLightTexture = scene->fallbackDomeLightTexture;
+      scene->domeLightTexture = std::make_shared<CgpuImage>(scene->fallbackDomeLightTexture);
     }
 
     // Init state for goto error handling.
@@ -2258,13 +2260,13 @@ cleanup:
 
     images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture,
                        .index = shaderCache->domeLightsAllocation.offset + 0 });
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture,
+    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = *scene->domeLightTexture,
                        .index = shaderCache->domeLightsAllocation.offset + 1 });
 
     for (const GiImageBinding& b : shaderCache->imageBindings)
     {
       assert(b.index != 0 && b.index != 1); // reserved for dome lights
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = b.image, .index = b.index });
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = *b.image, .index = b.index });
     }
 
     CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
@@ -2382,6 +2384,7 @@ cleanup:
       goto cleanup;
 
     s_delayedResourceDestroyer->nextFrame();
+    s_delayedResourceDestroyer->housekeep();
 
     for (const GiAovBinding& binding : params.aovBindings)
     {
@@ -2432,8 +2435,7 @@ cleanup:
     }
     if (scene->domeLight)
     {
-      s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
-      scene->domeLightTexture.handle = 0;
+      scene->domeLightTexture.reset();
     }
     if (scene->aovDefaultValues.handle)
     {

@@ -37,6 +37,7 @@ namespace gtl
 
   public:
     void nextFrame();
+    void housekeep();
 
     void destroyAll();
 

@@ -20,6 +20,7 @@
 
 #include <gtl/mc/Backend.h>
 #include <gtl/gb/Log.h>
+#include <gtl/ggpu/DelayedResourceDestroyer.h>
 #include <gtl/ggpu/Stager.h>
 #include <gtl/imgio/Imgio.h>
 
@@ -53,44 +54,49 @@ namespace
 
 namespace gtl
 {
-  GiTextureManager::GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager)
+  GiTextureManager::GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager,
+                                     GgpuDelayedResourceDestroyer& delayedResourceDestroyer)
     : m_device(device)
     , m_assetReader(assetReader)
     , m_stager(stager)
+    , m_delayedResourceDestroyer(delayedResourceDestroyer)
   {
-  }
-
-  GiTextureManager::~GiTextureManager()
-  {
-    // TODO: use DelayedResourceDestroyer
-    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
-    {
-      cgpuDestroyImage(m_device, it->second);
-    }
   }
 
   void GiTextureManager::destroy()
   {
     for (const auto& pathImagePair : m_imageCache)
     {
-      cgpuDestroyImage(m_device, pathImagePair.second);
+      GiImagePtr image = pathImagePair.second.lock();
+
+      if (!image)
+      {
+        continue;
+      }
+
+      cgpuDestroyImage(m_device, *image);
     }
     m_imageCache.clear();
   }
 
-  bool GiTextureManager::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flushImmediately)
+  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool is3dImage, bool flushImmediately)
   {
     auto cacheResult = m_imageCache.find(filePath);
+
     if (cacheResult != m_imageCache.end())
     {
-      image = cacheResult->second;
-      return true;
+      GiImagePtr image = cacheResult->second.lock();
+
+      if (image)
+      {
+        return image;
+      }
     }
 
     ImgioImage imageData;
     if (!_ReadImage(filePath, m_assetReader, &imageData))
     {
-      return false;
+      return nullptr;
     }
 
     GB_LOG("read image \"{}\" ({:.2f} MiB)", filePath, imageData.size * BYTES_TO_MIB);
@@ -101,26 +107,37 @@ namespace gtl
       .is3d = is3dImage,
       .debugName = filePath
     };
-    bool creationSuccessful = cgpuCreateImage(m_device, createInfo, &image) &&
-                              m_stager.stageToImage(&imageData.data[0], imageData.size, image, imageData.width, imageData.height, 1);
+
+    GiImagePtr image = makeImagePtr();
+
+    bool creationSuccessful = cgpuCreateImage(m_device, createInfo, image.get()) &&
+                              m_stager.stageToImage(&imageData.data[0], imageData.size, *image, imageData.width, imageData.height, 1);
 
     if (!creationSuccessful)
     {
-      return false;
+      return nullptr;
     }
 
-    m_imageCache[filePath] = image;
+    m_imageCache[filePath] = std::weak_ptr<CgpuImage>(image);
 
     if (flushImmediately)
     {
       m_stager.flush();
     }
 
-    return true;
+    return image;
+  }
+
+  GiImagePtr GiTextureManager::makeImagePtr()
+  {
+    return std::shared_ptr<CgpuImage>(new CgpuImage, [this](CgpuImage* d) {
+      m_delayedResourceDestroyer.enqueueDestruction(*d);
+      delete d;
+    });
   }
 
   bool GiTextureManager::loadTextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
-                                                 std::vector<CgpuImage>& images)
+                                                 std::vector<GiImagePtr>& images)
   {
     size_t texCount = textureDescriptions.size();
 
@@ -133,12 +150,9 @@ namespace gtl
 
     images.reserve(texCount);
 
-    bool result;
-
     for (size_t i = 0; i < texCount; i++)
     {
       fflush(stdout);
-      CgpuImage image;
 
       auto& textureResource = textureDescriptions[i];
       auto& payload = textureResource.data;
@@ -158,6 +172,8 @@ namespace gtl
           continue;
         }
 
+        GiImagePtr image = makeImagePtr();
+
         GB_LOG("image {} has binary payload of {:.2f} MiB", i, payloadSize * BYTES_TO_MIB);
 
         createInfo.width = textureResource.width;
@@ -165,17 +181,23 @@ namespace gtl
         createInfo.depth = textureResource.depth;
         createInfo.debugName = "[Payload texture]";
 
-        if (!cgpuCreateImage(m_device, createInfo, &image))
+        if (!cgpuCreateImage(m_device, createInfo, image.get()))
+        {
           return false;
+        }
 
-        result = m_stager.stageToImage(payload.data(), payloadSize, image, createInfo.width, createInfo.height, createInfo.depth);
-        if (!result) return false;
+        if (!m_stager.stageToImage(payload.data(), payloadSize, *image, createInfo.width, createInfo.height, createInfo.depth))
+        {
+          return false;
+        }
 
         images.push_back(image);
         continue;
       }
 
-      if (loadTextureFromFilePath(filePath, image, textureResource.is3dImage, false))
+      GiImagePtr image = loadTextureFromFilePath(filePath, textureResource.is3dImage, false);
+
+      if (image)
       {
         images.push_back(image);
         continue;
@@ -186,12 +208,16 @@ namespace gtl
       createInfo.height = 1;
       createInfo.depth = 1;
 
-      if (!cgpuCreateImage(m_device, createInfo, &image))
+      if (!cgpuCreateImage(m_device, createInfo, image.get()))
+      {
         return false;
+      }
 
       uint8_t black[4] = { 0, 0, 0, 0 };
-      result = m_stager.stageToImage(black, 4, image, 1, 1, 1);
-      if (!result) return false;
+      if (!m_stager.stageToImage(black, 4, *image, 1, 1, 1))
+      {
+        return false;
+      }
 
       images.push_back(image);
     }
@@ -199,36 +225,5 @@ namespace gtl
     m_stager.flush();
 
     return true;
-  }
-
-  void GiTextureManager::evictAndDestroyCachedImage(CgpuImage image)
-  {
-    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
-    {
-      if (it->second.handle != image.handle)
-      {
-        continue;
-      }
-
-      m_imageCache.erase(it);
-
-      cgpuDestroyImage(m_device, image);
-
-      return;
-    }
-
-    assert(false);
-  }
-
-  bool GiTextureManager::isCached(CgpuImage image) const
-  {
-    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
-    {
-      if (it->second.handle == image.handle)
-      {
-        return true;
-      }
-    }
-    return false;
   }
 }

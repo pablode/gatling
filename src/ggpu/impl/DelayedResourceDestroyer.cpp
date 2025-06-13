@@ -34,10 +34,8 @@ namespace gtl
     }
   }
 
-  void GgpuDelayedResourceDestroyer::nextFrame()
+  void GgpuDelayedResourceDestroyer::housekeep()
   {
-    m_frameIndex = (m_frameIndex + 1) % FrameCount;
-
     auto& oldestFrameDestructions = m_pendingDestructions[m_frameIndex];
     for (const DestroyFunc& fun : oldestFrameDestructions)
     {
@@ -47,11 +45,17 @@ namespace gtl
     oldestFrameDestructions.clear();
   }
 
+  void GgpuDelayedResourceDestroyer::nextFrame()
+  {
+    m_frameIndex = (m_frameIndex + 1) % FrameCount;
+  }
+
   void GgpuDelayedResourceDestroyer::destroyAll()
   {
     for (uint32_t i = 0; i < FrameCount; i++)
     {
       nextFrame();
+      housekeep();
     }
   }
 
