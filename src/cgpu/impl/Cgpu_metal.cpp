@@ -46,6 +46,23 @@ namespace gtl
   constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(3, 1, 0);
   constexpr static const char* SPVC_MSL_ENTRY_POINT = "main0";
 
+  // for shader reflection
+  typedef enum VkDescriptorType {
+    VK_DESCRIPTOR_TYPE_SAMPLER = 0,
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER = 1,
+    VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE = 2,
+    VK_DESCRIPTOR_TYPE_STORAGE_IMAGE = 3,
+    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+    VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR = 1000150000
+  } VkDescriptorType;
+
+  //typedef enum VkImageType {
+  //  VK_IMAGE_TYPE_1D = 0,
+  //  VK_IMAGE_TYPE_2D = 1,
+  //  VK_IMAGE_TYPE_3D = 2,
+  //} VkImageType;
+
   /* Internal structures. */
 
   struct CgpuIDevice
@@ -53,6 +70,7 @@ namespace gtl
     MTL::Device* device;
     MTL4::CommandQueue* commandQueue;
     MTL4::CounterHeap* counterHeap;
+    MTL::LogState* logState;
   };
 
   struct CgpuIBuffer
@@ -71,6 +89,11 @@ namespace gtl
 
   struct CgpuIPipeline
   {
+    MTL4::ArgumentTable* argumentTable;
+    std::vector<MTL::ArgumentEncoder*> argumentEncoders;
+    std::vector<MTL::Buffer*> argumentBuffers;
+    //std::array<MTL::Buffer*, CGPU_MAX_DESCRIPTOR_SET_COUNT + 1> argumentBuffers;
+
     MTL::ComputePipelineState* state;
     MTL::IntersectionFunctionTable* ift; // only for RT pipelines
   };
@@ -91,6 +114,7 @@ namespace gtl
     MTL4::CommandBuffer* commandBuffer;
     MTL4::CommandAllocator* commandAllocator;
     MTL4::ComputeCommandEncoder* encoder;
+
     MTL::Buffer* pcBuffer;
     void* pcMem;
     CgpuShaderStageFlags pcFlags;
@@ -747,7 +771,131 @@ namespace gtl
     entryFunc->release();
     descriptor->release();
 
+    MTL4::ArgumentTable* argumentTable;
+    {
+      auto* desc = MTL4::ArgumentTableDescriptor::alloc()->init();
+      CHK_MTL_NP(desc);
+      desc->setMaxBufferBindCount(CGPU_MAX_DESCRIPTOR_SET_COUNT + 1/* PC emulation */);
+      desc->setMaxSamplerStateBindCount(0);
+      desc->setMaxTextureBindCount(0);
+
+      NS::Error* error;
+      argumentTable = idevice->device->newArgumentTable(desc, &error);
+      CHK_MTL(argumentTable, error);
+      desc->release();
+    }
+
+    const CgpuShaderReflection& reflection = ishader->reflection;
+    uint32_t descriptorSetCount = reflection.descriptorSets.size();
+
+    std::vector<MTL::ArgumentEncoder*> argumentEncoders;
+    std::vector<MTL::Buffer*> argumentBuffers;
+    argumentEncoders.reserve(descriptorSetCount);
+    argumentBuffers.reserve(descriptorSetCount);
+
+    for (uint32_t i = 0; i < descriptorSetCount; i++)
+    {
+      const CgpuShaderReflectionDescriptorSet& descriptorSet = reflection.descriptorSets[i];
+      const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
+
+      std::vector<MTL::ArgumentDescriptor*> argumentDescriptors;
+      argumentDescriptors.reserve(bindings.size());
+
+      for (const CgpuShaderReflectionBinding& binding : bindings)
+      {
+        VkDescriptorType descriptorType = (VkDescriptorType) binding.descriptorType;
+
+        MTL::DataType dataType;
+        switch (descriptorType)
+        {
+        case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+        case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+          dataType = MTL::DataTypeTexture;
+          break;
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+          dataType = MTL::DataTypePointer;
+          break;
+        case VK_DESCRIPTOR_TYPE_SAMPLER:
+          dataType = MTL::DataTypeSampler;
+          break;
+        case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+          dataType = MTL::DataTypeInstanceAccelerationStructure;
+          break;
+        default:
+          CGPU_FATAL("unhandled data type");
+        }
+
+        MTL::BindingAccess access;
+        if (binding.readAccess && binding.writeAccess)
+        {
+          access = MTL::BindingAccessReadWrite;
+        }
+        else if (binding.readAccess)
+        {
+          access = MTL::BindingAccessReadOnly;
+        }
+        else if (binding.writeAccess)
+        {
+          access = MTL::BindingAccessWriteOnly;
+        }
+
+        //MTL::TextureType textureType;
+        //if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+        //    descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+        //    descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+        //{
+        //  switch (binding.imageType)
+        //  {
+        //  case VK_IMAGE_TYPE_1D:
+        //    textureType = MTL::TextureType1D;
+        //    break;
+        //  case VK_IMAGE_TYPE_2D:
+        //    textureType = MTL::TextureType2D;
+        //    break;
+        //  case VK_IMAGE_TYPE_3D:
+        //    textureType = MTL::TextureType3D;
+        //    break;
+        //  default:
+        //    CGPU_FATAL("unhandled image type");
+        //  }
+        //}
+
+        auto* desc = MTL::ArgumentDescriptor::alloc()->init();
+        CHK_MTL_NP(desc);
+        desc->setDataType(dataType);
+        desc->setIndex(binding.binding);
+        desc->setAccess(access);
+        desc->setArrayLength(binding.count);
+        desc->setTextureType(MTL::TextureType2D); // NOTE: can't derive 3d/2d from SPIR-V
+
+        argumentDescriptors.push_back(desc);
+      }
+
+      NS::Array* descriptorArray = NS::Array::array((const NS::Object* const*) argumentDescriptors.data(), (uint32_t) argumentDescriptors.size());
+      CHK_MTL_NP(descriptorArray);
+
+      MTL::ArgumentEncoder* argumentEncoder = idevice->device->newArgumentEncoder(descriptorArray);
+      CHK_MTL_NP(argumentEncoder);
+
+      descriptorArray->release();
+      for (MTL::ArgumentDescriptor* desc : argumentDescriptors)
+      {
+        desc->release();
+      }
+
+      uint64_t argumentBufferSize = argumentEncoder->encodedLength();
+      MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModePrivate);
+
+      argumentEncoders.push_back(argumentEncoder);
+      argumentBuffers.push_back(argumentBuffer);
+
+      argumentTable->setAddress(argumentBuffer->gpuAddress(), i);
+    }
+
     ipipeline->state = state;
+    ipipeline->argumentTable = argumentTable;
+    ipipeline->argumentEncoders = argumentEncoders;
+    ipipeline->argumentBuffers = argumentBuffers;
 
     pipeline->handle = handle;
     return true;
@@ -852,6 +1000,16 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     {
       ipipeline->ift->release();
     }
+
+    for (MTL::ArgumentEncoder* encoder : ipipeline->argumentEncoders)
+    {
+      encoder->release();
+    }
+    for (MTL::Buffer* buffer : ipipeline->argumentBuffers)
+    {
+      buffer->release();
+    }
+    ipipeline->argumentTable->release();
 
     ipipeline->state->release();
 
@@ -1119,7 +1277,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     encoder->setComputePipelineState(ipipeline->state);
 
-// TODO: seems like we need to use agument tables (descriptor sets)
+// TODO: bind SBT here?
     //encoder->setIntersectionFunctionTable(ipipeline->ift, bufferIndex);
   }
 
@@ -1150,11 +1308,13 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
+    MTL::ArgumentEncoder* argumentEncoder = ipipeline->argumentEncoders[descriptorSetIndex];
+    MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers[descriptorSetIndex];
 
-// TODO: we have to map descriptor sets to Argument Tables
-// TODO: in combination it looks like we also have to use Argument Buffers
+    uint32_t offset = 0;
+    argumentEncoder->setArgumentBuffer(argumentBuffer, offset);
 
+    // TODO
     for (uint32_t i = 0; i < bindings->bufferCount; i++)
     {
       const CgpuBufferBinding& b = bindings->buffers[i];
@@ -1173,7 +1333,22 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
       // ...
     }
 
-    // ...
+    for (uint32_t i = 0; i < bindings->samplerCount; i++)
+    {
+      const CgpuSamplerBinding& b = bindings->samplers[i];
+
+      // ...
+    }
+
+    for (uint32_t i = 0; i < bindings->tlasCount; i++)
+    {
+      const CgpuTlasBinding& b = bindings->tlases[i];
+
+      // ...
+    }
+
+// TODO: we need to do something similar for push constants
+    icommandBuffer->encoder->setArgumentTable(ipipeline->argumentTable);
   }
 
   void cgpuCmdUpdateBuffer(CgpuCommandBuffer commandBuffer,
@@ -1247,12 +1422,6 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     memcpy(icommandBuffer->pcMem, data, size);
 
     icommandBuffer->pcFlags = stageFlags; // TODO: test this against flags of bound pipeline
-
-// TODO: we need to map this to a descriptor set
-
-// TODO: check SPIRV-Cross kPushConstDescSet and kPushConstBinding. we need to do the
-//       same as MoltenVK. careful: might need to be batched with UpdateBindings() call
-//       -> consider cgpu API change (simplification)
   }
 
   static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
