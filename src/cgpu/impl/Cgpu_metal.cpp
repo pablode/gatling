@@ -1147,13 +1147,15 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
 // TODO: we have to map descriptor sets to Argument Tables
+// TODO: in combination it looks like we also have to use Argument Buffers
 
     for (uint32_t i = 0; i < bindings->bufferCount; i++)
     {
       const CgpuBufferBinding& b = bindings->buffers[i];
 
       CGPU_RESOLVE_BUFFER(b.buffer, ibuffer);
-      //encoder->setBuffer(ibuffer->buffer, b.offset, b.binding); // (.size is ignored)
+
+      // ...
     }
 
     for (uint32_t i = 0; i < bindings->imageCount; i++)
@@ -1161,13 +1163,11 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
       const CgpuImageBinding& b = bindings->images[i];
 
       CGPU_RESOLVE_IMAGE(b.image, iimage);
-      //encoder->setTexture(iimage->texture, b.binding); // TODO: there's no .index argument!!
+
+      // ...
     }
 
-    // TODO
-
-    // TODO: we have to call useResource for not only the TLAS but also all BLAS that
-    ///      belong to it (we can use a separate heap for all BLAS and call useHeap)
+    // ...
   }
 
   void cgpuCmdUpdateBuffer(CgpuCommandBuffer commandBuffer,
@@ -1240,14 +1240,13 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     memcpy(icommandBuffer->pcMem, data, size);
 
-    icommandBuffer->pcFlags = stageFlags;
+    icommandBuffer->pcFlags = stageFlags; // TODO: test this against flags of bound pipeline
 
-// TODO: this means we need to update the descriptor set (binding) afterwards
+// TODO: we need to map this to a descriptor set
 
-// TODO: in updateBindings function, bind this as arg table (4)
-
-// TODO: SPIRV-Cross needs to generate the code for it
-//       -> replace push_constant with buffer(N+!)
+// TODO: check SPIRV-Cross kPushConstDescSet and kPushConstBinding. we need to do the
+//       same as MoltenVK. careful: might need to be batched with UpdateBindings() call
+//       -> consider cgpu API change (simplification)
   }
 
   static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
