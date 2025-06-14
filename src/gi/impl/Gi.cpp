@@ -2343,10 +2343,10 @@ cleanup:
                                               CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT |
                                               CGPU_SHADER_STAGE_FLAG_ANY_HIT;
 
-      cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
+      cgpuCmdPushConstants(commandBuffer, pushShaderStages, sizeof(pushData), &pushData);
     }
 
-    cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
+    cgpuCmdTraceRays(commandBuffer, imageWidth, imageHeight);
 
     // Copy device to host memory.
     {
