@@ -3589,8 +3589,7 @@ cleanup_fail:
 
   bool cgpuWaitSemaphores(CgpuDevice device,
                           uint32_t semaphoreInfoCount,
-                          CgpuWaitSemaphoreInfo* semaphoreInfos,
-                          uint64_t timeoutNs)
+                          CgpuWaitSemaphoreInfo* semaphoreInfos)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
@@ -3620,7 +3619,7 @@ cleanup_fail:
     VkResult result = idevice->table.vkWaitSemaphoresKHR(
       idevice->logicalDevice,
       &waitInfo,
-      timeoutNs
+      UINT64_MAX
     );
 
     if (result != VK_SUCCESS)

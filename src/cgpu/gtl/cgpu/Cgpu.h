@@ -827,8 +827,7 @@ namespace gtl
   bool cgpuWaitSemaphores(
     CgpuDevice device,
     uint32_t semaphoreInfoCount,
-    CgpuWaitSemaphoreInfo* semaphoreInfos,
-    uint64_t timeoutNs = UINT64_MAX
+    CgpuWaitSemaphoreInfo* semaphoreInfos
   );
 
   bool cgpuSubmitCommandBuffer(
