@@ -51,8 +51,11 @@ namespace gtl
   struct CgpuIDevice
   {
     MTL::Device* device;
-
     MTL4::CommandQueue* commandQueue;
+
+    // TODO: seems like it was removed from Metal 4 and we have to use our own with sizeOfCounterHeapEnty()
+    //MTL::CounterSampleBuffer* counterSampleBuffer;
+    MTL::CounterHeap* counterHeap;
   };
 
   struct CgpuIBuffer
@@ -95,6 +98,8 @@ namespace gtl
     MTL::Buffer* pcBuffer;
     void* pcMem;
     CgpuShaderStageFlags pcFlags; // append after descriptor sets if flag matches
+
+    MTL::CounterHeap* counterHeap; // owned by device
   };
 
   struct CgpuIBlas
@@ -284,8 +289,34 @@ namespace gtl
     MTL4::CommandQueue* commandQueue = mtlDevice->newMTL4CommandQueue();
     CHK_MTL_NP(commandQueue);
 
+    //MTL::CounterSampleBuffer* counterSampleBuffer;
+    //{
+    //  auto* desc = MTL::CounterSampleBufferDescriptor::alloc()->init();
+    //  desc->setSampleCount(CGPU_MAX_TIMESTAMP_QUERIES);
+    //  desc->setStorageMode(MTL::ResourceStorageModeShared);
+
+    //  NS::Error* error;
+    //  counterSampleBuffer = mtlDevice->newCounterSampleBuffer(desc, &error);
+    //  CHK_MTL(counterSampleBuffer, error);
+    //  desc->release();
+    //}
+
+    MTL::CounterHeap* counterHeap;
+    {
+      auto* desc = MTL::CounterHeapDescriptor::alloc()->init();
+      desc->setEntryCount(CGPU_MAX_TIMESTAMP_QUERIES);
+      desc->setType(MTL4::CounterHeapTypeTimestamp);
+
+      NS::Error* error;
+      counterHeap = mtlDevice->newCounterHeap(desc, &error);
+      CHK_MTL(counterHeap, error);
+      desc->release();
+    }
+
     idevice->device = mtlDevice;
     idevice->commandQueue = commandQueue;
+    //idevice->counterSampleBuffer = counterSampleBuffer;
+    idevice->counterHeap = counterHeap;
 
     device->handle = handle;
     return true;
@@ -295,6 +326,8 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
+    idevice->counterHeap->release();
+    //idevice->counterSampleBuffer->release();
     idevice->commandQueue->release();
     idevice->device->release();
 
@@ -999,6 +1032,8 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     icommandBuffer->pcBuffer = pcBuffer;
     icommandBuffer->pcMem = pcBuffer->contents();
 
+    icommandBuffer->counterHeap = idevice->counterHeap;
+
     commandBuffer->handle = handle;
     return true;
   }
@@ -1206,15 +1241,25 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    // TODO
+    // TODO: counterHeap->invalidateCounterRange() ?
   }
 
   void cgpuCmdWriteTimestamp(CgpuCommandBuffer commandBuffer,
                              uint32_t timestampIndex)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
-    // TODO
+    // For debug configuration, we want precise profiling measurements.
+    MTL4::TimestampGranularity granularity;
+#ifndef NDEBUG
+    granularity = MTL4::TimestampGranularityPrecise;
+#else
+    granularity = MTL4::TimestampGranularityRelaxed;
+#endif
+
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
+    encoder->writeTimestamp(granularity, idevice->counterHeap, timestampIndex);
   }
 
   void cgpuCmdCopyTimestamps(CgpuCommandBuffer commandBuffer,
@@ -1232,7 +1277,9 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
       CGPU_FATAL("max timestamp query count exceeded!");
     }
 
-    // TODO
+    // TODO: commandBuffer->resolveCounterHeap(counterHeap, range, offset, waitSemaphore, signalSemaphore);
+
+    // TODO: commandBuffer->writeTimestampIntoHeap(counterHeap, index)
   }
 
   void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, uint32_t width, uint32_t height)

@@ -170,6 +170,7 @@ namespace gtl
     VkCommandBuffer commandBuffer;
     CgpuDevice device;
 
+// TODO: this is problematic!!!! because resource store could be resized :(
     CgpuIPipeline* boundPipeline = nullptr;
   };
 
