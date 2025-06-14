@@ -91,12 +91,11 @@ namespace gtl
     MTL4::CommandBuffer* commandBuffer;
     MTL4::CommandAllocator* commandAllocator;
     MTL4::ComputeCommandEncoder* encoder;
-
     MTL::Buffer* pcBuffer;
     void* pcMem;
     CgpuShaderStageFlags pcFlags; // append after descriptor sets if flag matches
-
     MTL4::CounterHeap* counterHeap; // owned by device
+    MTL::LogState* logState;
   };
 
   struct CgpuIBlas
@@ -864,6 +863,8 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     MTL::AccelerationStructure* as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
     CHK_MTL_NP(as);
 
+    MTL::Event* event = idevice->device->newEvent();
+    CHK_MTL_NP(event);
     MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
     CHK_MTL_NP(commandBuffer);
     MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
@@ -876,12 +877,10 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
     commandQueue->commit(&commandBuffer, 1);
-    // commandBuffer->waitUntilCompleted(); // TODO
+    commandQueue->signalEvent(event, 42);
+    commandQueue->wait(event, 42);
 
-// TODO: replace
-    //NS::Error* error = commandBuffer->error();
-    //LOG_MTL_ERR(error);
-
+    event->release();
     commandBuffer->release();
 
     scratchBuffer->release();
@@ -963,9 +962,10 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
       MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
       CHK_MTL_NP(scratchBuffer);
 
+      MTL::Event* event = idevice->device->newEvent();
+      CHK_MTL_NP(event);
       MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
       CHK_MTL_NP(commandBuffer);
-
       MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
       CHK_MTL_NP(encoder);
 
@@ -976,12 +976,10 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
       MTL4::CommandQueue* commandQueue = idevice->commandQueue;
       commandQueue->commit(&commandBuffer, 1);
-      // TODO: wait for completion
+      commandQueue->signalEvent(event, 42);
+      commandQueue->wait(event, 42);
 
-      // TODO: attach error logger
-      //NS::Error* error = commandBuffer->error();
-      //LOG_MTL_ERR(error);
-
+      event->release();
       commandBuffer->release();
       scratchBuffer->release();
     }
@@ -1026,18 +1024,50 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     CGPU_RESOLVE_COMMAND_BUFFER({ handle }, icommandBuffer);
 
-    icommandBuffer->commandAllocator = idevice->device->newCommandAllocator();
-    icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
-    icommandBuffer->encoder = nullptr;
-
     MTL::ResourceOptions options = MTL::ResourceOptionCPUCacheModeWriteCombined;
     MTL::Buffer* pcBuffer = idevice->device->newBuffer(CGPU_MAX_PUSH_CONSTANTS_SIZE, options);
     CHK_MTL_NP(pcBuffer);
 
+#ifndef NDEBUG
+    MTL::LogState* logState;
+    {
+      auto* logStateDesc = MTL::LogStateDescriptor::alloc()->init();
+      logStateDesc->setLevel(MTL::LogLevelDebug);
+
+      NS::Error* error;
+      logState = idevice->device->newLogState(logStateDesc, &error);
+      logStateDesc->release();
+      CHK_MTL(logState, error);
+
+      auto logHandler = [](NS::String* subsystem, NS::String* category, MTL::LogLevel logLevel, NS::String* message) {
+        std::string msg;
+        if (logLevel == MTL::LogLevelError || logLevel == MTL::LogLevelFault)
+        {
+          GB_ERROR("[MTL] ({}/{}) {}", subsystem->utf8String(), category->utf8String(), message->utf8String());
+        }
+        else
+        {
+          GB_LOG("[MTL] ({}/{}) {}", subsystem->utf8String(), category->utf8String(), message->utf8String());
+        }
+
+        if (logLevel == MTL::LogLevelFault)
+        {
+          exit(EXIT_FAILURE);
+        }
+      };
+      logState->addLogHandler(logHandler);
+    }
+#endif
+
+    icommandBuffer->commandAllocator = idevice->device->newCommandAllocator();
+    icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
+    icommandBuffer->encoder = nullptr;
     icommandBuffer->pcBuffer = pcBuffer;
     icommandBuffer->pcMem = pcBuffer->contents();
-
     icommandBuffer->counterHeap = idevice->counterHeap;
+#ifndef NDEBUG
+    icommandBuffer->logState = logState;
+#endif
 
     commandBuffer->handle = handle;
     return true;
@@ -1050,6 +1080,9 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     icommandBuffer->commandBuffer->release();
     icommandBuffer->commandAllocator->release();
     icommandBuffer->pcBuffer->release();
+#ifndef NDEBUG
+    icommandBuffer->logState->release();
+#endif
 
     iinstance->icommandBufferStore.free(commandBuffer.handle);
     return true;
@@ -1061,7 +1094,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     auto* options = MTL4::CommandBufferOptions::alloc()->init();
 #ifndef NDEBUG
-    // TODO: set log state
+    options->setLogState(icommandBuffer->logState);
 #endif
 
     icommandBuffer->commandBuffer->beginCommandBuffer(icommandBuffer->commandAllocator, options);
