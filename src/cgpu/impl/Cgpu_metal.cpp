@@ -83,7 +83,7 @@ namespace gtl
 
   struct CgpuISemaphore
   {
-    // TODO
+    MTL::Event* event;
   };
 
   struct CgpuICommandBuffer
@@ -1188,6 +1188,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
                               const CgpuPipelineBarrier* barrier)
   {
     // TODO: call encoder->useResource(res, FLAGS) here?
+    // TODO: -> no, but Metal barrier
 
     // Not available in Metal API.
   }
@@ -1255,7 +1256,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     CGPU_RESOLVE_SEMAPHORE({ handle }, isemaphore);
 
-    // TODO
+    isemaphore->event = idevice->device->newEvent();
 
     semaphore->handle = handle;
     return true;
@@ -1265,7 +1266,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   {
     CGPU_RESOLVE_SEMAPHORE(semaphore, isemaphore);
 
-    // TODO
+    isemaphore->event->release();
 
     iinstance->isemaphoreStore.free(semaphore.handle);
     return true;
@@ -1278,7 +1279,13 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    // TODO (see below)
+    MTL4::CommandQueue* commandQueue = idevice->commandQueue;
+    for (uint32_t i = 0; i < semaphoreInfoCount; i++)
+    {
+      CGPU_RESOLVE_SEMAPHORE(semaphoreInfos[i].semaphore, isemaphore);
+      commandQueue->wait(isemaphore->event, semaphoreInfos[i].value);
+    }
+
     return true;
   }
 
@@ -1292,12 +1299,11 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
+    // TODO: signaling not handled
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
     commandQueue->commit(&icommandBuffer->commandBuffer, 1);
-    // TODO
-    //queue->wait(MTL::Event* event, uint64_t value)
 
-    // TODO: either emulate semaphore or revert back to split sync primitives
+    cgpuWaitSemaphores(device, waitSemaphoreInfoCount, waitSemaphoreInfos);
     return true;
   }
 
