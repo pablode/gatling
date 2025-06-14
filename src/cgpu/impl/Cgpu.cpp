@@ -169,6 +169,8 @@ namespace gtl
   {
     VkCommandBuffer commandBuffer;
     CgpuDevice device;
+
+    CgpuIPipeline* boundPipeline = nullptr;
   };
 
   struct CgpuIBlas
@@ -2871,6 +2873,8 @@ cleanup_fail:
       dynamicOffsetCount,
       dynamicOffsets
     );
+
+    icommandBuffer->boundPipeline = ipipeline;
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
@@ -3318,18 +3322,18 @@ cleanup_fail:
   }
 
   void cgpuCmdPushConstants(CgpuCommandBuffer commandBuffer,
-                            CgpuPipeline pipeline,
                             CgpuShaderStageFlags stageFlags,
                             uint32_t size,
                             const void* data)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+
+    CgpuIPipeline* pipeline = icommandBuffer->boundPipeline;
 
     idevice->table.vkCmdPushConstants(
       icommandBuffer->commandBuffer,
-      ipipeline->layout,
+      pipeline->layout,
       (VkShaderStageFlags) stageFlags,
       0,
       size,
@@ -3512,17 +3516,18 @@ cleanup_fail:
     );
   }
 
-  void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, CgpuPipeline rtPipeline, uint32_t width, uint32_t height)
+  void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, uint32_t width, uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_PIPELINE(rtPipeline, ipipeline);
+
+    CgpuIPipeline* pipeline = icommandBuffer->boundPipeline;
 
     VkStridedDeviceAddressRegionKHR callableSBT = {};
     idevice->table.vkCmdTraceRaysKHR(icommandBuffer->commandBuffer,
-                                     &ipipeline->sbtRgen,
-                                     &ipipeline->sbtMiss,
-                                     &ipipeline->sbtHit,
+                                     &pipeline->sbtRgen,
+                                     &pipeline->sbtMiss,
+                                     &pipeline->sbtHit,
                                      &callableSBT,
                                      width, height, 1);
   }

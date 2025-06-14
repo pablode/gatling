@@ -760,7 +760,6 @@ namespace gtl
 
   void cgpuCmdPushConstants(
     CgpuCommandBuffer commandBuffer,
-    CgpuPipeline pipeline,
     CgpuShaderStageFlags stageFlags,
     uint32_t size,
     const void* data
@@ -799,7 +798,6 @@ namespace gtl
 
   void cgpuCmdTraceRays(
     CgpuCommandBuffer commandBuffer,
-    CgpuPipeline rtPipeline,
     uint32_t width,
     uint32_t height
   );
