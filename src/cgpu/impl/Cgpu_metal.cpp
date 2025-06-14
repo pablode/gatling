@@ -1141,7 +1141,6 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   }
 
   void cgpuCmdPushConstants(CgpuCommandBuffer commandBuffer,
-                            CgpuPipeline pipeline,
                             CgpuShaderStageFlags stageFlags,
                             uint32_t size,
                             const void* data)
@@ -1228,13 +1227,9 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     // TODO
   }
 
-  void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, CgpuPipeline rtPipeline, uint32_t width, uint32_t height)
+  void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, uint32_t width, uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_PIPELINE(rtPipeline, ipipeline);
-
-    // TODO
-
     cgpuCmdDispatch(icommandBuffer, width, height, 1);
   }
 
@@ -1274,8 +1269,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
   bool cgpuWaitSemaphores(CgpuDevice device,
                           uint32_t semaphoreInfoCount,
-                          CgpuWaitSemaphoreInfo* semaphoreInfos,
-                          uint64_t timeoutNs)
+                          CgpuWaitSemaphoreInfo* semaphoreInfos)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
