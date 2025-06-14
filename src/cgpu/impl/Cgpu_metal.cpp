@@ -93,9 +93,12 @@ namespace gtl
     MTL4::ComputeCommandEncoder* encoder;
     MTL::Buffer* pcBuffer;
     void* pcMem;
-    CgpuShaderStageFlags pcFlags; // append after descriptor sets if flag matches
+    CgpuShaderStageFlags pcFlags;
+
     MTL4::CounterHeap* counterHeap; // owned by device
-    MTL::LogState* logState;
+#ifndef NDEBUG
+    MTL::LogState* logState; // owned by device
+#endif
   };
 
   struct CgpuIBlas
@@ -329,9 +332,43 @@ namespace gtl
       desc->release();
     }
 
+#ifndef NDEBUG
+    MTL::LogState* logState;
+    {
+      auto* logStateDesc = MTL::LogStateDescriptor::alloc()->init();
+      logStateDesc->setLevel(MTL::LogLevelDebug);
+
+      NS::Error* error;
+      logState = idevice->device->newLogState(logStateDesc, &error);
+      logStateDesc->release();
+      CHK_MTL(logState, error);
+
+      auto logHandler = [](NS::String* subsystem, NS::String* category, MTL::LogLevel logLevel, NS::String* message) {
+        std::string msg;
+        if (logLevel == MTL::LogLevelError || logLevel == MTL::LogLevelFault)
+        {
+          GB_ERROR("[MTL] ({}/{}) {}", subsystem->utf8String(), category->utf8String(), message->utf8String());
+        }
+        else
+        {
+          GB_LOG("[MTL] ({}/{}) {}", subsystem->utf8String(), category->utf8String(), message->utf8String());
+        }
+
+        if (logLevel == MTL::LogLevelFault)
+        {
+          exit(EXIT_FAILURE);
+        }
+      };
+      logState->addLogHandler(logHandler);
+    }
+#endif
+
     idevice->device = mtlDevice;
     idevice->commandQueue = commandQueue;
     idevice->counterHeap = counterHeap;
+#ifndef NDEBUG
+    idevice->logState = logState;
+#endif
 
     device->handle = handle;
     return true;
@@ -1028,37 +1065,6 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     MTL::Buffer* pcBuffer = idevice->device->newBuffer(CGPU_MAX_PUSH_CONSTANTS_SIZE, options);
     CHK_MTL_NP(pcBuffer);
 
-#ifndef NDEBUG
-    MTL::LogState* logState;
-    {
-      auto* logStateDesc = MTL::LogStateDescriptor::alloc()->init();
-      logStateDesc->setLevel(MTL::LogLevelDebug);
-
-      NS::Error* error;
-      logState = idevice->device->newLogState(logStateDesc, &error);
-      logStateDesc->release();
-      CHK_MTL(logState, error);
-
-      auto logHandler = [](NS::String* subsystem, NS::String* category, MTL::LogLevel logLevel, NS::String* message) {
-        std::string msg;
-        if (logLevel == MTL::LogLevelError || logLevel == MTL::LogLevelFault)
-        {
-          GB_ERROR("[MTL] ({}/{}) {}", subsystem->utf8String(), category->utf8String(), message->utf8String());
-        }
-        else
-        {
-          GB_LOG("[MTL] ({}/{}) {}", subsystem->utf8String(), category->utf8String(), message->utf8String());
-        }
-
-        if (logLevel == MTL::LogLevelFault)
-        {
-          exit(EXIT_FAILURE);
-        }
-      };
-      logState->addLogHandler(logHandler);
-    }
-#endif
-
     icommandBuffer->commandAllocator = idevice->device->newCommandAllocator();
     icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
     icommandBuffer->encoder = nullptr;
@@ -1066,7 +1072,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     icommandBuffer->pcMem = pcBuffer->contents();
     icommandBuffer->counterHeap = idevice->counterHeap;
 #ifndef NDEBUG
-    icommandBuffer->logState = logState;
+    icommandBuffer->logState = idevice->logState;
 #endif
 
     commandBuffer->handle = handle;
