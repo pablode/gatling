@@ -52,10 +52,7 @@ namespace gtl
   {
     MTL::Device* device;
     MTL4::CommandQueue* commandQueue;
-
-    // TODO: seems like it was removed from Metal 4 and we have to use our own with sizeOfCounterHeapEnty()
-    //MTL::CounterSampleBuffer* counterSampleBuffer;
-    MTL::CounterHeap* counterHeap;
+    MTL4::CounterHeap* counterHeap;
   };
 
   struct CgpuIBuffer
@@ -99,7 +96,7 @@ namespace gtl
     void* pcMem;
     CgpuShaderStageFlags pcFlags; // append after descriptor sets if flag matches
 
-    MTL::CounterHeap* counterHeap; // owned by device
+    MTL4::CounterHeap* counterHeap; // owned by device
   };
 
   struct CgpuIBlas
@@ -289,21 +286,9 @@ namespace gtl
     MTL4::CommandQueue* commandQueue = mtlDevice->newMTL4CommandQueue();
     CHK_MTL_NP(commandQueue);
 
-    //MTL::CounterSampleBuffer* counterSampleBuffer;
-    //{
-    //  auto* desc = MTL::CounterSampleBufferDescriptor::alloc()->init();
-    //  desc->setSampleCount(CGPU_MAX_TIMESTAMP_QUERIES);
-    //  desc->setStorageMode(MTL::ResourceStorageModeShared);
-
-    //  NS::Error* error;
-    //  counterSampleBuffer = mtlDevice->newCounterSampleBuffer(desc, &error);
-    //  CHK_MTL(counterSampleBuffer, error);
-    //  desc->release();
-    //}
-
-    MTL::CounterHeap* counterHeap;
+    MTL4::CounterHeap* counterHeap;
     {
-      auto* desc = MTL::CounterHeapDescriptor::alloc()->init();
+      auto* desc = MTL4::CounterHeapDescriptor::alloc()->init();
       desc->setEntryCount(CGPU_MAX_TIMESTAMP_QUERIES);
       desc->setType(MTL4::CounterHeapTypeTimestamp);
 
@@ -315,7 +300,6 @@ namespace gtl
 
     idevice->device = mtlDevice;
     idevice->commandQueue = commandQueue;
-    //idevice->counterSampleBuffer = counterSampleBuffer;
     idevice->counterHeap = counterHeap;
 
     device->handle = handle;
@@ -327,7 +311,6 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
 
     idevice->counterHeap->release();
-    //idevice->counterSampleBuffer->release();
     idevice->commandQueue->release();
     idevice->device->release();
 
@@ -1241,14 +1224,14 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    // TODO: counterHeap->invalidateCounterRange() ?
+    NS::Range range(offset, count);
+    icommandBuffer->counterHeap->invalidateCounterRange(range); // clears to 0
   }
 
   void cgpuCmdWriteTimestamp(CgpuCommandBuffer commandBuffer,
                              uint32_t timestampIndex)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
 
     // For debug configuration, we want precise profiling measurements.
     MTL4::TimestampGranularity granularity;
@@ -1259,7 +1242,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 #endif
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
-    encoder->writeTimestamp(granularity, idevice->counterHeap, timestampIndex);
+    encoder->writeTimestamp(granularity, icommandBuffer->counterHeap, timestampIndex);
   }
 
   void cgpuCmdCopyTimestamps(CgpuCommandBuffer commandBuffer,
@@ -1277,9 +1260,27 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
       CGPU_FATAL("max timestamp query count exceeded!");
     }
 
-    // TODO: commandBuffer->resolveCounterHeap(counterHeap, range, offset, waitSemaphore, signalSemaphore);
+    for (uint32_t i = offset; i < count; i++)
+    {
+      icommandBuffer->commandBuffer->writeTimestampIntoHeap(icommandBuffer->counterHeap, i);
+    }
 
-    // TODO: commandBuffer->writeTimestampIntoHeap(counterHeap, index)
+    if (!waitUntilAvailable)
+    {
+      return;
+    }
+
+    NS::Range range(offset, count);
+    uint32_t bufferOffset = 0;
+
+    icommandBuffer->commandBuffer->resolveCounterHeap(
+      icommandBuffer->counterHeap,
+      range,
+      ibuffer->buffer,
+      bufferOffset,
+      nullptr,
+      nullptr
+    );
   }
 
   void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, uint32_t width, uint32_t height)
