@@ -701,7 +701,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     uint32_t functionCount = createInfo.hitGroupCount; // TODO: * 2 for anyhit (probably in user space)
 
-    std::vector<MTL::Function*> hitFunctions(functionCount); // TODO: release?
+    std::vector<MTL::Function*> hitFunctions(functionCount);
     MTL::LinkedFunctions* linkedFunctions;
     {
       for (uint32_t i = 0; i < functionCount; i++)
@@ -756,6 +756,14 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
         ift->setFunction(funcHandle, i/*TODO: consider offset for ahit*/);
       }
     }
+
+    // TODO: test if enable
+#if 0
+    for (MTL::Function* fun : hitFunctions)
+    {
+      fun->release();
+    }
+#endif
 
     ipipeline->ift = ift;
 
@@ -1293,11 +1301,17 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    // TODO: signaling not handled
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
     commandQueue->commit(&icommandBuffer->commandBuffer, 1);
 
     cgpuWaitSemaphores(device, waitSemaphoreInfoCount, waitSemaphoreInfos);
+
+    for (uint32_t i = 0; i < signalSemaphoreInfoCount; i++)
+    {
+      CGPU_RESOLVE_SEMAPHORE(signalSemaphoreInfos[i].semaphore, isemaphore);
+      commandQueue->signalEvent(isemaphore->event, signalSemaphoreInfos[i].value);
+    }
+
     return true;
   }
 
