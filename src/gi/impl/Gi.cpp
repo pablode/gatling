@@ -2327,6 +2327,7 @@ cleanup:
     if (!cgpuBeginCommandBuffer(commandBuffer))
       goto cleanup;
 
+    // TODO: do this only once after shader cache rebuild
     cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
     cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings0);

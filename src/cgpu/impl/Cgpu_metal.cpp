@@ -1123,9 +1123,17 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
                                            uint32_t imageCount,
                                            const CgpuImageBinding* images)
   {
-    // Not needed for Metal.
+    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-// TODO: call commandBuffer->optimizeResourcesForGPUAccess ?
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
+
+    for (uint32_t i = 0; i < imageCount; i++)
+    {
+      const CgpuImageBinding& b = images[i];
+      CGPU_RESOLVE_IMAGE(b.image, iimage);
+
+      encoder->optimizeContentsForGPUAccess(iimage->texture);
+    }
   }
 
   void cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
