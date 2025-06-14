@@ -436,6 +436,7 @@ namespace gtl
     CgpuMemoryAccessFlags dstAccessMask;
   };
 
+// TODO: rename BufferMemoryBarrier -> BufferBarrier
   struct CgpuBufferMemoryBarrier
   {
     CgpuBuffer buffer;

@@ -231,6 +231,38 @@ namespace gtl
   }
   */
 
+  static MTL::ResourceOptions cgpuTranslateMemoryProperties(CgpuMemoryPropertyFlags memoryProperties)
+  {
+    if (memoryProperties == CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
+    {
+      return MTL::ResourceStorageModePrivate;
+    }
+
+    return MTL::ResourceStorageModeShared;
+  }
+
+  static MTL::Stages cgpuTranslatePipelineStages(CgpuPipelineStageFlags stages)
+  {
+    MTL::Stages newStages = 0;
+
+    if (bool(stages & CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER) ||
+        bool(stages & CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER))
+    {
+      newStages |= MTL::StageDispatch;
+    }
+    if (bool(stages & CGPU_PIPELINE_STAGE_FLAG_TRANSFER) ||
+        bool(stages & CGPU_PIPELINE_STAGE_FLAG_HOST))
+    {
+      newStages |= MTL::StageBlit;
+    }
+    if (bool(stages & CGPU_PIPELINE_STAGE_FLAG_ACCELERATION_STRUCTURE_BUILD))
+    {
+      newStages |= MTL::StageAccelerationStructure;
+    }
+
+    return newStages;
+  }
+
   template<typename T>
   static T cgpuPadToAlignment(T value, T alignment)
   {
@@ -422,16 +454,6 @@ namespace gtl
     return true;
   }
 
-  static MTL::ResourceOptions cgpuMakeResourceOptions(CgpuMemoryPropertyFlags memoryProperties)
-  {
-    if (memoryProperties == CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
-    {
-      return MTL::ResourceStorageModePrivate;
-    }
-
-    return MTL::ResourceStorageModeShared;
-  }
-
   bool cgpuCreateBuffer(CgpuDevice device,
                         CgpuBufferCreateInfo createInfo,
                         CgpuBuffer* buffer)
@@ -446,7 +468,7 @@ namespace gtl
     uint64_t size = cgpuPadToAlignment(createInfo.size, BASE_ALIGNMENT); // for performance
     assert(size > 0);
 
-    MTL::ResourceOptions options = cgpuMakeResourceOptions(createInfo.memoryProperties);
+    MTL::ResourceOptions options = cgpuTranslateMemoryProperties(createInfo.memoryProperties);
 
     MTL::Buffer* mtlBuffer = idevice->device->newBuffer(size, options);
     if (!mtlBuffer)
@@ -1212,10 +1234,39 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   void cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
                               const CgpuPipelineBarrier* barrier)
   {
-    // TODO: call encoder->useResource(res, FLAGS) here?
-    // TODO: -> no, but Metal barrier
+    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    // Not available in Metal API.
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
+
+    for (uint32_t i = 0; i < barrier->memoryBarrierCount; i++)
+    {
+      const CgpuMemoryBarrier& b = barrier->memoryBarriers[i];
+
+      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.srcStageMask);
+      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.dstStageMask);
+
+      encoder->barrierAfterEncoderStages(afterStages, beforeStages, MTL4::VisibilityOptionDevice);
+    }
+
+    for (uint32_t i = 0; i < barrier->bufferBarrierCount; i++)
+    {
+      const CgpuBufferMemoryBarrier& b = barrier->bufferBarriers[i];
+
+      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.srcStageMask);
+      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.dstStageMask);
+
+      encoder->barrierAfterEncoderStages(afterStages, beforeStages, MTL4::VisibilityOptionDevice);
+    }
+
+    for (uint32_t i = 0; i < barrier->imageBarrierCount; i++)
+    {
+      const CgpuImageMemoryBarrier& b = barrier->imageBarriers[i];
+
+      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.srcStageMask);
+      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.dstStageMask);
+
+      encoder->barrierAfterEncoderStages(afterStages, beforeStages, MTL4::VisibilityOptionDevice);
+    }
   }
 
   void cgpuCmdResetTimestamps(CgpuCommandBuffer commandBuffer,
