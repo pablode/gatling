@@ -92,9 +92,8 @@ namespace gtl
     MTL4::CommandAllocator* commandAllocator;
     MTL4::ComputeCommandEncoder* encoder;
 
-// TODO: alloc has device local, host visible. expose limit in cgpu.h
     MTL::Buffer* pcBuffer;
-    uint8_t* pcMem;
+    void* pcMem;
     CgpuShaderStageFlags pcFlags; // append after descriptor sets if flag matches
   };
 
@@ -985,6 +984,13 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
     icommandBuffer->encoder = nullptr;
 
+    MTL::ResourceOptions options = MTL::ResourceOptionCPUCacheModeWriteCombined;
+    MTL::Buffer* pcBuffer = idevice->device->newBuffer(CGPU_MAX_PUSH_CONSTANTS_SIZE, options);
+    CHK_MTL_NP(pcBuffer);
+
+    icommandBuffer->pcBuffer = pcBuffer;
+    icommandBuffer->pcMem = pcBuffer->contents();
+
     commandBuffer->handle = handle;
     return true;
   }
@@ -995,6 +1001,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     icommandBuffer->commandBuffer->release();
     icommandBuffer->commandAllocator->release();
+    icommandBuffer->pcBuffer->release();
 
     iinstance->icommandBufferStore.free(commandBuffer.handle);
     return true;
@@ -1143,11 +1150,11 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
-    memcpy((void*) icommandBuffer->pcMem, data, size);
+    memcpy(icommandBuffer->pcMem, data, size);
 
-    // TODO: this means we need to update the descriptor set (binding) afterwards
+    icommandBuffer->pcFlags = stageFlags;
 
-// TODO: set flags to argument
+// TODO: this means we need to update the descriptor set (binding) afterwards
 
 // TODO: in updateBindings function, bind this as arg table (4)
 
