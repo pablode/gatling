@@ -51,7 +51,8 @@ namespace gtl
   struct CgpuIDevice
   {
     MTL::Device* device;
-    MTL::CommandQueue* queue;
+
+    MTL4::CommandQueue* commandQueue;
   };
 
   struct CgpuIBuffer
@@ -71,6 +72,7 @@ namespace gtl
   struct CgpuIPipeline
   {
     MTL::ComputePipelineState* state;
+    MTL::IntersectionFunctionTable* ift; // only for RT pipelines
   };
 
   struct CgpuIShader
@@ -86,8 +88,14 @@ namespace gtl
 
   struct CgpuICommandBuffer
   {
-    MTL::CommandBuffer* commandBuffer;
-    std::variant<std::monostate, MTL::ComputeCommandEncoder*, MTL::BlitCommandEncoder*> encoder;
+    MTL4::CommandBuffer* commandBuffer;
+    MTL4::CommandAllocator* commandAllocator;
+    MTL4::ComputeCommandEncoder* encoder;
+
+// TODO: alloc has device local, host visible. expose limit in cgpu.h
+    MTL::Buffer* pcBuffer;
+    uint8_t* pcMem;
+    CgpuShaderStageFlags pcFlags; // append after descriptor sets if flag matches
   };
 
   struct CgpuIBlas
@@ -274,11 +282,11 @@ namespace gtl
 
     // TODO: check device capabilities
 
-    MTL::CommandQueue* queue = mtlDevice->newCommandQueue();
-    CHK_MTL_NP(queue);
+    MTL4::CommandQueue* commandQueue = mtlDevice->newMTL4CommandQueue();
+    CHK_MTL_NP(commandQueue);
 
     idevice->device = mtlDevice;
-    idevice->queue = queue;
+    idevice->commandQueue = commandQueue;
 
     device->handle = handle;
     return true;
@@ -288,7 +296,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    idevice->queue->release();
+    idevice->commandQueue->release();
     idevice->device->release();
 
     iinstance->ideviceStore.free(device.handle);
@@ -520,7 +528,7 @@ namespace gtl
     MTL::PixelFormat pixelFormat = cgpuTranslateImageFormat(createInfo.format);
     bool mipmapped = false;
 
-    MTL::TextureDescriptor* descriptor = MTL::TextureDescriptor::alloc()->init();
+    auto* descriptor = MTL::TextureDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
 
     descriptor->setTextureType(createInfo.is3d ? MTL::TextureType3D : MTL::TextureType2D);
@@ -592,7 +600,7 @@ namespace gtl
       }
     };
 
-    MTL::SamplerDescriptor* descriptor = MTL::SamplerDescriptor::alloc()->init();
+    auto* descriptor = MTL::SamplerDescriptor::alloc()->init();
 
     descriptor->setSAddressMode(translateAddressMode(createInfo.addressModeU));
     descriptor->setTAddressMode(translateAddressMode(createInfo.addressModeV));
@@ -628,13 +636,12 @@ namespace gtl
     return true;
   }
 
-  bool cgpuCreateComputePipeline(CgpuDevice device,
-                                 CgpuComputePipelineCreateInfo createInfo,
-                                 CgpuPipeline* pipeline)
+  bool cgpuCreateComputePipeline(CgpuIDevice* idevice,
+                                 CgpuIShader* ishader,
+                                 const char* debugName,
+                                 CgpuPipeline* pipeline,
+                                 const MTL::LinkedFunctions* linkedFunctions = nullptr)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_SHADER(createInfo.shader, ishader);
-
     uint64_t handle = iinstance->ipipelineStore.allocate();
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
@@ -645,13 +652,17 @@ namespace gtl
     auto* descriptor = MTL::ComputePipelineDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
 
+    if (linkedFunctions)
+    {
+      descriptor->setLinkedFunctions(linkedFunctions);
+    }
     descriptor->setComputeFunction(entryFunc);
 #ifndef NDEBUG
     descriptor->setShaderValidation(MTL::ShaderValidationEnabled);
 #endif
-    if (createInfo.debugName)
+    if (debugName)
     {
-      descriptor->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+      descriptor->setLabel(NS::String::string(debugName, NS::StringEncoding::UTF8StringEncoding));
     }
 
     NS::Error* error;
@@ -669,24 +680,97 @@ namespace gtl
     return true;
   }
 
+
+  bool cgpuCreateComputePipeline(CgpuDevice device,
+                                 CgpuComputePipelineCreateInfo createInfo,
+                                 CgpuPipeline* pipeline)
+  {
+    CGPU_RESOLVE_DEVICE(device, idevice);
+    CGPU_RESOLVE_SHADER(createInfo.shader, ishader);
+
+    return cgpuCreateComputePipeline(idevice, ishader, createInfo.debugName, pipeline);
+  }
+
+int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name conflicts
   bool cgpuCreateRtPipeline(CgpuDevice device,
                             CgpuRtPipelineCreateInfo createInfo,
                             CgpuPipeline* pipeline)
   {
+
     CGPU_RESOLVE_DEVICE(device, idevice);
+    CGPU_RESOLVE_SHADER(createInfo.rgenShader, ishader);
 
-    uint64_t handle = iinstance->ipipelineStore.allocate();
+    uint32_t functionCount = createInfo.hitGroupCount; // TODO: * 2 for anyhit (probably in user space)
 
-    CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
+    std::vector<MTL::Function*> hitFunctions(functionCount); // TODO: release?
+    MTL::LinkedFunctions* linkedFunctions;
+    {
+      for (uint32_t i = 0; i < functionCount; i++)
+      {
+        CgpuShader shader = createInfo.hitGroups[i].closestHitShader; // TODO: ignores any hit
+        CGPU_RESOLVE_SHADER(shader, ishader);
 
-    // TODO
+        NS::String* entryFuncName = NS::String::string((std::string(SPVC_MSL_ENTRY_POINT)+std::to_string(fnNameCnt++)).c_str(), NS::UTF8StringEncoding);
 
-    return false;
+        MTL::Function* hitFunc = ishader->library->newFunction(entryFuncName);
+        CHK_MTL_NP(hitFunc);
+
+        hitFunctions[i] = hitFunc;
+      }
+
+      NS::Array* ar = NS::Array::array((const NS::Object* const*) hitFunctions.data(), (uint32_t) hitFunctions.size());
+      CHK_MTL_NP(ar);
+
+      linkedFunctions = MTL::LinkedFunctions::alloc()->init();
+      linkedFunctions->setFunctions(ar);
+
+      ar->release();
+    }
+
+    if (!cgpuCreateComputePipeline(idevice, ishader, createInfo.debugName, pipeline, linkedFunctions))
+    {
+      return false;
+    }
+
+    CGPU_RESOLVE_PIPELINE(*pipeline, ipipeline);
+
+    MTL::IntersectionFunctionTable* ift;
+    {
+      auto* descriptor = MTL::IntersectionFunctionTableDescriptor::alloc()->init();
+      CHK_MTL_NP(descriptor);
+
+      descriptor->setFunctionCount(functionCount);
+
+      MTL::IntersectionFunctionTable* ift = ipipeline->state->newIntersectionFunctionTable(descriptor);
+      CHK_MTL_NP(descriptor);
+
+      descriptor->release();
+
+      // TODO: do we need to allocate a buffer for the table (.setBuffer)? GH example does not
+
+      for (uint32_t i = 0; i < functionCount; i++)
+      {
+        MTL::Function* hitFunc = hitFunctions[i];
+        MTL::FunctionHandle* funcHandle = ipipeline->state->functionHandle(hitFunc);
+        CHK_MTL_NP(funcHandle);
+
+        ift->setFunction(funcHandle, i/*TODO: consider offset for ahit*/);
+      }
+    }
+
+    ipipeline->ift = ift;
+
+    return true;
   }
 
   bool cgpuDestroyPipeline(CgpuDevice device, CgpuPipeline pipeline)
   {
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+
+    if (ipipeline->ift)
+    {
+      ipipeline->ift->release();
+    }
 
     ipipeline->state->release();
 
@@ -706,15 +790,18 @@ namespace gtl
 
     CGPU_RESOLVE_BLAS({ handle }, iblas);
 
-    auto* triDesc = MTL::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
-    triDesc->setVertexBuffer(ivertexBuffer->buffer);
+    auto vertexBufferRange = MTL4::BufferRange::Make(ivertexBuffer->buffer->gpuAddress(), ivertexBuffer->size);
+    auto indexBufferRange = MTL4::BufferRange::Make(iindexBuffer->buffer->gpuAddress(), iindexBuffer->size);
+
+    auto* triDesc = MTL4::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
+    triDesc->setVertexBuffer(vertexBufferRange);
     triDesc->setVertexStride(sizeof(float) * 3);
-    triDesc->setIndexBuffer(iindexBuffer->buffer);
+    triDesc->setIndexBuffer(indexBufferRange);
     triDesc->setIndexType(MTL::IndexTypeUInt32);
     triDesc->setTriangleCount(createInfo.triangleCount);
     triDesc->setOpaque(createInfo.isOpaque);
 
-    auto* blasDesc = MTL::PrimitiveAccelerationStructureDescriptor::alloc()->init();
+    auto* blasDesc = MTL4::PrimitiveAccelerationStructureDescriptor::alloc()->init();
     CHK_MTL_NP(blasDesc);
 
     NS::Array* geoDescs = NS::Array::array(triDesc);
@@ -732,21 +819,23 @@ namespace gtl
     MTL::AccelerationStructure* as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
     CHK_MTL_NP(as);
 
-    MTL::CommandBuffer* commandBuffer = idevice->queue->commandBuffer();
+    MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
     CHK_MTL_NP(commandBuffer);
-    MTL::AccelerationStructureCommandEncoder* encoder = commandBuffer->accelerationStructureCommandEncoder();
+    MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
     CHK_MTL_NP(encoder);
 
-    uint32_t scratchBufferOffset = 0;
-    encoder->buildAccelerationStructure(as, blasDesc, scratchBuffer, scratchBufferOffset);
+    auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
+    encoder->buildAccelerationStructure(as, blasDesc, scratchBufferRange);
     encoder->endEncoding();
     encoder->release();
 
-    commandBuffer->commit();
-    commandBuffer->waitUntilCompleted();
+    MTL4::CommandQueue* commandQueue = idevice->commandQueue;
+    commandQueue->commit(&commandBuffer, 1);
+    // commandBuffer->waitUntilCompleted(); // TODO
 
-    NS::Error* error = commandBuffer->error();
-    LOG_MTL_ERR(error);
+// TODO: replace
+    //NS::Error* error = commandBuffer->error();
+    //LOG_MTL_ERR(error);
 
     commandBuffer->release();
 
@@ -778,6 +867,7 @@ namespace gtl
     CGPU_RESOLVE_TLAS({ handle }, itlas);
 
     // Upload instance buffer.
+    uint64_t instanceBufferSize;
     MTL::Buffer* instanceBuffer;
     {
       std::vector<MTL::AccelerationStructureUserIDInstanceDescriptor> instances(createInfo.instanceCount);
@@ -792,21 +882,24 @@ namespace gtl
         d.intersectionFunctionTableOffset = instance.hitGroupIndex;
         d.accelerationStructureIndex = i;
         d.userID = instance.instanceCustomIndex;;
+        // TODO: if transposed, set MTL::AccelerationStructureTriangleGeometryDescriptor::transformationMatrixLayout (MTL::MatrixLayout)
         memcpy(&d.transformationMatrix, instance.transform, sizeof(instance.transform)); // TODO: might be transposed
       }
 
-      uint64_t bufferSize = sizeof(MTL::AccelerationStructureInstanceDescriptor) * instances.size();
+      instanceBufferSize = sizeof(MTL::AccelerationStructureInstanceDescriptor) * instances.size();
 
-      instanceBuffer = idevice->device->newBuffer(bufferSize, MTL::ResourceStorageModeShared);
+      instanceBuffer = idevice->device->newBuffer(instanceBufferSize, MTL::ResourceStorageModeShared);
       CHK_MTL_NP(instanceBuffer);
 
-      memcpy(instanceBuffer->contents(), instances.data(), bufferSize);
-      instanceBuffer->didModifyRange(NS::Range::Make(0, bufferSize));
+      memcpy(instanceBuffer->contents(), instances.data(), instanceBufferSize);
+      instanceBuffer->didModifyRange(NS::Range::Make(0, instanceBufferSize));
     }
 
-    MTL::InstanceAccelerationStructureDescriptor* descriptor = MTL::InstanceAccelerationStructureDescriptor::alloc()->init();
+    auto instanceBufferRange = MTL4::BufferRange::Make(instanceBuffer->gpuAddress(), instanceBufferSize);
+
+    auto* descriptor = MTL4::InstanceAccelerationStructureDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
-    descriptor->setInstanceDescriptorBuffer(instanceBuffer);
+    descriptor->setInstanceDescriptorBuffer(instanceBufferRange);
     descriptor->setInstanceDescriptorStride(sizeof(MTL::AccelerationStructureInstanceDescriptor));
     descriptor->setInstanceCount(createInfo.instanceCount);
 
@@ -825,25 +918,26 @@ namespace gtl
       MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
       CHK_MTL_NP(scratchBuffer);
 
-      MTL::CommandBuffer* commandBuffer = idevice->queue->commandBuffer();
+      MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
       CHK_MTL_NP(commandBuffer);
 
-      MTL::AccelerationStructureCommandEncoder* encoder = commandBuffer->accelerationStructureCommandEncoder();
+      MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
       CHK_MTL_NP(encoder);
 
-      uint32_t scratchBufferOffset = 0;
-      encoder->buildAccelerationStructure(as, descriptor, scratchBuffer, scratchBufferOffset);
+      auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
+      encoder->buildAccelerationStructure(as, descriptor, scratchBufferRange);
       encoder->endEncoding();
       encoder->release();
 
-      commandBuffer->commit();
-      commandBuffer->waitUntilCompleted();
+      MTL4::CommandQueue* commandQueue = idevice->commandQueue;
+      commandQueue->commit(&commandBuffer, 1);
+      // TODO: wait for completion
 
-      NS::Error* error = commandBuffer->error();
-      LOG_MTL_ERR(error);
+      // TODO: attach error logger
+      //NS::Error* error = commandBuffer->error();
+      //LOG_MTL_ERR(error);
 
       commandBuffer->release();
-
       scratchBuffer->release();
     }
 
@@ -887,8 +981,9 @@ namespace gtl
 
     CGPU_RESOLVE_COMMAND_BUFFER({ handle }, icommandBuffer);
 
-    icommandBuffer->commandBuffer = idevice->queue->commandBuffer();
-    icommandBuffer->encoder = std::monostate{};
+    icommandBuffer->commandAllocator = idevice->device->newCommandAllocator();
+    icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
+    icommandBuffer->encoder = nullptr;
 
     commandBuffer->handle = handle;
     return true;
@@ -899,50 +994,26 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
     icommandBuffer->commandBuffer->release();
+    icommandBuffer->commandAllocator->release();
 
     iinstance->icommandBufferStore.free(commandBuffer.handle);
     return true;
   }
 
-  static MTL::BlitCommandEncoder* cgpuTransitionCommandBufferEncoderToBlit(CgpuICommandBuffer* icommandBuffer)
-  {
-    if (auto* computeEncoder = std::get_if<MTL::ComputeCommandEncoder*>(&icommandBuffer->encoder); computeEncoder)
-    {
-      (*computeEncoder)->endEncoding();
-      (*computeEncoder)->release();
-
-      icommandBuffer->encoder = std::monostate{};
-    }
-
-    if (std::holds_alternative<std::monostate>(icommandBuffer->encoder))
-    {
-      icommandBuffer->encoder = icommandBuffer->commandBuffer->blitCommandEncoder();
-    }
-
-    return std::get<MTL::BlitCommandEncoder*>(icommandBuffer->encoder);
-  }
-
-  static MTL::ComputeCommandEncoder* cgpuTransitionCommandBufferEncoderToCompute(CgpuICommandBuffer* icommandBuffer)
-  {
-    if (auto* blitEncoder = std::get_if<MTL::ComputeCommandEncoder*>(&icommandBuffer->encoder); blitEncoder)
-    {
-      (*blitEncoder)->endEncoding();
-      (*blitEncoder)->release();
-
-      icommandBuffer->encoder = std::monostate{};
-    }
-
-    if (std::holds_alternative<std::monostate>(icommandBuffer->encoder))
-    {
-      icommandBuffer->encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
-    }
-
-    return std::get<MTL::ComputeCommandEncoder*>(icommandBuffer->encoder);
-  }
-
   bool cgpuBeginCommandBuffer(CgpuCommandBuffer commandBuffer)
   {
-    return true; // No-op
+    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
+
+    auto* options = MTL4::CommandBufferOptions::alloc()->init();
+#ifndef NDEBUG
+    // TODO: set log state
+#endif
+
+    icommandBuffer->commandBuffer->beginCommandBuffer(icommandBuffer->commandAllocator, options);
+    icommandBuffer->encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
+
+    options->release();
+    return true;
   }
 
   void cgpuCmdBindPipeline(CgpuCommandBuffer commandBuffer, CgpuPipeline pipeline)
@@ -950,9 +1021,12 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    MTL::ComputeCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToCompute(icommandBuffer);
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
     encoder->setComputePipelineState(ipipeline->state);
+
+// TODO: seems like we need to use agument tables (descriptor sets)
+    //encoder->setIntersectionFunctionTable(ipipeline->ift, bufferIndex);
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
@@ -962,6 +1036,8 @@ namespace gtl
                                            const CgpuImageBinding* images)
   {
     // Not needed for Metal.
+
+// TODO: call commandBuffer->optimizeResourcesForGPUAccess ?
   }
 
   void cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
@@ -972,7 +1048,30 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
+
+// TODO: we have to map descriptor sets to Argument Tables
+
+    for (uint32_t i = 0; i < bindings->bufferCount; i++)
+    {
+      const CgpuBufferBinding& b = bindings->buffers[i];
+
+      CGPU_RESOLVE_BUFFER(b.buffer, ibuffer);
+      //encoder->setBuffer(ibuffer->buffer, b.offset, b.binding); // (.size is ignored)
+    }
+
+    for (uint32_t i = 0; i < bindings->imageCount; i++)
+    {
+      const CgpuImageBinding& b = bindings->images[i];
+
+      CGPU_RESOLVE_IMAGE(b.image, iimage);
+      //encoder->setTexture(iimage->texture, b.binding); // TODO: there's no .index argument!!
+    }
+
     // TODO
+
+    // TODO: we have to call useResource for not only the TLAS but also all BLAS that
+    ///      belong to it (we can use a separate heap for all BLAS and call useHeap)
   }
 
   void cgpuCmdUpdateBuffer(CgpuCommandBuffer commandBuffer,
@@ -995,7 +1094,7 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(srcBuffer, isrcBuffer);
     CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
 
-    MTL::BlitCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToBlit(icommandBuffer);
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
     uint64_t rangeSize = (size == CGPU_WHOLE_SIZE) ? std::min(isrcBuffer->size, idstBuffer->size) : size;
     encoder->copyFromBuffer(isrcBuffer->buffer, srcOffset, idstBuffer->buffer, dstOffset, rangeSize);
@@ -1010,7 +1109,7 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
     CGPU_RESOLVE_IMAGE(image, iimage);
 
-    MTL::BlitCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToBlit(icommandBuffer);
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
     uint32_t bytesPerPixel = 4; // TODO: from helper function
     uint32_t srcBytesPerRow = iimage->width * bytesPerPixel;
@@ -1042,10 +1141,18 @@ namespace gtl
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    MTL::ComputeCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToCompute(icommandBuffer);
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
-    uint32_t slot = 0;
-    encoder->setBytes(data, size, slot);
+    memcpy((void*) icommandBuffer->pcMem, data, size);
+
+    // TODO: this means we need to update the descriptor set (binding) afterwards
+
+// TODO: set flags to argument
+
+// TODO: in updateBindings function, bind this as arg table (4)
+
+// TODO: SPIRV-Cross needs to generate the code for it
+//       -> replace push_constant with buffer(N+!)
   }
 
   static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
@@ -1053,11 +1160,11 @@ namespace gtl
                               uint32_t dim_y,
                               uint32_t dim_z)
   {
-    MTL::ComputeCommandEncoder* encoder = cgpuTransitionCommandBufferEncoderToCompute(icommandBuffer);
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
     MTL::Size groupsPerGrid(dim_x, dim_y, dim_x);
     MTL::Size threadsPerGroup(32, 32, 1); // TODO: retrieve this from the bound pipeline
-    encoder->dispatchThreadgroups(groupsPerGrid, threadsPerGroup);
+   // encoder->dispatchThreadgroups(groupsPerGrid, threadsPerGroup);
   }
 
   void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
@@ -1073,6 +1180,8 @@ namespace gtl
   void cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
                               const CgpuPipelineBarrier* barrier)
   {
+    // TODO: call encoder->useResource(res, FLAGS) here?
+
     // Not available in Metal API.
   }
 
@@ -1125,18 +1234,10 @@ namespace gtl
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    if (auto* encoder = std::get_if<MTL::ComputeCommandEncoder*>(&icommandBuffer->encoder); encoder)
-    {
-      (*encoder)->endEncoding();
-      (*encoder)->release();
-    }
-    else if (auto* encoder = std::get_if<MTL::BlitCommandEncoder*>(&icommandBuffer->encoder); encoder)
-    {
-      (*encoder)->endEncoding();
-      (*encoder)->release();
-    }
+    icommandBuffer->encoder->endEncoding();
+    icommandBuffer->encoder->release();
 
-    icommandBuffer->encoder = std::monostate{};
+    icommandBuffer->commandBuffer->endCommandBuffer();
   }
 
   bool cgpuCreateSemaphore(CgpuDevice device, CgpuSemaphore* semaphore, uint64_t initialValue)
@@ -1184,11 +1285,12 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    icommandBuffer->commandBuffer->commit();
+    MTL4::CommandQueue* commandQueue = idevice->commandQueue;
+    commandQueue->commit(&icommandBuffer->commandBuffer, 1);
+    // TODO
+    //queue->wait(MTL::Event* event, uint64_t value)
 
     // TODO: either emulate semaphore or revert back to split sync primitives
-    icommandBuffer->commandBuffer->waitUntilCompleted();
-
     return true;
   }
 
