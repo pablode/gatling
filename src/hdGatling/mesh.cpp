@@ -452,7 +452,7 @@ HdGatlingMesh::HdGatlingMesh(const SdfPath& id,
 {
 }
 
-HdGatlingMesh::~HdGatlingMesh()
+void HdGatlingMesh::Finalize(HdRenderParam* renderParam)
 {
   if (_baseMesh)
   {

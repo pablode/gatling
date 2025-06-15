@@ -33,7 +33,7 @@ HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id,
 {
 }
 
-HdGatlingMaterial::~HdGatlingMaterial()
+void HdGatlingMaterial::Finalize(HdRenderParam* renderParam)
 {
   if (_giMaterial)
   {

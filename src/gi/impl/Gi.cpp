@@ -683,6 +683,12 @@ fail:
     }
   }
 
+  void giDestroyMeshGpuData(GiMeshGpuData& gpuData)
+  {
+    cgpuDestroyBlas(s_device, gpuData.blas);
+    cgpuDestroyBuffer(s_device, gpuData.payloadBuffer);
+  }
+
   void giSetMeshMaterial(GiMesh* mesh, GiMaterial* mat)
   {
     McMaterial* newMcMat = mat->mcMat;
@@ -718,7 +724,12 @@ fail:
     if (transparencyChanged || primvarsChanged)
     {
       dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
-      mesh->gpuData.reset();
+
+      if (mesh->gpuData.has_value())
+      {
+        giDestroyMeshGpuData(*mesh->gpuData);
+        mesh->gpuData.reset();
+      }
     }
 
     mesh->material = mat;
@@ -747,8 +758,7 @@ fail:
 
     if (gpuData.has_value())
     {
-      cgpuDestroyBlas(s_device, gpuData->blas);
-      cgpuDestroyBuffer(s_device, gpuData->payloadBuffer);
+      giDestroyMeshGpuData(*gpuData);
       gpuData.reset();
     }
 
