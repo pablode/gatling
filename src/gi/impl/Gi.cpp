@@ -106,7 +106,6 @@ namespace gtl
   {
     uint32_t                       aovMask;
     bool                           domeLightCameraVisible;
-    OffsetAllocator::Allocation    domeLightsAllocation;
     std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
     std::vector<CgpuShader>        missShaders;
@@ -202,6 +201,7 @@ namespace gtl
 
   struct GiScene
   {
+    OffsetAllocator::Allocation domeLightsAllocation;
     GgpuDenseDataStore sphereLights;
     GgpuDenseDataStore distantLights;
     GgpuDenseDataStore rectLights;
@@ -1366,9 +1366,6 @@ cleanup:
       .mediumStackSize = renderSettings.mediumStackSize
     };
 
-    OffsetAllocator::Allocation domeLightsAllocation = texAllocator.allocate(2); // primary + secondary
-    assert(domeLightsAllocation.offset == 0);
-
     // Create per-material hit shaders.
     {
       // 1. Generate GLSL from MDL in parallel
@@ -1757,7 +1754,6 @@ cleanup:
     cache = new GiShaderCache;
     cache->aovMask = aovMask;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
-    cache->domeLightsAllocation = domeLightsAllocation;
     cache->imageBindings = std::move(imageBindings);
     cache->materials.resize(materials.size());
     for (uint32_t i = 0; i < cache->materials.size(); i++)
@@ -1774,10 +1770,6 @@ cleanup:
     // compilation errors is that we want shader hotloading to not bloat resource usage.
     if (!cache)
     {
-      if (domeLightsAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-      {
-        scene->texAllocator.free(domeLightsAllocation);
-      }
       if (rgenShader.handle)
       {
         cgpuDestroyShader(s_device, rgenShader);
@@ -1801,11 +1793,6 @@ cleanup:
   void _giDestroyShaderCache(GiShaderCache* cache)
   {
     GiScene* scene = cache->scene;
-
-    if (cache->domeLightsAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-    {
-      scene->texAllocator.free(cache->domeLightsAllocation);
-    }
 
     cgpuDestroyShader(s_device, cache->rgenShader);
     for (CgpuShader shader : cache->missShaders)
@@ -2259,13 +2246,12 @@ cleanup:
     CgpuSamplerBinding sampler = { .binding = rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
 
     images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture,
-                       .index = shaderCache->domeLightsAllocation.offset + 0 });
+                       .index = scene->domeLightsAllocation.offset + 0 });
     images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = *scene->domeLightTexture,
-                       .index = shaderCache->domeLightsAllocation.offset + 1 });
+                       .index = scene->domeLightsAllocation.offset + 1 });
 
     for (const GiImageBinding& b : shaderCache->imageBindings)
     {
-      assert(b.index != 0 && b.index != 1); // reserved for dome lights
       images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = *b.image, .index = b.index });
     }
 
@@ -2420,6 +2406,13 @@ cleanup:
       .diskLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DiskLight), 64),
       .fallbackDomeLightTexture = fallbackDomeLightTexture,
     };
+
+    scene->domeLightsAllocation = scene->texAllocator.allocate(2); // primary + fallback
+    if (scene->domeLightsAllocation.offset == OffsetAllocator::Allocation::NO_SPACE)
+    {
+      GI_FATAL("max number of textures exceeded");
+    }
+
     return scene;
   }
 
