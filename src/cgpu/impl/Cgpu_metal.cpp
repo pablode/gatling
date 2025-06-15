@@ -1314,37 +1314,38 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     uint32_t offset = 0;
     argumentEncoder->setArgumentBuffer(argumentBuffer, offset);
 
-    // TODO
     for (uint32_t i = 0; i < bindings->bufferCount; i++)
     {
       const CgpuBufferBinding& b = bindings->buffers[i];
 
       CGPU_RESOLVE_BUFFER(b.buffer, ibuffer);
-
-      // ...
+      argumentEncoder->setBuffer(ibuffer->buffer, b.offset, b.binding);
     }
 
     for (uint32_t i = 0; i < bindings->imageCount; i++)
     {
       const CgpuImageBinding& b = bindings->images[i];
 
+      // TODO: there's no option to set a texture within an array!
+      //       -> we might have to rewrite tex2d array assignment
       CGPU_RESOLVE_IMAGE(b.image, iimage);
-
-      // ...
+      argumentEncoder->setTexture(iimage->texture, b.binding);
     }
 
     for (uint32_t i = 0; i < bindings->samplerCount; i++)
     {
       const CgpuSamplerBinding& b = bindings->samplers[i];
 
-      // ...
+      CGPU_RESOLVE_SAMPLER(b.sampler, isampler);
+      argumentEncoder->setSamplerState(isampler->sampler, b.binding);
     }
 
     for (uint32_t i = 0; i < bindings->tlasCount; i++)
     {
       const CgpuTlasBinding& b = bindings->tlases[i];
 
-      // ...
+      CGPU_RESOLVE_TLAS(b.as, itlas);
+      argumentEncoder->setAccelerationStructure(itlas->as, b.binding);
     }
 
 // TODO: we need to do something similar for push constants

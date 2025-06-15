@@ -406,14 +406,14 @@ namespace gtl
   {
     uint32_t binding;
     CgpuSampler sampler;
-    uint32_t index = 0;
+    uint32_t index = 0; // TODO: remove
   };
 
   struct CgpuTlasBinding
   {
     uint32_t binding;
     CgpuTlas as;
-    uint32_t index = 0;
+    uint32_t index = 0; // TODO: remove
   };
 
   struct CgpuBindings
