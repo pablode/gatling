@@ -15,8 +15,6 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-// TODO: currently, we ignore Residency - need to figure out how to use it!
-
 #include "Cgpu.h"
 #include "ShaderReflection.h"
 
@@ -72,7 +70,10 @@ namespace gtl
     MTL::Device* device;
     MTL4::CommandQueue* commandQueue;
     MTL4::CounterHeap* counterHeap;
+#ifndef NDEBUG
     MTL::LogState* logState;
+    MTL4::CommitOptions* commitOptions;
+#endif
   };
 
   struct CgpuIBuffer
@@ -127,6 +128,7 @@ namespace gtl
     MTL4::CounterHeap* counterHeap; // owned by device
 #ifndef NDEBUG
     MTL::LogState* logState; // owned by device
+    MTL4::CommitOptions* commitOptions; // owned by device
 #endif
   };
 
@@ -366,12 +368,12 @@ namespace gtl
 #ifndef NDEBUG
     MTL::LogState* logState;
     {
-      auto* logStateDesc = MTL::LogStateDescriptor::alloc()->init();
-      logStateDesc->setLevel(MTL::LogLevelDebug);
+      auto* desc = MTL::LogStateDescriptor::alloc()->init();
+      desc->setLevel(MTL::LogLevelDebug);
 
       NS::Error* error;
-      logState = idevice->device->newLogState(logStateDesc, &error);
-      logStateDesc->release();
+      logState = idevice->device->newLogState(desc, &error);
+      desc->release();
       CHK_MTL(logState, error);
 
       auto logHandler = [](NS::String* subsystem, NS::String* category, MTL::LogLevel logLevel, NS::String* message) {
@@ -392,6 +394,12 @@ namespace gtl
       };
       logState->addLogHandler(logHandler);
     }
+
+    MTL4::CommitOptions* commitOptions = MTL4::CommitOptions::alloc()->init();
+    commitOptions->addFeedbackHandler([](MTL4::CommitFeedback* f) {
+      NS::Error* error = f->error();
+      LOG_MTL_ERR(error);
+    });
 #endif
 
     idevice->device = mtlDevice;
@@ -399,6 +407,7 @@ namespace gtl
     idevice->counterHeap = counterHeap;
 #ifndef NDEBUG
     idevice->logState = logState;
+    idevice->commitOptions = commitOptions;
 #endif
 
     device->handle = handle;
@@ -412,6 +421,10 @@ namespace gtl
     idevice->counterHeap->release();
     idevice->commandQueue->release();
     idevice->device->release();
+#ifndef NDEBUG
+    idevice->logState->release();
+    idevice->commitOptions->release();
+#endif
 
     iinstance->ideviceStore.free(device.handle);
     return true;
@@ -1318,6 +1331,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     icommandBuffer->counterHeap = idevice->counterHeap;
 #ifndef NDEBUG
     icommandBuffer->logState = idevice->logState;
+    icommandBuffer->commitOptions = idevice->commitOptions;
 #endif
 
     commandBuffer->handle = handle;
@@ -1331,9 +1345,6 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     icommandBuffer->commandBuffer->release();
     icommandBuffer->commandAllocator->release();
     icommandBuffer->pcBuffer->release();
-#ifndef NDEBUG
-    icommandBuffer->logState->release();
-#endif
 
     iinstance->icommandBufferStore.free(commandBuffer.handle);
     return true;
