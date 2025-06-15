@@ -95,12 +95,15 @@ namespace gtl
     MTL::ComputePipelineState* state;
 
     MTL4::ArgumentTable* argumentTable;
-    std::vector<MTL::ArgumentEncoder*> argumentEncoders; // last entry is for PCs
-    std::vector<MTL::Buffer*> argumentBuffers; // last entry is reference to ICommandBuffer::pcBuffer
+    std::vector<MTL::ArgumentEncoder*> argumentEncoders; // last entry is for aux descriptor set
+    std::vector<MTL::Buffer*> argumentBuffers; // last entry is reference to aux descriptor set buffer
+    // NOTE: the aux descriptor set contains at 0: buffer for PCs, 1: intersection function argument buffer
+    //       the PC buffer resides in the command buffer, the IFBA here (below).
 
     // only for RT pipeline
     MTL::IntersectionFunctionTable* intersectionFunctionTable = nullptr;
     MTL::Buffer* intersectionFunctionBuffer = nullptr;
+    // TODO: rename to ifba. table to ift, etc.
     MTL::Buffer* intersectionFunctionBufferArgs = nullptr;
   };
 
@@ -922,17 +925,26 @@ GB_LOG("{}", mslSrc);
       }
     }
 
-    // Push constants emulation
+    // Aux descriptor set
     {
-      auto* desc = MTL::ArgumentDescriptor::alloc()->init();
-      CHK_MTL_NP(desc);
-      desc->setDataType(MTL::DataTypePointer);
-      desc->setIndex(SPVC_MSL_PUSH_CONSTANT_BINDING);
-      desc->setAccess(MTL::BindingAccessReadOnly);
+      static_assert(SPVC_MSL_PUSH_CONSTANT_BINDING == 0, "assumption invalidated");
 
-      pushDescriptorSet(SPVC_MSL_PUSH_CONSTANT_DESC_SET, { desc });
+      auto* pcDesc = MTL::ArgumentDescriptor::alloc()->init();
+      CHK_MTL_NP(pcDesc);
+      pcDesc->setDataType(MTL::DataTypePointer);
+      pcDesc->setIndex(0);
+      pcDesc->setAccess(MTL::BindingAccessReadOnly);
 
-      desc->release();
+      auto* ifbaDesc = MTL::ArgumentDescriptor::alloc()->init();
+      CHK_MTL_NP(ifbaDesc);
+      ifbaDesc->setDataType(MTL::DataTypePointer); // TODO: DataTypeIntersectionFunctionTable?
+      ifbaDesc->setIndex(1);
+      ifbaDesc->setAccess(MTL::BindingAccessReadOnly);
+
+      pushDescriptorSet(SPVC_MSL_PUSH_CONSTANT_DESC_SET, { pcDesc, ifbaDesc }); // TODO: rename SPIRV-Cross constant
+
+      pcDesc->release();
+      ifbaDesc->release();
     }
 
     ipipeline->state = state;
@@ -1528,7 +1540,11 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     uint32_t offset = 0;
     argumentEncoder->setArgumentBuffer(argumentBuffer, offset);
 
-    argumentEncoder->setBuffer(icommandBuffer->pcBuffer, offset, SPVC_MSL_PUSH_CONSTANT_BINDING);
+    // TODO: do we need to batch them? when and where else to set IFBA?
+    static_assert(SPVC_MSL_PUSH_CONSTANT_BINDING == 0, "assumption invalidated");
+    argumentEncoder->setBuffer(icommandBuffer->pcBuffer, offset, 0);
+    // TODO: bind IntersectionFunctionTable instead?
+    argumentEncoder->setBuffer(ipipeline->intersectionFunctionBufferArgs, offset, 1);
   }
 
   static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
