@@ -761,6 +761,7 @@ namespace gtl
 
   void cgpuCmdPushConstants(
     CgpuCommandBuffer commandBuffer,
+    CgpuPipeline pipeline,
     CgpuShaderStageFlags stageFlags,
     uint32_t size,
     const void* data

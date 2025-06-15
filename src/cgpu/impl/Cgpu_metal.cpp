@@ -89,12 +89,12 @@ namespace gtl
 
   struct CgpuIPipeline
   {
-    MTL4::ArgumentTable* argumentTable;
-    std::vector<MTL::ArgumentEncoder*> argumentEncoders;
-    std::vector<MTL::Buffer*> argumentBuffers;
-    //std::array<MTL::Buffer*, CGPU_MAX_DESCRIPTOR_SET_COUNT + 1> argumentBuffers;
-
     MTL::ComputePipelineState* state;
+
+    MTL4::ArgumentTable* argumentTable;
+    std::vector<MTL::ArgumentEncoder*> argumentEncoders; // last entry is for PCs
+    std::vector<MTL::Buffer*> argumentBuffers; // last entry is reference to ICommandBuffer::pcBuffer
+
     MTL::IntersectionFunctionTable* ift; // only for RT pipelines
   };
 
@@ -115,9 +115,9 @@ namespace gtl
     MTL4::CommandAllocator* commandAllocator;
     MTL4::ComputeCommandEncoder* encoder;
 
+    // NOTE: maybe rethink if this should live here or in IPipeline
     MTL::Buffer* pcBuffer;
     void* pcMem;
-    CgpuShaderStageFlags pcFlags;
 
     MTL4::CounterHeap* counterHeap; // owned by device
 #ifndef NDEBUG
@@ -338,8 +338,10 @@ namespace gtl
     {
       CGPU_FATAL("ray tracing not supported");
     }
-
-    // TODO: check device capabilities
+    if (mtlDevice->argumentBuffersSupport() != MTL::ArgumentBuffersTier2)
+    {
+      CGPU_FATAL("tier 2 argument buffers not supported");
+    }
 
     MTL4::CommandQueue* commandQueue = mtlDevice->newMTL4CommandQueue();
     CHK_MTL_NP(commandQueue);
@@ -793,6 +795,25 @@ namespace gtl
     argumentEncoders.reserve(descriptorSetCount);
     argumentBuffers.reserve(descriptorSetCount);
 
+    auto pushDescriptorSet = [&](uint32_t descriptorSetIndex, std::vector<MTL::ArgumentDescriptor*> descriptors)
+    {
+      NS::Array* descriptorArray = NS::Array::array((const NS::Object* const*) descriptors.data(), (uint32_t) descriptors.size());
+      CHK_MTL_NP(descriptorArray);
+
+      MTL::ArgumentEncoder* argumentEncoder = idevice->device->newArgumentEncoder(descriptorArray);
+      CHK_MTL_NP(argumentEncoder);
+
+      descriptorArray->release();
+
+      uint64_t argumentBufferSize = argumentEncoder->encodedLength();
+      MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModePrivate);
+
+      argumentEncoders.push_back(argumentEncoder);
+      argumentBuffers.push_back(argumentBuffer);
+
+      argumentTable->setAddress(argumentBuffer->gpuAddress(), descriptorSetIndex);
+    };
+
     for (uint32_t i = 0; i < descriptorSetCount; i++)
     {
       const CgpuShaderReflectionDescriptorSet& descriptorSet = reflection.descriptorSets[i];
@@ -871,25 +892,25 @@ namespace gtl
         argumentDescriptors.push_back(desc);
       }
 
-      NS::Array* descriptorArray = NS::Array::array((const NS::Object* const*) argumentDescriptors.data(), (uint32_t) argumentDescriptors.size());
-      CHK_MTL_NP(descriptorArray);
+      pushDescriptorSet(i, argumentDescriptors);
 
-      MTL::ArgumentEncoder* argumentEncoder = idevice->device->newArgumentEncoder(descriptorArray);
-      CHK_MTL_NP(argumentEncoder);
-
-      descriptorArray->release();
       for (MTL::ArgumentDescriptor* desc : argumentDescriptors)
       {
         desc->release();
       }
+    }
 
-      uint64_t argumentBufferSize = argumentEncoder->encodedLength();
-      MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModePrivate);
+    // Push constants emulation
+    {
+      auto* desc = MTL::ArgumentDescriptor::alloc()->init();
+      CHK_MTL_NP(desc);
+      desc->setDataType(MTL::DataTypePointer);
+      desc->setIndex(SPVC_MSL_PUSH_CONSTANT_BINDING);
+      desc->setAccess(MTL::BindingAccessReadOnly);
 
-      argumentEncoders.push_back(argumentEncoder);
-      argumentBuffers.push_back(argumentBuffer);
+      pushDescriptorSet(SPVC_MSL_PUSH_CONSTANT_DESC_SET, { desc });
 
-      argumentTable->setAddress(argumentBuffer->gpuAddress(), i);
+      desc->release();
     }
 
     ipipeline->state = state;
@@ -1412,17 +1433,25 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   }
 
   void cgpuCmdPushConstants(CgpuCommandBuffer commandBuffer,
+                            CgpuPipeline pipeline,
                             CgpuShaderStageFlags stageFlags,
                             uint32_t size,
                             const void* data)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
     memcpy(icommandBuffer->pcMem, data, size);
 
-    icommandBuffer->pcFlags = stageFlags; // TODO: test this against flags of bound pipeline
+    MTL::ArgumentEncoder* argumentEncoder = ipipeline->argumentEncoders.back(); // PC encoder
+    MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers.back(); // PC buffer
+
+    uint32_t offset = 0;
+    argumentEncoder->setArgumentBuffer(argumentBuffer, offset);
+
+    argumentEncoder->setBuffer(icommandBuffer->pcBuffer, offset, SPVC_MSL_PUSH_CONSTANT_BINDING);
   }
 
   static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
