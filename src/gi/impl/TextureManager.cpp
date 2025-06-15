@@ -95,6 +95,7 @@ namespace gtl
 
       if (image)
       {
+        GB_DEBUG("found image \"{}\" in cache", filePath);
         return image;
       }
     }
@@ -185,6 +186,8 @@ namespace gtl
 
           if (image)
           {
+            GB_DEBUG("found binary image {:x} in cache", hash);
+
             images.push_back(image);
             continue;
           }

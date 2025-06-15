@@ -65,6 +65,12 @@
 
 #include <offsetAllocator.hpp>
 
+#define GI_FATAL(msg)                               \
+  do {                                              \
+    GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); \
+    exit(EXIT_FAILURE);                             \
+  } while (false)
+
 namespace mx = MaterialX;
 
 namespace gtl
@@ -1443,6 +1449,11 @@ cleanup:
         if (texCount > 0)
         {
           gpuData.texOffsetAllocation = texAllocator.allocate(texCount);
+
+          if (gpuData.texOffsetAllocation.offset == OffsetAllocator::Allocation::NO_SPACE)
+          {
+            GI_FATAL("max number of textures exceeded");
+          }
         }
         for (const McTextureDescription& tr : genInfo.textureDescriptions)
         {
@@ -2245,14 +2256,14 @@ cleanup:
 
     CgpuSamplerBinding sampler = { .binding = rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
 
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture,
+    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = scene->fallbackDomeLightTexture,
                        .index = scene->domeLightsAllocation.offset + 0 });
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = *scene->domeLightTexture,
+    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *scene->domeLightTexture,
                        .index = scene->domeLightsAllocation.offset + 1 });
 
     for (const GiImageBinding& b : shaderCache->imageBindings)
     {
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = *b.image, .index = b.index });
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *b.image, .index = b.index });
     }
 
     CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
@@ -2271,8 +2282,7 @@ cleanup:
 
     if (shaderCache->imageBindings.size() > rp::MAX_TEXTURE_COUNT)
     {
-      GB_ERROR("max number of textures exceeded");
-      goto cleanup;
+      GI_FATAL("max number of textures exceeded");
     }
 
     // Set up command buffer.

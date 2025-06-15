@@ -70,9 +70,9 @@ layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) writeonly buffer Instanc
 layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, std430) writeonly buffer DoubleSidedBuffer { vec3 DoubleSidedAov[]; };
 #endif
 
-layout(set = 1, binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
+layout(set = 1, binding = BINDING_INDEX_TEXTURES) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
 
-layout(set = 2, binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
+layout(set = 2, binding = BINDING_INDEX_TEXTURES) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
   BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
