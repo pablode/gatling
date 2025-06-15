@@ -56,6 +56,7 @@ target_link_libraries(
     blosc2_static
     efsw-static
     OffsetAllocator
+    xxHash
 )
 
 if(OpenMP_CXX_FOUND)

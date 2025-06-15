@@ -24,6 +24,8 @@
 #include <gtl/ggpu/Stager.h>
 #include <gtl/imgio/Imgio.h>
 
+#include <xxhash.h>
+
 #include <assert.h>
 #include <string.h>
 #include <inttypes.h>
@@ -65,25 +67,29 @@ namespace gtl
 
   void GiTextureManager::destroy()
   {
-    for (const auto& pathImagePair : m_imageCache)
+    for (const auto& pathImagePair : m_fileCache)
     {
-      GiImagePtr image = pathImagePair.second.lock();
-
-      if (!image)
+      if (GiImagePtr image = pathImagePair.second.lock(); image)
       {
-        continue;
+        cgpuDestroyImage(m_device, *image);
       }
-
-      cgpuDestroyImage(m_device, *image);
     }
-    m_imageCache.clear();
+    for (const auto& pathImagePair : m_binaryCache)
+    {
+      if (GiImagePtr image = pathImagePair.second.lock(); image)
+      {
+        cgpuDestroyImage(m_device, *image);
+      }
+    }
+    m_fileCache.clear();
+    m_binaryCache.clear();
   }
 
   GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool is3dImage, bool flushImmediately)
   {
-    auto cacheResult = m_imageCache.find(filePath);
+    auto cacheResult = m_fileCache.find(filePath);
 
-    if (cacheResult != m_imageCache.end())
+    if (cacheResult != m_fileCache.end())
     {
       GiImagePtr image = cacheResult->second.lock();
 
@@ -118,7 +124,7 @@ namespace gtl
       return nullptr;
     }
 
-    m_imageCache[filePath] = std::weak_ptr<CgpuImage>(image);
+    m_fileCache[filePath] = std::weak_ptr<CgpuImage>(image);
 
     if (flushImmediately)
     {
@@ -172,6 +178,18 @@ namespace gtl
           continue;
         }
 
+        uint64_t hash = XXH64(payload.data(), payloadSize, 0);
+        if (auto it = m_binaryCache.find(hash); it != m_binaryCache.end())
+        {
+          GiImagePtr image = it->second.lock();
+
+          if (image)
+          {
+            images.push_back(image);
+            continue;
+          }
+        }
+
         GiImagePtr image = makeImagePtr();
 
         GB_LOG("image {} has binary payload of {:.2f} MiB", i, payloadSize * BYTES_TO_MIB);
@@ -190,6 +208,8 @@ namespace gtl
         {
           return false;
         }
+
+        m_binaryCache[hash] = std::weak_ptr<CgpuImage>(image);
 
         images.push_back(image);
         continue;

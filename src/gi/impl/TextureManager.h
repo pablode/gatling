@@ -58,6 +58,7 @@ namespace gtl
     GiAssetReader& m_assetReader;
     gtl::GgpuStager& m_stager;
     GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
-    std::unordered_map<std::string, std::weak_ptr<CgpuImage>> m_imageCache;
+    std::unordered_map<std::string, std::weak_ptr<CgpuImage>> m_fileCache;
+    std::unordered_map<uint64_t, std::weak_ptr<CgpuImage>> m_binaryCache;
   };
 }
