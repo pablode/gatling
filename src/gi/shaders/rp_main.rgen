@@ -6,6 +6,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64: require
 #extension GL_EXT_buffer_reference: require
+#extension GL_EXT_control_flow_attributes: require
 
 #ifdef REORDER_INVOCATIONS
 #extension GL_NV_shader_invocation_reorder: require
@@ -26,7 +27,7 @@
 #include "colormap.glsl"
 
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadEXT ShadeRayPayload rayPayload;
-layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadEXT ShadowRayPayload shadowRayPayload;
+//layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadEXT ShadowRayPayload shadowRayPayload;
 
 #ifdef REORDER_INVOCATIONS
 layout(buffer_reference, hitobjectshaderrecordnv) buffer ShaderRecordBuffer
@@ -192,6 +193,7 @@ vec3 evaluate_sample(uint pixelIndex,
         // Closest hit shading
         rayPayload.neeContrib = vec3(0.0);
 
+        rayPayload.hitSomething = false;
 #ifdef REORDER_INVOCATIONS
         hitObjectNV hitObject;
 
@@ -236,6 +238,15 @@ vec3 evaluate_sample(uint pixelIndex,
             PAYLOAD_INDEX_SHADE    // payload
         );
 #endif
+
+        // TODO: this emulates a simple hit shader. ideally, we want to move the hit
+        //       shader logic into a function and call it here.
+        if (!rayPayload.hitSomething)
+        {
+          const vec3 BG_RADIANCE = vec3(0.5);
+          rayPayload.radiance += rayPayload.throughput * BG_RADIANCE;
+          rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+        }
 
         // NEE contribution
 #ifdef NEXT_EVENT_ESTIMATION

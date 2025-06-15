@@ -1151,7 +1151,8 @@ fail_cleanup:
 
         CgpuBlasInstance blasInstance;
         blasInstance.as = data->blas;
-        blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
+// TODO: currently alpha hits deactivated
+        blasInstance.hitGroupIndex = materialIndex;// * 2; // always two hit groups per material: regular & shadow
         blasInstance.instanceCustomIndex = uint32_t(blasPayloads.size());
         memcpy(blasInstance.transform, glm::value_ptr(transform), sizeof(float) * 12);
 
@@ -1418,7 +1419,7 @@ cleanup:
 
         if (material->mcMat->hasCutoutTransparency)
         {
-          groupInfo.anyHitInfo = HitShaderCompInfo{};
+          //groupInfo.anyHitInfo = HitShaderCompInfo{};
         }
 
         std::lock_guard guard(hitGroupCompInfoMutex);
@@ -1480,6 +1481,7 @@ cleanup:
       }
 
       // 4. Generate final hit shader GLSL sources.
+GB_LOG(">>> hit shaders");
 #pragma omp parallel for
       for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
       {
@@ -1656,6 +1658,7 @@ cleanup:
     }
 
     // Create ray generation shader.
+GB_LOG(">>> rgen shader");
     {
       GiGlslShaderGen::RaygenShaderParams rgenParams = {
         .clippingPlanes = renderSettings.clippingPlanes,
@@ -1688,6 +1691,7 @@ cleanup:
     }
 
     // Create miss shaders.
+GB_LOG(">>> miss shaders");
     {
       GiGlslShaderGen::MissShaderParams missParams = {
         .commonParams = commonParams,
@@ -1718,6 +1722,7 @@ cleanup:
       }
 
       // shadow test miss shader
+if(false)
       {
         std::vector<uint8_t> spv;
         if (!s_shaderGen->generateMissSpirv("rp_main_shadow.miss", missParams, spv))
@@ -1748,7 +1753,7 @@ cleanup:
 
       if (!cgpuCreateRtPipeline(s_device, {
                                   .rgenShader = rgenShader,
-                                  .missShaderCount = (uint32_t) missShaders.size(),
+                                  .missShaderCount = 0,// (uint32_t) missShaders.size(),
                                   .missShaders = missShaders.data(),
                                   .hitGroupCount = (uint32_t) hitGroups.size(),
                                   .hitGroups = hitGroups.data(),
@@ -2343,7 +2348,7 @@ cleanup:
                                               CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT |
                                               CGPU_SHADER_STAGE_FLAG_ANY_HIT;
 
-      cgpuCmdPushConstants(commandBuffer, pushShaderStages, sizeof(pushData), &pushData);
+      cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
     }
 
     cgpuCmdTraceRays(commandBuffer, imageWidth, imageHeight);

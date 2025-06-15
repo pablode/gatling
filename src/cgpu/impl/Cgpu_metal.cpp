@@ -448,12 +448,16 @@ namespace gtl
     const char* mslSrc; // owned by context
     CHK_SPVC(spvc_compiler_compile(spvcCompiler, &mslSrc));
 
+//GB_LOG("{}", mslSrc);
+
 #undef CHK_SPVC
 
     MTL::CompileOptions* compileOptions = MTL::CompileOptions::alloc();
 #ifndef NDEBUG
     compileOptions->setEnableLogging(true);
 #endif
+
+GB_LOG("{}", mslSrc);
 
     NS::Error* error;
     NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);

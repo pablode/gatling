@@ -1,4 +1,6 @@
-if (APPLE)
+set(MTL_BACKEND ON)
+
+if (MTL_BACKEND)
   set(CGPU_SOURCE_FILE_NAME "impl/Cgpu_metal.cpp")
 else()
   # TODO: rename to Cgpu_vulkan.cpp
@@ -24,7 +26,7 @@ target_include_directories(
 
 target_link_libraries(cgpu PRIVATE gb spirv-reflect-static)
 
-if (APPLE)
+if (MTL_BACKEND)
   target_link_libraries(
     cgpu
     PRIVATE

@@ -27,15 +27,15 @@
 #ifndef SHADOW_TEST
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 #else
-layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayload;
+//layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayload;
 #endif
 
-hitAttributeEXT vec2 baryCoord;
+//hitAttributeEXT vec2 baryCoord;
 
 void main()
 {
   State shading_state;
-  vec2 hit_bc = baryCoord;
+  vec2 hit_bc = vec2(0.5);//baryCoord;
   bool isFrontFace;
   setup_mdl_shading_state(hit_bc, shading_state, isFrontFace);
 

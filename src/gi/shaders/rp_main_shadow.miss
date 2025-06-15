@@ -9,9 +9,9 @@
 #include "rp_main_payload.glsl"
 #include "rp_main_descriptors.glsl"
 
-layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayload;
+//layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayload;
 
 void main()
 {
-    rayPayload.shadowed = false;
+    //rayPayload.shadowed = false;
 }
