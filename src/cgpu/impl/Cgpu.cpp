@@ -42,9 +42,9 @@
 #endif
 
 #ifdef GTL_VERBOSE
-#define VMA_DEBUG_LOG_FORMAT(format, ...) do { \
-    GB_DEBUG_DYN("[VMA] {}", GB_FMT_SPRINTF((format), __VA_ARGS__)); \
-  } while (false)
+// Uncomment for verbose VMA logging.
+//#define VMA_DEBUG_LOG_FORMAT(format, ...) GB_DEBUG_DYN("[VMA] {}", GB_FMT_SPRINTF((format), __VA_ARGS__))
+#define VMA_LEAK_LOG_FORMAT(format, ...) do { GB_ERROR_DYN("[VMA] {}", GB_FMT_SPRINTF((format), __VA_ARGS__)); gtl::gbLogFlush(); } while(false)
 #endif
 
 #define VMA_IMPLEMENTATION
