@@ -15,6 +15,8 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
+// TODO: currently, we ignore Residency - need to figure out how to use it!
+
 #include "Cgpu.h"
 #include "ShaderReflection.h"
 
@@ -95,7 +97,10 @@ namespace gtl
     std::vector<MTL::ArgumentEncoder*> argumentEncoders; // last entry is for PCs
     std::vector<MTL::Buffer*> argumentBuffers; // last entry is reference to ICommandBuffer::pcBuffer
 
-    MTL::IntersectionFunctionTable* ift; // only for RT pipelines
+    // only for RT pipeline
+    MTL::IntersectionFunctionTable* intersectionFunctionTable = nullptr;
+    MTL::Buffer* intersectionFunctionBuffer = nullptr;
+    MTL::Buffer* intersectionFunctionBufferArgs = nullptr;
   };
 
   struct CgpuIShader
@@ -942,6 +947,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SHADER(createInfo.rgenShader, ishader);
 
+    // Collect all shaders and create pipeline
     uint32_t functionCount = createInfo.hitGroupCount; // TODO: * 2 for anyhit (probably in user space)
 
     std::vector<MTL::Function*> hitFunctions(functionCount);
@@ -976,19 +982,40 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     CGPU_RESOLVE_PIPELINE(*pipeline, ipipeline);
 
-    MTL::IntersectionFunctionTable* ift;
+    MTL::IntersectionFunctionTable* intersectionFunctionTable;
+    MTL::Buffer* intersectionFunctionBuffer;
+    MTL::Buffer* intersectionFunctionBufferArgs;
     {
+      // Create IFT
       auto* descriptor = MTL::IntersectionFunctionTableDescriptor::alloc()->init();
       CHK_MTL_NP(descriptor);
 
       descriptor->setFunctionCount(functionCount);
 
-      MTL::IntersectionFunctionTable* ift = ipipeline->state->newIntersectionFunctionTable(descriptor);
-      CHK_MTL_NP(descriptor);
+      intersectionFunctionTable = ipipeline->state->newIntersectionFunctionTable(descriptor);
+      CHK_MTL_NP(intersectionFunctionTable);
 
       descriptor->release();
 
-      // TODO: do we need to allocate a buffer for the table (.setBuffer)? GH example does not
+      // Create intersection function buffer
+      constexpr static uint64_t FUNCTION_STRIDE = sizeof(MTL::ResourceID);
+      static_assert(FUNCTION_STRIDE == 8, "intersection function buffer stride must be 0 or 8");
+
+      uint64_t intersectionFunctionBufferSize = FUNCTION_STRIDE * functionCount;
+
+      intersectionFunctionBuffer = idevice->device->newBuffer(intersectionFunctionBufferSize, MTL::ResourceStorageModeShared);
+      CHK_MTL_NP(intersectionFunctionBuffer);
+
+      auto* ifBufferMem = (uint8_t*) intersectionFunctionBuffer->contents();
+
+      // Fill intersection function table & buffer
+      intersectionFunctionTable->setBuffer(intersectionFunctionBuffer, /*offset*/0, /*index*/0);
+
+      MTL::IntersectionFunctionSignature functionSignature = MTL::IntersectionFunctionSignatureInstancing |
+                                                             MTL::IntersectionFunctionSignatureTriangleData |
+                                                             MTL::IntersectionFunctionSignatureWorldSpaceData |
+                                                             MTL::IntersectionFunctionSignatureIntersectionFunctionBuffer |
+                                                             MTL::IntersectionFunctionSignatureUserData;
 
       for (uint32_t i = 0; i < functionCount; i++)
       {
@@ -996,8 +1023,31 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
         MTL::FunctionHandle* funcHandle = ipipeline->state->functionHandle(hitFunc);
         CHK_MTL_NP(funcHandle);
 
-        ift->setFunction(funcHandle, i/*TODO: consider offset for ahit*/);
+        // TODO: no idea if this is correct
+        MTL::ResourceID resourceId = funcHandle->gpuResourceID();
+        memcpy((void*) &ifBufferMem[i * FUNCTION_STRIDE], &resourceId, FUNCTION_STRIDE);
+
+        intersectionFunctionTable->setOpaqueTriangleIntersectionFunction(functionSignature, i);
       }
+
+      // TODO: it seems that we need to have an explicit ref to this buffer in MSL.
+      //
+      // TODO: one idea: maybe we can rename PC descriptor set to 'aux' descriptor set.
+      // TODO: and as binding 2, we can expect a pointer to this function (if RGEN shader).
+
+      // Upload argument buffer
+      MTL::IntersectionFunctionBufferArguments args = {
+        .intersectionFunctionBuffer = intersectionFunctionBuffer->gpuAddress(),
+        .intersectionFunctionBufferSize = intersectionFunctionBufferSize,
+        .intersectionFunctionStride = FUNCTION_STRIDE
+      };
+
+      uint64_t ifBufferArgsSize = sizeof(MTL::IntersectionFunctionBufferArguments);
+      intersectionFunctionBufferArgs = idevice->device->newBuffer(ifBufferArgsSize, MTL::ResourceStorageModeShared);
+      CHK_MTL_NP(intersectionFunctionBufferArgs);
+
+      void* ifBufferArgsMem = intersectionFunctionBufferArgs->contents();
+      memcpy(ifBufferArgsMem, &args, ifBufferArgsSize);
     }
 
     // TODO: test if enable
@@ -1008,7 +1058,9 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     }
 #endif
 
-    ipipeline->ift = ift;
+    ipipeline->intersectionFunctionTable = intersectionFunctionTable;
+    ipipeline->intersectionFunctionBufferArgs = intersectionFunctionBufferArgs;
+    ipipeline->intersectionFunctionBuffer = intersectionFunctionBuffer;
 
     return true;
   }
@@ -1017,9 +1069,17 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
   {
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    if (ipipeline->ift)
+    if (ipipeline->intersectionFunctionTable)
     {
-      ipipeline->ift->release();
+      ipipeline->intersectionFunctionTable->release();
+    }
+    if (ipipeline->intersectionFunctionBuffer)
+    {
+      ipipeline->intersectionFunctionBuffer->release();
+    }
+    if (ipipeline->intersectionFunctionBufferArgs)
+    {
+      ipipeline->intersectionFunctionBufferArgs->release();
     }
 
     for (MTL::ArgumentEncoder* encoder : ipipeline->argumentEncoders)
@@ -1136,7 +1196,9 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
       {
         const CgpuBlasInstance& instance = createInfo.instances[i];
 
+// TODO: it could be that we need to use a Metal 4 type here
         MTL::AccelerationStructureUserIDInstanceDescriptor& d = instances[i];
+        //d.allowDuplicateIntersectionFunctionInvocation = false;
         d.options = MTL::AccelerationStructureInstanceOptionNone; // TODO: propagate opaque flag
         d.mask = 0xFFFFFFFF;
         d.intersectionFunctionTableOffset = instance.hitGroupIndex;
