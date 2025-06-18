@@ -104,12 +104,13 @@ namespace gtl
   uint64_t GgpuLinearDataStore::returnOrAllocIndex(uint32_t index)
   {
     uint64_t byteOffset = index * m_elementSize;
+    uint64_t byteSize = byteOffset + m_elementSize;
 
     // A resize is very unlikely and can be expensive
-    if (byteOffset >= m_buffer.byteSize())
+    if (byteSize > m_buffer.byteSize())
     {
       uint64_t minSize = m_elementSize * m_minCapacity;
-      uint64_t newSize = std::max(_NextPowerOfTwo(byteOffset), minSize);
+      uint64_t newSize = std::max(_NextPowerOfTwo(byteSize), minSize);
 
       bool result = false;
 
