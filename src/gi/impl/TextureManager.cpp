@@ -226,6 +226,8 @@ namespace gtl
         continue;
       }
 
+      image = makeImagePtr();
+
       GB_ERROR("failed to read image {} from path {}", i, filePath);
       createInfo.width = 1;
       createInfo.height = 1;
