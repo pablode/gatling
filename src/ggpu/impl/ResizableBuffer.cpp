@@ -27,7 +27,7 @@ namespace gtl
                                            CgpuMemoryProperties memoryProperties)
     : m_device(device)
     , m_delayedResourceDestroyer(delayedResourceDestroyer)
-    , m_usageFlags(usageFlags)
+    , m_usageFlags(usageFlags | CgpuBufferUsage::TransferSrc | CgpuBufferUsage::TransferDst)
     , m_memoryProperties(memoryProperties)
   {
   }
