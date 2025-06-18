@@ -1938,8 +1938,8 @@ namespace gtl
 
         switch (binding->descriptorType)
         {
-        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: storageBufferCount += binding->count; break;
-        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: uniformBufferCount += binding->count; break;
+        case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER: uniformBufferCount += binding->count; break;
+        case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER: storageBufferCount += binding->count; break;
         case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE: storageImageCount += binding->count; break;
         case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE: sampledImageCount += binding->count; break;
         case VK_DESCRIPTOR_TYPE_SAMPLER: samplerCount += binding->count; break;
