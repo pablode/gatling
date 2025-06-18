@@ -165,14 +165,6 @@ namespace gtl
     const char* debugName = nullptr;
   };
 
-  // TODO: replace with buffer offset & stride
-  struct CgpuVertex
-  {
-    float x;
-    float y;
-    float z;
-  };
-
   struct CgpuBlasInstance
   {
     CgpuBlas as;
@@ -201,7 +193,7 @@ namespace gtl
 
   struct CgpuBlasCreateInfo
   {
-    CgpuBuffer vertexBuffer;
+    CgpuBuffer vertexPosBuffer;
     CgpuBuffer indexBuffer;
     uint32_t maxVertex;
     uint32_t triangleCount;
