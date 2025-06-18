@@ -85,7 +85,7 @@ namespace gtl
     m_binaryCache.clear();
   }
 
-  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool is3dImage, bool flushImmediately)
+  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool is3dImage, bool destroyImmediately)
   {
     auto cacheResult = m_fileCache.find(filePath);
 
@@ -115,7 +115,7 @@ namespace gtl
       .debugName = filePath
     };
 
-    GiImagePtr image = makeImagePtr();
+    GiImagePtr image = makeImagePtr(destroyImmediately);
 
     bool creationSuccessful = cgpuCreateImage(m_device, createInfo, image.get()) &&
                               m_stager.stageToImage(&imageData.data[0], imageData.size, *image, imageData.width, imageData.height, 1);
@@ -127,18 +127,20 @@ namespace gtl
 
     m_fileCache[filePath] = std::weak_ptr<CgpuImage>(image);
 
-    if (flushImmediately)
-    {
-      m_stager.flush();
-    }
-
     return image;
   }
 
-  GiImagePtr GiTextureManager::makeImagePtr()
+  GiImagePtr GiTextureManager::makeImagePtr(bool destroyImmediately)
   {
-    return std::shared_ptr<CgpuImage>(new CgpuImage, [this](CgpuImage* d) {
-      m_delayedResourceDestroyer.enqueueDestruction(*d);
+    return std::shared_ptr<CgpuImage>(new CgpuImage, [=](CgpuImage* d) {
+      if (destroyImmediately)
+      {
+        cgpuDestroyImage(m_device, *d);
+      }
+      else
+      {
+        m_delayedResourceDestroyer.enqueueDestruction(*d);
+      }
       delete d;
     });
   }
@@ -218,7 +220,7 @@ namespace gtl
         continue;
       }
 
-      GiImagePtr image = loadTextureFromFilePath(filePath, textureResource.is3dImage, false);
+      GiImagePtr image = loadTextureFromFilePath(filePath, textureResource.is3dImage);
 
       if (image)
       {

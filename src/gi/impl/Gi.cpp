@@ -2116,8 +2116,8 @@ cleanup:
       if (scene->domeLightTexture &&
           scene->domeLightTexture->handle != scene->fallbackDomeLightTexture.handle)
       {
-        // TODO: free dome light memory immediately, before allocting new texture
-        scene->domeLightTexture.reset();
+        // TODO: if we have multiple frames in flight, we need to wait for last frame's semaphore here
+        scene->domeLightTexture.reset(); // frees memory immediately
       }
       scene->domeLight = nullptr;
 
@@ -2127,9 +2127,9 @@ cleanup:
         const char* filePath = domeLight->textureFilePath.c_str();
 
         bool is3dImage = false;
-        bool flushImmediately = false;
+        bool destroyImmediately = true;
 
-        scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, is3dImage, flushImmediately);
+        scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, is3dImage, destroyImmediately);
 
         if (!scene->domeLightTexture)
         {

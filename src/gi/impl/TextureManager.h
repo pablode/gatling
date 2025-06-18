@@ -45,13 +45,13 @@ namespace gtl
   public:
     GiImagePtr loadTextureFromFilePath(const char* filePath,
                                        bool is3dImage = false,
-                                       bool flushImmediately = true);
+                                       bool destroyImmediately = false);
 
     bool loadTextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
                                  std::vector<GiImagePtr>& images);
 
   private:
-    GiImagePtr makeImagePtr();
+    GiImagePtr makeImagePtr(bool destroyImmediately = false);
 
   private:
     CgpuDevice m_device;
