@@ -90,9 +90,6 @@ namespace gtl
 
     bool result = false;
 
-    uint32_t bindingCount;
-    std::vector<SpvReflectDescriptorBinding*> bindings;
-
     uint32_t interfaceVarCount;
     std::vector<SpvReflectInterfaceVariable*> interfaceVars;
 
