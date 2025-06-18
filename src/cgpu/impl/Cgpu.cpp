@@ -2550,7 +2550,7 @@ namespace gtl
                       CgpuBlas* blas)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(createInfo.vertexBuffer, ivertexBuffer);
+    CGPU_RESOLVE_BUFFER(createInfo.vertexPosBuffer, ivertexBuffer);
     CGPU_RESOLVE_BUFFER(createInfo.indexBuffer, iindexBuffer);
 
     uint64_t handle = s_iinstance->iblasStore.allocate();
@@ -2564,7 +2564,7 @@ namespace gtl
       .vertexData = {
         .deviceAddress = cgpuGetBufferDeviceAddress(idevice, ivertexBuffer),
       },
-      .vertexStride = sizeof(CgpuVertex),
+      .vertexStride = sizeof(float) * 3,
       .maxVertex = createInfo.maxVertex,
       .indexType = VK_INDEX_TYPE_UINT32,
       .indexData = {

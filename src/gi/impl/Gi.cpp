@@ -830,11 +830,11 @@ fail:
 
         // Collect vertices
         std::vector<rp::FVertex> vertexData;
-        std::vector<CgpuVertex> positionData;
+        std::vector<float> positionData;
         vertexData.resize(meshVertices.size());
-        positionData.resize(meshVertices.size());
+        positionData.resize(meshVertices.size() * 3);
 
-        for (uint32_t i = 0; i < positionData.size(); i++)
+        for (uint32_t i = 0; i < meshVertices.size(); i++)
         {
           const GiVertex& cpuVert = meshVertices[i];
           uint32_t encodedNormal = _EncodeDirection(glm::make_vec3(cpuVert.norm));
@@ -842,10 +842,12 @@ fail:
 
           vertexData[i] = rp::FVertex{
             .field1 = { glm::make_vec3(cpuVert.pos), cpuVert.bitangentSign },
-            .field2 = { *((float*)&encodedNormal), *((float*)&encodedTangent), cpuVert.u, cpuVert.v }
+            .field2 = { *((float*) &encodedNormal), *((float*) &encodedTangent), cpuVert.u, cpuVert.v }
           };
 
-          positionData[i] = CgpuVertex{ .x = cpuVert.pos[0], .y = cpuVert.pos[1], .z = cpuVert.pos[2] };
+          positionData[i * 3 + 0] = cpuVert.pos[0];
+          positionData[i * 3 + 1] = cpuVert.pos[1];
+          positionData[i * 3 + 2] = cpuVert.pos[2];
         }
 
         uint64_t verticesSize = vertexData.size() * sizeof(rp::FVertex);
@@ -1016,7 +1018,7 @@ fail:
         rp::BlasPayload payload;
 
         uint64_t tmpIndexBufferSize = indicesSize;
-        uint64_t tmpPositionBufferSize = positionData.size() * sizeof(CgpuVertex);
+        uint64_t tmpPositionBufferSize = positionData.size() * sizeof(float);
 
         // Create data buffers
         if (!cgpuCreateBuffer(s_device, {
@@ -1096,7 +1098,7 @@ fail:
           const GiMaterial* material = shaderCache->materials[materialIndex];
 
           bool blasCreated = cgpuCreateBlas(s_device, {
-                                              .vertexBuffer = tmpPositionBuffer,
+                                              .vertexPosBuffer = tmpPositionBuffer,
                                               .indexBuffer = tmpIndexBuffer,
                                               .maxVertex = (uint32_t) positionData.size(),
                                               .triangleCount = (uint32_t) indexData.size() / 3,
