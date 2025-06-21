@@ -51,16 +51,6 @@
     }
 
     parm {
-        name    "maxSampleValue"
-        label   "Max sample value"
-        type    float
-        default { 10.0 }
-        range   { 0.00001! 10000.0 }
-        parmtag { "spare_category" "Sampling" }
-        parmtag { "uiscope" "viewport" }
-    }
-
-    parm {
         name    "filterImportanceSampling"
         label   "Filter Importance Sampling"
         type    toggle

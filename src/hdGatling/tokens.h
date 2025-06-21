@@ -26,7 +26,6 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((maxBounces, "max-bounces"))                              \
   ((rrBounceOffset, "rr-bounce-offset"))                     \
   ((rrInvMinTermProb, "rr-inv-min-term-prob"))               \
-  ((maxSampleValue, "max-sample-value"))                     \
   ((nextEventEstimation, "next-event-estimation"))           \
   ((progressiveAccumulation, "progressive-accumulation"))    \
   ((filterImportanceSampling, "filter-importance-sampling")) \

@@ -2207,7 +2207,7 @@ cleanup:
       .sampleOffset                   = scene->sampleOffset,
       .lensRadius                     = lensRadius,
       .sampleCount                    = renderSettings.spp,
-      .maxSampleValue                 = renderSettings.maxSampleValue,
+      .metersPerSceneUnit             = renderSettings.metersPerSceneUnit,
       .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
       .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
       .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
@@ -2216,8 +2216,7 @@ cleanup:
       .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
       .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
       .sensorExposure                 = params.camera.exposure,
-      .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength,
-      .metersPerSceneUnit             = renderSettings.metersPerSceneUnit
+      .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength
     };
 
     std::vector<CgpuBufferBinding> buffers;

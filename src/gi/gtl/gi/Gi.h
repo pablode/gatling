@@ -140,7 +140,6 @@ namespace gtl
     bool     jitteredSampling;
     float    lightIntensityMultiplier;
     uint32_t maxBounces;
-    float    maxSampleValue;
     uint32_t maxVolumeWalkLength;
     uint32_t mediumStackSize;
     float    metersPerSceneUnit;

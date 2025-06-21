@@ -100,7 +100,7 @@ struct PushConstants
   GI_UINT  sampleOffset;
   GI_FLOAT lensRadius;
   GI_UINT  sampleCount;
-  GI_FLOAT maxSampleValue;
+  GI_FLOAT metersPerSceneUnit;
   GI_VEC4  domeLightRotation;
   GI_VEC3  domeLightEmissionMultiplier;
   GI_UINT  domeLightDiffuseSpecularPacked;
@@ -110,8 +110,7 @@ struct PushConstants
   GI_UINT  clipRangePacked;
   GI_FLOAT sensorExposure;
   GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
-  GI_FLOAT metersPerSceneUnit;
-  /* 1 float free */
+  /* 2 float free */
 };
 
 const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);

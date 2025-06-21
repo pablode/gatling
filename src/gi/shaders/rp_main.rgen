@@ -327,15 +327,7 @@ vec3 evaluate_sample(uint pixelIndex,
     BouncesAov[pixelIndex] = colormap_inferno(float(bounces) / float(maxBounces));
 #endif
 
-    // Radiance clamping
-    vec3 radiance = vec3(rayPayload.radiance);
-    float maxValue = max(radiance.r, max(radiance.g, radiance.b));
-    if (maxValue > PC.maxSampleValue)
-    {
-        radiance *= PC.maxSampleValue / maxValue;
-    }
-
-    return max(vec3(0.0), radiance);
+    return rayPayload.radiance;
 }
 
 // Filter Importance Sampling of a Gauss kernel

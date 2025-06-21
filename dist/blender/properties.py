@@ -38,10 +38,6 @@ class ViewportRenderProperties(bpy.types.PropertyGroup):
         name="Russian roulette inverse minimum terminate probability",
         default=0.95, min=0.0, max=1.0,
     )
-    max_sample_value: bpy.props.FloatProperty(
-        name="Max sample value",
-        default=10.0, min=0.0,
-    )
     # filter_importance_sampling: I don't think there's a need to disable it!
     # depth_of_field: currently not implemented in Hydra.
     # light_intensity_multipler: none, we don't need it!
@@ -83,10 +79,6 @@ class FinalRenderProperties(bpy.types.PropertyGroup):
     rr_inv_min_term_prob: bpy.props.FloatProperty(
         name="Russian roulette inverse minimum terminate probability",
         default=0.975, min=0.0, max=1.0,
-    )
-    max_sample_value: bpy.props.FloatProperty(
-        name="Max sample value",
-        default=10.0, min=0.0,
     )
     next_event_estimation: bpy.props.BoolProperty(
         name="Next event estimation",

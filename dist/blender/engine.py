@@ -33,7 +33,6 @@ class GatlingHydraRenderEngine(bpy.types.HydraRenderEngine):
             'max-bounces': settings.max_bounces,
             'rr-bounce-offset': settings.rr_bounce_offset,
             'rr-inv-min-term-prob': settings.rr_inv_min_term_prob,
-            'max-sample-value': settings.max_sample_value,
             'next-event-estimation': settings.next_event_estimation,
             'clipping-planes': settings.clipping_planes,
             'medium-stack-size': settings.medium_stack_size,
