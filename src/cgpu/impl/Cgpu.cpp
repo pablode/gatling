@@ -3332,7 +3332,6 @@ namespace gtl
 
   void cgpuCmdPushConstants(CgpuCommandBuffer commandBuffer,
                             CgpuPipeline pipeline,
-                            CgpuShaderStage stageFlags,
                             uint32_t size,
                             const void* data)
   {
@@ -3340,10 +3339,26 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
+    VkShaderStageFlags stageFlags;
+    switch (ipipeline->bindPoint)
+    {
+      case VK_PIPELINE_BIND_POINT_COMPUTE:
+        stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        break;
+      case VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR:
+        stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+                     VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
+                     VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                     VK_SHADER_STAGE_MISS_BIT_KHR;
+        break;
+      default:
+        CGPU_FATAL("unhandled pipeline bind point");
+    }
+
     idevice->table.vkCmdPushConstants(
       icommandBuffer->commandBuffer,
       ipipeline->layout,
-      (VkShaderStageFlags) stageFlags,
+      stageFlags,
       0,
       size,
       data
