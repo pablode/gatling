@@ -21,7 +21,7 @@ It is exposed as a Hydra render delegate and comes with a standalone that accept
 
 Complex BSDFs like [OpenPBR](https://academysoftwarefoundation.github.io/OpenPBR/), Autodesk's Standard Surface, and the glTF shading model are supported using MaterialX and its MDL code generation backend.  The MDL SDK is used to generate evaluation and importance sampling functions as GLSL code, which is compiled to SPIR-V and executed with Vulkan.
 
-\* Hardware ray tracing is required. MacOS will be supported [in the future](https://github.com/KhronosGroup/MoltenVK/issues/427).
+\* Hardware ray tracing is required. macOS will be supported [in the future](https://github.com/pablode/gatling/tree/wip/cgpu-metal).
 
 ### Build
 
@@ -80,9 +80,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 ### Issues
 
-* Features: certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (subdivision, UDIM, volumes, displacement) are not yet supported.
-
-* Real-time editing: changing material parameters and adjusting render settings currently result in long loading times.
+Certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (subdivision, UDIM, volumes, displacement) are not yet supported.
 
 ### License
 
