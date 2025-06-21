@@ -111,6 +111,7 @@ namespace gtl
   struct GiShaderCache
   {
     uint32_t                       aovMask;
+    std::array<CgpuBindSet, 3>     bindSets;
     bool                           domeLightCameraVisible;
     std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
@@ -1365,6 +1366,7 @@ cleanup:
 
     GiShaderCache* cache = nullptr;
     CgpuPipeline pipeline;
+    std::array<CgpuBindSet, 3> bindSets;
     CgpuShader rgenShader;
     std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
@@ -1748,6 +1750,8 @@ cleanup:
         .maxRayPayloadSize = maxRayPayloadSize,
         .maxRayHitAttributeSize = maxRayHitAttributeSize
       }, &pipeline);
+
+      cgpuCreateBindSets(s_device, pipeline, bindSets.data(), (uint32_t) bindSets.size());
     }
 
     // Assign GPU data to materials.
@@ -1774,6 +1778,7 @@ cleanup:
 
     cache = new GiShaderCache;
     cache->aovMask = aovMask;
+    cache->bindSets = bindSets;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
     cache->imageBindings = std::move(imageBindings);
     cache->materials.resize(materials.size());
@@ -1801,6 +1806,7 @@ cleanup:
       }
       if (pipeline.handle)
       {
+        cgpuDestroyBindSets(s_device, bindSets.data(), (uint32_t) bindSets.size());
         cgpuDestroyPipeline(s_device, pipeline);
       }
       for (GiMaterialGpuData& gpuData : newMaterialGpuDatas)
@@ -1820,6 +1826,7 @@ cleanup:
     {
       cgpuDestroyShader(s_device, shader);
     }
+    cgpuDestroyBindSets(s_device, cache->bindSets.data(), (uint32_t) cache->bindSets.size());
     cgpuDestroyPipeline(s_device, cache->pipeline);
     delete cache;
   }
@@ -2304,11 +2311,11 @@ cleanup:
 
     cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings0);
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 1/*descriptorSetIndex*/, &bindings1);
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 2/*descriptorSetIndex*/, &bindings2);
+    cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[0], &bindings0);
+    cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[1], &bindings1);
+    cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[2], &bindings2);
 
-    cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline);
+    cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline, shaderCache->bindSets.data(), (uint32_t) shaderCache->bindSets.size());
 
     // Trace rays.
     {

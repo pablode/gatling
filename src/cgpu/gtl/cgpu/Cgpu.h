@@ -120,6 +120,7 @@ namespace gtl
   struct CgpuSampler       { uint64_t handle = 0; };
   struct CgpuBlas          { uint64_t handle = 0; };
   struct CgpuTlas          { uint64_t handle = 0; };
+  struct CgpuBindSet       { uint64_t handle = 0; };
 
   struct CgpuImageCreateInfo
   {
@@ -458,6 +459,19 @@ namespace gtl
     CgpuTlas tlas
   );
 
+  void cgpuCreateBindSets(
+    CgpuDevice device,
+    CgpuPipeline pipeline,
+    CgpuBindSet* bindSets,
+    uint32_t bindSetCount
+  );
+
+  void cgpuDestroyBindSets(
+    CgpuDevice device,
+    CgpuBindSet* bindSets,
+    uint32_t bindSetCount
+  );
+
   bool cgpuCreateCommandBuffer(
     CgpuDevice device,
     CgpuCommandBuffer* commandBuffer
@@ -469,7 +483,9 @@ namespace gtl
 
   void cgpuCmdBindPipeline(
     CgpuCommandBuffer commandBuffer,
-    CgpuPipeline pipeline
+    CgpuPipeline pipeline,
+    const CgpuBindSet* bindSets,
+    uint32_t bindSetCount
   );
 
   void cgpuCmdTransitionShaderImageLayouts(
@@ -480,10 +496,9 @@ namespace gtl
     const CgpuImageBinding* images
   );
 
-  void cgpuCmdUpdateBindings(
+  void cgpuCmdUpdateBindSet(
     CgpuCommandBuffer commandBuffer,
-    CgpuPipeline pipeline,
-    uint32_t descriptorSetIndex,
+    CgpuBindSet bindSet,
     const CgpuBindings* bindings
   );
 
