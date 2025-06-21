@@ -202,6 +202,7 @@ namespace gtl
     DirtyPipeline           = (1 << 6),
     DirtyAovBindingDefaults = (1 << 7),
     DirtySceneParams        = (1 << 8),
+    DirtyBindSets           = (1 << 9),
     All                     = ~0u
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
@@ -1867,7 +1868,7 @@ cleanup:
     }
     if (aovsChanged)
     {
-      flags |= GiSceneDirtyFlags::DirtyShadersAll;
+      flags |= GiSceneDirtyFlags::DirtyShadersAll | GiSceneDirtyFlags::DirtyBindSets;
     }
     if (aovsChanged || aovDefaultsChanged)
     {
@@ -1875,11 +1876,14 @@ cleanup:
     }
 
     if (memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
-        memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0 ||
-        a.domeLight != b.domeLight ||
-        a.scene != b.scene)
+        memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0)
     {
       flags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    }
+
+    if (a.domeLight != b.domeLight || a.scene != b.scene)
+    {
+      flags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
     }
 
     const GiRenderSettings& ra = a.renderSettings;
@@ -1931,7 +1935,6 @@ cleanup:
     if (GiSceneDirtyFlags flags = _CalcDirtyFlagsForRenderParams(params, scene->oldRenderParams); bool(flags))
     {
       scene->dirtyFlags |= flags;
-
       scene->oldRenderParams = params;
     }
 
@@ -1986,7 +1989,9 @@ cleanup:
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyShadersHit;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyShadersMiss;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyPipeline;
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBvh; // SBT
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer |
+                           GiSceneDirtyFlags::DirtyBvh/*SBT*/ |
+                           GiSceneDirtyFlags::DirtyBindSets;
     }
 
     if (!scene->shaderCache)
@@ -2001,7 +2006,7 @@ cleanup:
       scene->bvh = _giCreateBvh(scene, scene->shaderCache);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBvh;
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
     }
 
     if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyFramebuffer))
@@ -2056,6 +2061,7 @@ cleanup:
       }
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyAovBindingDefaults;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
     }
 
     const GiShaderCache* shaderCache = scene->shaderCache;
@@ -2096,11 +2102,12 @@ cleanup:
       }
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtySceneParams;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
     }
 
     GiBvh* bvh = scene->bvh;
 
-    // Upload dome lights.
+    // Upload dome lights
     glm::vec4 backgroundColor(0.0f);
     for (const GiAovBinding& binding : params.aovBindings)
     {
@@ -2125,6 +2132,7 @@ cleanup:
       {
         // TODO: if we have multiple frames in flight, we need to wait for last frame's semaphore here
         scene->domeLightTexture.reset(); // frees memory immediately
+        scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
       }
       scene->domeLight = nullptr;
 
@@ -2145,6 +2153,7 @@ cleanup:
         else
         {
           scene->domeLight = domeLight;
+          scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
         }
       }
     }
@@ -2156,7 +2165,7 @@ cleanup:
       scene->domeLightTexture = std::make_shared<CgpuImage>(scene->fallbackDomeLightTexture);
     }
 
-    // Init state for goto error handling.
+    // Init state for goto error handling
     GiStatus result = GiStatus::Error;
 
     if (!scene->sphereLights.commitChanges())
@@ -2185,151 +2194,157 @@ cleanup:
     uint32_t imageWidth = params.aovBindings[0].renderBuffer->width;
     uint32_t imageHeight = params.aovBindings[0].renderBuffer->height;
 
-    // Set up GPU data.
+    // Start command buffer.
     CgpuCommandBuffer commandBuffer;
     CgpuSemaphore semaphore;
     CgpuSignalSemaphoreInfo signalSemaphoreInfo;
     CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
-    auto camForward = glm::normalize(glm::make_vec3(params.camera.forward));
-    auto camUp = glm::normalize(glm::make_vec3(params.camera.up));
-
-    float lensRadius = 0.0f;
-    if (params.camera.fStop > 0.0f)
-    {
-      lensRadius = params.camera.focalLength / (2.0f * params.camera.fStop);
-    }
-
-    glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
-    glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
-    uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
-
-    rp::PushConstants pushData = {
-      .cameraPosition                 = glm::make_vec3(params.camera.position),
-      .imageDims                      = ((imageHeight << 16) | imageWidth),
-      .cameraForward                  = camForward,
-      .focusDistance                  = params.camera.focusDistance,
-      .cameraUp                       = camUp,
-      .cameraVFoV                     = params.camera.vfov,
-      .sampleOffset                   = scene->sampleOffset,
-      .lensRadius                     = lensRadius,
-      .sampleCount                    = renderSettings.spp,
-      .maxSampleValue                 = renderSettings.maxSampleValue,
-      .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
-      .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
-      .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
-      .maxBouncesAndRrBounceOffset    = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
-      .rrInvMinTermProb               = renderSettings.rrInvMinTermProb,
-      .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
-      .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
-      .sensorExposure                 = params.camera.exposure,
-      .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength,
-      .metersPerSceneUnit             = renderSettings.metersPerSceneUnit
-    };
-
-    std::vector<CgpuBufferBinding> buffers;
-    buffers.reserve(16);
-
-    buffers.push_back({ .binding = rp::BINDING_INDEX_SCENE_PARAMS, .buffer = scene->sceneParams });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_IDS, .buffer = bvh->instanceIdsBuffer });
-
-    buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_F, .buffer = scene->aovDefaultValues });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_I, .buffer = scene->aovDefaultValues });
-
-    std::array<uint32_t, size_t(GiAovId::COUNT)> aovBindingIndices = {
-      rp::BINDING_INDEX_AOV_COLOR,
-      rp::BINDING_INDEX_AOV_NORMAL,
-      rp::BINDING_INDEX_AOV_NEE,
-      rp::BINDING_INDEX_AOV_BARYCENTRICS,
-      rp::BINDING_INDEX_AOV_TEXCOORDS,
-      rp::BINDING_INDEX_AOV_BOUNCES,
-      rp::BINDING_INDEX_AOV_CLOCK_CYCLES,
-      rp::BINDING_INDEX_AOV_OPACITY,
-      rp::BINDING_INDEX_AOV_TANGENTS,
-      rp::BINDING_INDEX_AOV_BITANGENTS,
-      rp::BINDING_INDEX_AOV_THIN_WALLED,
-      rp::BINDING_INDEX_AOV_OBJECT_ID,
-      rp::BINDING_INDEX_AOV_DEPTH,
-      rp::BINDING_INDEX_AOV_FACE_ID,
-      rp::BINDING_INDEX_AOV_INSTANCE_ID,
-      rp::BINDING_INDEX_AOV_DOUBLE_SIDED
-    };
-
-    for (const GiAovBinding& binding : params.aovBindings)
-    {
-      uint32_t bindingIndex = aovBindingIndices[int(binding.aovId)];
-      buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
-    }
-
-    size_t imageCount = shaderCache->imageBindings.size() + 2/* dome lights */;
-
-    std::vector<CgpuImageBinding> images;
-    images.reserve(imageCount);
-
-    CgpuSamplerBinding sampler = { .binding = rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
-
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = scene->fallbackDomeLightTexture,
-                       .index = scene->domeLightsAllocation.offset + 0 });
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *scene->domeLightTexture,
-                       .index = scene->domeLightsAllocation.offset + 1 });
-
-    for (const GiImageBinding& b : shaderCache->imageBindings)
-    {
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *b.image, .index = b.index });
-    }
-
-    CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
-
-    CgpuBindings bindings0 = {
-      .bufferCount = (uint32_t) buffers.size(),
-      .buffers = buffers.data(),
-      .samplerCount = imageCount ? 1u : 0u,
-      .samplers = &sampler,
-      .tlasCount = 1u,
-      .tlases = &as
-    };
-
-    CgpuBindings bindings1 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
-    CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
-
-    if (shaderCache->imageBindings.size() > rp::MAX_TEXTURE_COUNT)
-    {
-      GI_FATAL("max number of textures exceeded");
-    }
-
-    // Set up command buffer.
     if (!cgpuCreateCommandBuffer(s_device, &commandBuffer))
       goto cleanup;
 
     if (!cgpuBeginCommandBuffer(commandBuffer))
       goto cleanup;
 
-    cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
+    // Update descriptor sets if needed
+    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyBindSets))
+    {
+      GB_DEBUG("updating descriptor sets");
 
-    cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[0], &bindings0);
-    cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[1], &bindings1);
-    cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[2], &bindings2);
+      std::vector<CgpuBufferBinding> buffers;
+      buffers.reserve(16);
 
+      buffers.push_back({ .binding = rp::BINDING_INDEX_SCENE_PARAMS, .buffer = scene->sceneParams });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_IDS, .buffer = bvh->instanceIdsBuffer });
+
+      buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_F, .buffer = scene->aovDefaultValues });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_I, .buffer = scene->aovDefaultValues });
+
+      std::array<uint32_t, size_t(GiAovId::COUNT)> aovBindingIndices = {
+        rp::BINDING_INDEX_AOV_COLOR,
+        rp::BINDING_INDEX_AOV_NORMAL,
+        rp::BINDING_INDEX_AOV_NEE,
+        rp::BINDING_INDEX_AOV_BARYCENTRICS,
+        rp::BINDING_INDEX_AOV_TEXCOORDS,
+        rp::BINDING_INDEX_AOV_BOUNCES,
+        rp::BINDING_INDEX_AOV_CLOCK_CYCLES,
+        rp::BINDING_INDEX_AOV_OPACITY,
+        rp::BINDING_INDEX_AOV_TANGENTS,
+        rp::BINDING_INDEX_AOV_BITANGENTS,
+        rp::BINDING_INDEX_AOV_THIN_WALLED,
+        rp::BINDING_INDEX_AOV_OBJECT_ID,
+        rp::BINDING_INDEX_AOV_DEPTH,
+        rp::BINDING_INDEX_AOV_FACE_ID,
+        rp::BINDING_INDEX_AOV_INSTANCE_ID,
+        rp::BINDING_INDEX_AOV_DOUBLE_SIDED
+      };
+
+      for (const GiAovBinding& binding : params.aovBindings)
+      {
+        uint32_t bindingIndex = aovBindingIndices[int(binding.aovId)];
+        buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
+      }
+
+      size_t imageCount = shaderCache->imageBindings.size() + 2/* dome lights */;
+
+      std::vector<CgpuImageBinding> images;
+      images.reserve(imageCount);
+
+      CgpuSamplerBinding sampler = { .binding = rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
+
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = scene->fallbackDomeLightTexture,
+                         .index = scene->domeLightsAllocation.offset + 0 });
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *scene->domeLightTexture,
+                         .index = scene->domeLightsAllocation.offset + 1 });
+
+      for (const GiImageBinding& b : shaderCache->imageBindings)
+      {
+        images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *b.image, .index = b.index });
+      }
+
+      CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
+
+      CgpuBindings bindings0 = {
+        .bufferCount = (uint32_t) buffers.size(),
+        .buffers = buffers.data(),
+        .samplerCount = imageCount ? 1u : 0u,
+        .samplers = &sampler,
+        .tlasCount = 1u,
+        .tlases = &as
+      };
+
+      CgpuBindings bindings1 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
+      CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
+
+      if (shaderCache->imageBindings.size() > rp::MAX_TEXTURE_COUNT)
+      {
+        GI_FATAL("max number of textures exceeded");
+      }
+
+      cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
+
+      cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[0], &bindings0);
+      cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[1], &bindings1);
+      cgpuCmdUpdateBindSet(commandBuffer, shaderCache->bindSets[2], &bindings2);
+
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBindSets;
+    }
+
+    // Bind pipeline and descriptor sets
     cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline, shaderCache->bindSets.data(), (uint32_t) shaderCache->bindSets.size());
 
-    // Trace rays.
+    // Push constants
     {
-      CgpuShaderStage pushShaderStages = CgpuShaderStage::RayGen |
-                                         CgpuShaderStage::Miss |
-                                         CgpuShaderStage::ClosestHit |
-                                         CgpuShaderStage::AnyHit;
+      auto camForward = glm::normalize(glm::make_vec3(params.camera.forward));
+      auto camUp = glm::normalize(glm::make_vec3(params.camera.up));
+
+      float lensRadius = 0.0f;
+      if (params.camera.fStop > 0.0f)
+      {
+        lensRadius = params.camera.focalLength / (2.0f * params.camera.fStop);
+      }
+
+      glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
+      glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
+      uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
+
+      rp::PushConstants pushData = {
+        .cameraPosition                 = glm::make_vec3(params.camera.position),
+        .imageDims                      = ((imageHeight << 16) | imageWidth),
+        .cameraForward                  = camForward,
+        .focusDistance                  = params.camera.focusDistance,
+        .cameraUp                       = camUp,
+        .cameraVFoV                     = params.camera.vfov,
+        .sampleOffset                   = scene->sampleOffset,
+        .lensRadius                     = lensRadius,
+        .sampleCount                    = renderSettings.spp,
+        .maxSampleValue                 = renderSettings.maxSampleValue,
+        .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
+        .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
+        .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
+        .maxBouncesAndRrBounceOffset    = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
+        .rrInvMinTermProb               = renderSettings.rrInvMinTermProb,
+        .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
+        .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
+        .sensorExposure                 = params.camera.exposure,
+        .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength,
+        .metersPerSceneUnit             = renderSettings.metersPerSceneUnit
+      };
+
+      CgpuShaderStage pushShaderStages = CgpuShaderStage::RayGen | CgpuShaderStage::Miss | CgpuShaderStage::ClosestHit | CgpuShaderStage::AnyHit;
 
       cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
     }
 
+    // Trace rays
     cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
 
-    // Copy device to host memory.
+    // Copy device to host memory
     {
       GbSmallVector<CgpuBufferMemoryBarrier, 5> preBarriers;
       GbSmallVector<CgpuBufferMemoryBarrier, 5> postBarriers;
@@ -2383,7 +2398,7 @@ cleanup:
       cgpuCmdPipelineBarrier(commandBuffer, &postBarrier);
     }
 
-    // Submit command buffer.
+    // Submit command buffer
     cgpuEndCommandBuffer(commandBuffer);
 
     if (!cgpuCreateSemaphore(s_device, &semaphore))
