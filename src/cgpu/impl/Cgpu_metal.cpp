@@ -496,9 +496,7 @@ GB_LOG("{}", mslSrc);
 
     CGPU_RESOLVE_SHADER(*shader, ishader);
 
-    cgpuCreateShader(idevice, createInfo, ishader);
-
-    return true;
+    return cgpuCreateShader(idevice, createInfo, ishader);
   }
 
   bool cgpuCreateShaders(CgpuDevice device,
@@ -522,13 +520,18 @@ GB_LOG("{}", mslSrc);
       ishaders[i] = ishader;
     }
 
+    std::atomic<bool> success = true;
+
 #pragma omp parallel for schedule(dynamic, 1)
     for (int i = 0; i < int(shaderCount); i++)
     {
-      cgpuCreateShader(idevice, createInfos[i], ishaders[i]);
+      if (!cgpuCreateShader(idevice, createInfos[i], ishaders[i]))
+      {
+        success = false;
+      }
     }
 
-    return true;
+    return success;
   }
 
   bool cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
