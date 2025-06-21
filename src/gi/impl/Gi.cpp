@@ -1847,6 +1847,7 @@ cleanup:
     bool aovCountChanged = a.aovBindings.size() != b.aovBindings.size();
     bool aovsChanged = aovCountChanged;
     bool aovDefaultsChanged = false;
+    bool renderBufferChanged = false;
     if (!aovCountChanged)
     {
       auto& oldAovs = b.aovBindings;
@@ -1860,7 +1861,10 @@ cleanup:
         if (oldAov.aovId != newAov.aovId)
         {
           aovsChanged = true;
-          break;
+        }
+        if (oldAov.renderBuffer != newAov.renderBuffer)
+        {
+          renderBufferChanged = true;
         }
         if (memcmp(oldAov.clearValue, newAov.clearValue, GI_MAX_AOV_COMP_SIZE) != 0)
         {
@@ -1876,6 +1880,10 @@ cleanup:
     {
       flags |= GiSceneDirtyFlags::DirtyAovBindingDefaults | GiSceneDirtyFlags::DirtyFramebuffer;
     }
+    if (renderBufferChanged)
+    {
+      flags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
+    }
 
     if (memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
         memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0)
@@ -1883,7 +1891,9 @@ cleanup:
       flags |= GiSceneDirtyFlags::DirtyFramebuffer;
     }
 
-    if (a.domeLight != b.domeLight || a.scene != b.scene)
+    if (a.domeLight != b.domeLight ||
+        a.scene != b.scene ||
+        a.scene->domeLightTexture != b.scene->domeLightTexture)
     {
       flags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
     }
