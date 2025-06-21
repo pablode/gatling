@@ -2335,9 +2335,7 @@ cleanup:
         .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength
       };
 
-      CgpuShaderStage pushShaderStages = CgpuShaderStage::RayGen | CgpuShaderStage::Miss | CgpuShaderStage::ClosestHit | CgpuShaderStage::AnyHit;
-
-      cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
+      cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, sizeof(pushData), &pushData);
     }
 
     // Trace rays
