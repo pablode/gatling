@@ -154,7 +154,6 @@ namespace gtl
     VkPipelineLayout                          layout;
     VkDescriptorPool                          descriptorPool;
     uint32_t                                  descriptorSetCount;
-    VkDescriptorSet                           descriptorSets[CGPU_MAX_DESCRIPTOR_SET_COUNT];
     VkDescriptorSetLayout                     descriptorSetLayouts[CGPU_MAX_DESCRIPTOR_SET_COUNT];
     std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings[CGPU_MAX_DESCRIPTOR_SET_COUNT];
     VkPipelineBindPoint                       bindPoint;
@@ -213,6 +212,12 @@ namespace gtl
     VkSampler sampler;
   };
 
+  struct CgpuIBindSet
+  {
+    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings;
+    VkDescriptorSet descriptorSet;
+  };
+
   struct CgpuIInstance
   {
     VkInstance instance;
@@ -226,6 +231,7 @@ namespace gtl
     GbLinearDataStore<CgpuISampler, 8> isamplerStore;
     GbLinearDataStore<CgpuIBlas, 1024> iblasStore;
     GbLinearDataStore<CgpuITlas, 1> itlasStore;
+    GbLinearDataStore<CgpuIBindSet, 32> ibindSetStore;
     bool debugUtilsEnabled;
   };
 
@@ -281,6 +287,7 @@ namespace gtl
   CGPU_RESOLVE_HANDLE(      Sampler,       CgpuSampler,       CgpuISampler,       isamplerStore)
   CGPU_RESOLVE_HANDLE(         Blas,          CgpuBlas,          CgpuIBlas,          iblasStore)
   CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,          itlasStore)
+  CGPU_RESOLVE_HANDLE(      BindSet,       CgpuBindSet,       CgpuIBindSet,       ibindSetStore)
 
 #define CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, ITYPE, RESOLVE_FUNC)      \
   ITYPE* VAR_NAME;                                                       \
@@ -298,6 +305,7 @@ namespace gtl
 #define CGPU_RESOLVE_SAMPLER(HANDLE, VAR_NAME)        CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuISampler, cgpuResolveSampler)
 #define CGPU_RESOLVE_BLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIBlas, cgpuResolveBlas)
 #define CGPU_RESOLVE_TLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
+#define CGPU_RESOLVE_BIND_SET(HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIBindSet, cgpuResolveBindSet)
 
   /* Helper methods. */
 
@@ -2033,25 +2041,6 @@ namespace gtl
     {
       CGPU_FATAL("failed to create descriptor pool");
     }
-
-    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
-      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .pNext = nullptr,
-      .descriptorPool = ipipeline->descriptorPool,
-      .descriptorSetCount = ipipeline->descriptorSetCount,
-      .pSetLayouts = ipipeline->descriptorSetLayouts,
-    };
-
-    result = idevice->table.vkAllocateDescriptorSets(
-      idevice->logicalDevice,
-      &descriptorSetAllocateInfo,
-      ipipeline->descriptorSets
-    );
-
-    if (result != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to allocate descriptor set");
-    }
   }
 
   void cgpuCreateComputePipeline(CgpuDevice device,
@@ -2744,6 +2733,58 @@ namespace gtl
     s_iinstance->itlasStore.free(tlas.handle);
   }
 
+  void cgpuCreateBindSets(CgpuDevice device, CgpuPipeline pipeline, CgpuBindSet* bindSets, uint32_t bindSetCount)
+  {
+    CGPU_RESOLVE_DEVICE(device, idevice);
+    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+
+    if (ipipeline->descriptorSetCount != bindSetCount)
+    {
+      CGPU_FATAL("descriptor set count mismatch");
+    }
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .pNext = nullptr,
+      .descriptorPool = ipipeline->descriptorPool,
+      .descriptorSetCount = ipipeline->descriptorSetCount,
+      .pSetLayouts = ipipeline->descriptorSetLayouts,
+    };
+
+    VkDescriptorSet descriptorSets[CGPU_MAX_DESCRIPTOR_SET_COUNT];
+
+    VkResult result = idevice->table.vkAllocateDescriptorSets(
+      idevice->logicalDevice,
+      &descriptorSetAllocateInfo,
+      descriptorSets
+    );
+
+    if (result != VK_SUCCESS)
+    {
+      CGPU_FATAL("failed to allocate descriptor set");
+    }
+
+    for (uint32_t i = 0; i < bindSetCount; i++)
+    {
+      bindSets[i].handle = s_iinstance->ibindSetStore.allocate();
+
+      CGPU_RESOLVE_BIND_SET(bindSets[i], ibindSet);
+      ibindSet->descriptorSetLayoutBindings = ipipeline->descriptorSetLayoutBindings[i];
+      ibindSet->descriptorSet = descriptorSets[i];
+    }
+  }
+
+  void cgpuDestroyBindSets(CgpuDevice device, CgpuBindSet* bindSets, uint32_t bindSetCount)
+  {
+    CGPU_RESOLVE_DEVICE(device, idevice);
+
+    for (uint32_t i = 0; i < bindSetCount; i++)
+    {
+      // descriptor set memory is managed by pipeline VkDescriptorPool
+      s_iinstance->ibindSetStore.free(bindSets[i].handle);
+    }
+  }
+
   bool cgpuCreateCommandBuffer(CgpuDevice device, CgpuCommandBuffer* commandBuffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
@@ -2812,7 +2853,10 @@ namespace gtl
     return true;
   }
 
-  void cgpuCmdBindPipeline(CgpuCommandBuffer commandBuffer, CgpuPipeline pipeline)
+  void cgpuCmdBindPipeline(CgpuCommandBuffer commandBuffer,
+                           CgpuPipeline pipeline,
+                           const CgpuBindSet* bindSets,
+                           uint32_t bindSetCount)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
@@ -2824,6 +2868,13 @@ namespace gtl
       ipipeline->pipeline
     );
 
+    std::array<VkDescriptorSet, CGPU_MAX_DESCRIPTOR_SET_COUNT> descriptorSets;
+    for (uint32_t i = 0; i < bindSetCount; i++)
+    {
+      CGPU_RESOLVE_BIND_SET(bindSets[i], ibindSet);
+      descriptorSets[i] = ibindSet->descriptorSet;
+    }
+
     uint32_t firstDescriptorSet = 0;
     uint32_t dynamicOffsetCount = 0;
     const uint32_t* dynamicOffsets = nullptr;
@@ -2834,7 +2885,7 @@ namespace gtl
       ipipeline->layout,
       firstDescriptorSet,
       ipipeline->descriptorSetCount,
-      &ipipeline->descriptorSets[firstDescriptorSet],
+      &descriptorSets[firstDescriptorSet],
       dynamicOffsetCount,
       dynamicOffsets
     );
@@ -2963,14 +3014,13 @@ namespace gtl
     }
   }
 
-  void cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
-                             CgpuPipeline pipeline,
-                             uint32_t descriptorSetIndex,
-                             const CgpuBindings* bindings)
+  void cgpuCmdUpdateBindSet(CgpuCommandBuffer commandBuffer,
+                            CgpuBindSet bindSet,
+                            const CgpuBindings* bindings)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+    CGPU_RESOLVE_BIND_SET(bindSet, ibindSet);
 
     GbSmallVector<VkDescriptorBufferInfo, 8> bufferInfos;
     GbSmallVector<VkWriteDescriptorSetAccelerationStructureKHR, 1> asInfos;
@@ -2984,11 +3034,7 @@ namespace gtl
     std::vector<VkWriteDescriptorSet> writeDescriptorSets;
     writeDescriptorSets.reserve(512);
 
-    if (descriptorSetIndex >= ipipeline->descriptorSetCount)
-    {
-      CGPU_FATAL("descriptor set index out of bounds");
-    }
-    const std::vector<VkDescriptorSetLayoutBinding>& layoutBindings = ipipeline->descriptorSetLayoutBindings[descriptorSetIndex];
+    const std::vector<VkDescriptorSetLayoutBinding>& layoutBindings = ibindSet->descriptorSetLayoutBindings;
 
     for (uint32_t i = 0; i < layoutBindings.size(); i++)
     {
@@ -2997,7 +3043,7 @@ namespace gtl
       VkWriteDescriptorSet writeDescriptorSet = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = nullptr,
-        .dstSet = ipipeline->descriptorSets[descriptorSetIndex],
+        .dstSet = ibindSet->descriptorSet,
         .dstBinding = layoutBinding->binding,
         .dstArrayElement = 0,
         .descriptorCount = layoutBinding->descriptorCount,
