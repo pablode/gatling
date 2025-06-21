@@ -229,7 +229,9 @@ namespace gtl
     bool debugUtilsEnabled;
   };
 
-  static std::unique_ptr<CgpuIInstance> iinstance = nullptr;
+  static uint32_t s_instanceUsageCount = 0;
+  static std::mutex s_instanceLock;
+  static std::unique_ptr<CgpuIInstance> s_iinstance = nullptr;
 
   /* Helper macros. */
 
@@ -266,7 +268,7 @@ namespace gtl
 #define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)          \
   CGPU_INLINE static bool cgpuResolve##RESOURCE_NAME(HANDLE_TYPE handle, IRESOURCE_TYPE** idata) \
   {                                                                                              \
-    return iinstance->RESOURCE_STORE.get(handle.handle, idata);                                  \
+    return s_iinstance->RESOURCE_STORE.get(handle.handle, idata);                                \
   }
 
   CGPU_RESOLVE_HANDLE(       Device,        CgpuDevice,        CgpuIDevice,        ideviceStore)
@@ -430,6 +432,14 @@ namespace gtl
 
   bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
   {
+    std::lock_guard guard(s_instanceLock);
+
+    s_instanceUsageCount++;
+    if (s_instanceUsageCount > 1)
+    {
+      return true;
+    }
+
     if (volkInitialize() != VK_SUCCESS)
     {
       CGPU_RETURN_ERROR("failed to initialize volk");
@@ -527,16 +537,29 @@ namespace gtl
 
     volkLoadInstanceOnly(instance);
 
-    iinstance = std::make_unique<CgpuIInstance>();
-    iinstance->instance = instance;
-    iinstance->debugUtilsEnabled = debugUtilsEnabled;
+    s_iinstance = std::make_unique<CgpuIInstance>();
+    s_iinstance->instance = instance;
+    s_iinstance->debugUtilsEnabled = debugUtilsEnabled;
     return true;
   }
 
   void cgpuTerminate()
   {
-    vkDestroyInstance(iinstance->instance, nullptr);
-    iinstance.reset();
+    std::lock_guard guard(s_instanceLock);
+
+    if (s_instanceUsageCount == 0)
+    {
+      assert(false);
+      return;
+    }
+
+    s_instanceUsageCount--;
+
+    if (s_instanceUsageCount == 0)
+    {
+      vkDestroyInstance(s_iinstance->instance, nullptr);
+      s_iinstance.reset();
+    }
   }
 
   static VkPhysicalDevice cgpuSelectBestGpu(const VkPhysicalDevice* devices, size_t count)
@@ -649,25 +672,25 @@ namespace gtl
 
   bool cgpuCreateDevice(CgpuDevice* device)
   {
-    uint64_t handle = iinstance->ideviceStore.allocate();
+    uint64_t handle = s_iinstance->ideviceStore.allocate();
 
     CGPU_RESOLVE_DEVICE({ handle }, idevice);
 
     uint32_t physDeviceCount;
     vkEnumeratePhysicalDevices(
-      iinstance->instance,
+      s_iinstance->instance,
       &physDeviceCount,
       nullptr
     );
 
     if (physDeviceCount == 0)
     {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
       CGPU_RETURN_ERROR("no physical device found");
     }
 
     GbSmallVector<VkPhysicalDevice, 4> physicalDevices(physDeviceCount);
-    vkEnumeratePhysicalDevices(iinstance->instance, &physDeviceCount, physicalDevices.data());
+    vkEnumeratePhysicalDevices(s_iinstance->instance, &physDeviceCount, physicalDevices.data());
 
     // Select GPU using simple scoring system (dGPU > integrated).
     if (VkPhysicalDevice device = cgpuSelectBestGpu(physicalDevices.data(), physicalDevices.size()); device != VK_NULL_HANDLE)
@@ -738,7 +761,7 @@ namespace gtl
 
     if (apiVersion < CGPU_MIN_VK_API_VERSION)
     {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
 
       GB_ERROR("Vulkan device API version does match minimum of {}.{}.{}",
         VK_VERSION_MAJOR(CGPU_MIN_VK_API_VERSION), VK_VERSION_MINOR(CGPU_MIN_VK_API_VERSION),
@@ -813,7 +836,7 @@ namespace gtl
 
 #ifndef NDEBUG
     // This feature requires env var NV_ALLOW_RAYTRACING_VALIDATION=1 to be set.
-    if (iinstance->debugUtilsEnabled && enableOptionalExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
+    if (s_iinstance->debugUtilsEnabled && enableOptionalExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
     {
       idevice->internalFeatures.rayTracingValidation = true;
     }
@@ -837,7 +860,7 @@ namespace gtl
     }
     if (queueFamilyIndex == UINT32_MAX)
     {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
       CGPU_RETURN_ERROR("no suitable queue family");
     }
 
@@ -1081,7 +1104,7 @@ namespace gtl
       &idevice->logicalDevice
     );
     if (result != VK_SUCCESS) {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
       CGPU_RETURN_ERROR("failed to create device");
     }
 
@@ -1110,7 +1133,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
 
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
@@ -1135,7 +1158,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
 
       idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
@@ -1177,14 +1200,14 @@ namespace gtl
     allocCreateInfo.vulkanApiVersion = CGPU_MIN_VK_API_VERSION;
     allocCreateInfo.physicalDevice = idevice->physicalDevice;
     allocCreateInfo.device = idevice->logicalDevice;
-    allocCreateInfo.instance = iinstance->instance;
+    allocCreateInfo.instance = s_iinstance->instance;
     allocCreateInfo.pVulkanFunctions = &vmaVulkanFunctions;
 
     result = vmaCreateAllocator(&allocCreateInfo, &idevice->allocator);
 
     if (result != VK_SUCCESS)
     {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
 
       idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
       idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
@@ -1200,7 +1223,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      iinstance->ideviceStore.free(handle);
+      s_iinstance->ideviceStore.free(handle);
 
       vmaDestroyAllocator(idevice->allocator);
       idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
@@ -1256,7 +1279,7 @@ namespace gtl
 
     idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
-    iinstance->ideviceStore.free(device.handle);
+    s_iinstance->ideviceStore.free(device.handle);
   }
 
   static void cgpuCreatePipelineLayout(CgpuIDevice* idevice,
@@ -1491,7 +1514,7 @@ namespace gtl
         CGPU_FATAL("failed to create shader module");
       }
 
-      if (iinstance->debugUtilsEnabled && createInfo.debugName)
+      if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
       {
         cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t) ishader->module, createInfo.debugName);
       }
@@ -1509,7 +1532,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    shader->handle = iinstance->ishaderStore.allocate();
+    shader->handle = s_iinstance->ishaderStore.allocate();
 
     CGPU_RESOLVE_SHADER(*shader, ishader);
 
@@ -1527,7 +1550,7 @@ namespace gtl
 
     for (uint32_t i = 0; i < shaderCount; i++)
     {
-      shaders[i].handle = iinstance->ishaderStore.allocate();
+      shaders[i].handle = s_iinstance->ishaderStore.allocate();
     }
 
     std::vector<CgpuIShader*> ishaders;
@@ -1567,7 +1590,7 @@ namespace gtl
       idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
     }
 
-    iinstance->ishaderStore.free(shader.handle);
+    s_iinstance->ishaderStore.free(shader.handle);
   }
 
   static bool cgpuCreateIBuffer(CgpuIDevice* idevice,
@@ -1636,7 +1659,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->ibufferStore.allocate();
+    uint64_t handle = s_iinstance->ibufferStore.allocate();
 
     CGPU_RESOLVE_BUFFER({ handle }, ibuffer);
 
@@ -1645,11 +1668,11 @@ namespace gtl
     if (!cgpuCreateIBuffer(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size,
                            createInfo.alignment, ibuffer, createInfo.debugName))
     {
-      iinstance->ibufferStore.free(handle);
+      s_iinstance->ibufferStore.free(handle);
       CGPU_RETURN_ERROR("failed to create buffer");
     }
 
-    if (iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t) ibuffer->buffer, createInfo.debugName);
     }
@@ -1670,7 +1693,7 @@ namespace gtl
 
     cgpuDestroyIBuffer(idevice, ibuffer);
 
-    iinstance->ibufferStore.free(buffer.handle);
+    s_iinstance->ibufferStore.free(buffer.handle);
   }
 
   void cgpuMapBuffer(CgpuDevice device, CgpuBuffer buffer, void** mappedMem)
@@ -1717,7 +1740,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->iimageStore.allocate();
+    uint64_t handle = s_iinstance->iimageStore.allocate();
 
     CGPU_RESOLVE_IMAGE({ handle }, iimage);
 
@@ -1763,7 +1786,7 @@ namespace gtl
     );
 
     if (result != VK_SUCCESS) {
-      iinstance->iimageStore.free(handle);
+      s_iinstance->iimageStore.free(handle);
       CGPU_RETURN_ERROR("failed to create image");
     }
 
@@ -1807,12 +1830,12 @@ namespace gtl
     );
     if (result != VK_SUCCESS)
     {
-      iinstance->iimageStore.free(handle);
+      s_iinstance->iimageStore.free(handle);
       vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
       CGPU_RETURN_ERROR("failed to create image view");
     }
 
-    if (iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_IMAGE, (uint64_t) iimage->image, createInfo.debugName);
     }
@@ -1840,7 +1863,7 @@ namespace gtl
 
     vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
 
-    iinstance->iimageStore.free(image.handle);
+    s_iinstance->iimageStore.free(image.handle);
   }
 
   bool cgpuCreateSampler(CgpuDevice device,
@@ -1849,7 +1872,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->isamplerStore.allocate();
+    uint64_t handle = s_iinstance->isamplerStore.allocate();
 
     CGPU_RESOLVE_SAMPLER({ handle }, isampler);
 
@@ -1887,7 +1910,7 @@ namespace gtl
     );
 
     if (result != VK_SUCCESS) {
-      iinstance->isamplerStore.free(handle);
+      s_iinstance->isamplerStore.free(handle);
       CGPU_RETURN_ERROR("failed to create sampler");
     }
 
@@ -1902,7 +1925,7 @@ namespace gtl
 
     idevice->table.vkDestroySampler(idevice->logicalDevice, isampler->sampler, nullptr);
 
-    iinstance->isamplerStore.free(sampler.handle);
+    s_iinstance->isamplerStore.free(sampler.handle);
   }
 
   static void cgpuCreatePipelineDescriptors(CgpuIDevice* idevice,
@@ -2038,7 +2061,7 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SHADER(createInfo.shader, ishader);
 
-    uint64_t handle = iinstance->ipipelineStore.allocate();
+    uint64_t handle = s_iinstance->ipipelineStore.allocate();
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
@@ -2081,7 +2104,7 @@ namespace gtl
       CGPU_FATAL("failed to create compute pipeline");
     }
 
-    if (iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline, createInfo.debugName);
     }
@@ -2171,7 +2194,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->ipipelineStore.allocate();
+    uint64_t handle = s_iinstance->ipipelineStore.allocate();
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
@@ -2369,7 +2392,7 @@ namespace gtl
       // Create the SBT.
       cgpuCreateRtPipelineSbt(idevice, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
 
-      if (iinstance->debugUtilsEnabled && createInfo.debugName)
+      if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
       {
         cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline, createInfo.debugName);
       }
@@ -2395,7 +2418,7 @@ namespace gtl
     {
       idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
     }
-    iinstance->ipipelineStore.free(pipeline.handle);
+    s_iinstance->ipipelineStore.free(pipeline.handle);
   }
 
   static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
@@ -2541,7 +2564,7 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(createInfo.vertexBuffer, ivertexBuffer);
     CGPU_RESOLVE_BUFFER(createInfo.indexBuffer, iindexBuffer);
 
-    uint64_t handle = iinstance->iblasStore.allocate();
+    uint64_t handle = s_iinstance->iblasStore.allocate();
 
     CGPU_RESOLVE_BLAS({ handle }, iblas);
 
@@ -2580,11 +2603,11 @@ namespace gtl
 
     if (!creationSuccessul)
     {
-      iinstance->iblasStore.free(handle);
+      s_iinstance->iblasStore.free(handle);
       CGPU_RETURN_ERROR("failed to build BLAS");
     }
 
-    if (iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) iblas->as, createInfo.debugName);
     }
@@ -2608,7 +2631,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->itlasStore.allocate();
+    uint64_t handle = s_iinstance->itlasStore.allocate();
 
     CGPU_RESOLVE_TLAS({ handle }, itlas);
 
@@ -2619,7 +2642,7 @@ namespace gtl
                            (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
                            16/*required by spec*/, &itlas->instances, createInfo.debugName))
     {
-      iinstance->itlasStore.free(handle);
+      s_iinstance->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
     }
 
@@ -2637,7 +2660,7 @@ namespace gtl
 
         CgpuIBlas* iblas;
         if (!cgpuResolveBlas(instanceDesc.as, &iblas)) {
-          iinstance->itlasStore.free(handle);
+          s_iinstance->itlasStore.free(handle);
           cgpuDestroyIBuffer(idevice, &itlas->instances);
           CGPU_RETURN_ERROR_INVALID_HANDLE;
         }
@@ -2645,7 +2668,7 @@ namespace gtl
         uint32_t instanceCustomIndex = instanceDesc.instanceCustomIndex;
         if ((instanceCustomIndex & 0xFF000000u) != 0u)
         {
-          iinstance->itlasStore.free(handle);
+          s_iinstance->itlasStore.free(handle);
           cgpuDestroyIBuffer(idevice, &itlas->instances);
           CGPU_RETURN_ERROR("instanceCustomIndex must be equal to or smaller than 2^24");
         }
@@ -2684,12 +2707,12 @@ namespace gtl
 
     if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as))
     {
-      iinstance->itlasStore.free(handle);
+      s_iinstance->itlasStore.free(handle);
       cgpuDestroyIBuffer(idevice, &itlas->instances);
       CGPU_RETURN_ERROR("failed to build TLAS");
     }
 
-    if (iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) itlas->as, createInfo.debugName);
     }
@@ -2706,7 +2729,7 @@ namespace gtl
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, iblas->as, nullptr);
     cgpuDestroyIBuffer(idevice, &iblas->buffer);
 
-    iinstance->iblasStore.free(blas.handle);
+    s_iinstance->iblasStore.free(blas.handle);
   }
 
   void cgpuDestroyTlas(CgpuDevice device, CgpuTlas tlas)
@@ -2718,14 +2741,14 @@ namespace gtl
     cgpuDestroyIBuffer(idevice, &itlas->instances);
     cgpuDestroyIBuffer(idevice, &itlas->buffer);
 
-    iinstance->itlasStore.free(tlas.handle);
+    s_iinstance->itlasStore.free(tlas.handle);
   }
 
   bool cgpuCreateCommandBuffer(CgpuDevice device, CgpuCommandBuffer* commandBuffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->icommandBufferStore.allocate();
+    uint64_t handle = s_iinstance->icommandBufferStore.allocate();
 
     CGPU_RESOLVE_COMMAND_BUFFER({ handle }, icommandBuffer);
 
@@ -2762,7 +2785,7 @@ namespace gtl
       &icommandBuffer->commandBuffer
     );
 
-    iinstance->icommandBufferStore.free(commandBuffer.handle);
+    s_iinstance->icommandBufferStore.free(commandBuffer.handle);
   }
 
   bool cgpuBeginCommandBuffer(CgpuCommandBuffer commandBuffer)
@@ -3493,7 +3516,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    uint64_t handle = iinstance->isemaphoreStore.allocate();
+    uint64_t handle = s_iinstance->isemaphoreStore.allocate();
 
     CGPU_RESOLVE_SEMAPHORE({ handle }, isemaphore);
 
@@ -3518,7 +3541,7 @@ namespace gtl
     );
 
     if (result != VK_SUCCESS) {
-      iinstance->isemaphoreStore.free(handle);
+      s_iinstance->isemaphoreStore.free(handle);
       CGPU_RETURN_ERROR("failed to create semaphore");
     }
 
@@ -3537,7 +3560,7 @@ namespace gtl
       nullptr
     );
 
-    iinstance->isemaphoreStore.free(semaphore.handle);
+    s_iinstance->isemaphoreStore.free(semaphore.handle);
   }
 
   bool cgpuWaitSemaphores(CgpuDevice device,
