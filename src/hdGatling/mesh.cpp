@@ -482,6 +482,8 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     (*dirtyBits & HdChangeTracker::DirtyPoints) |
     (*dirtyBits & HdChangeTracker::DirtyNormals) |
     (*dirtyBits & HdChangeTracker::DirtyPrimvar) |
+    (*dirtyBits & HdChangeTracker::DirtyInstancer) |
+    (*dirtyBits & HdChangeTracker::DirtyTransform) |
     (*dirtyBits & HdChangeTracker::DirtyTopology);
 
   if (updateGeometry)
