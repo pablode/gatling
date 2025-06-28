@@ -247,6 +247,7 @@ namespace gtl
   CgpuDeviceProperties s_deviceProperties;
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
+  std::mutex s_resourceDestroyerMutex;
   std::unique_ptr<GgpuDelayedResourceDestroyer> s_delayedResourceDestroyer;
   std::unique_ptr<GiGlslShaderGen> s_shaderGen;
   std::unique_ptr<McRuntime> s_mcRuntime;
@@ -673,22 +674,27 @@ fail:
     }
   }
 
+  void giDestroyMeshGpuData(GiMeshGpuData& gpuData)
+  {
+    std::lock_guard guard(s_resourceDestroyerMutex); // Hydra sync is parallel
+    s_delayedResourceDestroyer->enqueueDestruction(gpuData.blas, gpuData.payloadBuffer);
+  }
+
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars)
   {
     mesh->instancerPrimvars = instancerPrimvars;
-    mesh->gpuData.reset();
+
+    if (mesh->gpuData.has_value())
+    {
+      giDestroyMeshGpuData(*mesh->gpuData);
+      mesh->gpuData.reset();
+    }
 
     GiScene* scene = mesh->scene;
     {
       std::lock_guard guard(scene->mutex);
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
-  }
-
-  void giDestroyMeshGpuData(GiMeshGpuData& gpuData)
-  {
-    cgpuDestroyBlas(s_device, gpuData.blas);
-    cgpuDestroyBuffer(s_device, gpuData.payloadBuffer);
   }
 
   void giSetMeshMaterial(GiMesh* mesh, GiMaterial* mat)
