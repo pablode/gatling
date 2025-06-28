@@ -21,6 +21,7 @@
 #include "utils.h"
 
 #include <pxr/base/gf/matrix4f.h>
+#include <pxr/imaging/hd/extComputationUtils.h>
 #include <pxr/imaging/hd/meshUtil.h>
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hd/smoothNormals.h>
@@ -482,7 +483,8 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     (*dirtyBits & HdChangeTracker::DirtyPoints) |
     (*dirtyBits & HdChangeTracker::DirtyNormals) |
     (*dirtyBits & HdChangeTracker::DirtyPrimvar) |
-    (*dirtyBits & HdChangeTracker::DirtyTopology);
+    (*dirtyBits & HdChangeTracker::DirtyTopology) |
+    (*dirtyBits & HdChangeTracker::DirtyComputationPrimvarDesc);
 
   if (updateGeometry)
   {
@@ -835,8 +837,40 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
   meshUtil.ComputeTriangleIndices(&faces, &primitiveParams);
   auto faceCount = uint32_t(faces.size());
 
-  // Points (required; one per vertex)
-  VtValue boxedPoints = GetPoints(sceneDelegate);
+  // Points (required; vertex interpolation)
+  VtValue boxedPoints;
+
+  const HdExtComputationPrimvarDescriptorVector& extComputationDescs =
+    sceneDelegate->GetExtComputationPrimvarDescriptors(id, HdInterpolationVertex);
+
+  for (const HdExtComputationPrimvarDescriptor& desc : extComputationDescs)
+  {
+    if (desc.name != HdTokens->points)
+    {
+      continue;
+    }
+
+    HdExtComputationUtils::SampledValueStore<1> valueStore;
+    HdExtComputationUtils::SampleComputedPrimvarValues({ desc }, sceneDelegate, 1, &valueStore);
+
+    auto storeIt = valueStore.find(desc.name);
+    if (storeIt != valueStore.end())
+    {
+      const auto& values = storeIt->second.values;
+
+      if (!values.empty() && values[0].IsHolding<VtVec3fArray>())
+      {
+        boxedPoints = values[0];
+      }
+    }
+
+    break;
+  }
+
+  if (boxedPoints.IsEmpty())
+  {
+    boxedPoints = GetPoints(sceneDelegate);
+  }
 
   if (boxedPoints.IsEmpty() || !boxedPoints.IsHolding<VtVec3fArray>())
   {
@@ -1103,7 +1137,8 @@ HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const
          HdChangeTracker::DirtyTransform |
          HdChangeTracker::DirtyMaterialId |
          HdChangeTracker::DirtyVisibility |
-         HdChangeTracker::DirtyDoubleSided;
+         HdChangeTracker::DirtyDoubleSided |
+         HdChangeTracker::DirtyComputationPrimvarDesc;
 }
 
 HdDirtyBits HdGatlingMesh::_PropagateDirtyBits(HdDirtyBits bits) const
