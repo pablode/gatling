@@ -26,6 +26,7 @@
 #include "light.h"
 
 #include <pxr/base/arch/fileSystem.h>
+#include <pxr/imaging/hd/extComputation.h>
 #include <pxr/imaging/hd/resourceRegistry.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/base/gf/vec4f.h>
@@ -50,7 +51,8 @@ namespace
     HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->diskLight,
     HdPrimTypeTokens->domeLight,
-    HdPrimTypeTokens->simpleLight // Required for usdview domeLight creation
+    HdPrimTypeTokens->simpleLight, // Required for usdview domeLight creation
+    HdPrimTypeTokens->extComputation
   };
 
   const static TfTokenVector _supportedBprimTypes =
@@ -301,6 +303,10 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   else if (typeId == HdPrimTypeTokens->simpleLight)
   {
     return new HdGatlingSimpleLight(sprimId, _giScene);
+  }
+  else if (typeId == HdPrimTypeTokens->extComputation)
+  {
+    return new HdExtComputation(sprimId);
   }
 
   return nullptr;
