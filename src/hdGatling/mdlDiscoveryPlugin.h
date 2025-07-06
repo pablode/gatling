@@ -17,10 +17,24 @@
 
 #pragma once
 
+#include <pxr/pxr.h>
+#if PXR_VERSION >= 2508
+#include <pxr/usd/sdr/discoveryPlugin.h>
+#else
 #include <pxr/usd/ndr/discoveryPlugin.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if PXR_VERSION >= 2508
+class HdGatlingMdlDiscoveryPlugin final : public SdrDiscoveryPlugin
+{
+public:
+  SdrShaderNodeDiscoveryResultVec DiscoverShaderNodes(const Context& ctx) override;
+
+  const SdrStringVec& GetSearchURIs() const override;
+};
+#else
 class HdGatlingMdlDiscoveryPlugin final : public NdrDiscoveryPlugin
 {
 public:
@@ -28,5 +42,6 @@ public:
 
   const NdrStringVec& GetSearchURIs() const override;
 };
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE

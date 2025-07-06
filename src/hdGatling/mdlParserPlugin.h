@@ -17,10 +17,26 @@
 
 #pragma once
 
+#include <pxr/pxr.h>
+#if PXR_VERSION >= 2508
+#include <pxr/usd/sdr/parserPlugin.h>
+#else
 #include <pxr/usd/ndr/parserPlugin.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if PXR_VERSION >= 2508
+class HdGatlingMdlParserPlugin final : public SdrParserPlugin
+{
+public:
+  SdrShaderNodeUniquePtr ParseShaderNode(const SdrShaderNodeDiscoveryResult& discoveryResult) override;
+
+  const SdrTokenVec& GetDiscoveryTypes() const override;
+
+  const TfToken& GetSourceType() const override;
+};
+#else
 class HdGatlingMdlParserPlugin final : public NdrParserPlugin
 {
 public:
@@ -30,5 +46,6 @@ public:
 
   const TfToken& GetSourceType() const override;
 };
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
