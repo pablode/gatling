@@ -521,7 +521,11 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(GiScene* scene, const
     return nullptr;
   }
 
+#if PXR_VERSION >= 2508
+  const SdrTokenMap& metadata = sdrNode->GetMetadata();
+#else
   const NdrTokenMap& metadata = sdrNode->GetMetadata();
+#endif
   const auto& subIdentifierIt = metadata.find(HdGatlingNodeMetadata->subIdentifier);
   TF_AXIOM(subIdentifierIt != metadata.end());
 

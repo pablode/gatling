@@ -26,6 +26,34 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if PXR_VERSION >= 2508
+SdrShaderNodeUniquePtr HdGatlingMdlParserPlugin::ParseShaderNode(const SdrShaderNodeDiscoveryResult& discoveryResult)
+{
+  SdrTokenMap metadata = discoveryResult.metadata;
+  metadata[HdGatlingNodeMetadata->subIdentifier] = discoveryResult.subIdentifier;
+
+  return std::make_unique<SdrShaderNode>(
+    discoveryResult.identifier,
+    discoveryResult.version,
+    discoveryResult.name,
+    discoveryResult.family,
+    HdGatlingNodeContexts->mdl,
+    discoveryResult.sourceType,
+    discoveryResult.uri,
+    discoveryResult.resolvedUri,
+    SdrShaderPropertyUniquePtrVec{},
+    metadata
+  );
+}
+
+const SdrTokenVec& HdGatlingMdlParserPlugin::GetDiscoveryTypes() const
+{
+  static SdrTokenVec s_discoveryTypes{ HdGatlingDiscoveryTypes->mdl };
+  return s_discoveryTypes;
+}
+
+#else
+
 NdrNodeUniquePtr HdGatlingMdlParserPlugin::Parse(const NdrNodeDiscoveryResult& discoveryResult)
 {
   NdrTokenMap metadata = discoveryResult.metadata;
@@ -50,12 +78,17 @@ const NdrTokenVec& HdGatlingMdlParserPlugin::GetDiscoveryTypes() const
   static NdrTokenVec s_discoveryTypes{ HdGatlingDiscoveryTypes->mdl };
   return s_discoveryTypes;
 }
+#endif
 
 const TfToken& HdGatlingMdlParserPlugin::GetSourceType() const
 {
   return HdGatlingSourceTypes->mdl;
 }
 
+#if PXR_VERSION >= 2508
+SDR_REGISTER_PARSER_PLUGIN(HdGatlingMdlParserPlugin);
+#else
 NDR_REGISTER_PARSER_PLUGIN(HdGatlingMdlParserPlugin);
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
