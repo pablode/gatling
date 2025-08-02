@@ -25,6 +25,26 @@ jobs:
     with:
       cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
 
+  build-usd2508:
+    name: Build for USD v25.08
+    needs: build-mdl-sdk
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 25.08
+      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
+      upload-install-artifacts: true
+      run-graphical-tests: true
+
+  build-usd2505:
+    name: Build for USD v25.05
+    needs: build-mdl-sdk
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 25.05
+      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
+      upload-install-artifacts: true
+      run-graphical-tests: true
+
   build-usd2502:
     name: Build for USD v25.02
     needs: build-mdl-sdk
@@ -45,34 +65,6 @@ jobs:
       upload-install-artifacts: true
       run-graphical-tests: true
 
-  build-usd2408:
-    name: Build for USD v24.08
-    needs: build-mdl-sdk
-    uses: ./.github/workflows/build-usd.yml
-    with:
-      usd-version: 24.08
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
-      upload-install-artifacts: true
-      run-graphical-tests: true
-
-  build-usd2405:
-    name: Build for USD v24.05
-    needs: build-mdl-sdk
-    uses: ./.github/workflows/build-usd.yml
-    with:
-      usd-version: 24.05
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
-      upload-install-artifacts: true
-
-  build-usd2403:
-    name: Build for USD v24.03
-    needs: build-mdl-sdk
-    uses: ./.github/workflows/build-usd.yml
-    with:
-      usd-version: 24.03
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
-      upload-install-artifacts: true
-
   build-houdini20:
     name: Build for Houdini 20.0
     needs: build-mdl-sdk
@@ -89,7 +81,7 @@ jobs:
 
   deploy-release:
     name: Deploy Release
-    needs: [build-usd2502, build-usd2411, build-usd2408, build-usd2405, build-usd2403, build-houdini20, build-blender43]
+    needs: [build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender43]
     runs-on: ubuntu-latest
 
     steps:
