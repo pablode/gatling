@@ -45,7 +45,6 @@ jobs:
     with:
       usd-version: 25.02
       mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
-      run-graphical-tests: true
       upload-test-artifacts: true
 
   build-2411:
@@ -55,5 +54,4 @@ jobs:
     with:
       usd-version: 24.11
       mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
-      run-graphical-tests: true
       upload-test-artifacts: true
