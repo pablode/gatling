@@ -1358,13 +1358,10 @@ cleanup:
     std::set<GiMaterial*> materialSet;
     for (auto* m : scene->meshes)
     {
-      if (!m->material)
+      if (m->material)
       {
-        assert(false);
-        GB_ERROR("coding error: mesh without material!");
-        return nullptr;
+        materialSet.insert(m->material);
       }
-      materialSet.insert(m->material);
     }
 
     std::vector<GiMaterial*> materials(materialSet.begin(), materialSet.end());
