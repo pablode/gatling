@@ -26,7 +26,7 @@ namespace gtl
   class McMtlxDocumentPatcher
   {
   public:
-    McMtlxDocumentPatcher(const std::string& customNodesPath);
+    McMtlxDocumentPatcher(const MaterialX::DocumentPtr mtlxStdLib, const std::string& customNodesPath);
 
     MaterialX::DocumentPtr patch(const MaterialX::DocumentPtr document);
 

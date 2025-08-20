@@ -169,7 +169,7 @@ namespace gtl
     unitSystem->setUnitConverterRegistry(unitRegistry);
     m_shaderGen->setUnitSystem(unitSystem);
 
-    m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(customNodesPath);
+    m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customNodesPath);
   }
 
   bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)

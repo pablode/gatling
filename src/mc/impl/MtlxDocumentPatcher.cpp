@@ -628,7 +628,7 @@ void _PatchStdLibBxdfs(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc
 
 namespace gtl
 {
-  McMtlxDocumentPatcher::McMtlxDocumentPatcher(const std::string& customNodesPath)
+  McMtlxDocumentPatcher::McMtlxDocumentPatcher([[maybe_unused]] const mx::DocumentPtr mtlxStdLib, const std::string& customNodesPath)
   {
     mx::FileSearchPath bxdfFiles;
 
@@ -641,6 +641,12 @@ namespace gtl
 
 #if MATERIALX_MAJOR_VERSION > 1 || (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION >= 39)
     bxdfFiles.append("open_pbr_surface.xml");
+#elif MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION == 10
+    // Detect MaterialX 1.38.10-OpenPBR version
+    if (mtlxStdLib->getNodeGraph("NG_mx39_open_pbr_surface_surfaceshader") != nullptr)
+    {
+      bxdfFiles.append("open_pbr_surface_1_38.xml");
+    }
 #endif
 
     m_customNodesDoc = mx::createDocument();
