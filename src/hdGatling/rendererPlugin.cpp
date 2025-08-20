@@ -60,11 +60,14 @@ namespace
       s = GB_FMT("{}/mdl", s);
     }
 
+    std::string mtlxCustomNodesPath = GB_FMT("{}/mtlx", resourcePath);
+
     GiInitParams params = {
       .shaderPath = shaderPath.c_str(),
       .mdlRuntimePath = resourcePath.c_str(),
       .mdlSearchPaths = mdlSearchPaths,
-      .mtlxStdLib = mtlxStdLib
+      .mtlxStdLib = mtlxStdLib,
+      .mtlxCustomNodesPath = mtlxCustomNodesPath
     };
     return giInitialize(params) == GiStatus::Ok;
   }

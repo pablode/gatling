@@ -33,6 +33,7 @@ namespace gtl
   {
   public:
     McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
+               const std::string& customMtlxNodesPath,
                McRuntime& mdlRuntime);
 
   private:

@@ -141,7 +141,7 @@ namespace
 
 namespace gtl
 {
-  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const mx::DocumentPtr mtlxStdLib)
+  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const mx::DocumentPtr mtlxStdLib, const std::string& customNodesPath)
   {
     // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
@@ -168,6 +168,8 @@ namespace gtl
 
     unitSystem->setUnitConverterRegistry(unitRegistry);
     m_shaderGen->setUnitSystem(unitSystem);
+
+    m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(customNodesPath);
   }
 
   bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
@@ -187,7 +189,7 @@ namespace gtl
     }
   }
 
-  bool McMtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
+  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -200,16 +202,15 @@ namespace gtl
     mx::ShaderPtr shader = nullptr;
     try
     {
-      McMtlxDocumentPatcher patcher;
-      patcher.patch(mtlxDoc);
+      mx::DocumentPtr patchedDoc = m_docPatcher->patch(mtlxDoc);
 
       if (getenv("GTL_DUMP_MTLX"))
       {
-        std::string mtlxSrc = mx::writeToXmlString(mtlxDoc);
+        std::string mtlxSrc = mx::writeToXmlString(patchedDoc);
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
       }
 
-      mx::TypedElementPtr element = _FindSurfaceShaderElement(mtlxDoc);
+      mx::TypedElementPtr element = _FindSurfaceShaderElement(patchedDoc);
       if (!element)
       {
         GB_ERROR("generation failed: surface shader not found");

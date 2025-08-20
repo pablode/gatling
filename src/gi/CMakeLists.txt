@@ -83,3 +83,9 @@ install(
   DESTINATION "./hdGatling/resources/mdl"
   COMPONENT hdGatling
 )
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mtlx/"
+  DESTINATION "./hdGatling/resources/mtlx"
+  COMPONENT hdGatling
+)

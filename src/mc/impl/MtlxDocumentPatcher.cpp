@@ -18,6 +18,8 @@
 #include "MtlxDocumentPatcher.h"
 
 #include <MaterialXCore/Types.h>
+#include <MaterialXFormat/File.h>
+#include <MaterialXFormat/Util.h>
 
 #include <unordered_set>
 #include <assert.h>
@@ -583,45 +585,111 @@ void _PatchGeompropPrimvarPrefix(mx::DocumentPtr document)
   }
 }
 
+// The MDL generator has some limitations when it comes to layering & mixing layers. This causes
+// problems with the OpenPBR BXDFs and recent optimization changes to the glTF PBR & Standard Surface.
+// To work around this, we ship our own implementations of these BXDFs.
+// For more details, see this PR: https://github.com/AcademySoftwareFoundation/MaterialX/pull/2215
+void _PatchStdLibBxdfs(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc)
+{
+  const static std::unordered_set<std::string_view> BXDFS = {
+#if MATERIALX_MAJOR_VERSION > 1 || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 39) || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 39 && MATERIALX_BUILD_VERSION > 3)
+    "gltf_pbr",
+    "standard_surface",
+#endif
+    "open_pbr_surface"
+  };
+
+  for (mx::NodeDefPtr nd : lib->getNodeDefs())
+  {
+    const std::string& nodeName = nd->getNodeString();
+
+    if (!BXDFS.contains(nodeName))
+    {
+      continue;
+    }
+
+    GB_DEBUG("patching {}", nodeName);
+
+    lib->removeNodeDef(nd->getName());
+
+    mx::InterfaceElementPtr impl = nd->getImplementation();
+    if (!impl || !impl->isA<mx::NodeGraph>())
+    {
+      continue;
+    }
+
+    lib->removeNodeGraph(impl->getName());
+  }
+
+  lib->importLibrary(customNodesDoc);
+}
+
 namespace gtl
 {
-  void McMtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
+  McMtlxDocumentPatcher::McMtlxDocumentPatcher(const std::string& customNodesPath)
   {
-    _SanitizeFilePaths(document);
+    mx::FileSearchPath bxdfFiles;
 
-    _PatchBoolValueMismatches(document);
+#if MATERIALX_MAJOR_VERSION > 1 || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 39) || \
+    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 39 && MATERIALX_BUILD_VERSION > 3)
+    bxdfFiles.append("gltf_pbr.xml");
+    bxdfFiles.append("standard_surface.xml");
+#endif
 
-    _PatchColor3FloatMismatches(document);
+#if MATERIALX_MAJOR_VERSION > 1 || (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION >= 39)
+    bxdfFiles.append("open_pbr_surface.xml");
+#endif
+
+    m_customNodesDoc = mx::createDocument();
+    mx::loadLibraries(mx::FilePathVec{ customNodesPath }, bxdfFiles, m_customNodesDoc);
+  }
+
+  mx::DocumentPtr McMtlxDocumentPatcher::patch(const mx::DocumentPtr document)
+  {
+    mx::DocumentPtr docCopy = document->copy();
+
+    _SanitizeFilePaths(docCopy);
+
+    _PatchBoolValueMismatches(docCopy);
+
+    _PatchColor3FloatMismatches(docCopy);
 
 #if PXR_VERSION >= 2502
-    _PatchUsdUVTextureParamTypes(document);
+    _PatchUsdUVTextureParamTypes(docCopy);
 #endif
 
     if (!getenv(ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING))
     {
-      _PatchUsdUVTextureColorSpaces(document);
+      _PatchUsdUVTextureColorSpaces(docCopy);
     }
 
-    _PatchNodeNames(document);
+    _PatchNodeNames(docCopy);
 
     // FIXME: we can't match nodes inside implementations due to a bug in MaterialX (also see HdGatlingMesh)
     // https://github.com/AcademySoftwareFoundation/MaterialX/issues/2117
 #if 0
-    for (mx::NodeGraphPtr graph : document->getNodeGraphs())
+    for (mx::NodeGraphPtr graph : docCopy->getNodeGraphs())
     {
-      if (graph->getActiveSourceUri() == document->getSourceUri())
+      if (graph->getActiveSourceUri() == docCopy->getSourceUri())
       {
         graph->flattenSubgraphs();
       }
     }
 #endif
 
-    _PatchSecondaryTexcoordIndices(document);
+    _PatchSecondaryTexcoordIndices(docCopy);
 
-    _PatchColorNodes(document);
+    _PatchColorNodes(docCopy);
 
-    _PatchDefaultGeomprops(document);
+    _PatchDefaultGeomprops(docCopy);
 
-    _PatchGeompropPrimvarPrefix(document);
+    _PatchGeompropPrimvarPrefix(docCopy);
+
+    _PatchStdLibBxdfs(docCopy, m_customNodesDoc);
+
+    return docCopy;
   }
 }

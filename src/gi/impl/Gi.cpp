@@ -412,7 +412,7 @@ namespace gtl
       goto fail;
     }
 
-    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, *s_mcRuntime);
+    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, params.mtlxCustomNodesPath, *s_mcRuntime);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))

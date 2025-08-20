@@ -173,6 +173,7 @@ namespace gtl
     std::string_view mdlRuntimePath;
     const std::vector<std::string>& mdlSearchPaths;
     const std::shared_ptr<void/*MaterialX::Document*/> mtlxStdLib;
+    std::string mtlxCustomNodesPath;
   };
 
   class GiAssetReader

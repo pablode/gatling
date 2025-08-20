@@ -186,11 +186,12 @@ namespace
 namespace gtl
 {
   McFrontend::McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
+                         const std::string& customMtlxNodesPath,
                          McRuntime& runtime)
   {
     McMdlRuntime& mdlRuntime = runtime.getMdlRuntime();
     m_mdlMaterialCompiler = std::make_shared<McMdlMaterialCompiler>(mdlRuntime);
-    m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib);
+    m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib, customMtlxNodesPath);
   }
 
   McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency)
