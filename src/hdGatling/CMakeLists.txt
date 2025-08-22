@@ -89,6 +89,11 @@ endif()
 
 set(PLUGINFO_PATH "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json")
 set(PLUG_INFO_LIBRARY_PATH "${PLUGINFO_LIBPATH_PREFIX}/hdGatling${CMAKE_SHARED_LIBRARY_SUFFIX}")
+if(PXR_VERSION GREATER_EQUAL 2508)
+  set(USD_NODE_LIB "Sdr")
+else()
+  set(USD_NODE_LIB "Ndr")
+endif()
 configure_file(plugInfo.json.in "${PLUGINFO_PATH}" @ONLY)
 
 install(
