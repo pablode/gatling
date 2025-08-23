@@ -45,12 +45,12 @@ namespace gtl
 {
   McMdlMaterialCompiler::McMdlMaterialCompiler(McMdlRuntime& runtime)
   {
-    m_logger = mi::base::Handle<McMdlLogger>(runtime.getLogger());
-    m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
-    m_transaction = mi::base::Handle<mi::neuraylib::ITransaction>(runtime.getTransaction());
-    m_config = mi::base::Handle<mi::neuraylib::IMdl_configuration>(runtime.getConfig());
-    m_factory = mi::base::Handle<mi::neuraylib::IMdl_factory>(runtime.getFactory());
-    m_impExpApi = mi::base::Handle<mi::neuraylib::IMdl_impexp_api>(runtime.getImpExpApi());
+    m_logger = runtime.getLogger();
+    m_database = runtime.getDatabase();
+    m_transaction = runtime.getTransaction();
+    m_config = runtime.getConfig();
+    m_factory = runtime.getFactory();
+    m_impExpApi = runtime.getImpExpApi();
   }
 
   bool McMdlMaterialCompiler::compileFromString(std::string_view srcStr,
