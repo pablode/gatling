@@ -5,6 +5,7 @@ add_library(
   gtl/gb/HandleStore.h
   gtl/gb/LinearDataStore.h
   gtl/gb/Log.h
+  gtl/gb/MathTypes.h
   gtl/gb/SmallVector.h
   impl/HandleStore.cpp
   impl/LinearDataStore.cpp

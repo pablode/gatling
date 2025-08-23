@@ -482,6 +482,53 @@ bool _GetMaterialNetworkSurfaceTerminal(const HdMaterialNetwork2& network2, HdMa
   return true;
 }
 
+GiMaterialParameters _TranslateMaterialParameters(const std::map<TfToken, VtValue>& hdParams)
+{
+  GiMaterialParameters giParams;
+  giParams.reserve(hdParams.size());
+
+  for (const auto& kvPair : hdParams)
+  {
+    const TfToken& name = kvPair.first;
+    const VtValue& value = kvPair.second;
+
+    if (value.IsHolding<bool>())
+    {
+      giParams[name] = value.UncheckedGet<bool>();
+    }
+    else if (value.IsHolding<int>())
+    {
+      giParams[name] = value.UncheckedGet<int>();
+    }
+    else if (value.IsHolding<float>())
+    {
+      giParams[name] = value.UncheckedGet<float>();
+    }
+    else if (value.IsHolding<GfVec2f>())
+    {
+      auto v = value.UncheckedGet<GfVec2f>();
+      giParams[name] = GbVec2f{ v[0], v[1] };
+    }
+    else if (value.IsHolding<GfVec3f>())
+    {
+      auto v = value.UncheckedGet<GfVec3f>();
+      giParams[name] = GbVec3f{ v[0], v[1], v[2] };
+    }
+    else if (value.IsHolding<GfVec4f>())
+    {
+      auto v = value.UncheckedGet<GfVec4f>();
+      giParams[name] = GbVec4f{ v[0], v[1], v[2], v[3] };
+    }
+    else
+    {
+      std::string typeName = value.GetTypeName();
+      TF_CODING_ERROR("Material parameter value type %s not supported", typeName.c_str());
+    }
+  }
+
+  return giParams;
+}
+
 MaterialNetworkCompiler::MaterialNetworkCompiler(const mx::DocumentPtr mtlxStdLib)
   : _mtlxStdLib(mtlxStdLib)
 {
@@ -532,7 +579,8 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(GiScene* scene, const
   const std::string& subIdentifier = (*subIdentifierIt).second;
   const std::string& fileUri = sdrNode->GetResolvedImplementationURI();
 
-  return giCreateMaterialFromMdlFile(scene, id.GetText(), fileUri.c_str(), subIdentifier.c_str());
+  GiMaterialParameters params = _TranslateMaterialParameters(node.parameters);
+  return giCreateMaterialFromMdlFile(scene, id.GetText(), fileUri.c_str(), subIdentifier.c_str(), params);
 }
 
 GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const

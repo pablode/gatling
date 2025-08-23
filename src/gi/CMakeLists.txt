@@ -40,8 +40,9 @@ target_compile_definitions(
 
 target_link_libraries(
   gi
-  PRIVATE
+  PUBLIC
     gb
+  PRIVATE
     mc
     cgpu
     ggpu
