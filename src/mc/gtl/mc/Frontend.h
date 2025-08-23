@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 
+#include "MaterialParameters.h"
+
 namespace gtl
 {
   struct McMaterial;
@@ -41,7 +43,7 @@ namespace gtl
 
     McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc);
 
-    McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier);
+    McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
 
   private:
     McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool isOpaque);

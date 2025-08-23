@@ -220,10 +220,10 @@ namespace gtl
     return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
   }
 
-  McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier)
+  McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& params)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    if (!m_mdlMaterialCompiler->compileFromFile(filePath, subIdentifier, compiledMaterial))
+    if (!m_mdlMaterialCompiler->compileFromFile(filePath, subIdentifier, compiledMaterial, params))
     {
       return nullptr;
     }

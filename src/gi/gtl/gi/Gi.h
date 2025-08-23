@@ -22,6 +22,10 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <variant>
+#include <unordered_map>
+
+#include <gtl/gb/ParamTypes.h>
 
 namespace gtl
 {
@@ -186,6 +190,9 @@ namespace gtl
     virtual ~GiAssetReader() = default;
   };
 
+  using GiMaterialParameterValue = std::variant<bool, int, float, GbVec2f, GbVec3f, GbVec4f, GbColor, GbTextureAsset>;
+  using GiMaterialParameters = std::unordered_map<std::string, GiMaterialParameterValue>;
+
   GiStatus giInitialize(const GiInitParams& params);
   void giTerminate();
 
@@ -193,7 +200,7 @@ namespace gtl
 
   GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc);
   GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc);
-  GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier);
+  GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier, const GiMaterialParameters& params = {});
   void giDestroyMaterial(GiMaterial* mat);
 
   GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc);

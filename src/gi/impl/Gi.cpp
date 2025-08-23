@@ -538,9 +538,9 @@ fail:
     return mat;
   }
 
-  GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier)
+  GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier, const GiMaterialParameters& params)
   {
-    McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier);
+    McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier, params);
     if (!mcMat)
     {
       return nullptr;

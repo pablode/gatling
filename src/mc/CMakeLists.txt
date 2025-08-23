@@ -3,6 +3,7 @@ add_library(
   gtl/mc/Backend.h
   gtl/mc/Frontend.h
   gtl/mc/Material.h
+  gtl/mc/MaterialParameters.h
   gtl/mc/Runtime.h
   impl/Backend.cpp
   impl/Frontend.cpp
