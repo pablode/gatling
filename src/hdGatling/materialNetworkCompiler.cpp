@@ -59,6 +59,8 @@ TF_DEFINE_PRIVATE_TOKENS(
   (normal)
   (wrapS)
   (wrapT)
+  (scale)
+  (bias)
   (black)
   (clamp)
   (repeat)
@@ -448,6 +450,21 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
       if (wrapT != parameters.end())
       {
         convertWrapType(wrapT->second);
+      }
+
+      // tell HdMtlx to translate the vector4f to a MaterialX color4
+      auto scale = parameters.find(_tokens->scale);
+      if (scale != parameters.end())
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->scale));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color4f.GetAsToken();
+      }
+
+      auto bias = parameters.find(_tokens->bias);
+      if (bias != parameters.end())
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->bias));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color4f.GetAsToken();
       }
     }
 
