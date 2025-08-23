@@ -519,7 +519,8 @@ GiMaterialParameters _TranslateMaterialParameters(const std::map<TfToken, VtValu
     {
       auto v = value.UncheckedGet<GfVec3f>();
 
-      auto typeNameIt = hdParams.find(TfToken("typeName:" + name));
+      TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, name));
+      auto typeNameIt = hdParams.find(typeNameParamName);
 
       bool isColor = typeNameIt != hdParams.end() && typeNameIt->second.IsHolding<TfToken>() &&
         typeNameIt->second.UncheckedGet<TfToken>() == SdfValueTypeNames->Color3f;
@@ -542,7 +543,9 @@ GiMaterialParameters _TranslateMaterialParameters(const std::map<TfToken, VtValu
     {
       bool isSrgb = true;
 
-      auto colorSpaceIt = hdParams.find(TfToken("colorSpace:" + name));
+      TfToken colorSpaceParamName(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, name));
+
+      auto colorSpaceIt = hdParams.find(colorSpaceParamName);
       if (colorSpaceIt != hdParams.end())
       {
         isSrgb = (colorSpaceIt->second.UncheckedGet<TfToken>() != _tokens->raw);
