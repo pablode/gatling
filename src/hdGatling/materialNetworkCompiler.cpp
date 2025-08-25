@@ -61,6 +61,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (wrapT)
   (scale)
   (bias)
+  (fallback)
   (black)
   (clamp)
   (repeat)
@@ -464,6 +465,13 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
       if (bias != parameters.end())
       {
         TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->bias));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color4f.GetAsToken();
+      }
+
+      auto fallback = parameters.find(_tokens->fallback);
+      if (fallback != parameters.end())
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->fallback));
         parameters[typeNameParamName] = SdfValueTypeNames->Color4f.GetAsToken();
       }
     }
