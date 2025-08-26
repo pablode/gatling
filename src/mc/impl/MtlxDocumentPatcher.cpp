@@ -190,48 +190,6 @@ void _PatchColor3FloatMismatches(mx::DocumentPtr document)
   }
 }
 
-// HdMtlx does not translate these inputs to their correct types, and we also
-// can't provide GfColor because it only has three components. Hence, we accept
-// the warnings it emits and patch the incorrect input types afterwards.
-void _PatchUsdUVTextureParamTypes(mx::DocumentPtr document)
-{
-  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
-  {
-    mx::ElementPtr elem = treeIt.getElement();
-
-    mx::NodePtr node = elem->asA<mx::Node>();
-
-    if (!node || node->getCategory() != "UsdUVTexture")
-    {
-      continue;
-    }
-
-    const auto patchVectorColorInput = [node](const std::string& inputName)
-    {
-      mx::InputPtr input = node->getActiveInput(inputName);
-      if (!input || !input->hasValue())
-      {
-        return;
-      }
-
-      const mx::ValuePtr& value = input->getValue();
-      if (!value->isA<mx::Vector4>())
-      {
-        return;
-      }
-
-      const mx::Vector4& vector = value->asA<mx::Vector4>();
-      mx::Color4 color = mx::Color4(vector[0], vector[1], vector[2], vector[3]);
-
-      input->setValue(color);
-    };
-
-    patchVectorColorInput("bias");
-    patchVectorColorInput("scale");
-    patchVectorColorInput("fallback");
-  }
-}
-
 // This function serves two purposes: first, for USD versions below 23.11, we
 // translate the 'sourceColorSpace' input to actual MaterialX colorspaces (this
 // input is not part of the NodeDef, but we add it in the render delegate and
@@ -663,10 +621,6 @@ namespace gtl
     _PatchBoolValueMismatches(docCopy);
 
     _PatchColor3FloatMismatches(docCopy);
-
-#if PXR_VERSION >= 2502
-    _PatchUsdUVTextureParamTypes(docCopy);
-#endif
 
     if (!getenv(ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING))
     {
