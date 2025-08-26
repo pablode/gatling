@@ -42,6 +42,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (st_1)
   (UV0)
   (UV1)
+  (map1)
   (tangents)
   (tangentSigns)
   (bitangentSigns)
@@ -419,7 +420,8 @@ namespace
     _tokens->st1,
     _tokens->st_1,
     _tokens->UV0,
-    _tokens->UV1
+    _tokens->UV1,
+    _tokens->map1
   };
 
   bool _IsPrimvarEligibleForVertexData(const TfToken& name, const TfToken& role)
@@ -785,7 +787,7 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
 #if 0
         // FIXME: optimization disabled, see MtlxDocumentPatcher.cpp
         name == _tokens->st || name == _tokens->st0 || name == _tokens->st_0 ||
-        name == _tokens->UV0 || name == _tokens->tangents ||
+        name == _tokens->UV0 || name == _tokens->map1 || name == _tokens->tangents ||
 #endif
         name == HdTokens->points || name == HdTokens->normals)
     {

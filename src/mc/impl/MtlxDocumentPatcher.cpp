@@ -523,6 +523,7 @@ void _PatchDefaultGeomprops(mx::DocumentPtr document)
     bool isTexcoord = geomprop == "st" ||
                       geomprop == "st0" ||
                       geomprop == "st_0" ||
+                      geomprop == "map1" ||
                       geomprop == "UV0";
 
     bool isTangent = (geomprop == "tangents");
