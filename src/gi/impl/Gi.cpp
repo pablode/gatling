@@ -508,7 +508,10 @@ fail:
       .scene = scene
     };
 
-    scene->materials.insert(mat);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->materials.insert(mat);
+    }
     return mat;
   }
 
@@ -534,7 +537,10 @@ fail:
       .scene = scene
     };
 
-    scene->materials.insert(mat);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->materials.insert(mat);
+    }
     return mat;
   }
 
@@ -554,7 +560,10 @@ fail:
       .scene = scene
     };
 
-    scene->materials.insert(mat);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->materials.insert(mat);
+    }
     return mat;
   }
 
