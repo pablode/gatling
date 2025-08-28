@@ -698,26 +698,14 @@ void _PatchGeompropPrimvarPrefix(mx::DocumentPtr document)
 }
 
 // The MDL generator has some limitations when it comes to layering & mixing layers. This causes
-// problems with the OpenPBR BXDFs and recent optimization changes to the glTF PBR & Standard Surface.
-// To work around this, we ship our own implementations of these BXDFs.
-// For more details, see this PR: https://github.com/AcademySoftwareFoundation/MaterialX/pull/2215
-void _PatchStdLibBxdfs(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc)
+// problems with the OpenPBR BXDF: https://github.com/AcademySoftwareFoundation/MaterialX/pull/2215
+void _PatchOpenPbrBxdf(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc)
 {
-  const static std::unordered_set<std::string_view> BXDFS = {
-#if MATERIALX_MAJOR_VERSION > 1 || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 39) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 39 && MATERIALX_BUILD_VERSION > 3)
-    "gltf_pbr",
-    "standard_surface",
-#endif
-    "open_pbr_surface"
-  };
-
   for (mx::NodeDefPtr nd : lib->getNodeDefs())
   {
     const std::string& nodeName = nd->getNodeString();
 
-    if (!BXDFS.contains(nodeName))
+    if (nodeName != "open_pbr_surface")
     {
       continue;
     }
@@ -743,13 +731,6 @@ namespace gtl
   McMtlxDocumentPatcher::McMtlxDocumentPatcher([[maybe_unused]] const mx::DocumentPtr mtlxStdLib, const std::string& customNodesPath)
   {
     mx::FileSearchPath bxdfFiles;
-
-#if MATERIALX_MAJOR_VERSION > 1 || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 39) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 39 && MATERIALX_BUILD_VERSION > 3)
-    bxdfFiles.append("gltf_pbr.xml");
-    bxdfFiles.append("standard_surface.xml");
-#endif
 
 #if MATERIALX_MAJOR_VERSION > 1 || (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION >= 39)
     bxdfFiles.append("open_pbr_surface.xml");
@@ -782,7 +763,7 @@ namespace gtl
 
     _PatchNodeNames(docCopy);
 
-    _PatchStdLibBxdfs(docCopy, m_customNodesDoc);
+    _PatchOpenPbrBxdf(docCopy, m_customNodesDoc);
 
     // Flatten BXDFs & helper nodes so that we can patch individual standard nodes
     for (mx::NodeGraphPtr graph : docCopy->getNodeGraphs())
