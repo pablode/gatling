@@ -64,3 +64,6 @@
 [submodule "extern/xxHash"]
 	path = extern/xxHash
 	url = https://github.com/Cyan4973/xxHash.git
+[submodule "extern/ddspp"]
+	path = extern/ddspp
+	url = https://github.com/redorav/ddspp.git

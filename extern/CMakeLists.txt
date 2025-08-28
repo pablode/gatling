@@ -86,6 +86,12 @@ set(tiff-install OFF)
 add_subdirectory(libtiff)
 
 #
+# ddspp
+#
+add_library(ddspp INTERFACE)
+target_include_directories(ddspp INTERFACE ddspp)
+
+#
 # Imath
 #
 add_subdirectory(Imath)
