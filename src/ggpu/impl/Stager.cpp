@@ -156,7 +156,7 @@ fail:
   bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
   {
     uint32_t rowCount = height;
-    uint64_t rowSize = size / rowCount;
+    uint64_t rowSize = (size / rowCount + 4 - 1) / 4 * 4;
 
     if (rowSize > BUFFER_HALF_SIZE)
     {
@@ -180,14 +180,18 @@ fail:
         maxCopyRowCount = uint32_t(BUFFER_HALF_SIZE / rowSize); // truncate
       }
 
+      maxCopyRowCount = (maxCopyRowCount + 4 - 1) / 4 * 4;
+
       uint32_t remainingRowCount = rowCount - rowsStaged;
-      uint32_t copyRowCount = std::min(remainingRowCount, maxCopyRowCount);
+      // TODO: but only do this for compressed... otherwise access violation... -> need VK-util?
+      uint32_t alignedRowCount = (remainingRowCount + 4 - 1) / 4 * 4; // always align to max compressed texel block size
+      uint32_t copyRowCount = std::min(alignedRowCount, maxCopyRowCount);
 
       auto copyFunc = [this, dst, rowsStaged, width, depth, copyRowCount](uint64_t srcOffset, [[maybe_unused]] uint64_t dstOffset, [[maybe_unused]] uint64_t size) {
         CgpuBufferImageCopyDesc desc;
         desc.bufferOffset = srcOffset;
         desc.texelOffsetX = 0;
-        desc.texelExtentX = width;
+        desc.texelExtentX = width; // TODO: align too..
         desc.texelOffsetY = rowsStaged;
         desc.texelExtentY = copyRowCount;
         desc.texelOffsetZ = 0;

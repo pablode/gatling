@@ -25,6 +25,7 @@ namespace gtl
     UnsupportedEncoding,
     Decode,
     CorruptData,
+    UnsupportedFeature,
     Unknown
   };
 }

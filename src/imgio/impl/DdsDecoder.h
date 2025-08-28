@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2019 Pablo Delgado Krämer
+// Copyright (C) 2025 Pablo Delgado Krämer
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,37 +18,16 @@
 #pragma once
 
 #include <stddef.h>
-#include <stdint.h>
 
-#include <vector>
+#include "ErrorCodes.h"
 
 namespace gtl
 {
-	enum class ImgioFormat
-	{
-		UNSUPPORTED,
-		RGBA8_UNORM,
-		R32_FLOAT,
-		BC1_UNORM,
-		BC1_UNORM_SRGB,
-		BC2_UNORM,
-		BC2_UNORM_SRGB,
-		BC3_UNORM,
-		BC3_UNORM_SRGB,
-		BC4_UNORM,
-		BC4_SNORM,
-		BC5_UNORM,
-		BC5_SNORM,
-		BC7_UNORM,
-		BC7_UNORM_SRGB
-  };
+  struct ImgioImage;
 
-  struct ImgioImage
+  class ImgioDdsDecoder
   {
-    ImgioFormat format = ImgioFormat::RGBA8_UNORM;
-    uint32_t width;
-    uint32_t height;
-    size_t size;
-    std::vector<uint8_t> data;
+  public:
+    static ImgioError decode(size_t size, const void* data, ImgioImage* img);
   };
 }

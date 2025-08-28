@@ -38,7 +38,7 @@ namespace gtl
     uint8_t* rgbaData = stbi_load_from_memory((const stbi_uc*) data, (int) size, (int*) &img->width, (int*) &img->height, &num_components, 4);
     if (!rgbaData)
     {
-      return ImgioError::Unknown;
+      return ImgioError::UnsupportedEncoding;
     }
 
     img->size = img->width * img->height * 4;

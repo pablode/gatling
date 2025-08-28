@@ -52,6 +52,28 @@ namespace
     assetReader.close(asset);
     return loadResult;
   }
+
+  CgpuImageFormat _TranslateImageFormat(ImgioFormat format)
+  {
+    switch (format)
+    {
+    case ImgioFormat::RGBA8_UNORM: return CgpuImageFormat::R8G8B8A8Unorm;
+    case ImgioFormat::R32_FLOAT: return CgpuImageFormat::R32Float;
+    case ImgioFormat::BC1_UNORM: return CgpuImageFormat::Bc1Unorm;
+    case ImgioFormat::BC1_UNORM_SRGB: return CgpuImageFormat::Bc1UnormSrgb;
+    case ImgioFormat::BC2_UNORM: return CgpuImageFormat::Bc2Unorm;
+    case ImgioFormat::BC2_UNORM_SRGB: return CgpuImageFormat::Bc2UnormSrgb;
+    case ImgioFormat::BC3_UNORM: return CgpuImageFormat::Bc3Unorm;
+    case ImgioFormat::BC3_UNORM_SRGB: return CgpuImageFormat::Bc3UnormSrgb;
+    case ImgioFormat::BC4_UNORM: return CgpuImageFormat::Bc4Unorm;
+    case ImgioFormat::BC4_SNORM: return CgpuImageFormat::Bc4Snorm;
+    case ImgioFormat::BC5_UNORM: return CgpuImageFormat::Bc5Unorm;
+    case ImgioFormat::BC5_SNORM: return CgpuImageFormat::Bc5Snorm;
+    case ImgioFormat::BC7_UNORM: return CgpuImageFormat::Bc7Unorm;
+    case ImgioFormat::BC7_UNORM_SRGB: return CgpuImageFormat::Bc7UnormSrgb;
+    default: CgpuImageFormat::Undefined;
+    }
+  }
 }
 
 namespace gtl
@@ -101,8 +123,9 @@ namespace gtl
     }
 
     ImgioImage imageData;
-    if (!_ReadImage(filePath, m_assetReader, &imageData))
+    if (!_ReadImage(filePath, m_assetReader, &imageData) || imageData.format == ImgioFormat::UNSUPPORTED)
     {
+      GB_ERROR("failed to read image {}", filePath);
       return nullptr;
     }
 
@@ -112,6 +135,7 @@ namespace gtl
       .width = imageData.width,
       .height = imageData.height,
       .is3d = is3dImage,
+      .format = _TranslateImageFormat(imageData.format),
       .debugName = filePath
     };
 
@@ -122,6 +146,7 @@ namespace gtl
 
     if (!creationSuccessful)
     {
+      GB_ERROR("failed to upload image {}", filePath);
       return nullptr;
     }
 
@@ -168,7 +193,7 @@ namespace gtl
 
       CgpuImageCreateInfo createInfo;
       createInfo.is3d = textureResource.is3dImage;
-      createInfo.format = textureResource.isFloat ? CgpuImageFormat::R32Sfloat : CgpuImageFormat::R8G8B8A8Unorm;
+      createInfo.format = textureResource.isFloat ? CgpuImageFormat::R32Float : CgpuImageFormat::R8G8B8A8Unorm;
       createInfo.usage = CgpuImageUsage::Sampled | CgpuImageUsage::TransferDst;
 
       const char* filePath = textureResource.filePath.c_str();
@@ -230,7 +255,7 @@ namespace gtl
 
       image = makeImagePtr();
 
-      GB_ERROR("failed to read image {} from path {}", i, filePath);
+      // use 1x1 black fallback image
       createInfo.width = 1;
       createInfo.height = 1;
       createInfo.depth = 1;

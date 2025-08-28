@@ -63,7 +63,19 @@ namespace gtl
   {
     Undefined = 0,
     R8G8B8A8Unorm = 37,
-    R32Sfloat = 100
+    R32Float = 100,
+    Bc1Unorm = 133,
+    Bc1UnormSrgb = 134,
+    Bc2Unorm = 135,
+    Bc2UnormSrgb = 136,
+    Bc3Unorm = 137,
+    Bc3UnormSrgb = 138,
+    Bc4Unorm = 139,
+    Bc4Snorm = 140,
+    Bc5Unorm = 141,
+    Bc5Snorm = 142,
+    Bc7Unorm = 145,
+    Bc7UnormSrgb = 146
   };
 
   enum class CgpuMemoryAccess

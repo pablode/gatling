@@ -3,6 +3,8 @@ set(IMGIO_SRCS
   gtl/imgio/Image.h
   gtl/imgio/Imgio.h
   impl/Imgio.cpp
+  impl/DdsDecoder.h
+  impl/DdsDecoder.cpp
   impl/ExrDecoder.h
   impl/ExrDecoder.cpp
   impl/HdrDecoder.h
@@ -33,6 +35,7 @@ function(configure_target TARGET)
       OpenEXR::OpenEXR
       stb # for HDR
       tiff tiffxx
+      ddspp
   )
 endfunction()
 
