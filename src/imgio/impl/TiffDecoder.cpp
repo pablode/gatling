@@ -23,11 +23,24 @@
 #include <tiffio.hxx>
 
 #include <sstream>
+#include <atomic>
 
 namespace gtl
 {
+  static std::atomic<bool> s_installedErrorHandler = false;
+
+  void _SilentErrorHandler(const char* module, const char* fmt, va_list ap)
+  {
+    // Don't log to stderr.
+  }
+
   ImgioError ImgioTiffDecoder::decode(size_t size, const void* data, ImgioImage* img)
   {
+    if (!s_installedErrorHandler.exchange(true))
+    {
+      TIFFSetErrorHandler(_SilentErrorHandler);
+    }
+
     const auto cData = (char*) data;
     std::istringstream stream(std::string(cData, cData + size)); // FIXME: don't copy; use custom istream
 
