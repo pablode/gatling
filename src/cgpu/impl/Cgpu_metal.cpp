@@ -451,6 +451,7 @@ namespace gtl
 #define CHK_SPVC(X) \
   if (spvc_result r = X; r != SPVC_SUCCESS) {                            \
     GB_ERROR("{}:{}: SPIRV-Cross error {}", __FILE__, __LINE__, int(r)); \
+    assert(false);                                                       \
     exit(EXIT_FAILURE);                                                  \
   }
 
