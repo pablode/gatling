@@ -244,7 +244,7 @@ namespace gtl
   if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, E->localizedDescription()->utf8String(), E->code()); }
 
 #define CHK_MTL(X, E)    \
-  if (!X) { LOG_MTL_ERR(E); assert(false); exit(EXIT_FAILURE); }
+  if (!X) { LOG_MTL_ERR(E); fflush(stdout); assert(false); exit(EXIT_FAILURE); }
 
 // TODO: replace with proper error handling in some cases
 #define CHK_MTL_NP(X)    \
@@ -471,6 +471,7 @@ namespace gtl
     const char* mslSrc; // owned by context
     CHK_SPVC(spvc_compiler_compile(spvcCompiler, &mslSrc));
 
+// NOTE: enable to print SPIRV-Cross output (MSL code)
 //GB_LOG("{}", mslSrc);
 
 #undef CHK_SPVC
@@ -479,8 +480,6 @@ namespace gtl
 #ifndef NDEBUG
     compileOptions->setEnableLogging(true);
 #endif
-
-GB_LOG("{}", mslSrc);
 
     NS::Error* error = nullptr;
     NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);
