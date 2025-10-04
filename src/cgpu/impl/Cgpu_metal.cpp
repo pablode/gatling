@@ -240,12 +240,13 @@ namespace gtl
   if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, E->localizedDescription()->utf8String(), E->code()); }
 
 #define CHK_MTL(X, E)    \
-  if (!X) { LOG_MTL_ERR(E); exit(EXIT_FAILURE); }
+  if (!X) { LOG_MTL_ERR(E); assert(false); exit(EXIT_FAILURE); }
 
 // TODO: replace with proper error handling in some cases
 #define CHK_MTL_NP(X)    \
   if (!X) {              \
     GB_ERROR("{}:{}: metal returned nullptr", __FILE__, __LINE__); \
+    assert(false); \
     exit(EXIT_FAILURE);  \
   }
 
