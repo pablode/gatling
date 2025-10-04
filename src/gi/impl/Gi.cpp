@@ -1380,6 +1380,7 @@ cleanup:
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
+      .debugPrintF = s_deviceFeatures.debugPrintf, // TODO: consistent casing
       .mediumStackSize = renderSettings.mediumStackSize
     };
 

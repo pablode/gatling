@@ -51,8 +51,13 @@ namespace gtl
 
   void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, const GiGlslShaderGen::CommonShaderParams& params)
   {
-#if defined(NDEBUG)
+#ifdef NDEBUG
     stitcher.appendDefine("NDEBUG");
+#else
+    if (params.debugPrintF)
+    {
+        stitcher.appendDefine("DEBUG_PRINTF");
+    }
 #endif
     stitcher.appendDefine("AOV_MASK", (int) params.aovMask);
     stitcher.appendDefine("MEDIUM_STACK_SIZE", (int32_t) params.mediumStackSize);
