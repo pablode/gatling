@@ -70,8 +70,6 @@ namespace gtl
                                                                             VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                                                                             VK_SHADER_STAGE_MISS_BIT_KHR;
 
-  constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
-
   static const std::array<const char*, 14> CGPU_REQUIRED_EXTENSIONS = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure

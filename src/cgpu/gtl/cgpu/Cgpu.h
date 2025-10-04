@@ -27,6 +27,7 @@ namespace gtl
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
   constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 4;
   constexpr static const uint32_t CGPU_MAX_PUSH_CONSTANTS_SIZE = 128;
+  constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
 
   typedef uint32_t CgpuBufferUsageFlags;
 
@@ -316,7 +317,7 @@ namespace gtl
   {
     uint64_t size;
     const uint8_t* source;
-    CgpuShaderStageFlags stageFlags;
+    CgpuShaderStageFlags stageFlags; // TODO: stageFlags -> stage
     const char* debugName = nullptr;
     uint32_t maxRayPayloadSize = 0; // for RT shaders
     uint32_t maxRayHitAttributeSize = 0; // for RT shaders

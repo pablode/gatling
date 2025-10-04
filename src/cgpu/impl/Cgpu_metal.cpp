@@ -45,7 +45,6 @@ namespace gtl
   /* Constants. */
 
   constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(3, 1, 0);
-  constexpr static const char* SPVC_MSL_ENTRY_POINT = "main0";
 
   // for shader reflection
   typedef enum VkDescriptorType {
@@ -68,13 +67,14 @@ namespace gtl
 
   struct CgpuIDevice
   {
-    MTL::Device* device;
-    MTL4::CommandQueue* commandQueue;
-    MTL4::CounterHeap* counterHeap;
+    MTL::Device*         device;
+    MTL4::CommandQueue*  commandQueue;
+    MTL4::CounterHeap*   counterHeap;
 #ifndef NDEBUG
-    MTL::LogState* logState; // nullable
+    MTL::LogState*       logState; // nullable
     MTL4::CommitOptions* commitOptions;
 #endif
+    uint32_t             uniqueShaderEntryPointCounter;
   };
 
   struct CgpuIBuffer
@@ -110,6 +110,7 @@ namespace gtl
 
   struct CgpuIShader
   {
+    std::string entryPoint;
     MTL::Library* library;
     CgpuShaderReflection reflection;
   };
@@ -422,6 +423,7 @@ namespace gtl
     idevice->logState = logState;
     idevice->commitOptions = commitOptions;
 #endif
+    idevice->uniqueShaderEntryPointCounter = 0;
 
     device->handle = handle;
     return true;
@@ -459,13 +461,16 @@ namespace gtl
     exit(EXIT_FAILURE);                                                  \
   }
 
-    spvc_compiler spvcCompiler;
+    spvc_compiler spvcCompiler; // TODO: rename to compiler
     {
       spvc_parsed_ir ir;
       CHK_SPVC(spvc_context_parse_spirv(iinstance->spvcContext, (const SpvId*) createInfo.source, createInfo.size / sizeof(SpvId), &ir));
       CHK_SPVC(spvc_context_create_compiler(iinstance->spvcContext, SPVC_BACKEND_MSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &spvcCompiler));
 
-      spvc_compiler_options spvcCompilerOptions;
+      SpvExecutionModel execModel = spvc_compiler_get_execution_model(spvcCompiler);
+      CHK_SPVC(spvc_compiler_rename_entry_point(spvcCompiler, CGPU_SHADER_ENTRY_POINT, ishader->entryPoint.c_str(), execModel));
+
+      spvc_compiler_options spvcCompilerOptions; // TODO: rename to compilerOptions
       CHK_SPVC(spvc_compiler_create_compiler_options(spvcCompiler, &spvcCompilerOptions));
       CHK_SPVC(spvc_compiler_options_set_uint(spvcCompilerOptions, SPVC_COMPILER_OPTION_MSL_PLATFORM, SPVC_MSL_PLATFORM_MACOS));
       CHK_SPVC(spvc_compiler_options_set_uint(spvcCompilerOptions, SPVC_COMPILER_OPTION_MSL_VERSION, SPVC_MSL_VERSION));
@@ -497,6 +502,11 @@ namespace gtl
     return true; // TODO: for shader hotloading, errors shouldn't be fatal
   }
 
+  static std::string cgpuMakeShaderEntryPoint(CgpuIDevice* idevice, CgpuShaderStageFlags stageFlag)
+  {
+    return GB_FMT("main{}", idevice->uniqueShaderEntryPointCounter++);
+  }
+
   bool cgpuCreateShader(CgpuDevice device,
                         CgpuShaderCreateInfo createInfo,
                         CgpuShader* shader)
@@ -506,6 +516,8 @@ namespace gtl
     shader->handle = iinstance->ishaderStore.allocate();
 
     CGPU_RESOLVE_SHADER(*shader, ishader);
+
+    ishader->entryPoint = cgpuMakeShaderEntryPoint(idevice, createInfo.stageFlags);
 
     return cgpuCreateShader(idevice, createInfo, ishader);
   }
@@ -528,6 +540,7 @@ namespace gtl
     for (uint32_t i = 0; i < shaderCount; i++)
     {
       CGPU_RESOLVE_SHADER(shaders[i], ishader);
+      ishader->entryPoint = cgpuMakeShaderEntryPoint(idevice, createInfos[i].stageFlags);
       ishaders[i] = ishader;
     }
 
@@ -784,7 +797,7 @@ namespace gtl
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
-    NS::String* entryFuncName = NS::String::string(SPVC_MSL_ENTRY_POINT, NS::UTF8StringEncoding);
+    NS::String* entryFuncName = NS::String::string(ishader->entryPoint.c_str(), NS::UTF8StringEncoding);
     MTL::Function* entryFunc = ishader->library->newFunction(entryFuncName);
 
     auto* descriptor = MTL::ComputePipelineDescriptor::alloc()->init();
@@ -987,7 +1000,7 @@ namespace gtl
   {
 
     CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_SHADER(createInfo.rgenShader, ishader);
+    CGPU_RESOLVE_SHADER(createInfo.rgenShader, irgenShader);
 
     // Collect all shaders and create pipeline
     uint32_t functionCount = createInfo.hitGroupCount; // TODO: * 2 for anyhit (probably in user space)
@@ -1000,7 +1013,7 @@ namespace gtl
         CgpuShader shader = createInfo.hitGroups[i].closestHitShader; // TODO: ignores any hit
         CGPU_RESOLVE_SHADER(shader, ishader);
 
-        NS::String* entryFuncName = NS::String::string(SPVC_MSL_ENTRY_POINT, NS::UTF8StringEncoding);
+        NS::String* entryFuncName = NS::String::string(ishader->entryPoint.c_str(), NS::UTF8StringEncoding);
 
         MTL::Function* hitFunc = ishader->library->newFunction(entryFuncName);
         CHK_MTL_NP(hitFunc);
@@ -1017,7 +1030,7 @@ namespace gtl
       ar->release();
     }
 
-    if (!cgpuCreateComputePipeline(idevice, ishader, createInfo.debugName, pipeline, linkedFunctions))
+    if (!cgpuCreateComputePipeline(idevice, irgenShader, createInfo.debugName, pipeline, linkedFunctions))
     {
       return false;
     }
