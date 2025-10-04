@@ -476,7 +476,7 @@ namespace gtl
 #undef CHK_SPVC
 
     MTL::CompileOptions* compileOptions = MTL::CompileOptions::alloc();
-#ifdef NDEBUG
+#ifndef NDEBUG
     compileOptions->setEnableLogging(true);
 #endif
 
