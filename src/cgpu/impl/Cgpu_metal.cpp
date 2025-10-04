@@ -237,7 +237,7 @@ namespace gtl
 #define CGPU_RESOLVE_TLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
 
 #define LOG_MTL_ERR(E) \
-  if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, error->localizedDescription()->utf8String(), error->code()); }
+  if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, E->localizedDescription()->utf8String(), E->code()); }
 
 #define CHK_MTL(X, E)    \
   if (!X) { LOG_MTL_ERR(E); exit(EXIT_FAILURE); }
@@ -363,7 +363,7 @@ namespace gtl
       desc->setCount(CGPU_MAX_TIMESTAMP_QUERIES);
       desc->setType(MTL4::CounterHeapTypeTimestamp);
 
-      NS::Error* error;
+      NS::Error* error = nullptr;
       counterHeap = mtlDevice->newCounterHeap(desc, &error);
       CHK_MTL(counterHeap, error);
       desc->release();
@@ -375,7 +375,7 @@ namespace gtl
       auto* desc = MTL::LogStateDescriptor::alloc()->init();
       desc->setLevel(MTL::LogLevelDebug);
 
-      NS::Error* error;
+      NS::Error* error = nullptr;
       logState = idevice->device->newLogState(desc, &error);
       desc->release();
       CHK_MTL(logState, error);
@@ -476,7 +476,7 @@ namespace gtl
 
 GB_LOG("{}", mslSrc);
 
-    NS::Error* error;
+    NS::Error* error = nullptr;
     NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);
     MTL::Library* library = idevice->device->newLibrary(mslStr, compileOptions, &error);
     CHK_MTL(library, error);
@@ -793,7 +793,7 @@ GB_LOG("{}", mslSrc);
       descriptor->setLabel(NS::String::string(debugName, NS::StringEncoding::UTF8StringEncoding));
     }
 
-    NS::Error* error;
+    NS::Error* error = nullptr;
     MTL::PipelineOption options = MTL::PipelineOptionNone; // TODO: consider values
     MTL::ComputePipelineState* state = idevice->device->newComputePipelineState(descriptor, options, nullptr, &error);
     CHK_MTL_NP(state);
