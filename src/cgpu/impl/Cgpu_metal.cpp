@@ -37,6 +37,7 @@
 
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
+// NOTE: there's a bug in beta2 where MTL4AccelerationStructure.hpp is not included in Metal.hpp
 #include <Metal.hpp>
 
 namespace gtl
@@ -359,7 +360,7 @@ namespace gtl
     MTL4::CounterHeap* counterHeap;
     {
       auto* desc = MTL4::CounterHeapDescriptor::alloc()->init();
-      desc->setEntryCount(CGPU_MAX_TIMESTAMP_QUERIES);
+      desc->setCount(CGPU_MAX_TIMESTAMP_QUERIES);
       desc->setType(MTL4::CounterHeapTypeTimestamp);
 
       NS::Error* error;
@@ -1142,13 +1143,10 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
 
     CGPU_RESOLVE_BLAS({ handle }, iblas);
 
-    auto vertexBufferRange = MTL4::BufferRange::Make(ivertexBuffer->buffer->gpuAddress(), ivertexBuffer->size);
-    auto indexBufferRange = MTL4::BufferRange::Make(iindexBuffer->buffer->gpuAddress(), iindexBuffer->size);
-
-    auto* triDesc = MTL4::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
-    triDesc->setVertexBuffer(vertexBufferRange);
+    auto* triDesc = MTL::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
+    triDesc->setVertexBuffer(ivertexBuffer->buffer);
     triDesc->setVertexStride(sizeof(float) * 3);
-    triDesc->setIndexBuffer(indexBufferRange);
+    triDesc->setIndexBuffer(iindexBuffer->buffer);
     triDesc->setIndexType(MTL::IndexTypeUInt32);
     triDesc->setTriangleCount(createInfo.triangleCount);
     triDesc->setOpaque(createInfo.isOpaque);
@@ -1663,13 +1661,12 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     }
 
     NS::Range range(offset, count);
-    uint32_t bufferOffset = 0;
+    auto bufferRange = MTL4::BufferRange::Make(ibuffer->buffer->gpuAddress(), ibuffer->size);
 
     icommandBuffer->commandBuffer->resolveCounterHeap(
       icommandBuffer->counterHeap,
       range,
-      ibuffer->buffer,
-      bufferOffset,
+      bufferRange,
       nullptr,
       nullptr
     );
