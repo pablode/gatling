@@ -40,6 +40,10 @@
 // NOTE: there's a bug in beta2 where MTL4AccelerationStructure.hpp is not included in Metal.hpp
 #include <Metal.hpp>
 
+// NOTE: there's another bug in Metal-cpp where the function 'newLogState' should be 'makeLogState'
+// TODO: if this doesn't get fixed, maybe we can write our own wrapper function
+//#define CUSTOM_LOGGER NDEBUG
+
 namespace gtl
 {
   /* Constants. */
@@ -71,7 +75,7 @@ namespace gtl
     MTL::Device* device;
     MTL4::CommandQueue* commandQueue;
     MTL4::CounterHeap* counterHeap;
-#ifndef NDEBUG
+#ifdef CUSTOM_LOGGER
     MTL::LogState* logState;
     MTL4::CommitOptions* commitOptions;
 #endif
@@ -130,7 +134,7 @@ namespace gtl
     void* pcMem;
 
     MTL4::CounterHeap* counterHeap; // owned by device
-#ifndef NDEBUG
+#ifdef CUSTOM_LOGGER
     MTL::LogState* logState; // owned by device
     MTL4::CommitOptions* commitOptions; // owned by device
 #endif
@@ -370,7 +374,7 @@ namespace gtl
       desc->release();
     }
 
-#ifndef NDEBUG
+#ifdef CUSTOM_LOGGER
     MTL::LogState* logState;
     {
       auto* desc = MTL::LogStateDescriptor::alloc()->init();
@@ -410,7 +414,7 @@ namespace gtl
     idevice->device = mtlDevice;
     idevice->commandQueue = commandQueue;
     idevice->counterHeap = counterHeap;
-#ifndef NDEBUG
+#ifdef CUSTOM_LOGGER
     idevice->logState = logState;
     idevice->commitOptions = commitOptions;
 #endif
@@ -426,7 +430,7 @@ namespace gtl
     idevice->counterHeap->release();
     idevice->commandQueue->release();
     idevice->device->release();
-#ifndef NDEBUG
+#ifdef CUSTOM_LOGGER
     idevice->logState->release();
     idevice->commitOptions->release();
 #endif
@@ -471,7 +475,7 @@ namespace gtl
 #undef CHK_SPVC
 
     MTL::CompileOptions* compileOptions = MTL::CompileOptions::alloc();
-#ifndef NDEBUG
+#ifdef NDEBUG
     compileOptions->setEnableLogging(true);
 #endif
 
@@ -1343,7 +1347,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     icommandBuffer->pcBuffer = pcBuffer;
     icommandBuffer->pcMem = pcBuffer->contents();
     icommandBuffer->counterHeap = idevice->counterHeap;
-#ifndef NDEBUG
+#ifdef CUSTOM_LOGGER
     icommandBuffer->logState = idevice->logState;
     icommandBuffer->commitOptions = idevice->commitOptions;
 #endif
@@ -1369,7 +1373,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
     auto* options = MTL4::CommandBufferOptions::alloc()->init();
-#ifndef NDEBUG
+#ifdef CUSTOM_LOGGER
     options->setLogState(icommandBuffer->logState);
 #endif
 
