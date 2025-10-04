@@ -1649,12 +1649,12 @@ GB_LOG(">>> hit shaders");
         hitGroups.push_back(hitGroup);
 
         // shadow hit group
-        CgpuRtHitGroup shadowHitGroup;
-        if (!gpuData.anyHits.empty())
-        {
-          hitGroup.anyHitShader = gpuData.anyHits[1];
-        }
-        hitGroups.push_back(shadowHitGroup);
+        //CgpuRtHitGroup shadowHitGroup;
+        //if (!gpuData.anyHits.empty())
+        //{
+        //  hitGroup.anyHitShader = gpuData.anyHits[1];
+        //}
+        //hitGroups.push_back(shadowHitGroup);
       };
     }
 
