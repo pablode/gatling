@@ -801,8 +801,8 @@ namespace gtl
     NS::Error* error = nullptr;
     MTL::PipelineOption options = MTL::PipelineOptionNone; // TODO: consider values
     MTL::ComputePipelineState* state = idevice->device->newComputePipelineState(descriptor, options, nullptr, &error);
-    CHK_MTL_NP(state);
     LOG_MTL_ERR(error);
+    CHK_MTL_NP(state);
 
     entryFunc->release();
     descriptor->release();
