@@ -63,7 +63,7 @@
 	url = https://github.com/sebbbi/OffsetAllocator.git
 [submodule "extern/metal-cpp"]
 	path = extern/metal-cpp
-	url = https://github.com/bkaradzic/metal-cpp.git
+	url = https://github.com/pablode/metal-cpp.git
 [submodule "extern/SPIRV-Cross"]
 	path = extern/SPIRV-Cross
 	url = https://github.com/KhronosGroup/SPIRV-Cross.git
