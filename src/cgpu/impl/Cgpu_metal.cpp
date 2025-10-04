@@ -1186,7 +1186,7 @@ namespace gtl
     encoder->release();
 
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
-    commandQueue->commit(&commandBuffer, 1);
+    commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
     commandQueue->signalEvent(event, 42);
     commandQueue->wait(event, 42);
 
@@ -1287,7 +1287,7 @@ namespace gtl
       encoder->release();
 
       MTL4::CommandQueue* commandQueue = idevice->commandQueue;
-      commandQueue->commit(&commandBuffer, 1);
+      commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
       commandQueue->signalEvent(event, 42);
       commandQueue->wait(event, 42);
 
@@ -1743,7 +1743,7 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
-    commandQueue->commit(&icommandBuffer->commandBuffer, 1);
+    commandQueue->commit(&icommandBuffer->commandBuffer, 1, idevice->commitOptions);
 
     cgpuWaitSemaphores(device, waitSemaphoreInfoCount, waitSemaphoreInfos);
 
