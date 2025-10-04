@@ -976,7 +976,6 @@ namespace gtl
     return cgpuCreateComputePipeline(idevice, ishader, createInfo.debugName, pipeline);
   }
 
-int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name conflicts
   bool cgpuCreateRtPipeline(CgpuDevice device,
                             CgpuRtPipelineCreateInfo createInfo,
                             CgpuPipeline* pipeline)
@@ -996,7 +995,7 @@ int fnNameCnt = 0; // TODO: just an idea to make sure that there are no name con
         CgpuShader shader = createInfo.hitGroups[i].closestHitShader; // TODO: ignores any hit
         CGPU_RESOLVE_SHADER(shader, ishader);
 
-        NS::String* entryFuncName = NS::String::string((std::string(SPVC_MSL_ENTRY_POINT)+std::to_string(fnNameCnt++)).c_str(), NS::UTF8StringEncoding);
+        NS::String* entryFuncName = NS::String::string(SPVC_MSL_ENTRY_POINT, NS::UTF8StringEncoding);
 
         MTL::Function* hitFunc = ishader->library->newFunction(entryFuncName);
         CHK_MTL_NP(hitFunc);
