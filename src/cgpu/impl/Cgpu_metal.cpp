@@ -40,10 +40,6 @@
 // NOTE: there's a bug in beta2 where MTL4AccelerationStructure.hpp is not included in Metal.hpp
 #include <Metal.hpp>
 
-// NOTE: there's another bug in Metal-cpp where the function 'newLogState' should be 'makeLogState'
-// TODO: if this doesn't get fixed, maybe we can write our own wrapper function
-//#define CUSTOM_LOGGER NDEBUG
-
 namespace gtl
 {
   /* Constants. */
@@ -75,8 +71,8 @@ namespace gtl
     MTL::Device* device;
     MTL4::CommandQueue* commandQueue;
     MTL4::CounterHeap* counterHeap;
-#ifdef CUSTOM_LOGGER
-    MTL::LogState* logState;
+#ifndef NDEBUG
+    MTL::LogState* logState; // nullable
     MTL4::CommitOptions* commitOptions;
 #endif
   };
@@ -134,8 +130,8 @@ namespace gtl
     void* pcMem;
 
     MTL4::CounterHeap* counterHeap; // owned by device
-#ifdef CUSTOM_LOGGER
-    MTL::LogState* logState; // owned by device
+#ifndef NDEBUG
+    MTL::LogState* logState; // nullable, owned by device
     MTL4::CommitOptions* commitOptions; // owned by device
 #endif
   };
@@ -374,16 +370,16 @@ namespace gtl
       desc->release();
     }
 
-#ifdef CUSTOM_LOGGER
-    MTL::LogState* logState;
+#ifndef NDEBUG
+    MTL::LogState* logState = nullptr;
     {
       auto* desc = MTL::LogStateDescriptor::alloc()->init();
+      //desc->setBufferSize(4 * 1024 * 1024);
       desc->setLevel(MTL::LogLevelDebug);
 
       NS::Error* error = nullptr;
       logState = idevice->device->newLogState(desc, &error);
       desc->release();
-      CHK_MTL(logState, error);
 
       auto logHandler = [](NS::String* subsystem, NS::String* category, MTL::LogLevel logLevel, NS::String* message) {
         std::string msg;
@@ -401,7 +397,15 @@ namespace gtl
           exit(EXIT_FAILURE);
         }
       };
-      logState->addLogHandler(logHandler);
+
+      if (logState)
+      {
+        logState->addLogHandler(logHandler);
+      }
+      else
+      {
+        LOG_MTL_ERR(error);
+      }
     }
 
     MTL4::CommitOptions* commitOptions = MTL4::CommitOptions::alloc()->init();
@@ -414,7 +418,7 @@ namespace gtl
     idevice->device = mtlDevice;
     idevice->commandQueue = commandQueue;
     idevice->counterHeap = counterHeap;
-#ifdef CUSTOM_LOGGER
+#ifndef NDEBUG
     idevice->logState = logState;
     idevice->commitOptions = commitOptions;
 #endif
@@ -430,7 +434,7 @@ namespace gtl
     idevice->counterHeap->release();
     idevice->commandQueue->release();
     idevice->device->release();
-#ifdef CUSTOM_LOGGER
+#ifndef NDEBUG
     idevice->logState->release();
     idevice->commitOptions->release();
 #endif
@@ -480,6 +484,7 @@ namespace gtl
 #ifndef NDEBUG
     compileOptions->setEnableLogging(true);
 #endif
+    // TODO: consider other compileOptions fields
 
     NS::Error* error = nullptr;
     NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);
@@ -1346,7 +1351,7 @@ namespace gtl
     icommandBuffer->pcBuffer = pcBuffer;
     icommandBuffer->pcMem = pcBuffer->contents();
     icommandBuffer->counterHeap = idevice->counterHeap;
-#ifdef CUSTOM_LOGGER
+#ifndef NDEBUG
     icommandBuffer->logState = idevice->logState;
     icommandBuffer->commitOptions = idevice->commitOptions;
 #endif
@@ -1372,7 +1377,7 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
     auto* options = MTL4::CommandBufferOptions::alloc()->init();
-#ifdef CUSTOM_LOGGER
+#ifndef NDEBUG
     options->setLogState(icommandBuffer->logState);
 #endif
 
