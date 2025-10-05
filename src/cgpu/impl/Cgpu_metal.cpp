@@ -40,6 +40,8 @@
 // NOTE: there's a bug in beta2 where MTL4AccelerationStructure.hpp is not included in Metal.hpp
 #include <Metal.hpp>
 
+// TODO: MTLSTR macro?
+
 namespace gtl
 {
   /* Constants. */
@@ -716,9 +718,7 @@ namespace gtl
 
     if (createInfo.debugName)
     {
-      auto label = NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding);
-      texture->setLabel(label);
-      label->release();
+      texture->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
     }
 
     iimage->texture = texture;
@@ -842,7 +842,6 @@ namespace gtl
 
     descriptor->release();
     entryFunDesc->release();
-    entryFuncName->release();
 
     MTL4::ArgumentTable* argumentTable;
     {
@@ -1049,7 +1048,7 @@ namespace gtl
       linkedFunctions = MTL4::StaticLinkingDescriptor::alloc()->init();
       linkedFunctions->setFunctionDescriptors(ar);
 
-      //ar->release(); // TODO: when safe to call?
+      ar->release();
     }
 
     if (!cgpuCreateComputePipeline(idevice, irgenShader, createInfo.debugName, pipeline, linkedFunctions))
@@ -1230,7 +1229,7 @@ namespace gtl
     auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
     encoder->buildAccelerationStructure(as, blasDesc, scratchBufferRange);
     encoder->endEncoding();
-    encoder->release();
+    // encoder->release();
 
     commandBuffer->endCommandBuffer();
 
@@ -1339,7 +1338,7 @@ namespace gtl
       auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
       encoder->buildAccelerationStructure(as, descriptor, scratchBufferRange);
       encoder->endEncoding();
-      encoder->release();
+      // encoder->release();
 
       commandBuffer->endCommandBuffer();
 
@@ -1749,7 +1748,7 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
     icommandBuffer->encoder->endEncoding();
-    icommandBuffer->encoder->release();
+    // icommandBuffer->encoder->release(); // owned by CB
 
     icommandBuffer->commandBuffer->endCommandBuffer();
   }
