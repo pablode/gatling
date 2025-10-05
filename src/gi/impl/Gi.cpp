@@ -2346,9 +2346,9 @@ cleanup:
     // TODO: do this only once after shader cache rebuild
     cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings0);
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 1/*descriptorSetIndex*/, &bindings1);
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 2/*descriptorSetIndex*/, &bindings2);
+    cgpuCmdUpdateBindings(s_device, commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings0);
+    cgpuCmdUpdateBindings(s_device, commandBuffer, shaderCache->pipeline, 1/*descriptorSetIndex*/, &bindings1);
+    cgpuCmdUpdateBindings(s_device, commandBuffer, shaderCache->pipeline, 2/*descriptorSetIndex*/, &bindings2);
 
     cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline);
 

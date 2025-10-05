@@ -730,6 +730,7 @@ namespace gtl
   );
 
   void cgpuCmdUpdateBindings(
+    CgpuDevice device,
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
     uint32_t descriptorSetIndex,

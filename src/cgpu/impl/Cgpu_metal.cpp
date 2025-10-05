@@ -109,6 +109,9 @@ namespace gtl
     MTL::Buffer* intersectionFunctionBuffer = nullptr;
     // TODO: rename to ifba. table to ift, etc.
     MTL::Buffer* intersectionFunctionBufferArgs = nullptr;
+
+    // TODO: in the dev/master branch, this should be a member of BindGroup
+    MTL::ResidencySet* residencySet = nullptr;
   };
 
   struct CgpuIShader
@@ -1472,13 +1475,33 @@ namespace gtl
     }
   }
 
-  void cgpuCmdUpdateBindings(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdUpdateBindings(CgpuDevice device,
+                             CgpuCommandBuffer commandBuffer,
                              CgpuPipeline pipeline,
                              uint32_t descriptorSetIndex,
                              const CgpuBindings* bindings)
   {
+    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+
+    if (ipipeline->residencySet)
+    {
+      ipipeline->residencySet->release();
+    }
+
+    // TODO: in the dev/master branch, this should be a member of BindGroup
+    MTL::ResidencySet* residencySet = nullptr;
+    {
+      auto* desc = MTL::ResidencySetDescriptor::alloc()->init();
+      desc->setInitialCapacity(bindings->bufferCount + bindings->imageCount + bindings->samplerCount + bindings->tlasCount);
+
+      NS::Error* error = nullptr;
+      residencySet = idevice->device->newResidencySet(desc, &error);
+      CHK_MTL(residencySet, error);
+
+      desc->release();
+    }
 
     MTL::ArgumentEncoder* argumentEncoder = ipipeline->argumentEncoders[descriptorSetIndex];
     MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers[descriptorSetIndex];
@@ -1492,6 +1515,7 @@ namespace gtl
 
       CGPU_RESOLVE_BUFFER(b.buffer, ibuffer);
       argumentEncoder->setBuffer(ibuffer->buffer, b.offset, b.binding);
+      residencySet->addAllocation(ibuffer->buffer);
     }
 
     for (uint32_t i = 0; i < bindings->imageCount; i++)
@@ -1502,6 +1526,7 @@ namespace gtl
       //       -> we might have to rewrite tex2d array assignment
       CGPU_RESOLVE_IMAGE(b.image, iimage);
       argumentEncoder->setTexture(iimage->texture, b.binding);
+      residencySet->addAllocation(iimage->texture);
     }
 
     for (uint32_t i = 0; i < bindings->samplerCount; i++)
@@ -1510,6 +1535,7 @@ namespace gtl
 
       CGPU_RESOLVE_SAMPLER(b.sampler, isampler);
       argumentEncoder->setSamplerState(isampler->sampler, b.binding);
+      //residencySet->addAllocation(isampler->sampler);
     }
 
     for (uint32_t i = 0; i < bindings->tlasCount; i++)
@@ -1518,7 +1544,12 @@ namespace gtl
 
       CGPU_RESOLVE_TLAS(b.as, itlas);
       argumentEncoder->setAccelerationStructure(itlas->as, b.binding);
+      residencySet->addAllocation(itlas->as);
     }
+
+    ipipeline->residencySet = residencySet;
+
+    icommandBuffer->commandBuffer->useResidencySet(residencySet);
 
 // TODO: we need to do something similar for push constants
     icommandBuffer->encoder->setArgumentTable(ipipeline->argumentTable);
