@@ -876,8 +876,6 @@ namespace gtl
       MTL::ArgumentEncoder* argumentEncoder = idevice->device->newArgumentEncoder(descriptorArray);
       CHK_MTL_NP(argumentEncoder);
 
-      descriptorArray->release();
-
       uint64_t argumentBufferSize = argumentEncoder->encodedLength();
       MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModeShared); // TODO: or Managed
 
@@ -1050,8 +1048,6 @@ namespace gtl
 
       linkedFunctions = MTL4::StaticLinkingDescriptor::alloc()->init();
       linkedFunctions->setFunctionDescriptors(ar);
-
-      ar->release();
     }
 
     if (!cgpuCreateComputePipeline(idevice, irgenShader, createInfo.debugName, pipeline, linkedFunctions))
@@ -1129,13 +1125,10 @@ namespace gtl
       memcpy(ifBufferArgsMem, &args, ifBufferArgsSize);
     }
 
-    // TODO: test if enable
-#if 0
-    for (MTL::Function* fun : hitFunctions)
+    for (MTL4::FunctionDescriptor* fun : hitFunctions)
     {
       fun->release();
     }
-#endif
 
     ipipeline->intersectionFunctionTable = intersectionFunctionTable;
     ipipeline->intersectionFunctionBufferArgs = intersectionFunctionBufferArgs;
@@ -1232,7 +1225,6 @@ namespace gtl
     auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
     encoder->buildAccelerationStructure(as, blasDesc, scratchBufferRange);
     encoder->endEncoding();
-    // encoder->release();
 
     commandBuffer->endCommandBuffer();
 
@@ -1246,7 +1238,6 @@ namespace gtl
     commandAllocator->release();
 
     scratchBuffer->release();
-    geoDescs->release();
     blasDesc->release();
     triDesc->release();
 
@@ -1341,7 +1332,6 @@ namespace gtl
       auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
       encoder->buildAccelerationStructure(as, descriptor, scratchBufferRange);
       encoder->endEncoding();
-      // encoder->release();
 
       commandBuffer->endCommandBuffer();
 
@@ -1779,7 +1769,6 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
     icommandBuffer->encoder->endEncoding();
-    // icommandBuffer->encoder->release(); // owned by CB
 
     icommandBuffer->commandBuffer->endCommandBuffer();
   }
