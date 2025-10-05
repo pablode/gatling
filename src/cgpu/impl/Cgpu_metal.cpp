@@ -702,7 +702,9 @@ namespace gtl
 
     if (createInfo.debugName)
     {
-      texture->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+      auto label = NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding);
+      texture->setLabel(label);
+      label->release();
     }
 
     iimage->texture = texture;
@@ -760,6 +762,7 @@ namespace gtl
     descriptor->setMagFilter(MTL::SamplerMinMagFilterLinear);
     descriptor->setNormalizedCoordinates(true);
     descriptor->setBorderColor(MTL::SamplerBorderColorOpaqueBlack);
+    descriptor->setSupportArgumentBuffers(true);
 
     MTL::SamplerState* mtlSampler = idevice->device->newSamplerState(descriptor);
 
@@ -858,7 +861,7 @@ namespace gtl
       descriptorArray->release();
 
       uint64_t argumentBufferSize = argumentEncoder->encodedLength();
-      MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModePrivate);
+      MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModeShared); // TODO: or Managed
 
       argumentEncoders.push_back(argumentEncoder);
       argumentBuffers.push_back(argumentBuffer);
@@ -903,14 +906,14 @@ namespace gtl
         {
           access = MTL::BindingAccessReadWrite;
         }
-        else if (binding.readAccess)
-        {
-          access = MTL::BindingAccessReadOnly;
-        }
         else if (binding.writeAccess)
         {
           access = MTL::BindingAccessWriteOnly;
         }
+        else
+	      {
+          access = MTL::BindingAccessReadOnly;
+	      }
 
         //MTL::TextureType textureType;
         //if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
@@ -968,7 +971,7 @@ namespace gtl
       ifbaDesc->setIndex(1);
       ifbaDesc->setAccess(MTL::BindingAccessReadOnly);
 
-      pushDescriptorSet(SPVC_MSL_PUSH_CONSTANT_DESC_SET, { pcDesc, ifbaDesc }); // TODO: rename SPIRV-Cross constant
+      pushDescriptorSet(/*SPVC_MSL_PUSH_CONSTANT_DESC_SET*/descriptorSetCount, { pcDesc, ifbaDesc }); // TODO: rename SPIRV-Cross constant
 
       pcDesc->release();
       ifbaDesc->release();
@@ -1034,6 +1037,8 @@ namespace gtl
     {
       return false;
     }
+
+    linkedFunctions->release();
 
     CGPU_RESOLVE_PIPELINE(*pipeline, ipipeline);
 
@@ -1165,10 +1170,13 @@ namespace gtl
 
     CGPU_RESOLVE_BLAS({ handle }, iblas);
 
-    auto* triDesc = MTL::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
-    triDesc->setVertexBuffer(ivertexBuffer->buffer);
+    auto vertexBufferRange = MTL4::BufferRange::Make(ivertexBuffer->buffer->gpuAddress(), ivertexBuffer->size);
+    auto indexBufferRange = MTL4::BufferRange::Make(iindexBuffer->buffer->gpuAddress(), iindexBuffer->size);
+
+    auto* triDesc = MTL4::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
+    triDesc->setVertexBuffer(vertexBufferRange);
     triDesc->setVertexStride(sizeof(float) * 3);
-    triDesc->setIndexBuffer(iindexBuffer->buffer);
+    triDesc->setIndexBuffer(indexBufferRange);
     triDesc->setIndexType(MTL::IndexTypeUInt32);
     triDesc->setTriangleCount(createInfo.triangleCount);
     triDesc->setOpaque(createInfo.isOpaque);
@@ -1194,6 +1202,10 @@ namespace gtl
     MTL::Event* event = idevice->device->newEvent();
     CHK_MTL_NP(event);
     MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
+
+    auto* commandAllocator = idevice->device->newCommandAllocator();
+    commandBuffer->beginCommandBuffer(commandAllocator); // TODO: pass options with LogState
+
     CHK_MTL_NP(commandBuffer);
     MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
     CHK_MTL_NP(encoder);
@@ -1203,6 +1215,8 @@ namespace gtl
     encoder->endEncoding();
     encoder->release();
 
+    commandBuffer->endCommandBuffer();
+
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
     commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
     commandQueue->signalEvent(event, 42);
@@ -1210,6 +1224,7 @@ namespace gtl
 
     event->release();
     commandBuffer->release();
+    commandAllocator->release();
 
     scratchBuffer->release();
     geoDescs->release();
@@ -1260,13 +1275,14 @@ namespace gtl
         memcpy(&d.transformationMatrix, instance.transform, sizeof(instance.transform)); // TODO: might be transposed
       }
 
-      instanceBufferSize = sizeof(MTL::AccelerationStructureInstanceDescriptor) * instances.size();
+      instanceBufferSize = 72/*sizeof(MTL::AccelerationStructureUserIDInstanceDescriptor)*/ * instances.size();
 
       instanceBuffer = idevice->device->newBuffer(instanceBufferSize, MTL::ResourceStorageModeShared);
       CHK_MTL_NP(instanceBuffer);
 
       memcpy(instanceBuffer->contents(), instances.data(), instanceBufferSize);
-      instanceBuffer->didModifyRange(NS::Range::Make(0, instanceBufferSize));
+      // TODO: only allowed for StorageModeManaged
+      //instanceBuffer->didModifyRange(NS::Range::Make(0, instanceBufferSize));
     }
 
     auto instanceBufferRange = MTL4::BufferRange::Make(instanceBuffer->gpuAddress(), instanceBufferSize);
@@ -1274,7 +1290,7 @@ namespace gtl
     auto* descriptor = MTL4::InstanceAccelerationStructureDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
     descriptor->setInstanceDescriptorBuffer(instanceBufferRange);
-    descriptor->setInstanceDescriptorStride(sizeof(MTL::AccelerationStructureInstanceDescriptor));
+    descriptor->setInstanceDescriptorStride(/*sizeof(MTL::AccelerationStructureUserIDInstanceDescriptor)*/72);
     descriptor->setInstanceCount(createInfo.instanceCount);
 
     // Build TLAS.
@@ -1296,6 +1312,10 @@ namespace gtl
       CHK_MTL_NP(event);
       MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
       CHK_MTL_NP(commandBuffer);
+
+      auto* commandAllocator = idevice->device->newCommandAllocator();
+      commandBuffer->beginCommandBuffer(commandAllocator); // TODO: pass options with LogState
+
       MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
       CHK_MTL_NP(encoder);
 
@@ -1304,6 +1324,8 @@ namespace gtl
       encoder->endEncoding();
       encoder->release();
 
+      commandBuffer->endCommandBuffer();
+
       MTL4::CommandQueue* commandQueue = idevice->commandQueue;
       commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
       commandQueue->signalEvent(event, 42);
@@ -1311,6 +1333,7 @@ namespace gtl
 
       event->release();
       commandBuffer->release();
+      commandAllocator->release();
       scratchBuffer->release();
     }
 
@@ -1782,7 +1805,8 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
     NS::Range range(offset, size);
-    ibuffer->buffer->didModifyRange(range);
+    // TODO: only allowed for StorageModeManaged
+    //ibuffer->buffer->didModifyRange(range);
     return true;
   }
 
