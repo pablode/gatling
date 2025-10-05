@@ -1452,6 +1452,8 @@ namespace gtl
 
     encoder->setComputePipelineState(ipipeline->state);
 
+    icommandBuffer->commandBuffer->useResidencySet(ipipeline->residencySet);
+
 // TODO: bind SBT here?
     //encoder->setIntersectionFunctionTable(ipipeline->ift, bufferIndex);
   }
@@ -1548,8 +1550,6 @@ namespace gtl
     }
 
     ipipeline->residencySet = residencySet;
-
-    icommandBuffer->commandBuffer->useResidencySet(residencySet);
 
 // TODO: we need to do something similar for push constants
     icommandBuffer->encoder->setArgumentTable(ipipeline->argumentTable);
