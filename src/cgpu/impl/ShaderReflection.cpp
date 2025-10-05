@@ -190,6 +190,18 @@ namespace gtl
       reflection->pushConstantsSize = pcBlock->size;
     }
 
+    if (shaderModule.entry_point_count != 1)
+    {
+      goto fail;
+    }
+    else
+    {
+      const SpvReflectEntryPoint& entryPoint = shaderModule.entry_points[0];
+      reflection->workgroupSize[0] = entryPoint.local_size.x;
+      reflection->workgroupSize[1] = entryPoint.local_size.y;
+      reflection->workgroupSize[2] = entryPoint.local_size.z;
+    }
+
     result = true;
 
 fail:

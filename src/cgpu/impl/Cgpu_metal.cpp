@@ -98,6 +98,8 @@ namespace gtl
   {
     MTL::ComputePipelineState* state;
 
+    MTL::Size threadsPerGroup; // fixed for RT, reflection for CS
+
     MTL4::ArgumentTable* argumentTable;
     std::vector<MTL::ArgumentEncoder*> argumentEncoders; // last entry is for aux descriptor set
     std::vector<MTL::Buffer*> argumentBuffers; // last entry is reference to aux descriptor set buffer
@@ -141,6 +143,8 @@ namespace gtl
     MTL::LogState* logState; // nullable, owned by device
     MTL4::CommitOptions* commitOptions; // owned by device
 #endif
+
+    MTL::Size threadsPerGroup; // from bound pipeline
   };
 
   struct CgpuIBlas
@@ -811,6 +815,7 @@ namespace gtl
                                         CgpuIShader* ishader,
                                         const char* debugName,
                                         CgpuPipeline* pipeline,
+                                        MTL::Size threadsPerGroup,
                                         const MTL4::StaticLinkingDescriptor* linkingDescriptor = nullptr)
   {
     uint64_t handle = iinstance->ipipelineStore.allocate();
@@ -1010,7 +1015,11 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_SHADER(createInfo.shader, ishader);
 
-    return cgpuCreateComputePipeline(idevice, ishader, createInfo.debugName, pipeline);
+    const CgpuShaderReflection& reflection = ishader->reflection;
+
+    MTL::Size threadsPerGroup(reflection.workgroupSize[0], reflection.workgroupSize[1], reflection.workgroupSize[2]);
+
+    return cgpuCreateComputePipeline(idevice, ishader, createInfo.debugName, pipeline, threadsPerGroup);
   }
 
   bool cgpuCreateRtPipeline(CgpuDevice device,
@@ -1050,7 +1059,9 @@ namespace gtl
       linkedFunctions->setFunctionDescriptors(ar);
     }
 
-    if (!cgpuCreateComputePipeline(idevice, irgenShader, createInfo.debugName, pipeline, linkedFunctions))
+    MTL::Size threadsPerGroup(8, 4, 1); // assuming that 32 threads is best
+
+    if (!cgpuCreateComputePipeline(idevice, irgenShader, createInfo.debugName, pipeline, threadsPerGroup, linkedFunctions))
     {
       return false;
     }
@@ -1438,6 +1449,8 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
+    icommandBuffer->threadsPerGroup = ipipeline->threadsPerGroup;
+
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
     encoder->setComputePipelineState(ipipeline->state);
@@ -1641,9 +1654,14 @@ namespace gtl
   {
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
-    MTL::Size groupsPerGrid(dim_x, dim_y, dim_x);
-    MTL::Size threadsPerGroup(32, 32, 1); // TODO: retrieve this from the bound pipeline
-   // encoder->dispatchThreadgroups(groupsPerGrid, threadsPerGroup);
+    const MTL::Size& tpg = icommandBuffer->threadsPerGroup;
+
+    uint32_t wgCountX = (dim_x + tpg.width - 1) / tpg.width;
+    uint32_t wgCountY = (dim_y + tpg.height - 1) / tpg.height;
+    uint32_t wgCountZ = (dim_z + tpg.depth - 1) / tpg.depth;
+
+    MTL::Size groupsPerGrid(wgCountX, wgCountY, wgCountZ);
+    encoder->dispatchThreadgroups(groupsPerGrid, tpg);
   }
 
   void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
@@ -1761,6 +1779,7 @@ namespace gtl
   void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, uint32_t width, uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
+
     cgpuCmdDispatch(icommandBuffer, width, height, 1);
   }
 
