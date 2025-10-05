@@ -1554,6 +1554,10 @@ namespace gtl
     uint32_t dstMipmapLevel = 0;
     MTL::Origin dstOrigin(desc->texelOffsetX, desc->texelOffsetY, desc->texelOffsetZ);
 
+    assert((desc->bufferOffset % bytesPerPixel) == 0); // TODO: need to expose as property. Metal docs make this requirement.
+    assert((desc->bufferOffset + srcBytesPerImage) <= ibuffer->size); // don't read OOB
+    assert(!iimage->texture->isFramebufferOnly());
+
     encoder->copyFromBuffer(
       ibuffer->buffer,
       desc->bufferOffset,
