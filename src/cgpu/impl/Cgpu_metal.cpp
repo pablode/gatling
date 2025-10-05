@@ -67,6 +67,7 @@ namespace gtl
 
   struct CgpuIDevice
   {
+    MTL4::Compiler*      compiler;
     MTL::Device*         device;
     MTL4::CommandQueue*  commandQueue;
     MTL4::CounterHeap*   counterHeap;
@@ -416,6 +417,18 @@ namespace gtl
     });
 #endif
 
+    MTL4::Compiler* compiler;
+    {
+      auto* descriptor = MTL4::CompilerDescriptor::alloc()->init();
+
+      NS::Error* error = nullptr;
+      compiler = mtlDevice->newCompiler(descriptor, &error);
+      CHK_MTL(compiler, error);
+
+      descriptor->release();
+    }
+
+    idevice->compiler = compiler;
     idevice->device = mtlDevice;
     idevice->commandQueue = commandQueue;
     idevice->counterHeap = counterHeap;
@@ -433,6 +446,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
+    idevice->compiler->release();
     idevice->counterHeap->release();
     idevice->commandQueue->release();
     idevice->device->release();
@@ -790,43 +804,45 @@ namespace gtl
     return true;
   }
 
-  bool cgpuCreateComputePipeline(CgpuIDevice* idevice,
-                                 CgpuIShader* ishader,
-                                 const char* debugName,
-                                 CgpuPipeline* pipeline,
-                                 const MTL::LinkedFunctions* linkedFunctions = nullptr)
+  static bool cgpuCreateComputePipeline(CgpuIDevice* idevice,
+                                        CgpuIShader* ishader,
+                                        const char* debugName,
+                                        CgpuPipeline* pipeline,
+                                        const MTL4::StaticLinkingDescriptor* linkingDescriptor = nullptr)
   {
     uint64_t handle = iinstance->ipipelineStore.allocate();
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
-    NS::String* entryFuncName = NS::String::string(ishader->entryPoint.c_str(), NS::UTF8StringEncoding);
-    MTL::Function* entryFunc = ishader->library->newFunction(entryFuncName);
-
-    auto* descriptor = MTL::ComputePipelineDescriptor::alloc()->init();
+    auto* descriptor = MTL4::ComputePipelineDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
 
-    if (linkedFunctions)
+    NS::String* entryFuncName = NS::String::string(ishader->entryPoint.c_str(), NS::UTF8StringEncoding);
+
+    auto* entryFunDesc = MTL4::LibraryFunctionDescriptor::alloc()->init();
+    entryFunDesc->setLibrary(ishader->library);
+    entryFunDesc->setName(entryFuncName);
+
+    descriptor->setComputeFunctionDescriptor(entryFunDesc);
+
+    if (linkingDescriptor)
     {
-      descriptor->setLinkedFunctions(linkedFunctions);
-    }
-    descriptor->setComputeFunction(entryFunc);
-#ifndef NDEBUG
-    descriptor->setShaderValidation(MTL::ShaderValidationEnabled);
-#endif
-    if (debugName)
-    {
-      descriptor->setLabel(NS::String::string(debugName, NS::StringEncoding::UTF8StringEncoding));
+      // TODO: this hangs infinitely :( maybe because of duplicate functions? but they should be static..
+      //descriptor->setStaticLinkingDescriptor(linkingDescriptor);
     }
 
+    MTL4::Compiler* compiler = idevice->compiler;
+
+    GB_LOG("before!");
     NS::Error* error = nullptr;
-    MTL::PipelineOption options = MTL::PipelineOptionNone; // TODO: consider values
-    MTL::ComputePipelineState* state = idevice->device->newComputePipelineState(descriptor, options, nullptr, &error);
+    MTL::ComputePipelineState* state = compiler->newComputePipelineState(descriptor, nullptr, &error);
     LOG_MTL_ERR(error);
     CHK_MTL_NP(state);
+    GB_LOG("after!");
 
-    entryFunc->release();
     descriptor->release();
+    entryFunDesc->release();
+    entryFuncName->release();
 
     MTL4::ArgumentTable* argumentTable;
     {
@@ -1008,8 +1024,10 @@ namespace gtl
     // Collect all shaders and create pipeline
     uint32_t functionCount = createInfo.hitGroupCount; // TODO: * 2 for anyhit (probably in user space)
 
-    std::vector<MTL::Function*> hitFunctions(functionCount);
-    MTL::LinkedFunctions* linkedFunctions;
+    std::vector<MTL4::FunctionDescriptor*> hitFunctions(functionCount); // TODO: rename
+    MTL4::StaticLinkingDescriptor* linkedFunctions = nullptr;
+
+    if (functionCount > 0)
     {
       for (uint32_t i = 0; i < functionCount; i++)
       {
@@ -1018,19 +1036,20 @@ namespace gtl
 
         NS::String* entryFuncName = NS::String::string(ishader->entryPoint.c_str(), NS::UTF8StringEncoding);
 
-        MTL::Function* hitFunc = ishader->library->newFunction(entryFuncName);
-        CHK_MTL_NP(hitFunc);
+        auto* funDesc = MTL4::LibraryFunctionDescriptor::alloc()->init();
+        funDesc->setLibrary(ishader->library);
+        funDesc->setName(entryFuncName);
 
-        hitFunctions[i] = hitFunc;
+        hitFunctions[i] = funDesc;
       }
 
       NS::Array* ar = NS::Array::array((const NS::Object* const*) hitFunctions.data(), (uint32_t) hitFunctions.size());
       CHK_MTL_NP(ar);
 
-      linkedFunctions = MTL::LinkedFunctions::alloc()->init();
-      linkedFunctions->setFunctions(ar);
+      linkedFunctions = MTL4::StaticLinkingDescriptor::alloc()->init();
+      linkedFunctions->setFunctionDescriptors(ar);
 
-      ar->release();
+      //ar->release(); // TODO: when safe to call?
     }
 
     if (!cgpuCreateComputePipeline(idevice, irgenShader, createInfo.debugName, pipeline, linkedFunctions))
@@ -1079,13 +1098,11 @@ namespace gtl
 
       for (uint32_t i = 0; i < functionCount; i++)
       {
-        MTL::Function* hitFunc = hitFunctions[i];
-        MTL::FunctionHandle* funcHandle = ipipeline->state->functionHandle(hitFunc);
-        CHK_MTL_NP(funcHandle);
+        MTL4::FunctionDescriptor* hitFunc = hitFunctions[i];
 
         // TODO: no idea if this is correct
-        MTL::ResourceID resourceId = funcHandle->gpuResourceID();
-        memcpy((void*) &ifBufferMem[i * FUNCTION_STRIDE], &resourceId, FUNCTION_STRIDE);
+        //MTL::ResourceID resourceId = funcHandle->gpuResourceID();
+        //memcpy((void*) &ifBufferMem[i * FUNCTION_STRIDE], &resourceId, FUNCTION_STRIDE);
 
         intersectionFunctionTable->setOpaqueTriangleIntersectionFunction(functionSignature, i);
       }
