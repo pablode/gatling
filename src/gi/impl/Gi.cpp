@@ -1374,6 +1374,8 @@ cleanup:
     std::vector<GiImageBinding> imageBindings3d;
     std::vector<HitGroupCompInfo> hitGroupCompInfos;
     std::vector<const GiMaterial*> cachedMaterials;
+    std::vector<CgpuImage> images2d;
+    std::vector<CgpuImage> images3d;
 
     uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
     uint32_t maxRayHitAttributeSize = _GetRpMainMaxRayHitAttributeSize();
@@ -1445,8 +1447,6 @@ cleanup:
       }
 
       // 3. Upload textures and assign images to new material GPU data.
-      std::vector<CgpuImage> images2d;
-      std::vector<CgpuImage> images3d;
       if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images2d, images3d))
       {
         goto cleanup;
@@ -1818,6 +1818,16 @@ cleanup:
       {
         scene->texAllocator.free(domeLightsAllocation);
       }
+      // TODO: this should not be needed with images refcounting anymore
+      for (CgpuImage image : images2d)
+      {
+        cgpuDestroyImage(s_device, image);
+      }
+      for (CgpuImage image : images3d)
+      {
+        cgpuDestroyImage(s_device, image);
+      }
+      // </TODO>
       if (rgenShader.handle)
       {
         cgpuDestroyShader(s_device, rgenShader);
