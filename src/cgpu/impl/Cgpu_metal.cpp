@@ -551,14 +551,23 @@ namespace gtl
 #ifndef NDEBUG
     compileOptions->setEnableLogging(true);
 #endif
-    // TODO: consider other compileOptions fields
 
     NS::Error* error = nullptr;
     NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);
-    MTL::Library* library = idevice->device->newLibrary(mslStr, compileOptions, &error);
+
+    auto libDesc = MTL4::LibraryDescriptor::alloc()->init();
+    if (createInfo.debugName)
+    {
+      libDesc->setName(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+    }
+    libDesc->setOptions(compileOptions);
+    libDesc->setSource(mslStr);
+
+    MTL::Library* library = idevice->compiler->newLibrary(libDesc, &error);
     CHK_MTL(library, error);
 
     compileOptions->release();
+    libDesc->release();
 
     ishader->library = library;
     return true; // TODO: for shader hotloading, errors shouldn't be fatal
