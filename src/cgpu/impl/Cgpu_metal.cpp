@@ -984,30 +984,31 @@ namespace gtl
           access = MTL::BindingAccessWriteOnly;
         }
         else
-	      {
+        {
           access = MTL::BindingAccessReadOnly;
-	      }
+        }
+#endif
 
-        //MTL::TextureType textureType;
-        //if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
-        //    descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
-        //    descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-        //{
-        //  switch (binding.imageType)
-        //  {
-        //  case VK_IMAGE_TYPE_1D:
-        //    textureType = MTL::TextureType1D;
-        //    break;
-        //  case VK_IMAGE_TYPE_2D:
-        //    textureType = MTL::TextureType2D;
-        //    break;
-        //  case VK_IMAGE_TYPE_3D:
-        //    textureType = MTL::TextureType3D;
-        //    break;
-        //  default:
-        //    CGPU_FATAL("unhandled image type");
-        //  }
-        //}
+        MTL::TextureType textureType;
+        if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+            descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+            descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+        {
+          switch (binding.dim)
+          {
+          case 1:
+            textureType = MTL::TextureType1D;
+            break;
+          case 2:
+            textureType = MTL::TextureType2D;
+            break;
+          case 3:
+            textureType = MTL::TextureType3D;
+            break;
+          default:
+            CGPU_FATAL("unsupported image dimensions");
+          }
+        }
 
         auto* desc = MTL::ArgumentDescriptor::alloc()->init();
         CHK_MTL_NP(desc);
@@ -1015,7 +1016,7 @@ namespace gtl
         desc->setIndex(binding.binding);
         desc->setAccess(access);
         desc->setArrayLength(binding.count);
-        desc->setTextureType(MTL::TextureType2D); // NOTE: can't derive 3d/2d from SPIR-V
+        desc->setTextureType(textureType);
 
         argumentDescriptors.push_back(desc);
       }
