@@ -917,7 +917,10 @@ namespace gtl
       CHK_MTL_NP(argumentEncoder);
 
       uint64_t argumentBufferSize = argumentEncoder->encodedLength();
-      MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModeShared); // TODO: or Managed
+
+      MTL::Buffer* argumentBuffer = idevice->device->newBuffer(argumentBufferSize, MTL::ResourceStorageModeShared);
+      CHK_MTL_NP(argumentBuffer);
+      argumentBuffer->setLabel(NS::String::string(GB_FMT("[argument buffer {}]", descriptorSetIndex).c_str(), NS::StringEncoding::UTF8StringEncoding));
 
       argumentEncoders.push_back(argumentEncoder);
       argumentBuffers.push_back(argumentBuffer);
@@ -1250,9 +1253,11 @@ namespace gtl
 
     MTL::Buffer* blasBuffer = idevice->device->newBuffer(sizes.accelerationStructureSize, MTL::ResourceStorageModePrivate);
     CHK_MTL_NP(blasBuffer);
+    blasBuffer->setLabel(NS::String::string("[BLAS buffer]", NS::StringEncoding::UTF8StringEncoding));
 
     MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
     CHK_MTL_NP(scratchBuffer);
+    scratchBuffer->setLabel(NS::String::string("[AS scratch buffer]", NS::StringEncoding::UTF8StringEncoding));
 
     MTL::AccelerationStructure* as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
     CHK_MTL_NP(as);
@@ -1335,6 +1340,7 @@ namespace gtl
 
       instanceBuffer = idevice->device->newBuffer(instanceBufferSize, MTL::ResourceStorageModeShared);
       CHK_MTL_NP(instanceBuffer);
+      instanceBuffer->setLabel(NS::String::string("[TLAS instance buffer]", NS::StringEncoding::UTF8StringEncoding));
 
       memcpy(instanceBuffer->contents(), instances.data(), instanceBufferSize);
       // TODO: only allowed for StorageModeManaged
@@ -1357,11 +1363,13 @@ namespace gtl
 
       tlasBuffer = idevice->device->newBuffer(sizes.accelerationStructureSize, MTL::ResourceStorageModePrivate);
       CHK_MTL_NP(tlasBuffer);
+      tlasBuffer->setLabel(NS::String::string("[TLAS buffer]", NS::StringEncoding::UTF8StringEncoding));
 
       as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
       CHK_MTL_NP(as);
 
       MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
+      scratchBuffer->setLabel(NS::String::string("[TLAS scratch buffer]", NS::StringEncoding::UTF8StringEncoding));
       CHK_MTL_NP(scratchBuffer);
 
       MTL::SharedEvent* event = idevice->device->newSharedEvent();
@@ -1435,6 +1443,7 @@ namespace gtl
     MTL::ResourceOptions options = MTL::ResourceOptionCPUCacheModeWriteCombined;
     MTL::Buffer* pcBuffer = idevice->device->newBuffer(CGPU_MAX_PUSH_CONSTANTS_SIZE, options);
     CHK_MTL_NP(pcBuffer);
+    pcBuffer->setLabel(NS::String::string("[PC buffer]", NS::StringEncoding::UTF8StringEncoding));
 
     icommandBuffer->commandAllocator = idevice->device->newCommandAllocator();
     icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
