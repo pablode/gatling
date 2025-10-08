@@ -425,6 +425,12 @@ void main()
 
     uint pixel_index = pixel_pos.x + pixel_pos.y * imageWidth;
 
+#if 1
+ColorAov[pixel_index] = vec4(pixel_pos.x/float(imageWidth),
+    pixel_pos.y/float(imageHeight), float(PC.sampleOffset % 256)/255.0, 0);
+return;
+#endif
+
     clearAovs(pixel_index);
 
     vec3 camera_right = cross(PC.cameraForward, PC.cameraUp);
