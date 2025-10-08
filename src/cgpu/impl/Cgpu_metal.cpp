@@ -1737,14 +1737,14 @@ namespace gtl
     encoder->dispatchThreadgroups(groupsPerGrid, tpg);
   }
 
-  void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
-                       uint32_t dim_x,
-                       uint32_t dim_y,
-                       uint32_t dim_z)
+  void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer, uint32_t dimX, uint32_t dimY, uint32_t dimZ)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
-    cgpuCmdDispatch(icommandBuffer, dim_x, dim_y, dim_z);
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
+
+    auto threadsPerGrid = MTL::Size(dimX, dimY, dimZ);
+    encoder->dispatchThreads(threadsPerGrid, icommandBuffer->threadsPerGroup);
   }
 
   void cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
@@ -1851,9 +1851,7 @@ namespace gtl
 
   void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, uint32_t width, uint32_t height)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-
-    cgpuCmdDispatch(icommandBuffer, width, height, 1);
+    cgpuCmdDispatch(commandBuffer, width, height, 1);
   }
 
   void cgpuEndCommandBuffer(CgpuCommandBuffer commandBuffer)
@@ -1896,10 +1894,11 @@ namespace gtl
     CGPU_RESOLVE_DEVICE(device, idevice);
 
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
+
     for (uint32_t i = 0; i < semaphoreInfoCount; i++)
     {
       CGPU_RESOLVE_SEMAPHORE(semaphoreInfos[i].semaphore, isemaphore);
-      commandQueue->wait(isemaphore->event, semaphoreInfos[i].value);
+      isemaphore->event->waitUntilSignaledValue(semaphoreInfos[i].value, UINT64_MAX);
     }
 
     return true;
@@ -1916,9 +1915,14 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
-    commandQueue->commit(&icommandBuffer->commandBuffer, 1, idevice->commitOptions);
 
-    cgpuWaitSemaphores(device, waitSemaphoreInfoCount, waitSemaphoreInfos);
+    for (uint32_t i = 0; i < waitSemaphoreInfoCount; i++)
+    {
+      CGPU_RESOLVE_SEMAPHORE(waitSemaphoreInfos[i].semaphore, isemaphore);
+      commandQueue->wait(isemaphore->event, waitSemaphoreInfos[i].value);
+    }
+
+    commandQueue->commit(&icommandBuffer->commandBuffer, 1, idevice->commitOptions);
 
     for (uint32_t i = 0; i < signalSemaphoreInfoCount; i++)
     {
