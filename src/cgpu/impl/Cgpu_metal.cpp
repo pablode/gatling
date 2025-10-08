@@ -35,6 +35,9 @@
 
 #include <spirv_cross_c.h>
 
+// NOTE: need to start from Xcode with "GPU Frame Capture" setting set to 'Metal'
+#define CAPTURE_API 1
+
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 // NOTE: there's a bug in beta2 where MTL4AccelerationStructure.hpp is not included in Metal.hpp
@@ -180,6 +183,10 @@ namespace gtl
   };
 
   static std::unique_ptr<CgpuIInstance> iinstance = nullptr;
+
+#ifdef CAPTURE_API
+  static MTL::CaptureManager* s_captureManager = nullptr;
+#endif
 
   /* Helper macros. */
 
@@ -333,11 +340,19 @@ namespace gtl
       GB_ERROR("[SPVC] {}", error);
     }, nullptr);
 
+#ifdef CAPTURE_API
+    s_captureManager = MTL::CaptureManager::sharedCaptureManager();
+#endif
+
     return true;
   }
 
   void cgpuTerminate()
   {
+#ifdef CAPTURE_API
+    s_captureManager->stopCapture();
+#endif
+
     spvc_context_destroy(iinstance->spvcContext);
 
     iinstance.reset();
@@ -365,6 +380,25 @@ namespace gtl
     {
       CGPU_FATAL("tier 2 argument buffers not supported");
     }
+
+    // TODO: consider requiring
+    //   - readWriteTextureSupport
+    //   - supportsFunctionPointers
+    //   - hasUnifiedMemory
+    //   - counterSets
+
+    // TODO: print stats like name, architecture, registry id(?), location(?), lowPower(!) -> warn
+
+#ifdef CAPTURE_API
+    auto captureDesc = MTL::CaptureDescriptor::alloc()->init();
+    captureDesc->setCaptureObject(mtlDevice);
+
+    NS::Error* error2 = nullptr;
+    s_captureManager->startCapture(captureDesc, &error2);
+    captureDesc->release();
+
+    LOG_MTL_ERR(error2);
+#endif
 
     MTL4::CommandQueue* commandQueue = mtlDevice->newMTL4CommandQueue();
     CHK_MTL_NP(commandQueue);
@@ -835,7 +869,8 @@ namespace gtl
 
     if (linkingDescriptor)
     {
-      // TODO: this hangs infinitely :( maybe because of duplicate functions? but they should be static..
+      // TODO: is this correct? should all shaders be statically linked even with their pointers in the SBT?
+      // TODO: this crashes with Xcode attached...
       //descriptor->setStaticLinkingDescriptor(linkingDescriptor);
     }
 
