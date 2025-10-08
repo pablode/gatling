@@ -2291,7 +2291,7 @@ cleanup:
     for (const GiAovBinding& binding : params.aovBindings)
     {
       uint32_t bindingIndex = aovBindingIndices[int(binding.aovId)];
-      buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
+      buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->hostMem }); // TODO: not using deviceMem here due to UMA
     }
 
     size_t imageCount = shaderCache->imageBindings2d.size() + shaderCache->imageBindings3d.size() + 2/* dome lights */;
@@ -2364,6 +2364,10 @@ cleanup:
 
     cgpuCmdTraceRays(commandBuffer, imageWidth, imageHeight);
 
+    // TODO: copy from deviceMem to hostMem works, but for some reason
+    //       we can't read the content on CPU! Anyway, on macOS we can
+    //       directly write into hostMem if we allocate all as Shared.
+#if 0
     // Copy device to host memory.
     {
       GbSmallVector<CgpuBufferMemoryBarrier, 5> preBarriers;
@@ -2418,6 +2422,7 @@ cleanup:
 
       cgpuCmdPipelineBarrier(commandBuffer, &postBarrier);
     }
+#endif
 
     // Submit command buffer.
     cgpuEndCommandBuffer(commandBuffer);
@@ -2425,11 +2430,13 @@ cleanup:
     if (!cgpuCreateSemaphore(s_device, &semaphore))
       goto cleanup;
 
-    signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+    constexpr static uint32_t SIGNAL_VALUE = 42;
+
+    signalSemaphoreInfo = { .semaphore = semaphore, .value = SIGNAL_VALUE };
     if (!cgpuSubmitCommandBuffer(s_device, commandBuffer, 1, &signalSemaphoreInfo))
       goto cleanup;
 
-    waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+    waitSemaphoreInfo = { .semaphore = semaphore, .value = SIGNAL_VALUE };
     if (!cgpuWaitSemaphores(s_device, 1, &waitSemaphoreInfo))
       goto cleanup;
 
@@ -2442,6 +2449,17 @@ cleanup:
         _EncodeRenderBufferAsHeatmap(binding.renderBuffer);
       }
     }
+
+// TODO: copying from deviceMem & reading content does not work :(
+#if 1
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      if (binding.aovId != GiAovId::Color) continue;
+      GiRenderBuffer* renderBuffer = binding.renderBuffer;
+      auto xx = (const float*) renderBuffer->mappedHostMem;
+      GB_LOG("Color [0-3]: {} {} {} {}", xx[0], xx[1], xx[2], xx[3]);
+    }
+#endif
 
     scene->sampleOffset += renderSettings.spp;
 
