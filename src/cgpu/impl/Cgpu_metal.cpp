@@ -43,8 +43,6 @@
 // NOTE: there's a bug in beta2 where MTL4AccelerationStructure.hpp is not included in Metal.hpp
 #include <Metal.hpp>
 
-// TODO: MTLSTR macro?
-
 namespace gtl
 {
   /* Constants. */
@@ -292,14 +290,20 @@ namespace gtl
   {
     if (memoryProperties == CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
     {
-      return MTL::ResourceStorageModePrivate;
+      // TODO: comment in again. currently, this is a workaround for being able to read render buffer
+      //       memory on the CPU, but Shared can have perf impact, especially for images (optimal tiling).
+      //return MTL::ResourceStorageModePrivate;
     }
 
-    return MTL::ResourceStorageModeShared;
+    // TODO: consider all flags
+    return MTL::ResourceStorageModeShared;// | MTL::ResourceHazardTrackingModeTracked | MTL::ResourceCPUCacheModeWriteCombined;
   }
 
   static MTL::Stages cgpuTranslatePipelineStages(CgpuPipelineStageFlags stages)
   {
+#if 1 // TODO
+    return MTL::StageDispatch | MTL::StageBlit;
+#else
     MTL::Stages newStages = 0;
 
     if (bool(stages & CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER) ||
@@ -317,7 +321,9 @@ namespace gtl
       newStages |= MTL::StageAccelerationStructure;
     }
 
+    assert(newStages != 0);
     return newStages;
+#endif
   }
 
   template<typename T>
@@ -542,8 +548,10 @@ namespace gtl
     const char* mslSrc; // owned by context
     CHK_SPVC(spvc_compiler_compile(spvcCompiler, &mslSrc));
 
-// NOTE: enable to print SPIRV-Cross output (MSL code)
-//GB_LOG("{}", mslSrc);
+    // DEBUG: enable to print SPIRV-Cross output (MSL code)
+#if 0
+    GB_LOG("{}", mslSrc);
+#endif
 
 #undef CHK_SPVC
 
@@ -693,13 +701,9 @@ namespace gtl
     return true;
   }
 
-  bool cgpuUnmapBuffer(CgpuDevice device, CgpuBuffer buffer)
+  bool cgpuUnmapBuffer([[maybe_unused]] CgpuDevice device, [[maybe_unused]] CgpuBuffer buffer)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-
-    // Nothing to do.
-    return true;
+    return true; // Do nothing.
   }
 
   uint64_t cgpuGetBufferAddress(CgpuDevice device, CgpuBuffer buffer)
@@ -890,12 +894,13 @@ namespace gtl
 
     MTL4::Compiler* compiler = idevice->compiler;
 
-    GB_LOG("before!");
+    auto* compilerTaskOptions = MTL4::CompilerTaskOptions::alloc()->init();
+    // TODO: future work lookupArchives. this is essentially a pipeline cache.
+
     NS::Error* error = nullptr;
-    MTL::ComputePipelineState* state = compiler->newComputePipelineState(descriptor, nullptr, &error);
+    MTL::ComputePipelineState* state = compiler->newComputePipelineState(descriptor, compilerTaskOptions, &error);
     LOG_MTL_ERR(error);
     CHK_MTL_NP(state);
-    GB_LOG("after!");
 
     descriptor->release();
     entryFunDesc->release();
@@ -927,6 +932,8 @@ namespace gtl
       NS::Array* descriptorArray = NS::Array::array((const NS::Object* const*) descriptors.data(), (uint32_t) descriptors.size());
       CHK_MTL_NP(descriptorArray);
 
+      // TODO: we can set a label on this encoder -> let's add a 'debugName' field to BindGroup resource.
+      //       e.g. "all", "textures2d", "textures3d". probably vk support too.
       MTL::ArgumentEncoder* argumentEncoder = idevice->device->newArgumentEncoder(descriptorArray);
       CHK_MTL_NP(argumentEncoder);
 
@@ -975,6 +982,10 @@ namespace gtl
           CGPU_FATAL("unhandled data type");
         }
 
+        // TODO
+#if 1
+        MTL::BindingAccess access = MTL::BindingAccessReadWrite;
+#else
         MTL::BindingAccess access;
         if (binding.readAccess && binding.writeAccess)
         {
@@ -1031,6 +1042,7 @@ namespace gtl
     }
 
     // Aux descriptor set
+#if 0
     {
       static_assert(SPVC_MSL_PUSH_CONSTANT_BINDING == 0, "assumption invalidated");
 
@@ -1064,7 +1076,6 @@ namespace gtl
     pipeline->handle = handle;
     return true;
   }
-
 
   bool cgpuCreateComputePipeline(CgpuDevice device,
                                  CgpuComputePipelineCreateInfo createInfo,
@@ -1363,8 +1374,6 @@ namespace gtl
       instanceBuffer->setLabel(NS::String::string("[TLAS instance buffer]", NS::StringEncoding::UTF8StringEncoding));
 
       memcpy(instanceBuffer->contents(), instances.data(), instanceBufferSize);
-      // TODO: only allowed for StorageModeManaged
-      //instanceBuffer->didModifyRange(NS::Range::Make(0, instanceBufferSize));
     }
 
     auto instanceBufferRange = MTL4::BufferRange::Make(instanceBuffer->gpuAddress(), instanceBufferSize);
@@ -1473,7 +1482,8 @@ namespace gtl
 
     CGPU_RESOLVE_COMMAND_BUFFER({ handle }, icommandBuffer);
 
-    MTL::ResourceOptions options = MTL::ResourceOptionCPUCacheModeWriteCombined;
+    MTL::ResourceOptions options = MTL::ResourceStorageModeShared; // TODO: revisit
+
     MTL::Buffer* pcBuffer = idevice->device->newBuffer(CGPU_MAX_PUSH_CONSTANTS_SIZE, options);
     CHK_MTL_NP(pcBuffer);
     pcBuffer->setLabel(NS::String::string("[PC buffer]", NS::StringEncoding::UTF8StringEncoding));
@@ -1562,7 +1572,7 @@ namespace gtl
       const CgpuImageBinding& b = images[i];
       CGPU_RESOLVE_IMAGE(b.image, iimage);
 
-      encoder->optimizeContentsForGPUAccess(iimage->texture);
+      //encoder->optimizeContentsForGPUAccess(iimage->texture);
     }
   }
 
@@ -1723,6 +1733,7 @@ namespace gtl
     encoder->dispatchThreads(threadsPerGrid, icommandBuffer->threadsPerGroup);
   }
 
+  // TODO: because we don't have buffer/image barriers, we can batch all barriers together
   void cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
                               const CgpuPipelineBarrier* barrier)
   {
@@ -1915,11 +1926,7 @@ namespace gtl
                              uint64_t size)
   {
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-
-    NS::Range range(offset, size);
-    // TODO: only allowed for StorageModeManaged
-    //ibuffer->buffer->didModifyRange(range);
-    return true;
+    return true; // We only allocate Private and Shared memory // TODO: consider for Vulkan?
   }
 
   bool cgpuInvalidateMappedMemory(CgpuDevice device,
