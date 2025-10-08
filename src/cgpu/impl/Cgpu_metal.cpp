@@ -900,11 +900,14 @@ namespace gtl
     descriptor->release();
     entryFunDesc->release();
 
+    const CgpuShaderReflection& reflection = ishader->reflection;
+    uint32_t descriptorSetCount = reflection.descriptorSets.size();
+
     MTL4::ArgumentTable* argumentTable;
     {
       auto* desc = MTL4::ArgumentTableDescriptor::alloc()->init();
       CHK_MTL_NP(desc);
-      desc->setMaxBufferBindCount(CGPU_MAX_DESCRIPTOR_SET_COUNT + 1/* PC emulation */);
+      desc->setMaxBufferBindCount(descriptorSetCount + 1/* PC & SBT emulation */); // TODO: might want + 2 for SBT
       desc->setMaxSamplerStateBindCount(0);
       desc->setMaxTextureBindCount(0);
 
@@ -913,9 +916,6 @@ namespace gtl
       CHK_MTL(argumentTable, error);
       desc->release();
     }
-
-    const CgpuShaderReflection& reflection = ishader->reflection;
-    uint32_t descriptorSetCount = reflection.descriptorSets.size();
 
     std::vector<MTL::ArgumentEncoder*> argumentEncoders;
     std::vector<MTL::Buffer*> argumentBuffers;
@@ -939,18 +939,19 @@ namespace gtl
       argumentEncoders.push_back(argumentEncoder);
       argumentBuffers.push_back(argumentBuffer);
 
+      uint32_t offset = 0;
+      argumentEncoder->setArgumentBuffer(argumentBuffer, offset);
       argumentTable->setAddress(argumentBuffer->gpuAddress(), descriptorSetIndex);
     };
 
     for (uint32_t i = 0; i < descriptorSetCount; i++)
     {
       const CgpuShaderReflectionDescriptorSet& descriptorSet = reflection.descriptorSets[i];
-      const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
 
       std::vector<MTL::ArgumentDescriptor*> argumentDescriptors;
-      argumentDescriptors.reserve(bindings.size());
+      argumentDescriptors.reserve(descriptorSet.bindings.size());
 
-      for (const CgpuShaderReflectionBinding& binding : bindings)
+      for (const CgpuShaderReflectionBinding& binding : descriptorSet.bindings)
       {
         VkDescriptorType descriptorType = (VkDescriptorType) binding.descriptorType;
 
@@ -1045,13 +1046,16 @@ namespace gtl
       ifbaDesc->setIndex(1);
       ifbaDesc->setAccess(MTL::BindingAccessReadOnly);
 
-      pushDescriptorSet(/*SPVC_MSL_PUSH_CONSTANT_DESC_SET*/descriptorSetCount, { pcDesc, ifbaDesc }); // TODO: rename SPIRV-Cross constant
+      // TODO: possible shader / SPIRV-Cross constant mismatch
+      pushDescriptorSet(/*SPVC_MSL_PUSH_CONSTANT_DESC_SET*/descriptorSetCount, { pcDesc, ifbaDesc }); // TODO: rename SPIRV-Cross constant if needed
 
       pcDesc->release();
       ifbaDesc->release();
     }
+#endif
 
     ipipeline->state = state;
+    ipipeline->threadsPerGroup = threadsPerGroup;
     ipipeline->argumentTable = argumentTable;
     ipipeline->argumentEncoders = argumentEncoders;
     ipipeline->argumentBuffers = argumentBuffers;
@@ -1481,7 +1485,6 @@ namespace gtl
     icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
     icommandBuffer->encoder = nullptr;
     icommandBuffer->pcBuffer = pcBuffer;
-    icommandBuffer->pcMem = pcBuffer->contents();
     icommandBuffer->counterHeap = idevice->counterHeap;
 #ifndef NDEBUG
     icommandBuffer->logState = idevice->logState;
@@ -1529,14 +1532,19 @@ namespace gtl
 
     icommandBuffer->threadsPerGroup = ipipeline->threadsPerGroup;
 
+    // TODO: bind SBT in the same way
+    constexpr static uint32_t PC_DESCRIPTOR_SET_INDEX = 3; // TODO
+    ipipeline->argumentTable->setAddress(icommandBuffer->pcBuffer->gpuAddress(), PC_DESCRIPTOR_SET_INDEX);
+
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
-
     encoder->setComputePipelineState(ipipeline->state);
-
-    icommandBuffer->commandBuffer->useResidencySet(ipipeline->residencySet);
-
-// TODO: bind SBT here?
+    encoder->setArgumentTable(ipipeline->argumentTable);
     //encoder->setIntersectionFunctionTable(ipipeline->ift, bufferIndex);
+
+    auto residencySets = ipipeline->residencySets;
+    residencySets.push_back(icommandBuffer->residencySet);
+
+    icommandBuffer->commandBuffer->useResidencySets(residencySets.data(), residencySets.size());
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
@@ -1580,10 +1588,6 @@ namespace gtl
                                                                               bindings->tlasCount);
 
     MTL::ArgumentEncoder* argumentEncoder = ipipeline->argumentEncoders[descriptorSetIndex];
-    MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers[descriptorSetIndex];
-
-    uint32_t offset = 0;
-    argumentEncoder->setArgumentBuffer(argumentBuffer, offset);
 
     for (uint32_t i = 0; i < bindings->bufferCount; i++)
     {
@@ -1705,36 +1709,8 @@ namespace gtl
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
-    memcpy(icommandBuffer->pcMem, data, size);
-
-    MTL::ArgumentEncoder* argumentEncoder = ipipeline->argumentEncoders.back(); // PC encoder
-    MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers.back(); // PC buffer
-
-    uint32_t offset = 0;
-    argumentEncoder->setArgumentBuffer(argumentBuffer, offset);
-
-    // TODO: do we need to batch them? when and where else to set IFBA?
-    static_assert(SPVC_MSL_PUSH_CONSTANT_BINDING == 0, "assumption invalidated");
-    argumentEncoder->setBuffer(icommandBuffer->pcBuffer, offset, 0);
-    // TODO: bind IntersectionFunctionTable instead?
-    argumentEncoder->setBuffer(ipipeline->intersectionFunctionBufferArgs, offset, 1);
-  }
-
-  static void cgpuCmdDispatch(CgpuICommandBuffer* icommandBuffer,
-                              uint32_t dim_x,
-                              uint32_t dim_y,
-                              uint32_t dim_z)
-  {
-    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
-
-    const MTL::Size& tpg = icommandBuffer->threadsPerGroup;
-
-    uint32_t wgCountX = (dim_x + tpg.width - 1) / tpg.width;
-    uint32_t wgCountY = (dim_y + tpg.height - 1) / tpg.height;
-    uint32_t wgCountZ = (dim_z + tpg.depth - 1) / tpg.depth;
-
-    MTL::Size groupsPerGrid(wgCountX, wgCountY, wgCountZ);
-    encoder->dispatchThreadgroups(groupsPerGrid, tpg);
+    // TODO: I think we need a ring buffer here... or don't support PCs -> user space ring buffer.
+    memcpy(icommandBuffer->pcBuffer->contents(), data, size);
   }
 
   void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer, uint32_t dimX, uint32_t dimY, uint32_t dimZ)
