@@ -1598,10 +1598,11 @@ namespace gtl
     {
       const CgpuImageBinding& b = bindings->images[i];
 
-      // TODO: there's no option to set a texture within an array!
-      //       -> we might have to rewrite tex2d array assignment
       CGPU_RESOLVE_IMAGE(b.image, iimage);
-      argumentEncoder->setTexture(iimage->texture, b.binding);
+
+      // TODO: hack -- this only works because our image arrays are in individual descriptor sets with no other descriptors
+      argumentEncoder->setTexture(iimage->texture, b.index);
+
       residencySet->addAllocation(iimage->texture);
     }
 
