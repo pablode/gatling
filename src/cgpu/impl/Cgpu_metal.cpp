@@ -116,7 +116,7 @@ namespace gtl
     MTL::Buffer* intersectionFunctionBufferArgs = nullptr;
 
     // TODO: in the dev/master branch, this should be a member of BindGroup
-    MTL::ResidencySet* residencySet = nullptr;
+    std::vector<MTL::ResidencySet*> residencySets;
   };
 
   struct CgpuIShader
@@ -139,7 +139,8 @@ namespace gtl
 
     // NOTE: maybe rethink if this should live here or in IPipeline
     MTL::Buffer* pcBuffer;
-    void* pcMem;
+
+    MTL::ResidencySet* residencySet;
 
     MTL4::CounterHeap* counterHeap; // owned by device
 #ifndef NDEBUG
@@ -1040,6 +1041,7 @@ namespace gtl
     ipipeline->argumentTable = argumentTable;
     ipipeline->argumentEncoders = argumentEncoders;
     ipipeline->argumentBuffers = argumentBuffers;
+    ipipeline->residencySets.resize(descriptorSetCount, nullptr);
 
     pipeline->handle = handle;
     return true;
@@ -1432,6 +1434,19 @@ namespace gtl
     return true;
   }
 
+  static MTL::ResidencySet* cgpuCreateResidencySet(MTL::Device* device, uint32_t initialCapacity)
+  {
+    auto* desc = MTL::ResidencySetDescriptor::alloc()->init();
+    desc->setInitialCapacity(initialCapacity);
+
+    NS::Error* error = nullptr;
+    MTL::ResidencySet* set = device->newResidencySet(desc, &error);
+    CHK_MTL(set, error);
+
+    desc->release();
+    return set;
+  }
+
   bool cgpuCreateCommandBuffer(CgpuDevice device, CgpuCommandBuffer* commandBuffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
@@ -1445,6 +1460,9 @@ namespace gtl
     CHK_MTL_NP(pcBuffer);
     pcBuffer->setLabel(NS::String::string("[PC buffer]", NS::StringEncoding::UTF8StringEncoding));
 
+    MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 1);
+    residencySet->addAllocation(pcBuffer);
+
     icommandBuffer->commandAllocator = idevice->device->newCommandAllocator();
     icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
     icommandBuffer->encoder = nullptr;
@@ -1455,6 +1473,7 @@ namespace gtl
     icommandBuffer->logState = idevice->logState;
     icommandBuffer->commitOptions = idevice->commitOptions;
 #endif
+    icommandBuffer->residencySet = residencySet;
 
     commandBuffer->handle = handle;
     return true;
@@ -1467,6 +1486,7 @@ namespace gtl
     icommandBuffer->commandBuffer->release();
     icommandBuffer->commandAllocator->release();
     icommandBuffer->pcBuffer->release();
+    icommandBuffer->residencySet->release();
 
     iinstance->icommandBufferStore.free(commandBuffer.handle);
     return true;
@@ -1534,23 +1554,16 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
 
-    if (ipipeline->residencySet)
+    if (ipipeline->residencySets[descriptorSetIndex])
     {
-      ipipeline->residencySet->release();
+      ipipeline->residencySets[descriptorSetIndex]->release();
     }
 
     // TODO: in the dev/master branch, this should be a member of BindGroup
-    MTL::ResidencySet* residencySet = nullptr;
-    {
-      auto* desc = MTL::ResidencySetDescriptor::alloc()->init();
-      desc->setInitialCapacity(bindings->bufferCount + bindings->imageCount + bindings->samplerCount + bindings->tlasCount);
 
-      NS::Error* error = nullptr;
-      residencySet = idevice->device->newResidencySet(desc, &error);
-      CHK_MTL(residencySet, error);
-
-      desc->release();
-    }
+    MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, bindings->imageCount +
+                                                                              bindings->samplerCount +
+                                                                              bindings->tlasCount);
 
     MTL::ArgumentEncoder* argumentEncoder = ipipeline->argumentEncoders[descriptorSetIndex];
     MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers[descriptorSetIndex];
@@ -1584,7 +1597,6 @@ namespace gtl
 
       CGPU_RESOLVE_SAMPLER(b.sampler, isampler);
       argumentEncoder->setSamplerState(isampler->sampler, b.binding);
-      //residencySet->addAllocation(isampler->sampler);
     }
 
     for (uint32_t i = 0; i < bindings->tlasCount; i++)
@@ -1596,10 +1608,12 @@ namespace gtl
       residencySet->addAllocation(itlas->as);
     }
 
-    ipipeline->residencySet = residencySet;
+    MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers[descriptorSetIndex];
+    residencySet->addAllocation(argumentBuffer);
 
-// TODO: we need to do something similar for push constants
-    icommandBuffer->encoder->setArgumentTable(ipipeline->argumentTable);
+    residencySet->commit();
+
+    ipipeline->residencySets[descriptorSetIndex] = residencySet;
   }
 
   void cgpuCmdUpdateBuffer(CgpuCommandBuffer commandBuffer,
