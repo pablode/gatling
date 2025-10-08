@@ -224,7 +224,7 @@ vec3 evaluate_sample(uint pixelIndex,
 
         hitObjectExecuteShaderNV(hitObject, PAYLOAD_INDEX_SHADE);
 #else
-        traceRayEXT(
+        /*traceRayEXT(
             sceneAS,               // top-level AS
             0,                     // ray flags
             0xFF,                  // cull mask
@@ -236,7 +236,7 @@ vec3 evaluate_sample(uint pixelIndex,
             rayPayload.ray_dir,    // ray direction
             tMax,                  // ray max range
             PAYLOAD_INDEX_SHADE    // payload
-        );
+        );*/
 #endif
 
         // TODO: this emulates a simple hit shader. ideally, we want to move the hit
