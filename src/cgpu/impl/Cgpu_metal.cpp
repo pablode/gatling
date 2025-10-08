@@ -1720,8 +1720,8 @@ namespace gtl
     {
       const CgpuMemoryBarrier& b = barrier->memoryBarriers[i];
 
-      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.srcStageMask);
-      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.dstStageMask);
+      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.srcStageMask);
+      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.dstStageMask);
 
       encoder->barrierAfterEncoderStages(afterStages, beforeStages, MTL4::VisibilityOptionDevice);
     }
@@ -1730,8 +1730,8 @@ namespace gtl
     {
       const CgpuBufferMemoryBarrier& b = barrier->bufferBarriers[i];
 
-      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.srcStageMask);
-      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.dstStageMask);
+      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.srcStageMask);
+      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.dstStageMask);
 
       encoder->barrierAfterEncoderStages(afterStages, beforeStages, MTL4::VisibilityOptionDevice);
     }
@@ -1740,8 +1740,8 @@ namespace gtl
     {
       const CgpuImageMemoryBarrier& b = barrier->imageBarriers[i];
 
-      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.srcStageMask);
-      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.dstStageMask);
+      MTL::Stages afterStages = cgpuTranslatePipelineStages(b.srcStageMask);
+      MTL::Stages beforeStages = cgpuTranslatePipelineStages(b.dstStageMask);
 
       encoder->barrierAfterEncoderStages(afterStages, beforeStages, MTL4::VisibilityOptionDevice);
     }
