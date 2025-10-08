@@ -24,9 +24,10 @@ namespace gtl
 {
   struct CgpuShaderReflectionBinding
   {
-    uint32_t binding; // TODO: rename to index
+    uint32_t binding; // TODO: rename to index(?)
     uint32_t count;
     int descriptorType;
+    uint32_t dim; // for images
     bool readAccess;
     bool writeAccess;
   };

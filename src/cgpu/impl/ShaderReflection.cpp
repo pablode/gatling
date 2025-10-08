@@ -170,6 +170,7 @@ namespace gtl
         dstBinding.binding = srcBinding->binding;
         dstBinding.count = srcBinding->count;
         dstBinding.descriptorType = (int)srcBinding->descriptor_type;
+        dstBinding.dim = uint32_t(srcBinding->image.dim) + 1; // enum starts with 0
         // Unfortunately SPIRV-Reflect lacks the functionality to detect read accesses:
         // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
         dstBinding.readAccess = srcBinding->accessed;
