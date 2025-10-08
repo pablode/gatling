@@ -128,7 +128,7 @@ namespace gtl
 
   struct CgpuISemaphore
   {
-    MTL::Event* event;
+    MTL::SharedEvent* event;
   };
 
   struct CgpuICommandBuffer
@@ -1257,7 +1257,7 @@ namespace gtl
     MTL::AccelerationStructure* as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
     CHK_MTL_NP(as);
 
-    MTL::Event* event = idevice->device->newEvent();
+    MTL::SharedEvent* event = idevice->device->newSharedEvent();
     CHK_MTL_NP(event);
     MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
 
@@ -1364,7 +1364,7 @@ namespace gtl
       MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
       CHK_MTL_NP(scratchBuffer);
 
-      MTL::Event* event = idevice->device->newEvent();
+      MTL::SharedEvent* event = idevice->device->newSharedEvent();
       CHK_MTL_NP(event);
       MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
       CHK_MTL_NP(commandBuffer);
@@ -1835,7 +1835,7 @@ namespace gtl
 
     CGPU_RESOLVE_SEMAPHORE({ handle }, isemaphore);
 
-    isemaphore->event = idevice->device->newEvent();
+    isemaphore->event = idevice->device->newSharedEvent();
 
     semaphore->handle = handle;
     return true;
