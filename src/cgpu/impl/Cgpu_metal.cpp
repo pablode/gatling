@@ -1316,8 +1316,13 @@ namespace gtl
     residencySet->addAllocation(scratchBuffer);
     residencySet->addAllocation(as);
 
+    auto* options = MTL4::CommandBufferOptions::alloc()->init();
+#ifndef NDEBUG
+    options->setLogState(idevice->logState);
+#endif
+
     auto* commandAllocator = idevice->device->newCommandAllocator();
-    commandBuffer->beginCommandBuffer(commandAllocator); // TODO: pass options with LogState
+    commandBuffer->beginCommandBuffer(commandAllocator, options);
 
     commandBuffer->useResidencySet(residencySet);
 
@@ -1440,8 +1445,13 @@ namespace gtl
         residencySet->addAllocation(blas);
       }
 
+      auto* options = MTL4::CommandBufferOptions::alloc()->init();
+#ifndef NDEBUG
+      options->setLogState(idevice->logState);
+#endif
+
       auto* commandAllocator = idevice->device->newCommandAllocator();
-      commandBuffer->beginCommandBuffer(commandAllocator); // TODO: pass options with LogState
+      commandBuffer->beginCommandBuffer(commandAllocator, options);
 
       commandBuffer->useResidencySet(residencySet);
 
