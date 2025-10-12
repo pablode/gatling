@@ -1349,25 +1349,25 @@ namespace gtl
     uint64_t instanceBufferSize;
     MTL::Buffer* instanceBuffer;
     {
-      std::vector<MTL::AccelerationStructureUserIDInstanceDescriptor> instances(createInfo.instanceCount);
+      std::vector<MTL::IndirectAccelerationStructureInstanceDescriptor> instances(createInfo.instanceCount);
 
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
       {
         const CgpuBlasInstance& instance = createInfo.instances[i];
 
-// TODO: it could be that we need to use a Metal 4 type here
-        MTL::AccelerationStructureUserIDInstanceDescriptor& d = instances[i];
-        //d.allowDuplicateIntersectionFunctionInvocation = false;
+        CGPU_RESOLVE_BLAS(instance.as, iblas);
+        blases.insert(iblas->as);
+
+        MTL::IndirectAccelerationStructureInstanceDescriptor& d = instances[i];
         d.options = MTL::AccelerationStructureInstanceOptionNone; // TODO: propagate opaque flag
         d.mask = 0xFFFFFFFF;
         d.intersectionFunctionTableOffset = instance.hitGroupIndex;
-        d.accelerationStructureIndex = i;
-        d.userID = instance.instanceCustomIndex;;
-        // TODO: if transposed, set MTL::AccelerationStructureTriangleGeometryDescriptor::transformationMatrixLayout (MTL::MatrixLayout)
+        d.accelerationStructureID = iblas->as->gpuResourceID();
+        d.userID = instance.instanceCustomIndex;
         memcpy(&d.transformationMatrix, instance.transform, sizeof(instance.transform)); // TODO: might be transposed
       }
 
-      instanceBufferSize = 72/*sizeof(MTL::AccelerationStructureUserIDInstanceDescriptor)*/ * instances.size();
+      instanceBufferSize = sizeof(MTL::IndirectAccelerationStructureInstanceDescriptor) * instances.size();
 
       instanceBuffer = idevice->device->newBuffer(instanceBufferSize, MTL::ResourceStorageModeShared);
       CHK_MTL_NP(instanceBuffer);
@@ -1380,9 +1380,9 @@ namespace gtl
 
     auto* descriptor = MTL4::InstanceAccelerationStructureDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
-    descriptor->setInstanceDescriptorBuffer(instanceBufferRange);
-    descriptor->setInstanceDescriptorStride(/*sizeof(MTL::AccelerationStructureUserIDInstanceDescriptor)*/72);
     descriptor->setInstanceCount(createInfo.instanceCount);
+    descriptor->setInstanceDescriptorBuffer(instanceBufferRange);
+    descriptor->setInstanceDescriptorStride(sizeof(MTL::IndirectAccelerationStructureInstanceDescriptor));
 
     // Build TLAS.
     MTL::Buffer* tlasBuffer;
