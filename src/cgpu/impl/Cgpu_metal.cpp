@@ -152,14 +152,13 @@ namespace gtl
   struct CgpuIBlas
   {
     MTL::AccelerationStructure* as;
-    MTL::Buffer* buffer;
+    bool isOpaque;
   };
 
   struct CgpuITlas
   {
     MTL::AccelerationStructure* as;
-    MTL::Buffer* buffer;
-    std::unordered_set<MTL::AccelerationStructure*> blases;
+    std::unordered_set<const MTL::AccelerationStructure*> blases;
   };
 
   struct CgpuISampler
@@ -551,6 +550,7 @@ namespace gtl
 
     // DEBUG: enable to print SPIRV-Cross output (MSL code)
 #if 0
+    //if (createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_RAYGEN)
     GB_LOG("{}", mslSrc);
 #endif
 
@@ -1281,7 +1281,7 @@ namespace gtl
 
     auto* triDesc = MTL4::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
     triDesc->setVertexBuffer(vertexBufferRange);
-    triDesc->setVertexStride(sizeof(float) * 3);
+    triDesc->setVertexFormat(MTL::AttributeFormatFloat3);
     triDesc->setIndexBuffer(indexBufferRange);
     triDesc->setIndexType(MTL::IndexTypeUInt32);
     triDesc->setTriangleCount(createInfo.triangleCount);
@@ -1297,10 +1297,6 @@ namespace gtl
 
     MTL::AccelerationStructureSizes sizes = idevice->device->accelerationStructureSizes(blasDesc);
 
-    MTL::Buffer* blasBuffer = idevice->device->newBuffer(sizes.accelerationStructureSize, MTL::ResourceStorageModePrivate);
-    CHK_MTL_NP(blasBuffer);
-    blasBuffer->setLabel(NS::String::string("[BLAS buffer]", NS::StringEncoding::UTF8StringEncoding));
-
     MTL::Buffer* scratchBuffer = idevice->device->newBuffer(sizes.buildScratchBufferSize, MTL::ResourceStorageModePrivate);
     CHK_MTL_NP(scratchBuffer);
     scratchBuffer->setLabel(NS::String::string("[AS scratch buffer]", NS::StringEncoding::UTF8StringEncoding));
@@ -1312,10 +1308,12 @@ namespace gtl
     CHK_MTL_NP(event);
     MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
 
-    MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 2);
-    residencySet->addAllocation(blasBuffer);
+    MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 4);
+    residencySet->addAllocation(ivertexBuffer->buffer);
+    residencySet->addAllocation(iindexBuffer->buffer);
     residencySet->addAllocation(scratchBuffer);
     residencySet->addAllocation(as);
+    residencySet->commit();
 
     auto* options = MTL4::CommandBufferOptions::alloc()->init();
 #ifndef NDEBUG
@@ -1360,7 +1358,7 @@ namespace gtl
     }
 
     iblas->as = as;
-    iblas->buffer = blasBuffer;
+    iblas->isOpaque = createInfo.isOpaque;
 
     blas->handle = handle;
     return true;
@@ -1376,14 +1374,14 @@ namespace gtl
 
     CGPU_RESOLVE_TLAS({ handle }, itlas);
 
-    std::unordered_set<MTL::AccelerationStructure*> blases;
+    std::unordered_set<const MTL::AccelerationStructure*> blases;
     blases.reserve(createInfo.instanceCount);
 
     // Upload instance buffer.
     uint64_t instanceBufferSize;
     MTL::Buffer* instanceBuffer;
     {
-      std::vector<MTL::IndirectAccelerationStructureInstanceDescriptor> instances(createInfo.instanceCount);
+      std::vector<MTL::IndirectAccelerationStructureInstanceDescriptor> instances;
 
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
       {
@@ -1392,14 +1390,21 @@ namespace gtl
         CGPU_RESOLVE_BLAS(instance.as, iblas);
         blases.insert(iblas->as);
 
-        MTL::IndirectAccelerationStructureInstanceDescriptor& d = instances[i];
-        d.options = MTL::AccelerationStructureInstanceOptionNone; // TODO: propagate opaque flag
-        d.mask = 0xFFFFFFFF;
+        MTL::AccelerationStructureInstanceOptions options = MTL::AccelerationStructureInstanceOptionNone;
+        if (iblas->isOpaque)
+        {
+          options |= MTL::AccelerationStructureInstanceOptionOpaque;
+        }
+
+        MTL::IndirectAccelerationStructureInstanceDescriptor d;
+        d.options = options;
+        d.mask = 0xFF;
         d.intersectionFunctionTableOffset = instance.hitGroupIndex;
         d.accelerationStructureID = iblas->as->gpuResourceID();
         d.userID = instance.instanceCustomIndex;
         memcpy(&d.transformationMatrix, instance.transform, sizeof(MTL::PackedFloat4x3));
 
+        instances.push_back(d);
       }
 
       instanceBufferSize = sizeof(MTL::IndirectAccelerationStructureInstanceDescriptor) * instances.size();
@@ -1419,17 +1424,12 @@ namespace gtl
     descriptor->setInstanceTransformationMatrixLayout(MTL::MatrixLayoutRowMajor);
     descriptor->setInstanceCount(createInfo.instanceCount);
     descriptor->setInstanceDescriptorBuffer(instanceBufferRange);
-    descriptor->setInstanceDescriptorStride(sizeof(MTL::IndirectAccelerationStructureInstanceDescriptor));
+    descriptor->setInstanceDescriptorType(MTL::AccelerationStructureInstanceDescriptorTypeIndirect);
 
     // Build TLAS.
-    MTL::Buffer* tlasBuffer;
     MTL::AccelerationStructure* as;
     {
       MTL::AccelerationStructureSizes sizes = idevice->device->accelerationStructureSizes(descriptor);
-
-      tlasBuffer = idevice->device->newBuffer(sizes.accelerationStructureSize, MTL::ResourceStorageModePrivate);
-      CHK_MTL_NP(tlasBuffer);
-      tlasBuffer->setLabel(NS::String::string("[TLAS buffer]", NS::StringEncoding::UTF8StringEncoding));
 
       as = idevice->device->newAccelerationStructure(sizes.accelerationStructureSize);
       CHK_MTL_NP(as);
@@ -1443,14 +1443,16 @@ namespace gtl
       MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
       CHK_MTL_NP(commandBuffer);
 
-      MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 2);
-      residencySet->addAllocation(tlasBuffer);
-      residencySet->addAllocation(scratchBuffer);
+      MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 3 + itlas->blases.size());
       residencySet->addAllocation(instanceBuffer);
+      residencySet->addAllocation(scratchBuffer);
+      residencySet->addAllocation(as);
+      // TODO: figure out if we need this
       for (const MTL::AccelerationStructure* blas : itlas->blases)
       {
         residencySet->addAllocation(blas);
       }
+      residencySet->commit();
 
       auto* options = MTL4::CommandBufferOptions::alloc()->init();
 #ifndef NDEBUG
@@ -1489,8 +1491,12 @@ namespace gtl
     descriptor->release();
     instanceBuffer->release();
 
+    if (createInfo.debugName)
+    {
+      as->setLabel(NS::String::string(createInfo.debugName, NS::StringEncoding::UTF8StringEncoding));
+    }
+
     itlas->as = as;
-    itlas->buffer = tlasBuffer;
     itlas->blases = blases;
 
     tlas->handle = handle;
@@ -1502,7 +1508,6 @@ namespace gtl
     CGPU_RESOLVE_BLAS(blas, iblas);
 
     iblas->as->release();
-    iblas->buffer->release();
 
     iinstance->iblasStore.free(blas.handle);
     return true;
@@ -1513,7 +1518,6 @@ namespace gtl
     CGPU_RESOLVE_TLAS(tlas, itlas);
 
     itlas->as->release();
-    itlas->buffer->release();
 
     iinstance->itlasStore.free(tlas.handle);
     return true;
@@ -1535,6 +1539,7 @@ namespace gtl
 
     MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 1);
     residencySet->addAllocation(pcBuffer);
+    residencySet->commit();
 
     icommandBuffer->commandAllocator = idevice->device->newCommandAllocator();
     icommandBuffer->commandBuffer = idevice->device->newCommandBuffer();
@@ -1683,7 +1688,7 @@ namespace gtl
       argumentEncoder->setAccelerationStructure(itlas->as, b.binding);
 
       residencySet->addAllocation(itlas->as);
-      residencySet->addAllocation(itlas->buffer);
+      // TODO: figure out if we need this
       for (const MTL::AccelerationStructure* blas : itlas->blases)
       {
         residencySet->addAllocation(blas);
@@ -1769,8 +1774,6 @@ namespace gtl
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
-
-    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->encoder;
 
     // TODO: I think we need a ring buffer here... or don't support PCs -> user space ring buffer.
     memcpy(icommandBuffer->pcBuffer->contents(), data, size);
