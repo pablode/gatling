@@ -2451,7 +2451,7 @@ cleanup:
     }
 
 // TODO: copying from deviceMem & reading content does not work :(
-#if 1
+#if 0
     for (const GiAovBinding& binding : params.aovBindings)
     {
       if (binding.aovId != GiAovId::Color) continue;
