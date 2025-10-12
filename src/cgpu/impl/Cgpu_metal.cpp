@@ -159,6 +159,7 @@ namespace gtl
   {
     MTL::AccelerationStructure* as;
     MTL::Buffer* buffer;
+    std::unordered_set<MTL::AccelerationStructure*> blases;
   };
 
   struct CgpuISampler
@@ -1250,6 +1251,19 @@ namespace gtl
     return true;
   }
 
+  static MTL::ResidencySet* cgpuCreateResidencySet(MTL::Device* device, uint32_t initialCapacity)
+  {
+    auto* desc = MTL::ResidencySetDescriptor::alloc()->init();
+    desc->setInitialCapacity(initialCapacity);
+
+    NS::Error* error = nullptr;
+    MTL::ResidencySet* set = device->newResidencySet(desc, &error);
+    CHK_MTL(set, error);
+
+    desc->release();
+    return set;
+  }
+
   bool cgpuCreateBlas(CgpuDevice device,
                       CgpuBlasCreateInfo createInfo,
                       CgpuBlas* blas)
@@ -1297,8 +1311,15 @@ namespace gtl
     CHK_MTL_NP(event);
     MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
 
+    MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 2);
+    residencySet->addAllocation(blasBuffer);
+    residencySet->addAllocation(scratchBuffer);
+    residencySet->addAllocation(as);
+
     auto* commandAllocator = idevice->device->newCommandAllocator();
     commandBuffer->beginCommandBuffer(commandAllocator); // TODO: pass options with LogState
+
+    commandBuffer->useResidencySet(residencySet);
 
     CHK_MTL_NP(commandBuffer);
     MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
@@ -1322,6 +1343,7 @@ namespace gtl
     scratchBuffer->release();
     blasDesc->release();
     triDesc->release();
+    residencySet->release();
 
     if (createInfo.debugName)
     {
@@ -1344,6 +1366,9 @@ namespace gtl
     uint64_t handle = iinstance->itlasStore.allocate();
 
     CGPU_RESOLVE_TLAS({ handle }, itlas);
+
+    std::unordered_set<MTL::AccelerationStructure*> blases;
+    blases.reserve(createInfo.instanceCount);
 
     // Upload instance buffer.
     uint64_t instanceBufferSize;
@@ -1406,8 +1431,19 @@ namespace gtl
       MTL4::CommandBuffer* commandBuffer = idevice->device->newCommandBuffer();
       CHK_MTL_NP(commandBuffer);
 
+      MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, 2);
+      residencySet->addAllocation(tlasBuffer);
+      residencySet->addAllocation(scratchBuffer);
+      residencySet->addAllocation(instanceBuffer);
+      for (const MTL::AccelerationStructure* blas : itlas->blases)
+      {
+        residencySet->addAllocation(blas);
+      }
+
       auto* commandAllocator = idevice->device->newCommandAllocator();
       commandBuffer->beginCommandBuffer(commandAllocator); // TODO: pass options with LogState
+
+      commandBuffer->useResidencySet(residencySet);
 
       MTL4::ComputeCommandEncoder* encoder = commandBuffer->computeCommandEncoder();
       CHK_MTL_NP(encoder);
@@ -1427,6 +1463,7 @@ namespace gtl
       commandBuffer->release();
       commandAllocator->release();
       scratchBuffer->release();
+      residencySet->release();
     }
 
     descriptor->release();
@@ -1434,6 +1471,7 @@ namespace gtl
 
     itlas->as = as;
     itlas->buffer = tlasBuffer;
+    itlas->blases = blases;
 
     tlas->handle = handle;
     return true;
@@ -1459,19 +1497,6 @@ namespace gtl
 
     iinstance->itlasStore.free(tlas.handle);
     return true;
-  }
-
-  static MTL::ResidencySet* cgpuCreateResidencySet(MTL::Device* device, uint32_t initialCapacity)
-  {
-    auto* desc = MTL::ResidencySetDescriptor::alloc()->init();
-    desc->setInitialCapacity(initialCapacity);
-
-    NS::Error* error = nullptr;
-    MTL::ResidencySet* set = device->newResidencySet(desc, &error);
-    CHK_MTL(set, error);
-
-    desc->release();
-    return set;
   }
 
   bool cgpuCreateCommandBuffer(CgpuDevice device, CgpuCommandBuffer* commandBuffer)
@@ -1523,6 +1548,7 @@ namespace gtl
   {
     CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
 
+    // TODO: store in device? then we could use it for internal command buffers such as for AS builds
     auto* options = MTL4::CommandBufferOptions::alloc()->init();
 #ifndef NDEBUG
     options->setLogState(icommandBuffer->logState);
@@ -1595,7 +1621,7 @@ namespace gtl
 
     MTL::ResidencySet* residencySet = cgpuCreateResidencySet(idevice->device, bindings->imageCount +
                                                                               bindings->samplerCount +
-                                                                              bindings->tlasCount);
+                                                                              bindings->tlasCount * 32);
 
     MTL::ArgumentEncoder* argumentEncoder = ipipeline->argumentEncoders[descriptorSetIndex];
 
@@ -1605,6 +1631,7 @@ namespace gtl
 
       CGPU_RESOLVE_BUFFER(b.buffer, ibuffer);
       argumentEncoder->setBuffer(ibuffer->buffer, b.offset, b.binding);
+
       residencySet->addAllocation(ibuffer->buffer);
     }
 
@@ -1634,7 +1661,13 @@ namespace gtl
 
       CGPU_RESOLVE_TLAS(b.as, itlas);
       argumentEncoder->setAccelerationStructure(itlas->as, b.binding);
+
       residencySet->addAllocation(itlas->as);
+      residencySet->addAllocation(itlas->buffer);
+      for (const MTL::AccelerationStructure* blas : itlas->blases)
+      {
+        residencySet->addAllocation(blas);
+      }
     }
 
     MTL::Buffer* argumentBuffer = ipipeline->argumentBuffers[descriptorSetIndex];
