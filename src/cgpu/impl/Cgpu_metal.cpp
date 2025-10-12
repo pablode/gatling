@@ -1289,6 +1289,7 @@ namespace gtl
 
     auto* blasDesc = MTL4::PrimitiveAccelerationStructureDescriptor::alloc()->init();
     CHK_MTL_NP(blasDesc);
+    blasDesc->setUsage(MTL::AccelerationStructureUsagePreferFastIntersection);
 
     NS::Array* geoDescs = NS::Array::array(triDesc);
     CHK_MTL_NP(geoDescs);
@@ -1410,6 +1411,7 @@ namespace gtl
 
     auto* descriptor = MTL4::InstanceAccelerationStructureDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
+    descriptor->setUsage(MTL::AccelerationStructureUsagePreferFastIntersection);
     descriptor->setInstanceCount(createInfo.instanceCount);
     descriptor->setInstanceDescriptorBuffer(instanceBufferRange);
     descriptor->setInstanceDescriptorStride(sizeof(MTL::IndirectAccelerationStructureInstanceDescriptor));
