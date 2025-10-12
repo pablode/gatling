@@ -1333,14 +1333,17 @@ namespace gtl
 
     auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
     encoder->buildAccelerationStructure(as, blasDesc, scratchBufferRange);
+
     encoder->endEncoding();
 
     commandBuffer->endCommandBuffer();
 
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
     commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
-    commandQueue->signalEvent(event, 42);
-    event->waitUntilSignaledValue(42, UINT64_MAX); // wait CPU side
+
+    constexpr static uint32_t SIGNAL_VALUE = 42;
+    commandQueue->signalEvent(event, SIGNAL_VALUE);
+    event->waitUntilSignaledValue(SIGNAL_VALUE,  UINT64_MAX);
 
     event->release();
     commandBuffer->release();
@@ -1462,14 +1465,17 @@ namespace gtl
 
       auto scratchBufferRange = MTL4::BufferRange::Make(scratchBuffer->gpuAddress(), sizes.buildScratchBufferSize);
       encoder->buildAccelerationStructure(as, descriptor, scratchBufferRange);
+
       encoder->endEncoding();
 
       commandBuffer->endCommandBuffer();
 
       MTL4::CommandQueue* commandQueue = idevice->commandQueue;
       commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
-      commandQueue->signalEvent(event, 42);
-      event->waitUntilSignaledValue(42, UINT64_MAX); // wait CPU side
+
+      constexpr static uint32_t SIGNAL_VALUE = 42;
+      commandQueue->signalEvent(event, SIGNAL_VALUE);
+      event->waitUntilSignaledValue(SIGNAL_VALUE, UINT64_MAX);
 
       event->release();
       commandBuffer->release();
