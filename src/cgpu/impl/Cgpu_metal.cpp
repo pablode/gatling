@@ -1313,7 +1313,7 @@ namespace gtl
     MTL4::CommandQueue* commandQueue = idevice->commandQueue;
     commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
     commandQueue->signalEvent(event, 42);
-    commandQueue->wait(event, 42);
+    event->waitUntilSignaledValue(42, UINT64_MAX); // wait CPU side
 
     event->release();
     commandBuffer->release();
@@ -1421,7 +1421,7 @@ namespace gtl
       MTL4::CommandQueue* commandQueue = idevice->commandQueue;
       commandQueue->commit(&commandBuffer, 1, idevice->commitOptions);
       commandQueue->signalEvent(event, 42);
-      commandQueue->wait(event, 42);
+      event->waitUntilSignaledValue(42, UINT64_MAX); // wait CPU side
 
       event->release();
       commandBuffer->release();
