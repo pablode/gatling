@@ -1398,7 +1398,8 @@ namespace gtl
         d.intersectionFunctionTableOffset = instance.hitGroupIndex;
         d.accelerationStructureID = iblas->as->gpuResourceID();
         d.userID = instance.instanceCustomIndex;
-        memcpy(&d.transformationMatrix, instance.transform, sizeof(instance.transform)); // TODO: might be transposed
+        memcpy(&d.transformationMatrix, instance.transform, sizeof(MTL::PackedFloat4x3));
+
       }
 
       instanceBufferSize = sizeof(MTL::IndirectAccelerationStructureInstanceDescriptor) * instances.size();
@@ -1415,6 +1416,7 @@ namespace gtl
     auto* descriptor = MTL4::InstanceAccelerationStructureDescriptor::alloc()->init();
     CHK_MTL_NP(descriptor);
     descriptor->setUsage(MTL::AccelerationStructureUsagePreferFastIntersection);
+    descriptor->setInstanceTransformationMatrixLayout(MTL::MatrixLayoutRowMajor);
     descriptor->setInstanceCount(createInfo.instanceCount);
     descriptor->setInstanceDescriptorBuffer(instanceBufferRange);
     descriptor->setInstanceDescriptorStride(sizeof(MTL::IndirectAccelerationStructureInstanceDescriptor));
