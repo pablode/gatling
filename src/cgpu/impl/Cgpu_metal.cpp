@@ -47,7 +47,7 @@ namespace gtl
 {
   /* Constants. */
 
-  constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(3, 1, 0);
+  constexpr static const uint32_t SPVC_MSL_VERSION = SPVC_MAKE_MSL_VERSION(4, 0, 0);
 
   // for shader reflection
   typedef enum VkDescriptorType {
@@ -560,6 +560,7 @@ namespace gtl
 #ifndef NDEBUG
     compileOptions->setEnableLogging(true);
 #endif
+    compileOptions->setLanguageVersion(MTL::LanguageVersion4_0);
 
     NS::Error* error = nullptr;
     NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);
