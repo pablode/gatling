@@ -24,7 +24,7 @@
 
 layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayload;
 
-//hitAttributeEXT vec2 baryCoord;
+hitAttributeEXT vec2 baryCoord;
 
 #ifdef NEXT_EVENT_ESTIMATION
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
@@ -134,7 +134,7 @@ void main()
     rayPayload.hitSomething = true;
 
     /* 1. Get hit info. */
-    vec2 hit_bc = vec2(0.5);//baryCoord;
+    vec2 hit_bc = baryCoord;
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
     bool isLeftHanded = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_FLIP_FACING) != 0);
     bool isDoubleSided = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED) != 0);
