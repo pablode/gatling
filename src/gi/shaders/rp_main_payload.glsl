@@ -19,6 +19,11 @@ struct Medium
 // NOTE: size needs to match _GetRpMainMaxRayPayloadSize()
 struct ShadeRayPayload
 {
+    // TODO: this is a workaround because on Metal, there is no gl_LaunchIDEXT intrinsic
+    //       (thread_position_in_grid is not available in intersection shaders.) The real
+    //       fix would be a proxy payload.
+    /* in */    uvec2 gl_LaunchID;
+
     /* inout */ vec3 throughput;
 
     /*               1000 0000 0000 0000 0000 0000 0000 0000 terminate
@@ -48,6 +53,8 @@ struct ShadeRayPayload
 
 struct ShadowRayPayload
 {
+    // TODO: see comment above
+    /* in */    uvec2 gl_LaunchID;
 #ifdef RAND_4D
     /* inout */ uvec4 rng_state;
 #else

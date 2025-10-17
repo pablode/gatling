@@ -120,6 +120,7 @@ vec3 evaluate_sample(uint pixelIndex,
                      vec3 ray_dir,
                      RNG_STATE_TYPE rng_state)
 {
+    rayPayload.gl_LaunchID    = gl_LaunchIDEXT.xy;
     rayPayload.throughput     = vec3(1.0);
     rayPayload.bitfield       = 0;
     rayPayload.radiance       = vec3(0.0);
