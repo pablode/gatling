@@ -209,12 +209,15 @@ void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDeleg
   delete renderDelegate;
 }
 
-#if PXR_VERSION >= 2302
-bool HdGatlingRendererPlugin::IsSupported(bool gpuEnabled) const
-#else
-bool HdGatlingRendererPlugin::IsSupported() const
-#endif
+#if PXR_VERSION >= 2511
+bool HdGatlingRendererPlugin::IsSupported(const HdRendererCreateArgs& createArgs,
+                                          [[maybe_unused]] std::string* reasonWhyNot) const
 {
+  bool gpuEnabled = createArgs.gpuEnabled;
+#else
+bool HdGatlingRendererPlugin::IsSupported(bool gpuEnabled) const
+{
+#endif
   // Note: we just assume that the renderer is supported on the system here because usdview
   // (and possibly other applications) instantiate the renderer plugin multiple times,
   // checking for support.

@@ -689,10 +689,17 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
 
     HdMeshTopology topology = GetMeshTopology(sceneDelegate);
     HdMeshUtil meshUtil(&topology, id);
+#if PXR_VERSION >= 2511
+    if (meshUtil.ComputeTriangulatedFaceVaryingPrimvar(buffer.GetData(),
+                                                       buffer.GetNumElements(),
+                                                       type,
+                                                       &result) == HdMeshComputationResult::Error)
+#else
     if (!meshUtil.ComputeTriangulatedFaceVaryingPrimvar(buffer.GetData(),
                                                         buffer.GetNumElements(),
                                                         type,
                                                         &result))
+#endif
     {
       return std::nullopt;
     }
