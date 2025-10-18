@@ -67,7 +67,9 @@ if(MSVC_VERSION GREATER_EQUAL 1920)
 endif()
 
 if(TARGET usd_ms)
-  set(USD_LIBS_PUBLIC usd_ms)
+  set(USD_LIBS_PUBLIC usd_ms) # before v25.11
+elseif(TARGET usd_m)
+  set(USD_LIBS_PUBLIC usd_m)  # equal and after v25.11
 else()
   set(USD_LIBS_PUBLIC hd)
   set(USD_LIBS_PRIVATE usdImaging usdMtlx hdMtlx glf)
