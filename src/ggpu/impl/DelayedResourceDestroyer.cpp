@@ -62,43 +62,43 @@ namespace gtl
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuBuffer handle)
   {
     assert(handle.handle);
-    enqueueDestroyFunc([=]() { cgpuDestroyBuffer(m_device, handle); });
+    enqueueDestroyFunc([this, handle]() { cgpuDestroyBuffer(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuImage handle)
   {
     assert(handle.handle);
-    enqueueDestroyFunc([=]() { cgpuDestroyImage(m_device, handle); });
+    enqueueDestroyFunc([this, handle]() { cgpuDestroyImage(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuPipeline handle)
   {
     assert(handle.handle);
-    enqueueDestroyFunc([=]() { cgpuDestroyPipeline(m_device, handle); });
+    enqueueDestroyFunc([this, handle]() { cgpuDestroyPipeline(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuSemaphore handle)
   {
     assert(handle.handle);
-    enqueueDestroyFunc([=]() { cgpuDestroySemaphore(m_device, handle); });
+    enqueueDestroyFunc([this, handle]() { cgpuDestroySemaphore(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuCommandBuffer handle)
   {
     assert(handle.handle);
-    enqueueDestroyFunc([=]() { cgpuDestroyCommandBuffer(m_device, handle); });
+    enqueueDestroyFunc([this, handle]() { cgpuDestroyCommandBuffer(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuBlas handle)
   {
     assert(handle.handle);
-    enqueueDestroyFunc([=]() { cgpuDestroyBlas(m_device, handle); });
+    enqueueDestroyFunc([this, handle]() { cgpuDestroyBlas(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuTlas handle)
   {
     assert(handle.handle);
-    enqueueDestroyFunc([=]() { cgpuDestroyTlas(m_device, handle); });
+    enqueueDestroyFunc([this, handle]() { cgpuDestroyTlas(m_device, handle); });
   }
 
   void GgpuDelayedResourceDestroyer::enqueueDestroyFunc(DestroyFunc fun)
