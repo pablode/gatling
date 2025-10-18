@@ -32,10 +32,17 @@ namespace
       return "MDL SDK";
     case mi::neuraylib::IMessage::MSG_IMP_EXP:
       return "Importer/Exporter";
+#if MI_NEURAYLIB_API_VERSION < 57
     case mi::neuraylib::IMessage::MSG_COMILER_BACKEND:
       return "Compiler Backend";
     case mi::neuraylib::IMessage::MSG_COMILER_CORE:
       return "Compiler Core";
+#else
+    case mi::neuraylib::IMessage::MSG_COMPILER_BACKEND:
+      return "Compiler Backend";
+    case mi::neuraylib::IMessage::MSG_COMPILER_CORE:
+      return "Compiler Core";
+#endif
     case mi::neuraylib::IMessage::MSG_COMPILER_ARCHIVE_TOOL:
       return "Compiler Archive Tool";
     case mi::neuraylib::IMessage::MSG_COMPILER_DAG:
