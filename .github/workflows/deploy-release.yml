@@ -19,65 +19,45 @@ on:
         type: boolean
 
 jobs:
-  build-mdl-sdk:
-    name: Build MDL SDK
-    uses: ./.github/workflows/build-mdl-sdk.yml
-    with:
-      cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
-
   build-usd2508:
     name: Build for USD v25.08
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 25.08
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       upload-install-artifacts: true
       run-graphical-tests: true
 
   build-usd2505:
     name: Build for USD v25.05
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 25.05
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       upload-install-artifacts: true
       run-graphical-tests: true
 
   build-usd2502:
     name: Build for USD v25.02
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 25.02
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       upload-install-artifacts: true
       run-graphical-tests: true
 
   build-usd2411:
     name: Build for USD v24.11
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 24.11
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       upload-install-artifacts: true
       run-graphical-tests: true
 
   build-houdini20:
     name: Build for Houdini 20.0
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-houdini20.yml
-    with:
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
 
   build-blender43:
     name: Build for Blender 4.3
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-blender43.yml
-    with:
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
 
   deploy-release:
     name: Deploy Release

@@ -2,12 +2,6 @@ name: Build for Blender 4.3
 
 on:
   workflow_call:
-    inputs:
-      mdl-sdk-cache-key-prefix:
-        description: "Prefix of the MDL SDK cache key"
-        required: true
-        type: string
-        default: "MDL-SDK"
 
 defaults:
   run:
@@ -50,16 +44,15 @@ jobs:
         patch --binary DEPS/boost/lib/cmake/boost_python-1.82.0/boost_python-config.cmake .github/patches/blender43/boost_python-config.cmake.patch
         cd DEPS/boost/include && ln -s boost boost-1_82
 
-    - name: Restore MDL SDK
-      id: restore-mdl-sdk
-      uses: actions/cache/restore@v4
-      with:
-        path: MDL-SDK
-        key: ${{ inputs.mdl-sdk-cache-key-prefix }}_windows-2022
-        fail-on-cache-miss: true
-
     - name: Fetch FindTBB.cmake
       run: curl https://raw.githubusercontent.com/PixarAnimationStudios/OpenUSD/v23.11/cmake/modules/FindTBB.cmake --output cmake/FindTBB.cmake
+
+    - name: Fetch & unpack MDL SDK binaries
+      run: |
+        curl "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-nt-x86-64.zip" -L --progress-bar -o MDL_SDK.zip
+        mkdir -p MDL-SDK
+        unzip MDL_SDK.zip -d MDL-SDK
+        mv MDL-SDK/*/* MDL-SDK/.
 
     - name: Generate build system files using CMake
       working-directory: BUILD

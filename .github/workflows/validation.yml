@@ -12,46 +12,32 @@ on:
       - '**.md'
 
 jobs:
-  build-mdl-sdk:
-    name: Build MDL SDK
-    uses: ./.github/workflows/build-mdl-sdk.yml
-    with:
-      cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
-
   build-2508:
     name: Build for USD v25.08
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 25.08
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       run-graphical-tests: true
       upload-test-artifacts: true
 
   build-2505:
     name: Build for USD v25.05
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 25.05
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       run-graphical-tests: true
       upload-test-artifacts: true
 
   build-2502:
     name: Build for USD v25.02
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 25.02
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       upload-test-artifacts: true
 
   build-2411:
     name: Build for USD v24.11
-    needs: build-mdl-sdk
     uses: ./.github/workflows/build-usd.yml
     with:
       usd-version: 24.11
-      mdl-sdk-cache-key-prefix: MDL-SDK_${{ vars.MDL_SDK_VERSION }}
       upload-test-artifacts: true
