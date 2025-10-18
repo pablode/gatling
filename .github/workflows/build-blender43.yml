@@ -91,15 +91,10 @@ jobs:
     - name: Copy plugin files
       run: cp -r dist/blender/* INSTALL
 
-    - name: Create archive
-      shell: pwsh
-      working-directory: INSTALL
-      run: Compress-Archive -Path * -Destination ${{ env.archive-name }}.zip
-
     - name: Upload archive
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.archive-name }}
-        path: INSTALL/${{ env.archive-name }}.zip
+        path: INSTALL/*
         if-no-files-found: error
         retention-days: 7
