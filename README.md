@@ -29,8 +29,8 @@ There are [prebuilt binaries](https://github.com/pablode/gatling/releases) which
 
 Alternatively, for a full source build you need to
 
-- download the <a href="https://github.com/NVIDIA/MDL-SDK/releases">MDL SDK</a> 2024.1+ binaries
-- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v25.08">USD 24.11+</a> with MaterialX support
+- download the <a href="https://github.com/NVIDIA/MDL-SDK/releases/tag/2024.1.4">MDL SDK 2024.1.4</a> binaries
+- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v25.11">USD 24.11+</a> with MaterialX support
 
 > Note: it is recommended to have NASM 2.13+ or YASM 1.2.0+ in your PATH to speed up image decoding.
 
