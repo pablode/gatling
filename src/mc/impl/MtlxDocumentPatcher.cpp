@@ -38,6 +38,7 @@ const char* TYPE_BOOL = "boolean";
 const char* ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING =
   "GTL_DISABLE_MTLX_USDUVTEXTURE_COLOR_SPACE_PATCHING";
 
+#if MATERIALX_VERSION < 13904
 // This is a variant of the GraphElement::flattenSubgraphs function shipped with MaterialX 1.39.4, containing
 // following bugfix: https://github.com/AcademySoftwareFoundation/MaterialX/pull/2348
 void _FlattenSubgraphs(mx::GraphElementPtr graphElem)
@@ -190,6 +191,7 @@ void _FlattenSubgraphs(mx::GraphElementPtr graphElem)
     }
   }
 }
+#endif
 
 void _SanitizeFilePath(std::string& path)
 {
@@ -770,7 +772,11 @@ namespace gtl
     {
       if (graph->getActiveSourceUri() == docCopy->getSourceUri())
       {
+#if MATERIALX_VERSION < 13904
         _FlattenSubgraphs(graph);
+#else
+        graph->flattenSubgraphs();
+#endif
       }
     }
 
