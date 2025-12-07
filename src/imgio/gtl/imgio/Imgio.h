@@ -20,7 +20,19 @@
 #include "Image.h"
 #include "ErrorCodes.h"
 
+#include <gtl/gb/Enum.h>
+
 namespace gtl
 {
-  ImgioError ImgioLoadImage(const void* data, size_t size, ImgioImage* img);
+  enum class ImgioLoadFlags
+  {
+    None = 0,
+    KeepHdr
+  };
+  GB_DECLARE_ENUM_BITOPS(ImgioLoadFlags);
+
+  ImgioError ImgioLoadImage(const void* data,
+                            size_t size,
+                            ImgioImage* img,
+                            ImgioLoadFlags flags = ImgioLoadFlags::None);
 }

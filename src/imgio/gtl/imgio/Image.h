@@ -24,8 +24,18 @@
 
 namespace gtl
 {
+  enum class ImgioFormat
+  {
+    UNSUPPORTED,
+    RGBA8_UNORM,
+    RGB16_FLOAT,
+    RGBA16_FLOAT,
+    R32_FLOAT
+  };
+
   struct ImgioImage
   {
+    ImgioFormat format = ImgioFormat::RGBA8_UNORM;
     uint32_t width;
     uint32_t height;
     size_t size;

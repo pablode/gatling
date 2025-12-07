@@ -28,6 +28,7 @@ function(configure_target TARGET)
   target_link_libraries(
     ${TARGET}
     PRIVATE
+      gb
       spng
       turbojpeg-static
       OpenEXR::OpenEXR

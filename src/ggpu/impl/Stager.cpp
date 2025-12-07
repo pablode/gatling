@@ -153,10 +153,13 @@ fail:
     return stage(src, size, copyFunc);
   }
 
-  bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
+  bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth, uint32_t bpp)
   {
     uint32_t rowCount = height;
     uint64_t rowSize = size / rowCount;
+
+    rowSize = rowSize / bpp * bpp; // truncate for Vulkan alignment requirements
+    rowCount = size / rowSize;
 
     if (rowSize > BUFFER_HALF_SIZE)
     {
@@ -185,7 +188,7 @@ fail:
 
       auto copyFunc = [this, dst, rowsStaged, width, depth, copyRowCount](uint64_t srcOffset, [[maybe_unused]] uint64_t dstOffset, [[maybe_unused]] uint64_t size) {
         CgpuBufferImageCopyDesc desc;
-        desc.bufferOffset = srcOffset;
+        desc.bufferOffset = srcOffset; // Vulkan requirement: must be multiple of texel format
         desc.texelOffsetX = 0;
         desc.texelExtentX = width;
         desc.texelOffsetY = rowsStaged;
@@ -203,7 +206,7 @@ fail:
 
       uint64_t srcOffset = rowsStaged * rowSize;
       uint64_t stageSize = copyRowCount * rowSize;
-      if (!stage(&src[srcOffset], stageSize, copyFunc))
+      if (!stage(&src[srcOffset], stageSize, copyFunc, bpp))
       {
         return false;
       }
@@ -214,19 +217,22 @@ fail:
     return true;
   }
 
-  bool GgpuStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc)
+  bool GgpuStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc, uint32_t offsetAlign)
   {
     uint64_t bytesToStage = size;
 
     while (bytesToStage > 0)
     {
       uint64_t bytesAlreadyCopied = size - bytesToStage;
+      uint64_t requiredSpace = (bytesToStage + offsetAlign - 1) / offsetAlign * offsetAlign;
 
       uint64_t availableSpace = BUFFER_HALF_SIZE - m_stagedBytes;
-      uint64_t memcpyByteCount = std::min(bytesToStage, availableSpace);
+      uint64_t memcpyByteCount = std::min(requiredSpace, availableSpace);
       bytesToStage -= memcpyByteCount;
 
       uint64_t dstOffset = m_writeableHalf * BUFFER_HALF_SIZE + m_stagedBytes;
+      dstOffset = (dstOffset + offsetAlign - 1) / offsetAlign * offsetAlign;
+
       memcpy(&m_mappedMem[dstOffset], &src[bytesAlreadyCopied], memcpyByteCount);
 
       copyFunc(dstOffset, bytesAlreadyCopied, memcpyByteCount);

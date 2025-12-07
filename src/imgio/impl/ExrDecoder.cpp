@@ -77,7 +77,7 @@ namespace
 
 namespace gtl
 {
-  ImgioError ImgioExrDecoder::decode(size_t size, const void* data, ImgioImage* img)
+  ImgioError ImgioExrDecoder::decode(size_t size, const void* data, ImgioImage* img, bool keepHdr)
   {
     // Do the signature check manually because we can't detect
     // a mismatch based on the exception-based API.
@@ -92,6 +92,8 @@ namespace gtl
       return ImgioError::UnsupportedEncoding;
     }
 
+    uint32_t bytesPerPixel = keepHdr ? 8 : 4;
+
     try
     {
       _MemStream stream((char*)data, size);
@@ -101,20 +103,32 @@ namespace gtl
       const Imath::Box2i& dw = file.dataWindow();
       img->width = (dw.max.x - dw.min.x + 1);
       img->height = (dw.max.y - dw.min.y + 1);
-      img->size = img->width * img->height * 4;
+      img->size = img->width * img->height * bytesPerPixel;
       img->data.resize(img->size);
+      img->format = keepHdr ? ImgioFormat::RGBA16_FLOAT : ImgioFormat::RGBA8_UNORM;
 
       Imf::Array2D<Imf::Rgba> tmpPixels(img->height, img->width); // values are 16-bit floats
       file.setFrameBuffer(&tmpPixels[0][0] - dw.min.x - dw.min.y * img->width, 1, img->width);
       file.readPixels(dw.min.y, dw.max.y);
 
       for (long h = 0; h < tmpPixels.height(); h++)
+      for (long w = 0; w < tmpPixels.width(); w++)
       {
-        for (long w = 0; w < tmpPixels.width(); w++)
-        {
-          const Imf::Rgba& value = tmpPixels[img->height - h - 1][w];
+        const Imf::Rgba& value = tmpPixels[img->height - h - 1][w];
 
-          uint64_t offset = (w + h * img->width) * 4;
+        uint64_t offset = (w + h * img->width) * bytesPerPixel;
+
+        if (keepHdr)
+        {
+          // copy 16 bit floats
+          memcpy(&img->data[offset + 0], &value.r, 2);
+          memcpy(&img->data[offset + 2], &value.g, 2);
+          memcpy(&img->data[offset + 4], &value.b, 2);
+          memcpy(&img->data[offset + 6], &value.a, 2);
+        }
+        else
+        {
+          // convert to bytes
           img->data[offset + 0] = _FloatToByte(value.r);
           img->data[offset + 1] = _FloatToByte(value.g);
           img->data[offset + 2] = _FloatToByte(value.b);
