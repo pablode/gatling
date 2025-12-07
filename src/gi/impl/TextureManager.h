@@ -45,7 +45,8 @@ namespace gtl
   public:
     GiImagePtr loadTextureFromFilePath(const char* filePath,
                                        bool is3dImage = false,
-                                       bool destroyImmediately = false);
+                                       bool destroyImmediately = false,
+                                       bool keepHdr = false);
 
     bool loadTextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
                                  std::vector<GiImagePtr>& images);

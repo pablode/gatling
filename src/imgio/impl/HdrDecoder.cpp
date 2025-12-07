@@ -27,11 +27,11 @@
 
 #include <algorithm>
 #include <float.h>
+#include <half.h>
 
 namespace gtl
 {
-  // FIXME: don't downcast to uint8_t; store as RGBA16F / E5B9G9R9_UFLOAT_PACK32 / ASTC_HDR
-  ImgioError ImgioHdrDecoder::decode(size_t size, const void* data, ImgioImage* img)
+  ImgioError ImgioHdrDecoder::decode(size_t size, const void* data, ImgioImage* img, bool keepHdr)
   {
     if (!stbi_is_hdr_from_memory((const stbi_uc*) data, (int) size))
     {
@@ -40,24 +40,37 @@ namespace gtl
 
     stbi_set_flip_vertically_on_load(1);
 
-    int num_components;
-    float* hdrData = stbi_loadf_from_memory((const stbi_uc*) data, (int) size, (int*) &img->width, (int*) &img->height, &num_components, 4);
+    float* hdrData = stbi_loadf_from_memory((const stbi_uc*) data, (int) size, (int*) &img->width, (int*) &img->height, nullptr, 4);
+
     if (!hdrData)
     {
       return ImgioError::Decode;
     }
 
-    img->size = img->width * img->height * 4;
-    img->data.resize(img->size);
+    uint32_t bytesPerPixel = keepHdr ? 8 : 4;
+
+    img->size = img->width * img->height * bytesPerPixel;
+    img->data.resize(img->size, 0);
+    img->format = keepHdr ? ImgioFormat::RGBA16_FLOAT : ImgioFormat::RGBA8_UNORM;
+
+    const float* floatDataIn = (const float*) hdrData;
+    uint8_t* byteDataOut = &img->data[0];
+    half* halfDataOut = (half*) &img->data[0];
 
     for (uint32_t i = 0; i < img->width; i++)
+    for (uint32_t j = 0; j < img->height; j++)
     {
-      for (uint32_t j = 0; j < img->height; j++)
+      uint32_t idx = (i + j * img->width) * 4;
+
+      for (uint32_t k = 0; k < 4; k++)
       {
-        for (uint32_t k = 0; k < 4; k++)
+        if (keepHdr)
         {
-          uint32_t cIndex = (i + j * img->width) * 4 + k;
-          img->data[cIndex] = uint8_t(std::min(int(hdrData[cIndex] * 255.0f), 255));
+          halfDataOut[idx + k] = half(floatDataIn[idx + k]);
+        }
+        else
+        {
+          byteDataOut[idx + k] = uint8_t(std::min(int(floatDataIn[idx + k] * 255.0f), 255));
         }
       }
     }

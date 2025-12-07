@@ -38,12 +38,12 @@ namespace gtl
 
     bool stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstOffset = 0);
 
-    bool stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth = 1);
+    bool stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth = 1, uint32_t bpp = 4);
 
   private:
     using CopyFunc = std::function<void(uint64_t srcOffset, uint64_t dstOffset, uint64_t size)>;
 
-    bool stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc);
+    bool stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc, uint32_t offsetAlign = 4);
 
   private:
     CgpuDevice m_device;

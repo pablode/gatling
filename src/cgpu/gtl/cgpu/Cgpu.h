@@ -63,6 +63,8 @@ namespace gtl
   {
     Undefined = 0,
     R8G8B8A8Unorm = 37,
+    R16G16B16Sfloat = 90,
+    R16G16B16A16Sfloat = 97,
     R32Sfloat = 100
   };
 

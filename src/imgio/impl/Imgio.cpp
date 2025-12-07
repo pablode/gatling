@@ -27,8 +27,10 @@
 
 namespace gtl
 {
-  ImgioError ImgioLoadImage(const void* data, size_t size, ImgioImage* img)
+  ImgioError ImgioLoadImage(const void* data, size_t size, ImgioImage* img, ImgioLoadFlags flags)
   {
+    bool keepHdr = (flags & ImgioLoadFlags::KeepHdr) != ImgioLoadFlags::None;
+
     ImgioError r = ImgioPngDecoder::decode(size, data, img);
 
     if (r == ImgioError::UnsupportedEncoding)
@@ -38,12 +40,12 @@ namespace gtl
 
     if (r == ImgioError::UnsupportedEncoding)
     {
-      r = ImgioExrDecoder::decode(size, data, img);
+      r = ImgioExrDecoder::decode(size, data, img, keepHdr);
     }
 
     if (r == ImgioError::UnsupportedEncoding)
     {
-      r = ImgioHdrDecoder::decode(size, data, img);
+      r = ImgioHdrDecoder::decode(size, data, img, keepHdr);
     }
 
     if (r == ImgioError::UnsupportedEncoding)

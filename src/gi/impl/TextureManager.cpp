@@ -36,7 +36,7 @@ namespace
 
   constexpr static const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
-  bool _ReadImage(const char* filePath, GiAssetReader& assetReader, ImgioImage* img)
+  bool _ReadImage(const char* filePath, GiAssetReader& assetReader, ImgioImage* img, ImgioLoadFlags flags)
   {
     GiAsset* asset = assetReader.open(filePath);
     if (!asset)
@@ -47,10 +47,22 @@ namespace
     size_t size = assetReader.size(asset);
     void* data = assetReader.data(asset);
 
-    bool loadResult = data && ImgioLoadImage(data, size, img) == ImgioError::None;
+    bool loadResult = data && ImgioLoadImage(data, size, img, flags) == ImgioError::None;
 
     assetReader.close(asset);
     return loadResult;
+  }
+
+  CgpuImageFormat _TranslateImageFormat(ImgioFormat format)
+  {
+    switch (format)
+    {
+    case ImgioFormat::RGBA8_UNORM: return CgpuImageFormat::R8G8B8A8Unorm;
+    case ImgioFormat::RGB16_FLOAT: return CgpuImageFormat::R16G16B16Sfloat;
+    case ImgioFormat::RGBA16_FLOAT: return CgpuImageFormat::R16G16B16A16Sfloat;
+    case ImgioFormat::R32_FLOAT: return CgpuImageFormat::R32Sfloat;
+    default: return CgpuImageFormat::Undefined;
+    }
   }
 }
 
@@ -85,7 +97,7 @@ namespace gtl
     m_binaryCache.clear();
   }
 
-  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool is3dImage, bool destroyImmediately)
+  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool is3dImage, bool destroyImmediately, bool keepHdr)
   {
     auto cacheResult = m_fileCache.find(filePath);
 
@@ -100,8 +112,14 @@ namespace gtl
       }
     }
 
+    ImgioLoadFlags loadFlags = ImgioLoadFlags::None;
+    if (keepHdr)
+    {
+      loadFlags |= ImgioLoadFlags::KeepHdr;
+    }
+
     ImgioImage imageData;
-    if (!_ReadImage(filePath, m_assetReader, &imageData))
+    if (!_ReadImage(filePath, m_assetReader, &imageData, loadFlags) || imageData.format == ImgioFormat::UNSUPPORTED)
     {
       return nullptr;
     }
@@ -112,16 +130,18 @@ namespace gtl
       .width = imageData.width,
       .height = imageData.height,
       .is3d = is3dImage,
+      .format = _TranslateImageFormat(imageData.format),
       .debugName = filePath
     };
 
     GiImagePtr image = makeImagePtr(destroyImmediately);
 
     bool creationSuccessful = cgpuCreateImage(m_device, createInfo, image.get()) &&
-                              m_stager.stageToImage(&imageData.data[0], imageData.size, *image, imageData.width, imageData.height, 1);
+                              m_stager.stageToImage(&imageData.data[0], imageData.size, *image, imageData.width, imageData.height, 1, keepHdr ? 8 : 4);
 
     if (!creationSuccessful)
     {
+      GB_ERROR("failed to upload image {}", filePath);
       return nullptr;
     }
 
@@ -169,7 +189,6 @@ namespace gtl
       CgpuImageCreateInfo createInfo;
       createInfo.is3d = textureResource.is3dImage;
       createInfo.format = textureResource.isFloat ? CgpuImageFormat::R32Sfloat : CgpuImageFormat::R8G8B8A8Unorm;
-      createInfo.usage = CgpuImageUsage::Sampled | CgpuImageUsage::TransferDst;
 
       const char* filePath = textureResource.filePath.c_str();
       if (strcmp(filePath, "") == 0)
@@ -231,6 +250,8 @@ namespace gtl
       image = makeImagePtr();
 
       GB_ERROR("failed to read image {} from path {}", i, filePath);
+
+      // use 1x1 black fallback image
       createInfo.width = 1;
       createInfo.height = 1;
       createInfo.depth = 1;
