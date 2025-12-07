@@ -66,6 +66,9 @@ TF_DEFINE_PRIVATE_TOKENS(
   (clamp)
   (repeat)
   (mirror)
+  (diffuseColor)
+  (specularColor)
+  (emissiveColor)
   (sourceColorSpace)
   (raw)
   (rgb)
@@ -412,6 +415,25 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
       return false;
     }
 
+    if (nodeTypeId == _tokens->UsdPreviewSurface)
+    {
+      auto& parameters = nodeIt->second.parameters;
+
+      // tell HdMtlx to translate vectors to specific MaterialX types
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->diffuseColor));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color3f.GetAsToken();
+      }
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->specularColor));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color3f.GetAsToken();
+      }
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->emissiveColor));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color3f.GetAsToken();
+      }
+    }
+
     if (nodeTypeId == _tokens->UsdUVTexture)
     {
       // MaterialX node inputs do not match the USD spec; we need to remap.
@@ -453,7 +475,7 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
         convertWrapType(wrapT->second);
       }
 
-      // tell HdMtlx to translate the vector4f to a MaterialX color4
+      // tell HdMtlx to translate vectors to MaterialX colors
       auto scale = parameters.find(_tokens->scale);
       if (scale != parameters.end())
       {
