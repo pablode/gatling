@@ -2165,10 +2165,9 @@ cleanup:
       {
         const char* filePath = domeLight->textureFilePath.c_str();
 
-        bool is3dImage = false;
         bool destroyImmediately = true;
         bool keepHdr = true;
-        scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, is3dImage, destroyImmediately, keepHdr);
+        scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, destroyImmediately, keepHdr);
 
         if (!scene->domeLightTexture)
         {
