@@ -55,13 +55,13 @@ jobs:
     name: Build for Houdini 20.0
     uses: ./.github/workflows/build-houdini20.yml
 
-  build-blender43:
-    name: Build for Blender 4.3
-    uses: ./.github/workflows/build-blender43.yml
+  build-blender50:
+    name: Build for Blender 5.0
+    uses: ./.github/workflows/build-blender50.yml
 
   deploy-release:
     name: Deploy Release
-    needs: [build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender43]
+    needs: [build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender50]
     runs-on: ubuntu-latest
 
     steps:
