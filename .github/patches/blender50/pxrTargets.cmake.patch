@@ -1,0 +1,10 @@
+59,60c59,64
+< set_target_properties(usd_ms PROPERTIES
+<   INTERFACE_LINK_LIBRARIES "Python3::Python;Ws2_32.lib;Dbghelp.lib;Shlwapi.lib;TBB::tbb;Python3::Python;Python3::Python;TBB::tbb;TBB::tbb;TBB::tbb;TBB::tbb;Python3::Python;TBB::tbb;Python3::Python;TBB::tbb;Python3::Python;TBB::tbb;Python3::Python;TBB::tbb;Python3::Python;TBB::tbb;TBB::tbb;TBB::tbb;TBB::tbb;MaterialXCore;MaterialXFormat;OpenGL::GL;C:/db/build/S/VS1564R/Release/opensubdiv/lib/osdCPU.lib;Vulkan::Headers;Vulkan::UtilityHeaders;GPUOpen::VulkanMemoryAllocator;TBB::tbb;TBB::tbb;TBB::tbb;MaterialXCore;MaterialXFormat;Imath::Imath;C:/db/build/S/VS1564R/Release/openvdb/lib/openvdb.lib;TBB::tbb;C:/db/build/S/VS1564R/Release/opensubdiv/lib/osdCPU.lib;C:/db/build/S/VS1564R/Release/opensubdiv/lib/osdGPU.lib;MaterialXGenShader;MaterialXRender;MaterialXCore;MaterialXFormat;MaterialXGenGlsl;MaterialXGenMsl;C:/db/build/S/VS1564R/Release/opensubdiv/lib/osdCPU.lib;C:/db/build/S/VS1564R/Release/opensubdiv/lib/osdGPU.lib;C:/db/build/S/VS1564R/Release/openimageio/lib/OpenImageIO.lib;C:/db/build/S/VS1564R/Release/openimageio/lib/OpenImageIO_Util.lib;Imath::Imath;TBB::tbb"
+---
+> target_link_libraries(
+>   usd_ms
+>   INTERFACE
+>     OpenSubdiv::osdGPU_static
+>     MaterialXCore
+>     Python3::Python
