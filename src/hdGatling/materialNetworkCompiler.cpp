@@ -217,8 +217,8 @@ void _PatchMaterialXColor3FloatMismatches(HdMaterialNetwork2& network)
         SdfPath convertNodePath = upstreamNodePath;
         for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
         {
-          std::string convertNodeName = GB_FMT("convert{}", i);
-          convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
+          std::string convertNodeName = GB_FMT("{}_convert{}", upstreamNodePath.GetName(), i);
+          convertNodePath = upstreamNodePath.ReplaceName(TfToken(convertNodeName));
         }
 
         TfToken nodeTypeId;
