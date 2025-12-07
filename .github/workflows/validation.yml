@@ -12,6 +12,10 @@ on:
       - '**.md'
 
 jobs:
+  build-blender50:
+    name: Build for Blender 5.0
+    uses: ./.github/workflows/build-blender50.yml
+
   build-2508:
     name: Build for USD v25.08
     uses: ./.github/workflows/build-usd.yml
