@@ -1,0 +1,24 @@
+45,49c45
+<     if (NOT DEFINED Python3_VERSION)
+<         find_dependency(Python3 "3.11.13" EXACT COMPONENTS Development)
+<     else()
+<         find_dependency(Python3 COMPONENTS Development)
+<     endif()
+---
+>     find_dependency(Python3 "3.11.9" EXACT COMPONENTS Development)
+135,138c131
+<         if (NOT DEFINED VulkanMemoryAllocator_DIR AND NOT [[C:/db/build/S/VS1564R/Release/vulkan_memory_allocator/share/cmake/VulkanMemoryAllocator]] STREQUAL "")
+<             set(VulkanMemoryAllocator_DIR [[C:/db/build/S/VS1564R/Release/vulkan_memory_allocator/share/cmake/VulkanMemoryAllocator]])
+<         endif()
+<         find_dependency(VulkanHeaders)
+---
+>         #find_dependency(VulkanHeaders)
+140d132
+<         find_dependency(VulkanMemoryAllocator)
+143a136,138
+> find_package(TBB REQUIRED)
+> find_package(OpenSubdiv REQUIRED)
+> 
+164a160,161
+> 
+> include_directories(${PXR_INCLUDE_DIRS})

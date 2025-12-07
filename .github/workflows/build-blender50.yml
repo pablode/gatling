@@ -1,4 +1,4 @@
-name: Build for Blender 4.3
+name: Build for Blender 5.0
 
 on:
   workflow_call:
@@ -12,7 +12,7 @@ jobs:
     name: Build gatling
 
     env:
-      archive-name: gatling_Blender4.3_Windows_x64
+      archive-name: gatling_Blender5.0_Windows_x64
 
     # NOTE: make sure to adjust occurrence below
     runs-on: windows-2022
@@ -29,20 +29,17 @@ jobs:
 
     - name: Check out deps
       run: |
-        git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch blender-v4.3-release https://projects.blender.org/blender/lib-windows_x64 DEPS
+        git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch blender-v5.0-release https://projects.blender.org/blender/lib-windows_x64 DEPS
         cd DEPS
         git sparse-checkout init --cone
-        git sparse-checkout add boost imath MaterialX opensubdiv python tbb usd
+        git sparse-checkout add boost imath MaterialX opensubdiv python tbb usd vulkan
         git checkout
 
     - name: Apply patches
       run: |
-        patch --binary DEPS/usd/pxrConfig.cmake .github/patches/blender43/pxrConfig.cmake.patch
-        patch --binary DEPS/usd/cmake/pxrTargets.cmake .github/patches/blender43/pxrTargets.cmake.patch
-        patch --binary DEPS/MaterialX/lib/cmake/MaterialX/MaterialXConfig.cmake .github/patches/blender43/MaterialXConfig.cmake.patch
-        patch --binary DEPS/opensubdiv/lib/cmake/OpenSubdiv/OpenSubdivTargets.cmake .github/patches/blender43/OpenSubdivTargets.cmake.patch
-        patch --binary DEPS/boost/lib/cmake/boost_python-1.82.0/boost_python-config.cmake .github/patches/blender43/boost_python-config.cmake.patch
-        cd DEPS/boost/include && ln -s boost boost-1_82
+        patch --binary DEPS/usd/pxrConfig.cmake .github/patches/blender50/pxrConfig.cmake.patch
+        patch --binary DEPS/usd/cmake/pxrTargets.cmake .github/patches/blender50/pxrTargets.cmake.patch
+        patch --binary DEPS/MaterialX/lib/cmake/MaterialX/MaterialXConfig.cmake .github/patches/blender50/MaterialXConfig.cmake.patch
 
     - name: Fetch FindTBB.cmake
       run: curl https://raw.githubusercontent.com/PixarAnimationStudios/OpenUSD/v23.11/cmake/modules/FindTBB.cmake --output cmake/FindTBB.cmake
@@ -57,11 +54,14 @@ jobs:
     - name: Generate build system files using CMake
       working-directory: BUILD
       run: |
-        MaterialX_DIR=../DEPS/MaterialX \
+        MaterialX_DIR=../DEPS/MaterialX/lib/cmake/MaterialX \
+        VulkanHeaders_DIR=../DEPS/vulkan/share/cmake/VulkanHeaders \
+        VulkanUtilityLibraries_DIR=../DEPS/vulkan/lib/cmake/VulkanUtilityLibraries \
         Imath_DIR=../DEPS/imath \
         OpenSubdiv_DIR=../DEPS/opensubdiv \
         BOOST_ROOT=../DEPS/boost \
         cmake .. \
+          -DCMAKE_CXX_FLAGS="-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR" \
           -DPython3_ROOT_DIR=../DEPS/python/311 \
           -DPython3_EXECUTABLE="../DEPS/python/311/bin/python.exe" \
           -DPython3_LIBRARY="../DEPS/python/311/libs/python311.lib" \
@@ -71,7 +71,6 @@ jobs:
           -DMDL_ROOT=../MDL-SDK \
           -DCMAKE_INSTALL_PREFIX="$PWD/../INSTALL/render_delegate" \
           -DCMAKE_BUILD_TYPE=Release \
-          -DBoost_USE_STATIC_LIBS=OFF \
           -G"Visual Studio 17 2022" \
           -Ax64
 
