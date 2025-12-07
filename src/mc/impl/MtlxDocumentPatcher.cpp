@@ -732,9 +732,9 @@ namespace gtl
   {
     mx::FileSearchPath bxdfFiles;
 
-#if MATERIALX_MAJOR_VERSION > 1 || (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION >= 39)
+#if MATERIALX_VERSION >= 13900
     bxdfFiles.append("open_pbr_surface.xml");
-#elif MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION == 10
+#elif MATERIALX_VERSION == 13810
     // Detect MaterialX 1.38.10-OpenPBR version
     if (mtlxStdLib->getNodeGraph("NG_mx39_open_pbr_surface_surfaceshader") != nullptr)
     {
