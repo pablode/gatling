@@ -97,7 +97,7 @@ namespace gtl
     m_binaryCache.clear();
   }
 
-  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool is3dImage, bool destroyImmediately, bool keepHdr)
+  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool destroyImmediately, bool keepHdr)
   {
     auto cacheResult = m_fileCache.find(filePath);
 
@@ -129,7 +129,6 @@ namespace gtl
     CgpuImageCreateInfo createInfo = {
       .width = imageData.width,
       .height = imageData.height,
-      .is3d = is3dImage,
       .format = _TranslateImageFormat(imageData.format),
       .debugName = filePath
     };
@@ -239,7 +238,7 @@ namespace gtl
         continue;
       }
 
-      GiImagePtr image = loadTextureFromFilePath(filePath, textureResource.is3dImage);
+      GiImagePtr image = loadTextureFromFilePath(filePath);
 
       if (image)
       {
