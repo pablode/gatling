@@ -151,7 +151,7 @@ namespace gtl
 
   GiImagePtr GiTextureManager::makeImagePtr(bool destroyImmediately)
   {
-    return std::shared_ptr<CgpuImage>(new CgpuImage, [=](CgpuImage* d) {
+    return std::shared_ptr<CgpuImage>(new CgpuImage, [this, destroyImmediately](CgpuImage* d) {
       if (destroyImmediately)
       {
         cgpuDestroyImage(m_device, *d);
