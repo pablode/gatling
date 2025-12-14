@@ -974,38 +974,6 @@ namespace gtl
     return candidates;
   }
 
-  static void cgpuPrintUnsuitableGpuErrors(const CgpuCandidateVector& candidates)
-  {
-    // (assumes the list to be already sorted)
-    for (const CgpuDeviceCandidate& candidate : candidates)
-    {
-      const char* deviceTypeName = "Other";
-      switch (candidate.vkProperties2.properties.deviceType)
-      {
-      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-        deviceTypeName = "Discrete";
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-        deviceTypeName = "Virtual";
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-        deviceTypeName = "Integrated";
-        break;
-      default:
-        break;
-      }
-
-      const char* deviceName = candidate.vkProperties2.properties.deviceName;
-
-      GB_ERROR("GPU {} ({}) unsuitable:", deviceName, deviceTypeName);
-
-      for (const std::string& msg : candidate.errorMessages)
-      {
-        GB_ERROR("- {}", msg);
-      }
-    }
-  }
-
   static std::string cgpuGetDriverVersionString(const VkPhysicalDeviceProperties& properties)
   {
     uint32_t driverVersion = properties.driverVersion;
@@ -1045,24 +1013,52 @@ namespace gtl
     // query & sort devices
     CgpuCandidateVector candidates = cgpuQueryDeviceCandidates();
 
+    if (candidates.empty())
+    {
+      GB_ERROR("no GPUs found");
+      return false;
+    }
+
     std::sort(candidates.begin(), candidates.end(), [](const CgpuDeviceCandidate& a, const CgpuDeviceCandidate& b) {
       return a.score > b.score;
     });
 
-    if (candidates.empty() || candidates[0].score == 0)
+    uint32_t deviceIndex = 0;
+    if (const char* envStr = getenv("GTL_DEVICE_INDEX_OVERRIDE"); envStr)
     {
-      cgpuPrintUnsuitableGpuErrors(candidates);
+      int newDeviceIndex = strtol(envStr, nullptr, 10);
 
-      GB_ERROR("failed to find suitable GPU");
+      deviceIndex = uint32_t(newDeviceIndex < 0 ? 0 :
+        (newDeviceIndex >= candidates.size() ? candidates.size() - 1 : newDeviceIndex));
+    }
+
+    GB_LOG("Device list:");
+    for (uint32_t i = 0; i < candidates.size(); i++)
+    {
+      const CgpuDeviceCandidate& candidate = candidates[i];
+
+      std::string idxStr = (i == deviceIndex) ? "x" : GB_FMT("{}", i);
+
+      GB_LOG("[{}] ({}) {}", idxStr, candidate.score, candidate.vkProperties2.properties.deviceName);
+
+      for (const std::string& msg : candidate.errorMessages)
+      {
+        GB_LOG("  - {}", msg);
+      }
+    }
+
+    if (candidates[deviceIndex].score == 0)
+    {
+      GB_ERROR("GPU not suitable");
       return false;
     }
 
-    const CgpuDeviceCandidate& candidate = candidates[0];
+    const CgpuDeviceCandidate& candidate = candidates[deviceIndex];
 
     // print info
     VkPhysicalDeviceProperties properties = candidate.vkProperties2.properties;
 
-    GB_LOG("Vulkan device:");
+    GB_LOG("Selected device {}:", deviceIndex);
     uint32_t apiVersion = properties.apiVersion;
     {
       uint32_t major = VK_VERSION_MAJOR(apiVersion);
