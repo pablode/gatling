@@ -108,6 +108,7 @@ namespace gtl
 
   struct CgpuIDeviceFeatures
   {
+    bool maintenance4;
     bool pageableDeviceLocalMemory;
     bool pipelineLibraries;
     bool rayTracingValidation;
@@ -607,6 +608,7 @@ namespace gtl
 
     VkPhysicalDeviceFeatures2 vkFeatures2;
     VkPhysicalDeviceProperties2 vkProperties2;
+    VkPhysicalDeviceMaintenance4Features vkMaintenance4Features;
     VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT vkGroupHandlesFeatures;
     VkPhysicalDeviceMemoryPriorityFeaturesEXT vkMemoryPriorityFeatures;
     VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT vkPageableMemoryFeatures;
@@ -697,6 +699,16 @@ namespace gtl
       };
 
       void* pNext = nullptr;
+
+      c.vkMaintenance4Features = VkPhysicalDeviceMaintenance4Features {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES,
+        .pNext = pNext
+      };
+
+      if (enableOptionalExtension(VK_KHR_MAINTENANCE_4_EXTENSION_NAME))
+      {
+        pNext = &c.vkMaintenance4Features;
+      }
 
       c.vkGroupHandlesFeatures = VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_EXT,
@@ -926,6 +938,7 @@ namespace gtl
 
       c.internalFeatures =
       {
+        .maintenance4 = bool(c.vkMaintenance4Features.maintenance4),
         .pageableDeviceLocalMemory = bool(c.vkPageableMemoryFeatures.pageableDeviceLocalMemory),
         .pipelineLibraries = pipelineLibraries,
         .rayTracingValidation = bool(c.vkRtValidationFeatures.rayTracingValidation)
