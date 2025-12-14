@@ -295,9 +295,6 @@ namespace gtl
     bool rayTracingInvocationReorder;
     bool rebar;
     bool shaderClock;
-    bool shaderFloat64;
-    bool shaderInt16;
-    bool textureCompressionBC;
   };
 
   struct CgpuDeviceProperties
