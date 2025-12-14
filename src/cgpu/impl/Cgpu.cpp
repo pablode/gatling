@@ -457,8 +457,8 @@ namespace gtl
     }
 
     uint32_t instanceVersion = volkGetInstanceVersion();
-    GB_LOG("Vulkan instance version {}.{}.{}", VK_VERSION_MAJOR(instanceVersion),
-      VK_VERSION_MINOR(instanceVersion), VK_VERSION_PATCH(instanceVersion));
+    GB_LOG("Vulkan instance:");
+    GB_LOG("> version {}.{}.{}", VK_VERSION_MAJOR(instanceVersion), VK_VERSION_MINOR(instanceVersion), VK_VERSION_PATCH(instanceVersion));
 
     if (instanceVersion < CGPU_MIN_VK_API_VERSION)
     {
@@ -484,7 +484,11 @@ namespace gtl
       if (cgpuFindLayer(VK_LAYER_KHRONOS_VALIDATION_NAME, availableLayers.size(), availableLayers.data()))
       {
         enabledLayers.push_back(VK_LAYER_KHRONOS_VALIDATION_NAME);
-        GB_LOG("> enabled layer {}", VK_LAYER_KHRONOS_VALIDATION_NAME);
+      }
+
+      if (enabledLayers.size() > 0)
+      {
+        GB_LOG("> layers: {}", enabledLayers);
       }
     }
 #endif
@@ -500,11 +504,14 @@ namespace gtl
       if (cgpuFindExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
       {
         enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        GB_LOG("> enabled instance extension {}", VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
         debugUtilsEnabled = true;
       }
 #endif
+
+      if (enabledExtensions.size() > 0)
+      {
+        GB_LOG("> extensions: {}", enabledExtensions);
+      }
     }
 
     uint32_t versionVariant = 0;
@@ -994,7 +1001,7 @@ namespace gtl
 
       for (const std::string& msg : candidate.errorMessages)
       {
-        GB_ERROR("    {}", msg);
+        GB_ERROR("- {}", msg);
       }
     }
   }
@@ -1012,6 +1019,25 @@ namespace gtl
     }
 
     return GB_FMT("{}", properties.driverVersion);
+  }
+
+  static void cgpuPrintEnabledFeatures(const CgpuDeviceFeatures& features, const CgpuIDeviceFeatures& internalFeatures)
+  {
+    GB_LOG("Optional features:");
+
+#define CGPU_PRINT_FEATURE(STRUCT, FIELD) \
+    if (STRUCT.FIELD) GB_LOG("- " #FIELD);
+
+    CGPU_PRINT_FEATURE(features,         debugPrintf);
+    CGPU_PRINT_FEATURE(internalFeatures, maintenance4);
+    CGPU_PRINT_FEATURE(internalFeatures, pageableDeviceLocalMemory);
+    CGPU_PRINT_FEATURE(internalFeatures, pipelineLibraries);
+    CGPU_PRINT_FEATURE(features,         rayTracingInvocationReorder);
+    CGPU_PRINT_FEATURE(internalFeatures, rayTracingValidation);
+    CGPU_PRINT_FEATURE(features,         rebar);
+    CGPU_PRINT_FEATURE(features,         shaderClock);
+
+#undef CGPU_PRINT_FEATURE
   }
 
   bool cgpuCreateDevice(CgpuDevice* device)
@@ -1036,7 +1062,7 @@ namespace gtl
     // print info
     VkPhysicalDeviceProperties properties = candidate.vkProperties2.properties;
 
-    GB_LOG("Vulkan device properties:");
+    GB_LOG("Vulkan device:");
     uint32_t apiVersion = properties.apiVersion;
     {
       uint32_t major = VK_VERSION_MAJOR(apiVersion);
@@ -1057,6 +1083,8 @@ namespace gtl
     }
 
     GB_LOG("> driver version: {}", cgpuGetDriverVersionString(properties));
+
+    cgpuPrintEnabledFeatures(candidate.features, candidate.internalFeatures);
 
     // create device
     uint64_t handle = s_iinstance->ideviceStore.allocate();
