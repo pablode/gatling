@@ -95,6 +95,9 @@ namespace gtl
 
   struct CgpuIDeviceProperties
   {
+    VkDriverId  driverID;
+    char driverInfo[VK_MAX_DRIVER_INFO_SIZE_KHR];
+    char driverName[VK_MAX_DRIVER_NAME_SIZE_KHR];
     uint32_t minAccelerationStructureScratchOffsetAlignment;
     size_t   minMemoryMapAlignment;
     uint64_t minStorageBufferOffsetAlignment;
@@ -108,6 +111,7 @@ namespace gtl
 
   struct CgpuIDeviceFeatures
   {
+    bool driverProperties;
     bool maintenance4;
     bool pageableDeviceLocalMemory;
     bool pipelineLibraries;
@@ -326,9 +330,11 @@ namespace gtl
 
   static CgpuIDeviceProperties cgpuTranslateInternalDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
                                                                      const VkPhysicalDeviceAccelerationStructurePropertiesKHR& vkAsProps,
-                                                                     const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps)
+                                                                     const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps,
+                                                                     const VkPhysicalDeviceDriverPropertiesKHR& driverProperties)
   {
-    return CgpuIDeviceProperties {
+    CgpuIDeviceProperties r {
+      .driverID = driverProperties.driverID,
       .minAccelerationStructureScratchOffsetAlignment = vkAsProps.minAccelerationStructureScratchOffsetAlignment,
       .minMemoryMapAlignment = vkLimits.minMemoryMapAlignment,
       .minStorageBufferOffsetAlignment = vkLimits.minStorageBufferOffsetAlignment,
@@ -339,6 +345,11 @@ namespace gtl
       .shaderGroupHandleSize = vkRtPipelineProps.shaderGroupHandleSize,
       .timestampPeriod = vkLimits.timestampPeriod
     };
+
+    memcpy(r.driverInfo, driverProperties.driverInfo, VK_MAX_DRIVER_INFO_SIZE_KHR);
+    memcpy(r.driverName, driverProperties.driverName, VK_MAX_DRIVER_NAME_SIZE_KHR);
+
+    return r;
   }
 
   static VkSamplerAddressMode cgpuTranslateAddressMode(CgpuSamplerAddressMode mode)
@@ -673,10 +684,33 @@ namespace gtl
       std::vector<VkExtensionProperties> extensions(extensionCount);
       vkEnumerateDeviceExtensionProperties(c.device, nullptr, &extensionCount, extensions.data());
 
+      const auto enableOptionalExtension = [&](const char* extName)
+      {
+        if (!cgpuFindExtension(extName, extensions.size(), extensions.data()))
+        {
+          return false;
+        }
+
+        c.enabledExtensions.push_back(extName);
+        return true;
+      };
+
       // query properties
+      void* pNext = nullptr;
+
+      VkPhysicalDeviceDriverPropertiesKHR driverProperties = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES_KHR,
+        .pNext = pNext
+      };
+
+      if (enableOptionalExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME))
+      {
+        pNext = &driverProperties;
+      }
+
       VkPhysicalDeviceAccelerationStructurePropertiesKHR asProperties = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
-        .pNext = nullptr
+        .pNext = pNext
       };
       VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
@@ -694,18 +728,7 @@ namespace gtl
       vkGetPhysicalDeviceProperties2(c.device, &c.vkProperties2);
 
       // query features
-      const auto enableOptionalExtension = [&](const char* extName)
-      {
-        if (!cgpuFindExtension(extName, extensions.size(), extensions.data()))
-        {
-          return false;
-        }
-
-        c.enabledExtensions.push_back(extName);
-        return true;
-      };
-
-      void* pNext = nullptr;
+      pNext = nullptr;
 
       c.vkMaintenance4Features = VkPhysicalDeviceMaintenance4Features {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES,
@@ -860,7 +883,7 @@ namespace gtl
       }
 
       c.properties = cgpuTranslateDeviceProperties(limits, subgroupProperties, rtPipelineProperties);
-      c.internalProperties = cgpuTranslateInternalDeviceProperties(limits, asProperties, rtPipelineProperties);
+      c.internalProperties = cgpuTranslateInternalDeviceProperties(limits, asProperties, rtPipelineProperties, driverProperties);
 
       // check features
 #define CGPU_CHECK_FEATURE(STRUCT, FIELD) \
@@ -945,6 +968,7 @@ namespace gtl
 
       c.internalFeatures =
       {
+        .driverProperties = bool(driverProperties.driverID),
         .maintenance4 = bool(c.vkMaintenance4Features.maintenance4),
         .pageableDeviceLocalMemory = bool(c.vkPageableMemoryFeatures.pageableDeviceLocalMemory),
         .pipelineLibraries = pipelineLibraries,
@@ -974,19 +998,14 @@ namespace gtl
     return candidates;
   }
 
-  static std::string cgpuGetDriverVersionString(const VkPhysicalDeviceProperties& properties)
+  static std::string cgpuGetDriverInfo(const CgpuDeviceCandidate& candidate)
   {
-    uint32_t driverVersion = properties.driverVersion;
-
-    if (properties.vendorID == CGPU_VENDOR_ID_NVIDIA)
+    if (candidate.internalFeatures.driverProperties)
     {
-      uint32_t major = (driverVersion >> 22) & 0x3FF;
-      uint32_t minor = (driverVersion >> 14) & 0xFF;
-      uint32_t patch = (driverVersion >> 6) & 0xFF;
-      return GB_FMT("{}.{}.{}", major, minor, patch);
+      return GB_FMT("{} ({})", candidate.internalProperties.driverName,
+                               candidate.internalProperties.driverInfo);
     }
-
-    return GB_FMT("{}", properties.driverVersion);
+    return std::string();
   }
 
   static void cgpuPrintEnabledFeatures(const CgpuDeviceFeatures& features, const CgpuIDeviceFeatures& internalFeatures)
@@ -997,6 +1016,7 @@ namespace gtl
     if (STRUCT.FIELD) GB_LOG("- " #FIELD);
 
     CGPU_PRINT_FEATURE(features,         debugPrintf);
+    CGPU_PRINT_FEATURE(internalFeatures, driverProperties);
     CGPU_PRINT_FEATURE(internalFeatures, maintenance4);
     CGPU_PRINT_FEATURE(internalFeatures, pageableDeviceLocalMemory);
     CGPU_PRINT_FEATURE(internalFeatures, pipelineLibraries);
@@ -1078,7 +1098,10 @@ namespace gtl
       GB_LOG("> vendor: Unknown ({:#08x})", properties.vendorID);
     }
 
-    GB_LOG("> driver version: {}", cgpuGetDriverVersionString(properties));
+    if (std::string driverInfo = cgpuGetDriverInfo(candidate); !driverInfo.empty())
+    {
+      GB_LOG("> driver: {}", driverInfo);
+    }
 
     cgpuPrintEnabledFeatures(candidate.features, candidate.internalFeatures);
 
