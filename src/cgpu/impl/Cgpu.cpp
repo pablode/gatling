@@ -589,7 +589,8 @@ namespace gtl
                                        VmaAllocator allocator,
                                        VkBufferUsageFlags bufferUsage,
                                        VmaMemoryUsage memoryUsage,
-                                       uint32_t allocationAlignment = 0)
+                                       uint32_t allocationAlignment = 0,
+                                       float priority = 0.5f)
   {
     VkBufferCreateInfo createInfoTemplate = {};
     createInfoTemplate.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -609,6 +610,7 @@ namespace gtl
 
     VmaPoolCreateInfo poolCreateInfo = {};
     poolCreateInfo.memoryTypeIndex = memTypeIndex;
+    poolCreateInfo.priority = priority;
     poolCreateInfo.minAllocationAlignment = allocationAlignment;
 
     return vmaCreatePool(allocator, &poolCreateInfo, &pool);
@@ -1273,10 +1275,12 @@ namespace gtl
       CGPU_RETURN_ERROR("failed to create vma allocator");
     }
 
+    float asScratchMemoryPriority = 1.0f;
     result = cgpuCreateMemoryPool(idevice->asScratchMemoryPool, idevice->allocator,
                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                                   VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
-                                  idevice->internalProperties.minAccelerationStructureScratchOffsetAlignment);
+                                  idevice->internalProperties.minAccelerationStructureScratchOffsetAlignment,
+                                  asScratchMemoryPriority);
 
     if (result != VK_SUCCESS)
     {
@@ -1676,9 +1680,17 @@ namespace gtl
       .pQueueFamilyIndices = nullptr,
     };
 
+    float priority = 0.5f; // higher than images
+    if (bool(usage & (CgpuBufferUsage::AccelerationStructureBuild | CgpuBufferUsage::AccelerationStructureStorage |
+                      CgpuBufferUsage::ShaderBindingTable | CgpuBufferUsage::ShaderDeviceAddress)))
+    {
+      priority = 1.0f;
+    }
+
     VmaAllocationCreateInfo allocCreateInfo = {};
     allocCreateInfo.requiredFlags = (VkMemoryPropertyFlags) memoryProperties;
     allocCreateInfo.pool = memoryPool;
+    allocCreateInfo.priority = priority;
 
     size_t newAlignment = cgpuPadToAlignment(alignment, BASE_ALIGNMENT); // for performance
 
