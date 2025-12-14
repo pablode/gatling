@@ -689,6 +689,7 @@ namespace gtl
 
     CGPU_RESOLVE_DEVICE({ handle }, idevice);
 
+    // select GPU using simple scoring system (dGPU > integrated)
     uint32_t physDeviceCount;
     vkEnumeratePhysicalDevices(
       s_iinstance->instance,
@@ -705,7 +706,6 @@ namespace gtl
     GbSmallVector<VkPhysicalDevice, 4> physicalDevices(physDeviceCount);
     vkEnumeratePhysicalDevices(s_iinstance->instance, &physDeviceCount, physicalDevices.data());
 
-    // Select GPU using simple scoring system (dGPU > integrated).
     if (VkPhysicalDevice device = cgpuSelectBestGpu(physicalDevices.data(), physicalDevices.size()); device != VK_NULL_HANDLE)
     {
       idevice->physicalDevice = device;
@@ -715,6 +715,7 @@ namespace gtl
       CGPU_RETURN_ERROR("no suitable physical device found!");
     }
 
+    // extension, feature & property checks
     VkPhysicalDeviceFeatures features;
     vkGetPhysicalDeviceFeatures(idevice->physicalDevice, &features);
 
@@ -810,7 +811,7 @@ namespace gtl
       return true;
     };
 
-    // Currently RT pipeline libraries as we use them only correctly work on NVIDIA.
+    // RT pipeline libraries only work correctly on NVIDIA
     if (deviceProperties.properties.vendorID == CGPU_VENDOR_ID_NVIDIA)
     {
       if (enableOptionalExtension(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) &&
@@ -847,13 +848,14 @@ namespace gtl
     }
 
 #ifndef NDEBUG
-    // This feature requires env var NV_ALLOW_RAYTRACING_VALIDATION=1 to be set.
+    // this feature requires NV_ALLOW_RAYTRACING_VALIDATION=1 to be set
     if (s_iinstance->debugUtilsEnabled && enableOptionalExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
     {
       idevice->internalFeatures.rayTracingValidation = true;
     }
 #endif
 
+    // queue check
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(idevice->physicalDevice, &queueFamilyCount, nullptr);
 
@@ -865,7 +867,8 @@ namespace gtl
     {
       const VkQueueFamilyProperties* queue_family = &queueFamilies[i];
 
-      if ((queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) && (queue_family->queueFlags & VK_QUEUE_TRANSFER_BIT))
+      if ((queue_family->queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+          (queue_family->queueFlags & VK_QUEUE_TRANSFER_BIT))
       {
         queueFamilyIndex = i;
       }
@@ -876,6 +879,40 @@ namespace gtl
       CGPU_RETURN_ERROR("no suitable queue family");
     }
 
+    // ReBAR check
+    {
+      VkPhysicalDeviceMemoryProperties memoryProperties;
+      vkGetPhysicalDeviceMemoryProperties(idevice->physicalDevice, &memoryProperties);
+
+      VkDeviceSize largestDeviceLocalHeapSize = 0;
+      bool isHeapHostAccessible = false;
+
+      for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
+      {
+        const auto& memoryType = memoryProperties.memoryTypes[i];
+        VkDeviceSize heapSize = memoryProperties.memoryHeaps[memoryType.heapIndex].size;
+
+        if (!bool(memoryType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) || heapSize < largestDeviceLocalHeapSize)
+        {
+          continue;
+        }
+
+        largestDeviceLocalHeapSize = heapSize;
+
+        if (bool(memoryType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+        {
+          isHeapHostAccessible = true;
+        }
+        else if (heapSize > largestDeviceLocalHeapSize)
+        {
+          isHeapHostAccessible = false;
+        }
+      }
+
+      idevice->features.rebar = isHeapHostAccessible;
+    }
+
+    // device creation
     void* pNext = nullptr;
 
     VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableMemoryFeatures = {
