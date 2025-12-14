@@ -502,12 +502,6 @@ namespace gtl
         debugUtilsEnabled = true;
       }
 #endif
-
-      if (cgpuFindExtension(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
-      {
-        enabledExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-        GB_LOG("> enabled instance extension {}", VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-      }
     }
 
     uint32_t versionVariant = 0;
@@ -524,7 +518,7 @@ namespace gtl
     VkInstanceCreateInfo createInfo = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = nullptr,
-      .flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR,
+      .flags = 0,
       .pApplicationInfo = &appInfo,
       .enabledLayerCount = (uint32_t) enabledLayers.size(),
       .ppEnabledLayerNames = enabledLayers.data(),
@@ -826,9 +820,6 @@ namespace gtl
     {
       idevice->internalFeatures.pageableDeviceLocalMemory = true;
     }
-
-    const char* VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME = "VK_KHR_portability_subset";
-    enableOptionalExtension(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
 
 #ifndef NDEBUG
     if (features.shaderInt64 && enableOptionalExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME))
