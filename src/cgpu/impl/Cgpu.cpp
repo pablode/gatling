@@ -1194,8 +1194,19 @@ namespace gtl
       .vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements,
     };
 
+    VmaAllocatorCreateFlags allocatorCreateFlags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT |
+                                                   VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE5_BIT;
+    if (candidate.internalFeatures.pageableDeviceLocalMemory)
+    {
+      allocatorCreateFlags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT;
+    }
+    if (candidate.internalFeatures.maintenance4)
+    {
+      allocatorCreateFlags |= VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE4_BIT;
+    }
+
     VmaAllocatorCreateInfo allocCreateInfo = {};
-    allocCreateInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+    allocCreateInfo.flags = allocatorCreateFlags;
     allocCreateInfo.vulkanApiVersion = CGPU_MIN_VK_API_VERSION;
     allocCreateInfo.physicalDevice = idevice->physicalDevice;
     allocCreateInfo.device = idevice->logicalDevice;
