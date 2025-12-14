@@ -353,7 +353,7 @@ namespace gtl
     CgpuShader* shader
   );
 
-  bool cgpuCreateShaders(
+  bool cgpuCreateShadersParallel(
     CgpuDevice device,
     uint32_t shaderCount,
     CgpuShaderCreateInfo* createInfos,

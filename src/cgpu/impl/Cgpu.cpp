@@ -678,6 +678,11 @@ namespace gtl
     return vmaCreatePool(allocator, &poolCreateInfo, &pool);
   }
 
+  static void cgpuDestroyMemoryPool(VmaAllocator allocator, VmaPool pool)
+  {
+    vmaDestroyPool(allocator, pool);
+  }
+
   bool cgpuCreateDevice(CgpuDevice* device)
   {
     uint64_t handle = s_iinstance->ideviceStore.allocate();
@@ -707,8 +712,7 @@ namespace gtl
     }
     else
     {
-      GB_ERROR("no suitable physical device found!");
-      return false;
+      CGPU_RETURN_ERROR("no suitable physical device found!");
     }
 
     VkPhysicalDeviceFeatures features;
@@ -744,7 +748,7 @@ namespace gtl
 
     if (!limits.timestampComputeAndGraphics)
     {
-      CGPU_FATAL("timestampComputeAndGraphics device limit not supported");
+      CGPU_RETURN_ERROR("timestampComputeAndGraphics device limit not supported");
     }
 
     GB_LOG("Vulkan device properties:");
@@ -1260,7 +1264,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      GB_ERROR("{}:{}: {}", __FILE__, __LINE__, "failed to create pipeline cache");
+      GB_WARN("{}:{}: {}", __FILE__, __LINE__, "failed to create pipeline cache");
 
       idevice->pipelineCache = VK_NULL_HANDLE;
     }
@@ -1273,7 +1277,7 @@ namespace gtl
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
 
-    vmaDestroyPool(idevice->allocator, idevice->asScratchMemoryPool);
+    cgpuDestroyMemoryPool(idevice->allocator, idevice->asScratchMemoryPool);
 
     if (idevice->pipelineCache != VK_NULL_HANDLE)
     {
@@ -1524,7 +1528,8 @@ namespace gtl
 
       if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
       {
-        cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE, (uint64_t) ishader->module, createInfo.debugName);
+        cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE,
+                          (uint64_t) ishader->module, createInfo.debugName);
       }
     }
     else
@@ -1549,7 +1554,7 @@ namespace gtl
     return true;
   }
 
-  bool cgpuCreateShaders(CgpuDevice device,
+  bool cgpuCreateShadersParallel(CgpuDevice device,
                          uint32_t shaderCount,
                          CgpuShaderCreateInfo* createInfos,
                          CgpuShader* shaders)
@@ -1570,6 +1575,7 @@ namespace gtl
       ishaders[i] = ishader;
     }
 
+    // TODO: proper error handling
 #pragma omp parallel for schedule(dynamic, 1)
     for (int i = 0; i < int(shaderCount); i++)
     {
@@ -1793,7 +1799,8 @@ namespace gtl
       nullptr
     );
 
-    if (result != VK_SUCCESS) {
+    if (result != VK_SUCCESS)
+    {
       s_iinstance->iimageStore.free(handle);
       CGPU_RETURN_ERROR("failed to create image");
     }
@@ -1917,7 +1924,8 @@ namespace gtl
       &isampler->sampler
     );
 
-    if (result != VK_SUCCESS) {
+    if (result != VK_SUCCESS)
+    {
       s_iinstance->isamplerStore.free(handle);
       CGPU_RETURN_ERROR("failed to create sampler");
     }
@@ -2696,8 +2704,8 @@ namespace gtl
 
     if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as))
     {
-      s_iinstance->itlasStore.free(handle);
       cgpuDestroyIBuffer(idevice, &itlas->instances);
+      s_iinstance->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to build TLAS");
     }
 

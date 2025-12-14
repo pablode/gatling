@@ -1596,9 +1596,8 @@ cleanup:
         }
       }
 
-      // NOTE: this call is internally parallelized.
       std::vector<CgpuShader> hitShaders(createInfos.size());
-      if (!cgpuCreateShaders(s_device, (uint32_t) createInfos.size(), createInfos.data(), hitShaders.data()))
+      if (!cgpuCreateShadersParallel(s_device, (uint32_t) createInfos.size(), createInfos.data(), hitShaders.data()))
       {
         goto cleanup;
       }
