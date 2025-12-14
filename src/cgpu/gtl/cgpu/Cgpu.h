@@ -293,6 +293,7 @@ namespace gtl
   {
     bool debugPrintf;
     bool rayTracingInvocationReorder;
+    bool rebar;
     bool shaderClock;
     bool shaderFloat64;
     bool shaderInt16;
