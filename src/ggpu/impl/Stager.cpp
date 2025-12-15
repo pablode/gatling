@@ -29,8 +29,7 @@ namespace gtl
   GgpuStager::GgpuStager(CgpuDevice device)
     : m_device(device)
   {
-    CgpuDeviceFeatures features;
-    cgpuGetDeviceFeatures(device, features);
+    const CgpuDeviceFeatures& features = cgpuGetDeviceFeatures(device);
 
     m_useRebar = features.rebar;
   }

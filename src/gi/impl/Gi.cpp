@@ -386,8 +386,8 @@ namespace gtl
     if (!cgpuCreateDevice(&s_device))
       goto fail;
 
-    cgpuGetDeviceFeatures(s_device, s_deviceFeatures);
-    cgpuGetDeviceProperties(s_device, s_deviceProperties);
+    s_deviceFeatures = cgpuGetDeviceFeatures(s_device);
+    s_deviceProperties = cgpuGetDeviceProperties(s_device);
 
     if (!cgpuCreateSampler(s_device, {
                             .addressModeU = CgpuSamplerAddressMode::Repeat,

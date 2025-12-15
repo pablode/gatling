@@ -622,13 +622,7 @@ namespace gtl
     uint64_t size
   );
 
-  void cgpuGetDeviceFeatures(
-    CgpuDevice device,
-    CgpuDeviceFeatures& features
-  );
+  const CgpuDeviceFeatures& cgpuGetDeviceFeatures(CgpuDevice device);
 
-  void cgpuGetDeviceProperties(
-    CgpuDevice device,
-    CgpuDeviceProperties& limits
-  );
+  const CgpuDeviceProperties& cgpuGetDeviceProperties(CgpuDevice device);
 }

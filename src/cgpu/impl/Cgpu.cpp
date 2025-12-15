@@ -3851,15 +3851,15 @@ namespace gtl
     }
   }
 
-  void cgpuGetDeviceFeatures(CgpuDevice device, CgpuDeviceFeatures& features)
+  const CgpuDeviceFeatures& cgpuGetDeviceFeatures(CgpuDevice device)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    memcpy(&features, &idevice->features, sizeof(CgpuDeviceFeatures));
+    return idevice->features;
   }
 
-  void cgpuGetDeviceProperties(CgpuDevice device, CgpuDeviceProperties& properties)
+  const CgpuDeviceProperties& cgpuGetDeviceProperties(CgpuDevice device)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
-    memcpy(&properties, &idevice->properties, sizeof(CgpuDeviceProperties));
+    return idevice->properties;
   }
 }
