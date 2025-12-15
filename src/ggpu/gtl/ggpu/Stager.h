@@ -48,6 +48,8 @@ namespace gtl
   private:
     CgpuDevice m_device;
 
+    bool m_useRebar;
+
     uint32_t m_writeableHalf = 0;
     CgpuBuffer m_stagingBuffer;
     CgpuCommandBuffer m_commandBuffers[2];

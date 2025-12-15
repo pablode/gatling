@@ -29,6 +29,10 @@ namespace gtl
   GgpuStager::GgpuStager(CgpuDevice device)
     : m_device(device)
   {
+    CgpuDeviceFeatures features;
+    cgpuGetDeviceFeatures(device, features);
+
+    m_useRebar = features.rebar;
   }
 
   GgpuStager::~GgpuStager()
@@ -127,6 +131,17 @@ fail:
     if (size == 0)
     {
       assert(false);
+      return true;
+    }
+
+    if (m_useRebar)
+    {
+      uint8_t* mappedMem;
+      cgpuMapBuffer(m_device, dst, (void**) &mappedMem);
+
+      memcpy(&mappedMem[dstBaseOffset], src, size);
+
+      cgpuUnmapBuffer(m_device, dst);
       return true;
     }
 
