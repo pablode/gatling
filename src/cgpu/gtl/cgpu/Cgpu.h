@@ -28,6 +28,7 @@ namespace gtl
   constexpr static const uint64_t CGPU_WHOLE_SIZE = ~0ULL;
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
   constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 4;
+  constexpr static const uint32_t CGPU_MAX_BUFFER_UPDATE_SIZE = 65535;
 
   enum class CgpuBufferUsage
   {

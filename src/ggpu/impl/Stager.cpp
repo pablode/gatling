@@ -130,7 +130,7 @@ fail:
       return true;
     }
 
-    if (size <= 65535)
+    if (size <= CGPU_MAX_BUFFER_UPDATE_SIZE)
     {
       m_commandsPending = true;
 
