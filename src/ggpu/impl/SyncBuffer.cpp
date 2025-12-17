@@ -37,7 +37,7 @@ namespace gtl
     , m_hostBuffer(m_device,
                    delayedResourceDestroyer,
                    CgpuBufferUsage::TransferSrc,
-                   CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent)
+                   CgpuMemoryProperties::HostVisible)
   {
   }
 

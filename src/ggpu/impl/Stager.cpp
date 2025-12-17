@@ -53,7 +53,7 @@ namespace gtl
 
     if (!bufferCreated)
     {
-      createInfo.memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent;
+      createInfo.memoryProperties = CgpuMemoryProperties::HostVisible;
 
       bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
     }
@@ -110,7 +110,6 @@ fail:
     cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
 
     uint32_t halfOffset = m_writeableHalf * BUFFER_HALF_SIZE;
-    cgpuFlushMappedMemory(m_device, m_stagingBuffer, halfOffset, halfOffset + m_stagedBytes);
 
     CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
     cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo);

@@ -45,8 +45,7 @@ namespace gtl
   enum class CgpuMemoryProperties
   {
     DeviceLocal = 0x00000001,
-    HostVisible = 0x00000002,
-    HostCoherent = 0x00000004,
+    HostVisible = 0x00000006,
     HostCached = 0x00000008
   };
   GB_DECLARE_ENUM_BITOPS(CgpuMemoryProperties);
@@ -606,20 +605,6 @@ namespace gtl
     CgpuSignalSemaphoreInfo* signalSemaphoreInfos = nullptr,
     uint32_t waitSemaphoreInfoCount = 0,
     CgpuWaitSemaphoreInfo* waitSemaphoreInfos = nullptr
-  );
-
-  void cgpuFlushMappedMemory(
-    CgpuDevice device,
-    CgpuBuffer buffer,
-    uint64_t offset,
-    uint64_t size
-  );
-
-  void cgpuInvalidateMappedMemory(
-    CgpuDevice device,
-    CgpuBuffer buffer,
-    uint64_t offset,
-    uint64_t size
   );
 
   const CgpuDeviceFeatures& cgpuGetDeviceFeatures(CgpuDevice device);

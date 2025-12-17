@@ -1049,7 +1049,7 @@ fail:
 
         if (!cgpuCreateBuffer(s_device, {
                                 .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
-                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible,
                                 .size = tmpPositionBufferSize,
                                 .debugName = "BlasVertexPositionsTmp"
                               }, &tmpPositionBuffer))
@@ -1060,7 +1060,7 @@ fail:
 
         if (!cgpuCreateBuffer(s_device, {
                                 .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
-                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible,
                                 .size = tmpIndexBufferSize,
                                 .debugName = "BlasIndicesTmp"
                               }, &tmpIndexBuffer))
@@ -2406,8 +2406,6 @@ cleanup:
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
         cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
-
-        cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE);
       }
 
       CgpuPipelineBarrier postBarrier = {
@@ -2930,7 +2928,6 @@ cleanup:
     if (!cgpuCreateBuffer(s_device, {
                             .usage = CgpuBufferUsage::TransferDst,
                             .memoryProperties = CgpuMemoryProperties::HostVisible |
-                                                CgpuMemoryProperties::HostCoherent |
                                                 CgpuMemoryProperties::HostCached,
                             .size = bufferSize,
                             .debugName = "RenderBufferCpu"

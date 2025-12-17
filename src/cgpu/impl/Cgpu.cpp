@@ -2750,7 +2750,7 @@ namespace gtl
     CgpuIBuffer instances;
     if (!cgpuCreateIBuffer(idevice,
                            CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
-                           CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent,
+                           CgpuMemoryProperties::HostVisible,
                            (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
                            16/*required by spec*/, &instances, createInfo.debugName))
     {
@@ -3842,40 +3842,6 @@ namespace gtl
                                          VK_NULL_HANDLE) != VK_SUCCESS)
     {
       CGPU_FATAL("failed to submit command buffer");
-    }
-  }
-
-  void cgpuFlushMappedMemory(CgpuDevice device,
-                             CgpuBuffer buffer,
-                             uint64_t offset,
-                             uint64_t size)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-
-    if (vmaFlushAllocation(idevice->allocator,
-                           ibuffer->allocation,
-                           offset,
-                           (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to flush mapped memory");
-    }
-  }
-
-  void cgpuInvalidateMappedMemory(CgpuDevice device,
-                                  CgpuBuffer buffer,
-                                  uint64_t offset,
-                                  uint64_t size)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-
-    if (vmaInvalidateAllocation(idevice->allocator,
-                                ibuffer->allocation,
-                                offset,
-                                (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to invalidate mapped memory");
     }
   }
 
