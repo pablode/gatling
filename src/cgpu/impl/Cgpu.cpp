@@ -963,8 +963,8 @@ namespace gtl
       c.features = {
         .debugPrintf = enableOptionalExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME),
         .rayTracingInvocationReorder = bool(c.vkRtReorderFeatures.rayTracingInvocationReorder),
-        .rebar = isHeapHostAccessible,
-        .shaderClock = bool(c.vkShaderClockFeatures.shaderSubgroupClock)
+        .shaderClock = bool(c.vkShaderClockFeatures.shaderSubgroupClock),
+        .sharedMemory = isHeapHostAccessible // likely UMA or ReBAR
       };
 
       c.internalFeatures =
@@ -1023,8 +1023,8 @@ namespace gtl
     CGPU_PRINT_FEATURE(internalFeatures, pipelineLibraries);
     CGPU_PRINT_FEATURE(features,         rayTracingInvocationReorder);
     CGPU_PRINT_FEATURE(internalFeatures, rayTracingValidation);
-    CGPU_PRINT_FEATURE(features,         rebar);
     CGPU_PRINT_FEATURE(features,         shaderClock);
+    CGPU_PRINT_FEATURE(features,         sharedMemory);
 
 #undef CGPU_PRINT_FEATURE
   }
@@ -1738,7 +1738,7 @@ namespace gtl
       ibuffer->gpuAddress = idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
     }
 
-    bool mapBuffer = idevice->features.rebar || bool(memoryProperties & CgpuMemoryProperties::HostVisible);
+    bool mapBuffer = idevice->features.sharedMemory || bool(memoryProperties & CgpuMemoryProperties::HostVisible);
 
     if (mapBuffer && vmaMapMemory(idevice->allocator, ibuffer->allocation, &ibuffer->cpuPtr) != VK_SUCCESS)
     {

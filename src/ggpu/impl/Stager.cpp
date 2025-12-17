@@ -32,7 +32,7 @@ namespace gtl
   {
     const CgpuDeviceFeatures& features = cgpuGetDeviceFeatures(device);
 
-    m_useRebar = features.rebar;
+    m_hasSharedMem = features.sharedMemory;
   }
 
   GgpuStager::~GgpuStager()
@@ -129,13 +129,13 @@ fail:
       return true;
     }
 
-    if (m_useRebar && size < BUFFER_STAGING_OPT_THRESHOLD)
+    if (m_hasSharedMem && size < BUFFER_STAGING_OPT_THRESHOLD)
     {
       auto ptr = (uint8_t*) cgpuGetBufferCpuPtr(dst);
       memcpy(&ptr[dstBaseOffset], src, size);
       return true;
     }
-    else if (!m_useRebar && size <= CGPU_MAX_BUFFER_UPDATE_SIZE)
+    else if (!m_hasSharedMem && size <= CGPU_MAX_BUFFER_UPDATE_SIZE)
     {
       m_commandsPending = true;
 

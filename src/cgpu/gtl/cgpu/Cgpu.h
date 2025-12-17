@@ -293,8 +293,8 @@ namespace gtl
   {
     bool debugPrintf;
     bool rayTracingInvocationReorder;
-    bool rebar;
     bool shaderClock;
+    bool sharedMemory;
   };
 
   struct CgpuDeviceProperties
