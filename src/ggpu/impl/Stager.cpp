@@ -23,6 +23,7 @@
 
 const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
 const static uint64_t BUFFER_HALF_SIZE = BUFFER_SIZE / 2;
+const static uint64_t BUFFER_STAGING_OPT_THRESHOLD = 256 * 1024;
 
 namespace gtl
 {
@@ -132,7 +133,7 @@ fail:
       return true;
     }
 
-    if (m_useRebar)
+    if (m_useRebar && size < BUFFER_STAGING_OPT_THRESHOLD)
     {
       uint8_t* mappedMem;
       cgpuMapBuffer(m_device, dst, (void**) &mappedMem);
@@ -142,8 +143,7 @@ fail:
       cgpuUnmapBuffer(m_device, dst);
       return true;
     }
-
-    if (size <= CGPU_MAX_BUFFER_UPDATE_SIZE)
+    else if (!m_useRebar && size <= CGPU_MAX_BUFFER_UPDATE_SIZE)
     {
       m_commandsPending = true;
 
