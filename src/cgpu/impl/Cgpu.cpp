@@ -141,6 +141,8 @@ namespace gtl
     VkBuffer      buffer;
     void*         mappedMem = nullptr; // only for ReBAR
     uint64_t      size;
+
+    uint64_t      gpuAddress = 0;
   };
 
   struct CgpuIImage
@@ -1725,6 +1727,17 @@ namespace gtl
     {
       vmaSetAllocationName(idevice->allocator, ibuffer->allocation, debugName);
     }
+    
+    if (bool(usage & CgpuBufferUsage::ShaderDeviceAddress))
+    {
+      VkBufferDeviceAddressInfoKHR addressInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+        .pNext = nullptr,
+        .buffer = ibuffer->buffer,
+      };
+
+      ibuffer->gpuAddress = idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
+    }
 
     ibuffer->size = newSize;
 
@@ -1806,23 +1819,11 @@ namespace gtl
     }
   }
 
-  static VkDeviceAddress cgpuGetBufferDeviceAddress(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
+  uint64_t cgpuGetBufferAddress(CgpuBuffer buffer)
   {
-    VkBufferDeviceAddressInfoKHR addressInfo = {
-      .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-      .pNext = nullptr,
-      .buffer = ibuffer->buffer,
-    };
-    return idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
-  }
-
-  uint64_t cgpuGetBufferAddress(CgpuDevice device, CgpuBuffer buffer)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    static_assert(sizeof(uint64_t) == sizeof(VkDeviceAddress));
-    return uint64_t(cgpuGetBufferDeviceAddress(idevice, ibuffer));
+    return ibuffer->gpuAddress;
   }
 
   bool cgpuCreateImage(CgpuDevice device,
@@ -2263,7 +2264,7 @@ namespace gtl
 
     CGPU_RESOLVE_BUFFER(ipipeline->sbt, isbt);
 
-    VkDeviceAddress sbtDeviceAddress = cgpuGetBufferDeviceAddress(idevice, isbt);
+    VkDeviceAddress sbtDeviceAddress = isbt->gpuAddress;
     ipipeline->sbtRgen.deviceAddress = sbtDeviceAddress;
     ipipeline->sbtMiss.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size;
     ipipeline->sbtHit.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size + ipipeline->sbtMiss.size;
@@ -2617,7 +2618,7 @@ namespace gtl
 
     asBuildGeomInfo.dstAccelerationStructure = *as;
     asBuildGeomInfo.scratchData.hostAddress = 0;
-    asBuildGeomInfo.scratchData.deviceAddress = cgpuGetBufferDeviceAddress(idevice, &iscratchBuffer);
+    asBuildGeomInfo.scratchData.deviceAddress = iscratchBuffer.gpuAddress;
 
     VkAccelerationStructureBuildRangeInfoKHR asBuildRangeInfo = {
       .primitiveCount = primitiveCount,
@@ -2684,13 +2685,13 @@ namespace gtl
       .pNext = nullptr,
       .vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
       .vertexData = {
-        .deviceAddress = cgpuGetBufferDeviceAddress(idevice, ivertexBuffer),
+        .deviceAddress = ivertexBuffer->gpuAddress,
       },
       .vertexStride = sizeof(float) * 3,
       .maxVertex = createInfo.maxVertex,
       .indexType = VK_INDEX_TYPE_UINT32,
       .indexData = {
-        .deviceAddress = cgpuGetBufferDeviceAddress(idevice, iindexBuffer),
+        .deviceAddress = iindexBuffer->gpuAddress,
       },
       .transformData = {
         .deviceAddress = 0, // optional
@@ -2802,7 +2803,7 @@ namespace gtl
           .pNext = nullptr,
           .arrayOfPointers = VK_FALSE,
           .data = {
-            .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &instances),
+            .deviceAddress = instances.gpuAddress
           }
         },
       },

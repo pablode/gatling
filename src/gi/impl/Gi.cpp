@@ -1135,7 +1135,7 @@ fail:
 
         // Append BLAS payload data
         {
-          uint64_t payloadBufferAddress = cgpuGetBufferAddress(s_device, payloadBuffer);
+          uint64_t payloadBufferAddress = cgpuGetBufferAddress(payloadBuffer);
           if (payloadBufferAddress == 0)
           {
             GB_ERROR("failed to get index-vertex buffer address");

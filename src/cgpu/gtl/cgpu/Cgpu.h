@@ -386,7 +386,6 @@ namespace gtl
   );
 
   uint64_t cgpuGetBufferAddress(
-    CgpuDevice device,
     CgpuBuffer buffer
   );
 
