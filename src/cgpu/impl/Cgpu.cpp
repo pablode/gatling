@@ -212,7 +212,6 @@ namespace gtl
   {
     VkAccelerationStructureKHR as;
     CgpuIBuffer buffer;
-    CgpuIBuffer instances;
   };
 
   struct CgpuISampler
@@ -272,9 +271,6 @@ namespace gtl
     GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); \
     exit(EXIT_FAILURE);                             \
   } while (false)
-
-#define CGPU_RETURN_ERROR_INVALID_HANDLE                              \
-  CGPU_RETURN_ERROR("invalid handle")
 
 #define CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED                     \
   CGPU_RETURN_ERROR("hardcoded limit reached")
@@ -2714,11 +2710,12 @@ namespace gtl
     CGPU_RESOLVE_TLAS({ handle }, itlas);
 
     // Create instance buffer & copy into it
+    CgpuIBuffer instances;
     if (!cgpuCreateIBuffer(idevice,
                            CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
                            CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent,
                            (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
-                           16/*required by spec*/, &itlas->instances, createInfo.debugName))
+                           16/*required by spec*/, &instances, createInfo.debugName))
     {
       s_iinstance->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
@@ -2727,7 +2724,7 @@ namespace gtl
     bool areAllBlasOpaque = true;
     {
       uint8_t* mapped_mem;
-      if (vmaMapMemory(idevice->allocator, itlas->instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
+      if (vmaMapMemory(idevice->allocator, instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
       {
         CGPU_FATAL("failed to map buffer memory");
       }
@@ -2735,20 +2732,12 @@ namespace gtl
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
       {
         const CgpuBlasInstance& instanceDesc = createInfo.instances[i];
-
-        CgpuIBlas* iblas;
-        if (!cgpuResolveBlas(instanceDesc.as, &iblas)) {
-          s_iinstance->itlasStore.free(handle);
-          cgpuDestroyIBuffer(idevice, &itlas->instances);
-          CGPU_RETURN_ERROR_INVALID_HANDLE;
-        }
+        CGPU_RESOLVE_BLAS(instanceDesc.as, iblas);
 
         uint32_t instanceCustomIndex = instanceDesc.instanceCustomIndex;
         if ((instanceCustomIndex & 0xFF000000u) != 0u)
         {
-          s_iinstance->itlasStore.free(handle);
-          cgpuDestroyIBuffer(idevice, &itlas->instances);
-          CGPU_RETURN_ERROR("instanceCustomIndex must be equal to or smaller than 2^24");
+          CGPU_FATAL("instanceCustomIndex must be equal to or smaller than 2^24");
         }
 
         VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];
@@ -2762,7 +2751,7 @@ namespace gtl
         areAllBlasOpaque &= iblas->isOpaque;
       }
 
-      vmaUnmapMemory(idevice->allocator, itlas->instances.allocation);
+      vmaUnmapMemory(idevice->allocator, instances.allocation);
     }
 
     // Create TLAS
@@ -2776,16 +2765,19 @@ namespace gtl
           .pNext = nullptr,
           .arrayOfPointers = VK_FALSE,
           .data = {
-            .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &itlas->instances),
+            .deviceAddress = cgpuGetBufferDeviceAddress(idevice, &instances),
           }
         },
       },
       .flags = VkGeometryFlagsKHR(areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0)
     };
 
-    if (!cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as))
+    bool result = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as);
+
+    cgpuDestroyIBuffer(idevice, &instances);
+
+    if (!result)
     {
-      cgpuDestroyIBuffer(idevice, &itlas->instances);
       s_iinstance->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to build TLAS");
     }
@@ -2816,7 +2808,6 @@ namespace gtl
     CGPU_RESOLVE_TLAS(tlas, itlas);
 
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, itlas->as, nullptr);
-    cgpuDestroyIBuffer(idevice, &itlas->instances);
     cgpuDestroyIBuffer(idevice, &itlas->buffer);
 
     s_iinstance->itlasStore.free(tlas.handle);
