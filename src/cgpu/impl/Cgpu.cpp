@@ -168,7 +168,7 @@ namespace gtl
     VkStridedDeviceAddressRegionKHR           sbtRgen;
     VkStridedDeviceAddressRegionKHR           sbtMiss;
     VkStridedDeviceAddressRegionKHR           sbtHit;
-    CgpuIBuffer                               sbt;
+    CgpuBuffer                                sbt;
   };
 
   struct CgpuIPipelineLibrary
@@ -2188,12 +2188,43 @@ namespace gtl
     pipeline->handle = handle;
   }
 
-  static void cgpuCreateRtPipelineSbt(CgpuIDevice* idevice,
+  static bool cgpuCopyMemoryToBuffer(CgpuDevice device, const uint8_t* data, uint64_t size, CgpuBuffer dst)
+  {
+    if (size > CGPU_MAX_BUFFER_UPDATE_SIZE)
+    {
+      CGPU_RETURN_ERROR("buffer size too large!");
+    }
+
+    CgpuCommandBuffer commandBuffer;
+    cgpuCreateCommandBuffer(device, &commandBuffer);
+
+    cgpuBeginCommandBuffer(commandBuffer);
+    cgpuCmdUpdateBuffer(commandBuffer, data, size, dst);
+    cgpuEndCommandBuffer(commandBuffer);
+
+    CgpuSemaphore semaphore;
+    cgpuCreateSemaphore(device, &semaphore);
+    CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
+
+    cgpuSubmitCommandBuffer(device, commandBuffer, 1, &signalSemaphoreInfo);
+
+    CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
+    cgpuWaitSemaphores(device, 1, &waitSemaphoreInfo);
+
+    cgpuDestroySemaphore(device, semaphore);
+    cgpuDestroyCommandBuffer(device, commandBuffer);
+
+    return true;
+  }
+
+  static void cgpuCreateRtPipelineSbt(CgpuDevice device,
                                       CgpuIPipeline* ipipeline,
                                       uint32_t groupCount,
                                       uint32_t missShaderCount,
                                       uint32_t hitGroupCount)
   {
+    CGPU_RESOLVE_DEVICE(device, idevice);
+
     const CgpuIDeviceProperties& properties = idevice->internalProperties;
 
     uint32_t handleSize = properties.shaderGroupHandleSize;
@@ -2216,50 +2247,56 @@ namespace gtl
     }
 
     VkDeviceSize sbtSize = ipipeline->sbtRgen.size + ipipeline->sbtMiss.size + ipipeline->sbtHit.size;
-    CgpuBufferUsage bufferUsageFlags = CgpuBufferUsage::TransferSrc | CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::ShaderBindingTable;
-    CgpuMemoryProperties bufferMemPropFlags = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached;
 
-    if (!cgpuCreateIBuffer(idevice, bufferUsageFlags, bufferMemPropFlags, sbtSize,
-                           properties.shaderGroupBaseAlignment, &ipipeline->sbt, "[SBT]"))
+    CgpuBufferCreateInfo sbtCreateInfo = {
+      .usage = CgpuBufferUsage::TransferDst | CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::ShaderBindingTable,
+      .memoryProperties = CgpuMemoryProperties::DeviceLocal,
+      .size = sbtSize,
+      .debugName = "[SBT]",
+      .alignment = properties.shaderGroupBaseAlignment
+    };
+
+    if (!cgpuCreateBuffer(device, sbtCreateInfo, &ipipeline->sbt))
     {
       CGPU_FATAL("failed to create sbt buffer");
     }
 
-    VkDeviceAddress sbtDeviceAddress = cgpuGetBufferDeviceAddress(idevice, &ipipeline->sbt);
+    CGPU_RESOLVE_BUFFER(ipipeline->sbt, isbt);
+
+    VkDeviceAddress sbtDeviceAddress = cgpuGetBufferDeviceAddress(idevice, isbt);
     ipipeline->sbtRgen.deviceAddress = sbtDeviceAddress;
     ipipeline->sbtMiss.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size;
     ipipeline->sbtHit.deviceAddress = sbtDeviceAddress + ipipeline->sbtRgen.size + ipipeline->sbtMiss.size;
 
-    uint8_t* sbtMem;
-    if (vmaMapMemory(idevice->allocator, ipipeline->sbt.allocation, (void**)&sbtMem) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to map buffer memory");
-    }
-
-    uint32_t handleCount = 0;
+    auto sbtMem = std::make_unique<uint8_t[]>(sbtSize);
     uint8_t* sbtMemRgen = &sbtMem[0];
     uint8_t* sbtMemMiss = &sbtMem[ipipeline->sbtRgen.size];
     uint8_t* sbtMemHit = &sbtMem[ipipeline->sbtRgen.size + ipipeline->sbtMiss.size];
 
+    uint32_t handleCount = 0;
+
     // Rgen
-    sbtMem = sbtMemRgen;
-    memcpy(sbtMem, &handleData[handleSize * (handleCount++)], handleSize);
+    uint8_t* sbtMemPtr = sbtMemRgen;
+    memcpy(sbtMemPtr, &handleData[handleSize * (handleCount++)], handleSize);
     // Miss
-    sbtMem = sbtMemMiss;
+    sbtMemPtr = sbtMemMiss;
     for (uint32_t i = 0; i < missShaderCount; i++)
     {
-      memcpy(sbtMem, &handleData[handleSize * (handleCount++)], handleSize);
-      sbtMem += ipipeline->sbtMiss.stride;
+      memcpy(sbtMemPtr, &handleData[handleSize * (handleCount++)], handleSize);
+      sbtMemPtr += ipipeline->sbtMiss.stride;
     }
     // Hit
-    sbtMem = sbtMemHit;
+    sbtMemPtr = sbtMemHit;
     for (uint32_t i = 0; i < hitGroupCount; i++)
     {
-      memcpy(sbtMem, &handleData[handleSize * (handleCount++)], handleSize);
-      sbtMem += ipipeline->sbtHit.stride;
+      memcpy(sbtMemPtr, &handleData[handleSize * (handleCount++)], handleSize);
+      sbtMemPtr += ipipeline->sbtHit.stride;
     }
 
-    vmaUnmapMemory(idevice->allocator, ipipeline->sbt.allocation);
+    if (!cgpuCopyMemoryToBuffer(device, &sbtMem[0], sbtSize, ipipeline->sbt))
+    {
+      CGPU_FATAL("failed to copy to sbt buffer");
+    }
   }
 
   void cgpuCreateRtPipeline(CgpuDevice device,
@@ -2464,7 +2501,7 @@ namespace gtl
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
       // Create the SBT.
-      cgpuCreateRtPipelineSbt(idevice, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
+      cgpuCreateRtPipelineSbt(device, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
 
       if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
       {
@@ -2482,7 +2519,7 @@ namespace gtl
 
     if (ipipeline->bindPoint == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR)
     {
-      cgpuDestroyIBuffer(idevice, &ipipeline->sbt);
+      cgpuDestroyBuffer(device, ipipeline->sbt);
     }
 
     idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
