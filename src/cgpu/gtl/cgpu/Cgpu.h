@@ -374,18 +374,11 @@ namespace gtl
     CgpuBuffer buffer
   );
 
-  void cgpuMapBuffer(
-    CgpuDevice device,
-    CgpuBuffer buffer,
-    void** mappedMem
-  );
-
-  void cgpuUnmapBuffer(
-    CgpuDevice device,
+  void* cgpuGetBufferCpuPtr(
     CgpuBuffer buffer
   );
 
-  uint64_t cgpuGetBufferAddress(
+  uint64_t cgpuGetBufferGpuAddress(
     CgpuBuffer buffer
   );
 

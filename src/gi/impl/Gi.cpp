@@ -1071,15 +1071,12 @@ fail:
 
         // Copy data to GPU
         {
-          void* mappedMem;
-
-          cgpuMapBuffer(s_device, tmpPositionBuffer, &mappedMem);
-          memcpy(mappedMem, positionData.data(), tmpPositionBufferSize);
-          cgpuUnmapBuffer(s_device, tmpPositionBuffer);
-
-          cgpuMapBuffer(s_device, tmpIndexBuffer, &mappedMem);
-          memcpy(mappedMem, indexData.data(), tmpIndexBufferSize);
-          cgpuUnmapBuffer(s_device, tmpIndexBuffer);
+          void* ptr = cgpuGetBufferCpuPtr(tmpPositionBuffer);
+          memcpy(ptr, positionData.data(), tmpPositionBufferSize);
+        }
+        {
+          void* ptr = cgpuGetBufferCpuPtr(tmpIndexBuffer);
+          memcpy(ptr, indexData.data(), tmpIndexBufferSize);
         }
 
         if (!s_stager->stageToBuffer((uint8_t*) &preamble, preambleSize, payloadBuffer, 0) ||
@@ -1135,7 +1132,7 @@ fail:
 
         // Append BLAS payload data
         {
-          uint64_t payloadBufferAddress = cgpuGetBufferAddress(payloadBuffer);
+          uint64_t payloadBufferAddress = cgpuGetBufferGpuAddress(payloadBuffer);
           if (payloadBufferAddress == 0)
           {
             GB_ERROR("failed to get index-vertex buffer address");
@@ -2937,8 +2934,7 @@ cleanup:
       return nullptr;
     }
 
-    void* mappedMem;
-    cgpuMapBuffer(s_device, hostMem, &mappedMem);
+    void* mappedMem = cgpuGetBufferCpuPtr(hostMem);
 
     return new GiRenderBuffer {
       .deviceMem = deviceMem,
@@ -2951,7 +2947,6 @@ cleanup:
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    cgpuUnmapBuffer(s_device, renderBuffer->hostMem);
     s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->deviceMem);
     s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->hostMem);
     delete renderBuffer;

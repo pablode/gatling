@@ -69,7 +69,7 @@ namespace gtl
     if (!cgpuCreateSemaphore(m_device, &m_semaphore))
       goto fail;
 
-    cgpuMapBuffer(m_device, m_stagingBuffer, (void**) &m_mappedMem);
+    m_mappedMem = (uint8_t*) cgpuGetBufferCpuPtr(m_stagingBuffer);
 
     if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
       goto fail;
@@ -85,10 +85,6 @@ fail:
   {
     CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
     cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo);
-    if (m_mappedMem)
-    {
-      cgpuUnmapBuffer(m_device, m_stagingBuffer);
-    }
     cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
     cgpuDestroySemaphore(m_device, m_semaphore);
     cgpuDestroyCommandBuffer(m_device, m_commandBuffers[0]);
@@ -135,12 +131,8 @@ fail:
 
     if (m_useRebar && size < BUFFER_STAGING_OPT_THRESHOLD)
     {
-      uint8_t* mappedMem;
-      cgpuMapBuffer(m_device, dst, (void**) &mappedMem);
-
-      memcpy(&mappedMem[dstBaseOffset], src, size);
-
-      cgpuUnmapBuffer(m_device, dst);
+      auto ptr = (uint8_t*) cgpuGetBufferCpuPtr(dst);
+      memcpy(&ptr[dstBaseOffset], src, size);
       return true;
     }
     else if (!m_useRebar && size <= CGPU_MAX_BUFFER_UPDATE_SIZE)

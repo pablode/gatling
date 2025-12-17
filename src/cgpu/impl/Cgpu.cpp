@@ -139,9 +139,9 @@ namespace gtl
   {
     VmaAllocation allocation;
     VkBuffer      buffer;
-    void*         mappedMem = nullptr; // only for ReBAR
     uint64_t      size;
 
+    void*         cpuPtr = nullptr;
     uint64_t      gpuAddress = 0;
   };
 
@@ -1655,6 +1655,15 @@ namespace gtl
     s_iinstance->ishaderStore.free(shader.handle);
   }
 
+  static void cgpuDestroyIBuffer(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
+  {
+    if (ibuffer->cpuPtr)
+    {
+      vmaUnmapMemory(idevice->allocator, ibuffer->allocation);
+    }
+    vmaDestroyBuffer(idevice->allocator, ibuffer->buffer, ibuffer->allocation);
+  }
+
   static bool cgpuCreateIBuffer(CgpuIDevice* idevice,
                                 CgpuBufferUsage usage,
                                 CgpuMemoryProperties memoryProperties,
@@ -1708,16 +1717,6 @@ namespace gtl
       nullptr
     );
 
-    if (bool(memoryProperties & CgpuMemoryProperties::DeviceLocal) &&
-        bool(memoryProperties & CgpuMemoryProperties::HostVisible))
-    {
-      void* mappedMem = nullptr;
-      if (vmaMapMemory(idevice->allocator, ibuffer->allocation, &mappedMem) == VK_SUCCESS)
-      {
-        ibuffer->mappedMem = mappedMem;
-      }
-    }
-
     if (result != VK_SUCCESS)
     {
       CGPU_RETURN_ERROR("failed to create buffer");
@@ -1737,6 +1736,14 @@ namespace gtl
       };
 
       ibuffer->gpuAddress = idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
+    }
+
+    bool mapBuffer = idevice->features.rebar || bool(memoryProperties & CgpuMemoryProperties::HostVisible);
+
+    if (mapBuffer && vmaMapMemory(idevice->allocator, ibuffer->allocation, &ibuffer->cpuPtr) != VK_SUCCESS)
+    {
+      cgpuDestroyIBuffer(idevice, ibuffer);
+      CGPU_RETURN_ERROR("failed to map buffer memory");
     }
 
     ibuffer->size = newSize;
@@ -1772,15 +1779,6 @@ namespace gtl
     return true;
   }
 
-  static void cgpuDestroyIBuffer(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
-  {
-    if (ibuffer->mappedMem)
-    {
-      vmaUnmapMemory(idevice->allocator, ibuffer->allocation);
-    }
-    vmaDestroyBuffer(idevice->allocator, ibuffer->buffer, ibuffer->allocation);
-  }
-
   void cgpuDestroyBuffer(CgpuDevice device, CgpuBuffer buffer)
   {
     CGPU_RESOLVE_DEVICE(device, idevice);
@@ -1791,35 +1789,14 @@ namespace gtl
     s_iinstance->ibufferStore.free(buffer.handle);
   }
 
-  void cgpuMapBuffer(CgpuDevice device, CgpuBuffer buffer, void** mappedMem)
+  void* cgpuGetBufferCpuPtr(CgpuBuffer buffer)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 
-    if (ibuffer->mappedMem)
-    {
-      *mappedMem = ibuffer->mappedMem;
-      return;
-    }
-
-    if (vmaMapMemory(idevice->allocator, ibuffer->allocation, mappedMem) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to map buffer memory");
-    }
+    return ibuffer->cpuPtr;
   }
 
-  void cgpuUnmapBuffer(CgpuDevice device, CgpuBuffer buffer)
-  {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-
-    if (!ibuffer->mappedMem)
-    {
-      vmaUnmapMemory(idevice->allocator, ibuffer->allocation);
-    }
-  }
-
-  uint64_t cgpuGetBufferAddress(CgpuBuffer buffer)
+  uint64_t cgpuGetBufferGpuAddress(CgpuBuffer buffer)
   {
     CGPU_RESOLVE_BUFFER(buffer, ibuffer);
 

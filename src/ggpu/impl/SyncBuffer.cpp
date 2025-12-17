@@ -43,11 +43,6 @@ namespace gtl
 
   GgpuSyncBuffer::~GgpuSyncBuffer()
   {
-    if (m_mappedHostMem)
-    {
-      cgpuUnmapBuffer(m_device, m_hostBuffer.buffer());
-      m_mappedHostMem = nullptr;
-    }
   }
 
   uint8_t* GgpuSyncBuffer::read(uint64_t byteOffset, uint64_t byteSize)
@@ -83,13 +78,6 @@ namespace gtl
       return true;
     }
 
-    // Unmap buffer before resize. New buffer is mapped later.
-    if (m_mappedHostMem)
-    {
-      cgpuUnmapBuffer(device, m_hostBuffer.buffer());
-      m_mappedHostMem = nullptr;
-    }
-
     m_size = newSize;
 
     // Reset buffers if new size is 0.
@@ -105,7 +93,7 @@ namespace gtl
 
     m_hostBuffer.resize(newSize, commandBuffer);
 
-    cgpuMapBuffer(device, m_hostBuffer.buffer(), (void**) &m_mappedHostMem);
+    m_mappedHostMem = (uint8_t*) cgpuGetBufferCpuPtr(m_hostBuffer.buffer());
 
     return true;
   }
