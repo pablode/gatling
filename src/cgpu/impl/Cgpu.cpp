@@ -403,7 +403,7 @@ namespace gtl
   }
 
   template<typename T>
-  static T cgpuPadToAlignment(T value, T alignment)
+  static T cgpuAlign(T value, T alignment)
   {
       return (value + (alignment - 1)) & ~(alignment - 1);
   }
@@ -1673,9 +1673,12 @@ namespace gtl
                                 const char* debugName,
                                 VmaPool memoryPool = VK_NULL_HANDLE)
   {
-    constexpr static uint64_t BASE_ALIGNMENT = 4;
+    constexpr static uint64_t BASE_ALIGNMENT = 32; // size of largest math primitive (vec4); ensure that
+                                                   // compiler can emit wide loads.
 
-    uint64_t newSize = cgpuPadToAlignment(size, BASE_ALIGNMENT); // required for vkCmdFillBuffer to clear whole range
+    uint64_t newSize = cgpuAlign(size, BASE_ALIGNMENT); // required for vkCmdFillBuffer to clear whole range
+
+    bool mapBuffer = idevice->features.sharedMemory || bool(memoryProperties & CgpuMemoryProperties::HostVisible);
 
     VkBufferCreateInfo bufferInfo = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -1700,12 +1703,15 @@ namespace gtl
     allocCreateInfo.pool = memoryPool;
     allocCreateInfo.priority = priority;
 
-    size_t newAlignment = cgpuPadToAlignment(alignment, BASE_ALIGNMENT); // for performance
+    size_t newAlignment = alignment;
+    size_t mmapAlign = idevice->internalProperties.minMemoryMapAlignment;
 
-    if (bool(memoryProperties & CgpuMemoryProperties::HostVisible))
+    if (mapBuffer && alignment < mmapAlign)
     {
-      newAlignment = cgpuPadToAlignment(newAlignment, idevice->internalProperties.minMemoryMapAlignment);
+      alignment = mmapAlign;
     }
+
+    newAlignment = cgpuAlign(alignment, BASE_ALIGNMENT);
 
     VkResult result = vmaCreateBufferWithAlignment(
       idevice->allocator,
@@ -1737,8 +1743,6 @@ namespace gtl
 
       ibuffer->gpuAddress = idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
     }
-
-    bool mapBuffer = idevice->features.sharedMemory || bool(memoryProperties & CgpuMemoryProperties::HostVisible);
 
     if (mapBuffer && vmaMapMemory(idevice->allocator, ibuffer->allocation, &ibuffer->cpuPtr) != VK_SUCCESS)
     {
@@ -2206,14 +2210,14 @@ namespace gtl
     const CgpuIDeviceProperties& properties = idevice->internalProperties;
 
     uint32_t handleSize = properties.shaderGroupHandleSize;
-    uint32_t alignedHandleSize = cgpuPadToAlignment(handleSize, properties.shaderGroupHandleAlignment);
+    uint32_t alignedHandleSize = cgpuAlign(handleSize, properties.shaderGroupHandleAlignment);
 
-    ipipeline->sbtRgen.stride = cgpuPadToAlignment(alignedHandleSize, properties.shaderGroupBaseAlignment);
+    ipipeline->sbtRgen.stride = cgpuAlign(alignedHandleSize, properties.shaderGroupBaseAlignment);
     ipipeline->sbtRgen.size = ipipeline->sbtRgen.stride; // Special raygen condition: size must be equal to stride
     ipipeline->sbtMiss.stride = alignedHandleSize;
-    ipipeline->sbtMiss.size = cgpuPadToAlignment(missShaderCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
+    ipipeline->sbtMiss.size = cgpuAlign(missShaderCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
     ipipeline->sbtHit.stride = alignedHandleSize;
-    ipipeline->sbtHit.size = cgpuPadToAlignment(hitGroupCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
+    ipipeline->sbtHit.size = cgpuAlign(hitGroupCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
 
     uint32_t firstGroup = 0;
     uint32_t dataSize = handleSize * groupCount;
