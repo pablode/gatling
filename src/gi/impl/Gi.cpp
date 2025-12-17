@@ -1049,7 +1049,7 @@ fail:
 
         if (!cgpuCreateBuffer(s_device, {
                                 .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
-                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent,
                                 .size = tmpPositionBufferSize,
                                 .debugName = "BlasVertexPositionsTmp"
                               }, &tmpPositionBuffer))
@@ -1060,7 +1060,7 @@ fail:
 
         if (!cgpuCreateBuffer(s_device, {
                                 .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
-                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent,
                                 .size = tmpIndexBufferSize,
                                 .debugName = "BlasIndicesTmp"
                               }, &tmpIndexBuffer))
@@ -2929,7 +2929,9 @@ cleanup:
     CgpuBuffer hostMem;
     if (!cgpuCreateBuffer(s_device, {
                             .usage = CgpuBufferUsage::TransferDst,
-                            .memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached,
+                            .memoryProperties = CgpuMemoryProperties::HostVisible |
+                                                CgpuMemoryProperties::HostCoherent |
+                                                CgpuMemoryProperties::HostCached,
                             .size = bufferSize,
                             .debugName = "RenderBufferCpu"
                           }, &hostMem))

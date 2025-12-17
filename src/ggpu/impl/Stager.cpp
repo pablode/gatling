@@ -53,7 +53,7 @@ namespace gtl
 
     if (!bufferCreated)
     {
-      createInfo.memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCached;
+      createInfo.memoryProperties = CgpuMemoryProperties::HostVisible | CgpuMemoryProperties::HostCoherent;
 
       bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
     }
