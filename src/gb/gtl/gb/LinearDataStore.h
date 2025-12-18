@@ -40,6 +40,7 @@ namespace gtl
         m_objects.resize(index + 1);
       }
 
+      m_objects[index] = {};
       return handle;
     }
 

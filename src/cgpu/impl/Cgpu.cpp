@@ -2294,8 +2294,6 @@ namespace gtl
 
     CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
 
-    memset(ipipeline, 0, sizeof(CgpuIPipeline));
-
     // Gather groups.
     size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups(groupCount);
