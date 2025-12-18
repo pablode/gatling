@@ -586,22 +586,16 @@ namespace gtl
 
   static VkResult cgpuCreateMemoryPool(VmaPool& pool,
                                        VmaAllocator allocator,
-                                       VkBufferUsageFlags bufferUsage,
-                                       VmaMemoryUsage memoryUsage,
+                                       VkMemoryPropertyFlags memoryProperties,
                                        uint32_t allocationAlignment = 0,
                                        float priority = 0.5f)
   {
-    VkBufferCreateInfo createInfoTemplate = {};
-    createInfoTemplate.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    createInfoTemplate.size = 0x1000; // doesn't matter
-    createInfoTemplate.usage = bufferUsage;
-
     VmaAllocationCreateInfo allocCreateInfo = {};
-    allocCreateInfo.usage = memoryUsage;
+    allocCreateInfo.requiredFlags = memoryProperties;
 
     uint32_t memTypeIndex;
-    VkResult result = vmaFindMemoryTypeIndexForBufferInfo(allocator, &createInfoTemplate,
-                                                          &allocCreateInfo, &memTypeIndex);
+    VkResult result = vmaFindMemoryTypeIndex(allocator, UINT32_MAX, &allocCreateInfo, &memTypeIndex);
+
     if (result != VK_SUCCESS)
     {
       return result;
@@ -1274,10 +1268,15 @@ namespace gtl
       CGPU_RETURN_ERROR("failed to create vma allocator");
     }
 
+    VkMemoryPropertyFlags asScratchMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    if (idevice->features.sharedMemory)
+    {
+      asScratchMemoryProperties |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    }
+
     float asScratchMemoryPriority = 1.0f;
     result = cgpuCreateMemoryPool(idevice->asScratchMemoryPool, idevice->allocator,
-                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                                  VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE,
+                                  asScratchMemoryProperties,
                                   idevice->internalProperties.minAccelerationStructureScratchOffsetAlignment,
                                   asScratchMemoryPriority);
 
@@ -1678,7 +1677,10 @@ namespace gtl
 
     uint64_t newSize = cgpuAlign(size, BASE_ALIGNMENT); // required for vkCmdFillBuffer to clear whole range
 
-    bool mapBuffer = idevice->features.sharedMemory || bool(memoryProperties & CgpuMemoryProperties::HostVisible);
+    if (idevice->features.sharedMemory)
+    {
+      memoryProperties |= CgpuMemoryProperties::HostVisible;
+    }
 
     VkBufferCreateInfo bufferInfo = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -1706,7 +1708,7 @@ namespace gtl
     size_t newAlignment = alignment;
     size_t mmapAlign = idevice->internalProperties.minMemoryMapAlignment;
 
-    if (mapBuffer && alignment < mmapAlign)
+    if (bool(memoryProperties & CgpuMemoryProperties::HostVisible) && alignment < mmapAlign)
     {
       alignment = mmapAlign;
     }
@@ -1744,7 +1746,8 @@ namespace gtl
       ibuffer->gpuAddress = idevice->table.vkGetBufferDeviceAddressKHR(idevice->logicalDevice, &addressInfo);
     }
 
-    if (mapBuffer && vmaMapMemory(idevice->allocator, ibuffer->allocation, &ibuffer->cpuPtr) != VK_SUCCESS)
+    if (bool(memoryProperties & CgpuMemoryProperties::HostVisible) &&
+        vmaMapMemory(idevice->allocator, ibuffer->allocation, &ibuffer->cpuPtr) != VK_SUCCESS)
     {
       cgpuDestroyIBuffer(idevice, ibuffer);
       CGPU_RETURN_ERROR("failed to map buffer memory");
