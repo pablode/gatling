@@ -96,8 +96,6 @@ namespace gtl
   struct CgpuIDeviceProperties
   {
     VkDriverId  driverID;
-    char driverInfo[VK_MAX_DRIVER_INFO_SIZE_KHR];
-    char driverName[VK_MAX_DRIVER_NAME_SIZE_KHR];
     uint32_t minAccelerationStructureScratchOffsetAlignment;
     size_t   minMemoryMapAlignment;
     uint64_t minStorageBufferOffsetAlignment;
@@ -315,42 +313,6 @@ namespace gtl
 
   /* Helper methods. */
 
-  static CgpuDeviceProperties cgpuTranslateDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
-                                                            const VkPhysicalDeviceSubgroupProperties& vkSubgroupProps,
-                                                            const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps)
-  {
-    return CgpuDeviceProperties {
-      .maxComputeSharedMemorySize = vkLimits.maxComputeSharedMemorySize,
-      .maxPushConstantsSize = vkLimits.maxPushConstantsSize,
-      .maxRayHitAttributeSize = vkRtPipelineProps.maxRayHitAttributeSize,
-      .subgroupSize = vkSubgroupProps.subgroupSize
-    };
-  }
-
-  static CgpuIDeviceProperties cgpuTranslateInternalDeviceProperties(const VkPhysicalDeviceLimits& vkLimits,
-                                                                     const VkPhysicalDeviceAccelerationStructurePropertiesKHR& vkAsProps,
-                                                                     const VkPhysicalDeviceRayTracingPipelinePropertiesKHR& vkRtPipelineProps,
-                                                                     const VkPhysicalDeviceDriverPropertiesKHR& driverProperties)
-  {
-    CgpuIDeviceProperties r {
-      .driverID = driverProperties.driverID,
-      .minAccelerationStructureScratchOffsetAlignment = vkAsProps.minAccelerationStructureScratchOffsetAlignment,
-      .minMemoryMapAlignment = vkLimits.minMemoryMapAlignment,
-      .minStorageBufferOffsetAlignment = vkLimits.minStorageBufferOffsetAlignment,
-      .optimalBufferCopyOffsetAlignment = vkLimits.optimalBufferCopyOffsetAlignment,
-      .optimalBufferCopyRowPitchAlignment = vkLimits.optimalBufferCopyRowPitchAlignment,
-      .shaderGroupBaseAlignment = vkRtPipelineProps.shaderGroupBaseAlignment,
-      .shaderGroupHandleAlignment = vkRtPipelineProps.shaderGroupHandleAlignment,
-      .shaderGroupHandleSize = vkRtPipelineProps.shaderGroupHandleSize,
-      .timestampPeriod = vkLimits.timestampPeriod
-    };
-
-    memcpy(r.driverInfo, driverProperties.driverInfo, VK_MAX_DRIVER_INFO_SIZE_KHR);
-    memcpy(r.driverName, driverProperties.driverName, VK_MAX_DRIVER_NAME_SIZE_KHR);
-
-    return r;
-  }
-
   static VkSamplerAddressMode cgpuTranslateAddressMode(CgpuSamplerAddressMode mode)
   {
     switch (mode)
@@ -424,7 +386,7 @@ namespace gtl
   }
 #endif
 
-  static bool cgpuFindExtension(const char* name, size_t extensionCount, VkExtensionProperties* extensions)
+  static bool cgpuFindExtension(const char* name, size_t extensionCount, const VkExtensionProperties* extensions)
   {
     for (size_t i = 0; i < extensionCount; ++i)
     {
@@ -614,279 +576,302 @@ namespace gtl
     vmaDestroyPool(allocator, pool);
   }
 
-  struct CgpuDeviceCandidate
+  struct CgpuDevicePropertyChain
   {
-    VkPhysicalDevice device;
-    GbSmallVector<const char*, 16> enabledExtensions;
-
-    VkPhysicalDeviceProperties2 vkProperties2;
-    VkPhysicalDeviceDriverPropertiesKHR vkDriverProperties;
-    VkPhysicalDeviceAccelerationStructurePropertiesKHR vkAsProperties;
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR vkRtPipelineProperties;
-    VkPhysicalDeviceSubgroupProperties vkSubgroupProperties;
-
-    VkPhysicalDeviceFeatures2 vkFeatures2;
-    VkPhysicalDeviceMaintenance4Features vkMaintenance4Features;
-    VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT vkGroupHandlesFeatures;
-    VkPhysicalDeviceMemoryPriorityFeaturesEXT vkMemoryPriorityFeatures;
-    VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT vkPageableMemoryFeatures;
-    VkPhysicalDeviceShaderClockFeaturesKHR vkShaderClockFeatures;
-    VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV vkRtReorderFeatures;
-    VkPhysicalDeviceRayTracingValidationFeaturesNV vkRtValidationFeatures;
-    VkPhysicalDeviceMaintenance5FeaturesKHR vkMaintenance5Features;
-    VkPhysicalDeviceTimelineSemaphoreFeaturesKHR vkTimelineSemaphoreFeatures;
-    VkPhysicalDeviceSynchronization2FeaturesKHR vkSynchronization2Features;
-    VkPhysicalDeviceAccelerationStructureFeaturesKHR vkAccelerationStructureFeatures;
-    VkPhysicalDeviceRayTracingPipelineFeaturesKHR vkRayTracingPipelineFeatures;
-    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR vkBufferDeviceAddressFeatures;
-    VkPhysicalDeviceDescriptorIndexingFeaturesEXT vkDescriptorIndexingFeatures;
-    VkPhysicalDeviceShaderFloat16Int8Features vkShaderFloat16Int8Features;
-    VkPhysicalDevice16BitStorageFeatures vkDevice16BitStorageFeatures;
-
-    uint32_t queueFamilyIndex;
-    uint32_t score;
-    std::vector<std::string> errorMessages; // if size() > 0: device is unsuitable
-
-    CgpuDeviceFeatures features;
-    CgpuIDeviceFeatures internalFeatures;
-
-    CgpuDeviceProperties properties;
-    CgpuIDeviceProperties internalProperties;
+    VkPhysicalDeviceProperties2 properties2;
+    VkPhysicalDeviceDriverPropertiesKHR driver;
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructure;
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipeline;
+    VkPhysicalDeviceSubgroupProperties subgroup;
   };
 
-  static void cgpuQueryDevice(VkPhysicalDevice device, CgpuDeviceCandidate& c)
+  static void cgpuSetupDevicePropertyChain(CgpuDevicePropertyChain& chain,
+                                           const VkExtensionProperties* extensions,
+                                           uint32_t extensionCount)
   {
-    c.device = device;
-
-    // query extensions
-    uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(c.device, nullptr, &extensionCount, nullptr);
-
-    std::vector<VkExtensionProperties> extensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(c.device, nullptr, &extensionCount, extensions.data());
-
-    const auto enableOptionalExtension = [&](const char* extName)
+    const auto findExtension = [&](const char* name)
     {
-      if (!cgpuFindExtension(extName, extensions.size(), extensions.data()))
-      {
-        return false;
-      }
-
-      c.enabledExtensions.push_back(extName);
-      return true;
+      return cgpuFindExtension(name, extensionCount, extensions);
     };
 
-    // query properties
     void* pNext = nullptr;
 
-    c.vkDriverProperties = VkPhysicalDeviceDriverPropertiesKHR {
+    chain = {};
+
+    chain.driver = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES_KHR,
       .pNext = pNext
     };
 
-    if (enableOptionalExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME))
+    if (findExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME))
     {
-      pNext = &c.vkDriverProperties;
+      pNext = &chain.driver;
     }
 
-    c.vkAsProperties = VkPhysicalDeviceAccelerationStructurePropertiesKHR {
+    chain.accelerationStructure = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
       .pNext = pNext
     };
-    c.vkRtPipelineProperties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR {
+    chain.rayTracingPipeline = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
-      .pNext = &c.vkAsProperties
+      .pNext = &chain.accelerationStructure
     };
-    c.vkSubgroupProperties = VkPhysicalDeviceSubgroupProperties {
+    chain.subgroup = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
-      .pNext = &c.vkRtPipelineProperties
+      .pNext = &chain.rayTracingPipeline
     };
-
-    c.vkProperties2 = VkPhysicalDeviceProperties2 {
+    chain.properties2 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-      .pNext = &c.vkSubgroupProperties
+      .pNext = &chain.subgroup
     };
-    vkGetPhysicalDeviceProperties2(c.device, &c.vkProperties2);
+  }
 
-    // query features
-    pNext = nullptr;
+  static CgpuDeviceProperties cgpuGetDeviceProperties(const CgpuDevicePropertyChain& chain)
+  {
+    const VkPhysicalDeviceLimits& limits = chain.properties2.properties.limits;
 
-    c.vkMaintenance4Features = VkPhysicalDeviceMaintenance4Features {
+    return CgpuDeviceProperties {
+      .maxComputeSharedMemorySize = limits.maxComputeSharedMemorySize,
+      .maxPushConstantsSize = limits.maxPushConstantsSize,
+      .maxRayHitAttributeSize = chain.rayTracingPipeline.maxRayHitAttributeSize,
+      .subgroupSize = chain.subgroup.subgroupSize
+    };
+  }
+
+  static CgpuIDeviceProperties cgpuGetInternalDeviceProperties(const CgpuDevicePropertyChain& chain)
+  {
+    const VkPhysicalDeviceLimits& limits = chain.properties2.properties.limits;
+
+    return CgpuIDeviceProperties {
+      .driverID = chain.driver.driverID,
+      .minAccelerationStructureScratchOffsetAlignment =
+        chain.accelerationStructure.minAccelerationStructureScratchOffsetAlignment,
+      .minMemoryMapAlignment = limits.minMemoryMapAlignment,
+      .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
+      .optimalBufferCopyOffsetAlignment = limits.optimalBufferCopyOffsetAlignment,
+      .optimalBufferCopyRowPitchAlignment = limits.optimalBufferCopyRowPitchAlignment,
+      .shaderGroupBaseAlignment = chain.rayTracingPipeline.shaderGroupBaseAlignment,
+      .shaderGroupHandleAlignment = chain.rayTracingPipeline.shaderGroupHandleAlignment,
+      .shaderGroupHandleSize = chain.rayTracingPipeline.shaderGroupHandleSize,
+      .timestampPeriod = limits.timestampPeriod
+    };
+  }
+
+  struct CgpuDeviceFeatureChain
+  {
+    VkPhysicalDeviceFeatures2 features2;
+    VkPhysicalDeviceMaintenance4Features maintenance4;
+    VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT groupHandles;
+    VkPhysicalDeviceMemoryPriorityFeaturesEXT memoryPriority;
+    VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableDeviceLocalMemory;
+    VkPhysicalDeviceShaderClockFeaturesKHR shaderClock;
+    VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV rayTracingInvocationReorder;
+    VkPhysicalDeviceRayTracingValidationFeaturesNV rayTracingValidation;
+    VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5;
+    VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timelineSemaphore;
+    VkPhysicalDeviceSynchronization2FeaturesKHR synchronization2;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructure;
+    VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipeline;
+    VkPhysicalDeviceBufferDeviceAddressFeaturesKHR bufferDeviceAddress;
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexing;
+    VkPhysicalDeviceShaderFloat16Int8Features shaderFloat16Int8;
+    VkPhysicalDevice16BitStorageFeatures storage16Bit;
+  };
+
+  static void cgpuSetupDeviceFeatureChain(CgpuDeviceFeatureChain& chain,
+                                          const VkExtensionProperties* extensions,
+                                          uint32_t extensionCount,
+                                          bool debugUtilsEnabled,
+                                          uint32_t vendorID)
+  {
+    const auto findExtension = [&](const char* name)
+    {
+      return cgpuFindExtension(name, extensionCount, extensions);
+    };
+
+    void* pNext = nullptr;
+
+    chain = {};
+
+    chain.maintenance4 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES,
       .pNext = pNext
     };
 
-    if (enableOptionalExtension(VK_KHR_MAINTENANCE_4_EXTENSION_NAME))
+    if (findExtension(VK_KHR_MAINTENANCE_4_EXTENSION_NAME))
     {
-      pNext = &c.vkMaintenance4Features;
+      pNext = &chain.maintenance4;
     }
 
-    c.vkGroupHandlesFeatures = VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT {
+    chain.groupHandles = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_LIBRARY_GROUP_HANDLES_FEATURES_EXT,
       .pNext = pNext
     };
 
-    if (enableOptionalExtension(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) &&
-        enableOptionalExtension(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME))
+    if (vendorID == CGPU_VENDOR_ID_NVIDIA && // issues on AMD and Intel
+        findExtension(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME) &&
+        findExtension(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME))
     {
-      pNext = &c.vkGroupHandlesFeatures;
+      pNext = &chain.groupHandles;
     }
 
-    c.vkMemoryPriorityFeatures = VkPhysicalDeviceMemoryPriorityFeaturesEXT {
+    chain.memoryPriority = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT,
       .pNext = pNext
     };
-
-    c.vkPageableMemoryFeatures = VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT {
+    chain.pageableDeviceLocalMemory = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT,
-      .pNext = &c.vkMemoryPriorityFeatures
+      .pNext = &chain.memoryPriority
     };
 
-    if (enableOptionalExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) &&
-        enableOptionalExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME))
+    if (findExtension(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) &&
+        findExtension(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME))
     {
-      pNext = &c.vkPageableMemoryFeatures;
+      pNext = &chain.pageableDeviceLocalMemory;
     }
 
-    c.vkShaderClockFeatures = VkPhysicalDeviceShaderClockFeaturesKHR {
+    chain.shaderClock = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CLOCK_FEATURES_KHR,
       .pNext = pNext
     };
 
 #ifndef NDEBUG
-    if (enableOptionalExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME))
+    if (findExtension(VK_KHR_SHADER_CLOCK_EXTENSION_NAME))
     {
-      pNext = &c.vkShaderClockFeatures;
+      pNext = &chain.shaderClock;
     }
 #endif
 
-    c.vkRtReorderFeatures = VkPhysicalDeviceRayTracingInvocationReorderFeaturesNV {
+    chain.rayTracingInvocationReorder = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_INVOCATION_REORDER_FEATURES_NV,
       .pNext = pNext
     };
 
 #ifndef NDEBUG
-    if (enableOptionalExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME))
+    if (findExtension(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME))
     {
-      pNext = &c.vkRtReorderFeatures;
+      pNext = &chain.rayTracingInvocationReorder;
     }
 #endif
 
-    c.vkRtValidationFeatures = VkPhysicalDeviceRayTracingValidationFeaturesNV {
+    chain.rayTracingValidation = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV,
       .pNext = pNext
     };
 
 #ifndef NDEBUG
-    // Note: driver additionally needs NV_ALLOW_RAYTRACING_VALIDATION=1 to be set
-    if (s_iinstance->debugUtilsEnabled && enableOptionalExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
+    if (debugUtilsEnabled && findExtension(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME))
     {
-      pNext = &c.vkRtValidationFeatures;
+      pNext = &chain.rayTracingValidation;
     }
 #endif
 
-    c.vkMaintenance5Features = VkPhysicalDeviceMaintenance5FeaturesKHR {
+    chain.maintenance5 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
       .pNext = pNext
     };
-
-    c.vkTimelineSemaphoreFeatures = VkPhysicalDeviceTimelineSemaphoreFeaturesKHR {
+    chain.timelineSemaphore = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES,
-      .pNext = &c.vkMaintenance5Features
+      .pNext = &chain.maintenance5
     };
-
-    c.vkSynchronization2Features = VkPhysicalDeviceSynchronization2FeaturesKHR {
+    chain.synchronization2 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR,
-      .pNext = &c.vkTimelineSemaphoreFeatures
+      .pNext = &chain.timelineSemaphore
     };
-
-    c.vkAccelerationStructureFeatures = VkPhysicalDeviceAccelerationStructureFeaturesKHR {
+    chain.accelerationStructure = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
-      .pNext = &c.vkSynchronization2Features
+      .pNext = &chain.synchronization2
     };
-
-    c.vkRayTracingPipelineFeatures = VkPhysicalDeviceRayTracingPipelineFeaturesKHR {
+    chain.rayTracingPipeline = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR,
-      .pNext = &c.vkAccelerationStructureFeatures
+      .pNext = &chain.accelerationStructure
     };
-
-    c.vkBufferDeviceAddressFeatures = VkPhysicalDeviceBufferDeviceAddressFeaturesKHR {
+    chain.bufferDeviceAddress = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
-      .pNext = &c.vkRayTracingPipelineFeatures
+      .pNext = &chain.rayTracingPipeline
     };
-
-    c.vkDescriptorIndexingFeatures = VkPhysicalDeviceDescriptorIndexingFeaturesEXT {
+    chain.descriptorIndexing = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES,
-      .pNext = &c.vkBufferDeviceAddressFeatures
+      .pNext = &chain.bufferDeviceAddress
     };
-
-    c.vkShaderFloat16Int8Features = VkPhysicalDeviceShaderFloat16Int8Features {
+    chain.shaderFloat16Int8 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
-      .pNext = &c.vkDescriptorIndexingFeatures
+      .pNext = &chain.descriptorIndexing
     };
-
-    c.vkDevice16BitStorageFeatures = VkPhysicalDevice16BitStorageFeatures{
+    chain.storage16Bit = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
-      .pNext = &c.vkShaderFloat16Int8Features
+      .pNext = &chain.shaderFloat16Int8
     };
-
-    c.vkFeatures2 = VkPhysicalDeviceFeatures2 {
+    chain.features2 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &c.vkDevice16BitStorageFeatures
+      .pNext = &chain.storage16Bit
     };
-    vkGetPhysicalDeviceFeatures2(c.device, &c.vkFeatures2);
+  }
 
-    // check extensions
-    for (uint32_t j = 0; j < CGPU_REQUIRED_EXTENSIONS.size(); j++)
+  using CgpuExtensionVector = GbSmallVector<const char*, 16>;
+
+  static void cgpuAddFeatureExtensions(const CgpuDeviceFeatures& features,
+                                       const CgpuIDeviceFeatures& internalFeatures,
+                                       CgpuExtensionVector& extensions)
+  {
+    if (features.debugPrintf)
     {
-      const char* extension = CGPU_REQUIRED_EXTENSIONS[j];
-
-      if (!cgpuFindExtension(extension, extensionCount, extensions.data()))
-      {
-        c.errorMessages.push_back(GB_FMT("extension {} missing", extension));
-      }
-
-      c.enabledExtensions.push_back(CGPU_REQUIRED_EXTENSIONS[j]);
+      extensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
+    }
+    if (features.rayTracingInvocationReorder)
+    {
+      extensions.push_back(VK_NV_RAY_TRACING_INVOCATION_REORDER_EXTENSION_NAME);
+    }
+    if (features.shaderClock)
+    {
+      extensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
     }
 
-    // check properties
-    const VkPhysicalDeviceLimits& limits = c.vkProperties2.properties.limits;
-    if (!limits.timestampComputeAndGraphics)
+    if (internalFeatures.driverProperties)
     {
-      c.errorMessages.push_back("property timestampComputeAndGraphics missing");
+      extensions.push_back(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME);
     }
-
-    uint32_t apiVersion = c.vkProperties2.properties.apiVersion;
-    if (apiVersion < CGPU_MIN_VK_API_VERSION)
+    if (internalFeatures.maintenance4)
     {
-      c.errorMessages.push_back(GB_FMT("outdated Vulkan API {}.{}.{}", VK_API_VERSION_MAJOR(apiVersion),
-        VK_API_VERSION_MINOR(apiVersion), VK_API_VERSION_PATCH(apiVersion)));
+      extensions.push_back(VK_KHR_MAINTENANCE_4_EXTENSION_NAME);
     }
+    if (internalFeatures.pageableDeviceLocalMemory)
+    {
+      extensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
+      extensions.push_back(VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME);
+    }
+    if (internalFeatures.pipelineLibraries)
+    {
+      extensions.push_back(VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME);
+      extensions.push_back(VK_EXT_PIPELINE_LIBRARY_GROUP_HANDLES_EXTENSION_NAME);
+    }
+    if (internalFeatures.rayTracingValidation)
+    {
+      extensions.push_back(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME);
+    }
+  }
 
-    c.properties = cgpuTranslateDeviceProperties(limits, c.vkSubgroupProperties, c.vkRtPipelineProperties);
-    c.internalProperties = cgpuTranslateInternalDeviceProperties(limits, c.vkAsProperties, c.vkRtPipelineProperties, c.vkDriverProperties);
+  struct CgpuDeviceCandidate
+  {
+    VkPhysicalDevice device;
+    CgpuExtensionVector enabledExtensions;
 
-    // check features
-#define CGPU_CHECK_FEATURE(STRUCT, FIELD) \
-    if (!STRUCT.FIELD) c.errorMessages.push_back(GB_FMT("feature {} missing", #FIELD))
+    CgpuDevicePropertyChain propertyChain;
+    CgpuDeviceFeatureChain featureChain;
 
-    CGPU_CHECK_FEATURE(c.vkMaintenance5Features, maintenance5);
-    CGPU_CHECK_FEATURE(c.vkTimelineSemaphoreFeatures, timelineSemaphore);
-    CGPU_CHECK_FEATURE(c.vkSynchronization2Features, synchronization2);
-    CGPU_CHECK_FEATURE(c.vkAccelerationStructureFeatures, accelerationStructure);
-    CGPU_CHECK_FEATURE(c.vkRayTracingPipelineFeatures, rayTracingPipeline);
-    CGPU_CHECK_FEATURE(c.vkBufferDeviceAddressFeatures, bufferDeviceAddress);
-    CGPU_CHECK_FEATURE(c.vkDescriptorIndexingFeatures, shaderSampledImageArrayNonUniformIndexing);
-    CGPU_CHECK_FEATURE(c.vkDescriptorIndexingFeatures, descriptorBindingPartiallyBound);
-    CGPU_CHECK_FEATURE(c.vkDescriptorIndexingFeatures, runtimeDescriptorArray);
-    CGPU_CHECK_FEATURE(c.vkShaderFloat16Int8Features, shaderFloat16);
-    CGPU_CHECK_FEATURE(c.vkDevice16BitStorageFeatures, storageBuffer16BitAccess);
-    CGPU_CHECK_FEATURE(c.vkFeatures2.features, shaderSampledImageArrayDynamicIndexing);
-    CGPU_CHECK_FEATURE(c.vkFeatures2.features, shaderInt16);
+    CgpuDeviceFeatures features;
+    CgpuIDeviceFeatures internalFeatures;
 
-#undef CGPU_CHECK_FEATURE
+    uint32_t queueFamilyIndex;
+    uint32_t score;
+    std::vector<std::string> errorMessages; // if size() > 0: device is unsuitable
+  };
 
-    // check queue
+  static void cgpuQueryDeviceCandidate(VkPhysicalDevice device, CgpuDeviceCandidate& c)
+  {
+    c.device = device;
+
+    // query & check queue
     uint32_t queueFamilyCount;
     vkGetPhysicalDeviceQueueFamilyProperties(c.device, &queueFamilyCount, nullptr);
 
@@ -908,7 +893,7 @@ namespace gtl
       c.errorMessages.push_back("no suitable queue family");
     }
 
-    // determine optional features
+    // query & check memory
     VkPhysicalDeviceMemoryProperties memoryProperties;
     vkGetPhysicalDeviceMemoryProperties(c.device, &memoryProperties);
 
@@ -937,24 +922,110 @@ namespace gtl
       }
     }
 
-    bool pipelineLibraries = c.vkProperties2.properties.vendorID == CGPU_VENDOR_ID_NVIDIA && // issues on AMD & Intel
-                             bool(c.vkGroupHandlesFeatures.pipelineLibraryGroupHandles);
+    // query & check extensions
+    uint32_t extensionCount;
+    vkEnumerateDeviceExtensionProperties(c.device, nullptr, &extensionCount, nullptr);
+
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(c.device, nullptr, &extensionCount, extensions.data());
+
+    for (uint32_t j = 0; j < CGPU_REQUIRED_EXTENSIONS.size(); j++)
+    {
+      const char* extension = CGPU_REQUIRED_EXTENSIONS[j];
+
+      if (!cgpuFindExtension(extension, extensionCount, extensions.data()))
+      {
+        c.errorMessages.push_back(GB_FMT("extension {} missing", extension));
+      }
+
+      c.enabledExtensions.push_back(CGPU_REQUIRED_EXTENSIONS[j]);
+    }
+
+    const auto findExtension = [&](const char* name)
+    {
+      return cgpuFindExtension(name, extensions.size(), extensions.data());
+    };
+
+    // query & check properties
+    cgpuSetupDevicePropertyChain(c.propertyChain, extensions.data(), extensionCount);
+    vkGetPhysicalDeviceProperties2(c.device, &c.propertyChain.properties2);
+
+    const VkPhysicalDeviceProperties& properties = c.propertyChain.properties2.properties;
+    const VkPhysicalDeviceLimits& limits = properties.limits;
+
+    if (!limits.timestampComputeAndGraphics)
+    {
+      c.errorMessages.push_back("property timestampComputeAndGraphics missing");
+    }
+
+    uint32_t apiVersion = properties.apiVersion;
+    if (apiVersion < CGPU_MIN_VK_API_VERSION)
+    {
+      c.errorMessages.push_back(GB_FMT("outdated Vulkan API {}.{}.{}", VK_API_VERSION_MAJOR(apiVersion),
+        VK_API_VERSION_MINOR(apiVersion), VK_API_VERSION_PATCH(apiVersion)));
+    }
+
+    // query & check features
+    CgpuDeviceFeatureChain tempFeatureChain;
+    cgpuSetupDeviceFeatureChain(tempFeatureChain, extensions.data(), extensionCount,
+                                s_iinstance->debugUtilsEnabled, properties.vendorID);
+    vkGetPhysicalDeviceFeatures2(c.device, &tempFeatureChain.features2);
+
+#define CGPU_REQUIRE_FEATURE(STRUCT, FIELD)                              \
+      if (tempFeatureChain.STRUCT.FIELD) {                               \
+        c.featureChain.STRUCT.FIELD = VK_TRUE;                           \
+      } else {                                                           \
+        c.errorMessages.push_back(GB_FMT("feature {} missing", #FIELD)); \
+      }
+
+    cgpuSetupDeviceFeatureChain(c.featureChain, extensions.data(), extensionCount,
+                                s_iinstance->debugUtilsEnabled, properties.vendorID);
+    CGPU_REQUIRE_FEATURE(maintenance5, maintenance5);
+    CGPU_REQUIRE_FEATURE(timelineSemaphore, timelineSemaphore);
+    CGPU_REQUIRE_FEATURE(synchronization2, synchronization2);
+    CGPU_REQUIRE_FEATURE(accelerationStructure, accelerationStructure);
+    CGPU_REQUIRE_FEATURE(rayTracingPipeline, rayTracingPipeline);
+    CGPU_REQUIRE_FEATURE(bufferDeviceAddress, bufferDeviceAddress);
+    CGPU_REQUIRE_FEATURE(descriptorIndexing, shaderSampledImageArrayNonUniformIndexing);
+    CGPU_REQUIRE_FEATURE(descriptorIndexing, descriptorBindingPartiallyBound);
+    CGPU_REQUIRE_FEATURE(descriptorIndexing, runtimeDescriptorArray);
+    CGPU_REQUIRE_FEATURE(shaderFloat16Int8, shaderFloat16);
+    CGPU_REQUIRE_FEATURE(storage16Bit, storageBuffer16BitAccess);
+    CGPU_REQUIRE_FEATURE(features2.features, shaderSampledImageArrayDynamicIndexing);
+    CGPU_REQUIRE_FEATURE(features2.features, shaderInt16);
+    CGPU_REQUIRE_FEATURE(features2.features, shaderInt64);
+#undef CGPU_REQUIRE_FEATURE
+
+#define CGPU_ENABLE_FEATURE(STRUCT, FIELD) \
+      bool(c.featureChain.STRUCT.FIELD = tempFeatureChain.STRUCT.FIELD)
+
+    bool pageableDeviceLocalMemory = tempFeatureChain.memoryPriority.memoryPriority &&
+                                     tempFeatureChain.pageableDeviceLocalMemory.pageableDeviceLocalMemory;
+
+    if (pageableDeviceLocalMemory)
+    {
+      c.featureChain.memoryPriority.memoryPriority = VK_TRUE;
+      c.featureChain.pageableDeviceLocalMemory.pageableDeviceLocalMemory = VK_TRUE;
+    }
 
     c.features = {
-      .debugPrintf = enableOptionalExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME),
-      .rayTracingInvocationReorder = bool(c.vkRtReorderFeatures.rayTracingInvocationReorder),
-      .shaderClock = bool(c.vkShaderClockFeatures.shaderSubgroupClock),
-      .sharedMemory = isHeapHostAccessible // likely UMA or ReBAR
+      .debugPrintf = findExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME),
+      .rayTracingInvocationReorder = CGPU_ENABLE_FEATURE(rayTracingInvocationReorder, rayTracingInvocationReorder),
+      .shaderClock = CGPU_ENABLE_FEATURE(shaderClock, shaderSubgroupClock),
+      .sharedMemory = isHeapHostAccessible // UMA or ReBAR
     };
 
     c.internalFeatures =
     {
-      .driverProperties = bool(c.vkDriverProperties.driverID),
-      .maintenance4 = bool(c.vkMaintenance4Features.maintenance4),
-      .pageableDeviceLocalMemory = bool(c.vkPageableMemoryFeatures.pageableDeviceLocalMemory),
-      .pipelineLibraries = pipelineLibraries,
-      .rayTracingValidation = bool(c.vkRtValidationFeatures.rayTracingValidation)
+      .driverProperties = findExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME),
+      .maintenance4 = CGPU_ENABLE_FEATURE(maintenance4, maintenance4),
+      .pageableDeviceLocalMemory = pageableDeviceLocalMemory,
+      .pipelineLibraries = CGPU_ENABLE_FEATURE(groupHandles, pipelineLibraryGroupHandles),
+      .rayTracingValidation = CGPU_ENABLE_FEATURE(rayTracingValidation, rayTracingValidation)
     };
+
+    cgpuAddFeatureExtensions(c.features, c.internalFeatures, c.enabledExtensions);
+#undef CGPU_ENABLE_FEATURE
 
     // calculate score
     c.score = 0;
@@ -964,11 +1035,11 @@ namespace gtl
       return;
     }
 
-    if (c.vkProperties2.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+    if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
     {
       c.score += 10000;
     }
-    else if (c.vkProperties2.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)
+    else if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)
     {
       c.score += 8000; // can be a masked dGPU
     }
@@ -997,20 +1068,10 @@ namespace gtl
     {
       CgpuDeviceCandidate& c = candidates[deviceIdx];
 
-      cgpuQueryDevice(devices[deviceIdx], c);
+      cgpuQueryDeviceCandidate(devices[deviceIdx], c);
     }
 
     return candidates;
-  }
-
-  static std::string cgpuGetDriverInfo(const CgpuDeviceCandidate& candidate)
-  {
-    if (candidate.internalFeatures.driverProperties)
-    {
-      return GB_FMT("{} ({})", candidate.internalProperties.driverName,
-                               candidate.internalProperties.driverInfo);
-    }
-    return std::string();
   }
 
   static void cgpuPrintEnabledFeatures(const CgpuDeviceFeatures& features, const CgpuIDeviceFeatures& internalFeatures)
@@ -1061,10 +1122,11 @@ namespace gtl
     for (uint32_t i = 0; i < candidates.size(); i++)
     {
       const CgpuDeviceCandidate& candidate = candidates[i];
+      const VkPhysicalDeviceProperties& properties = candidate.propertyChain.properties2.properties;
 
       std::string idxStr = (i == deviceIndex) ? "x" : GB_FMT("{}", i);
 
-      GB_LOG("[{}] ({}) {}", idxStr, candidate.score, candidate.vkProperties2.properties.deviceName);
+      GB_LOG("[{}] ({}) {}", idxStr, candidate.score, properties.deviceName);
 
       for (const std::string& msg : candidate.errorMessages)
       {
@@ -1081,7 +1143,7 @@ namespace gtl
     const CgpuDeviceCandidate& candidate = candidates[deviceIndex];
 
     // print info
-    VkPhysicalDeviceProperties properties = candidate.vkProperties2.properties;
+    const VkPhysicalDeviceProperties& properties = candidate.propertyChain.properties2.properties;
 
     GB_LOG("Selected device {}:", deviceIndex);
     uint32_t apiVersion = properties.apiVersion;
@@ -1103,9 +1165,10 @@ namespace gtl
       GB_LOG("> vendor: Unknown ({:#08x})", properties.vendorID);
     }
 
-    if (std::string driverInfo = cgpuGetDriverInfo(candidate); !driverInfo.empty())
+    if (candidate.internalFeatures.driverProperties)
     {
-      GB_LOG("> driver: {}", driverInfo);
+      GB_LOG("> driver: {} ({})", candidate.propertyChain.driver.driverName,
+                                  candidate.propertyChain.driver.driverInfo);
     }
 
     cgpuPrintEnabledFeatures(candidate.features, candidate.internalFeatures);
@@ -1119,8 +1182,8 @@ namespace gtl
 
     idevice->features = candidate.features;
     idevice->internalFeatures = candidate.internalFeatures;
-    idevice->properties = candidate.properties;
-    idevice->internalProperties = candidate.internalProperties;
+    idevice->properties = cgpuGetDeviceProperties(candidate.propertyChain);
+    idevice->internalProperties = cgpuGetInternalDeviceProperties(candidate.propertyChain);
 
     const float queuePriority = 1.0f;
 
@@ -1135,7 +1198,7 @@ namespace gtl
 
     VkDeviceCreateInfo deviceCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = &candidate.vkFeatures2,
+      .pNext = &candidate.featureChain,
       .flags = 0,
       .queueCreateInfoCount = 1,
       .pQueueCreateInfos = &queueCreateInfo,
