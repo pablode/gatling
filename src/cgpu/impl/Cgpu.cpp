@@ -619,8 +619,13 @@ namespace gtl
     VkPhysicalDevice device;
     GbSmallVector<const char*, 16> enabledExtensions;
 
-    VkPhysicalDeviceFeatures2 vkFeatures2;
     VkPhysicalDeviceProperties2 vkProperties2;
+    VkPhysicalDeviceDriverPropertiesKHR vkDriverProperties;
+    VkPhysicalDeviceAccelerationStructurePropertiesKHR vkAsProperties;
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR vkRtPipelineProperties;
+    VkPhysicalDeviceSubgroupProperties vkSubgroupProperties;
+
+    VkPhysicalDeviceFeatures2 vkFeatures2;
     VkPhysicalDeviceMaintenance4Features vkMaintenance4Features;
     VkPhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT vkGroupHandlesFeatures;
     VkPhysicalDeviceMemoryPriorityFeaturesEXT vkMemoryPriorityFeatures;
@@ -674,32 +679,32 @@ namespace gtl
     // query properties
     void* pNext = nullptr;
 
-    VkPhysicalDeviceDriverPropertiesKHR driverProperties = {
+    c.vkDriverProperties = VkPhysicalDeviceDriverPropertiesKHR {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES_KHR,
       .pNext = pNext
     };
 
     if (enableOptionalExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME))
     {
-      pNext = &driverProperties;
+      pNext = &c.vkDriverProperties;
     }
 
-    VkPhysicalDeviceAccelerationStructurePropertiesKHR asProperties = {
+    c.vkAsProperties = VkPhysicalDeviceAccelerationStructurePropertiesKHR {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
       .pNext = pNext
     };
-    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtPipelineProperties = {
+    c.vkRtPipelineProperties = VkPhysicalDeviceRayTracingPipelinePropertiesKHR {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR,
-      .pNext = &asProperties
+      .pNext = &c.vkAsProperties
     };
-    VkPhysicalDeviceSubgroupProperties subgroupProperties = {
+    c.vkSubgroupProperties = VkPhysicalDeviceSubgroupProperties {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
-      .pNext = &rtPipelineProperties
+      .pNext = &c.vkRtPipelineProperties
     };
 
     c.vkProperties2 = VkPhysicalDeviceProperties2 {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-      .pNext = &subgroupProperties
+      .pNext = &c.vkSubgroupProperties
     };
     vkGetPhysicalDeviceProperties2(c.device, &c.vkProperties2);
 
@@ -858,8 +863,8 @@ namespace gtl
         VK_API_VERSION_MINOR(apiVersion), VK_API_VERSION_PATCH(apiVersion)));
     }
 
-    c.properties = cgpuTranslateDeviceProperties(limits, subgroupProperties, rtPipelineProperties);
-    c.internalProperties = cgpuTranslateInternalDeviceProperties(limits, asProperties, rtPipelineProperties, driverProperties);
+    c.properties = cgpuTranslateDeviceProperties(limits, c.vkSubgroupProperties, c.vkRtPipelineProperties);
+    c.internalProperties = cgpuTranslateInternalDeviceProperties(limits, c.vkAsProperties, c.vkRtPipelineProperties, c.vkDriverProperties);
 
     // check features
 #define CGPU_CHECK_FEATURE(STRUCT, FIELD) \
@@ -944,7 +949,7 @@ namespace gtl
 
     c.internalFeatures =
     {
-      .driverProperties = bool(driverProperties.driverID),
+      .driverProperties = bool(c.vkDriverProperties.driverID),
       .maintenance4 = bool(c.vkMaintenance4Features.maintenance4),
       .pageableDeviceLocalMemory = bool(c.vkPageableMemoryFeatures.pageableDeviceLocalMemory),
       .pipelineLibraries = pipelineLibraries,
