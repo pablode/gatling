@@ -99,6 +99,7 @@ namespace gtl
     uint32_t minAccelerationStructureScratchOffsetAlignment;
     size_t   minMemoryMapAlignment;
     uint64_t minStorageBufferOffsetAlignment;
+    uint64_t minUniformBufferOffsetAlignment;
     uint64_t optimalBufferCopyOffsetAlignment;
     uint64_t optimalBufferCopyRowPitchAlignment;
     uint32_t shaderGroupBaseAlignment;
@@ -516,6 +517,7 @@ namespace gtl
         chain.accelerationStructure.minAccelerationStructureScratchOffsetAlignment,
       .minMemoryMapAlignment = limits.minMemoryMapAlignment,
       .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
+      .minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment,
       .optimalBufferCopyOffsetAlignment = limits.optimalBufferCopyOffsetAlignment,
       .optimalBufferCopyRowPitchAlignment = limits.optimalBufferCopyRowPitchAlignment,
       .shaderGroupBaseAlignment = chain.rayTracingPipeline.shaderGroupBaseAlignment,
@@ -1412,7 +1414,12 @@ namespace gtl
     for (uint32_t i = 0; i < bindingCount; i++)
     {
       const CgpuShaderReflectionBinding& bindingReflection = bindings[i];
+
       VkDescriptorType descriptorType = (VkDescriptorType) bindingReflection.descriptorType;
+      if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+      {
+        descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+      }
 
       VkDescriptorSetLayoutBinding layoutBinding = {
         .binding = bindingReflection.binding,
@@ -2077,7 +2084,8 @@ namespace gtl
 
     if (uniformBufferCount > 0)
     {
-      poolSizes[poolSizeCount].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      // We treat all uniform buffers we encounter as dynamic.
+      poolSizes[poolSizeCount].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
       poolSizes[poolSizeCount].descriptorCount = uniformBufferCount;
       poolSizeCount++;
     }
@@ -2929,6 +2937,12 @@ namespace gtl
     {
       const VkDescriptorSetLayoutBinding* layoutBinding = &layoutBindings[i];
 
+      VkDescriptorType descriptorType = layoutBinding->descriptorType;
+      if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER)
+      {
+        descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+      }
+
       VkWriteDescriptorSet writeDescriptorSet = {
         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
         .pNext = nullptr,
@@ -2936,14 +2950,14 @@ namespace gtl
         .dstBinding = layoutBinding->binding,
         .dstArrayElement = 0,
         .descriptorCount = layoutBinding->descriptorCount,
-        .descriptorType = layoutBinding->descriptorType,
+        .descriptorType = descriptorType,
         .pImageInfo = nullptr,
         .pBufferInfo = nullptr,
         .pTexelBufferView = nullptr,
       };
 
-      if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
-          layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+      if (descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
+          descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
       {
         for (uint32_t k = 0; k < bindings->bufferCount; ++k)
         {
@@ -2961,11 +2975,6 @@ namespace gtl
 
           CGPU_RESOLVE_BUFFER(ctx, bufferBinding->buffer, ibuffer);
 
-          if ((bufferBinding->offset % idevice->internalProperties.minStorageBufferOffsetAlignment) != 0)
-          {
-            CGPU_FATAL("buffer binding offset not aligned");
-          }
-
           VkDescriptorBufferInfo bufferInfo = {
             .buffer = ibuffer->buffer,
             .offset = bufferBinding->offset,
@@ -2977,8 +2986,8 @@ namespace gtl
           writeDescriptorSets.push_back(writeDescriptorSet);
         }
       }
-      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
-               layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+      else if (descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+               descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
       {
         for (uint32_t k = 0; k < bindings->imageCount; k++)
         {
@@ -3009,7 +3018,7 @@ namespace gtl
           writeDescriptorSets.push_back(writeDescriptorSet);
         }
       }
-      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
+      else if (descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
       {
         for (uint32_t k = 0; k < bindings->samplerCount; k++)
         {
@@ -3038,7 +3047,7 @@ namespace gtl
           writeDescriptorSets.push_back(writeDescriptorSet);
         }
       }
-      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+      else if (descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
       {
         for (uint32_t k = 0; k < bindings->tlasCount; ++k)
         {
@@ -3149,7 +3158,9 @@ namespace gtl
                            CgpuCommandBuffer commandBuffer,
                            CgpuPipeline pipeline,
                            const CgpuBindSet* bindSets,
-                           uint32_t bindSetCount)
+                           uint32_t bindSetCount,
+                           uint32_t dynamicOffsetCount,
+                           const uint32_t* dynamicOffsets)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
@@ -3169,9 +3180,6 @@ namespace gtl
     }
 
     uint32_t firstDescriptorSet = 0;
-    uint32_t dynamicOffsetCount = 0;
-    const uint32_t* dynamicOffsets = nullptr;
-
     idevice->table.vkCmdBindDescriptorSets(
       icommandBuffer->commandBuffer,
       ipipeline->bindPoint,

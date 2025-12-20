@@ -111,7 +111,7 @@ namespace gtl
   struct GiShaderCache
   {
     uint32_t                       aovMask;
-    std::array<CgpuBindSet, 3>     bindSets;
+    std::array<CgpuBindSet, 4>     bindSets;
     bool                           domeLightCameraVisible;
     std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
@@ -1368,7 +1368,7 @@ cleanup:
 
     GiShaderCache* cache = nullptr;
     CgpuPipeline pipeline;
-    std::array<CgpuBindSet, 3> bindSets;
+    std::array<CgpuBindSet, 4> bindSets;
     CgpuShader rgenShader;
     std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
@@ -2093,7 +2093,7 @@ cleanup:
       if (!scene->sceneParams.handle)
       {
         if (!cgpuCreateBuffer(s_ctx, {
-                                .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                                .usage = CgpuBufferUsage::Uniform | CgpuBufferUsage::TransferDst,
                                 .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                                 .size = sizeof(sceneParams),
                                 .debugName = "SceneParams"
@@ -2295,17 +2295,26 @@ cleanup:
         GI_FATAL("max number of textures exceeded");
       }
 
+      CgpuBufferBinding sceneParamsBinding = { .binding = 0, .buffer = scene->sceneParams };
+      CgpuBindings bindings3 = { .bufferCount = 1, .buffers = &sceneParamsBinding };
+
       cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[0], &bindings0);
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[1], &bindings1);
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[2], &bindings2);
+      cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[3], &bindings3);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBindSets;
     }
 
     // Bind pipeline and descriptor sets
-    cgpuCmdBindPipeline(s_ctx, commandBuffer, shaderCache->pipeline, shaderCache->bindSets.data(), (uint32_t) shaderCache->bindSets.size());
+    {
+      std::array<uint32_t, 1> dynamicOffsets { 0 };
+      cgpuCmdBindPipeline(s_ctx, commandBuffer, shaderCache->pipeline,
+                          shaderCache->bindSets.data(), uint32_t(shaderCache->bindSets.size()),
+                          uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
+    }
 
     // Push constants
     {

@@ -27,7 +27,7 @@ namespace gtl
 {
   constexpr static const uint64_t CGPU_WHOLE_SIZE = ~0ULL;
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
-  constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 4;
+  constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 6;
   constexpr static const uint32_t CGPU_MAX_BUFFER_UPDATE_SIZE = 65535;
 
   enum class CgpuBufferUsage
@@ -35,6 +35,7 @@ namespace gtl
     TransferSrc = 0x00000001,
     TransferDst = 0x00000002,
     Storage = 0x00000020,
+    Uniform = 0x00000010,
     ShaderDeviceAddress = 0x00020000,
     AccelerationStructureBuild = 0x00080000,
     AccelerationStructureStorage = 0x00100000,
@@ -472,7 +473,9 @@ namespace gtl
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
     const CgpuBindSet* bindSets,
-    uint32_t bindSetCount
+    uint32_t bindSetCount,
+    uint32_t dynamicOffsetCount = 0,
+    const uint32_t* dynamicOffsets = nullptr
   );
 
   void cgpuCmdTransitionShaderImageLayouts(
