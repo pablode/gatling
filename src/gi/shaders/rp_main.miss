@@ -80,8 +80,8 @@ void main()
 #endif
 
     uint domeLightIndex = useFallbackDomeLight ? 0 : 1;
-    vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, gl_WorldRayDirectionEXT));
-    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * PC.domeLightEmissionMultiplier;
+    vec3 sampleDir = normalize(quatRotateDir(sceneParams.domeLightRotation, gl_WorldRayDirectionEXT));
+    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * sceneParams.domeLightEmissionMultiplier;
 
     rayPayload.radiance += rayPayload.throughput * radiance;
 }

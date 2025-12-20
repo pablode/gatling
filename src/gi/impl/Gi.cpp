@@ -2075,47 +2075,7 @@ cleanup:
     }
 
     const GiShaderCache* shaderCache = scene->shaderCache;
-
-    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtySceneParams))
-    {
-      uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
-                                 scene->rectLights.elementCount() + scene->diskLights.elementCount();
-
-      rp::SceneParams sceneParams = {
-        .textureCount = (uint32_t) shaderCache->imageBindings.size(),
-        .sphereLightCount = scene->sphereLights.elementCount(),
-        .distantLightCount = scene->distantLights.elementCount(),
-        .rectLightCount = scene->rectLights.elementCount(),
-        .diskLightCount = scene->diskLights.elementCount(),
-        .totalLightCount = totalLightCount
-      };
-
-      if (!scene->sceneParams.handle)
-      {
-        if (!cgpuCreateBuffer(s_ctx, {
-                                .usage = CgpuBufferUsage::Uniform | CgpuBufferUsage::TransferDst,
-                                .memoryProperties = CgpuMemoryProperties::DeviceLocal,
-                                .size = sizeof(sceneParams),
-                                .debugName = "SceneParams"
-                              }, &scene->sceneParams))
-        {
-          GB_ERROR("failed to create scene params buffer");
-          return GiStatus::Error;
-        }
-      }
-
-      if (!s_stager->stageToBuffer((const uint8_t*) &sceneParams, sizeof(sceneParams), scene->sceneParams) ||
-          !s_stager->flush())
-      {
-        GB_ERROR("failed to stage scene params");
-        return GiStatus::Error;
-      }
-
-      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtySceneParams;
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
-    }
-
-    GiBvh* bvh = scene->bvh;
+    const GiBvh* bvh = scene->bvh;
 
     // Upload dome lights
     glm::vec4 backgroundColor(0.0f);
@@ -2162,7 +2122,7 @@ cleanup:
         else
         {
           scene->domeLight = domeLight;
-          scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
+          scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets | GiSceneDirtyFlags::DirtySceneParams;
         }
       }
     }
@@ -2172,6 +2132,53 @@ cleanup:
       // for the fallback texture because we need the background color in case the textured
       // dome light is not supposed to be seen by the camera ('domeLightCameraVisible' option).
       scene->domeLightTexture = std::make_shared<CgpuImage>(scene->fallbackDomeLightTexture);
+    }
+
+    // Update scene params
+    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtySceneParams))
+    {
+      glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
+      glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
+      uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
+
+      uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
+                                 scene->rectLights.elementCount() + scene->diskLights.elementCount();
+
+      rp::SceneParams sceneParams = {
+        .domeLightRotation = glm::make_vec4(&domeLightRotation[0]),
+        .domeLightEmissionMultiplier = domeLightEmissionMultiplier,
+        .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
+        .textureCount = (uint32_t) shaderCache->imageBindings.size(),
+        .sphereLightCount = scene->sphereLights.elementCount(),
+        .distantLightCount = scene->distantLights.elementCount(),
+        .rectLightCount = scene->rectLights.elementCount(),
+        .diskLightCount = scene->diskLights.elementCount(),
+        .totalLightCount = totalLightCount
+      };
+
+      if (!scene->sceneParams.handle)
+      {
+        if (!cgpuCreateBuffer(s_ctx, {
+                                .usage = CgpuBufferUsage::Uniform | CgpuBufferUsage::TransferDst,
+                                .memoryProperties = CgpuMemoryProperties::DeviceLocal,
+                                .size = sizeof(sceneParams),
+                                .debugName = "SceneParams"
+                              }, &scene->sceneParams))
+        {
+          GB_ERROR("failed to create scene params buffer");
+          return GiStatus::Error;
+        }
+      }
+
+      if (!s_stager->stageToBuffer((const uint8_t*) &sceneParams, sizeof(sceneParams), scene->sceneParams) ||
+          !s_stager->flush())
+      {
+        GB_ERROR("failed to stage scene params");
+        return GiStatus::Error;
+      }
+
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtySceneParams;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
     }
 
     // Init state for goto error handling
@@ -2327,10 +2334,6 @@ cleanup:
         lensRadius = params.camera.focalLength / (2.0f * params.camera.fStop);
       }
 
-      glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
-      glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
-      uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
-
       rp::PushConstants pushData = {
         .cameraPosition                 = glm::make_vec3(params.camera.position),
         .imageDims                      = ((imageHeight << 16) | imageWidth),
@@ -2342,9 +2345,6 @@ cleanup:
         .lensRadius                     = lensRadius,
         .sampleCount                    = renderSettings.spp,
         .maxSampleValue                 = renderSettings.maxSampleValue,
-        .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
-        .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
-        .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
         .maxBouncesAndRrBounceOffset    = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
         .rrInvMinTermProb               = renderSettings.rrInvMinTermProb,
         .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
@@ -2880,26 +2880,27 @@ cleanup:
 
   void giDestroyDomeLight(GiDomeLight* light)
   {
+    std::lock_guard guard(light->scene->mutex);
     delete light;
   }
 
   void giSetDomeLightRotation(GiDomeLight* light, float* quat)
   {
     light->rotation = glm::make_quat(quat);
-    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
   }
 
   void giSetDomeLightBaseEmission(GiDomeLight* light, float* rgb)
   {
     light->baseEmission = glm::make_vec3(rgb);
-    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
   }
 
   void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular)
   {
     light->diffuse = diffuse;
     light->specular = specular;
-    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
   }
 
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format)

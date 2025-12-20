@@ -24,6 +24,9 @@ GI_INTERFACE_BEGIN(rp_main)
 
 struct SceneParams
 {
+  GI_VEC4 domeLightRotation;
+  GI_VEC3 domeLightEmissionMultiplier;
+  GI_UINT domeLightDiffuseSpecularPacked;
   GI_UINT textureCount;
   GI_UINT sphereLightCount;
   GI_UINT distantLightCount;
@@ -101,9 +104,6 @@ struct PushConstants
   GI_FLOAT lensRadius;
   GI_UINT  sampleCount;
   GI_FLOAT maxSampleValue;
-  GI_VEC4  domeLightRotation;
-  GI_VEC3  domeLightEmissionMultiplier;
-  GI_UINT  domeLightDiffuseSpecularPacked;
   GI_UINT  maxBouncesAndRrBounceOffset;
   GI_FLOAT rrInvMinTermProb;
   GI_FLOAT lightIntensityMultiplier;
@@ -111,7 +111,7 @@ struct PushConstants
   GI_FLOAT sensorExposure;
   GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
   GI_FLOAT metersPerSceneUnit;
-  /* 1 float free */
+  /* 9 float free */
 };
 
 const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);
