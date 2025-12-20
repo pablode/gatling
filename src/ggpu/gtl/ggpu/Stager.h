@@ -28,6 +28,10 @@ namespace gtl
   {
   public:
     GgpuStager(CgpuContext* ctx);
+
+    GgpuStager(const GgpuStager&) = delete;
+    GgpuStager& operator=(const GgpuStager&) = delete;
+
     ~GgpuStager();
 
     bool allocate();

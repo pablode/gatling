@@ -33,6 +33,9 @@ namespace gtl
   public:
     GgpuDelayedResourceDestroyer(CgpuContext* ctx);
 
+    GgpuDelayedResourceDestroyer(const GgpuDelayedResourceDestroyer&) = delete;
+    GgpuDelayedResourceDestroyer& operator=(const GgpuDelayedResourceDestroyer&) = delete;
+
     ~GgpuDelayedResourceDestroyer();
 
   public:

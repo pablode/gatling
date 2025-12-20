@@ -45,6 +45,9 @@ namespace gtl
                       GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                       CgpuBuffer buffer, uint32_t size);
 
+    GgpuBumpAllocator(const GgpuBumpAllocator&) = delete;
+    GgpuBumpAllocator& operator=(const GgpuBumpAllocator&) = delete;
+
     ~GgpuBumpAllocator();
 
     CgpuBuffer getBuffer() const;

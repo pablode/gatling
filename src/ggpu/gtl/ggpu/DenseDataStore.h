@@ -37,6 +37,9 @@ namespace gtl
                        uint64_t elementSize,
                        uint32_t minCapacity);
 
+    GgpuDenseDataStore(const GgpuDenseDataStore&) = delete;
+    GgpuDenseDataStore& operator=(const GgpuDenseDataStore&) = delete;
+
   public:
     uint64_t allocate() override;
 

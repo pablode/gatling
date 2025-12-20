@@ -33,6 +33,9 @@ namespace gtl
                         CgpuBufferUsage usageFlags,
                         CgpuMemoryProperties memoryProperties);
 
+    GgpuResizableBuffer(const GgpuResizableBuffer&) = delete;
+    GgpuResizableBuffer& operator=(const GgpuResizableBuffer&) = delete;
+
     ~GgpuResizableBuffer();
 
   public:

@@ -40,6 +40,9 @@ namespace gtl
                    uint64_t elementSize,
                    CgpuBufferUsage bufferUsage = CgpuBufferUsage::Storage);
 
+    GgpuSyncBuffer(const GgpuSyncBuffer&) = delete;
+    GgpuSyncBuffer& operator=(const GgpuSyncBuffer&) = delete;
+
     ~GgpuSyncBuffer();
 
   public:
