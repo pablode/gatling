@@ -98,8 +98,6 @@ namespace gtl
     VkDriverId  driverID;
     uint32_t minAccelerationStructureScratchOffsetAlignment;
     size_t   minMemoryMapAlignment;
-    uint64_t minStorageBufferOffsetAlignment;
-    uint64_t minUniformBufferOffsetAlignment;
     uint64_t optimalBufferCopyOffsetAlignment;
     uint64_t optimalBufferCopyRowPitchAlignment;
     uint32_t shaderGroupBaseAlignment;
@@ -500,6 +498,8 @@ namespace gtl
     const VkPhysicalDeviceLimits& limits = chain.properties2.properties.limits;
 
     return CgpuDeviceProperties {
+      .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
+      .minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment,
       .maxComputeSharedMemorySize = limits.maxComputeSharedMemorySize,
       .maxPushConstantsSize = limits.maxPushConstantsSize,
       .maxRayHitAttributeSize = chain.rayTracingPipeline.maxRayHitAttributeSize,
@@ -516,8 +516,6 @@ namespace gtl
       .minAccelerationStructureScratchOffsetAlignment =
         chain.accelerationStructure.minAccelerationStructureScratchOffsetAlignment,
       .minMemoryMapAlignment = limits.minMemoryMapAlignment,
-      .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
-      .minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment,
       .optimalBufferCopyOffsetAlignment = limits.optimalBufferCopyOffsetAlignment,
       .optimalBufferCopyRowPitchAlignment = limits.optimalBufferCopyRowPitchAlignment,
       .shaderGroupBaseAlignment = chain.rayTracingPipeline.shaderGroupBaseAlignment,

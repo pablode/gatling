@@ -29,6 +29,7 @@ namespace gtl
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
   constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 6;
   constexpr static const uint32_t CGPU_MAX_BUFFER_UPDATE_SIZE = 65535;
+  constexpr static const uint32_t CGPU_MIN_UNIFORM_BUFFER_SIZE = 16384;
 
   enum class CgpuBufferUsage
   {
@@ -299,6 +300,8 @@ namespace gtl
 
   struct CgpuDeviceProperties
   {
+    uint64_t minStorageBufferOffsetAlignment;
+    uint64_t minUniformBufferOffsetAlignment;
     uint32_t maxComputeSharedMemorySize;
     uint32_t maxPushConstantsSize;
     uint32_t maxRayHitAttributeSize;
@@ -589,7 +592,6 @@ namespace gtl
     CgpuWaitSemaphoreInfo* waitSemaphoreInfos = nullptr
   );
 
-  // TODO: rename to not have 'Device' in name
   const CgpuDeviceFeatures& cgpuGetDeviceFeatures(
     CgpuContext* ctx
   );
