@@ -34,10 +34,6 @@ namespace gtl
                      delayedResourceDestroyer,
                      bufferUsage | CgpuBufferUsage::TransferDst,
                      CgpuMemoryProperties::DeviceLocal)
-    , m_hostBuffer(m_ctx,
-                   delayedResourceDestroyer,
-                   CgpuBufferUsage::TransferSrc,
-                   CgpuMemoryProperties::HostVisible)
   {
   }
 
@@ -48,7 +44,7 @@ namespace gtl
   uint8_t* GgpuSyncBuffer::read(uint64_t byteOffset, uint64_t byteSize)
   {
     assert((byteOffset + byteSize) <= m_size);
-    return &m_mappedHostMem[byteOffset];
+    return &m_hostMem[byteOffset];
   }
 
   uint8_t* GgpuSyncBuffer::write(uint64_t byteOffset, uint64_t byteSize)
@@ -57,7 +53,7 @@ namespace gtl
     assert(rangeEnd <= m_size);
     m_dirtyRangeBegin = std::min(byteOffset, m_dirtyRangeBegin);
     m_dirtyRangeEnd = std::max(rangeEnd, m_dirtyRangeEnd);
-    return &m_mappedHostMem[byteOffset];
+    return &m_hostMem[byteOffset];
   }
 
   CgpuBuffer GgpuSyncBuffer::buffer() const
@@ -83,7 +79,7 @@ namespace gtl
     // Reset buffers if new size is 0.
     if (newSize == 0)
     {
-      m_hostBuffer.resize(0, commandBuffer);
+      m_hostMem.reset();
       m_deviceBuffer.resize(0, commandBuffer);
       return true;
     }
@@ -91,9 +87,7 @@ namespace gtl
     // Resize buffers.
     m_deviceBuffer.resize(newSize, commandBuffer);
 
-    m_hostBuffer.resize(newSize, commandBuffer);
-
-    m_mappedHostMem = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, m_hostBuffer.buffer());
+    m_hostMem = std::make_unique<uint8_t[]>(newSize);
 
     return true;
   }
@@ -124,7 +118,7 @@ namespace gtl
       return true;
     }
 
-    if (!m_stager.stageToBuffer(&m_mappedHostMem[m_dirtyRangeBegin],
+    if (!m_stager.stageToBuffer(&m_hostMem[m_dirtyRangeBegin],
                                 commitSize,
                                 m_deviceBuffer.buffer(),
                                 m_dirtyRangeBegin))

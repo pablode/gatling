@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <memory>
 
 #include <gtl/cgpu/Cgpu.h>
 
@@ -72,10 +73,10 @@ namespace gtl
     uint64_t m_elementSize;
 
     uint64_t m_size = 0;
-    GgpuResizableBuffer m_deviceBuffer; // only for OptimalStaging strategy
-    GgpuResizableBuffer m_hostBuffer;
+    GgpuResizableBuffer m_deviceBuffer;
+    std::unique_ptr<uint8_t[]> m_hostMem;
 
-    uint8_t* m_mappedHostMem = nullptr;
+    // TODO: list of ranges or an interval tree for fine granular tracking
     uint64_t m_dirtyRangeBegin = UINT64_MAX;
     uint64_t m_dirtyRangeEnd = 0;
   };
