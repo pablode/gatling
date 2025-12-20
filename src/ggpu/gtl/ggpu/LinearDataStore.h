@@ -34,7 +34,7 @@ namespace gtl
   class GgpuLinearDataStore
   {
   public:
-    GgpuLinearDataStore(CgpuDevice device,
+    GgpuLinearDataStore(CgpuContext* ctx,
                         GgpuStager& stager,
                         GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                         uint64_t elementSize,
@@ -78,7 +78,7 @@ namespace gtl
     uint64_t returnOrAllocIndex(uint32_t index);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     uint64_t m_elementSize;
     uint32_t m_minCapacity;
     uint32_t m_elementCount;

@@ -111,8 +111,7 @@ namespace gtl
   };
   GB_DECLARE_ENUM_BITOPS(CgpuPipelineStage);
 
-  struct CgpuInstance      { uint64_t handle = 0; };
-  struct CgpuDevice        { uint64_t handle = 0; };
+  struct CgpuContext;
   struct CgpuBuffer        { uint64_t handle = 0; };
   struct CgpuImage         { uint64_t handle = 0; };
   struct CgpuShader        { uint64_t handle = 0; };
@@ -328,144 +327,148 @@ namespace gtl
     uint32_t texelExtentZ;
   };
 
-  bool cgpuInitialize(
+  CgpuContext* cgpuCreateContext(
     const char* appName,
     uint32_t versionMajor,
     uint32_t versionMinor,
     uint32_t versionPatch
   );
 
-  void cgpuTerminate();
-
-  bool cgpuCreateDevice(
-    CgpuDevice* device
-  );
-
-  void cgpuDestroyDevice(
-    CgpuDevice device
+  void cgpuDestroyContext(
+    CgpuContext* context
   );
 
   bool cgpuCreateShader(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuShaderCreateInfo createInfo,
     CgpuShader* shader
   );
 
   bool cgpuCreateShadersParallel(
-    CgpuDevice device,
+    CgpuContext* ctx,
     uint32_t shaderCount,
     CgpuShaderCreateInfo* createInfos,
     CgpuShader* shaders
   );
 
   void cgpuDestroyShader(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuShader shader
   );
 
   bool cgpuCreateBuffer(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuBufferCreateInfo createInfo,
     CgpuBuffer* buffer
   );
 
   void cgpuDestroyBuffer(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuBuffer buffer
   );
 
   void* cgpuGetBufferCpuPtr(
+    CgpuContext* ctx,
     CgpuBuffer buffer
   );
 
   uint64_t cgpuGetBufferGpuAddress(
+    CgpuContext* ctx,
     CgpuBuffer buffer
   );
 
   bool cgpuCreateImage(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuImageCreateInfo createInfo,
     CgpuImage* image
   );
 
   void cgpuDestroyImage(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuImage image
   );
 
   bool cgpuCreateSampler(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuSamplerCreateInfo createInfo,
     CgpuSampler* sampler
   );
 
   void cgpuDestroySampler(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuSampler sampler
   );
 
   void cgpuCreateComputePipeline(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuComputePipelineCreateInfo createInfo,
     CgpuPipeline* pipeline
   );
 
   void cgpuCreateRtPipeline(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuRtPipelineCreateInfo createInfo,
     CgpuPipeline* pipeline
   );
 
   void cgpuDestroyPipeline(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuPipeline pipeline
   );
 
   bool cgpuCreateBlas(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuBlasCreateInfo createInfo,
     CgpuBlas* blas
   );
 
   bool cgpuCreateTlas(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuTlasCreateInfo createInfo,
     CgpuTlas* tlas
   );
 
   void cgpuDestroyBlas(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuBlas blas
   );
 
   void cgpuDestroyTlas(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuTlas tlas
   );
 
   void cgpuCreateBindSets(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuPipeline pipeline,
     CgpuBindSet* bindSets,
     uint32_t bindSetCount
   );
 
   void cgpuDestroyBindSets(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuBindSet* bindSets,
     uint32_t bindSetCount
   );
 
+  void cgpuUpdateBindSet(
+    CgpuContext* ctx,
+    CgpuBindSet bindSet,
+    const CgpuBindings* bindings
+  );
+
   bool cgpuCreateCommandBuffer(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuCommandBuffer* commandBuffer
   );
 
   bool cgpuBeginCommandBuffer(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer
   );
 
   void cgpuCmdBindPipeline(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
     const CgpuBindSet* bindSets,
@@ -473,6 +476,7 @@ namespace gtl
   );
 
   void cgpuCmdTransitionShaderImageLayouts(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     CgpuShader shader,
     uint32_t descriptorSetIndex,
@@ -480,13 +484,8 @@ namespace gtl
     const CgpuImageBinding* images
   );
 
-  void cgpuCmdUpdateBindSet(
-    CgpuCommandBuffer commandBuffer,
-    CgpuBindSet bindSet,
-    const CgpuBindings* bindings
-  );
-
   void cgpuCmdUpdateBuffer(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     const uint8_t* data,
     uint64_t size,
@@ -495,6 +494,7 @@ namespace gtl
   );
 
   void cgpuCmdCopyBuffer(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     CgpuBuffer srcBuffer,
     uint64_t srcOffset,
@@ -504,6 +504,7 @@ namespace gtl
   );
 
   void cgpuCmdCopyBufferToImage(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     CgpuBuffer buffer,
     CgpuImage image,
@@ -511,6 +512,7 @@ namespace gtl
   );
 
   void cgpuCmdPushConstants(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     CgpuPipeline pipeline,
     uint32_t size,
@@ -525,37 +527,21 @@ namespace gtl
   );
 
   void cgpuCmdPipelineBarrier(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     const CgpuPipelineBarrier* barrier
   );
 
-  void cgpuCmdResetTimestamps(
-    CgpuCommandBuffer commandBuffer,
-    uint32_t offset,
-    uint32_t count
-  );
-
-  void cgpuCmdWriteTimestamp(
-    CgpuCommandBuffer commandBuffer,
-    uint32_t timestampIndex
-  );
-
-  void cgpuCmdCopyTimestamps(
-    CgpuCommandBuffer commandBuffer,
-    CgpuBuffer buffer,
-    uint32_t offset,
-    uint32_t count,
-    bool waitUntilAvailable
-  );
-
   void cgpuCmdTraceRays(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
-    CgpuPipeline rtPipeline,
+    CgpuPipeline pipeline,
     uint32_t width,
     uint32_t height
   );
 
   void cgpuCmdFillBuffer(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     CgpuBuffer buffer,
     uint64_t dstOffset = 0,
@@ -564,34 +550,35 @@ namespace gtl
   );
 
   void cgpuEndCommandBuffer(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer
   );
 
   void cgpuDestroyCommandBuffer(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer
   );
 
   bool cgpuCreateSemaphore(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuSemaphore* semaphore,
     uint64_t initialValue = 0
   );
 
   void cgpuDestroySemaphore(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuSemaphore semaphore
   );
 
   bool cgpuWaitSemaphores(
-    CgpuDevice device,
+    CgpuContext* ctx,
     uint32_t semaphoreInfoCount,
     CgpuWaitSemaphoreInfo* semaphoreInfos,
     uint64_t timeoutNs = UINT64_MAX
   );
 
   void cgpuSubmitCommandBuffer(
-    CgpuDevice device,
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     uint32_t signalSemaphoreInfoCount = 0,
     CgpuSignalSemaphoreInfo* signalSemaphoreInfos = nullptr,
@@ -599,7 +586,12 @@ namespace gtl
     CgpuWaitSemaphoreInfo* waitSemaphoreInfos = nullptr
   );
 
-  const CgpuDeviceFeatures& cgpuGetDeviceFeatures(CgpuDevice device);
+  // TODO: rename to not have 'Device' in name
+  const CgpuDeviceFeatures& cgpuGetDeviceFeatures(
+    CgpuContext* ctx
+  );
 
-  const CgpuDeviceProperties& cgpuGetDeviceProperties(CgpuDevice device);
+  const CgpuDeviceProperties& cgpuGetDeviceProperties(
+    CgpuContext* ctx
+  );
 }

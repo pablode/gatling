@@ -68,9 +68,9 @@ namespace
 
 namespace gtl
 {
-  GiTextureManager::GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager,
+  GiTextureManager::GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, GgpuStager& stager,
                                      GgpuDelayedResourceDestroyer& delayedResourceDestroyer)
-    : m_device(device)
+    : m_ctx(ctx)
     , m_assetReader(assetReader)
     , m_stager(stager)
     , m_delayedResourceDestroyer(delayedResourceDestroyer)
@@ -83,14 +83,14 @@ namespace gtl
     {
       if (GiImagePtr image = pathImagePair.second.lock(); image)
       {
-        cgpuDestroyImage(m_device, *image);
+        cgpuDestroyImage(m_ctx, *image);
       }
     }
     for (const auto& pathImagePair : m_binaryCache)
     {
       if (GiImagePtr image = pathImagePair.second.lock(); image)
       {
-        cgpuDestroyImage(m_device, *image);
+        cgpuDestroyImage(m_ctx, *image);
       }
     }
     m_fileCache.clear();
@@ -135,7 +135,7 @@ namespace gtl
 
     GiImagePtr image = makeImagePtr(destroyImmediately);
 
-    bool creationSuccessful = cgpuCreateImage(m_device, createInfo, image.get()) &&
+    bool creationSuccessful = cgpuCreateImage(m_ctx, createInfo, image.get()) &&
                               m_stager.stageToImage(&imageData.data[0], imageData.size, *image, imageData.width, imageData.height, 1, keepHdr ? 8 : 4);
 
     if (!creationSuccessful)
@@ -154,7 +154,7 @@ namespace gtl
     return std::shared_ptr<CgpuImage>(new CgpuImage, [this, destroyImmediately](CgpuImage* d) {
       if (destroyImmediately)
       {
-        cgpuDestroyImage(m_device, *d);
+        cgpuDestroyImage(m_ctx, *d);
       }
       else
       {
@@ -222,7 +222,7 @@ namespace gtl
         createInfo.depth = textureResource.depth;
         createInfo.debugName = "[Payload texture]";
 
-        if (!cgpuCreateImage(m_device, createInfo, image.get()))
+        if (!cgpuCreateImage(m_ctx, createInfo, image.get()))
         {
           return false;
         }
@@ -255,7 +255,7 @@ namespace gtl
       createInfo.height = 1;
       createInfo.depth = 1;
 
-      if (!cgpuCreateImage(m_device, createInfo, image.get()))
+      if (!cgpuCreateImage(m_ctx, createInfo, image.get()))
       {
         return false;
       }

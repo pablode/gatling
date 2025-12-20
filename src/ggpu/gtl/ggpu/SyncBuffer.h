@@ -33,7 +33,7 @@ namespace gtl
   class GgpuSyncBuffer
   {
   public:
-    GgpuSyncBuffer(CgpuDevice device,
+    GgpuSyncBuffer(CgpuContext* ctx,
                    GgpuStager& stager,
                    GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                    uint64_t elementSize,
@@ -58,7 +58,7 @@ namespace gtl
       return (T*) write(offset * m_elementSize, range * m_elementSize);
     }
 
-    bool resize(CgpuDevice device, CgpuCommandBuffer commandBuffer, uint64_t newSize);
+    bool resize(CgpuContext* ctx, CgpuCommandBuffer commandBuffer, uint64_t newSize);
 
     CgpuBuffer buffer() const;
 
@@ -67,7 +67,7 @@ namespace gtl
     bool commitChanges();
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     GgpuStager& m_stager;
     uint64_t m_elementSize;
 

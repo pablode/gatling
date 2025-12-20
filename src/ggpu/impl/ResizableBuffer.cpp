@@ -21,11 +21,11 @@
 
 namespace gtl
 {
-  GgpuResizableBuffer::GgpuResizableBuffer(CgpuDevice device,
+  GgpuResizableBuffer::GgpuResizableBuffer(CgpuContext* ctx,
                                            GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                                            CgpuBufferUsage usageFlags,
                                            CgpuMemoryProperties memoryProperties)
-    : m_device(device)
+    : m_ctx(ctx)
     , m_delayedResourceDestroyer(delayedResourceDestroyer)
     , m_usageFlags(usageFlags | CgpuBufferUsage::TransferSrc | CgpuBufferUsage::TransferDst)
     , m_memoryProperties(memoryProperties)
@@ -73,7 +73,7 @@ namespace gtl
     bool result = false;
 
     CgpuBuffer buffer;
-    if (!cgpuCreateBuffer(m_device, {
+    if (!cgpuCreateBuffer(m_ctx, {
                             .usage = m_usageFlags,
                             .memoryProperties = m_memoryProperties,
                             .size = newSize,
@@ -86,7 +86,7 @@ namespace gtl
     // Copy old buffer data if needed.
     if (m_size > 0)
     {
-      cgpuCmdCopyBuffer(commandBuffer, m_buffer, 0, buffer, 0, m_size);;
+      cgpuCmdCopyBuffer(m_ctx, commandBuffer, m_buffer, 0, buffer, 0, m_size);;
     }
 
     // Swap buffers, so that we always destroy the unused one.

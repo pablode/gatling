@@ -31,7 +31,7 @@ namespace gtl
     constexpr static uint32_t FrameCount = 4;
 
   public:
-    GgpuDelayedResourceDestroyer(CgpuDevice device);
+    GgpuDelayedResourceDestroyer(CgpuContext* ctx);
 
     ~GgpuDelayedResourceDestroyer();
 
@@ -62,7 +62,7 @@ namespace gtl
     void enqueueDestroyFunc(DestroyFunc fun);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     uint32_t m_frameIndex = 0;
     std::vector<DestroyFunc> m_pendingDestructions[FrameCount];
   };

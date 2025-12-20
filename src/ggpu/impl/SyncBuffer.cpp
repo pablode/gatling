@@ -22,19 +22,19 @@
 
 namespace gtl
 {
-  GgpuSyncBuffer::GgpuSyncBuffer(CgpuDevice device,
+  GgpuSyncBuffer::GgpuSyncBuffer(CgpuContext* ctx,
                                  GgpuStager& stager,
                                  GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                                  uint64_t elementSize,
                                  CgpuBufferUsage bufferUsage)
-    : m_device(device)
+    : m_ctx(ctx)
     , m_stager(stager)
     , m_elementSize(elementSize)
-    , m_deviceBuffer(m_device,
+    , m_deviceBuffer(m_ctx,
                      delayedResourceDestroyer,
                      bufferUsage | CgpuBufferUsage::TransferDst,
                      CgpuMemoryProperties::DeviceLocal)
-    , m_hostBuffer(m_device,
+    , m_hostBuffer(m_ctx,
                    delayedResourceDestroyer,
                    CgpuBufferUsage::TransferSrc,
                    CgpuMemoryProperties::HostVisible)
@@ -70,7 +70,7 @@ namespace gtl
     return m_size;
   }
 
-  bool GgpuSyncBuffer::resize(CgpuDevice device, CgpuCommandBuffer commandBuffer, uint64_t newSize)
+  bool GgpuSyncBuffer::resize(CgpuContext* ctx, CgpuCommandBuffer commandBuffer, uint64_t newSize)
   {
     if (newSize == m_size)
     {
@@ -93,7 +93,7 @@ namespace gtl
 
     m_hostBuffer.resize(newSize, commandBuffer);
 
-    m_mappedHostMem = (uint8_t*) cgpuGetBufferCpuPtr(m_hostBuffer.buffer());
+    m_mappedHostMem = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, m_hostBuffer.buffer());
 
     return true;
   }

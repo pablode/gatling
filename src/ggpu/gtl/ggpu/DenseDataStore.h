@@ -31,7 +31,7 @@ namespace gtl
   class GgpuDenseDataStore : public GgpuLinearDataStore
   {
   public:
-    GgpuDenseDataStore(CgpuDevice device,
+    GgpuDenseDataStore(CgpuContext* ctx,
                        GgpuStager& stager,
                        GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                        uint64_t elementSize,

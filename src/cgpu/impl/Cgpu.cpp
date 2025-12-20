@@ -56,7 +56,7 @@
 
 namespace gtl
 {
-  /* Constants. */
+  /* Constants */
 
   constexpr static const uint32_t CGPU_MIN_VK_API_VERSION = VK_API_VERSION_1_1;
 
@@ -91,7 +91,7 @@ namespace gtl
     VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME // required by VK_KHR_depth_stencil_resolve
   };
 
-  /* Internal structures. */
+  /* Internal structures */
 
   struct CgpuIDeviceProperties
   {
@@ -104,7 +104,6 @@ namespace gtl
     uint32_t shaderGroupBaseAlignment;
     uint32_t shaderGroupHandleAlignment;
     uint32_t shaderGroupHandleSize;
-    float    timestampPeriod;
   };
 
   struct CgpuIDeviceFeatures
@@ -130,7 +129,6 @@ namespace gtl
     VkPipelineCache            pipelineCache;
     CgpuDeviceProperties       properties;
     VolkDeviceTable            table;
-    VkQueryPool                timestampPool;
   };
 
   struct CgpuIBuffer
@@ -197,7 +195,6 @@ namespace gtl
   struct CgpuICommandBuffer
   {
     VkCommandBuffer commandBuffer;
-    CgpuDevice device;
   };
 
   struct CgpuIBlas
@@ -225,10 +222,14 @@ namespace gtl
     VkDescriptorSet descriptorSet;
   };
 
-  struct CgpuIInstance
+  /* Context */
+
+  struct CgpuContext
   {
     VkInstance instance;
-    GbLinearDataStore<CgpuIDevice, 32> ideviceStore;
+
+    CgpuIDevice idevice;
+
     GbLinearDataStore<CgpuIBuffer, 16> ibufferStore;
     GbLinearDataStore<CgpuIImage, 128> iimageStore;
     GbLinearDataStore<CgpuIShader, 32> ishaderStore;
@@ -239,14 +240,11 @@ namespace gtl
     GbLinearDataStore<CgpuIBlas, 1024> iblasStore;
     GbLinearDataStore<CgpuITlas, 1> itlasStore;
     GbLinearDataStore<CgpuIBindSet, 32> ibindSetStore;
+
     bool debugUtilsEnabled;
   };
 
-  static uint32_t s_instanceUsageCount = 0;
-  static std::mutex s_instanceLock;
-  static std::unique_ptr<CgpuIInstance> s_iinstance = nullptr;
-
-  /* Helper macros. */
+  /* Helper macros */
 
 #if defined(NDEBUG)
   #if defined(__GNUC__)
@@ -272,16 +270,15 @@ namespace gtl
     exit(EXIT_FAILURE);                             \
   } while (false)
 
-#define CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED                     \
+#define CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED   \
   CGPU_RETURN_ERROR("hardcoded limit reached")
 
-#define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)          \
-  CGPU_INLINE static bool cgpuResolve##RESOURCE_NAME(HANDLE_TYPE handle, IRESOURCE_TYPE** idata) \
-  {                                                                                              \
-    return s_iinstance->RESOURCE_STORE.get(handle.handle, idata);                                \
+#define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)                            \
+  CGPU_INLINE static bool cgpuResolve##RESOURCE_NAME(CgpuContext* ctx, HANDLE_TYPE handle, IRESOURCE_TYPE** idata) \
+  {                                                                                                                \
+    return ctx->RESOURCE_STORE.get(handle.handle, idata);                                                          \
   }
 
-  CGPU_RESOLVE_HANDLE(       Device,        CgpuDevice,        CgpuIDevice,        ideviceStore)
   CGPU_RESOLVE_HANDLE(       Buffer,        CgpuBuffer,        CgpuIBuffer,        ibufferStore)
   CGPU_RESOLVE_HANDLE(        Image,         CgpuImage,         CgpuIImage,         iimageStore)
   CGPU_RESOLVE_HANDLE(       Shader,        CgpuShader,        CgpuIShader,        ishaderStore)
@@ -293,25 +290,24 @@ namespace gtl
   CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,          itlasStore)
   CGPU_RESOLVE_HANDLE(      BindSet,       CgpuBindSet,       CgpuIBindSet,       ibindSetStore)
 
-#define CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, ITYPE, RESOLVE_FUNC)      \
+#define CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, ITYPE, RESOLVE_FUNC) \
   ITYPE* VAR_NAME;                                                       \
-  if (!RESOLVE_FUNC(HANDLE, &VAR_NAME)) [[unlikely]] {                   \
+  if (!RESOLVE_FUNC(CTX, HANDLE, &VAR_NAME)) [[unlikely]] {                   \
     CGPU_FATAL("invalid handle!");                                       \
   }
 
-#define CGPU_RESOLVE_DEVICE(HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIDevice, cgpuResolveDevice)
-#define CGPU_RESOLVE_BUFFER(HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIBuffer, cgpuResolveBuffer)
-#define CGPU_RESOLVE_IMAGE(HANDLE, VAR_NAME)          CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIImage, cgpuResolveImage)
-#define CGPU_RESOLVE_SHADER(HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIShader, cgpuResolveShader)
-#define CGPU_RESOLVE_PIPELINE(HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIPipeline, cgpuResolvePipeline)
-#define CGPU_RESOLVE_SEMAPHORE(HANDLE, VAR_NAME)      CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuISemaphore, cgpuResolveSemaphore)
-#define CGPU_RESOLVE_COMMAND_BUFFER(HANDLE, VAR_NAME) CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuICommandBuffer, cgpuResolveCommandBuffer)
-#define CGPU_RESOLVE_SAMPLER(HANDLE, VAR_NAME)        CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuISampler, cgpuResolveSampler)
-#define CGPU_RESOLVE_BLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIBlas, cgpuResolveBlas)
-#define CGPU_RESOLVE_TLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
-#define CGPU_RESOLVE_BIND_SET(HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuIBindSet, cgpuResolveBindSet)
+#define CGPU_RESOLVE_BUFFER(CTX, HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBuffer, cgpuResolveBuffer)
+#define CGPU_RESOLVE_IMAGE(CTX, HANDLE, VAR_NAME)          CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIImage, cgpuResolveImage)
+#define CGPU_RESOLVE_SHADER(CTX, HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIShader, cgpuResolveShader)
+#define CGPU_RESOLVE_PIPELINE(CTX, HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIPipeline, cgpuResolvePipeline)
+#define CGPU_RESOLVE_SEMAPHORE(CTX, HANDLE, VAR_NAME)      CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuISemaphore, cgpuResolveSemaphore)
+#define CGPU_RESOLVE_COMMAND_BUFFER(CTX, HANDLE, VAR_NAME) CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuICommandBuffer, cgpuResolveCommandBuffer)
+#define CGPU_RESOLVE_SAMPLER(CTX, HANDLE, VAR_NAME)        CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuISampler, cgpuResolveSampler)
+#define CGPU_RESOLVE_BLAS(CTX, HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBlas, cgpuResolveBlas)
+#define CGPU_RESOLVE_TLAS(CTX, HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
+#define CGPU_RESOLVE_BIND_SET(CTX, HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBindSet, cgpuResolveBindSet)
 
-  /* Helper methods. */
+  /* Helper methods */
 
   static VkSamplerAddressMode cgpuTranslateAddressMode(CgpuSamplerAddressMode mode)
   {
@@ -370,8 +366,6 @@ namespace gtl
       return (value + (alignment - 1)) & ~(alignment - 1);
   }
 
-  /* API method implementation. */
-
 #ifndef NDEBUG
   static bool cgpuFindLayer(const char* name, size_t layerCount, VkLayerProperties* layers)
   {
@@ -413,138 +407,12 @@ namespace gtl
     assert(result == VK_SUCCESS);
   }
 
-  bool cgpuInitialize(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
-  {
-    std::lock_guard guard(s_instanceLock);
+  /* Static state */
 
-    s_instanceUsageCount++;
-    if (s_instanceUsageCount > 1)
-    {
-      return true;
-    }
+  static bool s_volkInitialized = false;
+  static std::mutex s_volkLock;
 
-    if (volkInitialize() != VK_SUCCESS)
-    {
-      CGPU_RETURN_ERROR("failed to initialize volk");
-    }
-
-    uint32_t instanceVersion = volkGetInstanceVersion();
-    GB_LOG("Vulkan instance:");
-    GB_LOG("> version {}.{}.{}", VK_VERSION_MAJOR(instanceVersion), VK_VERSION_MINOR(instanceVersion), VK_VERSION_PATCH(instanceVersion));
-
-    if (instanceVersion < CGPU_MIN_VK_API_VERSION)
-    {
-      GB_ERROR("Vulkan instance version does match minimum of {}.{}.{}",
-        VK_VERSION_MAJOR(CGPU_MIN_VK_API_VERSION), VK_VERSION_MINOR(CGPU_MIN_VK_API_VERSION),
-        VK_VERSION_PATCH(CGPU_MIN_VK_API_VERSION));
-      return false;
-    }
-
-    GbSmallVector<const char*, 4> enabledLayers;
-    GbSmallVector<const char*, 16> enabledExtensions;
-    bool debugUtilsEnabled = false;
-#ifndef NDEBUG
-    {
-      uint32_t layerCount;
-      vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-      GbSmallVector<VkLayerProperties, 16> availableLayers(layerCount);
-      vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-      const char* VK_LAYER_KHRONOS_VALIDATION_NAME = "VK_LAYER_KHRONOS_validation";
-
-      if (cgpuFindLayer(VK_LAYER_KHRONOS_VALIDATION_NAME, availableLayers.size(), availableLayers.data()))
-      {
-        enabledLayers.push_back(VK_LAYER_KHRONOS_VALIDATION_NAME);
-      }
-
-      if (enabledLayers.size() > 0)
-      {
-        GB_LOG("> layers: {}", enabledLayers);
-      }
-    }
-#endif
-
-    {
-      uint32_t extensionCount;
-      vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-
-      std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-      vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
-
-#ifndef NDEBUG
-      if (cgpuFindExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
-      {
-        enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-        debugUtilsEnabled = true;
-      }
-#endif
-
-      if (enabledExtensions.size() > 0)
-      {
-        GB_LOG("> extensions: {}", enabledExtensions);
-      }
-    }
-
-    uint32_t versionVariant = 0;
-    VkApplicationInfo appInfo = {
-      .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-      .pNext = nullptr,
-      .pApplicationName = appName,
-      .applicationVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
-      .pEngineName = appName,
-      .engineVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
-      .apiVersion = CGPU_MIN_VK_API_VERSION,
-    };
-
-    VkInstanceCreateInfo createInfo = {
-      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-      .pApplicationInfo = &appInfo,
-      .enabledLayerCount = (uint32_t) enabledLayers.size(),
-      .ppEnabledLayerNames = enabledLayers.data(),
-      .enabledExtensionCount = (uint32_t) enabledExtensions.size(),
-      .ppEnabledExtensionNames = enabledExtensions.data(),
-    };
-
-    VkInstance instance;
-    {
-      VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
-
-      if (result != VK_SUCCESS)
-      {
-        GB_ERROR("{}:{}: failed to create Vulkan instance (code: {})", __FILE__, __LINE__, int(result));
-        return false;
-      }
-    }
-
-    volkLoadInstanceOnly(instance);
-
-    s_iinstance = std::make_unique<CgpuIInstance>();
-    s_iinstance->instance = instance;
-    s_iinstance->debugUtilsEnabled = debugUtilsEnabled;
-    return true;
-  }
-
-  void cgpuTerminate()
-  {
-    std::lock_guard guard(s_instanceLock);
-
-    if (s_instanceUsageCount == 0)
-    {
-      assert(false);
-      return;
-    }
-
-    s_instanceUsageCount--;
-
-    if (s_instanceUsageCount == 0)
-    {
-      vkDestroyInstance(s_iinstance->instance, nullptr);
-      s_iinstance.reset();
-    }
-  }
+  /* Implementation */
 
   static VkResult cgpuCreateMemoryPool(VmaPool& pool,
                                        VmaAllocator allocator,
@@ -652,8 +520,7 @@ namespace gtl
       .optimalBufferCopyRowPitchAlignment = limits.optimalBufferCopyRowPitchAlignment,
       .shaderGroupBaseAlignment = chain.rayTracingPipeline.shaderGroupBaseAlignment,
       .shaderGroupHandleAlignment = chain.rayTracingPipeline.shaderGroupHandleAlignment,
-      .shaderGroupHandleSize = chain.rayTracingPipeline.shaderGroupHandleSize,
-      .timestampPeriod = limits.timestampPeriod
+      .shaderGroupHandleSize = chain.rayTracingPipeline.shaderGroupHandleSize
     };
   }
 
@@ -867,7 +734,7 @@ namespace gtl
     std::vector<std::string> errorMessages; // if size() > 0: device is unsuitable
   };
 
-  static void cgpuQueryDeviceCandidate(VkPhysicalDevice device, CgpuDeviceCandidate& c)
+  static void cgpuQueryDeviceCandidate(VkPhysicalDevice device, bool debugUtilsEnabled, CgpuDeviceCandidate& c)
   {
     c.device = device;
 
@@ -951,12 +818,6 @@ namespace gtl
     vkGetPhysicalDeviceProperties2(c.device, &c.propertyChain.properties2);
 
     const VkPhysicalDeviceProperties& properties = c.propertyChain.properties2.properties;
-    const VkPhysicalDeviceLimits& limits = properties.limits;
-
-    if (!limits.timestampComputeAndGraphics)
-    {
-      c.errorMessages.push_back("property timestampComputeAndGraphics missing");
-    }
 
     uint32_t apiVersion = properties.apiVersion;
     if (apiVersion < CGPU_MIN_VK_API_VERSION)
@@ -968,7 +829,7 @@ namespace gtl
     // query & check features
     CgpuDeviceFeatureChain tempFeatureChain;
     cgpuSetupDeviceFeatureChain(tempFeatureChain, extensions.data(), extensionCount,
-                                s_iinstance->debugUtilsEnabled, properties.vendorID);
+                                debugUtilsEnabled, properties.vendorID);
     vkGetPhysicalDeviceFeatures2(c.device, &tempFeatureChain.features2);
 
 #define CGPU_REQUIRE_FEATURE(STRUCT, FIELD)                              \
@@ -979,7 +840,7 @@ namespace gtl
       }
 
     cgpuSetupDeviceFeatureChain(c.featureChain, extensions.data(), extensionCount,
-                                s_iinstance->debugUtilsEnabled, properties.vendorID);
+                                debugUtilsEnabled, properties.vendorID);
     CGPU_REQUIRE_FEATURE(maintenance5, maintenance5);
     CGPU_REQUIRE_FEATURE(timelineSemaphore, timelineSemaphore);
     CGPU_REQUIRE_FEATURE(synchronization2, synchronization2);
@@ -1049,10 +910,10 @@ namespace gtl
 
   using CgpuCandidateVector = GbSmallVector<CgpuDeviceCandidate, CGPU_INITIAL_PHYSICAL_DEVICE_COUNT>;
 
-  static CgpuCandidateVector cgpuQueryDeviceCandidates()
+  static CgpuCandidateVector cgpuQueryDeviceCandidates(VkInstance instance, bool debugUtilsEnabled)
   {
     uint32_t deviceCount;
-    vkEnumeratePhysicalDevices(s_iinstance->instance, &deviceCount, nullptr);
+    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
     if (deviceCount == 0)
     {
@@ -1060,7 +921,7 @@ namespace gtl
     }
 
     GbSmallVector<VkPhysicalDevice, CGPU_INITIAL_PHYSICAL_DEVICE_COUNT> devices(deviceCount);
-    vkEnumeratePhysicalDevices(s_iinstance->instance, &deviceCount, devices.data());
+    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
     CgpuCandidateVector candidates(deviceCount);
 
@@ -1068,7 +929,7 @@ namespace gtl
     {
       CgpuDeviceCandidate& c = candidates[deviceIdx];
 
-      cgpuQueryDeviceCandidate(devices[deviceIdx], c);
+      cgpuQueryDeviceCandidate(devices[deviceIdx], debugUtilsEnabled, c);
     }
 
     return candidates;
@@ -1094,10 +955,10 @@ namespace gtl
 #undef CGPU_PRINT_FEATURE
   }
 
-  bool cgpuCreateDevice(CgpuDevice* device)
+  static bool cgpuCreateIDevice(VkInstance instance, bool debugUtilsEnabled, CgpuIDevice* idevice)
   {
     // query & sort devices
-    CgpuCandidateVector candidates = cgpuQueryDeviceCandidates();
+    CgpuCandidateVector candidates = cgpuQueryDeviceCandidates(instance, debugUtilsEnabled);
 
     if (candidates.empty())
     {
@@ -1174,9 +1035,7 @@ namespace gtl
     cgpuPrintEnabledFeatures(candidate.features, candidate.internalFeatures);
 
     // create device
-    uint64_t handle = s_iinstance->ideviceStore.allocate();
-
-    CGPU_RESOLVE_DEVICE({ handle }, idevice);
+    *idevice = {};
 
     idevice->physicalDevice = candidate.device;
 
@@ -1217,8 +1076,8 @@ namespace gtl
       nullptr,
       &idevice->logicalDevice
     );
-    if (result != VK_SUCCESS) {
-      s_iinstance->ideviceStore.free(handle);
+    if (result != VK_SUCCESS)
+    {
       CGPU_RETURN_ERROR("failed to create device");
     }
 
@@ -1247,37 +1106,8 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      s_iinstance->ideviceStore.free(handle);
-
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
-
       CGPU_RETURN_ERROR("failed to create command pool");
-    }
-
-    VkQueryPoolCreateInfo timestampPoolCreateInfo = {
-      .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = 0,
-      .queryType = VK_QUERY_TYPE_TIMESTAMP,
-      .queryCount = CGPU_MAX_TIMESTAMP_QUERIES,
-      .pipelineStatistics = 0,
-    };
-
-    result = idevice->table.vkCreateQueryPool(
-      idevice->logicalDevice,
-      &timestampPoolCreateInfo,
-      nullptr,
-      &idevice->timestampPool
-    );
-
-    if (result != VK_SUCCESS)
-    {
-      s_iinstance->ideviceStore.free(handle);
-
-      idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
-      idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
-
-      CGPU_RETURN_ERROR("failed to create query pool");
     }
 
     VmaVulkanFunctions vmaVulkanFunctions = {
@@ -1325,16 +1155,13 @@ namespace gtl
     allocCreateInfo.vulkanApiVersion = CGPU_MIN_VK_API_VERSION;
     allocCreateInfo.physicalDevice = idevice->physicalDevice;
     allocCreateInfo.device = idevice->logicalDevice;
-    allocCreateInfo.instance = s_iinstance->instance;
+    allocCreateInfo.instance = instance;
     allocCreateInfo.pVulkanFunctions = &vmaVulkanFunctions;
 
     result = vmaCreateAllocator(&allocCreateInfo, &idevice->allocator);
 
     if (result != VK_SUCCESS)
     {
-      s_iinstance->ideviceStore.free(handle);
-
-      idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
       idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
@@ -1355,10 +1182,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      s_iinstance->ideviceStore.free(handle);
-
       vmaDestroyAllocator(idevice->allocator);
-      idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
       idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
@@ -1389,14 +1213,11 @@ namespace gtl
       idevice->pipelineCache = VK_NULL_HANDLE;
     }
 
-    device->handle = handle;
     return true;
   }
 
-  void cgpuDestroyDevice(CgpuDevice device)
+  static void cgpuDestroyIDevice(CgpuContext* ctx, CgpuIDevice* idevice)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-
     cgpuDestroyMemoryPool(idevice->allocator, idevice->asScratchMemoryPool);
 
     if (idevice->pipelineCache != VK_NULL_HANDLE)
@@ -1404,14 +1225,142 @@ namespace gtl
       idevice->table.vkDestroyPipelineCache(idevice->logicalDevice, idevice->pipelineCache, nullptr);
     }
 
-    idevice->table.vkDestroyQueryPool(idevice->logicalDevice, idevice->timestampPool, nullptr);
     idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
 
     vmaDestroyAllocator(idevice->allocator);
 
     idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
+  }
 
-    s_iinstance->ideviceStore.free(device.handle);
+  CgpuContext* cgpuCreateContext(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
+  {
+    // refcount Volk initialization
+    {
+      std::lock_guard guard(s_volkLock);
+
+      if (!s_volkInitialized && volkInitialize() != VK_SUCCESS)
+      {
+        GB_ERROR("failed to initialize volk");
+        return nullptr;
+      }
+
+      s_volkInitialized = true;
+    }
+
+    uint32_t instanceVersion = volkGetInstanceVersion();
+    GB_LOG("Vulkan instance:");
+    GB_LOG("> version {}.{}.{}", VK_VERSION_MAJOR(instanceVersion), VK_VERSION_MINOR(instanceVersion), VK_VERSION_PATCH(instanceVersion));
+
+    if (instanceVersion < CGPU_MIN_VK_API_VERSION)
+    {
+      GB_ERROR("Vulkan instance version does match minimum of {}.{}.{}",
+        VK_VERSION_MAJOR(CGPU_MIN_VK_API_VERSION), VK_VERSION_MINOR(CGPU_MIN_VK_API_VERSION),
+        VK_VERSION_PATCH(CGPU_MIN_VK_API_VERSION));
+      return nullptr;
+    }
+
+    GbSmallVector<const char*, 4> enabledLayers;
+    GbSmallVector<const char*, 16> enabledExtensions;
+    bool debugUtilsEnabled = false;
+#ifndef NDEBUG
+    {
+      uint32_t layerCount;
+      vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+      GbSmallVector<VkLayerProperties, 16> availableLayers(layerCount);
+      vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+      const char* VK_LAYER_KHRONOS_VALIDATION_NAME = "VK_LAYER_KHRONOS_validation";
+
+      if (cgpuFindLayer(VK_LAYER_KHRONOS_VALIDATION_NAME, availableLayers.size(), availableLayers.data()))
+      {
+        enabledLayers.push_back(VK_LAYER_KHRONOS_VALIDATION_NAME);
+      }
+
+      if (enabledLayers.size() > 0)
+      {
+        GB_LOG("> layers: {}", enabledLayers);
+      }
+    }
+#endif
+
+    {
+      uint32_t extensionCount;
+      vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+      std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+      vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
+
+#ifndef NDEBUG
+      if (cgpuFindExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME, availableExtensions.size(), availableExtensions.data()))
+      {
+        enabledExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        debugUtilsEnabled = true;
+      }
+#endif
+
+      if (enabledExtensions.size() > 0)
+      {
+        GB_LOG("> extensions: {}", enabledExtensions);
+      }
+    }
+
+    uint32_t versionVariant = 0;
+    VkApplicationInfo appInfo = {
+      .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+      .pNext = nullptr,
+      .pApplicationName = appName,
+      .applicationVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
+      .pEngineName = appName,
+      .engineVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
+      .apiVersion = CGPU_MIN_VK_API_VERSION,
+    };
+
+    VkInstanceCreateInfo createInfo = {
+      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .pApplicationInfo = &appInfo,
+      .enabledLayerCount = (uint32_t) enabledLayers.size(),
+      .ppEnabledLayerNames = enabledLayers.data(),
+      .enabledExtensionCount = (uint32_t) enabledExtensions.size(),
+      .ppEnabledExtensionNames = enabledExtensions.data(),
+    };
+
+    VkInstance instance;
+    {
+      VkResult result = vkCreateInstance(&createInfo, nullptr, &instance);
+
+      if (result != VK_SUCCESS)
+      {
+        GB_ERROR("{}:{}: failed to create Vulkan instance (code: {})", __FILE__, __LINE__, int(result));
+        return nullptr;
+      }
+    }
+
+    volkLoadInstanceOnly(instance);
+
+    CgpuIDevice idevice;
+    if (!cgpuCreateIDevice(instance, debugUtilsEnabled, &idevice))
+    {
+      vkDestroyInstance(instance, nullptr);
+      return nullptr;
+    }
+
+    CgpuContext* ctx = new CgpuContext {
+      .instance = instance,
+      .idevice = idevice,
+      .debugUtilsEnabled = debugUtilsEnabled
+    };
+
+    return ctx;
+  }
+
+  void cgpuDestroyContext(CgpuContext* ctx)
+  {
+    cgpuDestroyIDevice(ctx, &ctx->idevice);
+    vkDestroyInstance(ctx->instance, nullptr);
+    delete ctx;
   }
 
   static void cgpuCreatePipelineLayout(CgpuIDevice* idevice,
@@ -1603,10 +1552,12 @@ namespace gtl
     }
   }
 
-  static void cgpuCreateShader(CgpuIDevice* idevice,
+  static void cgpuCreateShader(CgpuContext* ctx,
                                const CgpuShaderCreateInfo& createInfo,
                                CgpuIShader* ishader)
   {
+    CgpuIDevice* idevice = &ctx->idevice;
+
     ishader->stageFlags = (VkShaderStageFlagBits)createInfo.stageFlags;
 
     if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
@@ -1646,7 +1597,7 @@ namespace gtl
         CGPU_FATAL("failed to create shader module");
       }
 
-      if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
+      if (ctx->debugUtilsEnabled && createInfo.debugName)
       {
         cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE,
                           (uint64_t) ishader->module, createInfo.debugName);
@@ -1659,31 +1610,27 @@ namespace gtl
     }
   }
 
-  bool cgpuCreateShader(CgpuDevice device,
+  bool cgpuCreateShader(CgpuContext* ctx,
                         CgpuShaderCreateInfo createInfo,
                         CgpuShader* shader)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    shader->handle = ctx->ishaderStore.allocate();
 
-    shader->handle = s_iinstance->ishaderStore.allocate();
+    CGPU_RESOLVE_SHADER(ctx, *shader, ishader);
 
-    CGPU_RESOLVE_SHADER(*shader, ishader);
-
-    cgpuCreateShader(idevice, createInfo, ishader);
+    cgpuCreateShader(ctx, createInfo, ishader);
 
     return true;
   }
 
-  bool cgpuCreateShadersParallel(CgpuDevice device,
+  bool cgpuCreateShadersParallel(CgpuContext* ctx,
                          uint32_t shaderCount,
                          CgpuShaderCreateInfo* createInfos,
                          CgpuShader* shaders)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-
     for (uint32_t i = 0; i < shaderCount; i++)
     {
-      shaders[i].handle = s_iinstance->ishaderStore.allocate();
+      shaders[i].handle = ctx->ishaderStore.allocate();
     }
 
     std::vector<CgpuIShader*> ishaders;
@@ -1691,7 +1638,7 @@ namespace gtl
 
     for (uint32_t i = 0; i < shaderCount; i++)
     {
-      CGPU_RESOLVE_SHADER(shaders[i], ishader);
+      CGPU_RESOLVE_SHADER(ctx, shaders[i], ishader);
       ishaders[i] = ishader;
     }
 
@@ -1699,16 +1646,16 @@ namespace gtl
 #pragma omp parallel for schedule(dynamic, 1)
     for (int i = 0; i < int(shaderCount); i++)
     {
-      cgpuCreateShader(idevice, createInfos[i], ishaders[i]);
+      cgpuCreateShader(ctx, createInfos[i], ishaders[i]);
     }
 
     return true;
   }
 
-  void cgpuDestroyShader(CgpuDevice device, CgpuShader shader)
+  void cgpuDestroyShader(CgpuContext* ctx, CgpuShader shader)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_SHADER(shader, ishader);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_SHADER(ctx, shader, ishader);
 
     const CgpuIPipelineLibrary& library = ishader->pipelineLibrary;
     idevice->table.vkDestroyPipeline(idevice->logicalDevice, library.pipeline, nullptr);
@@ -1724,7 +1671,7 @@ namespace gtl
       idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
     }
 
-    s_iinstance->ishaderStore.free(shader.handle);
+    ctx->ishaderStore.free(shader.handle);
   }
 
   static void cgpuDestroyIBuffer(CgpuIDevice* idevice, CgpuIBuffer* ibuffer)
@@ -1831,26 +1778,26 @@ namespace gtl
     return true;
   }
 
-  bool cgpuCreateBuffer(CgpuDevice device,
+  bool cgpuCreateBuffer(CgpuContext* ctx,
                         CgpuBufferCreateInfo createInfo,
                         CgpuBuffer* buffer)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = s_iinstance->ibufferStore.allocate();
+    uint64_t handle = ctx->ibufferStore.allocate();
 
-    CGPU_RESOLVE_BUFFER({ handle }, ibuffer);
+    CGPU_RESOLVE_BUFFER(ctx, { handle }, ibuffer);
 
     assert(createInfo.size > 0);
 
     if (!cgpuCreateIBuffer(idevice, createInfo.usage, createInfo.memoryProperties, createInfo.size,
                            createInfo.alignment, ibuffer, createInfo.debugName))
     {
-      s_iinstance->ibufferStore.free(handle);
+      ctx->ibufferStore.free(handle);
       CGPU_RETURN_ERROR("failed to create buffer");
     }
 
-    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (ctx->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_BUFFER, (uint64_t) ibuffer->buffer, createInfo.debugName);
     }
@@ -1859,39 +1806,39 @@ namespace gtl
     return true;
   }
 
-  void cgpuDestroyBuffer(CgpuDevice device, CgpuBuffer buffer)
+  void cgpuDestroyBuffer(CgpuContext* ctx, CgpuBuffer buffer)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
 
     cgpuDestroyIBuffer(idevice, ibuffer);
 
-    s_iinstance->ibufferStore.free(buffer.handle);
+    ctx->ibufferStore.free(buffer.handle);
   }
 
-  void* cgpuGetBufferCpuPtr(CgpuBuffer buffer)
+  void* cgpuGetBufferCpuPtr(CgpuContext* ctx, CgpuBuffer buffer)
   {
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
+    CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
 
     return ibuffer->cpuPtr;
   }
 
-  uint64_t cgpuGetBufferGpuAddress(CgpuBuffer buffer)
+  uint64_t cgpuGetBufferGpuAddress(CgpuContext* ctx, CgpuBuffer buffer)
   {
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
+    CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
 
     return ibuffer->gpuAddress;
   }
 
-  bool cgpuCreateImage(CgpuDevice device,
+  bool cgpuCreateImage(CgpuContext* ctx,
                        CgpuImageCreateInfo createInfo,
                        CgpuImage* image)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = s_iinstance->iimageStore.allocate();
+    uint64_t handle = ctx->iimageStore.allocate();
 
-    CGPU_RESOLVE_IMAGE({ handle }, iimage);
+    CGPU_RESOLVE_IMAGE(ctx, { handle }, iimage);
 
     // FIXME: check device support
     VkImageTiling vkImageTiling = VK_IMAGE_TILING_OPTIMAL;
@@ -1936,7 +1883,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      s_iinstance->iimageStore.free(handle);
+      ctx->iimageStore.free(handle);
       CGPU_RETURN_ERROR("failed to create image");
     }
 
@@ -1980,12 +1927,12 @@ namespace gtl
     );
     if (result != VK_SUCCESS)
     {
-      s_iinstance->iimageStore.free(handle);
+      ctx->iimageStore.free(handle);
       vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
       CGPU_RETURN_ERROR("failed to create image view");
     }
 
-    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (ctx->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_IMAGE, (uint64_t) iimage->image, createInfo.debugName);
     }
@@ -2000,10 +1947,10 @@ namespace gtl
     return true;
   }
 
-  void cgpuDestroyImage(CgpuDevice device, CgpuImage image)
+  void cgpuDestroyImage(CgpuContext* ctx, CgpuImage image)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_IMAGE(image, iimage);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_IMAGE(ctx, image, iimage);
 
     idevice->table.vkDestroyImageView(
       idevice->logicalDevice,
@@ -2013,18 +1960,18 @@ namespace gtl
 
     vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
 
-    s_iinstance->iimageStore.free(image.handle);
+    ctx->iimageStore.free(image.handle);
   }
 
-  bool cgpuCreateSampler(CgpuDevice device,
+  bool cgpuCreateSampler(CgpuContext* ctx,
                          CgpuSamplerCreateInfo createInfo,
                          CgpuSampler* sampler)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = s_iinstance->isamplerStore.allocate();
+    uint64_t handle = ctx->isamplerStore.allocate();
 
-    CGPU_RESOLVE_SAMPLER({ handle }, isampler);
+    CGPU_RESOLVE_SAMPLER(ctx, { handle }, isampler);
 
     // Emulate MDL's clip wrap mode if necessary; use optimal mode (according to ARM) if not.
     bool clampToBlack = (createInfo.addressModeU == CgpuSamplerAddressMode::ClampToBlack) ||
@@ -2061,7 +2008,7 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      s_iinstance->isamplerStore.free(handle);
+      ctx->isamplerStore.free(handle);
       CGPU_RETURN_ERROR("failed to create sampler");
     }
 
@@ -2069,14 +2016,14 @@ namespace gtl
     return true;
   }
 
-  void cgpuDestroySampler(CgpuDevice device, CgpuSampler sampler)
+  void cgpuDestroySampler(CgpuContext* ctx, CgpuSampler sampler)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_SAMPLER(sampler, isampler);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_SAMPLER(ctx, sampler, isampler);
 
     idevice->table.vkDestroySampler(idevice->logicalDevice, isampler->sampler, nullptr);
 
-    s_iinstance->isamplerStore.free(sampler.handle);
+    ctx->isamplerStore.free(sampler.handle);
   }
 
   static void cgpuCreatePipelineDescriptors(CgpuIDevice* idevice,
@@ -2186,16 +2133,16 @@ namespace gtl
     }
   }
 
-  void cgpuCreateComputePipeline(CgpuDevice device,
+  void cgpuCreateComputePipeline(CgpuContext* ctx,
                                  CgpuComputePipelineCreateInfo createInfo,
                                  CgpuPipeline* pipeline)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_SHADER(createInfo.shader, ishader);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_SHADER(ctx, createInfo.shader, ishader);
 
-    uint64_t handle = s_iinstance->ipipelineStore.allocate();
+    uint64_t handle = ctx->ipipelineStore.allocate();
 
-    CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
+    CGPU_RESOLVE_PIPELINE(ctx, { handle }, ipipeline);
 
     cgpuCreatePipelineDescriptors(idevice, ishader, VK_SHADER_STAGE_COMPUTE_BIT, ipipeline);
 
@@ -2236,7 +2183,7 @@ namespace gtl
       CGPU_FATAL("failed to create compute pipeline");
     }
 
-    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (ctx->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline, createInfo.debugName);
     }
@@ -2246,7 +2193,7 @@ namespace gtl
     pipeline->handle = handle;
   }
 
-  static bool cgpuCopyMemoryToBuffer(CgpuDevice device, const uint8_t* data, uint64_t size, CgpuBuffer dst)
+  static bool cgpuCopyMemoryToBuffer(CgpuContext* ctx, const uint8_t* data, uint64_t size, CgpuBuffer dst)
   {
     if (size > CGPU_MAX_BUFFER_UPDATE_SIZE)
     {
@@ -2254,34 +2201,34 @@ namespace gtl
     }
 
     CgpuCommandBuffer commandBuffer;
-    cgpuCreateCommandBuffer(device, &commandBuffer);
+    cgpuCreateCommandBuffer(ctx, &commandBuffer);
 
-    cgpuBeginCommandBuffer(commandBuffer);
-    cgpuCmdUpdateBuffer(commandBuffer, data, size, dst);
-    cgpuEndCommandBuffer(commandBuffer);
+    cgpuBeginCommandBuffer(ctx, commandBuffer);
+    cgpuCmdUpdateBuffer(ctx, commandBuffer, data, size, dst);
+    cgpuEndCommandBuffer(ctx, commandBuffer);
 
     CgpuSemaphore semaphore;
-    cgpuCreateSemaphore(device, &semaphore);
+    cgpuCreateSemaphore(ctx, &semaphore);
     CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
 
-    cgpuSubmitCommandBuffer(device, commandBuffer, 1, &signalSemaphoreInfo);
+    cgpuSubmitCommandBuffer(ctx, commandBuffer, 1, &signalSemaphoreInfo);
 
     CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
-    cgpuWaitSemaphores(device, 1, &waitSemaphoreInfo);
+    cgpuWaitSemaphores(ctx, 1, &waitSemaphoreInfo);
 
-    cgpuDestroySemaphore(device, semaphore);
-    cgpuDestroyCommandBuffer(device, commandBuffer);
+    cgpuDestroySemaphore(ctx, semaphore);
+    cgpuDestroyCommandBuffer(ctx, commandBuffer);
 
     return true;
   }
 
-  static void cgpuCreateRtPipelineSbt(CgpuDevice device,
+  static void cgpuCreateRtPipelineSbt(CgpuContext* ctx,
                                       CgpuIPipeline* ipipeline,
                                       uint32_t groupCount,
                                       uint32_t missShaderCount,
                                       uint32_t hitGroupCount)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     const CgpuIDeviceProperties& properties = idevice->internalProperties;
 
@@ -2314,12 +2261,12 @@ namespace gtl
       .alignment = properties.shaderGroupBaseAlignment
     };
 
-    if (!cgpuCreateBuffer(device, sbtCreateInfo, &ipipeline->sbt))
+    if (!cgpuCreateBuffer(ctx, sbtCreateInfo, &ipipeline->sbt))
     {
       CGPU_FATAL("failed to create sbt buffer");
     }
 
-    CGPU_RESOLVE_BUFFER(ipipeline->sbt, isbt);
+    CGPU_RESOLVE_BUFFER(ctx, ipipeline->sbt, isbt);
 
     VkDeviceAddress sbtDeviceAddress = isbt->gpuAddress;
     ipipeline->sbtRgen.deviceAddress = sbtDeviceAddress;
@@ -2351,21 +2298,21 @@ namespace gtl
       sbtMemPtr += ipipeline->sbtHit.stride;
     }
 
-    if (!cgpuCopyMemoryToBuffer(device, &sbtMem[0], sbtSize, ipipeline->sbt))
+    if (!cgpuCopyMemoryToBuffer(ctx, &sbtMem[0], sbtSize, ipipeline->sbt))
     {
       CGPU_FATAL("failed to copy to sbt buffer");
     }
   }
 
-  void cgpuCreateRtPipeline(CgpuDevice device,
+  void cgpuCreateRtPipeline(CgpuContext* ctx,
                             CgpuRtPipelineCreateInfo createInfo,
                             CgpuPipeline* pipeline)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = s_iinstance->ipipelineStore.allocate();
+    uint64_t handle = ctx->ipipelineStore.allocate();
 
-    CGPU_RESOLVE_PIPELINE({ handle }, ipipeline);
+    CGPU_RESOLVE_PIPELINE(ctx, { handle }, ipipeline);
 
     // Gather groups.
     size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
@@ -2420,7 +2367,7 @@ namespace gtl
     }
 
     // Create descriptor backing and pipeline layout.
-    CGPU_RESOLVE_SHADER(createInfo.rgenShader, irgenShader);
+    CGPU_RESOLVE_SHADER(ctx, createInfo.rgenShader, irgenShader);
 
     cgpuCreatePipelineDescriptors(idevice, irgenShader, CGPU_RT_PIPELINE_ACCESS_FLAGS, ipipeline);
 
@@ -2436,8 +2383,8 @@ namespace gtl
 
       libraries.push_back(irgenShader->pipelineLibrary.pipeline);
 
-      const auto getShaderPipelineHandle = [](CgpuShader shader) {
-        CGPU_RESOLVE_SHADER(shader, ishader);
+      const auto getShaderPipelineHandle = [ctx](CgpuShader shader) {
+        CGPU_RESOLVE_SHADER(ctx, shader, ishader);
         return ishader->pipelineLibrary.pipeline;
       };
 
@@ -2483,7 +2430,7 @@ namespace gtl
 
       for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
       {
-        CGPU_RESOLVE_SHADER(createInfo.missShaders[i], imissShader);
+        CGPU_RESOLVE_SHADER(ctx, createInfo.missShaders[i], imissShader);
         pushStage(VK_SHADER_STAGE_MISS_BIT_KHR, imissShader->module);
       }
 
@@ -2493,13 +2440,13 @@ namespace gtl
 
         if (hitGroup->closestHitShader.handle)
         {
-          CGPU_RESOLVE_SHADER(hitGroup->closestHitShader, iclosestHitShader);
+          CGPU_RESOLVE_SHADER(ctx, hitGroup->closestHitShader, iclosestHitShader);
           pushStage(iclosestHitShader->stageFlags, iclosestHitShader->module);
         }
 
         if (hitGroup->anyHitShader.handle)
         {
-          CGPU_RESOLVE_SHADER(hitGroup->anyHitShader, ianyHitShader);
+          CGPU_RESOLVE_SHADER(ctx, hitGroup->anyHitShader, ianyHitShader);
           pushStage(ianyHitShader->stageFlags, ianyHitShader->module);
         }
       }
@@ -2557,9 +2504,9 @@ namespace gtl
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
       // Create the SBT.
-      cgpuCreateRtPipelineSbt(device, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
+      cgpuCreateRtPipelineSbt(ctx, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
 
-      if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
+      if (ctx->debugUtilsEnabled && createInfo.debugName)
       {
         cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_PIPELINE, (uint64_t) ipipeline->pipeline, createInfo.debugName);
       }
@@ -2568,14 +2515,14 @@ namespace gtl
     }
   }
 
-  void cgpuDestroyPipeline(CgpuDevice device, CgpuPipeline pipeline)
+  void cgpuDestroyPipeline(CgpuContext* ctx, CgpuPipeline pipeline)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
 
     if (ipipeline->bindPoint == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR)
     {
-      cgpuDestroyBuffer(device, ipipeline->sbt);
+      cgpuDestroyBuffer(ctx, ipipeline->sbt);
     }
 
     idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);
@@ -2585,18 +2532,17 @@ namespace gtl
     {
       idevice->table.vkDestroyDescriptorSetLayout(idevice->logicalDevice, ipipeline->descriptorSetLayouts[i], nullptr);
     }
-    s_iinstance->ipipelineStore.free(pipeline.handle);
+    ctx->ipipelineStore.free(pipeline.handle);
   }
 
-  static bool cgpuCreateTopOrBottomAs(CgpuDevice device,
+  static bool cgpuCreateTopOrBottomAs(CgpuContext* ctx,
                                       VkAccelerationStructureTypeKHR asType,
                                       VkAccelerationStructureGeometryKHR* asGeom,
                                       uint32_t primitiveCount,
                                       CgpuIBuffer* iasBuffer,
                                       VkAccelerationStructureKHR* as)
   {
-    CgpuIDevice* idevice;
-    cgpuResolveDevice(device, &idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     // Get AS size
     VkAccelerationStructureBuildGeometryInfoKHR asBuildGeomInfo = {
@@ -2685,7 +2631,7 @@ namespace gtl
     const VkAccelerationStructureBuildRangeInfoKHR* asBuildRangeInfoPtr = &asBuildRangeInfo;
 
     CgpuCommandBuffer commandBuffer;
-    if (!cgpuCreateCommandBuffer(device, &commandBuffer))
+    if (!cgpuCreateCommandBuffer(ctx, &commandBuffer))
     {
       cgpuDestroyIBuffer(idevice, iasBuffer);
       cgpuDestroyIBuffer(idevice, &iscratchBuffer);
@@ -2694,15 +2640,15 @@ namespace gtl
     }
 
     CgpuICommandBuffer* icommandBuffer;
-    cgpuResolveCommandBuffer(commandBuffer, &icommandBuffer);
+    cgpuResolveCommandBuffer(ctx, commandBuffer, &icommandBuffer);
 
     // Build AS on device
-    cgpuBeginCommandBuffer(commandBuffer);
+    cgpuBeginCommandBuffer(ctx, commandBuffer);
     idevice->table.vkCmdBuildAccelerationStructuresKHR(icommandBuffer->commandBuffer, 1, &asBuildGeomInfo, &asBuildRangeInfoPtr);
-    cgpuEndCommandBuffer(commandBuffer);
+    cgpuEndCommandBuffer(ctx, commandBuffer);
 
     CgpuSemaphore semaphore;
-    if (!cgpuCreateSemaphore(device, &semaphore))
+    if (!cgpuCreateSemaphore(ctx, &semaphore))
     {
       cgpuDestroyIBuffer(idevice, iasBuffer);
       cgpuDestroyIBuffer(idevice, &iscratchBuffer);
@@ -2711,29 +2657,29 @@ namespace gtl
     }
 
     CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
-    cgpuSubmitCommandBuffer(device, commandBuffer, 1, &signalSemaphoreInfo);
+    cgpuSubmitCommandBuffer(ctx, commandBuffer, 1, &signalSemaphoreInfo);
     CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = semaphore, .value = 1 };
-    cgpuWaitSemaphores(device, 1, &waitSemaphoreInfo);
+    cgpuWaitSemaphores(ctx, 1, &waitSemaphoreInfo);
 
     // Dispose resources
-    cgpuDestroySemaphore(device, semaphore);
-    cgpuDestroyCommandBuffer(device, commandBuffer);
+    cgpuDestroySemaphore(ctx, semaphore);
+    cgpuDestroyCommandBuffer(ctx, commandBuffer);
     cgpuDestroyIBuffer(idevice, &iscratchBuffer);
 
     return true;
   }
 
-  bool cgpuCreateBlas(CgpuDevice device,
+  bool cgpuCreateBlas(CgpuContext* ctx,
                       CgpuBlasCreateInfo createInfo,
                       CgpuBlas* blas)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BUFFER(createInfo.vertexPosBuffer, ivertexBuffer);
-    CGPU_RESOLVE_BUFFER(createInfo.indexBuffer, iindexBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_BUFFER(ctx, createInfo.vertexPosBuffer, ivertexBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, createInfo.indexBuffer, iindexBuffer);
 
-    uint64_t handle = s_iinstance->iblasStore.allocate();
+    uint64_t handle = ctx->iblasStore.allocate();
 
-    CGPU_RESOLVE_BLAS({ handle }, iblas);
+    CGPU_RESOLVE_BLAS(ctx, { handle }, iblas);
 
     VkAccelerationStructureGeometryTrianglesDataKHR asTriangleData = {
       .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
@@ -2765,16 +2711,16 @@ namespace gtl
       .flags = VkGeometryFlagsKHR(createInfo.isOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0)
     };
 
-    bool creationSuccessul = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
+    bool creationSuccessul = cgpuCreateTopOrBottomAs(ctx, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
         &asGeom, createInfo.triangleCount, &iblas->buffer, &iblas->as);
 
     if (!creationSuccessul)
     {
-      s_iinstance->iblasStore.free(handle);
+      ctx->iblasStore.free(handle);
       CGPU_RETURN_ERROR("failed to build BLAS");
     }
 
-    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (ctx->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) iblas->as, createInfo.debugName);
     }
@@ -2792,15 +2738,15 @@ namespace gtl
     return true;
   }
 
-  bool cgpuCreateTlas(CgpuDevice device,
+  bool cgpuCreateTlas(CgpuContext* ctx,
                       CgpuTlasCreateInfo createInfo,
                       CgpuTlas* tlas)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = s_iinstance->itlasStore.allocate();
+    uint64_t handle = ctx->itlasStore.allocate();
 
-    CGPU_RESOLVE_TLAS({ handle }, itlas);
+    CGPU_RESOLVE_TLAS(ctx, { handle }, itlas);
 
     // Create instance buffer & copy into it
     CgpuIBuffer instances;
@@ -2810,7 +2756,7 @@ namespace gtl
                            (createInfo.instanceCount ? createInfo.instanceCount : 1) * sizeof(VkAccelerationStructureInstanceKHR),
                            16/*required by spec*/, &instances, createInfo.debugName))
     {
-      s_iinstance->itlasStore.free(handle);
+      ctx->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to create TLAS instances buffer");
     }
 
@@ -2825,7 +2771,7 @@ namespace gtl
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
       {
         const CgpuBlasInstance& instanceDesc = createInfo.instances[i];
-        CGPU_RESOLVE_BLAS(instanceDesc.as, iblas);
+        CGPU_RESOLVE_BLAS(ctx, instanceDesc.as, iblas);
 
         uint32_t instanceCustomIndex = instanceDesc.instanceCustomIndex;
         if ((instanceCustomIndex & 0xFF000000u) != 0u)
@@ -2865,17 +2811,17 @@ namespace gtl
       .flags = VkGeometryFlagsKHR(areAllBlasOpaque ? VK_GEOMETRY_OPAQUE_BIT_KHR : 0)
     };
 
-    bool result = cgpuCreateTopOrBottomAs(device, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as);
+    bool result = cgpuCreateTopOrBottomAs(ctx, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR, &asGeom, createInfo.instanceCount, &itlas->buffer, &itlas->as);
 
     cgpuDestroyIBuffer(idevice, &instances);
 
     if (!result)
     {
-      s_iinstance->itlasStore.free(handle);
+      ctx->itlasStore.free(handle);
       CGPU_RETURN_ERROR("failed to build TLAS");
     }
 
-    if (s_iinstance->debugUtilsEnabled && createInfo.debugName)
+    if (ctx->debugUtilsEnabled && createInfo.debugName)
     {
       cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR, (uint64_t) itlas->as, createInfo.debugName);
     }
@@ -2884,32 +2830,32 @@ namespace gtl
     return true;
   }
 
-  void cgpuDestroyBlas(CgpuDevice device, CgpuBlas blas)
+  void cgpuDestroyBlas(CgpuContext* ctx, CgpuBlas blas)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_BLAS(blas, iblas);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_BLAS(ctx, blas, iblas);
 
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, iblas->as, nullptr);
     cgpuDestroyIBuffer(idevice, &iblas->buffer);
 
-    s_iinstance->iblasStore.free(blas.handle);
+    ctx->iblasStore.free(blas.handle);
   }
 
-  void cgpuDestroyTlas(CgpuDevice device, CgpuTlas tlas)
+  void cgpuDestroyTlas(CgpuContext* ctx, CgpuTlas tlas)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_TLAS(tlas, itlas);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_TLAS(ctx, tlas, itlas);
 
     idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, itlas->as, nullptr);
     cgpuDestroyIBuffer(idevice, &itlas->buffer);
 
-    s_iinstance->itlasStore.free(tlas.handle);
+    ctx->itlasStore.free(tlas.handle);
   }
 
-  void cgpuCreateBindSets(CgpuDevice device, CgpuPipeline pipeline, CgpuBindSet* bindSets, uint32_t bindSetCount)
+  void cgpuCreateBindSets(CgpuContext* ctx, CgpuPipeline pipeline, CgpuBindSet* bindSets, uint32_t bindSetCount)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
 
     if (ipipeline->descriptorSetCount != bindSetCount)
     {
@@ -2939,34 +2885,207 @@ namespace gtl
 
     for (uint32_t i = 0; i < bindSetCount; i++)
     {
-      bindSets[i].handle = s_iinstance->ibindSetStore.allocate();
+      bindSets[i].handle = ctx->ibindSetStore.allocate();
 
-      CGPU_RESOLVE_BIND_SET(bindSets[i], ibindSet);
+      CGPU_RESOLVE_BIND_SET(ctx, bindSets[i], ibindSet);
       ibindSet->descriptorSetLayoutBindings = ipipeline->descriptorSetLayoutBindings[i];
       ibindSet->descriptorSet = descriptorSets[i];
     }
   }
 
-  void cgpuDestroyBindSets(CgpuDevice device, CgpuBindSet* bindSets, uint32_t bindSetCount)
+  void cgpuDestroyBindSets(CgpuContext* ctx, CgpuBindSet* bindSets, uint32_t bindSetCount)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     for (uint32_t i = 0; i < bindSetCount; i++)
     {
       // descriptor set memory is managed by pipeline VkDescriptorPool
-      s_iinstance->ibindSetStore.free(bindSets[i].handle);
+      ctx->ibindSetStore.free(bindSets[i].handle);
     }
   }
 
-  bool cgpuCreateCommandBuffer(CgpuDevice device, CgpuCommandBuffer* commandBuffer)
+  void cgpuUpdateBindSet(CgpuContext* ctx,
+                         CgpuBindSet bindSet,
+                         const CgpuBindings* bindings)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CGPU_RESOLVE_BIND_SET(ctx, bindSet, ibindSet);
+    CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = s_iinstance->icommandBufferStore.allocate();
+    GbSmallVector<VkDescriptorBufferInfo, 8> bufferInfos;
+    GbSmallVector<VkWriteDescriptorSetAccelerationStructureKHR, 1> asInfos;
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.reserve(128);
 
-    CGPU_RESOLVE_COMMAND_BUFFER({ handle }, icommandBuffer);
+    bufferInfos.reserve(bindings->bufferCount);
+    imageInfos.reserve(bindings->imageCount + bindings->samplerCount);
+    asInfos.reserve(bindings->tlasCount);
 
-    icommandBuffer->device.handle = device.handle;
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets;
+    writeDescriptorSets.reserve(512);
+
+    const std::vector<VkDescriptorSetLayoutBinding>& layoutBindings = ibindSet->descriptorSetLayoutBindings;
+
+    for (uint32_t i = 0; i < layoutBindings.size(); i++)
+    {
+      const VkDescriptorSetLayoutBinding* layoutBinding = &layoutBindings[i];
+
+      VkWriteDescriptorSet writeDescriptorSet = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .pNext = nullptr,
+        .dstSet = ibindSet->descriptorSet,
+        .dstBinding = layoutBinding->binding,
+        .dstArrayElement = 0,
+        .descriptorCount = layoutBinding->descriptorCount,
+        .descriptorType = layoutBinding->descriptorType,
+        .pImageInfo = nullptr,
+        .pBufferInfo = nullptr,
+        .pTexelBufferView = nullptr,
+      };
+
+      if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+          layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+      {
+        for (uint32_t k = 0; k < bindings->bufferCount; ++k)
+        {
+          const CgpuBufferBinding* bufferBinding = &bindings->buffers[k];
+
+          if (bufferBinding->binding != layoutBinding->binding)
+          {
+            continue;
+          }
+
+          if (bufferBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
+          }
+
+          CGPU_RESOLVE_BUFFER(ctx, bufferBinding->buffer, ibuffer);
+
+          if ((bufferBinding->offset % idevice->internalProperties.minStorageBufferOffsetAlignment) != 0)
+          {
+            CGPU_FATAL("buffer binding offset not aligned");
+          }
+
+          VkDescriptorBufferInfo bufferInfo = {
+            .buffer = ibuffer->buffer,
+            .offset = bufferBinding->offset,
+            .range = (bufferBinding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - bufferBinding->offset) : bufferBinding->size,
+          };
+          bufferInfos.push_back(bufferInfo);
+
+          writeDescriptorSet.pBufferInfo = &bufferInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
+        }
+      }
+      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
+               layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+      {
+        for (uint32_t k = 0; k < bindings->imageCount; k++)
+        {
+          const CgpuImageBinding* imageBinding = &bindings->images[k];
+
+          if (imageBinding->binding != layoutBinding->binding)
+          {
+            continue;
+          }
+
+          if (imageBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
+          }
+
+          CGPU_RESOLVE_IMAGE(ctx, imageBinding->image, iimage);
+
+          VkDescriptorImageInfo imageInfo = {
+            .sampler = VK_NULL_HANDLE,
+            .imageView = iimage->imageView,
+            .imageLayout = iimage->layout,
+          };
+          imageInfos.push_back(imageInfo);
+
+          writeDescriptorSet.dstArrayElement = imageBinding->index;
+          writeDescriptorSet.descriptorCount = 1;
+          writeDescriptorSet.pImageInfo = &imageInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
+        }
+      }
+      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
+      {
+        for (uint32_t k = 0; k < bindings->samplerCount; k++)
+        {
+          const CgpuSamplerBinding* samplerBinding = &bindings->samplers[k];
+
+          if (samplerBinding->binding != layoutBinding->binding)
+          {
+            continue;
+          }
+
+          if (samplerBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
+          }
+
+          CGPU_RESOLVE_SAMPLER(ctx, samplerBinding->sampler, isampler);
+
+          VkDescriptorImageInfo imageInfo = {
+            .sampler = isampler->sampler,
+            .imageView = VK_NULL_HANDLE,
+            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+          };
+          imageInfos.push_back(imageInfo);
+
+          writeDescriptorSet.pImageInfo = &imageInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
+        }
+      }
+      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
+      {
+        for (uint32_t k = 0; k < bindings->tlasCount; ++k)
+        {
+          const CgpuTlasBinding* asBinding = &bindings->tlases[k];
+
+          if (asBinding->binding != layoutBinding->binding)
+          {
+            continue;
+          }
+
+          if (asBinding->index >= layoutBinding->descriptorCount)
+          {
+            CGPU_FATAL("descriptor binding out of range");
+          }
+
+          CGPU_RESOLVE_TLAS(ctx, asBinding->as, itlas);
+
+          VkWriteDescriptorSetAccelerationStructureKHR asInfo = {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
+            .pNext = nullptr,
+            .accelerationStructureCount = 1,
+            .pAccelerationStructures = &itlas->as,
+          };
+          asInfos.push_back(asInfo);
+
+          writeDescriptorSet.pNext = &asInfos.back();
+          writeDescriptorSets.push_back(writeDescriptorSet);
+        }
+      }
+    }
+
+    idevice->table.vkUpdateDescriptorSets(
+      idevice->logicalDevice,
+      (uint32_t) writeDescriptorSets.size(),
+      writeDescriptorSets.data(),
+      0,
+      nullptr
+    );
+  }
+
+  bool cgpuCreateCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer* commandBuffer)
+  {
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    uint64_t handle = ctx->icommandBufferStore.allocate();
+
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, { handle }, icommandBuffer);
 
     VkCommandBufferAllocateInfo cmdbufAllocInfo = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -2987,10 +3106,10 @@ namespace gtl
     return true;
   }
 
-  void cgpuDestroyCommandBuffer(CgpuDevice device, CgpuCommandBuffer commandBuffer)
+  void cgpuDestroyCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
 
     idevice->table.vkFreeCommandBuffers(
       idevice->logicalDevice,
@@ -2999,13 +3118,13 @@ namespace gtl
       &icommandBuffer->commandBuffer
     );
 
-    s_iinstance->icommandBufferStore.free(commandBuffer.handle);
+    ctx->icommandBufferStore.free(commandBuffer.handle);
   }
 
-  bool cgpuBeginCommandBuffer(CgpuCommandBuffer commandBuffer)
+  bool cgpuBeginCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     VkCommandBufferBeginInfo beginInfo = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -3026,14 +3145,15 @@ namespace gtl
     return true;
   }
 
-  void cgpuCmdBindPipeline(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdBindPipeline(CgpuContext* ctx,
+                           CgpuCommandBuffer commandBuffer,
                            CgpuPipeline pipeline,
                            const CgpuBindSet* bindSets,
                            uint32_t bindSetCount)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     idevice->table.vkCmdBindPipeline(
       icommandBuffer->commandBuffer,
@@ -3044,7 +3164,7 @@ namespace gtl
     std::array<VkDescriptorSet, CGPU_MAX_DESCRIPTOR_SET_COUNT> descriptorSets;
     for (uint32_t i = 0; i < bindSetCount; i++)
     {
-      CGPU_RESOLVE_BIND_SET(bindSets[i], ibindSet);
+      CGPU_RESOLVE_BIND_SET(ctx, bindSets[i], ibindSet);
       descriptorSets[i] = ibindSet->descriptorSet;
     }
 
@@ -3064,15 +3184,16 @@ namespace gtl
     );
   }
 
-  void cgpuCmdTransitionShaderImageLayouts(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdTransitionShaderImageLayouts(CgpuContext* ctx,
+                                           CgpuCommandBuffer commandBuffer,
                                            CgpuShader shader,
                                            uint32_t descriptorSetIndex,
                                            uint32_t imageCount,
                                            const CgpuImageBinding* images)
   {
-    CGPU_RESOLVE_SHADER(shader, ishader);
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
+    CGPU_RESOLVE_SHADER(ctx, shader, ishader);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     std::vector<VkImageMemoryBarrier2KHR> barriers;
     barriers.reserve(64);
@@ -3124,7 +3245,7 @@ namespace gtl
           continue;
         }
 
-        CGPU_RESOLVE_IMAGE(imageBinding->image, iimage);
+        CGPU_RESOLVE_IMAGE(ctx, imageBinding->image, iimage);
 
         VkImageLayout oldLayout = iimage->layout;
         if (newLayout == oldLayout)
@@ -3187,191 +3308,16 @@ namespace gtl
     }
   }
 
-  void cgpuCmdUpdateBindSet(CgpuCommandBuffer commandBuffer,
-                            CgpuBindSet bindSet,
-                            const CgpuBindings* bindings)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_BIND_SET(bindSet, ibindSet);
-
-    GbSmallVector<VkDescriptorBufferInfo, 8> bufferInfos;
-    GbSmallVector<VkWriteDescriptorSetAccelerationStructureKHR, 1> asInfos;
-    std::vector<VkDescriptorImageInfo> imageInfos;
-    imageInfos.reserve(128);
-
-    bufferInfos.reserve(bindings->bufferCount);
-    imageInfos.reserve(bindings->imageCount + bindings->samplerCount);
-    asInfos.reserve(bindings->tlasCount);
-
-    std::vector<VkWriteDescriptorSet> writeDescriptorSets;
-    writeDescriptorSets.reserve(512);
-
-    const std::vector<VkDescriptorSetLayoutBinding>& layoutBindings = ibindSet->descriptorSetLayoutBindings;
-
-    for (uint32_t i = 0; i < layoutBindings.size(); i++)
-    {
-      const VkDescriptorSetLayoutBinding* layoutBinding = &layoutBindings[i];
-
-      VkWriteDescriptorSet writeDescriptorSet = {
-        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-        .pNext = nullptr,
-        .dstSet = ibindSet->descriptorSet,
-        .dstBinding = layoutBinding->binding,
-        .dstArrayElement = 0,
-        .descriptorCount = layoutBinding->descriptorCount,
-        .descriptorType = layoutBinding->descriptorType,
-        .pImageInfo = nullptr,
-        .pBufferInfo = nullptr,
-        .pTexelBufferView = nullptr,
-      };
-
-      if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
-          layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-      {
-        for (uint32_t k = 0; k < bindings->bufferCount; ++k)
-        {
-          const CgpuBufferBinding* bufferBinding = &bindings->buffers[k];
-
-          if (bufferBinding->binding != layoutBinding->binding)
-          {
-            continue;
-          }
-
-          if (bufferBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
-          CGPU_RESOLVE_BUFFER(bufferBinding->buffer, ibuffer);
-
-          if ((bufferBinding->offset % idevice->internalProperties.minStorageBufferOffsetAlignment) != 0)
-          {
-            CGPU_FATAL("buffer binding offset not aligned");
-          }
-
-          VkDescriptorBufferInfo bufferInfo = {
-            .buffer = ibuffer->buffer,
-            .offset = bufferBinding->offset,
-            .range = (bufferBinding->size == CGPU_WHOLE_SIZE) ? (ibuffer->size - bufferBinding->offset) : bufferBinding->size,
-          };
-          bufferInfos.push_back(bufferInfo);
-
-          writeDescriptorSet.pBufferInfo = &bufferInfos.back();
-          writeDescriptorSets.push_back(writeDescriptorSet);
-        }
-      }
-      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE ||
-               layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
-      {
-        for (uint32_t k = 0; k < bindings->imageCount; k++)
-        {
-          const CgpuImageBinding* imageBinding = &bindings->images[k];
-
-          if (imageBinding->binding != layoutBinding->binding)
-          {
-            continue;
-          }
-
-          if (imageBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
-          CGPU_RESOLVE_IMAGE(imageBinding->image, iimage);
-
-          VkDescriptorImageInfo imageInfo = {
-            .sampler = VK_NULL_HANDLE,
-            .imageView = iimage->imageView,
-            .imageLayout = iimage->layout,
-          };
-          imageInfos.push_back(imageInfo);
-
-          writeDescriptorSet.dstArrayElement = imageBinding->index;
-          writeDescriptorSet.descriptorCount = 1;
-          writeDescriptorSet.pImageInfo = &imageInfos.back();
-          writeDescriptorSets.push_back(writeDescriptorSet);
-        }
-      }
-      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_SAMPLER)
-      {
-        for (uint32_t k = 0; k < bindings->samplerCount; k++)
-        {
-          const CgpuSamplerBinding* samplerBinding = &bindings->samplers[k];
-
-          if (samplerBinding->binding != layoutBinding->binding)
-          {
-            continue;
-          }
-
-          if (samplerBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
-          CGPU_RESOLVE_SAMPLER(samplerBinding->sampler, isampler);
-
-          VkDescriptorImageInfo imageInfo = {
-            .sampler = isampler->sampler,
-            .imageView = VK_NULL_HANDLE,
-            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-          };
-          imageInfos.push_back(imageInfo);
-
-          writeDescriptorSet.pImageInfo = &imageInfos.back();
-          writeDescriptorSets.push_back(writeDescriptorSet);
-        }
-      }
-      else if (layoutBinding->descriptorType == VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
-      {
-        for (uint32_t k = 0; k < bindings->tlasCount; ++k)
-        {
-          const CgpuTlasBinding* asBinding = &bindings->tlases[k];
-
-          if (asBinding->binding != layoutBinding->binding)
-          {
-            continue;
-          }
-
-          if (asBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
-
-          CGPU_RESOLVE_TLAS(asBinding->as, itlas);
-
-          VkWriteDescriptorSetAccelerationStructureKHR asInfo = {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,
-            .pNext = nullptr,
-            .accelerationStructureCount = 1,
-            .pAccelerationStructures = &itlas->as,
-          };
-          asInfos.push_back(asInfo);
-
-          writeDescriptorSet.pNext = &asInfos.back();
-          writeDescriptorSets.push_back(writeDescriptorSet);
-        }
-      }
-    }
-
-    idevice->table.vkUpdateDescriptorSets(
-      idevice->logicalDevice,
-      (uint32_t) writeDescriptorSets.size(),
-      writeDescriptorSets.data(),
-      0,
-      nullptr
-    );
-  }
-
-  void cgpuCmdUpdateBuffer(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdUpdateBuffer(CgpuContext* ctx,
+                           CgpuCommandBuffer commandBuffer,
                            const uint8_t* data,
                            uint64_t size,
                            CgpuBuffer dstBuffer,
                            uint64_t dstOffset)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     idevice->table.vkCmdUpdateBuffer(
       icommandBuffer->commandBuffer,
@@ -3382,17 +3328,18 @@ namespace gtl
     );
   }
 
-  void cgpuCmdCopyBuffer(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdCopyBuffer(CgpuContext* ctx,
+                         CgpuCommandBuffer commandBuffer,
                          CgpuBuffer srcBuffer,
                          uint64_t srcOffset,
                          CgpuBuffer dstBuffer,
                          uint64_t dstOffset,
                          uint64_t size)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_BUFFER(srcBuffer, isrcBuffer);
-    CGPU_RESOLVE_BUFFER(dstBuffer, idstBuffer);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, srcBuffer, isrcBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     VkBufferCopy region = {
       .srcOffset = srcOffset,
@@ -3409,15 +3356,16 @@ namespace gtl
     );
   }
 
-  void cgpuCmdCopyBufferToImage(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdCopyBufferToImage(CgpuContext* ctx,
+                                CgpuCommandBuffer commandBuffer,
                                 CgpuBuffer buffer,
                                 CgpuImage image,
                                 const CgpuBufferImageCopyDesc* desc)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-    CGPU_RESOLVE_IMAGE(image, iimage);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
+    CGPU_RESOLVE_IMAGE(ctx, image, iimage);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     if (iimage->layout != VK_IMAGE_LAYOUT_GENERAL)
     {
@@ -3503,14 +3451,15 @@ namespace gtl
     );
   }
 
-  void cgpuCmdPushConstants(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdPushConstants(CgpuContext* ctx,
+                            CgpuCommandBuffer commandBuffer,
                             CgpuPipeline pipeline,
                             uint32_t size,
                             const void* data)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_PIPELINE(pipeline, ipipeline);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     VkShaderStageFlags stageFlags;
     switch (ipipeline->bindPoint)
@@ -3538,13 +3487,14 @@ namespace gtl
     );
   }
 
-  void cgpuCmdDispatch(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdDispatch(CgpuContext* ctx,
+                       CgpuCommandBuffer commandBuffer,
                        uint32_t dimX,
                        uint32_t dimY,
                        uint32_t dimZ)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     idevice->table.vkCmdDispatch(
       icommandBuffer->commandBuffer,
@@ -3554,11 +3504,12 @@ namespace gtl
     );
   }
 
-  void cgpuCmdPipelineBarrier(CgpuCommandBuffer commandBuffer,
+  void cgpuCmdPipelineBarrier(CgpuContext* ctx,
+                              CgpuCommandBuffer commandBuffer,
                               const CgpuPipelineBarrier* barrier)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     std::vector<VkMemoryBarrier2KHR> vkMemBarriers;
     vkMemBarriers.reserve(128);
@@ -3587,7 +3538,7 @@ namespace gtl
     {
       const CgpuBufferMemoryBarrier* bCgpu = &barrier->bufferBarriers[i];
 
-      CGPU_RESOLVE_BUFFER(bCgpu->buffer, ibuffer);
+      CGPU_RESOLVE_BUFFER(ctx, bCgpu->buffer, ibuffer);
 
       VkBufferMemoryBarrier2KHR bVk = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2_KHR,
@@ -3609,7 +3560,7 @@ namespace gtl
     {
       const CgpuImageMemoryBarrier* bCgpu = &barrier->imageBarriers[i];
 
-      CGPU_RESOLVE_IMAGE(bCgpu->image, iimage);
+      CGPU_RESOLVE_IMAGE(ctx, bCgpu->image, iimage);
 
       VkAccessFlags2KHR accessMask = (VkAccessFlags2KHR) bCgpu->accessMask;
 
@@ -3654,70 +3605,15 @@ namespace gtl
     idevice->table.vkCmdPipelineBarrier2KHR(icommandBuffer->commandBuffer, &dependencyInfo);
   }
 
-  void cgpuCmdResetTimestamps(CgpuCommandBuffer commandBuffer,
-                              uint32_t offset,
-                              uint32_t count)
+  void cgpuCmdTraceRays(CgpuContext* ctx,
+                        CgpuCommandBuffer commandBuffer,
+                        CgpuPipeline pipeline,
+                        uint32_t width,
+                        uint32_t height)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-
-    idevice->table.vkCmdResetQueryPool(
-      icommandBuffer->commandBuffer,
-      idevice->timestampPool,
-      offset,
-      count
-    );
-  }
-
-  void cgpuCmdWriteTimestamp(CgpuCommandBuffer commandBuffer,
-                             uint32_t timestampIndex)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-
-    idevice->table.vkCmdWriteTimestamp2KHR(
-      icommandBuffer->commandBuffer,
-      // FIXME: use correct pipeline flag bits
-      VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT_KHR,
-      idevice->timestampPool,
-      timestampIndex
-    );
-  }
-
-  void cgpuCmdCopyTimestamps(CgpuCommandBuffer commandBuffer,
-                             CgpuBuffer buffer,
-                             uint32_t offset,
-                             uint32_t count,
-                             bool waitUntilAvailable)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
-
-    uint32_t lastIndex = offset + count;
-    if (lastIndex >= CGPU_MAX_TIMESTAMP_QUERIES) {
-      CGPU_FATAL("max timestamp query count exceeded!");
-    }
-
-    VkQueryResultFlags waitFlag = waitUntilAvailable ? VK_QUERY_RESULT_WAIT_BIT : VK_QUERY_RESULT_WITH_AVAILABILITY_BIT;
-
-    idevice->table.vkCmdCopyQueryPoolResults(
-      icommandBuffer->commandBuffer,
-      idevice->timestampPool,
-      offset,
-      count,
-      ibuffer->buffer,
-      0,
-      sizeof(uint64_t),
-      VK_QUERY_RESULT_64_BIT | waitFlag
-    );
-  }
-
-  void cgpuCmdTraceRays(CgpuCommandBuffer commandBuffer, CgpuPipeline rtPipeline, uint32_t width, uint32_t height)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_PIPELINE(rtPipeline, ipipeline);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     VkStridedDeviceAddressRegionKHR callableSBT = {};
     idevice->table.vkCmdTraceRaysKHR(icommandBuffer->commandBuffer,
@@ -3728,31 +3624,36 @@ namespace gtl
                                      width, height, 1);
   }
 
-  void cgpuCmdFillBuffer(CgpuCommandBuffer commandBuffer, CgpuBuffer buffer, uint64_t dstOffset, uint64_t size, uint8_t data)
+  void cgpuCmdFillBuffer(CgpuContext* ctx,
+                         CgpuCommandBuffer commandBuffer,
+                         CgpuBuffer buffer,
+                         uint64_t dstOffset,
+                         uint64_t size,
+                         uint8_t data)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
-    CGPU_RESOLVE_BUFFER(buffer, ibuffer);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     uint64_t rangeSize = (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size;
     idevice->table.vkCmdFillBuffer(icommandBuffer->commandBuffer, ibuffer->buffer, dstOffset, rangeSize, data);
   }
 
-  void cgpuEndCommandBuffer(CgpuCommandBuffer commandBuffer)
+  void cgpuEndCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_DEVICE(icommandBuffer->device, idevice);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     idevice->table.vkEndCommandBuffer(icommandBuffer->commandBuffer);
   }
 
-  bool cgpuCreateSemaphore(CgpuDevice device, CgpuSemaphore* semaphore, uint64_t initialValue)
+  bool cgpuCreateSemaphore(CgpuContext* ctx, CgpuSemaphore* semaphore, uint64_t initialValue)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = s_iinstance->isemaphoreStore.allocate();
+    uint64_t handle = ctx->isemaphoreStore.allocate();
 
-    CGPU_RESOLVE_SEMAPHORE({ handle }, isemaphore);
+    CGPU_RESOLVE_SEMAPHORE(ctx, { handle }, isemaphore);
 
     VkSemaphoreTypeCreateInfo typeCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
@@ -3774,8 +3675,9 @@ namespace gtl
       &isemaphore->semaphore
     );
 
-    if (result != VK_SUCCESS) {
-      s_iinstance->isemaphoreStore.free(handle);
+    if (result != VK_SUCCESS)
+    {
+      ctx->isemaphoreStore.free(handle);
       CGPU_RETURN_ERROR("failed to create semaphore");
     }
 
@@ -3783,10 +3685,10 @@ namespace gtl
     return true;
   }
 
-  void cgpuDestroySemaphore(CgpuDevice device, CgpuSemaphore semaphore)
+  void cgpuDestroySemaphore(CgpuContext* ctx, CgpuSemaphore semaphore)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_SEMAPHORE(semaphore, isemaphore);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_SEMAPHORE(ctx, semaphore, isemaphore);
 
     idevice->table.vkDestroySemaphore(
       idevice->logicalDevice,
@@ -3794,15 +3696,15 @@ namespace gtl
       nullptr
     );
 
-    s_iinstance->isemaphoreStore.free(semaphore.handle);
+    ctx->isemaphoreStore.free(semaphore.handle);
   }
 
-  bool cgpuWaitSemaphores(CgpuDevice device,
+  bool cgpuWaitSemaphores(CgpuContext* ctx,
                           uint32_t semaphoreInfoCount,
                           CgpuWaitSemaphoreInfo* semaphoreInfos,
                           uint64_t timeoutNs)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
 
     GbSmallVector<VkSemaphore, 8> semaphores(semaphoreInfoCount);
     GbSmallVector<uint64_t, 8> semaphoreValues(semaphoreInfoCount);
@@ -3811,7 +3713,7 @@ namespace gtl
     {
       const CgpuWaitSemaphoreInfo& semaphoreInfo = semaphoreInfos[i];
 
-      CGPU_RESOLVE_SEMAPHORE(semaphoreInfo.semaphore, isemaphore);
+      CGPU_RESOLVE_SEMAPHORE(ctx, semaphoreInfo.semaphore, isemaphore);
 
       semaphores[i] = isemaphore->semaphore;
       semaphoreValues[i] = semaphoreInfo.value;
@@ -3840,15 +3742,15 @@ namespace gtl
     return true;
   }
 
-  void cgpuSubmitCommandBuffer(CgpuDevice device,
+  void cgpuSubmitCommandBuffer(CgpuContext* ctx,
                                CgpuCommandBuffer commandBuffer,
                                uint32_t signalSemaphoreInfoCount,
                                CgpuSignalSemaphoreInfo* signalSemaphoreInfos,
                                uint32_t waitSemaphoreInfoCount,
                                CgpuWaitSemaphoreInfo* waitSemaphoreInfos)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
-    CGPU_RESOLVE_COMMAND_BUFFER(commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
 
     GbSmallVector<VkSemaphoreSubmitInfo, 8> signalSubmitInfos(signalSemaphoreInfoCount);
     GbSmallVector<VkSemaphoreSubmitInfo, 8> waitSubmitInfos(waitSemaphoreInfoCount);
@@ -3857,7 +3759,7 @@ namespace gtl
     {
       for (uint32_t i = 0; i < infoCount; i++)
       {
-        CGPU_RESOLVE_SEMAPHORE(semaphoreInfos[i].semaphore, isemaphore);
+        CGPU_RESOLVE_SEMAPHORE(ctx, semaphoreInfos[i].semaphore, isemaphore);
 
         submitInfos[i] = VkSemaphoreSubmitInfo {
           .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
@@ -3901,15 +3803,15 @@ namespace gtl
     }
   }
 
-  const CgpuDeviceFeatures& cgpuGetDeviceFeatures(CgpuDevice device)
+  const CgpuDeviceFeatures& cgpuGetDeviceFeatures(CgpuContext* ctx)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
     return idevice->features;
   }
 
-  const CgpuDeviceProperties& cgpuGetDeviceProperties(CgpuDevice device)
+  const CgpuDeviceProperties& cgpuGetDeviceProperties(CgpuContext* ctx)
   {
-    CGPU_RESOLVE_DEVICE(device, idevice);
+    CgpuIDevice* idevice = &ctx->idevice;
     return idevice->properties;
   }
 }

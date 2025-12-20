@@ -28,7 +28,7 @@ namespace gtl
   class GgpuResizableBuffer
   {
   public:
-    GgpuResizableBuffer(CgpuDevice device,
+    GgpuResizableBuffer(CgpuContext* ctx,
                         GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                         CgpuBufferUsage usageFlags,
                         CgpuMemoryProperties memoryProperties);
@@ -43,7 +43,7 @@ namespace gtl
     bool resize(uint64_t newSize, CgpuCommandBuffer commandBuffer);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
     CgpuBufferUsage m_usageFlags;
     CgpuMemoryProperties m_memoryProperties;

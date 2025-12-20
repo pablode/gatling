@@ -35,7 +35,7 @@ namespace gtl
   class GiTextureManager
   {
   public:
-    GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, gtl::GgpuStager& stager,
+    GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, gtl::GgpuStager& stager,
                      GgpuDelayedResourceDestroyer& delayedResourceDestroyer);
 
     void housekeep();
@@ -54,7 +54,7 @@ namespace gtl
     GiImagePtr makeImagePtr(bool destroyImmediately = false);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     GiAssetReader& m_assetReader;
     gtl::GgpuStager& m_stager;
     GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;

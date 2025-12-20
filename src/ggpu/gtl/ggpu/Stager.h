@@ -27,7 +27,7 @@ namespace gtl
   class GgpuStager
   {
   public:
-    GgpuStager(CgpuDevice device);
+    GgpuStager(CgpuContext* ctx);
     ~GgpuStager();
 
     bool allocate();
@@ -46,7 +46,7 @@ namespace gtl
     bool stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc, uint32_t offsetAlign = 4);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
 
     bool m_hasSharedMem;
 

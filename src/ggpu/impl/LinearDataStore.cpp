@@ -36,16 +36,16 @@ namespace
 
 namespace gtl
 {
-  GgpuLinearDataStore::GgpuLinearDataStore(CgpuDevice device,
+  GgpuLinearDataStore::GgpuLinearDataStore(CgpuContext* ctx,
                                            GgpuStager& stager,
                                            GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
                                            uint64_t elementSize, 
                                            uint32_t minCapacity)
-    : m_device(device)
+    : m_ctx(ctx)
     , m_elementSize(elementSize)
     , m_minCapacity(minCapacity)
     , m_elementCount(0)
-    , m_buffer(device, stager, delayedResourceDestroyer, elementSize)
+    , m_buffer(ctx, stager, delayedResourceDestroyer, elementSize)
   {
   }
 
@@ -118,34 +118,34 @@ namespace gtl
       CgpuSemaphore semaphore;
       CgpuSignalSemaphoreInfo signalSemaphoreInfo;
       CgpuWaitSemaphoreInfo waitSemaphoreInfo;
-      if (!cgpuCreateCommandBuffer(m_device, &commandBuffer))
+      if (!cgpuCreateCommandBuffer(m_ctx, &commandBuffer))
         goto cleanup;
 
-      if (!cgpuBeginCommandBuffer(commandBuffer))
+      if (!cgpuBeginCommandBuffer(m_ctx, commandBuffer))
         goto cleanup;
 
-      if (!m_buffer.resize(m_device, commandBuffer, newSize))
+      if (!m_buffer.resize(m_ctx, commandBuffer, newSize))
         goto cleanup;
 
-      cgpuEndCommandBuffer(commandBuffer);
+      cgpuEndCommandBuffer(m_ctx, commandBuffer);
 
-      if (!cgpuCreateSemaphore(m_device, &semaphore))
+      if (!cgpuCreateSemaphore(m_ctx, &semaphore))
         goto cleanup;
 
       signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-      cgpuSubmitCommandBuffer(m_device, commandBuffer, 1, &signalSemaphoreInfo);
+      cgpuSubmitCommandBuffer(m_ctx, commandBuffer, 1, &signalSemaphoreInfo);
 
       waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-      if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))
+      if (!cgpuWaitSemaphores(m_ctx, 1, &waitSemaphoreInfo))
         goto cleanup;
 
       result = true;
 
 cleanup:
       if (commandBuffer.handle)
-        cgpuDestroyCommandBuffer(m_device, commandBuffer);
+        cgpuDestroyCommandBuffer(m_ctx, commandBuffer);
       if (semaphore.handle)
-        cgpuDestroySemaphore(m_device, semaphore);
+        cgpuDestroySemaphore(m_ctx, semaphore);
 
       if (!result)
         byteOffset = UINT64_MAX;

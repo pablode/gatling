@@ -27,10 +27,10 @@ const static uint64_t BUFFER_STAGING_OPT_THRESHOLD = 256 * 1024;
 
 namespace gtl
 {
-  GgpuStager::GgpuStager(CgpuDevice device)
-    : m_device(device)
+  GgpuStager::GgpuStager(CgpuContext* ctx)
+    : m_ctx(ctx)
   {
-    const CgpuDeviceFeatures& features = cgpuGetDeviceFeatures(device);
+    const CgpuDeviceFeatures& features = cgpuGetDeviceFeatures(ctx);
 
     m_hasSharedMem = features.sharedMemory;
   }
@@ -50,28 +50,28 @@ namespace gtl
       .debugName = "Staging"
     };
 
-    bool bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
+    bool bufferCreated = cgpuCreateBuffer(m_ctx, createInfo, &m_stagingBuffer);
 
     if (!bufferCreated)
     {
       createInfo.memoryProperties = CgpuMemoryProperties::HostVisible;
 
-      bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
+      bufferCreated = cgpuCreateBuffer(m_ctx, createInfo, &m_stagingBuffer);
     }
 
     if (!bufferCreated)
       goto fail;
 
-    if (!cgpuCreateCommandBuffer(m_device, &m_commandBuffers[0]) ||
-        !cgpuCreateCommandBuffer(m_device, &m_commandBuffers[1]))
+    if (!cgpuCreateCommandBuffer(m_ctx, &m_commandBuffers[0]) ||
+        !cgpuCreateCommandBuffer(m_ctx, &m_commandBuffers[1]))
       goto fail;
 
-    if (!cgpuCreateSemaphore(m_device, &m_semaphore))
+    if (!cgpuCreateSemaphore(m_ctx, &m_semaphore))
       goto fail;
 
-    m_mappedMem = (uint8_t*) cgpuGetBufferCpuPtr(m_stagingBuffer);
+    m_mappedMem = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, m_stagingBuffer);
 
-    if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
+    if (!cgpuBeginCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]))
       goto fail;
 
     return true;
@@ -84,12 +84,12 @@ fail:
   void GgpuStager::free()
   {
     CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
-    cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo);
-    cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
-    cgpuDestroySemaphore(m_device, m_semaphore);
-    cgpuDestroyCommandBuffer(m_device, m_commandBuffers[0]);
-    cgpuDestroyCommandBuffer(m_device, m_commandBuffers[1]);
-    cgpuDestroyBuffer(m_device, m_stagingBuffer);
+    cgpuWaitSemaphores(m_ctx, 1, &waitSemaphoreInfo);
+    cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
+    cgpuDestroySemaphore(m_ctx, m_semaphore);
+    cgpuDestroyCommandBuffer(m_ctx, m_commandBuffers[0]);
+    cgpuDestroyCommandBuffer(m_ctx, m_commandBuffers[1]);
+    cgpuDestroyBuffer(m_ctx, m_stagingBuffer);
   }
 
   bool GgpuStager::flush()
@@ -99,23 +99,23 @@ fail:
 
     // Wait until previous submit is finished.
     CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
-    if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))
+    if (!cgpuWaitSemaphores(m_ctx, 1, &waitSemaphoreInfo))
       return false;
 
     m_semaphoreCounter++;
 
-    cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
+    cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
 
     uint32_t halfOffset = m_writeableHalf * BUFFER_HALF_SIZE;
 
     CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
-    cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo);
+    cgpuSubmitCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo);
 
     m_stagedBytes = 0;
     m_commandsPending = false;
     m_writeableHalf = (m_writeableHalf == 0) ? 1 : 0;
 
-    if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
+    if (!cgpuBeginCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]))
       return false;
 
     return true;
@@ -131,7 +131,7 @@ fail:
 
     if (m_hasSharedMem && size < BUFFER_STAGING_OPT_THRESHOLD)
     {
-      auto ptr = (uint8_t*) cgpuGetBufferCpuPtr(dst);
+      auto ptr = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, dst);
       memcpy(&ptr[dstBaseOffset], src, size);
       return true;
     }
@@ -139,13 +139,14 @@ fail:
     {
       m_commandsPending = true;
 
-      cgpuCmdUpdateBuffer(m_commandBuffers[m_writeableHalf], src, size, dst, dstBaseOffset);
+      cgpuCmdUpdateBuffer(m_ctx, m_commandBuffers[m_writeableHalf], src, size, dst, dstBaseOffset);
 
       return true;
     }
 
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
       cgpuCmdCopyBuffer(
+        m_ctx,
         m_commandBuffers[m_writeableHalf],
         m_stagingBuffer,
         srcOffset,
@@ -202,6 +203,7 @@ fail:
         desc.texelExtentZ = depth;
 
         cgpuCmdCopyBufferToImage(
+          m_ctx,
           m_commandBuffers[m_writeableHalf],
           m_stagingBuffer,
           dst,
