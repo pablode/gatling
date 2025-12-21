@@ -581,25 +581,33 @@ namespace gtl
     MTL::Library* library = idevice->compiler->newLibrary(libDesc, &error);
     CHK_MTL(library, error);
 #else
-    std::atomic<bool> finished = false;
-    {
-      std::mutex mutex;
-      std::condition_variable cv;
-      std::unique_lock<std::mutex> lock(mutex);
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool done = false;
 
-      MTL4::CompilerTask* task = idevice->compiler->newLibrary(libDesc, [&](MTL::Library* result, NS::Error* error) {
-        CHK_MTL(result, error); // TODO: should not be fatal
+    MTL4::CompilerTask* task = idevice->compiler->newLibrary(libDesc, [&](MTL::Library* result, NS::Error* error) {
+      if (result)
+      {
+        std::unique_lock<std::mutex> lock(mutex);
         ishader->library = NS::RetainPtr(result);
-        finished = true;
-      });
+      }
+      else
+      {
+        LOG_MTL_ERR(error);
+      }
+      done = true;
+      cv.notify_one();
+    });
 
-      cv.wait(lock, [&finished]() { return finished.load(); });
-      task->release();
+    {
+      std::unique_lock<std::mutex> lock(mutex);
+      cv.wait(lock, [&]() { return done; });
     }
-#endif
 
+    task->release();
     compileOptions->release();
     libDesc->release();
+#endif
 
     return bool(ishader->library);
   }
