@@ -120,7 +120,7 @@ namespace gtl
   struct CgpuIShader
   {
     std::string entryPoint;
-    MTL::Library* library;
+    NS::SharedPtr<MTL::Library> library;
     CgpuShaderReflection reflection;
   };
 
@@ -257,7 +257,7 @@ namespace gtl
   if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, E->localizedDescription()->utf8String(), E->code()); gbLogFlush(); }
 
 #define CHK_MTL(X, E)    \
-  if (!X) { LOG_MTL_ERR(E); fflush(stdout); assert(false); exit(EXIT_FAILURE); }
+  if (!X) { LOG_MTL_ERR(E); assert(false); exit(EXIT_FAILURE); }
 
 // TODO: replace with proper error handling in some cases
 #define CHK_MTL_NP(X)    \
@@ -551,8 +551,8 @@ namespace gtl
     CHK_SPVC(spvc_compiler_compile(spvcCompiler, &mslSrc));
 
     // DEBUG: enable to print SPIRV-Cross output (MSL code)
-#if 0
-    //if (createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_RAYGEN)
+#if 1
+    if (createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT)
     GB_LOG("{}", mslSrc);
     gbLogFlush();
 #endif
@@ -581,18 +581,19 @@ namespace gtl
     MTL::Library* library = idevice->compiler->newLibrary(libDesc, &error);
     CHK_MTL(library, error);
 #else
-    MTL::Library* library = nullptr;
+    std::atomic<bool> finished = false;
     {
       std::mutex mutex;
       std::condition_variable cv;
       std::unique_lock<std::mutex> lock(mutex);
 
       MTL4::CompilerTask* task = idevice->compiler->newLibrary(libDesc, [&](MTL::Library* result, NS::Error* error) {
-        CHK_MTL(result, error);
-        library = result;
+        CHK_MTL(result, error); // TODO: should not be fatal
+        ishader->library = NS::RetainPtr(result);
+        finished = true;
       });
 
-      cv.wait(lock, [&library]() { return library; });
+      cv.wait(lock, [&finished]() { return finished.load(); });
       task->release();
     }
 #endif
@@ -600,8 +601,7 @@ namespace gtl
     compileOptions->release();
     libDesc->release();
 
-    ishader->library = library;
-    return true; // TODO: for shader hotloading, errors shouldn't be fatal
+    return bool(ishader->library);
   }
 
   static std::string cgpuMakeShaderEntryPoint(CgpuIDevice* idevice, CgpuShaderStageFlags stageFlag)
@@ -903,7 +903,7 @@ namespace gtl
     NS::String* entryFuncName = NS::String::string(ishader->entryPoint.c_str(), NS::UTF8StringEncoding);
 
     auto* entryFunDesc = MTL4::LibraryFunctionDescriptor::alloc()->init();
-    entryFunDesc->setLibrary(ishader->library);
+    entryFunDesc->setLibrary(ishader->library.get());
     entryFunDesc->setName(entryFuncName);
 
     descriptor->setComputeFunctionDescriptor(entryFunDesc);
@@ -1125,6 +1125,7 @@ namespace gtl
     // Collect all shaders and create pipeline
     uint32_t functionCount = createInfo.hitGroupCount; // TODO: * 2 for anyhit (probably in user space)
 
+    // TODO: handle functionCount == 0(?)
     std::vector<MTL4::FunctionDescriptor*> hitFunctions(functionCount); // TODO: rename
     MTL4::StaticLinkingDescriptor* linkedFunctions = nullptr;
 
@@ -1138,7 +1139,7 @@ namespace gtl
         NS::String* entryFuncName = NS::String::string(ishader->entryPoint.c_str(), NS::UTF8StringEncoding);
 
         auto* funDesc = MTL4::LibraryFunctionDescriptor::alloc()->init();
-        funDesc->setLibrary(ishader->library);
+        funDesc->setLibrary(ishader->library.get());
         funDesc->setName(entryFuncName);
 
         hitFunctions[i] = funDesc;

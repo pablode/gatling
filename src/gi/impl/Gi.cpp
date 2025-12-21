@@ -1692,6 +1692,7 @@ GB_LOG(">>> rgen shader");
     }
 
     // Create miss shaders.
+#if 0
 GB_LOG(">>> miss shaders");
     {
       GiGlslShaderGen::MissShaderParams missParams = {
@@ -1723,7 +1724,6 @@ GB_LOG(">>> miss shaders");
       }
 
       // shadow test miss shader
-if(false)
       {
         std::vector<uint8_t> spv;
         if (!s_shaderGen->generateMissSpirv("rp_main_shadow.miss", missParams, spv))
@@ -1746,6 +1746,7 @@ if(false)
         missShaders.push_back(missShader);
       }
     }
+#endif
 
     // Create RT pipeline.
     {
@@ -1754,7 +1755,7 @@ if(false)
 
       if (!cgpuCreateRtPipeline(s_device, {
                                   .rgenShader = rgenShader,
-                                  .missShaderCount = 0,// (uint32_t) missShaders.size(),
+                                  .missShaderCount = (uint32_t) missShaders.size(),
                                   .missShaders = missShaders.data(),
                                   .hitGroupCount = (uint32_t) hitGroups.size(),
                                   .hitGroups = hitGroups.data(),
