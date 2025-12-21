@@ -145,6 +145,7 @@ static_assert((sizeof(BlasPayloadBufferPreamble) % 32) == 0);
 #endif
 
 // set 0
+GI_BINDING_INDEX(UNIFORM_DATA,    0)
 GI_BINDING_INDEX(SPHERE_LIGHTS,   1)
 GI_BINDING_INDEX(DISTANT_LIGHTS,  2)
 GI_BINDING_INDEX(RECT_LIGHTS,     3)
@@ -176,9 +177,6 @@ GI_BINDING_INDEX(AOV_DOUBLE_SIDED, 28)
 
 // set 1 & set 2 (alised array)
 GI_BINDING_INDEX(TEXTURES,     0)
-
-// set 3
-GI_BINDING_INDEX(UNIFORM_DATA, 0)
 
 GI_INTERFACE_END()
 

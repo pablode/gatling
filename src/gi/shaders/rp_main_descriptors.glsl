@@ -1,6 +1,7 @@
 #include "interface/rp_main.h"
 #include "common.glsl"
 
+layout(binding = BINDING_INDEX_UNIFORM_DATA, std140) uniform UniformDataUbo { UniformData ubo; };
 layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLightBuffer { SphereLight sphereLights[]; };
 layout(binding = BINDING_INDEX_DISTANT_LIGHTS, std430) readonly buffer DistantLightBuffer { DistantLight distantLights[]; };
 layout(binding = BINDING_INDEX_RECT_LIGHTS, std430) readonly buffer RectLightBuffer { RectLight rectLights[]; };
@@ -71,8 +72,6 @@ layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, std430) writeonly buffer Double
 layout(set = 1, binding = BINDING_INDEX_TEXTURES) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
 
 layout(set = 2, binding = BINDING_INDEX_TEXTURES) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
-
-layout(set = 3, binding = BINDING_INDEX_UNIFORM_DATA, std140) uniform UniformDataUbo { UniformData ubo; };
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
   BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment

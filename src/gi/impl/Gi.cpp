@@ -112,7 +112,7 @@ namespace gtl
   struct GiShaderCache
   {
     uint32_t                       aovMask;
-    std::array<CgpuBindSet, 4>     bindSets;
+    std::array<CgpuBindSet, 3>     bindSets;
     bool                           domeLightCameraVisible;
     std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
@@ -1370,7 +1370,7 @@ cleanup:
 
     GiShaderCache* cache = nullptr;
     CgpuPipeline pipeline;
-    std::array<CgpuBindSet, 4> bindSets;
+    std::array<CgpuBindSet, 3> bindSets;
     CgpuShader rgenShader;
     std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
@@ -2185,6 +2185,8 @@ cleanup:
       std::vector<CgpuBufferBinding> buffers;
       buffers.reserve(16);
 
+      buffers.push_back({ .binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = s_bumpAlloc->getBuffer(), .size = sizeof(rp::UniformData) });
+
       buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
       buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
       buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
@@ -2256,15 +2258,11 @@ cleanup:
         GI_FATAL("max number of textures exceeded");
       }
 
-      CgpuBufferBinding uboBinding = { .binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = s_bumpAlloc->getBuffer(), .size = sizeof(rp::UniformData) };
-      CgpuBindings bindings3 = { .bufferCount = 1, .buffers = &uboBinding };
-
       cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[0], &bindings0);
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[1], &bindings1);
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[2], &bindings2);
-      cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[3], &bindings3);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBindSets;
     }
