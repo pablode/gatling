@@ -29,14 +29,14 @@
 namespace gtl
 {
   class GgpuStager;
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   class GgpuLinearDataStore
   {
   public:
     GgpuLinearDataStore(CgpuContext* ctx,
                         GgpuStager& stager,
-                        GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                        GgpuDeleteQueue& deleteQueue,
                         uint64_t elementSize,
                         uint32_t minCapacity);
 

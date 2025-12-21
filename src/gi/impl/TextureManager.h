@@ -26,7 +26,7 @@
 
 namespace gtl
 {
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
   class GgpuStager;
   class GiAssetReader;
 
@@ -36,7 +36,7 @@ namespace gtl
   {
   public:
     GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, gtl::GgpuStager& stager,
-                     GgpuDelayedResourceDestroyer& delayedResourceDestroyer);
+                     GgpuDeleteQueue& deleteQueue);
 
     void housekeep();
 
@@ -57,7 +57,7 @@ namespace gtl
     CgpuContext* m_ctx;
     GiAssetReader& m_assetReader;
     gtl::GgpuStager& m_stager;
-    GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
+    GgpuDeleteQueue& m_deleteQueue;
     std::unordered_map<std::string, std::weak_ptr<CgpuImage>> m_fileCache;
     std::unordered_map<uint64_t, std::weak_ptr<CgpuImage>> m_binaryCache;
   };

@@ -23,7 +23,7 @@
 
 namespace gtl
 {
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   template<typename T>
   struct GgpuTempAllocation
@@ -38,11 +38,11 @@ namespace gtl
 
   public:
     static std::shared_ptr<GgpuBumpAllocator> make(CgpuContext* ctx,
-                                                   GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                                                   GgpuDeleteQueue& deleteQueue,
                                                    uint32_t size);
 
     GgpuBumpAllocator(CgpuContext* ctx,
-                      GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                      GgpuDeleteQueue& deleteQueue,
                       CgpuBuffer buffer, uint32_t size);
 
     GgpuBumpAllocator(const GgpuBumpAllocator&) = delete;
@@ -63,7 +63,7 @@ namespace gtl
     GgpuTempAllocation<uint8_t> alloc(uint32_t size);
 
   private:
-    GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
+    GgpuDeleteQueue& m_deleteQueue;
     CgpuBuffer m_buffer;
     uint8_t* m_cpuPtr;
     uint32_t m_offset;

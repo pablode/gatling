@@ -20,7 +20,7 @@
 
 #include <gtl/mc/Backend.h>
 #include <gtl/gb/Log.h>
-#include <gtl/ggpu/DelayedResourceDestroyer.h>
+#include <gtl/ggpu/DeleteQueue.h>
 #include <gtl/ggpu/Stager.h>
 #include <gtl/imgio/Imgio.h>
 
@@ -69,11 +69,11 @@ namespace
 namespace gtl
 {
   GiTextureManager::GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, GgpuStager& stager,
-                                     GgpuDelayedResourceDestroyer& delayedResourceDestroyer)
+                                     GgpuDeleteQueue& deleteQueue)
     : m_ctx(ctx)
     , m_assetReader(assetReader)
     , m_stager(stager)
-    , m_delayedResourceDestroyer(delayedResourceDestroyer)
+    , m_deleteQueue(deleteQueue)
   {
   }
 
@@ -158,7 +158,7 @@ namespace gtl
       }
       else
       {
-        m_delayedResourceDestroyer.enqueueDestruction(*d);
+        m_deleteQueue.pushBack(*d);
       }
       delete d;
     });

@@ -29,14 +29,14 @@
 namespace gtl
 {
   class GgpuStager;
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   class GgpuSyncBuffer
   {
   public:
     GgpuSyncBuffer(CgpuContext* ctx,
                    GgpuStager& stager,
-                   GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                   GgpuDeleteQueue& deleteQueue,
                    uint64_t elementSize,
                    CgpuBufferUsage bufferUsage = CgpuBufferUsage::Storage);
 

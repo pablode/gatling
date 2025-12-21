@@ -23,13 +23,13 @@
 
 namespace gtl
 {
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   class GgpuResizableBuffer
   {
   public:
     GgpuResizableBuffer(CgpuContext* ctx,
-                        GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                        GgpuDeleteQueue& deleteQueue,
                         CgpuBufferUsage usageFlags,
                         CgpuMemoryProperties memoryProperties);
 
@@ -47,7 +47,7 @@ namespace gtl
 
   private:
     CgpuContext* m_ctx;
-    GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
+    GgpuDeleteQueue& m_deleteQueue;
     CgpuBufferUsage m_usageFlags;
     CgpuMemoryProperties m_memoryProperties;
 

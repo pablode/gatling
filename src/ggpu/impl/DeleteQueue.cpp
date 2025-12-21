@@ -15,18 +15,18 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
-#include "DelayedResourceDestroyer.h"
+#include "DeleteQueue.h"
 
 #include <assert.h>
 
 namespace gtl
 {
-  GgpuDelayedResourceDestroyer::GgpuDelayedResourceDestroyer(CgpuContext* ctx)
+  GgpuDeleteQueue::GgpuDeleteQueue(CgpuContext* ctx)
     : m_ctx(ctx)
   {
   }
 
-  GgpuDelayedResourceDestroyer::~GgpuDelayedResourceDestroyer()
+  GgpuDeleteQueue::~GgpuDeleteQueue()
   {
     for (uint32_t i = 0; i < FrameCount; i++)
     {
@@ -34,7 +34,7 @@ namespace gtl
     }
   }
 
-  void GgpuDelayedResourceDestroyer::housekeep()
+  void GgpuDeleteQueue::housekeep()
   {
     auto& oldestFrameDestructions = m_pendingDestructions[m_frameIndex];
     for (const DestroyFunc& fun : oldestFrameDestructions)
@@ -45,12 +45,12 @@ namespace gtl
     oldestFrameDestructions.clear();
   }
 
-  void GgpuDelayedResourceDestroyer::nextFrame()
+  void GgpuDeleteQueue::nextFrame()
   {
     m_frameIndex = (m_frameIndex + 1) % FrameCount;
   }
 
-  void GgpuDelayedResourceDestroyer::destroyAll()
+  void GgpuDeleteQueue::destroyAll()
   {
     for (uint32_t i = 0; i < FrameCount; i++)
     {
@@ -59,49 +59,49 @@ namespace gtl
     }
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuBuffer handle)
+  void GgpuDeleteQueue::pushBack(CgpuBuffer handle)
   {
     assert(handle.handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyBuffer(m_ctx, handle); });
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuImage handle)
+  void GgpuDeleteQueue::pushBack(CgpuImage handle)
   {
     assert(handle.handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyImage(m_ctx, handle); });
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuPipeline handle)
+  void GgpuDeleteQueue::pushBack(CgpuPipeline handle)
   {
     assert(handle.handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyPipeline(m_ctx, handle); });
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuSemaphore handle)
+  void GgpuDeleteQueue::pushBack(CgpuSemaphore handle)
   {
     assert(handle.handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroySemaphore(m_ctx, handle); });
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuCommandBuffer handle)
+  void GgpuDeleteQueue::pushBack(CgpuCommandBuffer handle)
   {
     assert(handle.handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyCommandBuffer(m_ctx, handle); });
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuBlas handle)
+  void GgpuDeleteQueue::pushBack(CgpuBlas handle)
   {
     assert(handle.handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyBlas(m_ctx, handle); });
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestruction(CgpuTlas handle)
+  void GgpuDeleteQueue::pushBack(CgpuTlas handle)
   {
     assert(handle.handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyTlas(m_ctx, handle); });
   }
 
-  void GgpuDelayedResourceDestroyer::enqueueDestroyFunc(DestroyFunc fun)
+  void GgpuDeleteQueue::enqueueDestroyFunc(DestroyFunc fun)
   {
     m_pendingDestructions[m_frameIndex].push_back(fun);
   }

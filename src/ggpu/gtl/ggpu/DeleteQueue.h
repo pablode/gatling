@@ -25,18 +25,18 @@
 
 namespace gtl
 {
-  class GgpuDelayedResourceDestroyer
+  class GgpuDeleteQueue
   {
   private:
     constexpr static uint32_t FrameCount = 4;
 
   public:
-    GgpuDelayedResourceDestroyer(CgpuContext* ctx);
+    GgpuDeleteQueue(CgpuContext* ctx);
 
-    GgpuDelayedResourceDestroyer(const GgpuDelayedResourceDestroyer&) = delete;
-    GgpuDelayedResourceDestroyer& operator=(const GgpuDelayedResourceDestroyer&) = delete;
+    GgpuDeleteQueue(const GgpuDeleteQueue&) = delete;
+    GgpuDeleteQueue& operator=(const GgpuDeleteQueue&) = delete;
 
-    ~GgpuDelayedResourceDestroyer();
+    ~GgpuDeleteQueue();
 
   public:
     void nextFrame();
@@ -45,19 +45,19 @@ namespace gtl
     void destroyAll();
 
     template<typename T, typename... U>
-    void enqueueDestruction(T handle, U... moreHandles)
+    void pushBack(T handle, U... moreHandles)
     {
-      enqueueDestruction(handle);
-      enqueueDestruction(moreHandles...);
+      pushBack(handle);
+      pushBack(moreHandles...);
     }
 
-    void enqueueDestruction(CgpuBuffer handle);
-    void enqueueDestruction(CgpuImage handle);
-    void enqueueDestruction(CgpuPipeline handle);
-    void enqueueDestruction(CgpuSemaphore handle);
-    void enqueueDestruction(CgpuCommandBuffer handle);
-    void enqueueDestruction(CgpuBlas handle);
-    void enqueueDestruction(CgpuTlas handle);
+    void pushBack(CgpuBuffer handle);
+    void pushBack(CgpuImage handle);
+    void pushBack(CgpuPipeline handle);
+    void pushBack(CgpuSemaphore handle);
+    void pushBack(CgpuCommandBuffer handle);
+    void pushBack(CgpuBlas handle);
+    void pushBack(CgpuTlas handle);
 
   private:
     using DestroyFunc = std::function<void()>;

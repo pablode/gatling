@@ -16,14 +16,14 @@
 //
 
 #include "BumpAllocator.h"
-#include "DelayedResourceDestroyer.h"
+#include "DeleteQueue.h"
 
 #include <assert.h>
 
 namespace gtl
 {
   std::shared_ptr<GgpuBumpAllocator> GgpuBumpAllocator::make(CgpuContext* ctx,
-                                                             GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                                                             GgpuDeleteQueue& deleteQueue,
                                                              uint32_t size)
   {
     CgpuBuffer buffer;
@@ -36,13 +36,13 @@ namespace gtl
       return nullptr;
     }
 
-    return std::make_shared<GgpuBumpAllocator>(ctx, delayedResourceDestroyer, buffer, size);
+    return std::make_shared<GgpuBumpAllocator>(ctx, deleteQueue, buffer, size);
   }
 
   GgpuBumpAllocator::GgpuBumpAllocator(CgpuContext* ctx,
-                                       GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                                       GgpuDeleteQueue& deleteQueue,
                                        CgpuBuffer buffer, uint32_t size)
-    : m_delayedResourceDestroyer(delayedResourceDestroyer)
+    : m_deleteQueue(deleteQueue)
     , m_buffer(buffer)
     , m_size(size)
   {
@@ -54,7 +54,7 @@ namespace gtl
 
   GgpuBumpAllocator::~GgpuBumpAllocator()
   {
-    m_delayedResourceDestroyer.enqueueDestruction(m_buffer);
+    m_deleteQueue.pushBack(m_buffer);
   }
 
   CgpuBuffer GgpuBumpAllocator::getBuffer() const

@@ -43,7 +43,7 @@
 
 #include <gtl/ggpu/Stager.h>
 #include <gtl/ggpu/BumpAllocator.h>
-#include <gtl/ggpu/DelayedResourceDestroyer.h>
+#include <gtl/ggpu/DeleteQueue.h>
 #include <gtl/ggpu/DenseDataStore.h>
 #include <gtl/ggpu/ResizableBuffer.h>
 #include <gtl/cgpu/Cgpu.h>
@@ -247,7 +247,7 @@ namespace gtl
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
   std::mutex s_resourceDestroyerMutex;
-  std::unique_ptr<GgpuDelayedResourceDestroyer> s_delayedResourceDestroyer;
+  std::unique_ptr<GgpuDeleteQueue> s_deleteQueue;
   std::unique_ptr<GiGlslShaderGen> s_shaderGen;
   std::unique_ptr<McRuntime> s_mcRuntime;
   std::unique_ptr<McFrontend> s_mcFrontend;
@@ -400,7 +400,7 @@ namespace gtl
       goto fail;
     }
 
-    s_delayedResourceDestroyer = std::make_unique<GgpuDelayedResourceDestroyer>(s_ctx);
+    s_deleteQueue = std::make_unique<GgpuDeleteQueue>(s_ctx);
 
     s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath, params.mdlSearchPaths));
     if (!s_mcRuntime)
@@ -417,7 +417,7 @@ namespace gtl
     }
 
     constexpr static uint32_t BUMP_ALLOC_SIZE = CGPU_MIN_UNIFORM_BUFFER_SIZE;
-    s_bumpAlloc = GgpuBumpAllocator::make(s_ctx, *s_delayedResourceDestroyer, BUMP_ALLOC_SIZE);
+    s_bumpAlloc = GgpuBumpAllocator::make(s_ctx, *s_deleteQueue, BUMP_ALLOC_SIZE);
 
     if (!s_bumpAlloc)
     {
@@ -428,7 +428,7 @@ namespace gtl
     s_aggregateAssetReader = std::make_unique<GiAggregateAssetReader>();
     s_aggregateAssetReader->addAssetReader(s_mmapAssetReader.get());
 
-    s_texSys = std::make_unique<GiTextureManager>(s_ctx, *s_aggregateAssetReader, *s_stager, *s_delayedResourceDestroyer);
+    s_texSys = std::make_unique<GiTextureManager>(s_ctx, *s_aggregateAssetReader, *s_stager, *s_deleteQueue);
 
 #ifdef GI_SHADER_HOTLOADING
     s_fileWatcher = std::make_unique<efsw::FileWatcher>();
@@ -473,10 +473,10 @@ fail:
       cgpuDestroySampler(s_ctx, s_texSampler);
       s_texSampler = {};
     }
-    if (s_delayedResourceDestroyer)
+    if (s_deleteQueue)
     {
-      s_delayedResourceDestroyer->destroyAll();
-      s_delayedResourceDestroyer.reset();
+      s_deleteQueue->destroyAll();
+      s_deleteQueue.reset();
     }
     if (s_ctx)
     {
@@ -679,7 +679,7 @@ fail:
   void giDestroyMeshGpuData(GiMeshGpuData& gpuData)
   {
     std::lock_guard guard(s_resourceDestroyerMutex); // Hydra sync is parallel
-    s_delayedResourceDestroyer->enqueueDestruction(gpuData.blas, gpuData.payloadBuffer);
+    s_deleteQueue->pushBack(gpuData.blas, gpuData.payloadBuffer);
   }
 
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars)
@@ -2032,7 +2032,7 @@ cleanup:
     {
       if (scene->aovDefaultValues.handle)
       {
-        s_delayedResourceDestroyer->enqueueDestruction(scene->aovDefaultValues);
+        s_deleteQueue->pushBack(scene->aovDefaultValues);
       }
 
       size_t conservativeSize = int(GiAovId::COUNT) * GI_MAX_AOV_COMP_SIZE;
@@ -2408,8 +2408,8 @@ cleanup:
     if (!cgpuWaitSemaphores(s_ctx, 1, &waitSemaphoreInfo))
       goto cleanup;
 
-    s_delayedResourceDestroyer->nextFrame();
-    s_delayedResourceDestroyer->housekeep();
+    s_deleteQueue->nextFrame();
+    s_deleteQueue->housekeep();
 
     for (const GiAovBinding& binding : params.aovBindings)
     {
@@ -2439,10 +2439,10 @@ cleanup:
     }
 
     GiScene* scene = new GiScene{
-      .sphereLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::SphereLight), 64),
-      .distantLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DistantLight), 64),
-      .rectLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::RectLight), 64),
-      .diskLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DiskLight), 64),
+      .sphereLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::SphereLight), 64),
+      .distantLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DistantLight), 64),
+      .rectLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::RectLight), 64),
+      .diskLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DiskLight), 64),
       .fallbackDomeLightTexture = fallbackDomeLightTexture,
     };
 
@@ -2930,8 +2930,8 @@ cleanup:
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->deviceMem);
-    s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->hostMem);
+    s_deleteQueue->pushBack(renderBuffer->deviceMem);
+    s_deleteQueue->pushBack(renderBuffer->hostMem);
     delete renderBuffer;
   }
 

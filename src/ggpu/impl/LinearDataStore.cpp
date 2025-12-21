@@ -38,14 +38,14 @@ namespace gtl
 {
   GgpuLinearDataStore::GgpuLinearDataStore(CgpuContext* ctx,
                                            GgpuStager& stager,
-                                           GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                                           GgpuDeleteQueue& deleteQueue,
                                            uint64_t elementSize, 
                                            uint32_t minCapacity)
     : m_ctx(ctx)
     , m_elementSize(elementSize)
     , m_minCapacity(minCapacity)
     , m_elementCount(0)
-    , m_buffer(ctx, stager, delayedResourceDestroyer, elementSize)
+    , m_buffer(ctx, stager, deleteQueue, elementSize)
   {
   }
 

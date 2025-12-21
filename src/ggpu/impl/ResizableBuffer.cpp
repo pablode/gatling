@@ -17,16 +17,16 @@
 
 #include "ResizableBuffer.h"
 
-#include "DelayedResourceDestroyer.h"
+#include "DeleteQueue.h"
 
 namespace gtl
 {
   GgpuResizableBuffer::GgpuResizableBuffer(CgpuContext* ctx,
-                                           GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                                           GgpuDeleteQueue& deleteQueue,
                                            CgpuBufferUsage usageFlags,
                                            CgpuMemoryProperties memoryProperties)
     : m_ctx(ctx)
-    , m_delayedResourceDestroyer(delayedResourceDestroyer)
+    , m_deleteQueue(deleteQueue)
     , m_usageFlags(usageFlags | CgpuBufferUsage::TransferSrc | CgpuBufferUsage::TransferDst)
     , m_memoryProperties(memoryProperties)
   {
@@ -36,7 +36,7 @@ namespace gtl
   {
     if (m_buffer.handle)
     {
-      m_delayedResourceDestroyer.enqueueDestruction(m_buffer);
+      m_deleteQueue.pushBack(m_buffer);
     }
   }
 
@@ -61,7 +61,7 @@ namespace gtl
     {
       if (m_buffer.handle)
       {
-        m_delayedResourceDestroyer.enqueueDestruction(m_buffer);
+        m_deleteQueue.pushBack(m_buffer);
         m_buffer.handle = 0;
       }
 
@@ -103,7 +103,7 @@ namespace gtl
   cleanup:
     if (buffer.handle)
     {
-      m_delayedResourceDestroyer.enqueueDestruction(buffer);
+      m_deleteQueue.pushBack(buffer);
     }
 
     return result;

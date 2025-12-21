@@ -24,14 +24,14 @@ namespace gtl
 {
   GgpuSyncBuffer::GgpuSyncBuffer(CgpuContext* ctx,
                                  GgpuStager& stager,
-                                 GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                                 GgpuDeleteQueue& deleteQueue,
                                  uint64_t elementSize,
                                  CgpuBufferUsage bufferUsage)
     : m_ctx(ctx)
     , m_stager(stager)
     , m_elementSize(elementSize)
     , m_deviceBuffer(m_ctx,
-                     delayedResourceDestroyer,
+                     deleteQueue,
                      bufferUsage | CgpuBufferUsage::TransferDst,
                      CgpuMemoryProperties::DeviceLocal)
   {
