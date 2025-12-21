@@ -254,7 +254,7 @@ namespace gtl
 #define CGPU_RESOLVE_TLAS(HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
 
 #define LOG_MTL_ERR(E) \
-  if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, E->localizedDescription()->utf8String(), E->code()); }
+  if (E) { GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, E->localizedDescription()->utf8String(), E->code()); gbLogFlush(); }
 
 #define CHK_MTL(X, E)    \
   if (!X) { LOG_MTL_ERR(E); fflush(stdout); assert(false); exit(EXIT_FAILURE); }
@@ -263,6 +263,7 @@ namespace gtl
 #define CHK_MTL_NP(X)    \
   if (!X) {              \
     GB_ERROR("{}:{}: metal returned nullptr", __FILE__, __LINE__); \
+    gbLogFlush(); \
     assert(false); \
     exit(EXIT_FAILURE);  \
   }
@@ -553,6 +554,7 @@ namespace gtl
 #if 0
     //if (createInfo.stageFlags == CGPU_SHADER_STAGE_FLAG_RAYGEN)
     GB_LOG("{}", mslSrc);
+    gbLogFlush();
 #endif
 
 #undef CHK_SPVC
