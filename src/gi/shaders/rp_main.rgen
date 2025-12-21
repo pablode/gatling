@@ -7,6 +7,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64: require
 #extension GL_EXT_buffer_reference: require
 #extension GL_EXT_control_flow_attributes: require
+#extension GL_EXT_nonuniform_qualifier: require
 
 // TODO
 #extension GL_EXT_ray_query: require
@@ -113,6 +114,80 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     throughput /= p;
 
     return false;
+}
+
+#if MEDIUM_STACK_SIZE > 0
+void stepVolume(uint mediumIdx, float rayTmax, vec3 worldRayDirection)
+{
+    float distance = rayTmax * PC.metersPerSceneUnit;
+
+    Medium m = rayPayload.media[mediumIdx - 1];
+
+    vec3 transmittance = exp(m.sigma_t * -distance);
+
+    vec3 density = m.sigma_t * transmittance;
+
+    float pdf = dot(rayPayload.walkSegmentPdf, density);
+
+    rayPayload.throughput *= (m.sigma_s * transmittance) / pdf;
+
+    rayPayload.ray_origin += worldRayDirection * distance;
+
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG;
+    shadeRayPayloadIncrementWalk(rayPayload);
+}
+#endif
+
+// Optimized implementation from GLM with only cross products:
+// https://github.com/g-truc/glm/blob/47585fde0c49fa77a2bf2fb1d2ead06999fd4b6e/glm/detail/type_quat.inl#L356-L363
+vec3 quatRotateDir(vec4 q, vec3 dir)
+{
+    vec3 a = cross(q.xyz, dir);
+    vec3 b = cross(q.xyz, a);
+    return dir + ((a * q.w) + b) * 2.0;
+}
+
+vec3 sampleDomeLight(uint domeLightIndex, vec3 rayDir)
+{
+    float u = (atan(rayDir.z, rayDir.x) + 0.5 * PI) / (2.0 * PI);
+    float v = 1.0 - acos(rayDir.y) / PI;
+
+    const uint lodLevel = 0;
+    return textureLod(sampler2D(textures_2d[nonuniformEXT(domeLightIndex)], tex_sampler), vec2(u, v), lodLevel).rgb;
+}
+
+void missShader()
+{
+#if MEDIUM_STACK_SIZE > 0
+    uint mediumIdx = shadeRayPayloadGetMediumIdx(rayPayload);
+
+    if (mediumIdx > 0)
+    {
+        stepVolume(mediumIdx); // TODO: provide other values
+
+        return;
+    }
+#endif
+
+    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+
+#if (AOV_MASK & AOV_BIT_COLOR) == 0
+    return; // early-out if color AOV not requested
+#endif
+
+    bool useFallbackDomeLight = false;
+
+#ifndef DOME_LIGHT_CAMERA_VISIBLE
+    bool isPrimaryRay = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK) == 0;
+
+    useFallbackDomeLight = isPrimaryRay;
+#endif
+
+    uint domeLightIndex = useFallbackDomeLight ? 0 : 1;
+    vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, rayPayload.ray_dir));
+    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * PC.domeLightEmissionMultiplier;
+
+    rayPayload.radiance += rayPayload.throughput * radiance;
 }
 
 vec3 evaluate_sample(uint pixelIndex,
@@ -252,9 +327,9 @@ while (rayQueryProceedEXT(rq))
 {
 }
 
-bool found = (rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT);
+rayPayload.hitSomething = (rayQueryGetIntersectionTypeEXT(rq, true) == gl_RayQueryCommittedIntersectionTriangleEXT);
 
-return found ? vec3(0,1,0) : vec3(1,0,0);
+//return rayPayload.hitSomething ? vec3(0,1,0) : vec3(1,0,0);
 
 #endif
 
@@ -262,9 +337,13 @@ return found ? vec3(0,1,0) : vec3(1,0,0);
         //       shader logic into a function and call it here.
         if (!rayPayload.hitSomething)
         {
+#if 0
           const vec3 BG_RADIANCE = vec3(0.5);
           rayPayload.radiance += rayPayload.throughput * BG_RADIANCE;
           rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+#else
+          missShader();
+#endif
         }
 
         // NEE contribution
