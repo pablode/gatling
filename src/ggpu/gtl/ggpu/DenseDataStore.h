@@ -22,6 +22,8 @@
 #include <assert.h>
 #include <unordered_map>
 
+#include <gtl/gb/Class.h>
+
 #include "LinearDataStore.h"
 
 namespace gtl
@@ -31,14 +33,13 @@ namespace gtl
   class GgpuDenseDataStore : public GgpuLinearDataStore
   {
   public:
+    GB_DECLARE_NONCOPY(GgpuDenseDataStore);
+
     GgpuDenseDataStore(CgpuContext* ctx,
                        GgpuStager& stager,
                        GgpuDeleteQueue& deleteQueue,
                        uint64_t elementSize,
                        uint32_t minCapacity);
-
-    GgpuDenseDataStore(const GgpuDenseDataStore&) = delete;
-    GgpuDenseDataStore& operator=(const GgpuDenseDataStore&) = delete;
 
   public:
     uint64_t allocate() override;

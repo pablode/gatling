@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 #include <memory>
@@ -32,21 +33,18 @@ namespace gtl
     uint32_t bufferOffset;
   };
 
+  // Inspired by this blog post: https://www.sebastianaaltonen.com/blog/no-graphics-api
   class GgpuBumpAllocator
   {
-    // Inspired by this blog post: https://www.sebastianaaltonen.com/blog/no-graphics-api
+  public:
+    static std::shared_ptr<GgpuBumpAllocator> make(CgpuContext* ctx, GgpuDeleteQueue& deleteQueue, uint32_t size);
 
   public:
-    static std::shared_ptr<GgpuBumpAllocator> make(CgpuContext* ctx,
-                                                   GgpuDeleteQueue& deleteQueue,
-                                                   uint32_t size);
+    GB_DECLARE_NONCOPY(GgpuBumpAllocator);
 
     GgpuBumpAllocator(CgpuContext* ctx,
                       GgpuDeleteQueue& deleteQueue,
                       CgpuBuffer buffer, uint32_t size);
-
-    GgpuBumpAllocator(const GgpuBumpAllocator&) = delete;
-    GgpuBumpAllocator& operator=(const GgpuBumpAllocator&) = delete;
 
     ~GgpuBumpAllocator();
 

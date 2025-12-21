@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 namespace gtl
@@ -28,13 +29,12 @@ namespace gtl
   class GgpuResizableBuffer
   {
   public:
+    GB_DECLARE_NONCOPY(GgpuResizableBuffer);
+
     GgpuResizableBuffer(CgpuContext* ctx,
                         GgpuDeleteQueue& deleteQueue,
                         CgpuBufferUsage usageFlags,
                         CgpuMemoryProperties memoryProperties);
-
-    GgpuResizableBuffer(const GgpuResizableBuffer&) = delete;
-    GgpuResizableBuffer& operator=(const GgpuResizableBuffer&) = delete;
 
     ~GgpuResizableBuffer();
 

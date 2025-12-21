@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <assert.h>
 
+#include <gtl/gb/Class.h>
 #include <gtl/gb/HandleStore.h>
 #include <gtl/cgpu/Cgpu.h>
 
@@ -34,14 +35,13 @@ namespace gtl
   class GgpuLinearDataStore
   {
   public:
+    GB_DECLARE_NONCOPY(GgpuLinearDataStore);
+
     GgpuLinearDataStore(CgpuContext* ctx,
                         GgpuStager& stager,
                         GgpuDeleteQueue& deleteQueue,
                         uint64_t elementSize,
                         uint32_t minCapacity);
-
-    GgpuLinearDataStore(const GgpuLinearDataStore&) = delete;
-    GgpuLinearDataStore& operator=(const GgpuLinearDataStore&) = delete;
 
     virtual ~GgpuLinearDataStore();
 

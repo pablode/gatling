@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <functional>
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 namespace gtl
@@ -27,10 +28,9 @@ namespace gtl
   class GgpuStager
   {
   public:
-    GgpuStager(CgpuContext* ctx);
+    GB_DECLARE_NONCOPY(GgpuStager);
 
-    GgpuStager(const GgpuStager&) = delete;
-    GgpuStager& operator=(const GgpuStager&) = delete;
+    GgpuStager(CgpuContext* ctx);
 
     ~GgpuStager();
 

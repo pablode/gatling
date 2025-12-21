@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <memory>
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 #include "ResizableBuffer.h"
@@ -34,14 +35,13 @@ namespace gtl
   class GgpuSyncBuffer
   {
   public:
+    GB_DECLARE_NONCOPY(GgpuSyncBuffer);
+
     GgpuSyncBuffer(CgpuContext* ctx,
                    GgpuStager& stager,
                    GgpuDeleteQueue& deleteQueue,
                    uint64_t elementSize,
                    CgpuBufferUsage bufferUsage = CgpuBufferUsage::Storage);
-
-    GgpuSyncBuffer(const GgpuSyncBuffer&) = delete;
-    GgpuSyncBuffer& operator=(const GgpuSyncBuffer&) = delete;
 
     ~GgpuSyncBuffer();
 

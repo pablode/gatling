@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 #include <functional>
@@ -31,10 +32,9 @@ namespace gtl
     constexpr static uint32_t FrameCount = 4;
 
   public:
-    GgpuDeleteQueue(CgpuContext* ctx);
+    GB_DECLARE_NONCOPY(GgpuDeleteQueue);
 
-    GgpuDeleteQueue(const GgpuDeleteQueue&) = delete;
-    GgpuDeleteQueue& operator=(const GgpuDeleteQueue&) = delete;
+    GgpuDeleteQueue(CgpuContext* ctx);
 
     ~GgpuDeleteQueue();
 
