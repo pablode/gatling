@@ -99,7 +99,7 @@ void sampleVolumeScatteringDirection(vec2 xi, float bias, inout vec3 dir)
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
-    float p = min(max_throughput, PC.rrInvMinTermProb);
+    float p = min(max_throughput, ubo.rrInvMinTermProb);
 
     if (random_float > p)
     {
@@ -128,12 +128,12 @@ vec3 evaluate_sample(uint pixelIndex,
 
     // Correct clip plane curving by getting the hypothenuse length (our current ray)
     // from the adjacent edge (the forward vector) the angle between both.
-    float cosConeAngle = max(1e-5, dot(ray_dir, PC.cameraForward));
-    vec2 clipRange = unpackHalf2x16(PC.clipRangePacked) / cosConeAngle;
+    float cosConeAngle = max(1e-5, dot(ray_dir, ubo.cameraForward));
+    vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked) / cosConeAngle;
 
     // Path trace
-    uint rrBounceOffset = PC.maxBouncesAndRrBounceOffset & 0xFFFFu;
-    uint maxBounces = min(SHADE_RAY_PAYLOAD_BOUNCES_MASK, PC.maxBouncesAndRrBounceOffset >> 16);
+    uint rrBounceOffset = ubo.maxBouncesAndRrBounceOffset & 0xFFFFu;
+    uint maxBounces = min(SHADE_RAY_PAYLOAD_BOUNCES_MASK, ubo.maxBouncesAndRrBounceOffset >> 16);
 
     [[loop]]
     while (true)
@@ -170,7 +170,7 @@ vec3 evaluate_sample(uint pixelIndex,
             uint walkLength = shadeRayPayloadGetWalk(rayPayload);
             bool hasScattering = any(greaterThan(m.sigma_s, vec3(0.0)));
 
-            if (hasScattering && walkLength <= PC.maxVolumeWalkLength)
+            if (hasScattering && walkLength <= ubo.maxVolumeWalkLength)
             {
                 vec3 albedo = safe_div(m.sigma_s, m.sigma_t);
 
@@ -182,7 +182,7 @@ vec3 evaluate_sample(uint pixelIndex,
 
                 float s = sampleDistance(albedo, rayPayload.throughput, m.sigma_t, xi.x, rayPayload.walkSegmentPdf);
 
-                s *= PC.metersPerSceneUnit;
+                s *= ubo.metersPerSceneUnit;
 
                 tMax = -log(1.0 - xi.y) / s; // collision free distance (mean free path)
             }
@@ -330,9 +330,9 @@ vec3 evaluate_sample(uint pixelIndex,
     // Radiance clamping
     vec3 radiance = vec3(rayPayload.radiance);
     float maxValue = max(radiance.r, max(radiance.g, radiance.b));
-    if (maxValue > PC.maxSampleValue)
+    if (maxValue > ubo.maxSampleValue)
     {
-        radiance *= PC.maxSampleValue / maxValue;
+        radiance *= ubo.maxSampleValue / maxValue;
     }
 
     return max(vec3(0.0), radiance);
@@ -359,7 +359,7 @@ vec2 fisGauss(vec2 xi)
 void clearAovs(uint pixelIndex)
 {
 #if (AOV_MASK & AOV_BIT_COLOR) != 0
-  if (PC.sampleOffset == 0)
+  if (ubo.sampleOffset == 0)
   {
     ColorAov[pixelIndex] = ClearValuesF[AOV_ID_COLOR];
   }
@@ -409,32 +409,32 @@ void main()
 #endif
 
     uvec2 pixel_pos = gl_LaunchIDEXT.xy;
-    uint imageWidth = PC.imageDims & 0xFFFFu;
-    uint imageHeight = PC.imageDims >> 16;
+    uint imageWidth = ubo.imageDims & 0xFFFFu;
+    uint imageHeight = ubo.imageDims >> 16;
 
     uint pixel_index = pixel_pos.x + pixel_pos.y * imageWidth;
 
     clearAovs(pixel_index);
 
-    vec3 camera_right = cross(PC.cameraForward, PC.cameraUp);
+    vec3 camera_right = cross(ubo.cameraForward, ubo.cameraUp);
     float aspect_ratio = float(imageWidth) / float(imageHeight);
 
     float H = 1.0;
     float W = H * aspect_ratio;
-    float d = H / (2.0 * tan(PC.cameraVFoV * 0.5));
+    float d = H / (2.0 * tan(ubo.cameraVFoV * 0.5));
 
     float WX = W / float(imageWidth);
     float HY = H / float(imageHeight);
 
-    vec3 C = PC.cameraPosition + PC.cameraForward * d;
-    vec3 L = C - camera_right * W * 0.5 - PC.cameraUp * H * 0.5;
+    vec3 C = ubo.cameraPosition + ubo.cameraForward * d;
+    vec3 L = C - camera_right * W * 0.5 - ubo.cameraUp * H * 0.5;
 
-    float inv_sample_count = 1.0 / float(PC.sampleCount);
+    float inv_sample_count = 1.0 / float(ubo.sampleCount);
 
     vec3 pixel_color = vec3(0.0, 0.0, 0.0);
-    for (uint s = 0; s < PC.sampleCount; ++s)
+    for (uint s = 0; s < ubo.sampleCount; ++s)
     {
-        uint sampleIndex = PC.sampleOffset + s;
+        uint sampleIndex = ubo.sampleOffset + s;
 #ifdef RAND_4D
         uvec4 rng_state = rng4d_init(pixel_pos.xy, sampleIndex);
         vec4 rand4 = rng4d_next4f(rng_state);
@@ -459,16 +459,16 @@ void main()
         vec3 P =
             L +
             (float(pixel_pos.x) + sampleOffset.x) * camera_right * WX +
-            (float(pixel_pos.y) + sampleOffset.y) * PC.cameraUp * HY;
+            (float(pixel_pos.y) + sampleOffset.y) * ubo.cameraUp * HY;
 
-        vec3 rayOrigin = PC.cameraPosition;
+        vec3 rayOrigin = ubo.cameraPosition;
         vec3 rayDir = normalize(P - rayOrigin);
 
         // Depth of Field
         // (cmp. RT Gems II; Boksansky's Reference PT)
 
 #ifdef DEPTH_OF_FIELD
-        if (PC.lensRadius > 0.0)
+        if (ubo.lensRadius > 0.0)
         {
 #ifdef RAND_4D
             vec2 rand2_zw = rand4.zw;
@@ -476,11 +476,11 @@ void main()
             vec2 rand2_zw = rng1d_next2f(rng_state);
 #endif
 
-            vec3 focalPoint = rayOrigin + rayDir * PC.focusDistance;
-            vec2 apertureSample = sample_hemisphere(rand2_zw).xy * PC.lensRadius;
+            vec3 focalPoint = rayOrigin + rayDir * ubo.focusDistance;
+            vec2 apertureSample = sample_hemisphere(rand2_zw).xy * ubo.lensRadius;
 
             rayOrigin += apertureSample.x * camera_right;
-            rayOrigin += apertureSample.y * PC.cameraUp;
+            rayOrigin += apertureSample.y * ubo.cameraUp;
 
             rayDir = normalize(focalPoint - rayOrigin);
         }
@@ -503,12 +503,12 @@ void main()
 #if (AOV_MASK & AOV_BIT_COLOR) != 0
 
 #ifdef PROGRESSIVE_ACCUMULATION
-    if (PC.sampleOffset > 0)
+    if (ubo.sampleOffset > 0)
     {
-      float inv_total_sample_count = 1.0 / float(PC.sampleOffset + PC.sampleCount);
+      float inv_total_sample_count = 1.0 / float(ubo.sampleOffset + ubo.sampleCount);
 
-      float weight_old = float(PC.sampleOffset) * inv_total_sample_count;
-      float weight_new = float(PC.sampleCount) * inv_total_sample_count;
+      float weight_old = float(ubo.sampleOffset) * inv_total_sample_count;
+      float weight_new = float(ubo.sampleCount) * inv_total_sample_count;
 
       pixel_color = weight_old * ColorAov[pixel_index].rgb + weight_new * pixel_color;
     }

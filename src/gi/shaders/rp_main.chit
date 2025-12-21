@@ -29,9 +29,9 @@ hitAttributeEXT vec2 baryCoord;
 #ifdef NEXT_EVENT_ESTIMATION
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
 {
-    if ((k4.x * sceneParams.totalLightCount) <= sceneParams.sphereLightCount)
+    if ((k4.x * ubo.totalLightCount) <= ubo.sphereLightCount)
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.sphereLightCount), sceneParams.sphereLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.sphereLightCount), ubo.sphereLightCount - 1);
 
         SphereLight light = sphereLights[lightIndex];
 
@@ -47,18 +47,18 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float cosTheta = max(0.0, dot(-dirToLight, lightNormal));
         invPdf = safe_div((light.area > 0.0) ? (light.area * cosTheta) : 1.0, dist * dist);
 
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
-    else if ((k4.x * sceneParams.totalLightCount) <= (sceneParams.sphereLightCount + sceneParams.distantLightCount))
+    else if ((k4.x * ubo.totalLightCount) <= (ubo.sphereLightCount + ubo.distantLightCount))
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.distantLightCount), sceneParams.distantLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.distantLightCount), ubo.distantLightCount - 1);
 
         DistantLight light = distantLights[lightIndex];
 
         dist = 100000.0;
         dirToLight = -light.direction;
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         invPdf = light.invPdf;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
 
@@ -73,9 +73,9 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
             dirToLight = normalize(sin(theta) * (cos(phi) * t1 + sin(phi) * t2) + cos(theta) * dirToLight);
         }
     }
-    else if ((k4.x * sceneParams.totalLightCount) <= (sceneParams.sphereLightCount + sceneParams.distantLightCount + sceneParams.rectLightCount))
+    else if ((k4.x * ubo.totalLightCount) <= (ubo.sphereLightCount + ubo.distantLightCount + ubo.rectLightCount))
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.rectLightCount), sceneParams.rectLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.rectLightCount), ubo.rectLightCount - 1);
 
         RectLight light = rectLights[lightIndex];
 
@@ -95,12 +95,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float area = light.width * light.height;
         invPdf = safe_div((area > 0.0) ? (area * cosTheta) : 1.0, dist * dist);
 
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
     else
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.diskLightCount), sceneParams.diskLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.diskLightCount), ubo.diskLightCount - 1);
 
         DiskLight light = diskLights[lightIndex];
         vec2 radiusXY = vec2(light.radiusX, light.radiusY);
@@ -120,12 +120,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float area = radiusXY.x * radiusXY.y * PI;
         invPdf = safe_div((area > 0.0) ? (area * cosTheta) : 1.0, dist * dist);
 
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
 
-    power *= exp2(PC.sensorExposure);
-    invPdf *= float(sceneParams.totalLightCount);
+    power *= exp2(ubo.sensorExposure);
+    invPdf *= float(ubo.totalLightCount);
 }
 #endif
 
@@ -163,7 +163,7 @@ void main()
       IndexBuffer indices = IndexBuffer(payload.bufferAddress);
       BlasPayloadBufferPreamble preamble = indices.preamble;
 #endif
-      uint imageWidth = PC.imageDims & 0xFFFFu;
+      uint imageWidth = ubo.imageDims & 0xFFFFu;
       uint pixelIndex = gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * imageWidth; // only for AOVs
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
 #ifndef HAS_CUTOUT_TRANSPARENCY
@@ -195,7 +195,7 @@ void main()
       ObjectIdAov[pixelIndex] = objectId;
 #endif
 #if (AOV_MASK & AOV_BIT_DEPTH) != 0
-      vec2 clipRange = unpackHalf2x16(PC.clipRangePacked);
+      vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked);
       float logDepth = 2.0 * log(gl_HitTEXT / clipRange.x) / log(clipRange.y / clipRange.x) - 1.0;
       DepthAov[pixelIndex] = logDepth;
 #endif
@@ -225,7 +225,7 @@ void main()
 
     if (mediumIdx > 0)
     {
-        float distance = gl_HitTEXT * PC.metersPerSceneUnit;
+        float distance = gl_HitTEXT * ubo.metersPerSceneUnit;
 
         vec3 transmittance;
 #if MEDIUM_STACK_SIZE == 0
@@ -291,7 +291,7 @@ void main()
             }
 #endif
 
-            emission_intensity *= exp2(PC.sensorExposure);
+            emission_intensity *= exp2(ubo.sensorExposure);
 
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }

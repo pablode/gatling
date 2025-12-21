@@ -60,7 +60,7 @@ vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
     coord.z = apply_wrap_and_crop(coord.z, wrap_w, crop_w, res.z);
 
-    ASSERT(array_idx < sceneParams.textureCount, "Error: invalid texture index\n");
+    ASSERT(array_idx < ubo.textureCount, "Error: invalid texture index\n");
     return texture(sampler3D(textures_3d[nonuniformEXT(array_idx)], tex_sampler), coord);
 }
 
@@ -100,7 +100,7 @@ vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    ASSERT(array_idx < sceneParams.textureCount, "Error: invalid texture index\n");
+    ASSERT(array_idx < ubo.textureCount, "Error: invalid texture index\n");
     return texelFetch(sampler3D(textures_3d[nonuniformEXT(array_idx)], tex_sampler), coord, mipmap_level);
 }
 
@@ -140,7 +140,7 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
     coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
     coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
 
-    ASSERT(array_idx < sceneParams.textureCount, "Error: invalid texture index\n");
+    ASSERT(array_idx < ubo.textureCount, "Error: invalid texture index\n");
     return texture(sampler2D(textures_2d[nonuniformEXT(array_idx)], tex_sampler), coord);
 }
 
@@ -180,7 +180,7 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    ASSERT(array_idx < sceneParams.textureCount, "Error: invalid texture index\n");
+    ASSERT(array_idx < ubo.textureCount, "Error: invalid texture index\n");
     return texelFetch(sampler2D(textures_2d[nonuniformEXT(array_idx)], tex_sampler), coord, mipmap_level);
 }
 
@@ -213,7 +213,7 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
 
     uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
 
-    ASSERT(array_idx < sceneParams.textureCount, "Error: invalid texture index\n");
+    ASSERT(array_idx < ubo.textureCount, "Error: invalid texture index\n");
 
     int mipmap_level = 0;
     return textureSize(textures_2d[nonuniformEXT(array_idx)], mipmap_level);
@@ -329,7 +329,7 @@ vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default
 #ifdef CAMERA_POSITION_SCENE_DATA_INDEX
     if (scene_data_id == CAMERA_POSITION_SCENE_DATA_INDEX)
     {
-      return PC.cameraPosition;
+      return ud.cameraPosition;
     }
 #endif
 

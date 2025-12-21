@@ -72,7 +72,7 @@ layout(set = 1, binding = BINDING_INDEX_TEXTURES) uniform texture2D textures_2d[
 
 layout(set = 2, binding = BINDING_INDEX_TEXTURES) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
 
-layout(set = 3, binding = BINDING_INDEX_SCENE_PARAMS, std140) uniform SceneParamsUbo { SceneParams sceneParams; };
+layout(set = 3, binding = BINDING_INDEX_UNIFORM_DATA, std140) uniform UniformDataUbo { UniformData ubo; };
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
   BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
@@ -85,5 +85,3 @@ layout(buffer_reference, std430, buffer_reference_align = 32/* largest type: ver
 };
 
 layout(buffer_reference, std430, buffer_reference_align = 4) buffer RawIntBuffer { int data[]; };
-
-layout(push_constant) uniform PushConstantBlock { PushConstants PC; };

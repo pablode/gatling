@@ -227,7 +227,6 @@ namespace gtl
     GiRenderParams oldRenderParams = {};
     CgpuBuffer aovDefaultValues;
     uint32_t sampleOffset = 0;
-    CgpuBuffer sceneParams;
     OffsetAllocator::Allocator texAllocator{rp::MAX_TEXTURE_COUNT};
   };
 
@@ -2186,7 +2185,6 @@ cleanup:
       std::vector<CgpuBufferBinding> buffers;
       buffers.reserve(16);
 
-      buffers.push_back({ .binding = rp::BINDING_INDEX_SCENE_PARAMS, .buffer = scene->sceneParams });
       buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
       buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
       buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
@@ -2258,8 +2256,8 @@ cleanup:
         GI_FATAL("max number of textures exceeded");
       }
 
-      CgpuBufferBinding sceneParamsBinding = { .binding = 0, .buffer = s_bumpAlloc->getBuffer(), .size = sizeof(rp::SceneParams) };
-      CgpuBindings bindings3 = { .bufferCount = 1, .buffers = &sceneParamsBinding };
+      CgpuBufferBinding uboBinding = { .binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = s_bumpAlloc->getBuffer(), .size = sizeof(rp::UniformData) };
+      CgpuBindings bindings3 = { .bufferCount = 1, .buffers = &uboBinding };
 
       cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
@@ -2271,42 +2269,8 @@ cleanup:
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBindSets;
     }
 
-    // Write scene params
-    uint32_t sceneParamsOffset;
-    {
-      glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
-      glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
-      uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
-
-      uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
-                                 scene->rectLights.elementCount() + scene->diskLights.elementCount();
-
-      auto sceneParams = s_bumpAlloc->alloc<rp::SceneParams>();
-
-      *sceneParams.cpuPtr = {
-        .domeLightRotation = glm::make_vec4(&domeLightRotation[0]),
-        .domeLightEmissionMultiplier = domeLightEmissionMultiplier,
-        .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
-        .textureCount = (uint32_t) shaderCache->imageBindings.size(),
-        .sphereLightCount = scene->sphereLights.elementCount(),
-        .distantLightCount = scene->distantLights.elementCount(),
-        .rectLightCount = scene->rectLights.elementCount(),
-        .diskLightCount = scene->diskLights.elementCount(),
-        .totalLightCount = totalLightCount
-      };
-
-      sceneParamsOffset = sceneParams.bufferOffset;
-    }
-
-    // Bind pipeline and descriptor sets
-    {
-      std::array<uint32_t, 1> dynamicOffsets { sceneParamsOffset };
-      cgpuCmdBindPipeline(s_ctx, commandBuffer, shaderCache->pipeline,
-                          shaderCache->bindSets.data(), uint32_t(shaderCache->bindSets.size()),
-                          uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
-    }
-
-    // Push constants
+    // Update uniforms
+    uint32_t uniformOffset;
     {
       auto camForward = glm::normalize(glm::make_vec3(params.camera.forward));
       auto camUp = glm::normalize(glm::make_vec3(params.camera.up));
@@ -2317,27 +2281,53 @@ cleanup:
         lensRadius = params.camera.focalLength / (2.0f * params.camera.fStop);
       }
 
-      rp::PushConstants pushData = {
-        .cameraPosition                 = glm::make_vec3(params.camera.position),
-        .imageDims                      = ((imageHeight << 16) | imageWidth),
-        .cameraForward                  = camForward,
-        .focusDistance                  = params.camera.focusDistance,
-        .cameraUp                       = camUp,
-        .cameraVFoV                     = params.camera.vfov,
-        .sampleOffset                   = scene->sampleOffset,
-        .lensRadius                     = lensRadius,
-        .sampleCount                    = renderSettings.spp,
-        .maxSampleValue                 = renderSettings.maxSampleValue,
-        .maxBouncesAndRrBounceOffset    = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
-        .rrInvMinTermProb               = renderSettings.rrInvMinTermProb,
-        .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
-        .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
-        .sensorExposure                 = params.camera.exposure,
-        .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength,
-        .metersPerSceneUnit             = renderSettings.metersPerSceneUnit
+      glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
+      glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
+      uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
+
+      uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
+        scene->rectLights.elementCount() + scene->diskLights.elementCount();
+
+      auto uniformData = s_bumpAlloc->alloc<rp::UniformData>();
+
+      *uniformData.cpuPtr = {
+        .domeLightRotation = glm::make_vec4(&domeLightRotation[0]),
+        .domeLightEmissionMultiplier = domeLightEmissionMultiplier,
+        .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
+        .textureCount = (uint32_t)shaderCache->imageBindings.size(),
+        .sphereLightCount = scene->sphereLights.elementCount(),
+        .distantLightCount = scene->distantLights.elementCount(),
+        .rectLightCount = scene->rectLights.elementCount(),
+        .diskLightCount = scene->diskLights.elementCount(),
+        .totalLightCount = totalLightCount,
+        .metersPerSceneUnit = renderSettings.metersPerSceneUnit,
+        .maxVolumeWalkLength = renderSettings.maxVolumeWalkLength,
+        .cameraPosition = glm::make_vec3(params.camera.position),
+        .imageDims = ((imageHeight << 16) | imageWidth),
+        .cameraForward = camForward,
+        .focusDistance = params.camera.focusDistance,
+        .cameraUp = camUp,
+        .cameraVFoV = params.camera.vfov,
+        .sampleOffset = scene->sampleOffset,
+        .lensRadius = lensRadius,
+        .sampleCount = renderSettings.spp,
+        .maxSampleValue = renderSettings.maxSampleValue,
+        .maxBouncesAndRrBounceOffset = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
+        .rrInvMinTermProb = renderSettings.rrInvMinTermProb,
+        .lightIntensityMultiplier = renderSettings.lightIntensityMultiplier,
+        .clipRangePacked = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
+        .sensorExposure = params.camera.exposure,
       };
 
-      cgpuCmdPushConstants(s_ctx, commandBuffer, shaderCache->pipeline, sizeof(pushData), &pushData);
+      uniformOffset = uniformData.bufferOffset;
+    }
+
+    // Bind pipeline and descriptor sets
+    {
+      std::array<uint32_t, 1> dynamicOffsets { uniformOffset };
+      cgpuCmdBindPipeline(s_ctx, commandBuffer, shaderCache->pipeline,
+                          shaderCache->bindSets.data(), uint32_t(shaderCache->bindSets.size()),
+                          uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
     }
 
     // Trace rays
@@ -2472,10 +2462,6 @@ cleanup:
     if (scene->aovDefaultValues.handle)
     {
       cgpuDestroyBuffer(s_ctx, scene->aovDefaultValues);
-    }
-    if (scene->sceneParams.handle)
-    {
-      cgpuDestroyBuffer(s_ctx, scene->sceneParams);
     }
     cgpuDestroyImage(s_ctx, scene->fallbackDomeLightTexture);
     delete scene;

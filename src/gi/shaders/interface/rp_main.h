@@ -22,7 +22,7 @@
 
 GI_INTERFACE_BEGIN(rp_main)
 
-struct SceneParams
+struct UniformData
 {
   GI_VEC4 domeLightRotation;
   GI_VEC3 domeLightEmissionMultiplier;
@@ -33,6 +33,23 @@ struct SceneParams
   GI_UINT rectLightCount;
   GI_UINT diskLightCount;
   GI_UINT totalLightCount;
+  GI_FLOAT metersPerSceneUnit;
+  GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
+  GI_VEC3  cameraPosition;
+  GI_UINT  imageDims;
+  GI_VEC3  cameraForward;
+  GI_FLOAT focusDistance;
+  GI_VEC3  cameraUp;
+  GI_FLOAT cameraVFoV;
+  GI_UINT  sampleOffset;
+  GI_FLOAT lensRadius;
+  GI_UINT  sampleCount;
+  GI_FLOAT maxSampleValue;
+  GI_UINT  maxBouncesAndRrBounceOffset;
+  GI_FLOAT rrInvMinTermProb;
+  GI_FLOAT lightIntensityMultiplier;
+  GI_UINT  clipRangePacked;
+  GI_FLOAT sensorExposure;
 };
 
 struct FVertex
@@ -90,28 +107,6 @@ struct DiskLight
   GI_UVEC2 tangentFramePacked;
   GI_UINT  diffuseSpecularPacked;
   GI_FLOAT padding;
-};
-
-struct PushConstants
-{
-  GI_VEC3  cameraPosition;
-  GI_UINT  imageDims;
-  GI_VEC3  cameraForward;
-  GI_FLOAT focusDistance;
-  GI_VEC3  cameraUp;
-  GI_FLOAT cameraVFoV;
-  GI_UINT  sampleOffset;
-  GI_FLOAT lensRadius;
-  GI_UINT  sampleCount;
-  GI_FLOAT maxSampleValue;
-  GI_UINT  maxBouncesAndRrBounceOffset;
-  GI_FLOAT rrInvMinTermProb;
-  GI_FLOAT lightIntensityMultiplier;
-  GI_UINT  clipRangePacked;
-  GI_FLOAT sensorExposure;
-  GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
-  GI_FLOAT metersPerSceneUnit;
-  /* 9 float free */
 };
 
 const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);
@@ -183,7 +178,7 @@ GI_BINDING_INDEX(AOV_DOUBLE_SIDED, 28)
 GI_BINDING_INDEX(TEXTURES,     0)
 
 // set 3
-GI_BINDING_INDEX(SCENE_PARAMS, 0)
+GI_BINDING_INDEX(UNIFORM_DATA, 0)
 
 GI_INTERFACE_END()
 
