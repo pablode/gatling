@@ -565,7 +565,6 @@ namespace gtl
 #endif
     compileOptions->setLanguageVersion(MTL::LanguageVersion4_0);
 
-    NS::Error* error = nullptr;
     NS::String* mslStr = NS::String::string(mslSrc, NS::UTF8StringEncoding);
 
     auto libDesc = MTL4::LibraryDescriptor::alloc()->init();
@@ -576,8 +575,27 @@ namespace gtl
     libDesc->setOptions(compileOptions);
     libDesc->setSource(mslStr);
 
+    // We use the async code path as the synchronous one returns a corrupt error object
+#if 0
+    NS::Error* error = nullptr;
     MTL::Library* library = idevice->compiler->newLibrary(libDesc, &error);
     CHK_MTL(library, error);
+#else
+    MTL::Library* library = nullptr;
+    {
+      std::mutex mutex;
+      std::unique_lock<std::mutex> lock(mutex);
+      std::condition_variable cv;
+
+      MTL4::CompilerTask* task = idevice->compiler->newLibrary(libDesc, [&](MTL::Library* result, NS::Error* error) {
+        CHK_MTL(result, error);
+        library = result;
+      });
+
+      cv.wait(lock, [&library]() { return library; });
+      task->release();
+    }
+#endif
 
     compileOptions->release();
     libDesc->release();
