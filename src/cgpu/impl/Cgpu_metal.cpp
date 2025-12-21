@@ -584,8 +584,8 @@ namespace gtl
     MTL::Library* library = nullptr;
     {
       std::mutex mutex;
-      std::unique_lock<std::mutex> lock(mutex);
       std::condition_variable cv;
+      std::unique_lock<std::mutex> lock(mutex);
 
       MTL4::CompilerTask* task = idevice->compiler->newLibrary(libDesc, [&](MTL::Library* result, NS::Error* error) {
         CHK_MTL(result, error);
