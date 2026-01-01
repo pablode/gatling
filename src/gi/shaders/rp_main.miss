@@ -15,7 +15,7 @@ layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayloa
 #if MEDIUM_STACK_SIZE > 0
 void stepVolume(uint mediumIdx)
 {
-    float distance = gl_RayTmaxEXT * ud.metersPerSceneUnit;
+    float distance = gl_RayTmaxEXT * ubo.metersPerSceneUnit;
 
     Medium m = rayPayload.media[mediumIdx - 1];
 

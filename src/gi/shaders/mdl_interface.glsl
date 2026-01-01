@@ -329,7 +329,7 @@ vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default
 #ifdef CAMERA_POSITION_SCENE_DATA_INDEX
     if (scene_data_id == CAMERA_POSITION_SCENE_DATA_INDEX)
     {
-      return ud.cameraPosition;
+      return ubo.cameraPosition;
     }
 #endif
 
