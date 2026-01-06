@@ -172,6 +172,7 @@ namespace gtl
         dstBinding.readAccess = srcBinding->accessed;
         const SpvReflectTypeDescription* typeDescription = srcBinding->type_description;
         dstBinding.writeAccess = srcBinding->accessed && ~(typeDescription->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+        dstBinding.dim = uint32_t(srcBinding->image.dim) + 1; // enum starts with 0
       }
     }
 
@@ -185,6 +186,18 @@ namespace gtl
 
       const SpvReflectBlockVariable* pcBlock = &shaderModule.push_constant_blocks[0];
       reflection->pushConstantsSize = pcBlock->size;
+    }
+
+    if (shaderModule.entry_point_count != 1)
+    {
+      goto fail;
+    }
+    else
+    {
+      const SpvReflectEntryPoint& entryPoint = shaderModule.entry_points[0];
+      reflection->workgroupSize[0] = entryPoint.local_size.x;
+      reflection->workgroupSize[1] = entryPoint.local_size.y;
+      reflection->workgroupSize[2] = entryPoint.local_size.z;
     }
 
     result = true;
