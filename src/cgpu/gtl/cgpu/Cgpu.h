@@ -303,7 +303,6 @@ namespace gtl
     uint64_t minStorageBufferOffsetAlignment;
     uint64_t minUniformBufferOffsetAlignment;
     uint32_t maxComputeSharedMemorySize;
-    uint32_t maxPushConstantsSize;
     uint32_t maxRayHitAttributeSize;
     uint32_t subgroupSize;
   };
@@ -515,14 +514,6 @@ namespace gtl
     CgpuBuffer buffer,
     CgpuImage image,
     const CgpuBufferImageCopyDesc* desc
-  );
-
-  void cgpuCmdPushConstants(
-    CgpuContext* ctx,
-    CgpuCommandBuffer commandBuffer,
-    CgpuPipeline pipeline,
-    uint32_t size,
-    const void* data
   );
 
   void cgpuCmdDispatch(

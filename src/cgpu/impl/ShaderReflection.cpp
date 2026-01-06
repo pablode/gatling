@@ -176,18 +176,6 @@ namespace gtl
       }
     }
 
-    if (shaderModule.push_constant_block_count == 0)
-    {
-      reflection->pushConstantsSize = 0;
-    }
-    else
-    {
-      assert(shaderModule.push_constant_block_count == 1);
-
-      const SpvReflectBlockVariable* pcBlock = &shaderModule.push_constant_blocks[0];
-      reflection->pushConstantsSize = pcBlock->size;
-    }
-
     if (shaderModule.entry_point_count != 1)
     {
       goto fail;
