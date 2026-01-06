@@ -501,7 +501,6 @@ namespace gtl
       .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
       .minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment,
       .maxComputeSharedMemorySize = limits.maxComputeSharedMemorySize,
-      .maxPushConstantsSize = limits.maxPushConstantsSize,
       .maxRayHitAttributeSize = chain.rayTracingPipeline.maxRayHitAttributeSize,
       .subgroupSize = chain.subgroup.subgroupSize
     };
@@ -1370,20 +1369,14 @@ namespace gtl
                                        VkShaderStageFlags stageFlags,
                                        VkPipelineLayout* pipelineLayout)
   {
-    VkPushConstantRange pushConstRange = {
-      .stageFlags = stageFlags,
-      .offset = 0,
-      .size = ishader->reflection.pushConstantsSize
-    };
-
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
       .setLayoutCount = descriptorSetCount,
       .pSetLayouts = descriptorSetLayouts,
-      .pushConstantRangeCount = pushConstRange.size ? 1u : 0u,
-      .pPushConstantRanges = &pushConstRange
+      .pushConstantRangeCount = 0,
+      .pPushConstantRanges = nullptr
     };
 
     VkResult result = idevice->table.vkCreatePipelineLayout(idevice->logicalDevice,
@@ -3452,42 +3445,6 @@ namespace gtl
       iimage->layout,
       1,
       &region
-    );
-  }
-
-  void cgpuCmdPushConstants(CgpuContext* ctx,
-                            CgpuCommandBuffer commandBuffer,
-                            CgpuPipeline pipeline,
-                            uint32_t size,
-                            const void* data)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
-    CgpuIDevice* idevice = &ctx->idevice;
-
-    VkShaderStageFlags stageFlags;
-    switch (ipipeline->bindPoint)
-    {
-      case VK_PIPELINE_BIND_POINT_COMPUTE:
-        stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        break;
-      case VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR:
-        stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-                     VK_SHADER_STAGE_ANY_HIT_BIT_KHR |
-                     VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-                     VK_SHADER_STAGE_MISS_BIT_KHR;
-        break;
-      default:
-        CGPU_FATAL("unhandled pipeline bind point");
-    }
-
-    idevice->table.vkCmdPushConstants(
-      icommandBuffer->commandBuffer,
-      ipipeline->layout,
-      stageFlags,
-      0,
-      size,
-      data
     );
   }
 

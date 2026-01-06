@@ -40,7 +40,6 @@ namespace gtl
   struct CgpuShaderReflection
   {
     std::vector<CgpuShaderReflectionDescriptorSet> descriptorSets;
-    uint32_t pushConstantsSize;
     uint32_t maxRayPayloadSize;
     uint32_t maxRayHitAttributeSize;
     uint32_t workgroupSize[3];
