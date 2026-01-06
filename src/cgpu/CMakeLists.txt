@@ -1,7 +1,7 @@
 add_library(
   cgpu STATIC
   gtl/cgpu/Cgpu.h
-  impl/Cgpu.cpp
+  impl/CgpuVk.cpp
   impl/ShaderReflection.cpp
   impl/ShaderReflection.h
 )
