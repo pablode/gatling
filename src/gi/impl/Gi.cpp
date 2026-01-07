@@ -2342,7 +2342,7 @@ cleanup:
     }
 
     // Trace rays
-    cgpuCmdTraceRays(s_ctx, commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
+    cgpuCmdTraceRays(s_ctx, commandBuffer, imageWidth, imageHeight);
 
     // Copy device to host memory
     {
