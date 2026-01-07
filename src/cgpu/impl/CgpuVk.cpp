@@ -194,6 +194,7 @@ namespace gtl
   struct CgpuICommandBuffer
   {
     VkCommandBuffer commandBuffer;
+    CgpuIPipeline* pipeline = nullptr;
   };
 
   struct CgpuIBlas
@@ -3179,6 +3180,8 @@ namespace gtl
       dynamicOffsetCount,
       dynamicOffsets
     );
+
+    icommandBuffer->pipeline = ipipeline;
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuContext* ctx,
@@ -3568,12 +3571,11 @@ namespace gtl
 
   void cgpuCmdTraceRays(CgpuContext* ctx,
                         CgpuCommandBuffer commandBuffer,
-                        CgpuPipeline pipeline,
                         uint32_t width,
                         uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
+    CgpuIPipeline* ipipeline = icommandBuffer->pipeline;
     CgpuIDevice* idevice = &ctx->idevice;
 
     VkStridedDeviceAddressRegionKHR callableSBT = {};
