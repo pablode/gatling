@@ -116,6 +116,7 @@ namespace gtl
     bool                           domeLightCameraVisible;
     std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
+    uint32_t                       maxTextureIndex;
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
     CgpuShader                     rgenShader;
@@ -1382,6 +1383,7 @@ cleanup:
 
     uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
     uint32_t maxRayHitAttributeSize = _GetRpMainMaxRayHitAttributeSize();
+    uint32_t maxTextureIndex = 0;
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
@@ -1774,7 +1776,12 @@ cleanup:
       uint32_t texCount = 0;
       for (GiImagePtr img : gpuData.images)
       {
-        imageBindings.push_back({ .image = img, .index = texOffset + texCount });
+        uint32_t index = texOffset + texCount;
+        imageBindings.push_back({ .image = img, .index = index });
+        if (index > maxTextureIndex)
+        {
+          maxTextureIndex = index;
+        }
         texCount++;
       }
     }
@@ -1784,6 +1791,7 @@ cleanup:
     cache->bindSets = bindSets;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
     cache->imageBindings = std::move(imageBindings);
+    cache->maxTextureIndex = maxTextureIndex;
     cache->materials.resize(materials.size());
     for (uint32_t i = 0; i < cache->materials.size(); i++)
     {
@@ -2292,7 +2300,7 @@ cleanup:
         .domeLightRotation = glm::make_vec4(&domeLightRotation[0]),
         .domeLightEmissionMultiplier = domeLightEmissionMultiplier,
         .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
-        .textureCount = (uint32_t)shaderCache->imageBindings.size(),
+        .maxTextureIndex = shaderCache->maxTextureIndex,
         .sphereLightCount = scene->sphereLights.elementCount(),
         .distantLightCount = scene->distantLights.elementCount(),
         .rectLightCount = scene->rectLights.elementCount(),
