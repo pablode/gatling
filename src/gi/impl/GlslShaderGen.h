@@ -53,6 +53,7 @@ namespace gtl
     struct CommonShaderParams
     {
       uint32_t aovMask;
+      bool debugPrintf;
       uint32_t mediumStackSize;
     };
 
