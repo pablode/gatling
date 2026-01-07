@@ -27,7 +27,7 @@ struct UniformData
   GI_VEC4 domeLightRotation;
   GI_VEC3 domeLightEmissionMultiplier;
   GI_UINT domeLightDiffuseSpecularPacked;
-  GI_UINT textureCount;
+  GI_UINT maxTextureIndex;
   GI_UINT sphereLightCount;
   GI_UINT distantLightCount;
   GI_UINT rectLightCount;
