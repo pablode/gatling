@@ -55,6 +55,10 @@ namespace gtl
     stitcher.appendDefine("NDEBUG");
 #endif
     stitcher.appendDefine("AOV_MASK", (int) params.aovMask);
+    if (params.debugPrintf)
+    {
+      stitcher.appendDefine("DEBUG_PRINTF");
+    }
     stitcher.appendDefine("MEDIUM_STACK_SIZE", (int32_t) params.mediumStackSize);
   }
 

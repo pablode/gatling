@@ -8,7 +8,7 @@ const float FLOAT_MAX = 3.402823466e38;
 const float FLOAT_MIN = 1.175494351e-38;
 const float PI = 3.1415926535897932384626433832795;
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) && defined(DEBUG_PRINTF)
 #extension GL_EXT_debug_printf: enable
 #define ASSERT(cond, str) if (!(cond)) debugPrintfEXT(str)
 #else

@@ -1387,6 +1387,11 @@ cleanup:
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
+#ifndef NDEBUG
+      .debugPrintf = s_ctxFeatures.debugPrintf,
+#else
+      .debugPrintf = false,
+#endif
       .mediumStackSize = renderSettings.mediumStackSize
     };
 
