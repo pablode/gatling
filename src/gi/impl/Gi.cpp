@@ -351,7 +351,7 @@ namespace gtl
   // IMPORTANT: this needs to match the rp_main* shaders. It is asserted in cgpu.
   uint32_t _GetRpMainMaxRayPayloadSize(uint32_t mediumStackSize)
   {
-    uint32_t size = 80;
+    uint32_t size = 84;
     if (mediumStackSize > 0)
     {
       size += mediumStackSize * 40 + 12;

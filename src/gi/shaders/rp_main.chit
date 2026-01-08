@@ -164,7 +164,7 @@ void main()
       BlasPayloadBufferPreamble preamble = indices.preamble;
 #endif
       uint imageWidth = ubo.imageDims & 0xFFFFu;
-      uint pixelIndex = gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * imageWidth; // only for AOVs
+      uint pixelIndex = rayPayload.pixelIndex;
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
 #ifndef HAS_CUTOUT_TRANSPARENCY
       OpacityAov[pixelIndex] = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap set in any-hit shader
