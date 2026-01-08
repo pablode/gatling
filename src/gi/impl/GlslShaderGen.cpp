@@ -122,23 +122,6 @@ namespace gtl
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::RayGen, source, spv);
   }
 
-  bool GiGlslShaderGen::generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv)
-  {
-    GiGlslStitcher stitcher;
-    stitcher.appendVersion();
-
-    _sgGenerateCommonDefines(stitcher, params.commonParams);
-
-    fs::path filePath = m_shaderPath / fileName;
-    if (!stitcher.appendSourceFile(filePath))
-    {
-      return false;
-    }
-
-    std::string source = stitcher.source();
-    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::Miss, source, spv);
-  }
-
   bool _MakeMaterialGenInfo(const McGlslGenResult& codeGenResult,
                             const std::string& resourcePathPrefix,
                             fs::path shaderPath,

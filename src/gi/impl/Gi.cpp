@@ -117,7 +117,6 @@ namespace gtl
     std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
     uint32_t                       maxTextureIndex;
-    std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
     CgpuShader                     rgenShader;
     GiScene*                       scene;
@@ -1339,6 +1338,7 @@ cleanup:
     };
 
     const GiRenderSettings& renderSettings = params.renderSettings;
+    bool nee = params.renderSettings.nextEventEstimation;
     GiScene* scene = params.scene;
     OffsetAllocator::Allocator& texAllocator = scene->texAllocator;
 
@@ -1375,7 +1375,6 @@ cleanup:
     CgpuShader rgenShader;
     std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
-    std::vector<CgpuShader> missShaders;
     std::vector<McTextureDescription> textureDescriptions;
     std::vector<GiImageBinding> imageBindings;
     std::vector<HitGroupCompInfo> hitGroupCompInfos;
@@ -1425,11 +1424,6 @@ cleanup:
         HitGroupCompInfo groupInfo;
         groupInfo.material = material;
         groupInfo.genInfo = genInfo;
-
-        if (material->mcMat->hasCutoutTransparency)
-        {
-          groupInfo.anyHitInfo = HitShaderCompInfo{};
-        }
 
         std::lock_guard guard(hitGroupCompInfoMutex);
         hitGroupCompInfos.push_back(groupInfo);
@@ -1527,8 +1521,12 @@ cleanup:
         }
 
         // Any hit
-        if (compInfo.anyHitInfo)
+        bool isTransparent = material->mcMat->hasCutoutTransparency;
+
+        if (isTransparent || nee)
         {
+          compInfo.anyHitInfo = HitShaderCompInfo{};
+
           GiGlslShaderGen::AnyHitShaderParams hitParams = {
             .baseFileName = "rp_main.ahit",
             .commonParams = commonParams,
@@ -1539,18 +1537,24 @@ cleanup:
             .textureIndexOffset = texOffset
           };
 
-          hitParams.shadowTest = false;
-          if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
+          if (isTransparent)
           {
-            threadWorkFailed = true;
-            continue;
+            hitParams.shadowTest = false;
+            if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
+            {
+              threadWorkFailed = true;
+              continue;
+            }
           }
 
-          hitParams.shadowTest = true;
-          if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->shadowSpv))
+          if (nee)
           {
-            threadWorkFailed = true;
-            continue;
+            hitParams.shadowTest = true;
+            if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->shadowSpv))
+            {
+              threadWorkFailed = true;
+              continue;
+            }
           }
         }
       }
@@ -1578,8 +1582,11 @@ cleanup:
           if (compInfo.anyHitInfo)
           {
             const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->spv;
-            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
-                                    .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
+            if (!aSpv.empty())
+            {
+              createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
+                                      .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
+            }
           }
         }
 
@@ -1587,8 +1594,11 @@ cleanup:
         if (compInfo.anyHitInfo)
         {
           const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->shadowSpv;
-          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
-                                  .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
+          if (!aSpv.empty())
+          {
+            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
+                                    .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
+          }
         }
       }
 
@@ -1607,14 +1617,14 @@ cleanup:
         {
           gpuData.closestHit = hitShaders[hitShaderCounter++];
 
-          if (compInfo.anyHitInfo)
+          if (hitGroupCompInfos[i].anyHitInfo && !hitGroupCompInfos[i].anyHitInfo->spv.empty())
           {
             gpuData.anyHits.push_back(hitShaders[hitShaderCounter++]);
           }
         }
 
         // shadow hit group
-        if (compInfo.anyHitInfo)
+        if (hitGroupCompInfos[i].anyHitInfo && !hitGroupCompInfos[i].anyHitInfo->shadowSpv.empty())
         {
             gpuData.anyHits.push_back(hitShaders[hitShaderCounter++]);
         }
@@ -1693,59 +1703,6 @@ cleanup:
       }
     }
 
-    // Create miss shaders.
-    {
-      GiGlslShaderGen::MissShaderParams missParams = {
-        .commonParams = commonParams
-      };
-
-      // regular miss shader
-      {
-        std::vector<uint8_t> spv;
-        if (!s_shaderGen->generateMissSpirv("rp_main.miss", missParams, spv))
-        {
-          goto cleanup;
-        }
-
-        CgpuShader missShader;
-        if (!cgpuCreateShader(s_ctx, {
-                                .size = spv.size(),
-                                .source = spv.data(),
-                                .stageFlags = CgpuShaderStage::Miss,
-                                .maxRayPayloadSize = maxRayPayloadSize,
-                                .maxRayHitAttributeSize = maxRayHitAttributeSize
-                              }, &missShader))
-        {
-          goto cleanup;
-        }
-
-        missShaders.push_back(missShader);
-      }
-
-      // shadow test miss shader
-      {
-        std::vector<uint8_t> spv;
-        if (!s_shaderGen->generateMissSpirv("rp_main_shadow.miss", missParams, spv))
-        {
-          goto cleanup;
-        }
-
-        CgpuShader missShader;
-        if (!cgpuCreateShader(s_ctx, {
-                                .size = spv.size(),
-                                .source = spv.data(),
-                                .stageFlags = CgpuShaderStage::Miss,
-                                .maxRayPayloadSize = maxRayPayloadSize,
-                                .maxRayHitAttributeSize = maxRayHitAttributeSize
-                              }, &missShader))
-        {
-          goto cleanup;
-        }
-
-        missShaders.push_back(missShader);
-      }
-    }
-
     // Create RT pipeline.
     {
       GB_LOG("creating RT pipeline..");
@@ -1753,8 +1710,6 @@ cleanup:
 
       cgpuCreateRtPipeline(s_ctx, {
         .rgenShader = rgenShader,
-        .missShaderCount = (uint32_t)missShaders.size(),
-        .missShaders = missShaders.data(),
         .hitGroupCount = (uint32_t)hitGroups.size(),
         .hitGroups = hitGroups.data(),
         .maxRayPayloadSize = maxRayPayloadSize,
@@ -1802,7 +1757,6 @@ cleanup:
     {
       cache->materials[i] = materials[i];
     }
-    cache->missShaders = missShaders;
     cache->pipeline = pipeline;
     cache->rgenShader = rgenShader;
     cache->scene = scene;
@@ -1815,10 +1769,6 @@ cleanup:
       if (rgenShader.handle)
       {
         cgpuDestroyShader(s_ctx, rgenShader);
-      }
-      for (CgpuShader shader : missShaders)
-      {
-        cgpuDestroyShader(s_ctx, shader);
       }
       if (pipeline.handle)
       {
@@ -1838,10 +1788,6 @@ cleanup:
     GiScene* scene = cache->scene;
 
     cgpuDestroyShader(s_ctx, cache->rgenShader);
-    for (CgpuShader shader : cache->missShaders)
-    {
-      cgpuDestroyShader(s_ctx, shader);
-    }
     cgpuDestroyBindSets(s_ctx, cache->bindSets.data(), (uint32_t) cache->bindSets.size());
     cgpuDestroyPipeline(s_ctx, cache->pipeline);
     delete cache;

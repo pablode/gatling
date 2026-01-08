@@ -98,8 +98,7 @@ namespace gtl
     Compute = 0x00000020,
     RayGen = 0x00000100,
     AnyHit = 0x00000200,
-    ClosestHit = 0x00000400,
-    Miss = 0x00000800
+    ClosestHit = 0x00000400
   };
   GB_DECLARE_ENUM_BITOPS(CgpuShaderStage);
 
@@ -185,8 +184,6 @@ namespace gtl
   struct CgpuRtPipelineCreateInfo
   {
     CgpuShader rgenShader;
-    uint32_t missShaderCount = 0;
-    CgpuShader* missShaders = nullptr;
     uint32_t hitGroupCount = 0;
     const CgpuRtHitGroup* hitGroups = nullptr;
     const char* debugName = nullptr;

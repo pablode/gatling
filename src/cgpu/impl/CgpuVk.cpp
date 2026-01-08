@@ -91,6 +91,27 @@ namespace gtl
     VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME // required by VK_KHR_depth_stencil_resolve
   };
 
+  // SPIR-V of an empty GLSL miss shader.
+  uint8_t CGPU_MISS_SHADER_SPV_DATA [] = {
+    0x03, 0x02, 0x23, 0x07, 0x00, 0x03, 0x01, 0x00, 0x0b, 0x00, 0x08, 0x00,
+    0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x02, 0x00,
+    0x7f, 0x11, 0x00, 0x00, 0x0a, 0x00, 0x06, 0x00, 0x53, 0x50, 0x56, 0x5f,
+    0x4b, 0x48, 0x52, 0x5f, 0x72, 0x61, 0x79, 0x5f, 0x74, 0x72, 0x61, 0x63,
+    0x69, 0x6e, 0x67, 0x00, 0x0b, 0x00, 0x06, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x47, 0x4c, 0x53, 0x4c, 0x2e, 0x73, 0x74, 0x64, 0x2e, 0x34, 0x35, 0x30,
+    0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x05, 0x00, 0xc5, 0x14, 0x00, 0x00,
+    0x04, 0x00, 0x00, 0x00, 0x6d, 0x61, 0x69, 0x6e, 0x00, 0x00, 0x00, 0x00,
+    0x03, 0x00, 0x03, 0x00, 0x02, 0x00, 0x00, 0x00, 0xcc, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x04, 0x00, 0x04, 0x00, 0x00, 0x00, 0x6d, 0x61, 0x69, 0x6e,
+    0x00, 0x00, 0x00, 0x00, 0x13, 0x00, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00,
+    0x21, 0x00, 0x03, 0x00, 0x03, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+    0x36, 0x00, 0x05, 0x00, 0x02, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0xf8, 0x00, 0x02, 0x00,
+    0x05, 0x00, 0x00, 0x00, 0xfd, 0x00, 0x01, 0x00, 0x38, 0x00, 0x01, 0x00
+  };
+  uint32_t CGPU_MISS_SHADER_SPV_LENGTH = 192;
+
   /* Internal structures */
 
   struct CgpuIDeviceProperties
@@ -153,21 +174,6 @@ namespace gtl
     VkAccessFlags2KHR accessMask;
   };
 
-  struct CgpuIPipeline
-  {
-    VkPipeline                                pipeline;
-    VkPipelineLayout                          layout;
-    VkDescriptorPool                          descriptorPool;
-    uint32_t                                  descriptorSetCount;
-    VkDescriptorSetLayout                     descriptorSetLayouts[CGPU_MAX_DESCRIPTOR_SET_COUNT];
-    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings[CGPU_MAX_DESCRIPTOR_SET_COUNT];
-    VkPipelineBindPoint                       bindPoint;
-    VkStridedDeviceAddressRegionKHR           sbtRgen;
-    VkStridedDeviceAddressRegionKHR           sbtMiss;
-    VkStridedDeviceAddressRegionKHR           sbtHit;
-    CgpuBuffer                                sbt;
-  };
-
   struct CgpuIPipelineLibrary
   {
     VkDescriptorPool                          descriptorPool;
@@ -184,6 +190,24 @@ namespace gtl
     CgpuShaderReflection reflection;
     VkShaderStageFlagBits stageFlags;
     CgpuIPipelineLibrary pipelineLibrary;
+  };
+
+  struct CgpuIPipeline
+  {
+    VkPipelineBindPoint                       bindPoint;
+    VkPipeline                                pipeline;
+    VkPipelineLayout                          layout;
+    VkDescriptorPool                          descriptorPool;
+    uint32_t                                  descriptorSetCount;
+    VkDescriptorSetLayout                     descriptorSetLayouts[CGPU_MAX_DESCRIPTOR_SET_COUNT];
+    std::vector<VkDescriptorSetLayoutBinding> descriptorSetLayoutBindings[CGPU_MAX_DESCRIPTOR_SET_COUNT];
+
+    // RT pipelines only
+    CgpuBuffer                                sbt;
+    VkStridedDeviceAddressRegionKHR           sbtRgen;
+    VkStridedDeviceAddressRegionKHR           sbtMiss;
+    VkStridedDeviceAddressRegionKHR           sbtHit;
+    CgpuIShader                               missShader;
   };
 
   struct CgpuISemaphore
@@ -1551,13 +1575,13 @@ namespace gtl
     }
   }
 
-  static void cgpuCreateShader(CgpuContext* ctx,
-                               const CgpuShaderCreateInfo& createInfo,
-                               CgpuIShader* ishader)
+  static void cgpuCreateIShader(CgpuIDevice* idevice,
+                                bool debugUtilsEnabled,
+                                const CgpuShaderCreateInfo& createInfo,
+                                VkShaderStageFlagBits stageFlags,
+                                CgpuIShader* ishader)
   {
-    CgpuIDevice* idevice = &ctx->idevice;
-
-    ishader->stageFlags = (VkShaderStageFlagBits)createInfo.stageFlags;
+    ishader->stageFlags = stageFlags;
 
     if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
     {
@@ -1565,10 +1589,8 @@ namespace gtl
     }
 
 #ifndef NDEBUG
-    if (createInfo.stageFlags != CgpuShaderStage::Compute)
+    if (stageFlags != VK_SHADER_STAGE_COMPUTE_BIT)
     {
-      assert(createInfo.maxRayPayloadSize > 0);
-      assert(createInfo.maxRayHitAttributeSize > 0);
       assert(ishader->reflection.maxRayPayloadSize <= createInfo.maxRayPayloadSize);
       assert(ishader->reflection.maxRayHitAttributeSize <= createInfo.maxRayHitAttributeSize);
     }
@@ -1582,7 +1604,7 @@ namespace gtl
      .pCode = (uint32_t*) createInfo.source,
     };
 
-    if (!idevice->internalFeatures.pipelineLibraries || createInfo.stageFlags == CgpuShaderStage::Compute)
+    if (!idevice->internalFeatures.pipelineLibraries || stageFlags == VK_SHADER_STAGE_COMPUTE_BIT)
     {
       VkResult result = idevice->table.vkCreateShaderModule(
         idevice->logicalDevice,
@@ -1596,7 +1618,7 @@ namespace gtl
         CGPU_FATAL("failed to create shader module");
       }
 
-      if (ctx->debugUtilsEnabled && createInfo.debugName)
+      if (debugUtilsEnabled && createInfo.debugName)
       {
         cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_SHADER_MODULE,
                           (uint64_t) ishader->module, createInfo.debugName);
@@ -1617,7 +1639,7 @@ namespace gtl
 
     CGPU_RESOLVE_SHADER(ctx, *shader, ishader);
 
-    cgpuCreateShader(ctx, createInfo, ishader);
+    cgpuCreateIShader(&ctx->idevice, ctx->debugUtilsEnabled, createInfo, (VkShaderStageFlagBits) createInfo.stageFlags, ishader);
 
     return true;
   }
@@ -1645,17 +1667,15 @@ namespace gtl
 #pragma omp parallel for schedule(dynamic, 1)
     for (int i = 0; i < int(shaderCount); i++)
     {
-      cgpuCreateShader(ctx, createInfos[i], ishaders[i]);
+      auto stageFlags = (VkShaderStageFlagBits) createInfos[i].stageFlags;
+      cgpuCreateIShader(&ctx->idevice, ctx->debugUtilsEnabled, createInfos[i], stageFlags, ishaders[i]);
     }
 
     return true;
   }
 
-  void cgpuDestroyShader(CgpuContext* ctx, CgpuShader shader)
+  static void cgpuDestroyIShader(CgpuIDevice* idevice, CgpuIShader* ishader)
   {
-    CgpuIDevice* idevice = &ctx->idevice;
-    CGPU_RESOLVE_SHADER(ctx, shader, ishader);
-
     const CgpuIPipelineLibrary& library = ishader->pipelineLibrary;
     idevice->table.vkDestroyPipeline(idevice->logicalDevice, library.pipeline, nullptr);
     idevice->table.vkDestroyPipelineLayout(idevice->logicalDevice, library.layout, nullptr);
@@ -1669,6 +1689,14 @@ namespace gtl
     {
       idevice->table.vkDestroyShaderModule(idevice->logicalDevice, ishader->module, nullptr);
     }
+  }
+
+  void cgpuDestroyShader(CgpuContext* ctx, CgpuShader shader)
+  {
+    CgpuIDevice* idevice = &ctx->idevice;
+    CGPU_RESOLVE_SHADER(ctx, shader, ishader);
+
+    cgpuDestroyIShader(idevice, ishader);
 
     ctx->ishaderStore.free(shader.handle);
   }
@@ -2225,7 +2253,6 @@ namespace gtl
   static void cgpuCreateRtPipelineSbt(CgpuContext* ctx,
                                       CgpuIPipeline* ipipeline,
                                       uint32_t groupCount,
-                                      uint32_t missShaderCount,
                                       uint32_t hitGroupCount)
   {
     CgpuIDevice* idevice = &ctx->idevice;
@@ -2238,7 +2265,7 @@ namespace gtl
     ipipeline->sbtRgen.stride = cgpuAlign(alignedHandleSize, properties.shaderGroupBaseAlignment);
     ipipeline->sbtRgen.size = ipipeline->sbtRgen.stride; // Special raygen condition: size must be equal to stride
     ipipeline->sbtMiss.stride = alignedHandleSize;
-    ipipeline->sbtMiss.size = cgpuAlign(missShaderCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
+    ipipeline->sbtMiss.size = cgpuAlign(1/*miss*/ * alignedHandleSize, properties.shaderGroupBaseAlignment);
     ipipeline->sbtHit.stride = alignedHandleSize;
     ipipeline->sbtHit.size = cgpuAlign(hitGroupCount * alignedHandleSize, properties.shaderGroupBaseAlignment);
 
@@ -2285,11 +2312,8 @@ namespace gtl
     memcpy(sbtMemPtr, &handleData[handleSize * (handleCount++)], handleSize);
     // Miss
     sbtMemPtr = sbtMemMiss;
-    for (uint32_t i = 0; i < missShaderCount; i++)
-    {
-      memcpy(sbtMemPtr, &handleData[handleSize * (handleCount++)], handleSize);
-      sbtMemPtr += ipipeline->sbtMiss.stride;
-    }
+    memcpy(sbtMemPtr, &handleData[handleSize * (handleCount++)], handleSize);
+    sbtMemPtr += ipipeline->sbtMiss.stride;
     // Hit
     sbtMemPtr = sbtMemHit;
     for (uint32_t i = 0; i < hitGroupCount; i++)
@@ -2314,8 +2338,19 @@ namespace gtl
 
     CGPU_RESOLVE_PIPELINE(ctx, { handle }, ipipeline);
 
+    // Create empty miss shader.
+    CgpuShaderCreateInfo missShaderCreateInfo = {
+      .size = CGPU_MISS_SHADER_SPV_LENGTH,
+      .source = CGPU_MISS_SHADER_SPV_DATA,
+      .debugName = "[miss shader]",
+      .maxRayPayloadSize = createInfo.maxRayPayloadSize,
+      .maxRayHitAttributeSize = createInfo.maxRayHitAttributeSize
+    };
+
+    cgpuCreateIShader(idevice, ctx->debugUtilsEnabled, missShaderCreateInfo, VK_SHADER_STAGE_MISS_BIT_KHR, &ipipeline->missShader);
+
     // Gather groups.
-    size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
+    size_t groupCount = 1/*rgen*/ + 1/*miss*/ + createInfo.hitGroupCount;
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups(groupCount);
 
     for (uint32_t i = 0; i < groups.size(); i++)
@@ -2337,7 +2372,7 @@ namespace gtl
     bool anyNullClosestHitShader = false;
     bool anyNullAnyHitShader = false;
 
-    uint32_t hitStageAndGroupOffset = 1/*rgen*/ + createInfo.missShaderCount;
+    uint32_t hitStageAndGroupOffset = 1/*rgen*/ + 1/*miss*/;
     uint32_t hitShaderStageIndex = hitStageAndGroupOffset;
     for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
     {
@@ -2377,21 +2412,19 @@ namespace gtl
     // Collect pipeline libraries OR stages.
     std::vector<VkPipeline> libraries;
     std::vector<VkPipelineShaderStageCreateInfo> stages;
+
     if (idevice->internalFeatures.pipelineLibraries)
     {
       libraries.reserve(groupCount * 2);
 
       libraries.push_back(irgenShader->pipelineLibrary.pipeline);
 
+      libraries.push_back(ipipeline->missShader.pipelineLibrary.pipeline);
+
       const auto getShaderPipelineHandle = [ctx](CgpuShader shader) {
         CGPU_RESOLVE_SHADER(ctx, shader, ishader);
         return ishader->pipelineLibrary.pipeline;
       };
-
-      for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
-      {
-        libraries.push_back(getShaderPipelineHandle(createInfo.missShaders[i]));
-      }
 
       for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
       {
@@ -2428,11 +2461,7 @@ namespace gtl
 
       pushStage(VK_SHADER_STAGE_RAYGEN_BIT_KHR, irgenShader->module);
 
-      for (uint32_t i = 0; i < createInfo.missShaderCount; i++)
-      {
-        CGPU_RESOLVE_SHADER(ctx, createInfo.missShaders[i], imissShader);
-        pushStage(VK_SHADER_STAGE_MISS_BIT_KHR, imissShader->module);
-      }
+      pushStage(VK_SHADER_STAGE_MISS_BIT_KHR, ipipeline->missShader.module);
 
       for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
       {
@@ -2504,7 +2533,7 @@ namespace gtl
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
       // Create the SBT.
-      cgpuCreateRtPipelineSbt(ctx, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
+      cgpuCreateRtPipelineSbt(ctx, ipipeline, groupCount, createInfo.hitGroupCount);
 
       if (ctx->debugUtilsEnabled && createInfo.debugName)
       {
@@ -2523,6 +2552,7 @@ namespace gtl
     if (ipipeline->bindPoint == VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR)
     {
       cgpuDestroyBuffer(ctx, ipipeline->sbt);
+      cgpuDestroyIShader(&ctx->idevice, &ipipeline->missShader);
     }
 
     idevice->table.vkDestroyDescriptorPool(idevice->logicalDevice, ipipeline->descriptorPool, nullptr);

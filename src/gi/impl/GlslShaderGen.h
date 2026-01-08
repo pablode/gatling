@@ -71,11 +71,6 @@ namespace gtl
       bool reorderInvocations;
     };
 
-    struct MissShaderParams
-    {
-      CommonShaderParams commonParams;
-    };
-
     struct ClosestHitShaderParams
     {
       std::string_view baseFileName;
@@ -109,7 +104,6 @@ namespace gtl
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);
-    bool generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv);
     bool generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv);
     bool generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv);
 
