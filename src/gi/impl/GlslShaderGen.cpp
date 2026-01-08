@@ -87,6 +87,10 @@ namespace gtl
     {
       stitcher.appendDefine("DEPTH_OF_FIELD");
     }
+    if (params.domeLightCameraVisible)
+    {
+      stitcher.appendDefine("DOME_LIGHT_CAMERA_VISIBLE");
+    }
     if (params.filterImportanceSampling)
     {
       stitcher.appendDefine("FILTER_IMPORTANCE_SAMPLING");
@@ -124,11 +128,6 @@ namespace gtl
     stitcher.appendVersion();
 
     _sgGenerateCommonDefines(stitcher, params.commonParams);
-
-    if (params.domeLightCameraVisible)
-    {
-      stitcher.appendDefine("DOME_LIGHT_CAMERA_VISIBLE");
-    }
 
     fs::path filePath = m_shaderPath / fileName;
     if (!stitcher.appendSourceFile(filePath))

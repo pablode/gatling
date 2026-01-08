@@ -54,8 +54,16 @@ void main()
 #else
   float k = rng1d_next1f(rayPayload.rng_state);
 #endif
+
   if (k > opacity)
   {
     ignoreIntersectionEXT;
+  }
+  else
+  {
+#ifdef SHADOW_TEST
+    rayPayload.shadowed = true;
+#endif
+    terminateRayEXT;
   }
 }

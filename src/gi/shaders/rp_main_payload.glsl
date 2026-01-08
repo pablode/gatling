@@ -1,6 +1,7 @@
 #include "common.glsl"
 
 #define SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG 0x40000000u
+#define SHADE_RAY_PAYLOAD_SKY_HIT_FLAG 0x20000000u
 #define SHADE_RAY_PAYLOAD_MEDIUM_IDX_MASK 0x0f000000u
 #define SHADE_RAY_PAYLOAD_MEDIUM_IDX_OFFSET 24
 #define SHADE_RAY_PAYLOAD_WALK_MASK 0x00fff000u
@@ -23,7 +24,8 @@ struct ShadeRayPayload
 
     /*               1000 0000 0000 0000 0000 0000 0000 0000 terminate
      *               0100 0000 0000 0000 0000 0000 0000 0000 volume walk miss
-     *               0011 0000 0000 0000 0000 0000 0000 0000 unused
+     *               0010 0000 0000 0000 0000 0000 0000 0000 sky hit
+     *               0001 0000 0000 0000 0000 0000 0000 0000 unused
      *               0000 1111 0000 0000 0000 0000 0000 0000 medium index [0, 256)
      *               0000 0000 1111 1111 1111 0000 0000 0000 walk length [0, 4096)
      *               0000 0000 0000 0000 0000 1111 1111 1111 bounces [0, 4096) */

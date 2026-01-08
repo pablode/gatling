@@ -446,6 +446,9 @@ void main()
         rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
     }
 
+    // Register hit
+    rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_SKY_HIT_FLAG;
+
     vec3 geomNormal = shading_state.geom_normal * (isTransmissionEvent ? -1.0 /* undo flip */ : 1.0);
     rayPayload.ray_origin = offset_ray_origin(shading_state.position, geomNormal);
 

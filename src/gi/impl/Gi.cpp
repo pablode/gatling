@@ -1666,6 +1666,7 @@ cleanup:
         .clippingPlanes = renderSettings.clippingPlanes,
         .commonParams = commonParams,
         .depthOfField = renderSettings.depthOfField,
+        .domeLightCameraVisible = renderSettings.domeLightCameraVisible,
         .filterImportanceSampling = renderSettings.filterImportanceSampling,
         .jitteredSampling = renderSettings.jitteredSampling,
         .materialCount = uint32_t(materials.size()),
@@ -1695,8 +1696,7 @@ cleanup:
     // Create miss shaders.
     {
       GiGlslShaderGen::MissShaderParams missParams = {
-        .commonParams = commonParams,
-        .domeLightCameraVisible = renderSettings.domeLightCameraVisible
+        .commonParams = commonParams
       };
 
       // regular miss shader

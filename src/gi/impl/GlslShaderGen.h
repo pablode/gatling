@@ -62,6 +62,7 @@ namespace gtl
       bool clippingPlanes;
       CommonShaderParams commonParams;
       bool depthOfField;
+      bool domeLightCameraVisible;
       bool filterImportanceSampling;
       bool jitteredSampling;
       uint32_t materialCount;
@@ -73,7 +74,6 @@ namespace gtl
     struct MissShaderParams
     {
       CommonShaderParams commonParams;
-      bool domeLightCameraVisible;
     };
 
     struct ClosestHitShaderParams
