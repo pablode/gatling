@@ -42,6 +42,8 @@ struct ShadeRayPayload
     /* out */   vec3 ray_dir;
     /* out */   vec3 neeToLight;
     /* out */   vec3 neeContrib;
+
+    /* in  */   uint pixelIndex;
 };
 
 struct ShadowRayPayload

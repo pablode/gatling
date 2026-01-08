@@ -125,6 +125,7 @@ vec3 evaluate_sample(uint pixelIndex,
 #if MEDIUM_STACK_SIZE > 0
     rayPayload.walkSegmentPdf = vec3(1.0);
 #endif
+    rayPayload.pixelIndex     = pixelIndex;
 
     // Correct clip plane curving by getting the hypothenuse length (our current ray)
     // from the adjacent edge (the forward vector) the angle between both.
