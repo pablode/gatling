@@ -2460,8 +2460,6 @@ namespace gtl
 
     // Create pipeline.
     {
-      uint32_t groupCount = hitStageAndGroupOffset + createInfo.hitGroupCount;
-
       VkPipelineLibraryCreateInfoKHR libraryCreateInfo {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR,
         .pNext = nullptr,
