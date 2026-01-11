@@ -1647,7 +1647,7 @@ cleanup:
         CgpuRtHitGroup shadowHitGroup;
         if (!gpuData.anyHits.empty())
         {
-          hitGroup.anyHitShader = gpuData.anyHits[1];
+          shadowHitGroup.anyHitShader = gpuData.anyHits[1];
         }
         hitGroups.push_back(shadowHitGroup);
       };
