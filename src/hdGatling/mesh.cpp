@@ -790,11 +790,14 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
     const TfToken& name = it->first;
     const ProcessedPrimvar& p = it->second;
 
-    // We skip secondary primvars likely to be already encoded in vertex data as an optimization.
-    // The corresponding change to the shading network happens in the MaterialX document patcher.
+
     if (name.IsEmpty() ||
+#if 0 // NOTE: temporarily disabled, see MtlxDocumentPatcher.cpp.
+        // We skip secondary primvars likely to be already encoded in vertex data as an optimization.
+        // The corresponding change to the shading network happens in the MaterialX document patcher.
         name == _tokens->st || name == _tokens->st0 || name == _tokens->st_0 ||
         name == _tokens->UV0 || name == _tokens->map1 || name == _tokens->tangents ||
+#endif
         name == HdTokens->points || name == HdTokens->normals)
     {
       continue;

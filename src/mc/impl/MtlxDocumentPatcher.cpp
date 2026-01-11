@@ -38,161 +38,6 @@ const char* TYPE_BOOL = "boolean";
 const char* ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING =
   "GTL_DISABLE_MTLX_USDUVTEXTURE_COLOR_SPACE_PATCHING";
 
-#if MATERIALX_VERSION < 13904
-// This is a variant of the GraphElement::flattenSubgraphs function shipped with MaterialX 1.39.4, containing
-// following bugfix: https://github.com/AcademySoftwareFoundation/MaterialX/pull/2348
-void _FlattenSubgraphs(mx::GraphElementPtr graphElem)
-{
-  std::vector<mx::NodePtr> nodeQueue = graphElem->getNodes();
-
-  while (!nodeQueue.empty())
-  {
-    // Determine which nodes require processing, and precompute declarations
-    // and graph implementations for these nodes.
-    using PortElementVec = std::vector<mx::PortElementPtr>;
-    std::vector<mx::NodePtr> processNodeVec;
-    std::unordered_map<mx::NodePtr, mx::NodeGraphPtr> graphImplMap;
-    std::unordered_map<mx::NodePtr, mx::ConstInterfaceElementPtr> declarationMap;
-    std::unordered_map<mx::NodePtr, PortElementVec> downstreamPortMap;
-    for (mx::NodePtr node : nodeQueue)
-    {
-      mx::InterfaceElementPtr implement = node->getImplementation();
-      if (implement && implement->isA<mx::NodeGraph>())
-      {
-        processNodeVec.push_back(node);
-        graphImplMap[node] = implement->asA<mx::NodeGraph>();
-        declarationMap[node] = node->getDeclaration();
-        downstreamPortMap[node] = node->getDownstreamPorts();
-        for (mx::NodePtr sourceSubNode : implement->asA<mx::NodeGraph>()->getNodes())
-        {
-          downstreamPortMap[sourceSubNode] = sourceSubNode->getDownstreamPorts();
-        }
-      }
-    }
-    nodeQueue.clear();
-
-    // Iterate through nodes with graph implementations.
-    for (mx::NodePtr processNode : processNodeVec)
-    {
-      mx::NodeGraphPtr sourceSubGraph = graphImplMap[processNode];
-      std::unordered_map<mx::NodePtr, mx::NodePtr> subNodeMap;
-
-      // Create a new instance of each original subnode.
-      for (mx::NodePtr sourceSubNode : sourceSubGraph->getNodes())
-      {
-        std::string origName = sourceSubNode->getName();
-        std::string destName = graphElem->createValidChildName(origName);
-        mx::NodePtr destSubNode = graphElem->addNode(sourceSubNode->getCategory(), destName);
-
-        destSubNode->copyContentFrom(sourceSubNode);
-        graphElem->setChildIndex(destSubNode->getName(), graphElem->getChildIndex(processNode->getName()));
-
-        // Store the mapping between subgraphs.
-        subNodeMap[sourceSubNode] = destSubNode;
-
-        // Add the subnode to the queue, allowing processing of nested subgraphs.
-        nodeQueue.push_back(destSubNode);
-      }
-
-      // Update properties of generated subnodes.
-      for (const auto& subNodePair : subNodeMap)
-      {
-        mx::NodePtr sourceSubNode = subNodePair.first;
-        mx::NodePtr destSubNode = subNodePair.second;
-
-        // Update node connections.
-        for (mx::PortElementPtr sourcePort : downstreamPortMap[sourceSubNode])
-        {
-          if (sourcePort->isA<mx::Input>())
-          {
-            auto it = subNodeMap.find(sourcePort->getParent()->asA<mx::Node>());
-            if (it != subNodeMap.end())
-            {
-              mx::InputPtr processNodeInput = it->second->getInput(sourcePort->getName());
-              if (processNodeInput)
-              {
-                processNodeInput->setNodeName(destSubNode->getName());
-              }
-            }
-          }
-          else if (sourcePort->isA<mx::Output>())
-          {
-            for (mx::PortElementPtr processNodePort : downstreamPortMap[processNode])
-            {
-              processNodePort->setNodeName(destSubNode->getName());
-            }
-          }
-        }
-
-        // Transfer interface properties.
-        for (mx::InputPtr destInput : destSubNode->getInputs())
-        {
-          if (destInput->hasInterfaceName())
-          {
-            mx::InputPtr sourceInput = processNode->getInput(destInput->getInterfaceName());
-            if (sourceInput)
-            {
-              destInput->copyContentFrom(sourceInput);
-              mx::NodePtr connectedNode = destInput->getConnectedNode();
-              // Update downstream port map with the new instance
-              if (connectedNode && downstreamPortMap.count(connectedNode) > 0)
-              {
-                downstreamPortMap[connectedNode] = connectedNode->getDownstreamPorts();
-              }
-            }
-            else
-            {
-              mx::ConstInterfaceElementPtr declaration = declarationMap[processNode];
-              mx::InputPtr declInput = declaration ? declaration->getActiveInput(destInput->getInterfaceName()) : nullptr;
-              if (declInput)
-              {
-                if (declInput->hasValueString())
-                {
-                  destInput->setValueString(declInput->getValueString());
-                }
-                if (declInput->hasDefaultGeomPropString())
-                {
-                  mx::ConstGeomPropDefPtr geomPropDef = graphElem->getDocument()->getGeomPropDef(declInput->getDefaultGeomPropString());
-                  if (geomPropDef)
-                  {
-                    destInput->setConnectedNode(graphElem->addGeomNode(geomPropDef, "geomNode"));
-                  }
-                }
-              }
-              destInput->removeAttribute(mx::ValueElement::INTERFACE_NAME_ATTRIBUTE);
-            }
-          }
-        }
-      }
-
-      // Update downstream ports with connections to subgraph outputs.
-      for (mx::PortElementPtr downstreamPort : downstreamPortMap[processNode])
-      {
-        if (downstreamPort->hasOutputString())
-        {
-          mx::OutputPtr subGraphOutput = sourceSubGraph->getOutput(downstreamPort->getOutputString());
-          if (subGraphOutput)
-          {
-            std::string destName = subGraphOutput->getNodeName();
-            mx::NodePtr sourceSubNode = sourceSubGraph->getNode(destName);
-            mx::NodePtr destNode = sourceSubNode ? subNodeMap[sourceSubNode] : nullptr;
-            if (destNode)
-            {
-              destName = destNode->getName();
-            }
-            downstreamPort->setNodeName(destName);
-            downstreamPort->setOutputString(mx::EMPTY_STRING);
-          }
-        }
-      }
-
-      // The processed node has been replaced, so remove it from the graph.
-      graphElem->removeNode(processNode->getName());
-    }
-  }
-}
-#endif
-
 void _SanitizeFilePath(std::string& path)
 {
   // The MDL SDK does not take raw OS paths. First, only forward-facing slashes are allowed.
@@ -767,18 +612,20 @@ namespace gtl
 
     _PatchOpenPbrBxdf(docCopy, m_customNodesDoc);
 
+    // NOTE: this optimization is currently disabled due to a subtle bug with multi-output
+    //       nodes in MaterialX (presumably it's an edge case in the flattening logic).
+#if 0
     // Flatten BXDFs & helper nodes so that we can patch individual standard nodes
     for (mx::NodeGraphPtr graph : docCopy->getNodeGraphs())
     {
       if (graph->getActiveSourceUri() == docCopy->getSourceUri())
       {
-#if MATERIALX_VERSION < 13904
-        _FlattenSubgraphs(graph);
-#else
+        // We need to flatten the graph in order to apply the following patching steps since
+        // they operate on nodes that can be part of BXDFs and helper node implementations.
         graph->flattenSubgraphs();
-#endif
       }
     }
+#endif
 
     _PatchSecondaryTexcoordIndices(docCopy);
 
