@@ -31,6 +31,8 @@ namespace gtl
   constexpr static const uint32_t CGPU_MAX_BUFFER_UPDATE_SIZE = 65535;
   constexpr static const uint32_t CGPU_MIN_UNIFORM_BUFFER_SIZE = 16384;
 
+  constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
+
   enum class CgpuBufferUsage
   {
     TransferSrc = 0x00000001,
@@ -517,6 +519,7 @@ namespace gtl
   );
 
   void cgpuCmdDispatch(
+    CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
     uint32_t dimX,
     uint32_t dimY,

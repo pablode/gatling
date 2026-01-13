@@ -409,9 +409,9 @@ void main()
                     1,                   // sbtRecordOffset (shadow test: use second hit group)
                     2,                   // sbtRecordStride
                     1,                   // missIndex (differs because of shadow test)
-                    shadowray_origin,     // ray origin
+                    shadowray_origin,    // ray origin
                     tMin,                // ray min range
-                    shadowray_dir,        // ray direction
+                    shadowray_dir,       // ray direction
                     tMax,                // ray max range
                     PAYLOAD_INDEX_SHADOW // payload
                 );

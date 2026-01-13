@@ -70,8 +70,6 @@ namespace gtl
                                                                             VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                                                                             VK_SHADER_STAGE_MISS_BIT_KHR;
 
-  constexpr static const char* CGPU_SHADER_ENTRY_POINT = "main";
-
   constexpr static const uint32_t CGPU_INITIAL_PHYSICAL_DEVICE_COUNT = 4;
 
   static const std::array<const char*, 14> CGPU_REQUIRED_EXTENSIONS = {
@@ -258,20 +256,23 @@ namespace gtl
   #define CGPU_INLINE
 #endif
 
-#define CGPU_RETURN_ERROR(msg)                      \
+#define CGPU_LOG_ERROR(msg)                         \
   do {                                              \
     GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); \
-    return false;                                   \
+    gbLogFlush();                                   \
   } while (false)
 
-#define CGPU_FATAL(msg)                             \
-  do {                                              \
-    GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); \
-    exit(EXIT_FAILURE);                             \
+#define CGPU_RETURN_ERROR(msg) \
+  do {                         \
+    CGPU_LOG_ERROR(msg);       \
+    return false;              \
   } while (false)
 
-#define CGPU_RETURN_ERROR_HARDCODED_LIMIT_REACHED   \
-  CGPU_RETURN_ERROR("hardcoded limit reached")
+#define CGPU_FATAL(msg)  \
+  do {                   \
+    CGPU_LOG_ERROR(msg); \
+    exit(EXIT_FAILURE);  \
+  } while (false)
 
 #define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)                            \
   CGPU_INLINE static bool cgpuResolve##RESOURCE_NAME(CgpuContext* ctx, HANDLE_TYPE handle, IRESOURCE_TYPE** idata) \
