@@ -1758,7 +1758,8 @@ cleanup:
         .hitGroupCount = (uint32_t)hitGroups.size(),
         .hitGroups = hitGroups.data(),
         .maxRayPayloadSize = maxRayPayloadSize,
-        .maxRayHitAttributeSize = maxRayHitAttributeSize
+        .maxRayHitAttributeSize = maxRayHitAttributeSize,
+        .payloadStride = 2
       }, &pipeline);
 
       cgpuCreateBindSets(s_ctx, pipeline, bindSets.data(), (uint32_t) bindSets.size());

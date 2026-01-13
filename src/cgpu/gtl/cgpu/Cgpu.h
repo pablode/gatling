@@ -194,6 +194,7 @@ namespace gtl
     const char* debugName = nullptr;
     uint32_t maxRayPayloadSize = 0;
     uint32_t maxRayHitAttributeSize = 0;
+    uint32_t payloadStride = 0;
   };
 
   struct CgpuBlasCreateInfo
