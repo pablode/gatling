@@ -2194,18 +2194,40 @@ namespace gtl
     pipeline->handle = handle;
   }
 
-  static bool cgpuCopyMemoryToBuffer(CgpuContext* ctx, const uint8_t* data, uint64_t size, CgpuBuffer dst)
+  // TODO: refactor, possibily move into user space
+  static bool cgpuCopyMemoryToBuffer(CgpuContext* ctx, const uint8_t* data, uint64_t size, CgpuBuffer dstBuffer)
   {
-    if (size > CGPU_MAX_BUFFER_UPDATE_SIZE)
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    CgpuIBuffer istagingBuffer;
+    if (!cgpuCreateIBuffer(idevice,
+                           CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
+                           CgpuMemoryProperties::HostVisible,
+                           size, 0,
+                           &istagingBuffer, "[SBT staging buffer]"))
     {
-      CGPU_RETURN_ERROR("buffer size too large!");
+      CGPU_RETURN_ERROR("failed to create AS buffer");
     }
+
+    memcpy(istagingBuffer.cpuPtr, data, size);
 
     CgpuCommandBuffer commandBuffer;
     cgpuCreateCommandBuffer(ctx, &commandBuffer);
 
     cgpuBeginCommandBuffer(ctx, commandBuffer);
-    cgpuCmdUpdateBuffer(ctx, commandBuffer, data, size, dst);
+
+    CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+
+    VkBufferCopy region = { 0, 0, size };
+    idevice->table.vkCmdCopyBuffer(
+      icommandBuffer->commandBuffer,
+      istagingBuffer.buffer,
+      idstBuffer->buffer,
+      1,
+      &region
+    );
+
     cgpuEndCommandBuffer(ctx, commandBuffer);
 
     CgpuSemaphore semaphore;
@@ -2219,6 +2241,8 @@ namespace gtl
 
     cgpuDestroySemaphore(ctx, semaphore);
     cgpuDestroyCommandBuffer(ctx, commandBuffer);
+
+    cgpuDestroyIBuffer(idevice, &istagingBuffer);
 
     return true;
   }
@@ -3307,26 +3331,6 @@ namespace gtl
 
       idevice->table.vkCmdPipelineBarrier2KHR(icommandBuffer->commandBuffer, &dependencyInfo);
     }
-  }
-
-  void cgpuCmdUpdateBuffer(CgpuContext* ctx,
-                           CgpuCommandBuffer commandBuffer,
-                           const uint8_t* data,
-                           uint64_t size,
-                           CgpuBuffer dstBuffer,
-                           uint64_t dstOffset)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-    CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
-    CgpuIDevice* idevice = &ctx->idevice;
-
-    idevice->table.vkCmdUpdateBuffer(
-      icommandBuffer->commandBuffer,
-      idstBuffer->buffer,
-      dstOffset,
-      size,
-      (const void*) data
-    );
   }
 
   void cgpuCmdCopyBuffer(CgpuContext* ctx,

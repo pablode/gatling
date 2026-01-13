@@ -129,18 +129,11 @@ fail:
       return true;
     }
 
+    // Use copy command for compression for large data regions
     if (m_hasSharedMem && size < BUFFER_STAGING_OPT_THRESHOLD)
     {
       auto ptr = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, dst);
       memcpy(&ptr[dstBaseOffset], src, size);
-      return true;
-    }
-    else if (!m_hasSharedMem && size <= CGPU_MAX_BUFFER_UPDATE_SIZE)
-    {
-      m_commandsPending = true;
-
-      cgpuCmdUpdateBuffer(m_ctx, m_commandBuffers[m_writeableHalf], src, size, dst, dstBaseOffset);
-
       return true;
     }
 

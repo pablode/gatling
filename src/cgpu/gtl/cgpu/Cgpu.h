@@ -491,15 +491,6 @@ namespace gtl
     const CgpuImageBinding* images
   );
 
-  void cgpuCmdUpdateBuffer(
-    CgpuContext* ctx,
-    CgpuCommandBuffer commandBuffer,
-    const uint8_t* data,
-    uint64_t size,
-    CgpuBuffer dstBuffer,
-    uint64_t dstOffset = 0
-  );
-
   void cgpuCmdCopyBuffer(
     CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,
