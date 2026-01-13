@@ -64,3 +64,6 @@
 [submodule "extern/xxHash"]
 	path = extern/xxHash
 	url = https://github.com/Cyan4973/xxHash.git
+[submodule "extern/metal-cpp"]
+	path = extern/metal-cpp
+	url = https://github.com/pablode/metal-cpp
