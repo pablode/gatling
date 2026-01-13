@@ -42,6 +42,7 @@ namespace gtl
     std::vector<CgpuShaderReflectionDescriptorSet> descriptorSets;
     uint32_t maxRayPayloadSize;
     uint32_t maxRayHitAttributeSize;
+    uint32_t payloadCount;
     uint32_t workgroupSize[3];
   };
 

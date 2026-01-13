@@ -109,6 +109,7 @@ namespace gtl
 
     reflection->maxRayPayloadSize = 0;
     reflection->maxRayHitAttributeSize = 0;
+    reflection->payloadCount = 0;
 
     for (const SpvReflectInterfaceVariable* interfaceVar : interfaceVars)
     {
@@ -121,6 +122,8 @@ namespace gtl
         {
           reflection->maxRayPayloadSize = size;
         }
+
+        reflection->payloadCount++;
       }
       else if (interfaceVar->storage_class == SpvStorageClassHitAttributeKHR)
       {
