@@ -235,7 +235,7 @@ namespace gtl
   {
     CgpuBuffer deviceMem;
     CgpuBuffer hostMem;
-    void* mappedHostMem;
+    void* mappedHostMem = nullptr;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t size = 0;
@@ -1946,6 +1946,46 @@ cleanup:
     GiScene* scene = params.scene;
     const GiRenderSettings& renderSettings = params.renderSettings;
 
+    // Allocate memory for render buffers
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      GiRenderBuffer* renderBuffer = binding.renderBuffer;
+
+      if (renderBuffer->deviceMem.handle)
+      {
+        continue;
+      }
+
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
+                              .size = renderBuffer->size,
+                              .debugName = "RenderBufferGpu"
+                            }, &renderBuffer->deviceMem))
+      {
+        GB_ERROR("failed to allocate render buffer");
+        return GiStatus::Error;
+      }
+
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::HostVisible |
+                                                  CgpuMemoryProperties::HostCached,
+                              .size = renderBuffer->size,
+                              .debugName = "RenderBufferCpu"
+                            }, &renderBuffer->hostMem))
+      {
+        GB_ERROR("failed to allocate render buffer");
+        cgpuDestroyBuffer(s_ctx, renderBuffer->deviceMem);
+        return GiStatus::Error;
+      }
+
+      renderBuffer->mappedHostMem = cgpuGetBufferCpuPtr(s_ctx, renderBuffer->hostMem);
+
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
+      s_resetSampleOffset = true;
+    }
+
     if (s_forceShaderCacheInvalid)
     {
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyShadersAll | GiSceneDirtyFlags::DirtyFramebuffer;
@@ -2887,49 +2927,25 @@ cleanup:
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format)
   {
     uint32_t stride = _GiRenderBufferFormatStride(format);
-    uint32_t bufferSize = width * height * stride;
-
-    GB_LOG("creating render buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
-
-    CgpuBuffer deviceMem;
-    if (!cgpuCreateBuffer(s_ctx, {
-                            .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
-                            .memoryProperties = CgpuMemoryProperties::DeviceLocal,
-                            .size = bufferSize,
-                            .debugName = "RenderBufferGpu"
-                          }, &deviceMem))
-    {
-      return nullptr;
-    }
-
-    CgpuBuffer hostMem;
-    if (!cgpuCreateBuffer(s_ctx, {
-                            .usage = CgpuBufferUsage::TransferDst,
-                            .memoryProperties = CgpuMemoryProperties::HostVisible |
-                                                CgpuMemoryProperties::HostCached,
-                            .size = bufferSize,
-                            .debugName = "RenderBufferCpu"
-                          }, &hostMem))
-    {
-      cgpuDestroyBuffer(s_ctx, deviceMem);
-      return nullptr;
-    }
-
-    void* mappedMem = cgpuGetBufferCpuPtr(s_ctx, hostMem);
+    uint32_t size = width * height * stride;
 
     return new GiRenderBuffer {
-      .deviceMem = deviceMem,
-      .hostMem = hostMem,
-      .mappedHostMem = mappedMem,
       .width = width,
-      .height = height
+      .height = height,
+      .size = size
     };
   }
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    s_deleteQueue->pushBack(renderBuffer->deviceMem);
-    s_deleteQueue->pushBack(renderBuffer->hostMem);
+    if (renderBuffer->deviceMem.handle)
+    {
+      s_deleteQueue->pushBack(renderBuffer->deviceMem);
+    }
+    if (renderBuffer->hostMem.handle)
+    {
+      s_deleteQueue->pushBack(renderBuffer->hostMem);
+    }
     delete renderBuffer;
   }
 
