@@ -165,3 +165,26 @@ target_include_directories(OffsetAllocator PUBLIC OffsetAllocator)
 #
 add_library(xxHash STATIC xxHash/xxhash.c)
 target_include_directories(xxHash PUBLIC xxHash)
+
+if (APPLE)
+  #
+  # metal-cpp
+  #
+  add_library(metal-cpp INTERFACE)
+  target_include_directories(metal-cpp INTERFACE metal-cpp/SingleHeader)
+
+  #
+  # SPIRV-Cross
+  #
+  set(SPIRV_CROSS_STATIC ON)
+  set(SPIRV_CROSS_CLI OFF)
+  set(SPIRV_CROSS_ENABLE_TESTS OFF)
+  set(SPIRV_CROSS_ENABLE_GLSL ON) # "must enable GLSL support to enable MSL support"
+  set(SPIRV_CROSS_ENABLE_HLSL OFF)
+  set(SPIRV_CROSS_ENABLE_MSL ON)
+  set(SPIRV_CROSS_ENABLE_CPP OFF)
+  set(SPIRV_CROSS_ENABLE_REFLECT OFF)
+  set(SPIRV_CROSS_SKIP_INSTALL ON)
+  set(SPIRV_CROSS_FORCE_PIC ON)
+  add_subdirectory(SPIRV-Cross)
+endif()
