@@ -47,4 +47,13 @@ find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
 find_package(MDL REQUIRED)
 find_package(OpenMP)
 
+if(GTL_VERBOSE)
+  add_compile_definitions(GTL_VERBOSE=1)
+endif()
+
+math(EXPR MATERIALX_VERSION "${MaterialX_VERSION_MAJOR} * 100 * 100 +
+                             ${MaterialX_VERSION_MINOR} * 100 +
+                             ${MaterialX_VERSION_PATCH}")
+add_compile_definitions(MATERIALX_VERSION=${MATERIALX_VERSION})
+
 add_subdirectory(src)

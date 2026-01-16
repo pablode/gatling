@@ -56,7 +56,7 @@ target_compile_definitions(
     # Required for PLUG_THIS_PLUGIN macro
     MFB_PACKAGE_NAME=hdGatling
   PRIVATE
-    GI_LICENSE_FILE_NAME="LICENSE"
+    HDGATLING_LICENSE_FILE_NAME="LICENSE"
     # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
     "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
 )
@@ -66,7 +66,7 @@ if (APPLE)
     hdGatling
     PRIVATE
       # TODO: this feature causes artifacts on Metal which need to be investigated
-      GI_DISABLE_VOLUME_SAMPLING=1
+      HDGATLING_DISABLE_VOLUME_SAMPLING=1
   )
 endif()
 

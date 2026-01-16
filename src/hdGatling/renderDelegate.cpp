@@ -100,7 +100,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Light intensity multiplier", HdGatlingSettingsTokens->lightIntensityMultiplier, VtValue{1.0f} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->nextEventEstimation, VtValue{false} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Clipping planes", HdGatlingSettingsTokens->clippingPlanes, VtValue{false} });
-#ifndef GI_DISABLE_VOLUME_SAMPLING
+#ifndef HDGATLING_DISABLE_VOLUME_SAMPLING
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Medium stack size", HdGatlingSettingsTokens->mediumStackSize, VtValue{0} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max volume walk length", HdGatlingSettingsTokens->maxVolumeWalkLength, VtValue{7} });
 #endif
@@ -171,7 +171,7 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, [[maybe_unus
 {
   if (command == HdGatlingCommandTokens->printLicenses)
   {
-    std::string licenseFilePath = TfStringCatPaths(_resourcePath, GI_LICENSE_FILE_NAME);
+    std::string licenseFilePath = TfStringCatPaths(_resourcePath, HDGATLING_LICENSE_FILE_NAME);
     std::string errorMessage;
 
     ArchConstFileMapping mapping = ArchMapFileReadOnly(licenseFilePath, &errorMessage);

@@ -46,22 +46,5 @@ target_link_libraries(
     MaterialXGenMdl
 )
 
-math(EXPR MATERIALX_VERSION "${MaterialX_VERSION_MAJOR} * 100 * 100 +
-                             ${MaterialX_VERSION_MINOR} * 100 +
-                             ${MaterialX_VERSION_PATCH}")
-target_compile_definitions(
-  mc
-  PRIVATE
-    MATERIALX_VERSION=${MATERIALX_VERSION}
-)
-
-if(DEFINED PXR_VERSION)
-  target_compile_definitions(
-    mc
-    PRIVATE
-      PXR_VERSION=${PXR_VERSION}
-  )
-endif()
-
 # Required since library is linked into hdGatling DSO
 set_target_properties(mc PROPERTIES POSITION_INDEPENDENT_CODE ON)
