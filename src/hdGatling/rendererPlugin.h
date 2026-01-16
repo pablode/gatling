@@ -39,7 +39,7 @@ public:
 
 #if PXR_VERSION >= 2511
   bool IsSupported(const HdRendererCreateArgs& createArgs,
-                   std::string* reasonWhyNot = nullptr) const;
+                   std::string* reasonWhyNot = nullptr) const override;
 #else
   bool IsSupported(bool gpuEnabled) const override;
 #endif
