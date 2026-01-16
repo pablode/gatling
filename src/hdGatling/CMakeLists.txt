@@ -61,6 +61,15 @@ target_compile_definitions(
     "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
 )
 
+if (APPLE)
+  target_compile_definitions(
+    hdGatling
+    PRIVATE
+      # TODO: this feature causes artifacts on Metal which need to be investigated
+      GI_DISABLE_VOLUME_SAMPLING=1
+  )
+endif()
+
 # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
 if(MSVC_VERSION GREATER_EQUAL 1920)
   target_compile_options(hdGatling PRIVATE "/Zc:inline-")
