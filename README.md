@@ -17,11 +17,9 @@
 
 This is my toy path tracer I work on in my free time.
 
-It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform\*, GPU-accelerated, and implements the [MaterialX](https://www.materialx.org/index.html), [NVIDIA MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) material standards.
+It is exposed as an [OpenUSD](https://graphics.pixar.com/usd/release/intro.html) Hydra render delegate that implements the [MaterialX](https://www.materialx.org/index.html), [NVIDIA MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) material standards. As a result, it supports complex BSDFs like [OpenPBR](https://academysoftwarefoundation.github.io/OpenPBR/).
 
-Complex BSDFs like [OpenPBR](https://academysoftwarefoundation.github.io/OpenPBR/), Autodesk's Standard Surface, and the glTF shading model are supported using MaterialX and its MDL code generation backend.  The MDL SDK is used to generate evaluation and importance sampling functions as GLSL code, which is compiled to SPIR-V and executed with Vulkan.
-
-\* Hardware ray tracing is required. macOS will be supported [in the future](https://github.com/pablode/gatling/tree/wip/cgpu-metal).
+Gatling runs on Vulkan ray tracing and Apple M3+ processors. Tested in CI: ![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white) ![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black) ![macOS](https://img.shields.io/badge/macOS-8A2BE2?logo=apple)
 
 ### Build
 
