@@ -22,6 +22,7 @@ jobs:
     with:
       image: ${{ matrix.image }}
       build-config: Release
+      mdl-download-url: ${{ matrix.mdl-download-url }}
       usd-download-url: ${{ matrix.usd-download-url }}
       usd-install-path: ${{ matrix.usd-install-path }}
       upload-install-artifacts: true
