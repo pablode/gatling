@@ -54,6 +54,8 @@ namespace gtl
 
     quill::BackendOptions options;
     options.thread_name = "GbLog";
+    options.check_backend_singleton_instance = false;
+
     quill::Backend::start(options);
   }
 
