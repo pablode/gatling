@@ -1558,7 +1558,7 @@ namespace gtl
   {
     CgpuIDevice* idevice = &ctx->idevice;
 
-    ishader->stageFlags = (VkShaderStageFlagBits)createInfo.stageFlags;
+    ishader->stageFlags = (VkShaderStageFlagBits) createInfo.stageFlags;
 
     if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
     {
@@ -1605,7 +1605,7 @@ namespace gtl
     }
     else
     {
-      cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, CGPU_RT_PIPELINE_ACCESS_FLAGS,
+      cgpuCreateRtPipelineLibrary(idevice, moduleCreateInfo, ishader, ishader->stageFlags,
                                   createInfo.maxRayPayloadSize, createInfo.maxRayHitAttributeSize);
     }
   }
