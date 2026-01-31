@@ -177,6 +177,9 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
     NormalsAov[pixelIndex] = ClearValuesF[AOV_ID_NORMAL].rgb;
 #endif
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+    AlbedoAov[pixelIndex] = ClearValuesF[AOV_ID_ALBEDO].rgb;
+#endif
 }
 
 void main()

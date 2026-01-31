@@ -259,6 +259,34 @@ void main()
 #endif
         NormalsAov[pixelIndex] = mix(prevNormal, posNormal, ubo.invSampleCount);
 #endif
+
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+        Bsdf_auxiliary_data bsdf_aux_data;
+        bsdf_aux_data.ior1 = iorCurrent;
+        bsdf_aux_data.ior2 = iorOther;
+        bsdf_aux_data.k1 = -gl_WorldRayDirectionEXT;
+
+#if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
+        if (!isDoubleSided && thinWalled && !isFrontFace)
+        {
+            mdl_backface_bsdf_scattering_auxiliary(bsdf_aux_data, shading_state);
+        }
+        else
+#endif
+        {
+            mdl_bsdf_scattering_auxiliary(bsdf_aux_data, shading_state);
+        }
+
+        vec3 albedo = bsdf_aux_data.albedo_diffuse + bsdf_aux_data.albedo_glossy;
+        vec3 prevAlbedo = albedo;
+#ifdef PROGRESSIVE_ACCUMULATION
+        if (ubo.sampleOffset > 0)
+        {
+            prevAlbedo = AlbedoAov[pixelIndex];
+        }
+#endif
+        AlbedoAov[pixelIndex] = mix(prevAlbedo, albedo, ubo.invSampleCount);
+#endif
     }
 
     /* 5. Add Emission */

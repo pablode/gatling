@@ -1396,6 +1396,9 @@ cleanup:
       .progressiveAccumulation = renderSettings.progressiveAccumulation
     };
 
+    bool needsAuxOutput = bool(aovMask & (1 << int(GiAovId::Albedo)));
+    s_shaderGen->setAuxiliaryOutputEnabled(needsAuxOutput);
+
     // Create per-material hit shaders.
     {
       // 1. Generate GLSL from MDL in parallel
@@ -2267,7 +2270,8 @@ cleanup:
         rp::BINDING_INDEX_AOV_DEPTH,
         rp::BINDING_INDEX_AOV_FACE_ID,
         rp::BINDING_INDEX_AOV_INSTANCE_ID,
-        rp::BINDING_INDEX_AOV_DOUBLE_SIDED
+        rp::BINDING_INDEX_AOV_DOUBLE_SIDED,
+        rp::BINDING_INDEX_AOV_ALBEDO
       };
 
       for (const GiAovBinding& binding : params.aovBindings)

@@ -51,6 +51,7 @@ namespace gtl
     FaceId,
     InstanceId,
     DoubleSided,
+    Albedo,
     COUNT
   };
 

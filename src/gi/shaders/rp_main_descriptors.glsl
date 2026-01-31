@@ -68,6 +68,9 @@ layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) writeonly buffer Instanc
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
 layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, std430) writeonly buffer DoubleSidedBuffer { vec3 DoubleSidedAov[]; };
 #endif
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+layout(binding = BINDING_INDEX_AOV_ALBEDO, std430) buffer AlbedoBuffer { vec3 AlbedoAov[]; };
+#endif
 
 layout(set = 1, binding = BINDING_INDEX_TEXTURES) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
 

@@ -40,6 +40,8 @@ namespace gtl
   public:
     bool init(std::string_view shaderPath, McRuntime& runtime);
 
+    void setAuxiliaryOutputEnabled(bool enabled);
+
   public:
     struct MaterialGenInfo
     {

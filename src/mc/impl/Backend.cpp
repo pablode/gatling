@@ -67,6 +67,11 @@ namespace gtl
       m_context->set_option("resolve_resources", false);
     }
 
+    void setAuxiliaryOutputEnabled(bool enabled)
+    {
+      m_backend->set_option("enable_auxiliary", enabled ? "on" : "off");
+    }
+
     bool generateGlslWithDfs(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                              std::string& glslSrc,
@@ -261,6 +266,11 @@ namespace gtl
 
     m_impl = std::make_shared<_Impl>(mdlRuntime, backend);
     return true;
+  }
+
+  void McBackend::setAuxiliaryOutputEnabled(bool enabled)
+  {
+    m_impl->setAuxiliaryOutputEnabled(enabled);
   }
 
   bool McBackend::genGlsl(const McMdlMaterial& material, McDfMap dfMap, McGlslGenResult& result)

@@ -49,6 +49,11 @@ namespace gtl
     return true;
   }
 
+  void GiGlslShaderGen::setAuxiliaryOutputEnabled(bool enabled)
+  {
+    m_mcBackend->setAuxiliaryOutputEnabled(enabled);
+  }
+
   void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, const GiGlslShaderGen::CommonShaderParams& params)
   {
 #if defined(NDEBUG)

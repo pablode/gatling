@@ -53,6 +53,7 @@ namespace
     { HdAovTokens->elementId,                GiAovId::FaceId       },
     { HdAovTokens->instanceId,               GiAovId::InstanceId   },
     { HdGatlingAovTokens->debugDoubleSided,  GiAovId::DoubleSided  },
+    { HdGatlingAovTokens->albedo,            GiAovId::Albedo       },
   };
 
   std::vector<GiAovBinding> _PrepareAovBindings(const HdRenderPassAovBindingVector& aovBindings)
