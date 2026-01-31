@@ -157,68 +157,6 @@ void main()
     thinWalled = mdl_thin_walled(shading_state);
 #endif
 
-    if (bounce == 0)
-    {
-#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0 || (AOV_MASK & AOV_BIT_FACE_ID) != 0
-      IndexBuffer indices = IndexBuffer(payload.bufferAddress);
-      BlasPayloadBufferPreamble preamble = indices.preamble;
-#endif
-      uint imageWidth = ubo.imageDims & 0xFFFFu;
-      uint pixelIndex = rayPayload.pixelIndex;
-#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-#ifndef HAS_CUTOUT_TRANSPARENCY
-      OpacityAov[pixelIndex] = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap set in any-hit shader
-#else
-      // Payload fields have been set in any-hit shader.
-#endif
-#endif
-#if (AOV_MASK & AOV_BIT_NORMAL) != 0
-      NormalsAov[pixelIndex] = (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
-      TangentsAov[pixelIndex] = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
-      BitangentsAov[pixelIndex] = (shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
-      BarycentricsAov[pixelIndex] = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
-      TexcoordsAov[pixelIndex] = shading_state.text_coords[0];
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
-      ThinWalledAov[pixelIndex] = thinWalled ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-#endif
-#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
-      int objectId = preamble.objectId;
-      ObjectIdAov[pixelIndex] = objectId;
-#endif
-#if (AOV_MASK & AOV_BIT_DEPTH) != 0
-      vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked);
-      float logDepth = 2.0 * log(gl_HitTEXT / clipRange.x) / log(clipRange.y / clipRange.x) - 1.0;
-      DepthAov[pixelIndex] = logDepth;
-#endif
-#if (AOV_MASK & AOV_BIT_FACE_ID) != 0
-      int faceIdStride = int((preamble.faceIdsInfo & FACE_ID_STRIDE_MASK) >> FACE_ID_STRIDE_OFFSET);
-      int invFaceIdStride = 4 / faceIdStride;
-
-      uint faceIdsOffset = preamble.faceIdsInfo & FACE_ID_MASK;
-      RawIntBuffer faceIdsBuffer = RawIntBuffer(payload.bufferAddress + faceIdsOffset);
-      int encodedFaceId = faceIdsBuffer.data[gl_PrimitiveID / invFaceIdStride];
-
-      encodedFaceId >>= ((gl_PrimitiveID % invFaceIdStride) * 8);
-      FaceIdAov[pixelIndex] = encodedFaceId & (faceIdStride * 8 - 1);
-#endif
-#if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
-      int instanceId = InstanceIds[gl_InstanceID];
-      InstanceIdAov[pixelIndex] = instanceId;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
-      DoubleSidedAov[pixelIndex] = isDoubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-#endif
-    }
-
     /* 3. Apply volume attenuation */
     vec3 prevMediumIor = vec3(1.0);
     vec3 nextMediumIor = vec3(1.0);
@@ -250,7 +188,80 @@ void main()
     const vec3 iorCurrent = (isFrontFace || thinWalled) ? prevMediumIor : vec3(BSDF_USE_MATERIAL_IOR);
     const vec3 iorOther = (isFrontFace || thinWalled) ? vec3(BSDF_USE_MATERIAL_IOR) : nextMediumIor;
 
-    /* 4. Add Emission */
+    /* 4. Output auxialiary AOVs */
+    if (bounce == 0)
+    {
+#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0 || (AOV_MASK & AOV_BIT_FACE_ID) != 0
+        IndexBuffer indices = IndexBuffer(payload.bufferAddress);
+        BlasPayloadBufferPreamble preamble = indices.preamble;
+#endif
+        uint imageWidth = ubo.imageDims & 0xFFFFu;
+        uint pixelIndex = rayPayload.pixelIndex;
+#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
+#ifndef HAS_CUTOUT_TRANSPARENCY
+        OpacityAov[pixelIndex] = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap set in any-hit shader
+#else
+        // Payload fields have been set in any-hit shader.
+#endif
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
+        TangentsAov[pixelIndex] = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
+        BitangentsAov[pixelIndex] = (shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
+        BarycentricsAov[pixelIndex] = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
+        TexcoordsAov[pixelIndex] = shading_state.text_coords[0];
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
+        ThinWalledAov[pixelIndex] = thinWalled ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+#endif
+#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
+        int objectId = preamble.objectId;
+        ObjectIdAov[pixelIndex] = objectId;
+#endif
+#if (AOV_MASK & AOV_BIT_DEPTH) != 0
+        vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked);
+        float logDepth = 2.0 * log(gl_HitTEXT / clipRange.x) / log(clipRange.y / clipRange.x) - 1.0;
+        DepthAov[pixelIndex] = logDepth;
+#endif
+#if (AOV_MASK & AOV_BIT_FACE_ID) != 0
+        int faceIdStride = int((preamble.faceIdsInfo & FACE_ID_STRIDE_MASK) >> FACE_ID_STRIDE_OFFSET);
+        int invFaceIdStride = 4 / faceIdStride;
+
+        uint faceIdsOffset = preamble.faceIdsInfo & FACE_ID_MASK;
+        RawIntBuffer faceIdsBuffer = RawIntBuffer(payload.bufferAddress + faceIdsOffset);
+        int encodedFaceId = faceIdsBuffer.data[gl_PrimitiveID / invFaceIdStride];
+
+        encodedFaceId >>= ((gl_PrimitiveID % invFaceIdStride) * 8);
+        FaceIdAov[pixelIndex] = encodedFaceId & (faceIdStride * 8 - 1);
+#endif
+#if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
+        int instanceId = InstanceIds[gl_InstanceID];
+        InstanceIdAov[pixelIndex] = instanceId;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
+        DoubleSidedAov[pixelIndex] = isDoubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+#endif
+
+        // Accumulating AOVs
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+        vec3 posNormal = (normal + vec3(1.0)) * 0.5;
+        vec3 prevNormal = posNormal;
+#ifdef PROGRESSIVE_ACCUMULATION
+        if (ubo.sampleOffset > 0)
+        {
+            prevNormal = NormalsAov[pixelIndex];
+        }
+#endif
+        NormalsAov[pixelIndex] = mix(prevNormal, posNormal, ubo.invSampleCount);
+#endif
+    }
+
+    /* 5. Add Emission */
 #ifdef IS_EMISSIVE
     {
         if (isDoubleSided)
@@ -318,12 +329,12 @@ void main()
         mdl_bsdf_scattering_init(shading_state);
     }
 
-    /* 5. BSDF importance sampling. */
+    /* 6. BSDF importance sampling. */
     uint eventType;
     {
         Bsdf_sample_data bsdf_sample_data;
-        bsdf_sample_data.ior1 = vec3(iorCurrent);
-        bsdf_sample_data.ior2 = vec3(iorOther);
+        bsdf_sample_data.ior1 = iorCurrent;
+        bsdf_sample_data.ior2 = iorOther;
         bsdf_sample_data.k1 = -gl_WorldRayDirectionEXT;
 #ifdef RAND_4D
         bsdf_sample_data.xi = rng4d_next4f(rayPayload.rng_state);
@@ -351,7 +362,7 @@ void main()
 
     bool isTransmissionEvent = (eventType & BSDF_EVENT_TRANSMISSION) != 0;
 
-    /* 6. NEE light sampling */
+    /* 7. NEE light sampling */
 #ifdef NEXT_EVENT_ESTIMATION
     if ((eventType & (BSDF_EVENT_DIFFUSE | BSDF_EVENT_GLOSSY)) != 0)
     {
@@ -379,8 +390,8 @@ void main()
         if (neeValid)
         {
             Bsdf_evaluate_data bsdf_eval_data;
-            bsdf_eval_data.ior1 = vec3(iorCurrent);
-            bsdf_eval_data.ior2 = vec3(iorOther);
+            bsdf_eval_data.ior1 = iorCurrent;
+            bsdf_eval_data.ior2 = iorOther;
             bsdf_eval_data.k1 = -gl_WorldRayDirectionEXT;
             bsdf_eval_data.k2 = dirToLight;
             mdl_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);

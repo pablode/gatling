@@ -55,6 +55,7 @@ namespace gtl
       uint32_t aovMask;
       bool debugPrintf;
       uint32_t mediumStackSize;
+      bool progressiveAccumulation;
     };
 
     struct RaygenShaderParams
@@ -66,7 +67,6 @@ namespace gtl
       bool jitteredSampling;
       uint32_t materialCount;
       bool nextEventEstimation;
-      bool progressiveAccumulation;
       bool reorderInvocations;
     };
 

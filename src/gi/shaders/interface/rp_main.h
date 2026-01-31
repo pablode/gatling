@@ -43,7 +43,8 @@ struct UniformData
   GI_FLOAT cameraVFoV;
   GI_UINT  sampleOffset;
   GI_FLOAT lensRadius;
-  GI_UINT  sampleCount;
+  GI_UINT  spp;
+  GI_FLOAT invSampleCount;
   GI_FLOAT maxSampleValue;
   GI_UINT  maxBouncesAndRrBounceOffset;
   GI_FLOAT rrInvMinTermProb;

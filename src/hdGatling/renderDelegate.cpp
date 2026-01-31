@@ -230,13 +230,17 @@ HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& 
   }
   else if (name == HdAovTokens->depth)
   {
-    return HdAovDescriptor(HdFormatFloat32, true, VtValue(1.0f));
+    return HdAovDescriptor(HdFormatFloat32, false, VtValue(1.0f));
   }
   else if (name == HdAovTokens->primId ||
            name == HdAovTokens->elementId ||
            name == HdAovTokens->instanceId)
   {
-    return HdAovDescriptor(HdFormatInt32, true, VtValue(-1));
+    return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
+  }
+  else if (name == HdAovTokens->normal)
+  {
+    return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(GfVec4f(0.5f)));
   }
 
   return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(GfVec4f(0.0f)));

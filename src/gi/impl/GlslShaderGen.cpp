@@ -60,6 +60,10 @@ namespace gtl
       stitcher.appendDefine("DEBUG_PRINTF");
     }
     stitcher.appendDefine("MEDIUM_STACK_SIZE", (int32_t) params.mediumStackSize);
+    if (params.progressiveAccumulation)
+    {
+      stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
+    }
   }
 
   bool GiGlslShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)
@@ -98,10 +102,6 @@ namespace gtl
     if (params.nextEventEstimation)
     {
       stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
-    }
-    if (params.progressiveAccumulation)
-    {
-      stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
     }
     if (params.clippingPlanes)
     {

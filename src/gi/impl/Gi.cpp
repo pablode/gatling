@@ -1392,7 +1392,8 @@ cleanup:
 #else
       .debugPrintf = false,
 #endif
-      .mediumStackSize = renderSettings.mediumStackSize
+      .mediumStackSize = renderSettings.mediumStackSize,
+      .progressiveAccumulation = renderSettings.progressiveAccumulation
     };
 
     // Create per-material hit shaders.
@@ -1670,7 +1671,6 @@ cleanup:
         .jitteredSampling = renderSettings.jitteredSampling,
         .materialCount = uint32_t(materials.size()),
         .nextEventEstimation = renderSettings.nextEventEstimation,
-        .progressiveAccumulation = renderSettings.progressiveAccumulation,
         .reorderInvocations = s_ctxFeatures.rayTracingInvocationReorder
       };
 
@@ -1924,14 +1924,14 @@ cleanup:
         ra.depthOfField != rb.depthOfField ||
         ra.filterImportanceSampling != rb.filterImportanceSampling ||
         ra.jitteredSampling != rb.jitteredSampling ||
-        ra.maxVolumeWalkLength != rb.maxVolumeWalkLength ||
-        ra.progressiveAccumulation != rb.progressiveAccumulation)
+        ra.maxVolumeWalkLength != rb.maxVolumeWalkLength)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersRgen;
     }
 
     if (ra.mediumStackSize != rb.mediumStackSize ||
-        ra.nextEventEstimation != rb.nextEventEstimation)
+        ra.nextEventEstimation != rb.nextEventEstimation ||
+        ra.progressiveAccumulation != rb.progressiveAccumulation)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersAll;
     }
@@ -2362,7 +2362,8 @@ cleanup:
         .cameraVFoV = params.camera.vfov,
         .sampleOffset = scene->sampleOffset,
         .lensRadius = lensRadius,
-        .sampleCount = renderSettings.spp,
+        .spp = renderSettings.spp,
+        .invSampleCount = 1.0f / float(scene->sampleOffset + renderSettings.spp),
         .maxSampleValue = renderSettings.maxSampleValue,
         .maxBouncesAndRrBounceOffset = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
         .rrInvMinTermProb = renderSettings.rrInvMinTermProb,

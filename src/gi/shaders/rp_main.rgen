@@ -131,15 +131,6 @@ vec2 fisGauss(vec2 xi)
 
 void clearAovs(uint pixelIndex)
 {
-#if (AOV_MASK & AOV_BIT_COLOR) != 0
-    if (ubo.sampleOffset == 0)
-    {
-        ColorAov[pixelIndex] = ClearValuesF[AOV_ID_COLOR];
-    }
-#endif
-#if (AOV_MASK & AOV_BIT_NORMAL) != 0
-    NormalsAov[pixelIndex] = ClearValuesF[AOV_ID_NORMAL].rgb;
-#endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
     BarycentricsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BARYCENTRICS].rgb;
 #endif
@@ -173,6 +164,19 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
     DoubleSidedAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_DOUBLE_SIDED].rgb;
 #endif
+
+    // AOVs that converge over time.
+    if (ubo.sampleOffset != 0)
+    {
+        return;
+    }
+
+#if (AOV_MASK & AOV_BIT_COLOR) != 0
+    ColorAov[pixelIndex] = ClearValuesF[AOV_ID_COLOR];
+#endif
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+    NormalsAov[pixelIndex] = ClearValuesF[AOV_ID_NORMAL].rgb;
+#endif
 }
 
 void main()
@@ -202,10 +206,10 @@ void main()
     vec3 C = ubo.cameraPosition + ubo.cameraForward * d;
     vec3 L = C - camera_right * W * 0.5 - ubo.cameraUp * H * 0.5;
 
-    float inv_sample_count = 1.0 / float(ubo.sampleCount);
+    float invSpp = 1.0 / float(ubo.spp);
 
     vec3 pixel_color = vec3(0.0, 0.0, 0.0);
-    for (uint s = 0; s < ubo.sampleCount; ++s)
+    for (uint s = 0; s < ubo.spp; ++s)
     {
         uint sampleIndex = ubo.sampleOffset + s;
 #ifdef RAND_4D
@@ -488,7 +492,7 @@ void main()
 
         vec3 sample_color = max(vec3(0.0), radiance);
 
-        pixel_color += sample_color * inv_sample_count;
+        pixel_color += sample_color * invSpp;
     }
 
 #if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
@@ -497,19 +501,18 @@ void main()
 #endif
 
 #if (AOV_MASK & AOV_BIT_COLOR) != 0
-
+    vec3 prevColor = pixel_color;
 #ifdef PROGRESSIVE_ACCUMULATION
     if (ubo.sampleOffset > 0)
     {
-      float inv_total_sample_count = 1.0 / float(ubo.sampleOffset + ubo.sampleCount);
-
-      float weight_old = float(ubo.sampleOffset) * inv_total_sample_count;
-      float weight_new = float(ubo.sampleCount) * inv_total_sample_count;
-
-      pixel_color = weight_old * ColorAov[pixelIndex].rgb + weight_new * pixel_color;
+        prevColor = ColorAov[pixelIndex].rgb;
     }
 #endif
+    ColorAov[pixelIndex] = vec4(mix(prevColor, pixel_color, ubo.invSampleCount), 1.0);
+#endif
 
-    ColorAov[pixelIndex] = vec4(pixel_color, 1.0);
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+    vec3 normal = (NormalsAov[pixelIndex] * 2.0) - 1.0;
+    NormalsAov[pixelIndex] = (normalize(normal) + 1.0) * 0.5;
 #endif
 }

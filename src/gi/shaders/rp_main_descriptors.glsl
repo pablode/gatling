@@ -24,7 +24,7 @@ layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_I, std430) readonly buffer Clear
 layout(binding = BINDING_INDEX_AOV_COLOR, std430) buffer Framebuffer { vec4 ColorAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
-layout(binding = BINDING_INDEX_AOV_NORMAL, std430) writeonly buffer NormalBuffer { vec3 NormalsAov[]; };
+layout(binding = BINDING_INDEX_AOV_NORMAL, std430) buffer NormalBuffer { vec3 NormalsAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_NEE) != 0
 layout(binding = BINDING_INDEX_AOV_NEE, std430) writeonly writeonly buffer NeeBuffer { vec3 NeeAov[]; };
