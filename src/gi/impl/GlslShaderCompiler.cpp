@@ -139,6 +139,7 @@ namespace gtl
     bool success = shader.parse(resourceLimits, defaultVersion, forwardCompatible, messages, *m_fileIncluder);
     if (!success)
     {
+      GB_LOG("{}", source);
       const char* msgDesc = "failed to compile shader";
 #ifndef NDEBUG
       GB_ERROR("{}: {} ({})", msgDesc, shader.getInfoLog(), shader.getInfoDebugLog());
