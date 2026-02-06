@@ -22,42 +22,29 @@
 
 namespace gtl
 {
-  GgpuSyncBuffer::GgpuSyncBuffer(CgpuDevice device,
+  GgpuSyncBuffer::GgpuSyncBuffer(CgpuContext* ctx,
                                  GgpuStager& stager,
-                                 GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                                 GgpuDeleteQueue& deleteQueue,
                                  uint64_t elementSize,
-                                 UpdateStrategy updateStrategy,
-                                 CgpuBufferUsageFlags bufferUsage)
-    : m_device(device)
+                                 CgpuBufferUsage bufferUsage)
+    : m_ctx(ctx)
     , m_stager(stager)
     , m_elementSize(elementSize)
-    , m_updateStrategy(updateStrategy)
-    , m_deviceBuffer(m_device,
-                     delayedResourceDestroyer,
-                     bufferUsage | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                     CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL)
-    , m_hostBuffer(m_device,
-                   delayedResourceDestroyer,
-                   CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-                   CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_COHERENT |
-                     (updateStrategy == UpdateStrategy::PersistentMapping ? CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL : 0))
+    , m_deviceBuffer(m_ctx,
+                     deleteQueue,
+                     bufferUsage | CgpuBufferUsage::TransferDst,
+                     CgpuMemoryProperties::DeviceLocal)
   {
-
   }
 
   GgpuSyncBuffer::~GgpuSyncBuffer()
   {
-    if (m_mappedHostMem)
-    {
-      cgpuUnmapBuffer(m_device, m_hostBuffer.buffer());
-      m_mappedHostMem = nullptr;
-    }
   }
 
   uint8_t* GgpuSyncBuffer::read(uint64_t byteOffset, uint64_t byteSize)
   {
     assert((byteOffset + byteSize) <= m_size);
-    return &m_mappedHostMem[byteOffset];
+    return &m_hostMem[byteOffset];
   }
 
   uint8_t* GgpuSyncBuffer::write(uint64_t byteOffset, uint64_t byteSize)
@@ -66,13 +53,12 @@ namespace gtl
     assert(rangeEnd <= m_size);
     m_dirtyRangeBegin = std::min(byteOffset, m_dirtyRangeBegin);
     m_dirtyRangeEnd = std::max(rangeEnd, m_dirtyRangeEnd);
-    return &m_mappedHostMem[byteOffset];
+    return &m_hostMem[byteOffset];
   }
 
   CgpuBuffer GgpuSyncBuffer::buffer() const
   {
-    return m_updateStrategy == UpdateStrategy::PersistentMapping ?
-      m_hostBuffer.buffer() : m_deviceBuffer.buffer();
+    return m_deviceBuffer.buffer();
   }
 
   uint64_t GgpuSyncBuffer::byteSize() const
@@ -80,7 +66,7 @@ namespace gtl
     return m_size;
   }
 
-  bool GgpuSyncBuffer::resize(CgpuDevice device, CgpuCommandBuffer commandBuffer, uint64_t newSize)
+  bool GgpuSyncBuffer::resize(CgpuContext* ctx, CgpuCommandBuffer commandBuffer, uint64_t newSize)
   {
     if (newSize == m_size)
     {
@@ -88,32 +74,22 @@ namespace gtl
       return true;
     }
 
-    // Unmap buffer before resize. New buffer is mapped later.
-    if (m_mappedHostMem)
-    {
-      cgpuUnmapBuffer(device, m_hostBuffer.buffer());
-      m_mappedHostMem = nullptr;
-    }
-
     m_size = newSize;
 
     // Reset buffers if new size is 0.
     if (newSize == 0)
     {
-      m_hostBuffer.resize(0, commandBuffer);
+      m_hostMem.reset();
       m_deviceBuffer.resize(0, commandBuffer);
       return true;
     }
 
     // Resize buffers.
-    if (m_updateStrategy == UpdateStrategy::OptimalStaging)
-    {
-      m_deviceBuffer.resize(newSize, commandBuffer);
-    }
+    m_deviceBuffer.resize(newSize, commandBuffer);
 
-    m_hostBuffer.resize(newSize, commandBuffer);
+    m_hostMem = std::make_unique<uint8_t[]>(newSize);
 
-    return cgpuMapBuffer(device, m_hostBuffer.buffer(), (void**) &m_mappedHostMem);
+    return true;
   }
 
   bool GgpuSyncBuffer::commitChanges()
@@ -130,11 +106,6 @@ namespace gtl
       return false;
     }
 
-    if (m_updateStrategy == UpdateStrategy::PersistentMapping)
-    {
-      return true;
-    }
-
     // Vulkan spec conformance: offset and size must be multiples of 4.
     m_dirtyRangeBegin = (m_dirtyRangeBegin < 4) ? 0 : (m_dirtyRangeBegin / 4) * 4;
     m_dirtyRangeEnd = (m_dirtyRangeEnd + 3) / 4 * 4;
@@ -147,7 +118,7 @@ namespace gtl
       return true;
     }
 
-    if (!m_stager.stageToBuffer(&m_mappedHostMem[m_dirtyRangeBegin],
+    if (!m_stager.stageToBuffer(&m_hostMem[m_dirtyRangeBegin],
                                 commitSize,
                                 m_deviceBuffer.buffer(),
                                 m_dirtyRangeBegin))

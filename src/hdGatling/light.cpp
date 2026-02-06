@@ -366,7 +366,8 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
   std::string path = assetPath.GetResolvedPath();
   if (path.empty())
   {
-    TF_RUNTIME_ERROR("Unable to resolve asset path!");
+    // Texture file is missing
+    TF_WARN("Unable to resolve asset path \"%s\"", assetPath.GetAssetPath().c_str());
     return;
   }
 

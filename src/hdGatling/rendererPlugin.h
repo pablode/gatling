@@ -37,10 +37,11 @@ public:
 
   void DeleteRenderDelegate(HdRenderDelegate* renderDelegate) override;
 
-#if PXR_VERSION >= 2302
-  bool IsSupported(bool gpuEnabled) const override;
+#if PXR_VERSION >= 2511
+  bool IsSupported(const HdRendererCreateArgs& createArgs,
+                   std::string* reasonWhyNot = nullptr) const override;
 #else
-  bool IsSupported() const override;
+  bool IsSupported(bool gpuEnabled) const override;
 #endif
 
 private:

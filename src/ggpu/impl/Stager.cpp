@@ -23,12 +23,16 @@
 
 const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
 const static uint64_t BUFFER_HALF_SIZE = BUFFER_SIZE / 2;
+const static uint64_t BUFFER_STAGING_OPT_THRESHOLD = 256 * 1024;
 
 namespace gtl
 {
-  GgpuStager::GgpuStager(CgpuDevice device)
-    : m_device(device)
+  GgpuStager::GgpuStager(CgpuContext* ctx)
+    : m_ctx(ctx)
   {
+    const CgpuDeviceFeatures& features = cgpuGetDeviceFeatures(ctx);
+
+    m_hasSharedMem = features.sharedMemory;
   }
 
   GgpuStager::~GgpuStager()
@@ -40,35 +44,34 @@ namespace gtl
   bool GgpuStager::allocate()
   {
     CgpuBufferCreateInfo createInfo = {
-      .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
-      .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL | CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE,
+      .usage = CgpuBufferUsage::TransferSrc,
+      .memoryProperties = CgpuMemoryProperties::DeviceLocal | CgpuMemoryProperties::HostVisible,
       .size = BUFFER_SIZE,
       .debugName = "Staging"
     };
 
-    bool bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
+    bool bufferCreated = cgpuCreateBuffer(m_ctx, createInfo, &m_stagingBuffer);
 
     if (!bufferCreated)
     {
-      createInfo.memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED;
+      createInfo.memoryProperties = CgpuMemoryProperties::HostVisible;
 
-      bufferCreated = cgpuCreateBuffer(m_device, createInfo, &m_stagingBuffer);
+      bufferCreated = cgpuCreateBuffer(m_ctx, createInfo, &m_stagingBuffer);
     }
 
     if (!bufferCreated)
       goto fail;
 
-    if (!cgpuCreateCommandBuffer(m_device, &m_commandBuffers[0]) ||
-        !cgpuCreateCommandBuffer(m_device, &m_commandBuffers[1]))
+    if (!cgpuCreateCommandBuffer(m_ctx, &m_commandBuffers[0]) ||
+        !cgpuCreateCommandBuffer(m_ctx, &m_commandBuffers[1]))
       goto fail;
 
-    if (!cgpuCreateSemaphore(m_device, &m_semaphore))
+    if (!cgpuCreateSemaphore(m_ctx, &m_semaphore))
       goto fail;
 
-    if (!cgpuMapBuffer(m_device, m_stagingBuffer, (void**) &m_mappedMem))
-      goto fail;
+    m_mappedMem = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, m_stagingBuffer);
 
-    if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
+    if (!cgpuBeginCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]))
       goto fail;
 
     return true;
@@ -81,16 +84,12 @@ fail:
   void GgpuStager::free()
   {
     CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
-    cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo);
-    if (m_mappedMem)
-    {
-      cgpuUnmapBuffer(m_device, m_stagingBuffer);
-    }
-    cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
-    cgpuDestroySemaphore(m_device, m_semaphore);
-    cgpuDestroyCommandBuffer(m_device, m_commandBuffers[0]);
-    cgpuDestroyCommandBuffer(m_device, m_commandBuffers[1]);
-    cgpuDestroyBuffer(m_device, m_stagingBuffer);
+    cgpuWaitSemaphores(m_ctx, 1, &waitSemaphoreInfo);
+    cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
+    cgpuDestroySemaphore(m_ctx, m_semaphore);
+    cgpuDestroyCommandBuffer(m_ctx, m_commandBuffers[0]);
+    cgpuDestroyCommandBuffer(m_ctx, m_commandBuffers[1]);
+    cgpuDestroyBuffer(m_ctx, m_stagingBuffer);
   }
 
   bool GgpuStager::flush()
@@ -100,26 +99,23 @@ fail:
 
     // Wait until previous submit is finished.
     CgpuWaitSemaphoreInfo waitSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
-    if (!cgpuWaitSemaphores(m_device, 1, &waitSemaphoreInfo))
+    if (!cgpuWaitSemaphores(m_ctx, 1, &waitSemaphoreInfo))
       return false;
 
     m_semaphoreCounter++;
 
-    cgpuEndCommandBuffer(m_commandBuffers[m_writeableHalf]);
+    cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
 
     uint32_t halfOffset = m_writeableHalf * BUFFER_HALF_SIZE;
-    if (!cgpuFlushMappedMemory(m_device, m_stagingBuffer, halfOffset, halfOffset + m_stagedBytes))
-      return false;
 
     CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
-    if (!cgpuSubmitCommandBuffer(m_device, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo))
-      return false;
+    cgpuSubmitCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo);
 
     m_stagedBytes = 0;
     m_commandsPending = false;
     m_writeableHalf = (m_writeableHalf == 0) ? 1 : 0;
 
-    if (!cgpuBeginCommandBuffer(m_commandBuffers[m_writeableHalf]))
+    if (!cgpuBeginCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]))
       return false;
 
     return true;
@@ -133,17 +129,17 @@ fail:
       return true;
     }
 
-    if (size <= 65535)
+    // Use copy command for compression for large data regions
+    if (m_hasSharedMem && size < BUFFER_STAGING_OPT_THRESHOLD)
     {
-      m_commandsPending = true;
-
-      cgpuCmdUpdateBuffer(m_commandBuffers[m_writeableHalf], src, size, dst, dstBaseOffset);
-
+      auto ptr = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, dst);
+      memcpy(&ptr[dstBaseOffset], src, size);
       return true;
     }
 
     auto copyFunc = [this, dst, dstBaseOffset](uint64_t srcOffset, uint64_t dstOffset, uint64_t size) {
       cgpuCmdCopyBuffer(
+        m_ctx,
         m_commandBuffers[m_writeableHalf],
         m_stagingBuffer,
         srcOffset,
@@ -156,10 +152,13 @@ fail:
     return stage(src, size, copyFunc);
   }
 
-  bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth)
+  bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth, uint32_t bpp)
   {
     uint32_t rowCount = height;
     uint64_t rowSize = size / rowCount;
+
+    rowSize = rowSize / bpp * bpp; // truncate for Vulkan alignment requirements
+    rowCount = size / rowSize;
 
     if (rowSize > BUFFER_HALF_SIZE)
     {
@@ -188,7 +187,7 @@ fail:
 
       auto copyFunc = [this, dst, rowsStaged, width, depth, copyRowCount](uint64_t srcOffset, [[maybe_unused]] uint64_t dstOffset, [[maybe_unused]] uint64_t size) {
         CgpuBufferImageCopyDesc desc;
-        desc.bufferOffset = srcOffset;
+        desc.bufferOffset = srcOffset; // Vulkan requirement: must be multiple of texel format
         desc.texelOffsetX = 0;
         desc.texelExtentX = width;
         desc.texelOffsetY = rowsStaged;
@@ -197,6 +196,7 @@ fail:
         desc.texelExtentZ = depth;
 
         cgpuCmdCopyBufferToImage(
+          m_ctx,
           m_commandBuffers[m_writeableHalf],
           m_stagingBuffer,
           dst,
@@ -206,7 +206,7 @@ fail:
 
       uint64_t srcOffset = rowsStaged * rowSize;
       uint64_t stageSize = copyRowCount * rowSize;
-      if (!stage(&src[srcOffset], stageSize, copyFunc))
+      if (!stage(&src[srcOffset], stageSize, copyFunc, bpp))
       {
         return false;
       }
@@ -217,19 +217,22 @@ fail:
     return true;
   }
 
-  bool GgpuStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc)
+  bool GgpuStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc, uint32_t offsetAlign)
   {
     uint64_t bytesToStage = size;
 
     while (bytesToStage > 0)
     {
       uint64_t bytesAlreadyCopied = size - bytesToStage;
+      uint64_t requiredSpace = (bytesToStage + offsetAlign - 1) / offsetAlign * offsetAlign;
 
       uint64_t availableSpace = BUFFER_HALF_SIZE - m_stagedBytes;
-      uint64_t memcpyByteCount = std::min(bytesToStage, availableSpace);
+      uint64_t memcpyByteCount = std::min(requiredSpace, availableSpace);
       bytesToStage -= memcpyByteCount;
 
       uint64_t dstOffset = m_writeableHalf * BUFFER_HALF_SIZE + m_stagedBytes;
+      dstOffset = (dstOffset + offsetAlign - 1) / offsetAlign * offsetAlign;
+
       memcpy(&m_mappedMem[dstOffset], &src[bytesAlreadyCopied], memcpyByteCount);
 
       copyFunc(dstOffset, bytesAlreadyCopied, memcpyByteCount);

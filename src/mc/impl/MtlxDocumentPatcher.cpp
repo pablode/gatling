@@ -18,6 +18,8 @@
 #include "MtlxDocumentPatcher.h"
 
 #include <MaterialXCore/Types.h>
+#include <MaterialXFormat/File.h>
+#include <MaterialXFormat/Util.h>
 
 #include <unordered_set>
 #include <assert.h>
@@ -185,48 +187,6 @@ void _PatchColor3FloatMismatches(mx::DocumentPtr document)
     input->removeAttribute(mx::PortElement::NODE_GRAPH_ATTRIBUTE);
     input->setType(nodeType);
     input->setConnectedNode(node);
-  }
-}
-
-// HdMtlx does not translate these inputs to their correct types, and we also
-// can't provide GfColor because it only has three components. Hence, we accept
-// the warnings it emits and patch the incorrect input types afterwards.
-void _PatchUsdUVTextureParamTypes(mx::DocumentPtr document)
-{
-  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
-  {
-    mx::ElementPtr elem = treeIt.getElement();
-
-    mx::NodePtr node = elem->asA<mx::Node>();
-
-    if (!node || node->getCategory() != "UsdUVTexture")
-    {
-      continue;
-    }
-
-    const auto patchVectorColorInput = [node](const std::string& inputName)
-    {
-      mx::InputPtr input = node->getActiveInput(inputName);
-      if (!input || !input->hasValue())
-      {
-        return;
-      }
-
-      const mx::ValuePtr& value = input->getValue();
-      if (!value->isA<mx::Vector4>())
-      {
-        return;
-      }
-
-      const mx::Vector4& vector = value->asA<mx::Vector4>();
-      mx::Color4 color = mx::Color4(vector[0], vector[1], vector[2], vector[3]);
-
-      input->setValue(color);
-    };
-
-    patchVectorColorInput("bias");
-    patchVectorColorInput("scale");
-    patchVectorColorInput("fallback");
   }
 }
 
@@ -521,6 +481,7 @@ void _PatchDefaultGeomprops(mx::DocumentPtr document)
     bool isTexcoord = geomprop == "st" ||
                       geomprop == "st0" ||
                       geomprop == "st_0" ||
+                      geomprop == "map1" ||
                       geomprop == "UV0";
 
     bool isTangent = (geomprop == "tangents");
@@ -583,45 +544,97 @@ void _PatchGeompropPrimvarPrefix(mx::DocumentPtr document)
   }
 }
 
+// The MDL generator has some limitations when it comes to layering & mixing layers. This causes
+// problems with the OpenPBR BXDF: https://github.com/AcademySoftwareFoundation/MaterialX/pull/2215
+void _PatchOpenPbrBxdf(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc)
+{
+  for (mx::NodeDefPtr nd : lib->getNodeDefs())
+  {
+    const std::string& nodeName = nd->getNodeString();
+
+    if (nodeName != "open_pbr_surface")
+    {
+      continue;
+    }
+
+    GB_DEBUG("patching {}", nodeName);
+
+    lib->removeNodeDef(nd->getName());
+
+    mx::InterfaceElementPtr impl = nd->getImplementation();
+    if (!impl || !impl->isA<mx::NodeGraph>())
+    {
+      continue;
+    }
+
+    lib->removeNodeGraph(impl->getName());
+  }
+
+  lib->importLibrary(customNodesDoc);
+}
+
 namespace gtl
 {
-  void McMtlxDocumentPatcher::patch(MaterialX::DocumentPtr document)
+  McMtlxDocumentPatcher::McMtlxDocumentPatcher([[maybe_unused]] const mx::DocumentPtr mtlxStdLib, const std::string& customNodesPath)
   {
-    _SanitizeFilePaths(document);
+    mx::FileSearchPath bxdfFiles;
 
-    _PatchBoolValueMismatches(document);
-
-    _PatchColor3FloatMismatches(document);
-
-#if PXR_VERSION >= 2502
-    _PatchUsdUVTextureParamTypes(document);
+#if MATERIALX_VERSION >= 13900
+    bxdfFiles.append("open_pbr_surface.xml");
+#elif MATERIALX_VERSION == 13810
+    // Detect MaterialX 1.38.10-OpenPBR version
+    if (mtlxStdLib->getNodeGraph("NG_mx39_open_pbr_surface_surfaceshader") != nullptr)
+    {
+      bxdfFiles.append("open_pbr_surface_1_38.xml");
+    }
 #endif
+
+    m_customNodesDoc = mx::createDocument();
+    mx::loadLibraries(mx::FilePathVec{ customNodesPath }, bxdfFiles, m_customNodesDoc);
+  }
+
+  mx::DocumentPtr McMtlxDocumentPatcher::patch(const mx::DocumentPtr document)
+  {
+    mx::DocumentPtr docCopy = document->copy();
+
+    _SanitizeFilePaths(docCopy);
+
+    _PatchBoolValueMismatches(docCopy);
+
+    _PatchColor3FloatMismatches(docCopy);
 
     if (!getenv(ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING))
     {
-      _PatchUsdUVTextureColorSpaces(document);
+      _PatchUsdUVTextureColorSpaces(docCopy);
     }
 
-    _PatchNodeNames(document);
+    _PatchNodeNames(docCopy);
 
-    // FIXME: we can't match nodes inside implementations due to a bug in MaterialX (also see HdGatlingMesh)
-    // https://github.com/AcademySoftwareFoundation/MaterialX/issues/2117
+    _PatchOpenPbrBxdf(docCopy, m_customNodesDoc);
+
+    // NOTE: this optimization is currently disabled due to a subtle bug with multi-output
+    //       nodes in MaterialX (presumably it's an edge case in the flattening logic).
 #if 0
-    for (mx::NodeGraphPtr graph : document->getNodeGraphs())
+    // Flatten BXDFs & helper nodes so that we can patch individual standard nodes
+    for (mx::NodeGraphPtr graph : docCopy->getNodeGraphs())
     {
-      if (graph->getActiveSourceUri() == document->getSourceUri())
+      if (graph->getActiveSourceUri() == docCopy->getSourceUri())
       {
+        // We need to flatten the graph in order to apply the following patching steps since
+        // they operate on nodes that can be part of BXDFs and helper node implementations.
         graph->flattenSubgraphs();
       }
     }
 #endif
 
-    _PatchSecondaryTexcoordIndices(document);
+    _PatchSecondaryTexcoordIndices(docCopy);
 
-    _PatchColorNodes(document);
+    _PatchColorNodes(docCopy);
 
-    _PatchDefaultGeomprops(document);
+    _PatchDefaultGeomprops(docCopy);
 
-    _PatchGeompropPrimvarPrefix(document);
+    _PatchGeompropPrimvarPrefix(docCopy);
+
+    return docCopy;
   }
 }

@@ -53,6 +53,7 @@ namespace
     { HdAovTokens->elementId,                GiAovId::FaceId       },
     { HdAovTokens->instanceId,               GiAovId::InstanceId   },
     { HdGatlingAovTokens->debugDoubleSided,  GiAovId::DoubleSided  },
+    { HdGatlingAovTokens->albedo,            GiAovId::Albedo       },
   };
 
   std::vector<GiAovBinding> _PrepareAovBindings(const HdRenderPassAovBindingVector& aovBindings)
@@ -232,9 +233,11 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),
       .maxBounces = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<uint32_t>(),
       .maxSampleValue = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->maxSampleValue)->second).Get<float>(),
+#ifndef HDGATLING_DISABLE_VOLUME_SAMPLING
       .maxVolumeWalkLength = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxVolumeWalkLength)->second).Get<uint32_t>(),
       .mediumStackSize = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->mediumStackSize)->second).Get<uint32_t>(),
-      .metersPerSceneUnit = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->metersPerSceneUnit)->second).Get<float>(),
+#endif
+      .metersPerSceneUnit = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->stageMetersPerUnit)->second).Get<float>(),
       .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
       .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
       .rrBounceOffset = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<uint32_t>(),

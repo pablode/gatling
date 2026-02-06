@@ -186,39 +186,12 @@ namespace
 namespace gtl
 {
   McFrontend::McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
+                         const std::string& customMtlxNodesPath,
                          McRuntime& runtime)
   {
     McMdlRuntime& mdlRuntime = runtime.getMdlRuntime();
     m_mdlMaterialCompiler = std::make_shared<McMdlMaterialCompiler>(mdlRuntime);
-    m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib);
-  }
-
-  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency)
-  {
-    mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
-    {
-      return nullptr;
-    }
-
-    auto mdlMaterial = std::make_shared<McMdlMaterial>();
-    mdlMaterial->compiledMaterial = compiledMaterial;
-
-    return new McMaterial{
-      .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),
-      .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
-      .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
-      .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
-      .hasCutoutTransparency = hasCutoutTransparency,
-      .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
-      .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
-      .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
-      .resourcePathPrefix = "", // no source file
-      .mdlMaterial = mdlMaterial,
-      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
-      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial),
-      .cameraPositionSceneDataIndex = _FindCameraPositionSceneDataIndex(compiledMaterial)
-    };
+    m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib, customMtlxNodesPath);
   }
 
   McMaterial* McFrontend::createFromMtlxStr(std::string_view docStr)
@@ -247,10 +220,10 @@ namespace gtl
     return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
   }
 
-  McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier)
+  McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& params)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    if (!m_mdlMaterialCompiler->compileFromFile(filePath, subIdentifier, compiledMaterial))
+    if (!m_mdlMaterialCompiler->compileFromFile(filePath, subIdentifier, compiledMaterial, params))
     {
       return nullptr;
     }
@@ -271,6 +244,34 @@ namespace gtl
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
       .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
       .resourcePathPrefix = resourcePathPrefix,
+      .mdlMaterial = mdlMaterial,
+      .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
+      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial),
+      .cameraPositionSceneDataIndex = _FindCameraPositionSceneDataIndex(compiledMaterial)
+    };
+  }
+
+  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency)
+  {
+    mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
+    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
+    {
+      return nullptr;
+    }
+
+    auto mdlMaterial = std::make_shared<McMdlMaterial>();
+    mdlMaterial->compiledMaterial = compiledMaterial;
+
+    return new McMaterial{
+      .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),
+      .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
+      .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
+      .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
+      .hasCutoutTransparency = hasCutoutTransparency,
+      .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
+      .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
+      .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
+      .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
       .sceneDataNames = _ExtractSceneDataNames(compiledMaterial),

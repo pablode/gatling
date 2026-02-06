@@ -27,6 +27,7 @@
 #include <quill/std/Vector.h>
 
 #define GB_ERROR(fmt, ...) QUILL_LOG_ERROR(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
+#define GB_ERROR_DYN(fmt, ...) QUILL_LOG_DYNAMIC(gtl::gbGetLogger(), quill::LogLevel::Error, fmt, ##__VA_ARGS__)
 #define GB_WARN(fmt, ...) QUILL_LOG_WARNING(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_LOG(fmt, ...) QUILL_LOG_INFO(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_DEBUG(fmt, ...) QUILL_LOG_DEBUG(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)

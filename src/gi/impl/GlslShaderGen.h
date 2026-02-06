@@ -41,6 +41,8 @@ namespace gtl
   public:
     bool init(std::string_view shaderPath, McRuntime& runtime);
 
+    void setAuxiliaryOutputEnabled(bool enabled);
+
   public:
     struct MaterialGenInfo
     {
@@ -54,7 +56,9 @@ namespace gtl
     struct CommonShaderParams
     {
       uint32_t aovMask;
+      bool debugPrintf;
       uint32_t mediumStackSize;
+      bool progressiveAccumulation;
     };
 
     struct RaygenShaderParams
@@ -66,7 +70,6 @@ namespace gtl
       bool jitteredSampling;
       uint32_t materialCount;
       bool nextEventEstimation;
-      bool progressiveAccumulation;
       bool reorderInvocations;
     };
 

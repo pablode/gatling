@@ -22,15 +22,35 @@
 
 GI_INTERFACE_BEGIN(rp_main)
 
-struct SceneParams
+struct UniformData
 {
-  GI_UINT texture2dCount;
-  GI_UINT texture3dCount;
+  GI_VEC4 domeLightRotation;
+  GI_VEC3 domeLightEmissionMultiplier;
+  GI_UINT domeLightDiffuseSpecularPacked;
+  GI_UINT maxTextureIndex;
   GI_UINT sphereLightCount;
   GI_UINT distantLightCount;
   GI_UINT rectLightCount;
   GI_UINT diskLightCount;
   GI_UINT totalLightCount;
+  GI_FLOAT metersPerSceneUnit;
+  GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
+  GI_VEC3  cameraPosition;
+  GI_UINT  imageDims;
+  GI_VEC3  cameraForward;
+  GI_FLOAT focusDistance;
+  GI_VEC3  cameraUp;
+  GI_FLOAT cameraVFoV;
+  GI_UINT  sampleOffset;
+  GI_FLOAT lensRadius;
+  GI_UINT  spp;
+  GI_FLOAT invSampleCount;
+  GI_FLOAT maxSampleValue;
+  GI_UINT  maxBouncesAndRrBounceOffset;
+  GI_FLOAT rrInvMinTermProb;
+  GI_FLOAT lightIntensityMultiplier;
+  GI_UINT  clipRangePacked;
+  GI_FLOAT sensorExposure;
 };
 
 struct FVertex
@@ -90,31 +110,6 @@ struct DiskLight
   GI_FLOAT padding;
 };
 
-struct PushConstants
-{
-  GI_VEC3  cameraPosition;
-  GI_UINT  imageDims;
-  GI_VEC3  cameraForward;
-  GI_FLOAT focusDistance;
-  GI_VEC3  cameraUp;
-  GI_FLOAT cameraVFoV;
-  GI_UINT  sampleOffset;
-  GI_FLOAT lensRadius;
-  GI_UINT  sampleCount;
-  GI_FLOAT maxSampleValue;
-  GI_VEC4  domeLightRotation;
-  GI_VEC3  domeLightEmissionMultiplier;
-  GI_UINT  domeLightDiffuseSpecularPacked;
-  GI_UINT  maxBouncesAndRrBounceOffset;
-  GI_FLOAT rrInvMinTermProb;
-  GI_FLOAT lightIntensityMultiplier;
-  GI_UINT  clipRangePacked;
-  GI_FLOAT sensorExposure;
-  GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
-  GI_FLOAT metersPerSceneUnit;
-  /* 1 float free */
-};
-
 const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);
 const GI_UINT BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED = (1 << 1);
 
@@ -151,7 +146,7 @@ static_assert((sizeof(BlasPayloadBufferPreamble) % 32) == 0);
 #endif
 
 // set 0
-GI_BINDING_INDEX(SCENE_PARAMS,    0)
+GI_BINDING_INDEX(UNIFORM_DATA,    0)
 GI_BINDING_INDEX(SPHERE_LIGHTS,   1)
 GI_BINDING_INDEX(DISTANT_LIGHTS,  2)
 GI_BINDING_INDEX(RECT_LIGHTS,     3)
@@ -180,13 +175,11 @@ GI_BINDING_INDEX(AOV_DEPTH,        25)
 GI_BINDING_INDEX(AOV_FACE_ID,      26)
 GI_BINDING_INDEX(AOV_INSTANCE_ID,  27)
 GI_BINDING_INDEX(AOV_DOUBLE_SIDED, 28)
-GI_BINDING_INDEX(AOV_OIDN,         29)
+GI_BINDING_INDEX(AOV_ALBEDO,       29)
+GI_BINDING_INDEX(AOV_OIDN,         30)
 
-// set 1
-GI_BINDING_INDEX(TEXTURES_2D,     0)
-
-// set 2
-GI_BINDING_INDEX(TEXTURES_3D,     0)
+// set 1 & set 2 (alised array)
+GI_BINDING_INDEX(TEXTURES,     0)
 
 GI_INTERFACE_END()
 

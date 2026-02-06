@@ -24,11 +24,12 @@ namespace gtl
 {
   struct CgpuShaderReflectionBinding
   {
-    uint32_t binding;
+    uint32_t binding; // TODO: rename to index
     uint32_t count;
     int descriptorType;
     bool readAccess;
     bool writeAccess;
+    uint32_t dim;
   };
 
   struct CgpuShaderReflectionDescriptorSet
@@ -39,9 +40,10 @@ namespace gtl
   struct CgpuShaderReflection
   {
     std::vector<CgpuShaderReflectionDescriptorSet> descriptorSets;
-    uint32_t pushConstantsSize;
     uint32_t maxRayPayloadSize;
     uint32_t maxRayHitAttributeSize;
+    uint32_t payloadCount;
+    uint32_t workgroupSize[3];
   };
 
   bool cgpuReflectShader(const uint32_t* spv, uint64_t size, CgpuShaderReflection* reflection);

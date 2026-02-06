@@ -25,9 +25,6 @@
 #include "AssetReader.h"
 #include "GlslShaderGen.h"
 #include "MeshProcessing.h"
-#include "Oidn.h"
-#include "Tza.h"
-#include "Mmap.h"
 #include "interface/rp_main.h"
 
 #include <stdlib.h>
@@ -45,7 +42,8 @@
 #include <assert.h>
 
 #include <gtl/ggpu/Stager.h>
-#include <gtl/ggpu/DelayedResourceDestroyer.h>
+#include <gtl/ggpu/BumpAllocator.h>
+#include <gtl/ggpu/DeleteQueue.h>
 #include <gtl/ggpu/DenseDataStore.h>
 #include <gtl/ggpu/ResizableBuffer.h>
 #include <gtl/cgpu/Cgpu.h>
@@ -67,6 +65,12 @@
 #include <blosc2.h>
 
 #include <offsetAllocator.hpp>
+
+#define GI_FATAL(msg)                               \
+  do {                                              \
+    GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); \
+    exit(EXIT_FAILURE);                             \
+  } while (false)
 
 namespace mx = MaterialX;
 
@@ -101,18 +105,18 @@ namespace gtl
 
   struct GiImageBinding
   {
-    CgpuImage image;
+    GiImagePtr image;
     uint32_t index;
   };
 
   struct GiShaderCache
   {
     uint32_t                       aovMask;
+    std::array<CgpuBindSet, 3>     bindSets;
     bool                           domeLightCameraVisible;
-    OffsetAllocator::Allocation    domeLightsAllocation;
-    std::vector<GiImageBinding>    imageBindings2d;
-    std::vector<GiImageBinding>    imageBindings3d;
+    std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
+    uint32_t                       maxTextureIndex;
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
     CgpuShader                     rgenShader;
@@ -125,13 +129,12 @@ namespace gtl
     CgpuShader closestHit;
     std::vector<CgpuShader> anyHits; // optional
     OffsetAllocator::Allocation texOffsetAllocation;
-    std::vector<CgpuImage> images2d;
-    std::vector<CgpuImage> images3d;
+    std::vector<GiImagePtr> images;
   };
 
   struct GiMaterial
   {
-    McMaterial* mcMat;
+    McMaterial* mcMat = nullptr;
     std::string name;
     GiScene* scene;
     std::optional<GiMaterialGpuData> gpuData;
@@ -200,18 +203,19 @@ namespace gtl
     DirtyShadersAll         = (DirtyShadersRgen | DirtyShadersHit | DirtyShadersMiss),
     DirtyPipeline           = (1 << 6),
     DirtyAovBindingDefaults = (1 << 7),
-    DirtySceneParams        = (1 << 8),
+    DirtyBindSets           = (1 << 8),
     All                     = ~0u
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
 
   struct GiScene
   {
+    OffsetAllocator::Allocation domeLightsAllocation;
     GgpuDenseDataStore sphereLights;
     GgpuDenseDataStore distantLights;
     GgpuDenseDataStore rectLights;
     GgpuDenseDataStore diskLights;
-    CgpuImage domeLightTexture;
+    GiImagePtr domeLightTexture;
     GiDomeLight* domeLight = nullptr; // weak ptr
     glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
     CgpuImage fallbackDomeLightTexture;
@@ -224,37 +228,35 @@ namespace gtl
     GiRenderParams oldRenderParams = {};
     CgpuBuffer aovDefaultValues;
     uint32_t sampleOffset = 0;
-    CgpuBuffer sceneParams;
     OffsetAllocator::Allocator texAllocator{rp::MAX_TEXTURE_COUNT};
-    GiOidnState* denoiserState;
   };
 
   struct GiRenderBuffer
   {
     CgpuBuffer deviceMem;
     CgpuBuffer hostMem;
-    void* mappedHostMem;
+    void* mappedHostMem = nullptr;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t size = 0;
   };
 
-  bool s_cgpuInitialized = false;
-  CgpuDevice s_device;
-  CgpuPhysicalDeviceFeatures s_deviceFeatures;
-  CgpuPhysicalDeviceProperties s_deviceProperties;
+  CgpuContext* s_ctx = nullptr;
+  CgpuDeviceFeatures s_ctxFeatures;
+  CgpuDeviceProperties s_ctxProperties;
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
-  std::unique_ptr<GgpuDelayedResourceDestroyer> s_delayedResourceDestroyer;
+  std::mutex s_resourceDestroyerMutex;
+  std::unique_ptr<GgpuDeleteQueue> s_deleteQueue;
   std::unique_ptr<GiGlslShaderGen> s_shaderGen;
   std::unique_ptr<McRuntime> s_mcRuntime;
   std::unique_ptr<McFrontend> s_mcFrontend;
   std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
   std::unique_ptr<GiTextureManager> s_texSys;
+  std::shared_ptr<GgpuBumpAllocator> s_bumpAlloc;
   std::atomic_bool s_forceShaderCacheInvalid = false;
   std::atomic_bool s_resetSampleOffset = false;
-  std::string s_resourcePath;
 
 #ifdef GI_SHADER_HOTLOADING
   class ShaderFileListener : public efsw::FileWatchListener
@@ -349,7 +351,7 @@ namespace gtl
   // IMPORTANT: this needs to match the rp_main* shaders. It is asserted in cgpu.
   uint32_t _GetRpMainMaxRayPayloadSize(uint32_t mediumStackSize)
   {
-    uint32_t size = 80;
+    uint32_t size = 84;
     if (mediumStackSize > 0)
     {
       size += mediumStackSize * 40 + 12;
@@ -365,7 +367,6 @@ namespace gtl
     // Use shaders dir in source tree for auto-reloading
     std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
 #endif
-    s_resourcePath = params.mdlRuntimePath;
 
     mx::DocumentPtr mtlxStdLib = std::static_pointer_cast<mx::Document>(params.mtlxStdLib);
     if (!mtlxStdLib)
@@ -377,36 +378,29 @@ namespace gtl
 
     _PrintInitInfo(params);
 
-    if (!cgpuInitialize("gatling", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH))
+    s_ctx = cgpuCreateContext("gatling", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH);
+    if (!s_ctx)
       goto fail;
 
-    s_cgpuInitialized = true;
+    s_ctxFeatures = cgpuGetDeviceFeatures(s_ctx);
+    s_ctxProperties = cgpuGetDeviceProperties(s_ctx);
 
-    if (!cgpuCreateDevice(&s_device))
-      goto fail;
-
-    if (!cgpuGetPhysicalDeviceFeatures(s_device, s_deviceFeatures))
-      goto fail;
-
-    if (!cgpuGetPhysicalDeviceProperties(s_device, s_deviceProperties))
-      goto fail;
-
-    if (!cgpuCreateSampler(s_device, {
-                            .addressModeU = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-                            .addressModeV = CGPU_SAMPLER_ADDRESS_MODE_REPEAT,
-                            .addressModeW = CGPU_SAMPLER_ADDRESS_MODE_REPEAT
+    if (!cgpuCreateSampler(s_ctx, {
+                            .addressModeU = CgpuSamplerAddressMode::Repeat,
+                            .addressModeV = CgpuSamplerAddressMode::Repeat,
+                            .addressModeW = CgpuSamplerAddressMode::Repeat
                           }, &s_texSampler))
     {
       goto fail;
     }
 
-    s_stager = std::make_unique<GgpuStager>(s_device);
+    s_stager = std::make_unique<GgpuStager>(s_ctx);
     if (!s_stager->allocate())
     {
       goto fail;
     }
 
-    s_delayedResourceDestroyer = std::make_unique<GgpuDelayedResourceDestroyer>(s_device);
+    s_deleteQueue = std::make_unique<GgpuDeleteQueue>(s_ctx);
 
     s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath, params.mdlSearchPaths));
     if (!s_mcRuntime)
@@ -414,10 +408,18 @@ namespace gtl
       goto fail;
     }
 
-    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, *s_mcRuntime);
+    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, params.mtlxCustomNodesPath, *s_mcRuntime);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))
+    {
+      goto fail;
+    }
+
+    constexpr static uint32_t BUMP_ALLOC_SIZE = CGPU_MIN_UNIFORM_BUFFER_SIZE;
+    s_bumpAlloc = GgpuBumpAllocator::make(s_ctx, *s_deleteQueue, BUMP_ALLOC_SIZE);
+
+    if (!s_bumpAlloc)
     {
       goto fail;
     }
@@ -426,7 +428,7 @@ namespace gtl
     s_aggregateAssetReader = std::make_unique<GiAggregateAssetReader>();
     s_aggregateAssetReader->addAssetReader(s_mmapAssetReader.get());
 
-    s_texSys = std::make_unique<GiTextureManager>(s_device, *s_aggregateAssetReader, *s_stager);
+    s_texSys = std::make_unique<GiTextureManager>(s_ctx, *s_aggregateAssetReader, *s_stager, *s_deleteQueue);
 
 #ifdef GI_SHADER_HOTLOADING
     s_fileWatcher = std::make_unique<efsw::FileWatcher>();
@@ -451,6 +453,7 @@ fail:
   #ifdef GI_SHADER_HOTLOADING
     s_fileWatcher.reset();
   #endif
+    s_bumpAlloc.reset();
     s_aggregateAssetReader.reset();
     s_mmapAssetReader.reset();
     if (s_texSys)
@@ -467,23 +470,18 @@ fail:
     }
     if (s_texSampler.handle)
     {
-      cgpuDestroySampler(s_device, s_texSampler);
+      cgpuDestroySampler(s_ctx, s_texSampler);
       s_texSampler = {};
     }
-    if (s_delayedResourceDestroyer)
+    if (s_deleteQueue)
     {
-      s_delayedResourceDestroyer->destroyAll();
-      s_delayedResourceDestroyer.reset();
+      s_deleteQueue->destroyAll();
+      s_deleteQueue.reset();
     }
-    if (s_device.handle)
+    if (s_ctx)
     {
-      cgpuDestroyDevice(s_device);
-      s_device = {};
-    }
-    if (s_cgpuInitialized)
-    {
-      cgpuTerminate();
-      s_cgpuInitialized = false;
+      cgpuDestroyContext(s_ctx);
+      s_ctx = nullptr;
     }
     s_mcFrontend.reset();
     s_mcRuntime.reset();
@@ -502,15 +500,16 @@ fail:
       return nullptr;
     }
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
-
     GiMaterial* mat = new GiMaterial {
       .mcMat = mcMat,
       .name = name,
       .scene = scene
     };
 
-    scene->materials.insert(mat);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->materials.insert(mat);
+    }
     return mat;
   }
 
@@ -528,35 +527,37 @@ fail:
       return nullptr;
     }
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
-
     GiMaterial* mat = new GiMaterial {
       .mcMat = mcMat,
       .name = name,
       .scene = scene
     };
 
-    scene->materials.insert(mat);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->materials.insert(mat);
+    }
     return mat;
   }
 
-  GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier)
+  GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier, const GiMaterialParameters& params)
   {
-    McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier);
+    McMaterial* mcMat = s_mcFrontend->createFromMdlFile(filePath, subIdentifier, params);
     if (!mcMat)
     {
       return nullptr;
     }
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
-
     GiMaterial* mat = new GiMaterial {
       .mcMat = mcMat,
       .name = name,
       .scene = scene
     };
 
-    scene->materials.insert(mat);
+    {
+      std::lock_guard guard(scene->mutex);
+      scene->materials.insert(mat);
+    }
     return mat;
   }
 
@@ -568,25 +569,35 @@ fail:
     }
     if (gpuData.closestHit.handle)
     {
-      cgpuDestroyShader(s_device, gpuData.closestHit);
+      cgpuDestroyShader(s_ctx, gpuData.closestHit);
     }
     for (CgpuShader shader : gpuData.anyHits)
     {
-      cgpuDestroyShader(s_device, shader);
+      cgpuDestroyShader(s_ctx, shader);
     }
   }
 
   void giDestroyMaterial(GiMaterial* mat)
   {
     GiScene* scene = mat->scene;
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
-
-    if (mat->gpuData)
     {
-      giDestroyMaterialGpuData(scene, *mat->gpuData);
-    }
+      std::lock_guard guard(scene->mutex);
 
-    scene->materials.erase(mat);
+      if (mat->gpuData)
+      {
+        giDestroyMaterialGpuData(scene, *mat->gpuData);
+      }
+
+      scene->materials.erase(mat);
+
+      for (GiMesh* m : scene->meshes)
+      {
+        if (m->material == mat)
+        {
+          m->material = nullptr;
+        }
+      }
+    }
 
     delete mat->mcMat;
     delete mat;
@@ -665,10 +676,21 @@ fail:
     }
   }
 
+  void giDestroyMeshGpuData(GiMeshGpuData& gpuData)
+  {
+    std::lock_guard guard(s_resourceDestroyerMutex); // Hydra sync is parallel
+    s_deleteQueue->pushBack(gpuData.blas, gpuData.payloadBuffer);
+  }
+
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars)
   {
     mesh->instancerPrimvars = instancerPrimvars;
-    mesh->gpuData.reset();
+
+    if (mesh->gpuData.has_value())
+    {
+      giDestroyMeshGpuData(*mesh->gpuData);
+      mesh->gpuData.reset();
+    }
 
     GiScene* scene = mesh->scene;
     {
@@ -682,16 +704,20 @@ fail:
     McMaterial* newMcMat = mat->mcMat;
     McMaterial* oldMcMat = mesh->material ? mesh->material->mcMat : nullptr;
 
+    bool transparencyChanged = bool(newMcMat) ^ bool(oldMcMat);
+    bool primvarsChanged = bool(newMcMat) ^ bool(oldMcMat);
+
     GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::DirtyPipeline;
-    if (oldMcMat)
+    if (oldMcMat && newMcMat)
     {
       // material data such as alpha is used in the BVH build
-      bool transparencyChanged = newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency;
+      transparencyChanged |= (newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency);
 
       const auto& newPrimvarNames = newMcMat->sceneDataNames;
       const auto& oldPrimvarNames = oldMcMat->sceneDataNames;
 
-      bool primvarsChanged = newPrimvarNames.size() != oldPrimvarNames.size();
+      primvarsChanged |= newPrimvarNames.size() != oldPrimvarNames.size();
+
       if (!primvarsChanged)
       {
         for (size_t i = 0; i < newPrimvarNames.size(); i++)
@@ -703,10 +729,15 @@ fail:
           }
         }
       }
+    }
 
-      if (transparencyChanged || primvarsChanged)
+    if (transparencyChanged || primvarsChanged)
+    {
+      dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+
+      if (mesh->gpuData.has_value())
       {
-        dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+        giDestroyMeshGpuData(*mesh->gpuData);
         mesh->gpuData.reset();
       }
     }
@@ -737,8 +768,7 @@ fail:
 
     if (gpuData.has_value())
     {
-      cgpuDestroyBlas(s_device, gpuData->blas);
-      cgpuDestroyBuffer(s_device, gpuData->payloadBuffer);
+      giDestroyMeshGpuData(*gpuData);
       gpuData.reset();
     }
 
@@ -808,11 +838,11 @@ fail:
 
         // Collect vertices
         std::vector<rp::FVertex> vertexData;
-        std::vector<CgpuVertex> positionData;
+        std::vector<float> positionData;
         vertexData.resize(meshVertices.size());
-        positionData.resize(meshVertices.size());
+        positionData.resize(meshVertices.size() * 3);
 
-        for (uint32_t i = 0; i < positionData.size(); i++)
+        for (uint32_t i = 0; i < meshVertices.size(); i++)
         {
           const GiVertex& cpuVert = meshVertices[i];
           uint32_t encodedNormal = _EncodeDirection(glm::make_vec3(cpuVert.norm));
@@ -820,10 +850,12 @@ fail:
 
           vertexData[i] = rp::FVertex{
             .field1 = { glm::make_vec3(cpuVert.pos), cpuVert.bitangentSign },
-            .field2 = { *((float*)&encodedNormal), *((float*)&encodedTangent), cpuVert.u, cpuVert.v }
+            .field2 = { *((float*) &encodedNormal), *((float*) &encodedTangent), cpuVert.u, cpuVert.v }
           };
 
-          positionData[i] = CgpuVertex{ .x = cpuVert.pos[0], .y = cpuVert.pos[1], .z = cpuVert.pos[2] };
+          positionData[i * 3 + 0] = cpuVert.pos[0];
+          positionData[i * 3 + 1] = cpuVert.pos[1];
+          positionData[i * 3 + 2] = cpuVert.pos[2];
         }
 
         uint64_t verticesSize = vertexData.size() * sizeof(rp::FVertex);
@@ -932,7 +964,14 @@ fail:
           }
 
           uint64_t newPayloadBufferSize = payloadBufferSize;
-          uint32_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
+          uint64_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
+
+          if (sceneDataOffset >= UINT32_MAX)
+          {
+            GB_ERROR("scene data too large");
+            preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
+            continue;
+          }
 
           if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset || sceneDataOffset == rp::SCENE_DATA_OFFSET_MASK)
           {
@@ -942,7 +981,7 @@ fail:
           }
 
           payloadBufferSize = newPayloadBufferSize;
-          sceneDataOffsets[i] = sceneDataOffset;
+          sceneDataOffsets[i] = uint32_t(sceneDataOffset);
 
           uint32_t stride = 0;
           switch (primvar->type)
@@ -973,7 +1012,7 @@ fail:
           assert(stride < 4);
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
 
-          uint32_t info = ((sceneDataOffset / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
+          uint32_t info = ((uint32_t(sceneDataOffset) / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
                           (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
                           (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
           preamble.sceneDataInfos[i] = info;
@@ -987,12 +1026,12 @@ fail:
         rp::BlasPayload payload;
 
         uint64_t tmpIndexBufferSize = indicesSize;
-        uint64_t tmpPositionBufferSize = positionData.size() * sizeof(CgpuVertex);
+        uint64_t tmpPositionBufferSize = positionData.size() * sizeof(float);
 
         // Create data buffers
-        if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+        if (!cgpuCreateBuffer(s_ctx, {
+                                .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::TransferDst,
+                                .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                                 .size = payloadBufferSize,
                                 .debugName = "BlasPayloadBuffer"
                               }, &payloadBuffer))
@@ -1001,9 +1040,9 @@ fail:
           goto fail_cleanup;
         }
 
-        if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+        if (!cgpuCreateBuffer(s_ctx, {
+                                .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible,
                                 .size = tmpPositionBufferSize,
                                 .debugName = "BlasVertexPositionsTmp"
                               }, &tmpPositionBuffer))
@@ -1012,9 +1051,9 @@ fail:
           goto fail_cleanup;
         }
 
-        if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_SHADER_DEVICE_ADDRESS | CGPU_BUFFER_USAGE_FLAG_ACCELERATION_STRUCTURE_BUILD_INPUT,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
+        if (!cgpuCreateBuffer(s_ctx, {
+                                .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::AccelerationStructureBuild,
+                                .memoryProperties = CgpuMemoryProperties::HostVisible,
                                 .size = tmpIndexBufferSize,
                                 .debugName = "BlasIndicesTmp"
                               }, &tmpIndexBuffer))
@@ -1025,15 +1064,12 @@ fail:
 
         // Copy data to GPU
         {
-          void* mappedMem;
-
-          cgpuMapBuffer(s_device, tmpPositionBuffer, &mappedMem);
-          memcpy(mappedMem, positionData.data(), tmpPositionBufferSize);
-          cgpuUnmapBuffer(s_device, tmpPositionBuffer);
-
-          cgpuMapBuffer(s_device, tmpIndexBuffer, &mappedMem);
-          memcpy(mappedMem, indexData.data(), tmpIndexBufferSize);
-          cgpuUnmapBuffer(s_device, tmpIndexBuffer);
+          void* ptr = cgpuGetBufferCpuPtr(s_ctx, tmpPositionBuffer);
+          memcpy(ptr, positionData.data(), tmpPositionBufferSize);
+        }
+        {
+          void* ptr = cgpuGetBufferCpuPtr(s_ctx, tmpIndexBuffer);
+          memcpy(ptr, indexData.data(), tmpIndexBufferSize);
         }
 
         if (!s_stager->stageToBuffer((uint8_t*) &preamble, preambleSize, payloadBuffer, 0) ||
@@ -1066,8 +1102,8 @@ fail:
         {
           const GiMaterial* material = shaderCache->materials[materialIndex];
 
-          bool blasCreated = cgpuCreateBlas(s_device, {
-                                              .vertexBuffer = tmpPositionBuffer,
+          bool blasCreated = cgpuCreateBlas(s_ctx, {
+                                              .vertexPosBuffer = tmpPositionBuffer,
                                               .indexBuffer = tmpIndexBuffer,
                                               .maxVertex = (uint32_t) positionData.size(),
                                               .triangleCount = (uint32_t) indexData.size() / 3,
@@ -1082,14 +1118,14 @@ fail:
           }
         }
 
-        cgpuDestroyBuffer(s_device, tmpPositionBuffer);
+        cgpuDestroyBuffer(s_ctx, tmpPositionBuffer);
         tmpPositionBuffer.handle = 0;
-        cgpuDestroyBuffer(s_device, tmpIndexBuffer);
+        cgpuDestroyBuffer(s_ctx, tmpIndexBuffer);
         tmpIndexBuffer.handle = 0;
 
         // Append BLAS payload data
         {
-          uint64_t payloadBufferAddress = cgpuGetBufferAddress(s_device, payloadBuffer);
+          uint64_t payloadBufferAddress = cgpuGetBufferGpuAddress(s_ctx, payloadBuffer);
           if (payloadBufferAddress == 0)
           {
             GB_ERROR("failed to get index-vertex buffer address");
@@ -1128,13 +1164,13 @@ fail:
         {
 fail_cleanup:
           if (payloadBuffer.handle)
-            cgpuDestroyBuffer(s_device, payloadBuffer);
+            cgpuDestroyBuffer(s_ctx, payloadBuffer);
           if (tmpPositionBuffer.handle)
-            cgpuDestroyBuffer(s_device, tmpPositionBuffer);
+            cgpuDestroyBuffer(s_ctx, tmpPositionBuffer);
           if (tmpIndexBuffer.handle)
-            cgpuDestroyBuffer(s_device, tmpIndexBuffer);
+            cgpuDestroyBuffer(s_ctx, tmpIndexBuffer);
           if (blas.handle)
-            cgpuDestroyBlas(s_device, blas);
+            cgpuDestroyBlas(s_ctx, blas);
 
           continue;
         }
@@ -1194,7 +1230,7 @@ fail_cleanup:
 
     // Create TLAS.
     {
-      if (!cgpuCreateTlas(s_device, {
+      if (!cgpuCreateTlas(s_ctx, {
                             .instanceCount = (uint32_t) blasInstances.size(),
                             .instances = blasInstances.data()
                           }, &tlas))
@@ -1210,9 +1246,9 @@ fail_cleanup:
     {
       uint64_t bufferSize = (blasPayloads.empty() ? 1 : blasPayloads.size()) * sizeof(rp::BlasPayload);
 
-      if (!cgpuCreateBuffer(s_device, {
-                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                               .size = bufferSize,
                               .debugName = "BlasPayloadAddresses"
                             }, &blasPayloadsBuffer))
@@ -1232,9 +1268,9 @@ fail_cleanup:
     {
       uint64_t bufferSize = (instanceIds.empty() ? 1 : instanceIds.size()) * sizeof(int);
 
-      if (!cgpuCreateBuffer(s_device, {
-                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                               .size = bufferSize,
                               .debugName = "InstanceIds"
                             }, &instanceIdsBuffer))
@@ -1245,7 +1281,7 @@ fail_cleanup:
 
       if (!instanceIds.empty() && !s_stager->stageToBuffer((uint8_t*) instanceIds.data(), bufferSize, instanceIdsBuffer))
       {
-        GB_ERROR("failed to upload addresses to instance IDs buffer");
+        GB_ERROR("failed to upload instance IDs");
         goto cleanup;
       }
     }
@@ -1263,15 +1299,15 @@ cleanup:
       assert(false);
       if (blasPayloadsBuffer.handle)
       {
-        cgpuDestroyBuffer(s_device, blasPayloadsBuffer);
+        cgpuDestroyBuffer(s_ctx, blasPayloadsBuffer);
       }
       if (instanceIdsBuffer.handle)
       {
-        cgpuDestroyBuffer(s_device, instanceIdsBuffer);
+        cgpuDestroyBuffer(s_ctx, instanceIdsBuffer);
       }
       if (tlas.handle)
       {
-        cgpuDestroyTlas(s_device, tlas);
+        cgpuDestroyTlas(s_ctx, tlas);
       }
     }
 
@@ -1280,9 +1316,9 @@ cleanup:
 
   void _giDestroyBvh(GiBvh* bvh)
   {
-    cgpuDestroyTlas(s_device, bvh->tlas);
-    cgpuDestroyBuffer(s_device, bvh->blasPayloadsBuffer);
-    cgpuDestroyBuffer(s_device, bvh->instanceIdsBuffer);
+    cgpuDestroyTlas(s_ctx, bvh->tlas);
+    cgpuDestroyBuffer(s_ctx, bvh->blasPayloadsBuffer);
+    cgpuDestroyBuffer(s_ctx, bvh->instanceIdsBuffer);
     delete bvh;
   }
 
@@ -1309,7 +1345,7 @@ cleanup:
     uint32_t aovMask = 0;
     for (const GiAovBinding& binding : params.aovBindings)
     {
-      if (binding.aovId == GiAovId::ClockCycles && !s_deviceFeatures.shaderClock)
+      if (binding.aovId == GiAovId::ClockCycles && !s_ctxFeatures.shaderClock)
       {
         GB_ERROR("clock cycles AOV misses device feature - ignoring");
         continue;
@@ -1318,21 +1354,13 @@ cleanup:
       aovMask |= (1 << int(binding.aovId));
     }
 
-    if (renderSettings.denoiseColorAov && bool(aovMask & (1 << int(GiAovId::Color))))
-    {
-      aovMask |= (1 << 16/*OIDN, internal*/);
-    }
-
     std::set<GiMaterial*> materialSet;
     for (auto* m : scene->meshes)
     {
-      if (!m->material)
+      if (m->material)
       {
-        assert(false);
-        GB_ERROR("coding error: mesh without material!");
-        return nullptr;
+        materialSet.insert(m->material);
       }
-      materialSet.insert(m->material);
     }
 
     std::vector<GiMaterial*> materials(materialSet.begin(), materialSet.end());
@@ -1343,26 +1371,33 @@ cleanup:
 
     GiShaderCache* cache = nullptr;
     CgpuPipeline pipeline;
+    std::array<CgpuBindSet, 3> bindSets;
     CgpuShader rgenShader;
     std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
     std::vector<CgpuShader> missShaders;
     std::vector<McTextureDescription> textureDescriptions;
-    std::vector<GiImageBinding> imageBindings2d;
-    std::vector<GiImageBinding> imageBindings3d;
+    std::vector<GiImageBinding> imageBindings;
     std::vector<HitGroupCompInfo> hitGroupCompInfos;
     std::vector<const GiMaterial*> cachedMaterials;
 
     uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
     uint32_t maxRayHitAttributeSize = _GetRpMainMaxRayHitAttributeSize();
+    uint32_t maxTextureIndex = 0;
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
-      .mediumStackSize = renderSettings.mediumStackSize
+#ifndef NDEBUG
+      .debugPrintf = s_ctxFeatures.debugPrintf,
+#else
+      .debugPrintf = false,
+#endif
+      .mediumStackSize = renderSettings.mediumStackSize,
+      .progressiveAccumulation = renderSettings.progressiveAccumulation
     };
 
-    OffsetAllocator::Allocation domeLightsAllocation = texAllocator.allocate(2); // primary + secondary
-    assert(domeLightsAllocation.offset == 0);
+    bool needsAuxOutput = bool(aovMask & (1 << int(GiAovId::Albedo)));
+    s_shaderGen->setAuxiliaryOutputEnabled(needsAuxOutput);
 
     // Create per-material hit shaders.
     {
@@ -1422,38 +1457,34 @@ cleanup:
       }
 
       // 3. Upload textures and assign images to new material GPU data.
-      std::vector<CgpuImage> images2d;
-      std::vector<CgpuImage> images3d;
-      if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images2d, images3d))
+      std::vector<GiImagePtr> images;
+      if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, images))
       {
         goto cleanup;
       }
 
-      uint32_t image2dCounter = 0;
-      uint32_t image3dCounter = 0;
+      uint32_t imageCounter = 0;
       newMaterialGpuDatas.reserve(hitGroupCompInfos.size());
       for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
       {
         GiMaterial* material = groupInfo.material;
 
         const GiGlslShaderGen::MaterialGenInfo& genInfo = groupInfo.genInfo;
-        size_t texCount = genInfo.textureDescriptions.size();
+        auto texCount = uint32_t(genInfo.textureDescriptions.size());
 
         GiMaterialGpuData gpuData;
         if (texCount > 0)
         {
           gpuData.texOffsetAllocation = texAllocator.allocate(texCount);
+
+          if (gpuData.texOffsetAllocation.offset == OffsetAllocator::Allocation::NO_SPACE)
+          {
+            GI_FATAL("max number of textures exceeded");
+          }
         }
         for (const McTextureDescription& tr : genInfo.textureDescriptions)
         {
-          if (tr.is3dImage)
-          {
-            gpuData.images3d.push_back(images3d[image3dCounter++]);
-          }
-          else
-          {
-            gpuData.images2d.push_back(images2d[image2dCounter++]);
-          }
+          gpuData.images.push_back(images[imageCounter++]);
         }
         newMaterialGpuDatas.push_back(gpuData);
       }
@@ -1545,13 +1576,13 @@ cleanup:
         // regular hit group
         {
           const std::vector<uint8_t>& cSpv = compInfo.closestHitInfo.spv;
-          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT,
+          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CgpuShaderStage::ClosestHit,
                                   .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
 
           if (compInfo.anyHitInfo)
           {
             const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->spv;
-            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT,
+            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
                                     .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
           }
         }
@@ -1560,14 +1591,13 @@ cleanup:
         if (compInfo.anyHitInfo)
         {
           const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->shadowSpv;
-          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_ANY_HIT,
+          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
                                   .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
         }
       }
 
-      // NOTE: this call is internally parallelized.
       std::vector<CgpuShader> hitShaders(createInfos.size());
-      if (!cgpuCreateShaders(s_device, (uint32_t) createInfos.size(), createInfos.data(), hitShaders.data()))
+      if (!cgpuCreateShadersParallel(s_ctx, (uint32_t) createInfos.size(), createInfos.data(), hitShaders.data()))
       {
         goto cleanup;
       }
@@ -1628,7 +1658,7 @@ cleanup:
         CgpuRtHitGroup shadowHitGroup;
         if (!gpuData.anyHits.empty())
         {
-          hitGroup.anyHitShader = gpuData.anyHits[1];
+          shadowHitGroup.anyHitShader = gpuData.anyHits[1];
         }
         hitGroups.push_back(shadowHitGroup);
       };
@@ -1644,8 +1674,7 @@ cleanup:
         .jitteredSampling = renderSettings.jitteredSampling,
         .materialCount = uint32_t(materials.size()),
         .nextEventEstimation = renderSettings.nextEventEstimation,
-        .progressiveAccumulation = renderSettings.progressiveAccumulation,
-        .reorderInvocations = s_deviceFeatures.rayTracingInvocationReorder
+        .reorderInvocations = s_ctxFeatures.rayTracingInvocationReorder
       };
 
       std::vector<uint8_t> spv;
@@ -1654,10 +1683,10 @@ cleanup:
         goto cleanup;
       }
 
-      if (!cgpuCreateShader(s_device, {
+      if (!cgpuCreateShader(s_ctx, {
                               .size = spv.size(),
                               .source = spv.data(),
-                              .stageFlags = CGPU_SHADER_STAGE_FLAG_RAYGEN,
+                              .stageFlags = CgpuShaderStage::RayGen,
                               .maxRayPayloadSize = maxRayPayloadSize,
                               .maxRayHitAttributeSize = maxRayHitAttributeSize
                             }, &rgenShader))
@@ -1682,10 +1711,10 @@ cleanup:
         }
 
         CgpuShader missShader;
-        if (!cgpuCreateShader(s_device, {
+        if (!cgpuCreateShader(s_ctx, {
                                 .size = spv.size(),
                                 .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
+                                .stageFlags = CgpuShaderStage::Miss,
                                 .maxRayPayloadSize = maxRayPayloadSize,
                                 .maxRayHitAttributeSize = maxRayHitAttributeSize
                               }, &missShader))
@@ -1705,10 +1734,10 @@ cleanup:
         }
 
         CgpuShader missShader;
-        if (!cgpuCreateShader(s_device, {
+        if (!cgpuCreateShader(s_ctx, {
                                 .size = spv.size(),
                                 .source = spv.data(),
-                                .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
+                                .stageFlags = CgpuShaderStage::Miss,
                                 .maxRayPayloadSize = maxRayPayloadSize,
                                 .maxRayHitAttributeSize = maxRayHitAttributeSize
                               }, &missShader))
@@ -1725,18 +1754,18 @@ cleanup:
       GB_LOG("creating RT pipeline..");
       fflush(stdout);
 
-      if (!cgpuCreateRtPipeline(s_device, {
-                                  .rgenShader = rgenShader,
-                                  .missShaderCount = (uint32_t) missShaders.size(),
-                                  .missShaders = missShaders.data(),
-                                  .hitGroupCount = (uint32_t) hitGroups.size(),
-                                  .hitGroups = hitGroups.data(),
-                                  .maxRayPayloadSize = maxRayPayloadSize,
-                                  .maxRayHitAttributeSize = maxRayHitAttributeSize
-                                }, &pipeline))
-      {
-        goto cleanup;
-      }
+      cgpuCreateRtPipeline(s_ctx, {
+        .rgenShader = rgenShader,
+        .missShaderCount = (uint32_t)missShaders.size(),
+        .missShaders = missShaders.data(),
+        .hitGroupCount = (uint32_t)hitGroups.size(),
+        .hitGroups = hitGroups.data(),
+        .maxRayPayloadSize = maxRayPayloadSize,
+        .maxRayHitAttributeSize = maxRayHitAttributeSize,
+        .payloadStride = 2
+      }, &pipeline);
+
+      cgpuCreateBindSets(s_ctx, pipeline, bindSets.data(), (uint32_t) bindSets.size());
     }
 
     // Assign GPU data to materials.
@@ -1754,24 +1783,24 @@ cleanup:
       uint32_t texOffset = gpuData.texOffsetAllocation.offset;
 
       uint32_t texCount = 0;
-      for (CgpuImage img : gpuData.images2d)
+      for (GiImagePtr img : gpuData.images)
       {
-        imageBindings2d.push_back({ .image = img, .index = texOffset + texCount });
-        texCount++;
-      }
-      for (CgpuImage img : gpuData.images3d)
-      {
-        imageBindings3d.push_back({ .image = img, .index = texOffset + texCount });
+        uint32_t index = texOffset + texCount;
+        imageBindings.push_back({ .image = img, .index = index });
+        if (index > maxTextureIndex)
+        {
+          maxTextureIndex = index;
+        }
         texCount++;
       }
     }
 
     cache = new GiShaderCache;
     cache->aovMask = aovMask;
+    cache->bindSets = bindSets;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
-    cache->domeLightsAllocation = domeLightsAllocation;
-    cache->imageBindings2d = std::move(imageBindings2d);
-    cache->imageBindings3d = std::move(imageBindings3d);
+    cache->imageBindings = std::move(imageBindings);
+    cache->maxTextureIndex = maxTextureIndex;
     cache->materials.resize(materials.size());
     for (uint32_t i = 0; i < cache->materials.size(); i++)
     {
@@ -1787,21 +1816,18 @@ cleanup:
     // compilation errors is that we want shader hotloading to not bloat resource usage.
     if (!cache)
     {
-      if (domeLightsAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-      {
-        scene->texAllocator.free(domeLightsAllocation);
-      }
       if (rgenShader.handle)
       {
-        cgpuDestroyShader(s_device, rgenShader);
+        cgpuDestroyShader(s_ctx, rgenShader);
       }
       for (CgpuShader shader : missShaders)
       {
-        cgpuDestroyShader(s_device, shader);
+        cgpuDestroyShader(s_ctx, shader);
       }
       if (pipeline.handle)
       {
-        cgpuDestroyPipeline(s_device, pipeline);
+        cgpuDestroyBindSets(s_ctx, bindSets.data(), (uint32_t) bindSets.size());
+        cgpuDestroyPipeline(s_ctx, pipeline);
       }
       for (GiMaterialGpuData& gpuData : newMaterialGpuDatas)
       {
@@ -1815,17 +1841,13 @@ cleanup:
   {
     GiScene* scene = cache->scene;
 
-    if (cache->domeLightsAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-    {
-      scene->texAllocator.free(cache->domeLightsAllocation);
-    }
-
-    cgpuDestroyShader(s_device, cache->rgenShader);
+    cgpuDestroyShader(s_ctx, cache->rgenShader);
     for (CgpuShader shader : cache->missShaders)
     {
-      cgpuDestroyShader(s_device, shader);
+      cgpuDestroyShader(s_ctx, shader);
     }
-    cgpuDestroyPipeline(s_device, cache->pipeline);
+    cgpuDestroyBindSets(s_ctx, cache->bindSets.data(), (uint32_t) cache->bindSets.size());
+    cgpuDestroyPipeline(s_ctx, cache->pipeline);
     delete cache;
   }
 
@@ -1842,6 +1864,7 @@ cleanup:
     bool aovCountChanged = a.aovBindings.size() != b.aovBindings.size();
     bool aovsChanged = aovCountChanged;
     bool aovDefaultsChanged = false;
+    bool renderBufferChanged = false;
     if (!aovCountChanged)
     {
       auto& oldAovs = b.aovBindings;
@@ -1855,7 +1878,10 @@ cleanup:
         if (oldAov.aovId != newAov.aovId)
         {
           aovsChanged = true;
-          break;
+        }
+        if (oldAov.renderBuffer != newAov.renderBuffer)
+        {
+          renderBufferChanged = true;
         }
         if (memcmp(oldAov.clearValue, newAov.clearValue, GI_MAX_AOV_COMP_SIZE) != 0)
         {
@@ -1865,19 +1891,28 @@ cleanup:
     }
     if (aovsChanged)
     {
-      flags |= GiSceneDirtyFlags::DirtyShadersAll;
+      flags |= GiSceneDirtyFlags::DirtyShadersAll | GiSceneDirtyFlags::DirtyBindSets;
     }
     if (aovsChanged || aovDefaultsChanged)
     {
       flags |= GiSceneDirtyFlags::DirtyAovBindingDefaults | GiSceneDirtyFlags::DirtyFramebuffer;
     }
+    if (renderBufferChanged)
+    {
+      flags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
+    }
 
     if (memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
-        memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0 ||
-        a.domeLight != b.domeLight ||
-        a.scene != b.scene)
+        memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0)
     {
       flags |= GiSceneDirtyFlags::DirtyFramebuffer;
+    }
+
+    if (a.domeLight != b.domeLight ||
+        a.scene != b.scene ||
+        a.scene->domeLightTexture != b.scene->domeLightTexture)
+    {
+      flags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
     }
 
     const GiRenderSettings& ra = a.renderSettings;
@@ -1892,15 +1927,14 @@ cleanup:
         ra.depthOfField != rb.depthOfField ||
         ra.filterImportanceSampling != rb.filterImportanceSampling ||
         ra.jitteredSampling != rb.jitteredSampling ||
-        ra.maxVolumeWalkLength != rb.maxVolumeWalkLength ||
-        ra.progressiveAccumulation != rb.progressiveAccumulation)
+        ra.maxVolumeWalkLength != rb.maxVolumeWalkLength)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersRgen;
     }
 
     if (ra.mediumStackSize != rb.mediumStackSize ||
         ra.nextEventEstimation != rb.nextEventEstimation ||
-        ra.denoiseColorAov != rb.denoiseColorAov)
+        ra.progressiveAccumulation != rb.progressiveAccumulation)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersAll;
     }
@@ -1914,6 +1948,46 @@ cleanup:
 
     GiScene* scene = params.scene;
     const GiRenderSettings& renderSettings = params.renderSettings;
+
+    // Allocate memory for render buffers
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      GiRenderBuffer* renderBuffer = binding.renderBuffer;
+
+      if (renderBuffer->deviceMem.handle)
+      {
+        continue;
+      }
+
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
+                              .size = renderBuffer->size,
+                              .debugName = "RenderBufferGpu"
+                            }, &renderBuffer->deviceMem))
+      {
+        GB_ERROR("failed to allocate render buffer");
+        return GiStatus::Error;
+      }
+
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::HostVisible |
+                                                  CgpuMemoryProperties::HostCached,
+                              .size = renderBuffer->size,
+                              .debugName = "RenderBufferCpu"
+                            }, &renderBuffer->hostMem))
+      {
+        GB_ERROR("failed to allocate render buffer");
+        cgpuDestroyBuffer(s_ctx, renderBuffer->deviceMem);
+        return GiStatus::Error;
+      }
+
+      renderBuffer->mappedHostMem = cgpuGetBufferCpuPtr(s_ctx, renderBuffer->hostMem);
+
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
+      s_resetSampleOffset = true;
+    }
 
     if (s_forceShaderCacheInvalid)
     {
@@ -1930,7 +2004,6 @@ cleanup:
     if (GiSceneDirtyFlags flags = _CalcDirtyFlagsForRenderParams(params, scene->oldRenderParams); bool(flags))
     {
       scene->dirtyFlags |= flags;
-
       scene->oldRenderParams = params;
     }
 
@@ -1951,11 +2024,11 @@ cleanup:
         }
         if (gpuData.closestHit.handle)
         {
-          cgpuDestroyShader(s_device, gpuData.closestHit);
+          cgpuDestroyShader(s_ctx, gpuData.closestHit);
         }
         for (CgpuShader shader : gpuData.anyHits)
         {
-          cgpuDestroyShader(s_device, shader);
+          cgpuDestroyShader(s_ctx, shader);
         }
 
         mat->gpuData.reset();
@@ -1971,15 +2044,23 @@ cleanup:
         bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyShadersHit) ||
         bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyShadersMiss))
     {
-      if (scene->shaderCache) _giDestroyShaderCache(scene->shaderCache);
+      GiShaderCache* oldShaderCache = scene->shaderCache;
 
       scene->shaderCache = _giCreateShaderCache(params);
+
+      if (oldShaderCache)
+      {
+        // Delay destruction to reuse images
+        _giDestroyShaderCache(oldShaderCache);
+      }
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyShadersRgen;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyShadersHit;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyShadersMiss;
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyPipeline;
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBvh; // SBT
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer |
+                           GiSceneDirtyFlags::DirtyBvh/*SBT*/ |
+                           GiSceneDirtyFlags::DirtyBindSets;
     }
 
     if (!scene->shaderCache)
@@ -1994,7 +2075,7 @@ cleanup:
       scene->bvh = _giCreateBvh(scene, scene->shaderCache);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBvh;
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
     }
 
     if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyFramebuffer))
@@ -2007,13 +2088,13 @@ cleanup:
     {
       if (scene->aovDefaultValues.handle)
       {
-        s_delayedResourceDestroyer->enqueueDestruction(scene->aovDefaultValues);
+        s_deleteQueue->pushBack(scene->aovDefaultValues);
       }
 
       size_t conservativeSize = int(GiAovId::COUNT) * GI_MAX_AOV_COMP_SIZE;
-      if (!cgpuCreateBuffer(s_device, {
-                              .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                              .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                               .size = conservativeSize,
                               .debugName = "AovDefaults"
                             }, &scene->aovDefaultValues))
@@ -2049,52 +2130,13 @@ cleanup:
       }
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyAovBindingDefaults;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
     }
 
     const GiShaderCache* shaderCache = scene->shaderCache;
+    const GiBvh* bvh = scene->bvh;
 
-    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtySceneParams))
-    {
-      uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
-                                 scene->rectLights.elementCount() + scene->diskLights.elementCount();
-
-      rp::SceneParams sceneParams = {
-        .texture2dCount = (uint32_t) shaderCache->imageBindings2d.size(),
-        .texture3dCount = (uint32_t) shaderCache->imageBindings3d.size(),
-        .sphereLightCount = scene->sphereLights.elementCount(),
-        .distantLightCount = scene->distantLights.elementCount(),
-        .rectLightCount = scene->rectLights.elementCount(),
-        .diskLightCount = scene->diskLights.elementCount(),
-        .totalLightCount = totalLightCount
-      };
-
-      if (!scene->sceneParams.handle)
-      {
-        if (!cgpuCreateBuffer(s_device, {
-                                .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                                .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                                .size = sizeof(sceneParams),
-                                .debugName = "SceneParams"
-                              }, &scene->sceneParams))
-        {
-          GB_ERROR("failed to create scene params buffer");
-          return GiStatus::Error;
-        }
-      }
-
-      if (!s_stager->stageToBuffer((const uint8_t*) &sceneParams, sizeof(sceneParams), scene->sceneParams) ||
-          !s_stager->flush())
-      {
-        GB_ERROR("failed to stage scene params");
-        return GiStatus::Error;
-      }
-
-      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtySceneParams;
-    }
-
-    GiBvh* bvh = scene->bvh;
-
-    // Upload dome lights.
+    // Upload dome lights
     glm::vec4 backgroundColor(0.0f);
     for (const GiAovBinding& binding : params.aovBindings)
     {
@@ -2114,11 +2156,12 @@ cleanup:
 
     if (scene->domeLight != params.domeLight)
     {
-      if (scene->domeLightTexture.handle &&
-          scene->domeLightTexture.handle != scene->fallbackDomeLightTexture.handle)
+      if (scene->domeLightTexture &&
+          scene->domeLightTexture->handle != scene->fallbackDomeLightTexture.handle)
       {
-        s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
-        scene->domeLightTexture.handle = 0;
+        // TODO: if we have multiple frames in flight, we need to wait for last frame's semaphore here
+        scene->domeLightTexture.reset(); // frees memory immediately
+        scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
       }
       scene->domeLight = nullptr;
 
@@ -2127,15 +2170,18 @@ cleanup:
       {
         const char* filePath = domeLight->textureFilePath.c_str();
 
-        bool is3dImage = false;
-        bool flushImmediately = false;
-        if (!s_texSys->loadTextureFromFilePath(filePath, scene->domeLightTexture, is3dImage, flushImmediately))
+        bool destroyImmediately = true;
+        bool keepHdr = true;
+        scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, destroyImmediately, keepHdr);
+
+        if (!scene->domeLightTexture)
         {
           GB_ERROR("unable to load dome light texture at {}", filePath);
         }
         else
         {
           scene->domeLight = domeLight;
+          scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
         }
       }
     }
@@ -2144,10 +2190,10 @@ cleanup:
       // Use fallback texture in case no dome light is set. We still have an explicit binding
       // for the fallback texture because we need the background color in case the textured
       // dome light is not supposed to be seen by the camera ('domeLightCameraVisible' option).
-      scene->domeLightTexture = scene->fallbackDomeLightTexture;
+      scene->domeLightTexture = std::make_shared<CgpuImage>(scene->fallbackDomeLightTexture);
     }
 
-    // Init state for goto error handling.
+    // Init state for goto error handling
     GiStatus result = GiStatus::Error;
 
     if (!scene->sphereLights.commitChanges())
@@ -2176,213 +2222,175 @@ cleanup:
     uint32_t imageWidth = params.aovBindings[0].renderBuffer->width;
     uint32_t imageHeight = params.aovBindings[0].renderBuffer->height;
 
-    // Set up GPU data.
+    // Start command buffer.
     CgpuCommandBuffer commandBuffer;
     CgpuSemaphore semaphore;
     CgpuSignalSemaphoreInfo signalSemaphoreInfo;
     CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
-    auto camForward = glm::normalize(glm::make_vec3(params.camera.forward));
-    auto camUp = glm::normalize(glm::make_vec3(params.camera.up));
+    if (!cgpuCreateCommandBuffer(s_ctx, &commandBuffer))
+      goto cleanup;
 
-    float lensRadius = 0.0f;
-    if (params.camera.fStop > 0.0f)
+    if (!cgpuBeginCommandBuffer(s_ctx, commandBuffer))
+      goto cleanup;
+
+    // Update descriptor sets if needed
+    if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyBindSets))
     {
-      lensRadius = params.camera.focalLength / (2.0f * params.camera.fStop);
-    }
+      GB_DEBUG("updating descriptor sets");
 
-    glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
-    glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
-    uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
+      std::vector<CgpuBufferBinding> buffers;
+      buffers.reserve(16);
 
-    rp::PushConstants pushData = {
-      .cameraPosition                 = glm::make_vec3(params.camera.position),
-      .imageDims                      = ((imageHeight << 16) | imageWidth),
-      .cameraForward                  = camForward,
-      .focusDistance                  = params.camera.focusDistance,
-      .cameraUp                       = camUp,
-      .cameraVFoV                     = params.camera.vfov,
-      .sampleOffset                   = scene->sampleOffset,
-      .lensRadius                     = lensRadius,
-      .sampleCount                    = renderSettings.spp,
-      .maxSampleValue                 = renderSettings.maxSampleValue,
-      .domeLightRotation              = glm::make_vec4(&domeLightRotation[0]),
-      .domeLightEmissionMultiplier    = domeLightEmissionMultiplier,
-      .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
-      .maxBouncesAndRrBounceOffset    = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
-      .rrInvMinTermProb               = renderSettings.rrInvMinTermProb,
-      .lightIntensityMultiplier       = renderSettings.lightIntensityMultiplier,
-      .clipRangePacked                = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
-      .sensorExposure                 = params.camera.exposure,
-      .maxVolumeWalkLength            = renderSettings.maxVolumeWalkLength,
-      .metersPerSceneUnit             = renderSettings.metersPerSceneUnit
-    };
+      buffers.push_back({ .binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = s_bumpAlloc->getBuffer(), .size = sizeof(rp::UniformData) });
 
-    std::vector<CgpuBufferBinding> buffers;
-    buffers.reserve(16);
+      buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_IDS, .buffer = bvh->instanceIdsBuffer });
 
-    buffers.push_back({ .binding = rp::BINDING_INDEX_SCENE_PARAMS, .buffer = scene->sceneParams });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_IDS, .buffer = bvh->instanceIdsBuffer });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_F, .buffer = scene->aovDefaultValues });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_I, .buffer = scene->aovDefaultValues });
 
-    buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_F, .buffer = scene->aovDefaultValues });
-    buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_CLEAR_VALUES_I, .buffer = scene->aovDefaultValues });
+      std::array<uint32_t, size_t(GiAovId::COUNT)> aovBindingIndices = {
+        rp::BINDING_INDEX_AOV_COLOR,
+        rp::BINDING_INDEX_AOV_NORMAL,
+        rp::BINDING_INDEX_AOV_NEE,
+        rp::BINDING_INDEX_AOV_BARYCENTRICS,
+        rp::BINDING_INDEX_AOV_TEXCOORDS,
+        rp::BINDING_INDEX_AOV_BOUNCES,
+        rp::BINDING_INDEX_AOV_CLOCK_CYCLES,
+        rp::BINDING_INDEX_AOV_OPACITY,
+        rp::BINDING_INDEX_AOV_TANGENTS,
+        rp::BINDING_INDEX_AOV_BITANGENTS,
+        rp::BINDING_INDEX_AOV_THIN_WALLED,
+        rp::BINDING_INDEX_AOV_OBJECT_ID,
+        rp::BINDING_INDEX_AOV_DEPTH,
+        rp::BINDING_INDEX_AOV_FACE_ID,
+        rp::BINDING_INDEX_AOV_INSTANCE_ID,
+        rp::BINDING_INDEX_AOV_DOUBLE_SIDED,
+        rp::BINDING_INDEX_AOV_ALBEDO
+      };
 
-    std::array<uint32_t, size_t(GiAovId::COUNT)> aovBindingIndices = {
-      rp::BINDING_INDEX_AOV_COLOR,
-      rp::BINDING_INDEX_AOV_NORMAL,
-      rp::BINDING_INDEX_AOV_NEE,
-      rp::BINDING_INDEX_AOV_BARYCENTRICS,
-      rp::BINDING_INDEX_AOV_TEXCOORDS,
-      rp::BINDING_INDEX_AOV_BOUNCES,
-      rp::BINDING_INDEX_AOV_CLOCK_CYCLES,
-      rp::BINDING_INDEX_AOV_OPACITY,
-      rp::BINDING_INDEX_AOV_TANGENTS,
-      rp::BINDING_INDEX_AOV_BITANGENTS,
-      rp::BINDING_INDEX_AOV_THIN_WALLED,
-      rp::BINDING_INDEX_AOV_OBJECT_ID,
-      rp::BINDING_INDEX_AOV_DEPTH,
-      rp::BINDING_INDEX_AOV_FACE_ID,
-      rp::BINDING_INDEX_AOV_INSTANCE_ID,
-      rp::BINDING_INDEX_AOV_DOUBLE_SIDED
-    };
-
-    for (const GiAovBinding& binding : params.aovBindings)
-    {
-      uint32_t bindingIndex = aovBindingIndices[int(binding.aovId)];
-      buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
-    }
-
-    // <OIDN AOV>
-    bool enableDenoiser = false;
-
-    for (const GiAovBinding& binding : params.aovBindings)
-    {
-      if (binding.aovId == GiAovId::Color)
+      for (const GiAovBinding& binding : params.aovBindings)
       {
-        enableDenoiser = renderSettings.denoiseColorAov;
-        break;
-      }
-    }
-
-    if (enableDenoiser)
-    {
-      if (!scene->denoiserState)
-      {
-        std::string filePath = GB_FMT("{}/{}", s_resourcePath, GI_OIDN_WEIGHTS_FILE);
-
-        GiFile* oidnWeightsFile;
-        bool s = giFileOpen(filePath.c_str(), GiFileUsage::Read, &oidnWeightsFile);
-        if (!s) GB_FATAL("can't read OIDN weights");
-
-        size_t tensorSize = giFileSize(oidnWeightsFile);
-        auto tensorData = (const uint8_t*) giMmap(oidnWeightsFile, 0, tensorSize);
-        if (!tensorData) GB_FATAL("can't read OIDN weights");
-
-        GiTzaTensorDescriptions tensorDescs = giTzaParseTensors(tensorData, tensorSize);
-
-        scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen,
-          *s_stager, *s_delayedResourceDestroyer, tensorDescs, tensorData);
-        // TODO: handle failure
-
-        giMunmap(oidnWeightsFile, (void*) tensorData);
-        giFileClose(oidnWeightsFile);
+        uint32_t bindingIndex = aovBindingIndices[int(binding.aovId)];
+        buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
       }
 
-      bool b = giOidnUpdateState(scene->denoiserState, s_device, imageWidth, imageHeight);
-      assert(b); // TODO: handle
+      size_t imageCount = shaderCache->imageBindings.size() + 2/* dome lights */;
 
-      CgpuBuffer oidnBuffer = giOidnGetInputBuffer(scene->denoiserState);
+      std::vector<CgpuImageBinding> images;
+      images.reserve(imageCount);
 
-      buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_OIDN, .buffer = oidnBuffer });
+      CgpuSamplerBinding sampler = { .binding = rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
+
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = scene->fallbackDomeLightTexture,
+                         .index = scene->domeLightsAllocation.offset + 0 });
+      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *scene->domeLightTexture,
+                         .index = scene->domeLightsAllocation.offset + 1 });
+
+      for (const GiImageBinding& b : shaderCache->imageBindings)
+      {
+        images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES, .image = *b.image, .index = b.index });
+      }
+
+      CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
+
+      CgpuBindings bindings0 = {
+        .bufferCount = (uint32_t) buffers.size(),
+        .buffers = buffers.data(),
+        .samplerCount = imageCount ? 1u : 0u,
+        .samplers = &sampler,
+        .tlasCount = 1u,
+        .tlases = &as
+      };
+
+      CgpuBindings bindings1 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
+      CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
+
+      if (shaderCache->imageBindings.size() > rp::MAX_TEXTURE_COUNT)
+      {
+        GI_FATAL("max number of textures exceeded");
+      }
+
+      cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
+
+      cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[0], &bindings0);
+      cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[1], &bindings1);
+      cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[2], &bindings2);
+
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBindSets;
     }
-    else if (scene->denoiserState)
+
+    // Update uniforms
+    uint32_t uniformOffset;
     {
-      giOidnDestroyState(scene->denoiserState);
-      scene->denoiserState = nullptr;
+      auto camForward = glm::normalize(glm::make_vec3(params.camera.forward));
+      auto camUp = glm::normalize(glm::make_vec3(params.camera.up));
+
+      float lensRadius = 0.0f;
+      if (params.camera.fStop > 0.0f)
+      {
+        lensRadius = params.camera.focalLength / (2.0f * params.camera.fStop);
+      }
+
+      glm::quat domeLightRotation = scene->domeLight ? scene->domeLight->rotation : glm::quat()/* doesn't matter, uniform color */;
+      glm::vec3 domeLightEmissionMultiplier = scene->domeLight ? scene->domeLight->baseEmission : glm::vec3(1.0f);
+      uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
+
+      uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
+        scene->rectLights.elementCount() + scene->diskLights.elementCount();
+
+      auto uniformData = s_bumpAlloc->alloc<rp::UniformData>();
+
+      *uniformData.cpuPtr = {
+        .domeLightRotation = glm::make_vec4(&domeLightRotation[0]),
+        .domeLightEmissionMultiplier = domeLightEmissionMultiplier,
+        .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
+        .maxTextureIndex = shaderCache->maxTextureIndex,
+        .sphereLightCount = scene->sphereLights.elementCount(),
+        .distantLightCount = scene->distantLights.elementCount(),
+        .rectLightCount = scene->rectLights.elementCount(),
+        .diskLightCount = scene->diskLights.elementCount(),
+        .totalLightCount = totalLightCount,
+        .metersPerSceneUnit = renderSettings.metersPerSceneUnit,
+        .maxVolumeWalkLength = renderSettings.maxVolumeWalkLength,
+        .cameraPosition = glm::make_vec3(params.camera.position),
+        .imageDims = ((imageHeight << 16) | imageWidth),
+        .cameraForward = camForward,
+        .focusDistance = params.camera.focusDistance,
+        .cameraUp = camUp,
+        .cameraVFoV = params.camera.vfov,
+        .sampleOffset = scene->sampleOffset,
+        .lensRadius = lensRadius,
+        .spp = renderSettings.spp,
+        .invSampleCount = 1.0f / float(scene->sampleOffset + renderSettings.spp),
+        .maxSampleValue = renderSettings.maxSampleValue,
+        .maxBouncesAndRrBounceOffset = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
+        .rrInvMinTermProb = renderSettings.rrInvMinTermProb,
+        .lightIntensityMultiplier = renderSettings.lightIntensityMultiplier,
+        .clipRangePacked = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
+        .sensorExposure = params.camera.exposure,
+      };
+
+      uniformOffset = uniformData.bufferOffset;
     }
-    // </OIDN AOV>
 
-    size_t imageCount = shaderCache->imageBindings2d.size() + shaderCache->imageBindings3d.size() + 2/* dome lights */;
-
-    std::vector<CgpuImageBinding> images;
-    images.reserve(imageCount);
-
-    CgpuSamplerBinding sampler = { .binding = rp::BINDING_INDEX_SAMPLER, .sampler = s_texSampler };
-
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->fallbackDomeLightTexture,
-                       .index = shaderCache->domeLightsAllocation.offset + 0 });
-    images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = scene->domeLightTexture,
-                       .index = shaderCache->domeLightsAllocation.offset + 1 });
-
-    for (const GiImageBinding& b : shaderCache->imageBindings2d)
+    // Bind pipeline and descriptor sets
     {
-      assert(b.index != 0 && b.index != 1); // reserved for dome lights
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_2D, .image = b.image, .index = b.index });
-    }
-    for (const GiImageBinding& b : shaderCache->imageBindings3d)
-    {
-      images.push_back({ .binding = rp::BINDING_INDEX_TEXTURES_3D, .image = b.image, .index = b.index });
+      std::array<uint32_t, 1> dynamicOffsets { uniformOffset };
+      cgpuCmdBindPipeline(s_ctx, commandBuffer, shaderCache->pipeline,
+                          shaderCache->bindSets.data(), uint32_t(shaderCache->bindSets.size()),
+                          uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
     }
 
-    CgpuTlasBinding as = { .binding = rp::BINDING_INDEX_SCENE_AS, .as = bvh->tlas };
+    // Trace rays
+    cgpuCmdTraceRays(s_ctx, commandBuffer, imageWidth, imageHeight);
 
-    CgpuBindings bindings0 = {
-      .bufferCount = (uint32_t) buffers.size(),
-      .buffers = buffers.data(),
-      .samplerCount = imageCount ? 1u : 0u,
-      .samplers = &sampler,
-      .tlasCount = 1u,
-      .tlases = &as
-    };
-
-    CgpuBindings bindings1 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
-    CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
-
-    if (shaderCache->imageBindings2d.size() > rp::MAX_TEXTURE_COUNT || shaderCache->imageBindings3d.size() > rp::MAX_TEXTURE_COUNT)
-    {
-      GB_ERROR("max number of textures exceeded");
-      goto cleanup;
-    }
-
-    // Set up command buffer.
-    if (!cgpuCreateCommandBuffer(s_device, &commandBuffer))
-      goto cleanup;
-
-    if (!cgpuBeginCommandBuffer(commandBuffer))
-      goto cleanup;
-
-    cgpuCmdTransitionShaderImageLayouts(commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
-
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 0/*descriptorSetIndex*/, &bindings0);
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 1/*descriptorSetIndex*/, &bindings1);
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->pipeline, 2/*descriptorSetIndex*/, &bindings2);
-
-    cgpuCmdBindPipeline(commandBuffer, shaderCache->pipeline);
-
-    // Trace rays.
-    {
-      CgpuShaderStageFlags pushShaderStages = CGPU_SHADER_STAGE_FLAG_RAYGEN |
-                                              CGPU_SHADER_STAGE_FLAG_MISS |
-                                              CGPU_SHADER_STAGE_FLAG_CLOSEST_HIT |
-                                              CGPU_SHADER_STAGE_FLAG_ANY_HIT;
-
-      cgpuCmdPushConstants(commandBuffer, shaderCache->pipeline, pushShaderStages, sizeof(pushData), &pushData);
-    }
-
-    cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
-
-    // Denoise color AOV.
-    if (enableDenoiser)
-    {
-      giOidnRender(scene->denoiserState, commandBuffer);
-    }
-
-    // Copy device to host memory.
+    // Copy device to host memory
     {
       GbSmallVector<CgpuBufferMemoryBarrier, 5> preBarriers;
       GbSmallVector<CgpuBufferMemoryBarrier, 5> postBarriers;
@@ -2397,19 +2405,18 @@ cleanup:
 
         preBarriers[i] = CgpuBufferMemoryBarrier {
           .buffer = renderBuffer->deviceMem,
-          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER |
-                          CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_READ
+          .srcStageMask = CgpuPipelineStage::RayTracingShader,
+          .srcAccessMask = CgpuMemoryAccess::ShaderWrite,
+          .dstStageMask = CgpuPipelineStage::Transfer,
+          .dstAccessMask = CgpuMemoryAccess::TransferRead
         };
 
         postBarriers[i] = CgpuBufferMemoryBarrier {
           .buffer = renderBuffer->hostMem,
-          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_HOST,
-          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_HOST_READ
+          .srcStageMask = CgpuPipelineStage::Transfer,
+          .srcAccessMask = CgpuMemoryAccess::TransferWrite,
+          .dstStageMask = CgpuPipelineStage::Host,
+          .dstAccessMask = CgpuMemoryAccess::HostRead
         };
       }
 
@@ -2418,22 +2425,13 @@ cleanup:
         .bufferBarriers = preBarriers.data()
       };
 
-      cgpuCmdPipelineBarrier(commandBuffer, &preBarrier);
+      cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &preBarrier);
 
       for (const GiAovBinding& binding : params.aovBindings)
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-        CgpuBuffer deviceMem = renderBuffer->deviceMem;
-        if (binding.aovId == GiAovId::Color && renderSettings.denoiseColorAov)
-        {
-          deviceMem = giOidnGetOutputBuffer(scene->denoiserState);
-        }
-
-        cgpuCmdCopyBuffer(commandBuffer, deviceMem, 0, renderBuffer->hostMem);
-
-        if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
-          goto cleanup;
+        cgpuCmdCopyBuffer(s_ctx, commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
       }
 
       CgpuPipelineBarrier postBarrier = {
@@ -2441,24 +2439,24 @@ cleanup:
         .bufferBarriers = postBarriers.data()
       };
 
-      cgpuCmdPipelineBarrier(commandBuffer, &postBarrier);
+      cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &postBarrier);
     }
 
-    // Submit command buffer.
-    cgpuEndCommandBuffer(commandBuffer);
+    // Submit command buffer
+    cgpuEndCommandBuffer(s_ctx, commandBuffer);
 
-    if (!cgpuCreateSemaphore(s_device, &semaphore))
+    if (!cgpuCreateSemaphore(s_ctx, &semaphore))
       goto cleanup;
 
     signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-    if (!cgpuSubmitCommandBuffer(s_device, commandBuffer, 1, &signalSemaphoreInfo))
-      goto cleanup;
+    cgpuSubmitCommandBuffer(s_ctx, commandBuffer, 1, &signalSemaphoreInfo);
 
     waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-    if (!cgpuWaitSemaphores(s_device, 1, &waitSemaphoreInfo))
+    if (!cgpuWaitSemaphores(s_ctx, 1, &waitSemaphoreInfo))
       goto cleanup;
 
-    s_delayedResourceDestroyer->nextFrame();
+    s_deleteQueue->nextFrame();
+    s_deleteQueue->housekeep();
 
     for (const GiAovBinding& binding : params.aovBindings)
     {
@@ -2473,8 +2471,8 @@ cleanup:
     result = GiStatus::Ok;
 
 cleanup:
-    cgpuDestroySemaphore(s_device, semaphore);
-    cgpuDestroyCommandBuffer(s_device, commandBuffer);
+    cgpuDestroySemaphore(s_ctx, semaphore);
+    cgpuDestroyCommandBuffer(s_ctx, commandBuffer);
 
     return result;
   }
@@ -2482,18 +2480,25 @@ cleanup:
   GiScene* giCreateScene()
   {
     CgpuImage fallbackDomeLightTexture;
-    if (!cgpuCreateImage(s_device, { .width = 1, .height = 1 }, &fallbackDomeLightTexture))
+    if (!cgpuCreateImage(s_ctx, { .width = 1, .height = 1 }, &fallbackDomeLightTexture))
     {
       return nullptr;
     }
 
     GiScene* scene = new GiScene{
-      .sphereLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::SphereLight), 64),
-      .distantLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DistantLight), 64),
-      .rectLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::RectLight), 64),
-      .diskLights = GgpuDenseDataStore(s_device, *s_stager, *s_delayedResourceDestroyer, sizeof(rp::DiskLight), 64),
+      .sphereLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::SphereLight), 64),
+      .distantLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DistantLight), 64),
+      .rectLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::RectLight), 64),
+      .diskLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DiskLight), 64),
       .fallbackDomeLightTexture = fallbackDomeLightTexture,
     };
+
+    scene->domeLightsAllocation = scene->texAllocator.allocate(2); // primary + fallback
+    if (scene->domeLightsAllocation.offset == OffsetAllocator::Allocation::NO_SPACE)
+    {
+      GI_FATAL("max number of textures exceeded");
+    }
+
     return scene;
   }
 
@@ -2509,23 +2514,13 @@ cleanup:
     }
     if (scene->domeLight)
     {
-      s_texSys->evictAndDestroyCachedImage(scene->domeLightTexture);
-      scene->domeLightTexture.handle = 0;
+      scene->domeLightTexture.reset();
     }
     if (scene->aovDefaultValues.handle)
     {
-      cgpuDestroyBuffer(s_device, scene->aovDefaultValues);
+      cgpuDestroyBuffer(s_ctx, scene->aovDefaultValues);
     }
-    if (scene->sceneParams.handle)
-    {
-      cgpuDestroyBuffer(s_device, scene->sceneParams);
-    }
-    cgpuDestroyImage(s_device, scene->fallbackDomeLightTexture);
-
-    if (scene->denoiserState)
-    {
-      giOidnDestroyState(scene->denoiserState);
-    }
+    cgpuDestroyImage(s_ctx, scene->fallbackDomeLightTexture);
     delete scene;
   }
 
@@ -2552,7 +2547,7 @@ cleanup:
     data->radiusXYZ[1] = 0.5f;
     data->radiusXYZ[2] = 0.5f;
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     return light;
   }
@@ -2562,7 +2557,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->sphereLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     delete light;
   }
@@ -2640,7 +2635,7 @@ cleanup:
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
     data->invPdf = 1.0f;
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     return light;
   }
@@ -2650,7 +2645,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->distantLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     delete light;
   }
@@ -2728,7 +2723,7 @@ cleanup:
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     return light;
   }
@@ -2738,7 +2733,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->rectLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     delete light;
   }
@@ -2826,7 +2821,7 @@ cleanup:
     data->tangentFramePacked = glm::uvec2(t0packed, t1packed);
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     return light;
   }
@@ -2836,7 +2831,7 @@ cleanup:
     std::lock_guard guard(scene->mutex);
 
     scene->diskLights.free(light->gpuHandle);
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtySceneParams;
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
 
     delete light;
   }
@@ -2911,6 +2906,7 @@ cleanup:
 
   void giDestroyDomeLight(GiDomeLight* light)
   {
+    std::lock_guard guard(light->scene->mutex);
     delete light;
   }
 
@@ -2936,56 +2932,25 @@ cleanup:
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format)
   {
     uint32_t stride = _GiRenderBufferFormatStride(format);
-    uint32_t bufferSize = width * height * stride;
-
-    GB_LOG("creating render buffer with size {}x{} ({:.2f} MiB)", width, height, bufferSize * BYTES_TO_MIB);
-
-    CgpuBuffer deviceMem;
-    if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
-                                     CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*TODO: replace OIDN->renderBuffer transfer with direct shader write*/,
-                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
-                            .size = bufferSize,
-                            .debugName = "RenderBufferGpu"
-                          }, &deviceMem))
-    {
-      return nullptr;
-    }
-
-    CgpuBuffer hostMem;
-    if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST,
-                            .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_HOST_VISIBLE | CGPU_MEMORY_PROPERTY_FLAG_HOST_CACHED,
-                            .size = bufferSize,
-                            .debugName = "RenderBufferCpu"
-                          }, &hostMem))
-    {
-      cgpuDestroyBuffer(s_device, deviceMem);
-      return nullptr;
-    }
-
-    void* mappedMem;
-    if (!cgpuMapBuffer(s_device, hostMem, &mappedMem))
-    {
-      cgpuDestroyBuffer(s_device, hostMem);
-      cgpuDestroyBuffer(s_device, deviceMem);
-      return nullptr;
-    }
+    uint32_t size = width * height * stride;
 
     return new GiRenderBuffer {
-      .deviceMem = deviceMem,
-      .hostMem = hostMem,
-      .mappedHostMem = mappedMem,
       .width = width,
-      .height = height
+      .height = height,
+      .size = size
     };
   }
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    cgpuUnmapBuffer(s_device, renderBuffer->hostMem);
-    s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->deviceMem);
-    s_delayedResourceDestroyer->enqueueDestruction(renderBuffer->hostMem);
+    if (renderBuffer->deviceMem.handle)
+    {
+      s_deleteQueue->pushBack(renderBuffer->deviceMem);
+    }
+    if (renderBuffer->hostMem.handle)
+    {
+      s_deleteQueue->pushBack(renderBuffer->hostMem);
+    }
     delete renderBuffer;
   }
 

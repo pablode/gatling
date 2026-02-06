@@ -24,7 +24,7 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec3 pos = vec3(gl_ObjectToWorldEXT * vec4(localPos, 1.0));
 
     vec3 geomNormal = normalize(cross(p_1 - p_0, p_2 - p_0));
-    geomNormal = normalize(vec3(geomNormal * gl_WorldToObjectEXT));
+    geomNormal = normalize(vec3(geomNormal * mat3(gl_WorldToObjectEXT)));
 
     // Shading normal
     vec3 n_0 = decode_direction(floatBitsToUint(v_0.field2.x));
@@ -32,7 +32,7 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec3 n_2 = decode_direction(floatBitsToUint(v_2.field2.x));
 
     vec3 localNormal = normalize(bc.x * n_0 + bc.y * n_1 + bc.z * n_2);
-    vec3 normal = normalize(vec3(localNormal * gl_WorldToObjectEXT));
+    vec3 normal = normalize(vec3(localNormal * mat3(gl_WorldToObjectEXT)));
 
     // Flip normals to side of the incident ray
     isFrontFace = dot(geomNormal, -gl_WorldRayDirectionEXT) >= 0.0;
@@ -87,8 +87,8 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     state.animation_time = 0.0;
     state.text_coords[0] = vec3(uv, 0.0);
 #ifdef SCENE_TRANSFORMS
-    state.world_to_object = mat4(gl_WorldToObject3x4EXT);
-    state.object_to_world = mat4(gl_ObjectToWorld3x4EXT);
+    state.world_to_object = mat4(gl_WorldToObjectEXT);
+    state.object_to_world = mat4(gl_ObjectToWorldEXT);
 #endif
 #if SCENE_DATA_COUNT > 0
     state.renderer_state = rendererState;

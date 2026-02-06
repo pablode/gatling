@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <assert.h>
 
+#include <gtl/gb/Class.h>
 #include <gtl/gb/HandleStore.h>
 #include <gtl/cgpu/Cgpu.h>
 
@@ -29,14 +30,16 @@
 namespace gtl
 {
   class GgpuStager;
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   class GgpuLinearDataStore
   {
   public:
-    GgpuLinearDataStore(CgpuDevice device,
+    GB_DECLARE_NONCOPY(GgpuLinearDataStore);
+
+    GgpuLinearDataStore(CgpuContext* ctx,
                         GgpuStager& stager,
-                        GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                        GgpuDeleteQueue& deleteQueue,
                         uint64_t elementSize,
                         uint32_t minCapacity);
 
@@ -78,7 +81,7 @@ namespace gtl
     uint64_t returnOrAllocIndex(uint32_t index);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     uint64_t m_elementSize;
     uint32_t m_minCapacity;
     uint32_t m_elementCount;

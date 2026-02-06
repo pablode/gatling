@@ -59,10 +59,16 @@ TF_DEFINE_PRIVATE_TOKENS(
   (normal)
   (wrapS)
   (wrapT)
+  (scale)
+  (bias)
+  (fallback)
   (black)
   (clamp)
   (repeat)
   (mirror)
+  (diffuseColor)
+  (specularColor)
+  (emissiveColor)
   (sourceColorSpace)
   (raw)
   (rgb)
@@ -211,8 +217,8 @@ void _PatchMaterialXColor3FloatMismatches(HdMaterialNetwork2& network)
         SdfPath convertNodePath = upstreamNodePath;
         for (int i = 0; network.nodes.count(convertNodePath) > 0; i++)
         {
-          std::string convertNodeName = GB_FMT("convert{}", i);
-          convertNodePath = upstreamNodePath.AppendElementString(convertNodeName);
+          std::string convertNodeName = GB_FMT("{}_convert{}", upstreamNodePath.GetName(), i);
+          convertNodePath = upstreamNodePath.ReplaceName(TfToken(convertNodeName));
         }
 
         TfToken nodeTypeId;
@@ -409,6 +415,25 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
       return false;
     }
 
+    if (nodeTypeId == _tokens->UsdPreviewSurface)
+    {
+      auto& parameters = nodeIt->second.parameters;
+
+      // tell HdMtlx to translate vectors to specific MaterialX types
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->diffuseColor));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color3f.GetAsToken();
+      }
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->specularColor));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color3f.GetAsToken();
+      }
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->emissiveColor));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color3f.GetAsToken();
+      }
+    }
+
     if (nodeTypeId == _tokens->UsdUVTexture)
     {
       // MaterialX node inputs do not match the USD spec; we need to remap.
@@ -449,6 +474,28 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
       {
         convertWrapType(wrapT->second);
       }
+
+      // tell HdMtlx to translate vectors to MaterialX colors
+      auto scale = parameters.find(_tokens->scale);
+      if (scale != parameters.end())
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->scale));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color4f.GetAsToken();
+      }
+
+      auto bias = parameters.find(_tokens->bias);
+      if (bias != parameters.end())
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->bias));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color4f.GetAsToken();
+      }
+
+      auto fallback = parameters.find(_tokens->fallback);
+      if (fallback != parameters.end())
+      {
+        TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, _tokens->fallback));
+        parameters[typeNameParamName] = SdfValueTypeNames->Color4f.GetAsToken();
+      }
     }
 
     nodeTypeId = mappingIt->second;
@@ -480,6 +527,87 @@ bool _GetMaterialNetworkSurfaceTerminal(const HdMaterialNetwork2& network2, HdMa
   terminalNode = nodeIt->second;
 
   return true;
+}
+
+GiMaterialParameters _TranslateMaterialParameters(const std::map<TfToken, VtValue>& hdParams)
+{
+  GiMaterialParameters giParams;
+  giParams.reserve(hdParams.size());
+
+  for (const auto& kvPair : hdParams)
+  {
+    std::string name = kvPair.first.GetString();
+    const VtValue& value = kvPair.second;
+
+    if (name.find(":") != std::string::npos)
+    {
+      // filter out any metadata
+      continue;
+    }
+
+    if (value.IsHolding<bool>())
+    {
+      giParams[name] = value.UncheckedGet<bool>();
+    }
+    else if (value.IsHolding<int>())
+    {
+      giParams[name] = value.UncheckedGet<int>();
+    }
+    else if (value.IsHolding<float>())
+    {
+      giParams[name] = value.UncheckedGet<float>();
+    }
+    else if (value.IsHolding<GfVec2f>())
+    {
+      auto v = value.UncheckedGet<GfVec2f>();
+      giParams[name] = GbVec2f{ v[0], v[1] };
+    }
+    else if (value.IsHolding<GfVec3f>())
+    {
+      auto v = value.UncheckedGet<GfVec3f>();
+
+      TfToken typeNameParamName(SdfPath::JoinIdentifier(SdfFieldKeys->TypeName, name));
+      auto typeNameIt = hdParams.find(typeNameParamName);
+
+      bool isColor = typeNameIt != hdParams.end() && typeNameIt->second.IsHolding<TfToken>() &&
+        typeNameIt->second.UncheckedGet<TfToken>() == SdfValueTypeNames->Color3f;
+
+      if (isColor)
+      {
+        giParams[name] = GbColor{ v[0], v[1], v[2] };
+      }
+      else
+      {
+        giParams[name] = GbVec3f{ v[0], v[1], v[2] };
+      }
+    }
+    else if (value.IsHolding<GfVec4f>())
+    {
+      auto v = value.UncheckedGet<GfVec4f>();
+      giParams[name] = GbVec4f{ v[0], v[1], v[2], v[3] };
+    }
+    else if (value.IsHolding<SdfAssetPath>())
+    {
+      bool isSrgb = true;
+
+      TfToken colorSpaceParamName(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, name));
+
+      auto colorSpaceIt = hdParams.find(colorSpaceParamName);
+      if (colorSpaceIt != hdParams.end())
+      {
+        isSrgb = (colorSpaceIt->second.UncheckedGet<TfToken>() != _tokens->raw);
+      }
+
+      giParams[name] = GbTextureAsset{ value.UncheckedGet<SdfAssetPath>().GetResolvedPath(), isSrgb };
+    }
+    else
+    {
+      std::string typeName = value.GetTypeName();
+      TF_CODING_ERROR("Material parameter value type %s not supported", typeName.c_str());
+    }
+  }
+
+  return giParams;
 }
 
 MaterialNetworkCompiler::MaterialNetworkCompiler(const mx::DocumentPtr mtlxStdLib)
@@ -521,14 +649,19 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(GiScene* scene, const
     return nullptr;
   }
 
+#if PXR_VERSION >= 2508
+  const SdrTokenMap& metadata = sdrNode->GetMetadata();
+#else
   const NdrTokenMap& metadata = sdrNode->GetMetadata();
+#endif
   const auto& subIdentifierIt = metadata.find(HdGatlingNodeMetadata->subIdentifier);
   TF_AXIOM(subIdentifierIt != metadata.end());
 
   const std::string& subIdentifier = (*subIdentifierIt).second;
   const std::string& fileUri = sdrNode->GetResolvedImplementationURI();
 
-  return giCreateMaterialFromMdlFile(scene, id.GetText(), fileUri.c_str(), subIdentifier.c_str());
+  GiMaterialParameters params = _TranslateMaterialParameters(node.parameters);
+  return giCreateMaterialFromMdlFile(scene, id.GetText(), fileUri.c_str(), subIdentifier.c_str(), params);
 }
 
 GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const

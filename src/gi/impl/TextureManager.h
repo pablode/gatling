@@ -26,35 +26,39 @@
 
 namespace gtl
 {
+  class GgpuDeleteQueue;
   class GgpuStager;
   class GiAssetReader;
+
+  using GiImagePtr = std::shared_ptr<CgpuImage>;
 
   class GiTextureManager
   {
   public:
-    GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, gtl::GgpuStager& stager);
+    GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, gtl::GgpuStager& stager,
+                     GgpuDeleteQueue& deleteQueue);
 
-    ~GiTextureManager();
+    void housekeep();
 
     void destroy();
 
   public:
-    bool loadTextureFromFilePath(const char* filePath,
-                                 CgpuImage& image,
-                                 bool is3dImage = false,
-                                 bool flushImmediately = true);
+    GiImagePtr loadTextureFromFilePath(const char* filePath,
+                                       bool destroyImmediately = false,
+                                       bool keepHdr = false);
 
     bool loadTextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
-                              std::vector<CgpuImage>& images2d,
-                              std::vector<CgpuImage>& images3d);
-
-    void evictAndDestroyCachedImage(CgpuImage image);
+                                 std::vector<GiImagePtr>& images);
 
   private:
-    CgpuDevice m_device;
+    GiImagePtr makeImagePtr(bool destroyImmediately = false);
+
+  private:
+    CgpuContext* m_ctx;
     GiAssetReader& m_assetReader;
     gtl::GgpuStager& m_stager;
-    // FIXME: implement a proper CPU and GPU-aware cache with eviction strategy
-    std::unordered_map<std::string, CgpuImage> m_imageCache;
+    GgpuDeleteQueue& m_deleteQueue;
+    std::unordered_map<std::string, std::weak_ptr<CgpuImage>> m_fileCache;
+    std::unordered_map<uint64_t, std::weak_ptr<CgpuImage>> m_binaryCache;
   };
 }

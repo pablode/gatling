@@ -36,7 +36,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((maxVolumeWalkLength, "max-volume-walk-length"))          \
   ((jitteredSampling, "jittered-sampling"))                  \
   ((clippingPlanes, "clipping-planes"))                      \
-  ((metersPerSceneUnit, "meters-per-scene-unit"))            \
+  ((stageMetersPerUnit, "stage-meters-per-unit"))            \
   ((denoiseColorAov, "denoise-color-aov"))
 
 // mtlx node identifier is given by UsdMtlx.
@@ -73,7 +73,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((debugTangents, "debug:tangents"))                \
   ((debugBitangents, "debug:bitangents"))            \
   ((debugThinWalled, "debug:thinWalled"))            \
-  ((debugDoubleSided, "debug:doubleSided"))
+  ((debugDoubleSided, "debug:doubleSided"))          \
+  (albedo)
 
 #define HD_GATLING_COMMAND_TOKENS                    \
   (printLicenses)

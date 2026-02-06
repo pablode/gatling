@@ -100,7 +100,7 @@ void sampleVolumeScatteringDirection(vec2 xi, float bias, inout vec3 dir)
 bool russian_roulette(in float random_float, inout vec3 throughput)
 {
     float max_throughput = max(throughput.r, max(throughput.g, throughput.b));
-    float p = min(max_throughput, PC.rrInvMinTermProb);
+    float p = min(max_throughput, ubo.rrInvMinTermProb);
 
     if (random_float > p)
     {
@@ -110,233 +110,6 @@ bool russian_roulette(in float random_float, inout vec3 throughput)
     throughput /= p;
 
     return false;
-}
-
-vec3 evaluate_sample(uint pixelIndex,
-                     vec3 ray_origin,
-                     vec3 ray_dir,
-                     RNG_STATE_TYPE rng_state)
-{
-    rayPayload.throughput     = vec3(1.0);
-    rayPayload.bitfield       = 0;
-    rayPayload.radiance       = vec3(0.0);
-    rayPayload.rng_state      = rng_state;
-    rayPayload.ray_origin     = ray_origin;
-    rayPayload.ray_dir        = ray_dir;
-#if MEDIUM_STACK_SIZE > 0
-    rayPayload.walkSegmentPdf = vec3(1.0);
-#endif
-
-    // Correct clip plane curving by getting the hypothenuse length (our current ray)
-    // from the adjacent edge (the forward vector) the angle between both.
-    float cosConeAngle = max(1e-5, dot(ray_dir, PC.cameraForward));
-    vec2 clipRange = unpackHalf2x16(PC.clipRangePacked) / cosConeAngle;
-
-    // Path trace
-    uint rrBounceOffset = PC.maxBouncesAndRrBounceOffset & 0xFFFFu;
-    uint maxBounces = min(SHADE_RAY_PAYLOAD_BOUNCES_MASK, PC.maxBouncesAndRrBounceOffset >> 16);
-
-    [[loop]]
-    while (true)
-    {
-        // Loop exit.
-        uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
-        bool terminate = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_TERMINATE_FLAG) != 0;
-
-        if (bounce >= maxBounces || terminate)
-        {
-             break;
-        }
-
-        float tMin = 0.0;
-        float tMax = FLOAT_MAX;
-#ifdef CLIPPING_PLANES
-        if (bounce == 0)
-        {
-          tMin = clipRange.x;
-          tMax = clipRange.y;
-        }
-#endif
-
-        // Calculate distance for volume sampling
-#if MEDIUM_STACK_SIZE > 0
-        uint mediumIdx = shadeRayPayloadGetMediumIdx(rayPayload);
-
-        if (mediumIdx > 0)
-        {
-            Medium m = rayPayload.media[mediumIdx - 1];
-
-            rayPayload.walkSegmentPdf = vec3(1.0);
-
-            uint walkLength = shadeRayPayloadGetWalk(rayPayload);
-            bool hasScattering = any(greaterThan(m.sigma_s, vec3(0.0)));
-
-            if (hasScattering && walkLength <= PC.maxVolumeWalkLength)
-            {
-                vec3 albedo = safe_div(m.sigma_s, m.sigma_t);
-
-#ifdef RAND_4D
-                vec2 xi = rng4d_next4f(rayPayload.rng_state).xy;
-#else
-                vec2 xi = rng1d_next2f(rayPayload.rng_state);
-#endif
-
-                float s = sampleDistance(albedo, rayPayload.throughput, m.sigma_t, xi.x, rayPayload.walkSegmentPdf);
-
-                s *= PC.metersPerSceneUnit;
-
-                tMax = -log(1.0 - xi.y) / s; // collision free distance (mean free path)
-            }
-        }
-#endif
-
-        // Closest hit shading
-        rayPayload.neeContrib = vec3(0.0);
-
-#ifdef REORDER_INVOCATIONS
-        hitObjectNV hitObject;
-
-        hitObjectTraceRayNV(
-            hitObject,             // hit object
-            sceneAS,               // top-level AS
-            0,                     // ray flags
-            0xFF,                  // cull mask
-            0,                     // sbt record offset
-            2,                     // sbt record stride
-            0,                     // miss index
-            rayPayload.ray_origin, // ray origin
-            tMin,                  // ray min range
-            rayPayload.ray_dir,    // ray direction
-            tMax,                  // ray max range
-            PAYLOAD_INDEX_SHADE    // payload
-        );
-
-        uint reorderHint = 0xFFFFFFFFu;
-
-        if (hitObjectIsHitNV(hitObject))
-        {
-            uvec2 handle = hitObjectGetShaderRecordBufferHandleNV(hitObject);
-            reorderHint = ShaderRecordBuffer(handle).closestHitShaderIndex;
-        }
-
-        reorderThreadNV(hitObject, reorderHint, REORDER_HINT_BIT_COUNT);
-
-        hitObjectExecuteShaderNV(hitObject, PAYLOAD_INDEX_SHADE);
-#else
-        traceRayEXT(
-            sceneAS,               // top-level AS
-            0,                     // ray flags
-            0xFF,                  // cull mask
-            0,                     // sbt record offset
-            2,                     // sbt record stride
-            0,                     // miss index
-            rayPayload.ray_origin, // ray origin
-            tMin,                  // ray min range
-            rayPayload.ray_dir,    // ray direction
-            tMax,                  // ray max range
-            PAYLOAD_INDEX_SHADE    // payload
-        );
-#endif
-
-        // NEE contribution
-#ifdef NEXT_EVENT_ESTIMATION
-        {
-            shadowRayPayload.rng_state = rayPayload.rng_state;
-            shadowRayPayload.shadowed = true; // Gets set to false by miss shader
-
-            vec3 shadowRayOrigin = rayPayload.ray_origin; // actually not correct, but we compensate with tMin
-            float lightDist = length(rayPayload.neeToLight);
-            vec3 shadowRayDir = safe_div(rayPayload.neeToLight, lightDist); // according to spec, must not contain NaNs
-
-            // NV best practices recommends unconditional dispatch with tMin = tMax = 0.0
-            bool traceRay = luminance(rayPayload.neeContrib) > 1e-6 && lightDist > 1e-9;
-            uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
-            float tMin = traceRay ? 0.01 : 0.0; // FIXME: investigate resulting artifacts
-            float tMax = traceRay ? lightDist : 0.0;
-
-            traceRayEXT(
-                sceneAS,             // top-level acceleration structure
-                rayFlags,            // rayFlags
-                0xFF,                // cullMask
-                1,                   // sbtRecordOffset (shadow test: use second hit group)
-                2,                   // sbtRecordStride
-                1,                   // missIndex (differs because of shadow test)
-                shadowRayOrigin,     // ray origin
-                tMin,                // ray min range
-                shadowRayDir,        // ray direction
-                tMax,                // ray max range
-                PAYLOAD_INDEX_SHADOW // payload
-            );
-
-            bool addContrib = traceRay && !shadowRayPayload.shadowed;
-
-            rayPayload.rng_state = shadowRayPayload.rng_state;
-            rayPayload.radiance += rayPayload.neeContrib * float(addContrib);
-
-#if (AOV_MASK & AOV_BIT_DEBUG_NEE) != 0
-            if (bounce == 0)
-              NeeAov[pixelIndex] = shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-#endif
-        }
-#endif
-
-        // Terminate path if throughput is too small
-        if (length(rayPayload.throughput) < 1e-9)
-        {
-            rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
-        }
-
-        // Russian roulette
-        if (bounce > rrBounceOffset)
-        {
-#ifdef RAND_4D
-            float k1 = rng4d_next4f(rayPayload.rng_state).x;
-#else
-            float k1 = rng1d_next1f(rayPayload.rng_state);
-#endif
-
-            if (russian_roulette(k1, rayPayload.throughput))
-            {
-                rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
-            }
-        }
-
-        // Handle volume miss
-#if MEDIUM_STACK_SIZE > 0
-        if ((rayPayload.bitfield & SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG) != 0)
-        {
-#ifdef RAND_4D
-            vec2 xi = rng4d_next4f(rayPayload.rng_state).xy;
-#else
-            vec2 xi = rng1d_next2f(rayPayload.rng_state);
-#endif
-
-            float bias = rayPayload.media[mediumIdx - 1].bias;
-
-            sampleVolumeScatteringDirection(xi, bias, rayPayload.ray_dir);
-
-            rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG;
-        }
-#endif
-
-        // Update bounce count
-        rayPayload.bitfield++;
-    }
-
-#if (AOV_MASK & AOV_BIT_DEBUG_BOUNCES) != 0
-    uint bounces = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
-    BouncesAov[pixelIndex] = colormap_inferno(float(bounces) / float(maxBounces));
-#endif
-
-    // Radiance clamping
-    vec3 radiance = vec3(rayPayload.radiance);
-    float maxValue = max(radiance.r, max(radiance.g, radiance.b));
-    if (maxValue > PC.maxSampleValue)
-    {
-        radiance *= PC.maxSampleValue / maxValue;
-    }
-
-    return max(vec3(0.0), radiance);
 }
 
 // Filter Importance Sampling of a Gauss kernel
@@ -359,47 +132,54 @@ vec2 fisGauss(vec2 xi)
 
 void clearAovs(uint pixelIndex)
 {
-#if (AOV_MASK & AOV_BIT_COLOR) != 0
-  if (PC.sampleOffset == 0)
-  {
-    ColorAov[pixelIndex] = ClearValuesF[AOV_ID_COLOR];
-  }
-#endif
-#if (AOV_MASK & AOV_BIT_NORMAL) != 0
-  NormalsAov[pixelIndex] = ClearValuesF[AOV_ID_NORMAL].rgb;
-#endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
-  BarycentricsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BARYCENTRICS].rgb;
+    BarycentricsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BARYCENTRICS].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
-  TexcoordsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_TEXCOORDS].rgb;
+    TexcoordsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_TEXCOORDS].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-  OpacityAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_OPACITY].rgb;
+    OpacityAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_OPACITY].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
-  TangentsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_TANGENTS].rgb;
+    TangentsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_TANGENTS].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
-  BitangentsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BITANGENTS].rgb;
+    BitangentsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BITANGENTS].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
-  ThinWalledAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_THIN_WALLED].rgb;
+    ThinWalledAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_THIN_WALLED].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
-  ObjectIdAov[pixelIndex] = ClearValuesI[AOV_ID_OBJECT_ID].x;
+    ObjectIdAov[pixelIndex] = ClearValuesI[AOV_ID_OBJECT_ID].x;
 #endif
 #if (AOV_MASK & AOV_BIT_DEPTH) != 0
-  DepthAov[pixelIndex] = ClearValuesF[AOV_ID_DEPTH].x;
+    DepthAov[pixelIndex] = ClearValuesF[AOV_ID_DEPTH].x;
 #endif
 #if (AOV_MASK & AOV_BIT_FACE_ID) != 0
-  FaceIdAov[pixelIndex] = ClearValuesI[AOV_ID_FACE_ID].x;
+    FaceIdAov[pixelIndex] = ClearValuesI[AOV_ID_FACE_ID].x;
 #endif
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
-  InstanceIdAov[pixelIndex] = ClearValuesI[AOV_ID_INSTANCE_ID].x;
+    InstanceIdAov[pixelIndex] = ClearValuesI[AOV_ID_INSTANCE_ID].x;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
-  DoubleSidedAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_DOUBLE_SIDED].rgb;
+    DoubleSidedAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_DOUBLE_SIDED].rgb;
+#endif
+
+    // AOVs that converge over time.
+    if (ubo.sampleOffset != 0)
+    {
+        return;
+    }
+
+#if (AOV_MASK & AOV_BIT_COLOR) != 0
+    ColorAov[pixelIndex] = ClearValuesF[AOV_ID_COLOR];
+#endif
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+    NormalsAov[pixelIndex] = ClearValuesF[AOV_ID_NORMAL].rgb;
+#endif
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+    AlbedoAov[pixelIndex] = ClearValuesF[AOV_ID_ALBEDO].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
   const int CHANNEL_COUNT = 3;
@@ -417,38 +197,38 @@ void main()
 #endif
 
     uvec2 pixel_pos = gl_LaunchIDEXT.xy;
-    uint imageWidth = PC.imageDims & 0xFFFFu;
-    uint imageHeight = PC.imageDims >> 16;
+    uint imageWidth = ubo.imageDims & 0xFFFFu;
+    uint imageHeight = ubo.imageDims >> 16;
 
-    uint pixel_index = pixel_pos.x + pixel_pos.y * imageWidth;
+    uint pixelIndex = pixel_pos.x + pixel_pos.y * imageWidth;
 
-    clearAovs(pixel_index);
+    clearAovs(pixelIndex);
 
-    vec3 camera_right = cross(PC.cameraForward, PC.cameraUp);
+    vec3 camera_right = cross(ubo.cameraForward, ubo.cameraUp);
     float aspect_ratio = float(imageWidth) / float(imageHeight);
 
     float H = 1.0;
     float W = H * aspect_ratio;
-    float d = H / (2.0 * tan(PC.cameraVFoV * 0.5));
+    float d = H / (2.0 * tan(ubo.cameraVFoV * 0.5));
 
     float WX = W / float(imageWidth);
     float HY = H / float(imageHeight);
 
-    vec3 C = PC.cameraPosition + PC.cameraForward * d;
-    vec3 L = C - camera_right * W * 0.5 - PC.cameraUp * H * 0.5;
+    vec3 C = ubo.cameraPosition + ubo.cameraForward * d;
+    vec3 L = C - camera_right * W * 0.5 - ubo.cameraUp * H * 0.5;
 
-    float inv_sample_count = 1.0 / float(PC.sampleCount);
+    float invSpp = 1.0 / float(ubo.spp);
 
     vec3 pixel_color = vec3(0.0, 0.0, 0.0);
-    for (uint s = 0; s < PC.sampleCount; ++s)
+    for (uint s = 0; s < ubo.spp; ++s)
     {
-        uint sampleIndex = PC.sampleOffset + s;
+        uint sampleIndex = ubo.sampleOffset + s;
 #ifdef RAND_4D
         uvec4 rng_state = rng4d_init(pixel_pos.xy, sampleIndex);
         vec4 rand4 = rng4d_next4f(rng_state);
         vec2 rand2_xy = rand4.xy;
 #else
-        uint rng_state = rng1d_init(pixel_index, sampleIndex);
+        uint rng_state = rng1d_init(pixelIndex, sampleIndex);
         vec2 rand2_xy = rng1d_next2f(rng_state);
 #endif
 
@@ -467,16 +247,16 @@ void main()
         vec3 P =
             L +
             (float(pixel_pos.x) + sampleOffset.x) * camera_right * WX +
-            (float(pixel_pos.y) + sampleOffset.y) * PC.cameraUp * HY;
+            (float(pixel_pos.y) + sampleOffset.y) * ubo.cameraUp * HY;
 
-        vec3 rayOrigin = PC.cameraPosition;
-        vec3 rayDir = normalize(P - rayOrigin);
+        vec3 ray_origin = ubo.cameraPosition;
+        vec3 ray_dir = normalize(P - ray_origin);
 
         // Depth of Field
         // (cmp. RT Gems II; Boksansky's Reference PT)
 
 #ifdef DEPTH_OF_FIELD
-        if (PC.lensRadius > 0.0)
+        if (ubo.lensRadius > 0.0)
         {
 #ifdef RAND_4D
             vec2 rand2_zw = rand4.zw;
@@ -484,45 +264,267 @@ void main()
             vec2 rand2_zw = rng1d_next2f(rng_state);
 #endif
 
-            vec3 focalPoint = rayOrigin + rayDir * PC.focusDistance;
-            vec2 apertureSample = sample_hemisphere(rand2_zw).xy * PC.lensRadius;
+            vec3 focalPoint = ray_origin + ray_dir * ubo.focusDistance;
+            vec2 apertureSample = sample_hemisphere(rand2_zw).xy * ubo.lensRadius;
 
-            rayOrigin += apertureSample.x * camera_right;
-            rayOrigin += apertureSample.y * PC.cameraUp;
+            ray_origin += apertureSample.x * camera_right;
+            ray_origin += apertureSample.y * ubo.cameraUp;
 
-            rayDir = normalize(focalPoint - rayOrigin);
+            ray_dir = normalize(focalPoint - ray_origin);
         }
 #endif
 
         /* Beware: a single direction component must not be zero,
          * because we often take the inverse of the direction. */
-        rayDir += vec3(equal(rayDir, vec3(0.0))) * FLOAT_MIN;
+        ray_dir += vec3(equal(ray_dir, vec3(0.0))) * FLOAT_MIN;
 
         /* Path trace sample and accumulate color. */
-        vec3 sample_color = evaluate_sample(pixel_index, rayOrigin, rayDir, rng_state);
-        pixel_color += sample_color * inv_sample_count;
+        rayPayload.throughput     = vec3(1.0);
+        rayPayload.bitfield       = 0;
+        rayPayload.radiance       = vec3(0.0);
+        rayPayload.rng_state      = rng_state;
+        rayPayload.ray_origin     = ray_origin;
+        rayPayload.ray_dir        = ray_dir;
+#if MEDIUM_STACK_SIZE > 0
+        rayPayload.walkSegmentPdf = vec3(1.0);
+#endif
+        rayPayload.pixelIndex     = pixelIndex;
+
+        // Correct clip plane curving by getting the hypothenuse length (our current ray)
+        // from the adjacent edge (the forward vector) the angle between both.
+        float cosConeAngle = max(1e-5, dot(ray_dir, ubo.cameraForward));
+        vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked) / cosConeAngle;
+
+        // Path trace
+        uint rrBounceOffset = ubo.maxBouncesAndRrBounceOffset & 0xFFFFu;
+        uint maxBounces = min(SHADE_RAY_PAYLOAD_BOUNCES_MASK, ubo.maxBouncesAndRrBounceOffset >> 16);
+
+        [[loop]]
+        while (true)
+        {
+            // Loop exit.
+            uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
+            bool terminate = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_TERMINATE_FLAG) != 0;
+
+            if (bounce >= maxBounces || terminate)
+            {
+                 break;
+            }
+
+            float tMin = 0.0;
+            float tMax = FLOAT_MAX;
+#ifdef CLIPPING_PLANES
+            if (bounce == 0)
+            {
+              tMin = clipRange.x;
+              tMax = clipRange.y;
+            }
+#endif
+
+            // Calculate distance for volume sampling
+#if MEDIUM_STACK_SIZE > 0
+            uint mediumIdx = shadeRayPayloadGetMediumIdx(rayPayload);
+
+            if (mediumIdx > 0)
+            {
+                Medium m = rayPayload.media[mediumIdx - 1];
+
+                rayPayload.walkSegmentPdf = vec3(1.0);
+
+                uint walkLength = shadeRayPayloadGetWalk(rayPayload);
+                bool hasScattering = any(greaterThan(m.sigma_s, vec3(0.0)));
+
+                if (hasScattering && walkLength <= ubo.maxVolumeWalkLength)
+                {
+                    vec3 albedo = safe_div(m.sigma_s, m.sigma_t);
+
+#ifdef RAND_4D
+                    vec2 xi = rng4d_next4f(rayPayload.rng_state).xy;
+#else
+                    vec2 xi = rng1d_next2f(rayPayload.rng_state);
+#endif
+
+                    float s = sampleDistance(albedo, rayPayload.throughput, m.sigma_t, xi.x, rayPayload.walkSegmentPdf);
+
+                    s *= ubo.metersPerSceneUnit;
+
+                    tMax = -log(1.0 - xi.y) / s; // collision free distance (mean free path)
+                }
+            }
+#endif
+
+            // Closest hit shading
+            rayPayload.neeContrib = vec3(0.0);
+
+#ifdef REORDER_INVOCATIONS
+            hitObjectNV hitObject;
+
+            hitObjectTraceRayNV(
+                hitObject,             // hit object
+                sceneAS,               // top-level AS
+                0,                     // ray flags
+                0xFF,                  // cull mask
+                0,                     // sbt record offset
+                2,                     // sbt record stride
+                0,                     // miss index
+                rayPayload.ray_origin, // ray origin
+                tMin,                  // ray min range
+                rayPayload.ray_dir,    // ray direction
+                tMax,                  // ray max range
+                PAYLOAD_INDEX_SHADE    // payload
+            );
+
+            uint reorderHint = 0xFFFFFFFFu;
+
+            if (hitObjectIsHitNV(hitObject))
+            {
+                uvec2 handle = hitObjectGetShaderRecordBufferHandleNV(hitObject);
+                reorderHint = ShaderRecordBuffer(handle).closestHitShaderIndex;
+            }
+
+            reorderThreadNV(hitObject, reorderHint, REORDER_HINT_BIT_COUNT);
+
+            hitObjectExecuteShaderNV(hitObject, PAYLOAD_INDEX_SHADE);
+#else
+            traceRayEXT(
+                sceneAS,               // top-level AS
+                0,                     // ray flags
+                0xFF,                  // cull mask
+                0,                     // sbt record offset
+                2,                     // sbt record stride
+                0,                     // miss index
+                rayPayload.ray_origin, // ray origin
+                tMin,                  // ray min range
+                rayPayload.ray_dir,    // ray direction
+                tMax,                  // ray max range
+                PAYLOAD_INDEX_SHADE    // payload
+            );
+#endif
+
+            // NEE contribution
+#ifdef NEXT_EVENT_ESTIMATION
+            {
+                shadowRayPayload.rng_state = rayPayload.rng_state;
+                shadowRayPayload.shadowed = true; // Gets set to false by miss shader
+
+                vec3 shadowray_origin = rayPayload.ray_origin; // actually not correct, but we compensate with tMin
+                float lightDist = length(rayPayload.neeToLight);
+                vec3 shadowray_dir = safe_div(rayPayload.neeToLight, lightDist); // according to spec, must not contain NaNs
+
+                // NV best practices recommends unconditional dispatch with tMin = tMax = 0.0
+                bool traceRay = luminance(rayPayload.neeContrib) > 1e-6 && lightDist > 1e-9;
+                uint rayFlags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+                float tMin = traceRay ? 0.01 : 0.0; // FIXME: investigate resulting artifacts
+                float tMax = traceRay ? lightDist : 0.0;
+
+                traceRayEXT(
+                    sceneAS,             // top-level acceleration structure
+                    rayFlags,            // rayFlags
+                    0xFF,                // cullMask
+                    1,                   // sbtRecordOffset (shadow test: use second hit group)
+                    2,                   // sbtRecordStride
+                    1,                   // missIndex (differs because of shadow test)
+                    shadowray_origin,    // ray origin
+                    tMin,                // ray min range
+                    shadowray_dir,       // ray direction
+                    tMax,                // ray max range
+                    PAYLOAD_INDEX_SHADOW // payload
+                );
+
+                bool addContrib = traceRay && !shadowRayPayload.shadowed;
+
+                rayPayload.rng_state = shadowRayPayload.rng_state;
+                rayPayload.radiance += rayPayload.neeContrib * float(addContrib);
+
+#if (AOV_MASK & AOV_BIT_DEBUG_NEE) != 0
+                if (bounce == 0)
+                {
+                    NeeAov[pixelIndex] = shadowRayPayload.shadowed ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+                }
+#endif
+            }
+#endif
+
+            // Terminate path if throughput is too small
+            if (length(rayPayload.throughput) < 1e-9)
+            {
+                rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+            }
+
+            // Russian roulette
+            if (bounce > rrBounceOffset)
+            {
+#ifdef RAND_4D
+                float k1 = rng4d_next4f(rayPayload.rng_state).x;
+#else
+                float k1 = rng1d_next1f(rayPayload.rng_state);
+#endif
+
+                if (russian_roulette(k1, rayPayload.throughput))
+                {
+                    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_TERMINATE_FLAG;
+                }
+            }
+
+            // Handle volume miss
+#if MEDIUM_STACK_SIZE > 0
+            if ((rayPayload.bitfield & SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG) != 0)
+            {
+#ifdef RAND_4D
+                vec2 xi = rng4d_next4f(rayPayload.rng_state).xy;
+#else
+                vec2 xi = rng1d_next2f(rayPayload.rng_state);
+#endif
+
+                float bias = rayPayload.media[mediumIdx - 1].bias;
+
+                sampleVolumeScatteringDirection(xi, bias, rayPayload.ray_dir);
+
+                rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG;
+            }
+#endif
+
+            // Update bounce count
+            rayPayload.bitfield++;
+        }
+
+#if (AOV_MASK & AOV_BIT_DEBUG_BOUNCES) != 0
+        uint bounces = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
+        BouncesAov[pixelIndex] = colormap_inferno(float(bounces) / float(maxBounces));
+#endif
+
+        // Radiance clamping
+        vec3 radiance = vec3(rayPayload.radiance);
+        float maxValue = max(radiance.r, max(radiance.g, radiance.b));
+        if (maxValue > ubo.maxSampleValue)
+        {
+            radiance *= ubo.maxSampleValue / maxValue;
+        }
+
+        vec3 sample_color = max(vec3(0.0), radiance);
+
+        pixel_color += sample_color * invSpp;
     }
 
 #if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
     int cyclesElapsed = int(clockARB() - start_cycle_count);
-    ClockCyclesAov[pixel_index] = uvec3(cyclesElapsed, 0, 0);
+    ClockCyclesAov[pixelIndex] = uvec3(cyclesElapsed, 0, 0);
 #endif
 
 #if (AOV_MASK & AOV_BIT_COLOR) != 0
-
+    vec3 prevColor = pixel_color;
 #ifdef PROGRESSIVE_ACCUMULATION
-    if (PC.sampleOffset > 0)
+    if (ubo.sampleOffset > 0)
     {
-      float inv_total_sample_count = 1.0 / float(PC.sampleOffset + PC.sampleCount);
-
-      float weight_old = float(PC.sampleOffset) * inv_total_sample_count;
-      float weight_new = float(PC.sampleCount) * inv_total_sample_count;
-
-      pixel_color = weight_old * ColorAov[pixel_index].rgb + weight_new * pixel_color;
+        prevColor = ColorAov[pixelIndex].rgb;
     }
 #endif
+    ColorAov[pixelIndex] = vec4(mix(prevColor, pixel_color, ubo.invSampleCount), 1.0);
+#endif
 
-    ColorAov[pixel_index] = vec4(pixel_color, 1.0);
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+    vec3 normal = (NormalsAov[pixelIndex] * 2.0) - 1.0;
+    NormalsAov[pixelIndex] = (normalize(normal) + 1.0) * 0.5;
 #endif
 
 #if (AOV_MASK & AOV_BIT_OIDN) != 0

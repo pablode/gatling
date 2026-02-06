@@ -1,8 +1,7 @@
 #include "interface/rp_main.h"
 #include "common.glsl"
 
-layout(binding = BINDING_INDEX_SCENE_PARAMS, std430) readonly buffer SceneParamsBuffer { SceneParams sceneParams; };
-
+layout(binding = BINDING_INDEX_UNIFORM_DATA, std140) uniform UniformDataUbo { UniformData ubo; };
 layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLightBuffer { SphereLight sphereLights[]; };
 layout(binding = BINDING_INDEX_DISTANT_LIGHTS, std430) readonly buffer DistantLightBuffer { DistantLight distantLights[]; };
 layout(binding = BINDING_INDEX_RECT_LIGHTS, std430) readonly buffer RectLightBuffer { RectLight rectLights[]; };
@@ -25,7 +24,7 @@ layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_I, std430) readonly buffer Clear
 layout(binding = BINDING_INDEX_AOV_COLOR, std430) buffer Framebuffer { vec4 ColorAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
-layout(binding = BINDING_INDEX_AOV_NORMAL, std430) writeonly buffer NormalBuffer { vec3 NormalsAov[]; };
+layout(binding = BINDING_INDEX_AOV_NORMAL, std430) buffer NormalBuffer { vec3 NormalsAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_NEE) != 0
 layout(binding = BINDING_INDEX_AOV_NEE, std430) writeonly writeonly buffer NeeBuffer { vec3 NeeAov[]; };
@@ -69,13 +68,16 @@ layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) writeonly buffer Instanc
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
 layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, std430) writeonly buffer DoubleSidedBuffer { vec3 DoubleSidedAov[]; };
 #endif
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+layout(binding = BINDING_INDEX_AOV_ALBEDO, std430) buffer AlbedoBuffer { vec3 AlbedoAov[]; };
+#endif
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
 layout(binding = BINDING_INDEX_AOV_OIDN, std430) writeonly buffer OidnBuffer { float16_t OidnAov[]; }; // 9 channels: color, normal, albedo
 #endif
 
-layout(set = 1, binding = BINDING_INDEX_TEXTURES_2D) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
+layout(set = 1, binding = BINDING_INDEX_TEXTURES) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
 
-layout(set = 2, binding = BINDING_INDEX_TEXTURES_3D) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
+layout(set = 2, binding = BINDING_INDEX_TEXTURES) uniform texture3D textures_3d[MAX_TEXTURE_COUNT];
 
 layout(buffer_reference, std430, buffer_reference_align = 32/* largest type (see below) */) buffer IndexBuffer {
   BlasPayloadBufferPreamble preamble; // important: preamble size must match alignment
@@ -88,5 +90,3 @@ layout(buffer_reference, std430, buffer_reference_align = 32/* largest type: ver
 };
 
 layout(buffer_reference, std430, buffer_reference_align = 4) buffer RawIntBuffer { int data[]; };
-
-layout(push_constant) uniform PushConstantBlock { PushConstants PC; };

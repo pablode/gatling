@@ -13,5 +13,4 @@ jobs:
       version-name: Weekly
       tag-name: weekly
       release-notes: 'Weekly build of the master branch.'
-      # NOTE: will be enabled later
-      #publish-prerelease: true
+      publish-prerelease: true

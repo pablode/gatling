@@ -14,5 +14,5 @@ layout(location = PAYLOAD_INDEX_SHADOW) rayPayloadInEXT ShadowRayPayload rayPayl
 
 void main()
 {
-    rayPayload.shadowed = false;
+  rayPayload.shadowed = false;
 }

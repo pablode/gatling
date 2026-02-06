@@ -10,11 +10,6 @@ on:
         description: "Name of the USD release, in the form 'XX.XX'"
         required: true
         type: string
-      mdl-sdk-cache-key-prefix:
-        description: "Prefix of the MDL SDK cache key"
-        required: false
-        type: string
-        default: "MDL-SDK"
       upload-install-artifacts:
         description: "Whether build results should be uploaded or not"
         required: false
@@ -38,6 +33,7 @@ jobs:
         include:
         - name: Ubuntu (GCC)
           image: ubuntu-22.04
+          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-linux-x86-64.tgz"
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
@@ -48,6 +44,7 @@ jobs:
 
         - name: Ubuntu (clang)
           image: ubuntu-22.04
+          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-linux-x86-64.tgz"
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           # Don't upload clang build results -- we already have GCC's
@@ -58,6 +55,7 @@ jobs:
 
         - name: Windows (MSVC)
           image: windows-2022
+          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-nt-x86-64.zip"
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
@@ -70,11 +68,11 @@ jobs:
     with:
       image: ${{ matrix.image }}
       build-config: ${{ inputs.build-config }}
+      mdl-download-url: ${{ matrix.mdl-download-url }}
       usd-download-url: ${{ matrix.usd-download-url }}
       usd-install-path: ${{ matrix.usd-install-path }}
       upload-install-artifacts: ${{ matrix.upload-install-artifacts }}
       archive-name: ${{ matrix.archive-name }}
-      mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_${{ matrix.image }}
       cmake-params: ${{ matrix.cmake-params }}
       run-graphical-tests: ${{ matrix.run-graphical-tests }}
       upload-test-artifacts: ${{ inputs.upload-test-artifacts }}

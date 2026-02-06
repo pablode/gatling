@@ -34,10 +34,14 @@ namespace gtl
       return;
     }
 
-    quill::ConsoleColours consoleColors;
-    consoleColors.set_default_colours();
-    consoleColors.set_colour(quill::LogLevel::Info, quill::ConsoleColours::white);
-    auto sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("console", consoleColors);
+    quill::ConsoleSinkConfig::Colours consoleColors;
+    consoleColors.apply_default_colours();
+    consoleColors.assign_colour_to_log_level(quill::LogLevel::Info, quill::ConsoleSinkConfig::Colours::white);
+
+    quill::ConsoleSinkConfig config;
+    config.set_colours(consoleColors);
+
+    auto sink = quill::Frontend::create_or_get_sink<quill::ConsoleSink>("console", config);
 
     std::vector<std::shared_ptr<quill::Sink>> sinks = extraSinks;
     sinks.push_back(std::move(sink));
@@ -50,6 +54,8 @@ namespace gtl
 
     quill::BackendOptions options;
     options.thread_name = "GbLog";
+    options.check_backend_singleton_instance = false;
+
     quill::Backend::start(options);
   }
 

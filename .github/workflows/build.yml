@@ -9,6 +9,9 @@ on:
       build-config:
         required: true
         type: string
+      mdl-download-url:
+        required: true
+        type: string
       # Must match CI installation path (see USD issue #1025)
       usd-download-url:
         required: true
@@ -21,9 +24,6 @@ on:
         type: boolean
         default: false
       archive-name:
-        required: true
-        type: string
-      mdl-sdk-cache-key:
         required: true
         type: string
       cmake-params:
@@ -92,11 +92,10 @@ jobs:
       if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}
       run: vulkaninfo
 
-    - name: Fetch USD binaries
-      run: curl ${{ inputs.usd-download-url }} -L -v -o USD.tar.gz
-
-    - name: Unpack USD binaries
-      run: mkdir -p ${{ inputs.usd-install-path }} && tar -xvf USD.tar.gz -C ${{ inputs.usd-install-path }}
+    - name: Fetch & unpack USD binaries
+      run: |
+        curl ${{ inputs.usd-download-url }} -L --progress-bar -o USD.tar.gz
+        mkdir -p ${{ inputs.usd-install-path }} && tar -xvf USD.tar.gz -C ${{ inputs.usd-install-path }}
 
     # We need to put the USD libs in the PATH because we build against USD's MaterialX distribution.
     - name: Set up USD environment variables
@@ -112,13 +111,20 @@ jobs:
     - name: Create temporary folders
       run: mkdir BUILD INSTALL
 
-    - name: Restore MDL SDK
-      id: restore-mdl-sdk
-      uses: actions/cache/restore@v4
-      with:
-        path: MDL-SDK
-        key: ${{ inputs.mdl-sdk-cache-key }}
-        fail-on-cache-miss: true
+    - name: Fetch & unpack MDL SDK binaries
+      if: runner.os != 'Windows'
+      run: |
+        curl ${{ inputs.mdl-download-url }} -L --progress-bar -o MDL_SDK.tgz
+        mkdir -p MDL-SDK
+        tar --strip-components=1 -xvzf MDL_SDK.tgz -C MDL-SDK
+
+    - name: Fetch & unpack MDL SDK binaries
+      if: runner.os == 'Windows'
+      run: |
+        curl ${{ inputs.mdl-download-url }} -L --progress-bar -o MDL_SDK.zip
+        mkdir -p MDL-SDK
+        unzip MDL_SDK.zip -d MDL-SDK
+        mv MDL-SDK/*/* MDL-SDK/.
 
     - name: Install NASM
       if: runner.os == 'Windows'

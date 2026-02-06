@@ -18,22 +18,27 @@
 #include "MdlNeurayLoader.h"
 
 #include <mi/mdl_sdk.h>
-
 #ifdef MI_PLATFORM_WINDOWS
 #include <mi/base/miwindows.h>
 #else
 #include <dlfcn.h>
 #endif
 
-#include <string>
+#include <MaterialXCore/Generated.h>
+
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 
+#include <string>
+
 #define GTL_RECOMMENDED_NEURAYLIB_VERSION 56
 #define GTL_RECOMMENDED_NEURAYLIB_VERSION_STRING "2024.1"
-#define GTL_LATEST_TESTED_NEURAYLIB_VERSION 56
+#define GTL_LATEST_TESTED_NEURAYLIB_VERSION 57
 
 static_assert(MI_NEURAYLIB_API_VERSION >= 48, "MDL SDK version is too old!");
+#if MATERIALX_VERSION >= 13900
+static_assert(MI_NEURAYLIB_API_VERSION >= 56, "MaterialX 1.39+ requires MDL SDK 2024.1+!");
+#endif
 static_assert(MI_NEURAYLIB_API_VERSION <= GTL_LATEST_TESTED_NEURAYLIB_VERSION, "Untested MDL SDK version!");
 
 namespace

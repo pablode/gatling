@@ -44,8 +44,8 @@ void main()
 
 #ifndef SHADOW_TEST
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-  uint imageWidth = PC.imageDims & 0xFFFFu;
-  uint pixelIndex = gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * imageWidth;
+  uint imageWidth = ubo.imageDims & 0xFFFFu;
+  uint pixelIndex = rayPayload.pixelIndex;
   OpacityAov[pixelIndex] = (opacity == 0.0) ? vec3(1.0) : colormap_viridis(opacity);
 #endif
 #endif

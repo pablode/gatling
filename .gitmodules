@@ -61,9 +61,15 @@
 [submodule "extern/OffsetAllocator"]
 	path = extern/OffsetAllocator
 	url = https://github.com/sebbbi/OffsetAllocator.git
-[submodule "extern/--recurse"]
-	path = extern/--recurse
-	url = https://github.com/RenderKit/oidn-weights
 [submodule "extern/oidn-weights"]
 	path = extern/oidn-weights
 	url = https://github.com/RenderKit/oidn-weights
+[submodule "extern/xxHash"]
+	path = extern/xxHash
+	url = https://github.com/Cyan4973/xxHash.git
+[submodule "extern/metal-cpp"]
+	path = extern/metal-cpp
+	url = https://github.com/pablode/metal-cpp
+[submodule "extern/SPIRV-Cross"]
+	path = extern/SPIRV-Cross
+	url = https://github.com/pablode/SPIRV-Cross

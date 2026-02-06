@@ -295,28 +295,6 @@ void _PatchUsdPreviewSurfaceNormalInputConnection(HdMaterialNetwork2& network, H
   upstreamNodeParams[_tokens->bias] = GfVec4f(-1.0f, -1.0f, -1.0f, 0.0f);
 }
 
-// Some Sketchfab assets have a normal parameter of the value (1, 1, 1). For example:
-// https://sketchfab.com/3d-models/light-transport-equation-orb-385f55f5d1d34bbc80f91cd86193b78f
-// https://sketchfab.com/3d-models/medieval-fantasy-book-06d5a80a04fc4c5ab552759e9a97d91as
-void _PatchUsdPreviewSurfaceNormalParamValue(VtValue& value)
-{
-  if (!value.IsHolding<GfVec3f>())
-  {
-    return;
-  }
-
-  GfVec3f rawVec = value.UncheckedGet<GfVec3f>();
-  if (rawVec[0] != 1.0f || rawVec[1] != 1.0f || rawVec[2] != 1.0f)
-  {
-    return;
-  }
-
-  TF_WARN("patching UsdPreviewSurface:normal param value from (1,1,1) to default (0,0,1) (set %s to disable)",
-    _envvarDisablePatchUsdPreviewSurfaceNormalMap);
-
-  value = GfVec3f(0, 0, 1);
-}
-
 void _PatchUsdPreviewSurfaceFloatInputTypeMismatches(HdMaterialNetwork2& network)
 {
   for (auto& [path, node] : network.nodes)
@@ -390,10 +368,14 @@ void _PatchUsdPreviewSurfaceNormalMap(HdMaterialNetwork2& network)
       }
     }
 
+    // Some Sketchfab assets have a normal parameter of the value (1, 1, 1). For example:
+    // https://sketchfab.com/3d-models/light-transport-equation-orb-385f55f5d1d34bbc80f91cd86193b78f
+    // https://sketchfab.com/3d-models/medieval-fantasy-book-06d5a80a04fc4c5ab552759e9a97d91as
+    // Any static value assigned to this input is likely incorrect, so remove it.
     auto normalParamIt = parameters.find(_tokens->normal);
     if (normalParamIt != parameters.end())
     {
-      _PatchUsdPreviewSurfaceNormalParamValue(normalParamIt->second);
+      parameters.erase(normalParamIt);
     }
   }
 }

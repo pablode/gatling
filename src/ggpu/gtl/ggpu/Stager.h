@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <functional>
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 namespace gtl
@@ -27,7 +28,10 @@ namespace gtl
   class GgpuStager
   {
   public:
-    GgpuStager(CgpuDevice device);
+    GB_DECLARE_NONCOPY(GgpuStager);
+
+    GgpuStager(CgpuContext* ctx);
+
     ~GgpuStager();
 
     bool allocate();
@@ -38,15 +42,17 @@ namespace gtl
 
     bool stageToBuffer(const uint8_t* src, uint64_t size, CgpuBuffer dst, uint64_t dstOffset = 0);
 
-    bool stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth = 1);
+    bool stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth = 1, uint32_t bpp = 4);
 
   private:
     using CopyFunc = std::function<void(uint64_t srcOffset, uint64_t dstOffset, uint64_t size)>;
 
-    bool stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc);
+    bool stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc, uint32_t offsetAlign = 4);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
+
+    bool m_hasSharedMem;
 
     uint32_t m_writeableHalf = 0;
     CgpuBuffer m_stagingBuffer;

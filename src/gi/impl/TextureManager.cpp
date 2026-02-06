@@ -20,8 +20,11 @@
 
 #include <gtl/mc/Backend.h>
 #include <gtl/gb/Log.h>
+#include <gtl/ggpu/DeleteQueue.h>
 #include <gtl/ggpu/Stager.h>
 #include <gtl/imgio/Imgio.h>
+
+#include <xxhash.h>
 
 #include <assert.h>
 #include <string.h>
@@ -33,7 +36,7 @@ namespace
 
   constexpr static const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
 
-  bool _ReadImage(const char* filePath, GiAssetReader& assetReader, ImgioImage* img)
+  bool _ReadImage(const char* filePath, GiAssetReader& assetReader, ImgioImage* img, ImgioLoadFlags flags)
   {
     GiAsset* asset = assetReader.open(filePath);
     if (!asset)
@@ -44,53 +47,81 @@ namespace
     size_t size = assetReader.size(asset);
     void* data = assetReader.data(asset);
 
-    bool loadResult = data && ImgioLoadImage(data, size, img) == ImgioError::None;
+    bool loadResult = data && ImgioLoadImage(data, size, img, flags) == ImgioError::None;
 
     assetReader.close(asset);
     return loadResult;
+  }
+
+  CgpuImageFormat _TranslateImageFormat(ImgioFormat format)
+  {
+    switch (format)
+    {
+    case ImgioFormat::RGBA8_UNORM: return CgpuImageFormat::R8G8B8A8Unorm;
+    case ImgioFormat::RGB16_FLOAT: return CgpuImageFormat::R16G16B16Sfloat;
+    case ImgioFormat::RGBA16_FLOAT: return CgpuImageFormat::R16G16B16A16Sfloat;
+    case ImgioFormat::R32_FLOAT: return CgpuImageFormat::R32Sfloat;
+    default: return CgpuImageFormat::Undefined;
+    }
   }
 }
 
 namespace gtl
 {
-  GiTextureManager::GiTextureManager(CgpuDevice device, GiAssetReader& assetReader, GgpuStager& stager)
-    : m_device(device)
+  GiTextureManager::GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, GgpuStager& stager,
+                                     GgpuDeleteQueue& deleteQueue)
+    : m_ctx(ctx)
     , m_assetReader(assetReader)
     , m_stager(stager)
+    , m_deleteQueue(deleteQueue)
   {
-  }
-
-  GiTextureManager::~GiTextureManager()
-  {
-    // TODO: use DelayedResourceDestroyer
-    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
-    {
-      cgpuDestroyImage(m_device, it->second);
-    }
   }
 
   void GiTextureManager::destroy()
   {
-    for (const auto& pathImagePair : m_imageCache)
+    for (const auto& pathImagePair : m_fileCache)
     {
-      cgpuDestroyImage(m_device, pathImagePair.second);
+      if (GiImagePtr image = pathImagePair.second.lock(); image)
+      {
+        cgpuDestroyImage(m_ctx, *image);
+      }
     }
-    m_imageCache.clear();
+    for (const auto& pathImagePair : m_binaryCache)
+    {
+      if (GiImagePtr image = pathImagePair.second.lock(); image)
+      {
+        cgpuDestroyImage(m_ctx, *image);
+      }
+    }
+    m_fileCache.clear();
+    m_binaryCache.clear();
   }
 
-  bool GiTextureManager::loadTextureFromFilePath(const char* filePath, CgpuImage& image, bool is3dImage, bool flushImmediately)
+  GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool destroyImmediately, bool keepHdr)
   {
-    auto cacheResult = m_imageCache.find(filePath);
-    if (cacheResult != m_imageCache.end())
+    auto cacheResult = m_fileCache.find(filePath);
+
+    if (cacheResult != m_fileCache.end())
     {
-      image = cacheResult->second;
-      return true;
+      GiImagePtr image = cacheResult->second.lock();
+
+      if (image)
+      {
+        GB_DEBUG("found image \"{}\" in cache", filePath);
+        return image;
+      }
+    }
+
+    ImgioLoadFlags loadFlags = ImgioLoadFlags::None;
+    if (keepHdr)
+    {
+      loadFlags |= ImgioLoadFlags::KeepHdr;
     }
 
     ImgioImage imageData;
-    if (!_ReadImage(filePath, m_assetReader, &imageData))
+    if (!_ReadImage(filePath, m_assetReader, &imageData, loadFlags) || imageData.format == ImgioFormat::UNSUPPORTED)
     {
-      return false;
+      return nullptr;
     }
 
     GB_LOG("read image \"{}\" ({:.2f} MiB)", filePath, imageData.size * BYTES_TO_MIB);
@@ -98,30 +129,43 @@ namespace gtl
     CgpuImageCreateInfo createInfo = {
       .width = imageData.width,
       .height = imageData.height,
-      .is3d = is3dImage,
+      .format = _TranslateImageFormat(imageData.format),
       .debugName = filePath
     };
-    bool creationSuccessful = cgpuCreateImage(m_device, createInfo, &image) &&
-                              m_stager.stageToImage(&imageData.data[0], imageData.size, image, imageData.width, imageData.height, 1);
+
+    GiImagePtr image = makeImagePtr(destroyImmediately);
+
+    bool creationSuccessful = cgpuCreateImage(m_ctx, createInfo, image.get()) &&
+                              m_stager.stageToImage(&imageData.data[0], imageData.size, *image, imageData.width, imageData.height, 1, keepHdr ? 8 : 4);
 
     if (!creationSuccessful)
     {
-      return false;
+      GB_ERROR("failed to upload image {}", filePath);
+      return nullptr;
     }
 
-    m_imageCache[filePath] = image;
+    m_fileCache[filePath] = std::weak_ptr<CgpuImage>(image);
 
-    if (flushImmediately)
-    {
-      m_stager.flush();
-    }
+    return image;
+  }
 
-    return true;
+  GiImagePtr GiTextureManager::makeImagePtr(bool destroyImmediately)
+  {
+    return std::shared_ptr<CgpuImage>(new CgpuImage, [this, destroyImmediately](CgpuImage* d) {
+      if (destroyImmediately)
+      {
+        cgpuDestroyImage(m_ctx, *d);
+      }
+      else
+      {
+        m_deleteQueue.pushBack(*d);
+      }
+      delete d;
+    });
   }
 
   bool GiTextureManager::loadTextureDescriptions(const std::vector<McTextureDescription>& textureDescriptions,
-                                                 std::vector<CgpuImage>& images2d,
-                                                 std::vector<CgpuImage>& images3d)
+                                                 std::vector<GiImagePtr>& images)
   {
     size_t texCount = textureDescriptions.size();
 
@@ -132,25 +176,18 @@ namespace gtl
 
     GB_LOG("staging {} images", texCount);
 
-    images2d.reserve(texCount);
-    images3d.reserve(texCount);
-
-    bool result;
+    images.reserve(texCount);
 
     for (size_t i = 0; i < texCount; i++)
     {
       fflush(stdout);
-      CgpuImage image;
 
       auto& textureResource = textureDescriptions[i];
       auto& payload = textureResource.data;
 
       CgpuImageCreateInfo createInfo;
       createInfo.is3d = textureResource.is3dImage;
-      createInfo.format = textureResource.isFloat ? CGPU_IMAGE_FORMAT_R32_SFLOAT : CGPU_IMAGE_FORMAT_R8G8B8A8_UNORM;
-      createInfo.usage = CGPU_IMAGE_USAGE_FLAG_SAMPLED | CGPU_IMAGE_USAGE_FLAG_TRANSFER_DST;
-
-      auto& imageVector = createInfo.is3d ? images3d : images2d;
+      createInfo.format = textureResource.isFloat ? CgpuImageFormat::R32Sfloat : CgpuImageFormat::R8G8B8A8Unorm;
 
       const char* filePath = textureResource.filePath.c_str();
       if (strcmp(filePath, "") == 0)
@@ -162,64 +199,78 @@ namespace gtl
           continue;
         }
 
+        uint64_t hash = XXH64(payload.data(), payloadSize, 0);
+        if (auto it = m_binaryCache.find(hash); it != m_binaryCache.end())
+        {
+          GiImagePtr image = it->second.lock();
+
+          if (image)
+          {
+            GB_DEBUG("found binary image {:x} in cache", hash);
+
+            images.push_back(image);
+            continue;
+          }
+        }
+
+        GiImagePtr image = makeImagePtr();
+
         GB_LOG("image {} has binary payload of {:.2f} MiB", i, payloadSize * BYTES_TO_MIB);
 
         createInfo.width = textureResource.width;
         createInfo.height = textureResource.height;
         createInfo.depth = textureResource.depth;
+        createInfo.debugName = "[Payload texture]";
 
-        if (!cgpuCreateImage(m_device, createInfo, &image))
+        if (!cgpuCreateImage(m_ctx, createInfo, image.get()))
+        {
           return false;
+        }
 
-        result = m_stager.stageToImage(payload.data(), payloadSize, image, createInfo.width, createInfo.height, createInfo.depth);
-        if (!result) return false;
+        if (!m_stager.stageToImage(payload.data(), payloadSize, *image, createInfo.width, createInfo.height, createInfo.depth))
+        {
+          return false;
+        }
 
-        imageVector.push_back(image);
+        m_binaryCache[hash] = std::weak_ptr<CgpuImage>(image);
+
+        images.push_back(image);
         continue;
       }
 
-      if (loadTextureFromFilePath(filePath, image, textureResource.is3dImage, false))
+      GiImagePtr image = loadTextureFromFilePath(filePath);
+
+      if (image)
       {
-        imageVector.push_back(image);
+        images.push_back(image);
         continue;
       }
+
+      image = makeImagePtr();
 
       GB_ERROR("failed to read image {} from path {}", i, filePath);
+
+      // use 1x1 black fallback image
       createInfo.width = 1;
       createInfo.height = 1;
       createInfo.depth = 1;
 
-      if (!cgpuCreateImage(m_device, createInfo, &image))
+      if (!cgpuCreateImage(m_ctx, createInfo, image.get()))
+      {
         return false;
+      }
 
       uint8_t black[4] = { 0, 0, 0, 0 };
-      result = m_stager.stageToImage(black, 4, image, 1, 1, 1);
-      if (!result) return false;
+      if (!m_stager.stageToImage(black, 4, *image, 1, 1, 1))
+      {
+        return false;
+      }
 
-      imageVector.push_back(image);
+      images.push_back(image);
     }
 
     m_stager.flush();
 
     return true;
-  }
-
-  void GiTextureManager::evictAndDestroyCachedImage(CgpuImage image)
-  {
-    for (auto it = m_imageCache.begin(); it != m_imageCache.end(); it++)
-    {
-      if (it->second.handle != image.handle)
-      {
-        continue;
-      }
-
-      m_imageCache.erase(it);
-
-      cgpuDestroyImage(m_device, image);
-
-      return;
-    }
-
-    assert(false);
   }
 }

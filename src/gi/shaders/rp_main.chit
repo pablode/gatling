@@ -30,9 +30,9 @@ hitAttributeEXT vec2 baryCoord;
 #ifdef NEXT_EVENT_ESTIMATION
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
 {
-    if ((k4.x * sceneParams.totalLightCount) <= sceneParams.sphereLightCount)
+    if ((k4.x * ubo.totalLightCount) <= ubo.sphereLightCount)
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.sphereLightCount), sceneParams.sphereLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.sphereLightCount), ubo.sphereLightCount - 1);
 
         SphereLight light = sphereLights[lightIndex];
 
@@ -48,18 +48,18 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float cosTheta = max(0.0, dot(-dirToLight, lightNormal));
         invPdf = safe_div((light.area > 0.0) ? (light.area * cosTheta) : 1.0, dist * dist);
 
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
-    else if ((k4.x * sceneParams.totalLightCount) <= (sceneParams.sphereLightCount + sceneParams.distantLightCount))
+    else if ((k4.x * ubo.totalLightCount) <= (ubo.sphereLightCount + ubo.distantLightCount))
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.distantLightCount), sceneParams.distantLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.distantLightCount), ubo.distantLightCount - 1);
 
         DistantLight light = distantLights[lightIndex];
 
         dist = 100000.0;
         dirToLight = -light.direction;
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         invPdf = light.invPdf;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
 
@@ -74,9 +74,9 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
             dirToLight = normalize(sin(theta) * (cos(phi) * t1 + sin(phi) * t2) + cos(theta) * dirToLight);
         }
     }
-    else if ((k4.x * sceneParams.totalLightCount) <= (sceneParams.sphereLightCount + sceneParams.distantLightCount + sceneParams.rectLightCount))
+    else if ((k4.x * ubo.totalLightCount) <= (ubo.sphereLightCount + ubo.distantLightCount + ubo.rectLightCount))
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.rectLightCount), sceneParams.rectLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.rectLightCount), ubo.rectLightCount - 1);
 
         RectLight light = rectLights[lightIndex];
 
@@ -96,12 +96,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float area = light.width * light.height;
         invPdf = safe_div((area > 0.0) ? (area * cosTheta) : 1.0, dist * dist);
 
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
     else
     {
-        uint lightIndex = min(uint(k4.y * sceneParams.diskLightCount), sceneParams.diskLightCount - 1);
+        uint lightIndex = min(uint(k4.y * ubo.diskLightCount), ubo.diskLightCount - 1);
 
         DiskLight light = diskLights[lightIndex];
         vec2 radiusXY = vec2(light.radiusX, light.radiusY);
@@ -121,12 +121,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         float area = radiusXY.x * radiusXY.y * PI;
         invPdf = safe_div((area > 0.0) ? (area * cosTheta) : 1.0, dist * dist);
 
-        power = light.baseEmission * PC.lightIntensityMultiplier;
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
 
-    power *= exp2(PC.sensorExposure);
-    invPdf *= float(sceneParams.totalLightCount);
+    power *= exp2(ubo.sensorExposure);
+    invPdf *= float(ubo.totalLightCount);
 }
 #endif
 
@@ -158,75 +158,13 @@ void main()
     thinWalled = mdl_thin_walled(shading_state);
 #endif
 
-    if (bounce == 0)
-    {
-#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0 || (AOV_MASK & AOV_BIT_FACE_ID) != 0
-      IndexBuffer indices = IndexBuffer(payload.bufferAddress);
-      BlasPayloadBufferPreamble preamble = indices.preamble;
-#endif
-      uint imageWidth = PC.imageDims & 0xFFFFu;
-      uint pixelIndex = gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * imageWidth; // only for AOVs
-#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-#ifndef HAS_CUTOUT_TRANSPARENCY
-      OpacityAov[pixelIndex] = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap set in any-hit shader
-#else
-      // Payload fields have been set in any-hit shader.
-#endif
-#endif
-#if (AOV_MASK & AOV_BIT_NORMAL) != 0
-      NormalsAov[pixelIndex] = (normal + vec3(1.0, 1.0, 1.0)) * 0.5;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
-      TangentsAov[pixelIndex] = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
-      BitangentsAov[pixelIndex] = (shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
-      BarycentricsAov[pixelIndex] = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
-      TexcoordsAov[pixelIndex] = shading_state.text_coords[0];
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
-      ThinWalledAov[pixelIndex] = thinWalled ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-#endif
-#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
-      int objectId = preamble.objectId;
-      ObjectIdAov[pixelIndex] = objectId;
-#endif
-#if (AOV_MASK & AOV_BIT_DEPTH) != 0
-      vec2 clipRange = unpackHalf2x16(PC.clipRangePacked);
-      float logDepth = 2.0 * log(gl_HitTEXT / clipRange.x) / log(clipRange.y / clipRange.x) - 1.0;
-      DepthAov[pixelIndex] = logDepth;
-#endif
-#if (AOV_MASK & AOV_BIT_FACE_ID) != 0
-      int faceIdStride = int((preamble.faceIdsInfo & FACE_ID_STRIDE_MASK) >> FACE_ID_STRIDE_OFFSET);
-      int invFaceIdStride = 4 / faceIdStride;
-
-      uint faceIdsOffset = preamble.faceIdsInfo & FACE_ID_MASK;
-      RawIntBuffer faceIdsBuffer = RawIntBuffer(payload.bufferAddress + faceIdsOffset);
-      int encodedFaceId = faceIdsBuffer.data[gl_PrimitiveID / invFaceIdStride];
-
-      encodedFaceId >>= ((gl_PrimitiveID % invFaceIdStride) * 8);
-      FaceIdAov[pixelIndex] = encodedFaceId & (faceIdStride * 8 - 1);
-#endif
-#if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
-      int instanceId = InstanceIds[gl_InstanceID];
-      InstanceIdAov[pixelIndex] = instanceId;
-#endif
-#if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
-      DoubleSidedAov[pixelIndex] = isDoubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-#endif
-    }
-
     /* 3. Apply volume attenuation */
     vec3 prevMediumIor = vec3(1.0);
     vec3 nextMediumIor = vec3(1.0);
 
     if (mediumIdx > 0)
     {
-        float distance = gl_HitTEXT * PC.metersPerSceneUnit;
+        float distance = gl_HitTEXT * ubo.metersPerSceneUnit;
 
         vec3 transmittance;
 #if MEDIUM_STACK_SIZE == 0
@@ -251,7 +189,108 @@ void main()
     const vec3 iorCurrent = (isFrontFace || thinWalled) ? prevMediumIor : vec3(BSDF_USE_MATERIAL_IOR);
     const vec3 iorOther = (isFrontFace || thinWalled) ? vec3(BSDF_USE_MATERIAL_IOR) : nextMediumIor;
 
-    /* 4. Add Emission */
+    /* 4. Output auxialiary AOVs */
+    if (bounce == 0)
+    {
+#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0 || (AOV_MASK & AOV_BIT_FACE_ID) != 0
+        IndexBuffer indices = IndexBuffer(payload.bufferAddress);
+        BlasPayloadBufferPreamble preamble = indices.preamble;
+#endif
+        uint imageWidth = ubo.imageDims & 0xFFFFu;
+        uint pixelIndex = rayPayload.pixelIndex;
+#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
+#ifndef HAS_CUTOUT_TRANSPARENCY
+        OpacityAov[pixelIndex] = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap set in any-hit shader
+#else
+        // Payload fields have been set in any-hit shader.
+#endif
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
+        TangentsAov[pixelIndex] = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
+        BitangentsAov[pixelIndex] = (shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
+        BarycentricsAov[pixelIndex] = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
+        TexcoordsAov[pixelIndex] = shading_state.text_coords[0];
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
+        ThinWalledAov[pixelIndex] = thinWalled ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+#endif
+#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
+        int objectId = preamble.objectId;
+        ObjectIdAov[pixelIndex] = objectId;
+#endif
+#if (AOV_MASK & AOV_BIT_DEPTH) != 0
+        vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked);
+        float logDepth = 2.0 * log(gl_HitTEXT / clipRange.x) / log(clipRange.y / clipRange.x) - 1.0;
+        DepthAov[pixelIndex] = logDepth;
+#endif
+#if (AOV_MASK & AOV_BIT_FACE_ID) != 0
+        int faceIdStride = int((preamble.faceIdsInfo & FACE_ID_STRIDE_MASK) >> FACE_ID_STRIDE_OFFSET);
+        int invFaceIdStride = 4 / faceIdStride;
+
+        uint faceIdsOffset = preamble.faceIdsInfo & FACE_ID_MASK;
+        RawIntBuffer faceIdsBuffer = RawIntBuffer(payload.bufferAddress + faceIdsOffset);
+        int encodedFaceId = faceIdsBuffer.data[gl_PrimitiveID / invFaceIdStride];
+
+        encodedFaceId >>= ((gl_PrimitiveID % invFaceIdStride) * 8);
+        FaceIdAov[pixelIndex] = encodedFaceId & (faceIdStride * 8 - 1);
+#endif
+#if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
+        int instanceId = InstanceIds[gl_InstanceID];
+        InstanceIdAov[pixelIndex] = instanceId;
+#endif
+#if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
+        DoubleSidedAov[pixelIndex] = isDoubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+#endif
+
+        // Accumulating AOVs
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+        vec3 posNormal = (normal + vec3(1.0)) * 0.5;
+        vec3 prevNormal = posNormal;
+#ifdef PROGRESSIVE_ACCUMULATION
+        if (ubo.sampleOffset > 0)
+        {
+            prevNormal = NormalsAov[pixelIndex];
+        }
+#endif
+        NormalsAov[pixelIndex] = mix(prevNormal, posNormal, ubo.invSampleCount);
+#endif
+
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+        Bsdf_auxiliary_data bsdf_aux_data;
+        bsdf_aux_data.ior1 = iorCurrent;
+        bsdf_aux_data.ior2 = iorOther;
+        bsdf_aux_data.k1 = -gl_WorldRayDirectionEXT;
+
+#if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
+        if (!isDoubleSided && thinWalled && !isFrontFace)
+        {
+            mdl_backface_bsdf_scattering_auxiliary(bsdf_aux_data, shading_state);
+        }
+        else
+#endif
+        {
+            mdl_bsdf_scattering_auxiliary(bsdf_aux_data, shading_state);
+        }
+
+        vec3 albedo = bsdf_aux_data.albedo_diffuse + bsdf_aux_data.albedo_glossy;
+        vec3 prevAlbedo = albedo;
+#ifdef PROGRESSIVE_ACCUMULATION
+        if (ubo.sampleOffset > 0)
+        {
+            prevAlbedo = AlbedoAov[pixelIndex];
+        }
+#endif
+        AlbedoAov[pixelIndex] = mix(prevAlbedo, albedo, ubo.invSampleCount);
+#endif
+    }
+
+    /* 5. Add Emission */
 #ifdef IS_EMISSIVE
     {
         if (isDoubleSided)
@@ -292,7 +331,7 @@ void main()
             }
 #endif
 
-            emission_intensity *= exp2(PC.sensorExposure);
+            emission_intensity *= exp2(ubo.sensorExposure);
 
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
         }
@@ -319,12 +358,12 @@ void main()
         mdl_bsdf_scattering_init(shading_state);
     }
 
-    /* 5. BSDF importance sampling. */
+    /* 6. BSDF importance sampling. */
     uint eventType;
     {
         Bsdf_sample_data bsdf_sample_data;
-        bsdf_sample_data.ior1 = vec3(iorCurrent);
-        bsdf_sample_data.ior2 = vec3(iorOther);
+        bsdf_sample_data.ior1 = iorCurrent;
+        bsdf_sample_data.ior2 = iorOther;
         bsdf_sample_data.k1 = -gl_WorldRayDirectionEXT;
 #ifdef RAND_4D
         bsdf_sample_data.xi = rng4d_next4f(rayPayload.rng_state);
@@ -352,7 +391,7 @@ void main()
 
     bool isTransmissionEvent = (eventType & BSDF_EVENT_TRANSMISSION) != 0;
 
-    /* 6. NEE light sampling */
+    /* 7. NEE light sampling */
 #ifdef NEXT_EVENT_ESTIMATION
     if ((eventType & (BSDF_EVENT_DIFFUSE | BSDF_EVENT_GLOSSY)) != 0)
     {
@@ -380,8 +419,8 @@ void main()
         if (neeValid)
         {
             Bsdf_evaluate_data bsdf_eval_data;
-            bsdf_eval_data.ior1 = vec3(iorCurrent);
-            bsdf_eval_data.ior2 = vec3(iorOther);
+            bsdf_eval_data.ior1 = iorCurrent;
+            bsdf_eval_data.ior2 = iorOther;
             bsdf_eval_data.k1 = -gl_WorldRayDirectionEXT;
             bsdf_eval_data.k2 = dirToLight;
             mdl_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);

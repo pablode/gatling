@@ -28,6 +28,6 @@ namespace gtl
   class ImgioHdrDecoder
   {
   public:
-    static ImgioError decode(size_t size, const void* data, ImgioImage* img);
+    static ImgioError decode(size_t size, const void* data, ImgioImage* img, bool keepHdr);
   };
 }

@@ -17,11 +17,9 @@
 
 This is my toy path tracer I work on in my free time.
 
-It is exposed as a Hydra render delegate and comes with a standalone that accepts [Universal Scene Description](https://graphics.pixar.com/usd/release/intro.html) (USD) files. It is cross-platform\*, GPU-accelerated, and implements the [MaterialX](https://www.materialx.org/index.html), [NVIDIA MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) material standards.
+It is exposed as an [OpenUSD](https://graphics.pixar.com/usd/release/intro.html) Hydra render delegate that implements the [MaterialX](https://www.materialx.org/index.html), [NVIDIA MDL](https://www.nvidia.com/en-us/design-visualization/technologies/material-definition-language/) and [UsdPreviewSurface](https://graphics.pixar.com/usd/release/spec_usdpreviewsurface.html) material standards. As a result, it supports complex BSDFs like [OpenPBR](https://academysoftwarefoundation.github.io/OpenPBR/).
 
-Complex BSDFs like [OpenPBR](https://academysoftwarefoundation.github.io/OpenPBR/), Autodesk's Standard Surface, and the glTF shading model are supported using MaterialX and its MDL code generation backend.  The MDL SDK is used to generate evaluation and importance sampling functions as GLSL code, which is compiled to SPIR-V and executed with Vulkan.
-
-\* Hardware ray tracing is required. MacOS will be supported [in the future](https://github.com/KhronosGroup/MoltenVK/issues/427).
+Gatling runs on Vulkan ray tracing and Apple M3+ processors. Tested in CI: ![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white) ![Linux](https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black) ![macOS](https://img.shields.io/badge/macOS-8A2BE2?logo=apple)
 
 ### Build
 
@@ -29,8 +27,8 @@ There are [prebuilt binaries](https://github.com/pablode/gatling/releases) which
 
 Alternatively, for a full source build you need to
 
-- download the <a href="https://developer.nvidia.com/nvidia-mdl-sdk-get-started">MDL SDK</a> 2024.0.4 binaries
-- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v24.11">USD 24.03+</a> with MaterialX support
+- download the <a href="https://github.com/NVIDIA/MDL-SDK/releases/tag/2024.1.4">MDL SDK 2024.1.4</a> binaries
+- download or build <a href="https://github.com/PixarAnimationStudios/USD/tree/v25.11">USD 24.11+</a> with MaterialX support
 
 > Note: it is recommended to have NASM 2.13+ or YASM 1.2.0+ in your PATH to speed up image decoding.
 
@@ -80,9 +78,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 ### Issues
 
-* Features: certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (subdivision, UDIM, volumes, displacement) are not yet supported.
-
-* Real-time editing: changing material parameters and adjusting render settings currently result in long loading times.
+Certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (subdivision, UDIM, volumes, displacement) are not yet supported.
 
 ### License
 

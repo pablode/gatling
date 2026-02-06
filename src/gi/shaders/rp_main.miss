@@ -16,7 +16,7 @@ layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayloa
 #if MEDIUM_STACK_SIZE > 0
 void stepVolume(uint mediumIdx)
 {
-    float distance = gl_RayTmaxEXT * PC.metersPerSceneUnit;
+    float distance = gl_RayTmaxEXT * ubo.metersPerSceneUnit;
 
     Medium m = rayPayload.media[mediumIdx - 1];
 
@@ -81,8 +81,8 @@ void main()
 #endif
 
     uint domeLightIndex = useFallbackDomeLight ? 0 : 1;
-    vec3 sampleDir = normalize(quatRotateDir(PC.domeLightRotation, gl_WorldRayDirectionEXT));
-    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * PC.domeLightEmissionMultiplier;
+    vec3 sampleDir = normalize(quatRotateDir(ubo.domeLightRotation, gl_WorldRayDirectionEXT));
+    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * ubo.domeLightEmissionMultiplier;
 
     rayPayload.radiance += rayPayload.throughput * radiance;
 }

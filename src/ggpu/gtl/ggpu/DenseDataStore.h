@@ -22,18 +22,22 @@
 #include <assert.h>
 #include <unordered_map>
 
+#include <gtl/gb/Class.h>
+
 #include "LinearDataStore.h"
 
 namespace gtl
 {
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   class GgpuDenseDataStore : public GgpuLinearDataStore
   {
   public:
-    GgpuDenseDataStore(CgpuDevice device,
+    GB_DECLARE_NONCOPY(GgpuDenseDataStore);
+
+    GgpuDenseDataStore(CgpuContext* ctx,
                        GgpuStager& stager,
-                       GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                       GgpuDeleteQueue& deleteQueue,
                        uint64_t elementSize,
                        uint32_t minCapacity);
 

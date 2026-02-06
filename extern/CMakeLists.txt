@@ -75,8 +75,8 @@ set(CMAKE_INSTALL_DOCDIR "${CMAKE_CURRENT_BINARY_DIR}/doc" CACHE PATH "" FORCE)
 add_subdirectory(libjpeg-turbo)
 target_include_directories(turbojpeg-static PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libjpeg-turbo>)
 
-# libtiff
 #
+# libtiff
 #
 set(tiff-tools OFF)
 set(tiff-tests OFF)
@@ -168,3 +168,32 @@ install(
   DESTINATION "${GTL_HDGATLING_RESOURCES_DIR}"
   COMPONENT hdGatling
 )
+
+#
+# xxHash
+#
+add_library(xxHash STATIC xxHash/xxhash.c)
+target_include_directories(xxHash PUBLIC xxHash)
+
+if (APPLE)
+  #
+  # metal-cpp
+  #
+  add_library(metal-cpp INTERFACE)
+  target_include_directories(metal-cpp INTERFACE metal-cpp/SingleHeader)
+
+  #
+  # SPIRV-Cross
+  #
+  set(SPIRV_CROSS_STATIC ON)
+  set(SPIRV_CROSS_CLI OFF)
+  set(SPIRV_CROSS_ENABLE_TESTS OFF)
+  set(SPIRV_CROSS_ENABLE_GLSL ON) # "must enable GLSL support to enable MSL support"
+  set(SPIRV_CROSS_ENABLE_HLSL OFF)
+  set(SPIRV_CROSS_ENABLE_MSL ON)
+  set(SPIRV_CROSS_ENABLE_CPP OFF)
+  set(SPIRV_CROSS_ENABLE_REFLECT OFF)
+  set(SPIRV_CROSS_SKIP_INSTALL ON)
+  set(SPIRV_CROSS_FORCE_PIC ON)
+  add_subdirectory(SPIRV-Cross)
+endif()

@@ -90,9 +90,6 @@ namespace gtl
 
     bool result = false;
 
-    uint32_t bindingCount;
-    std::vector<SpvReflectDescriptorBinding*> bindings;
-
     uint32_t interfaceVarCount;
     std::vector<SpvReflectInterfaceVariable*> interfaceVars;
 
@@ -112,6 +109,7 @@ namespace gtl
 
     reflection->maxRayPayloadSize = 0;
     reflection->maxRayHitAttributeSize = 0;
+    reflection->payloadCount = 0;
 
     for (const SpvReflectInterfaceVariable* interfaceVar : interfaceVars)
     {
@@ -124,6 +122,8 @@ namespace gtl
         {
           reflection->maxRayPayloadSize = size;
         }
+
+        reflection->payloadCount++;
       }
       else if (interfaceVar->storage_class == SpvStorageClassHitAttributeKHR)
       {
@@ -175,19 +175,20 @@ namespace gtl
         dstBinding.readAccess = srcBinding->accessed;
         const SpvReflectTypeDescription* typeDescription = srcBinding->type_description;
         dstBinding.writeAccess = srcBinding->accessed && ~(typeDescription->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+        dstBinding.dim = uint32_t(srcBinding->image.dim) + 1; // enum starts with 0
       }
     }
 
-    if (shaderModule.push_constant_block_count == 0)
+    if (shaderModule.entry_point_count != 1)
     {
-      reflection->pushConstantsSize = 0;
+      goto fail;
     }
     else
     {
-      assert(shaderModule.push_constant_block_count == 1);
-
-      const SpvReflectBlockVariable* pcBlock = &shaderModule.push_constant_blocks[0];
-      reflection->pushConstantsSize = pcBlock->size;
+      const SpvReflectEntryPoint& entryPoint = shaderModule.entry_points[0];
+      reflection->workgroupSize[0] = entryPoint.local_size.x;
+      reflection->workgroupSize[1] = entryPoint.local_size.y;
+      reflection->workgroupSize[2] = entryPoint.local_size.z;
     }
 
     result = true;

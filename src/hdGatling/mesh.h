@@ -35,7 +35,7 @@ public:
                 GiScene* scene,
                 GiMaterial* defaultMaterial);
 
-  ~HdGatlingMesh() override;
+  void Finalize(HdRenderParam* renderParam) override;
 
 public:
   void Sync(HdSceneDelegate* delegate,

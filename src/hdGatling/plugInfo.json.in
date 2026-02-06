@@ -9,11 +9,11 @@
                         "priority": 99
                     },
                     "HdGatlingMdlDiscoveryPlugin": {
-                        "bases": ["NdrDiscoveryPlugin"],
+                        "bases": ["@USD_NODE_LIB@DiscoveryPlugin"],
                         "displayName": "MDL Discovery"
                     },
                     "HdGatlingMdlParserPlugin": {
-                        "bases": ["NdrParserPlugin"],
+                        "bases": ["@USD_NODE_LIB@ParserPlugin"],
                         "displayName": "MDL Node Parser"
                     }
                 }

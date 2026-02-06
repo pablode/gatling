@@ -49,13 +49,26 @@ namespace gtl
     return true;
   }
 
+  void GiGlslShaderGen::setAuxiliaryOutputEnabled(bool enabled)
+  {
+    m_mcBackend->setAuxiliaryOutputEnabled(enabled);
+  }
+
   void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, const GiGlslShaderGen::CommonShaderParams& params)
   {
 #if defined(NDEBUG)
     stitcher.appendDefine("NDEBUG");
 #endif
     stitcher.appendDefine("AOV_MASK", (int) params.aovMask);
+    if (params.debugPrintf)
+    {
+      stitcher.appendDefine("DEBUG_PRINTF");
+    }
     stitcher.appendDefine("MEDIUM_STACK_SIZE", (int32_t) params.mediumStackSize);
+    if (params.progressiveAccumulation)
+    {
+      stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
+    }
   }
 
   bool GiGlslShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)
@@ -94,10 +107,6 @@ namespace gtl
     if (params.nextEventEstimation)
     {
       stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
-    }
-    if (params.progressiveAccumulation)
-    {
-      stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
     }
     if (params.clippingPlanes)
     {

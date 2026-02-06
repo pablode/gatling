@@ -22,6 +22,36 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if PXR_VERSION >= 2508
+SdrShaderNodeDiscoveryResultVec HdGatlingMdlDiscoveryPlugin::DiscoverShaderNodes([[maybe_unused]] const Context& ctx)
+{
+  SdrShaderNodeDiscoveryResultVec result;
+
+  SdrShaderNodeDiscoveryResult mdlNode(
+    HdGatlingNodeIdentifiers->mdl, // identifier
+    SdrVersion(1),                 // version
+    HdGatlingNodeIdentifiers->mdl, // name
+    TfToken(),                     // family
+    HdGatlingDiscoveryTypes->mdl,  // discoveryType
+    HdGatlingSourceTypes->mdl,     // sourceType
+    std::string(),                 // uri
+    std::string()                  // resolvedUri
+  );
+  result.push_back(mdlNode);
+
+  return result;
+}
+
+const SdrStringVec& HdGatlingMdlDiscoveryPlugin::GetSearchURIs() const
+{
+  static const SdrStringVec s_searchURIs;
+  return s_searchURIs;
+}
+
+SDR_REGISTER_DISCOVERY_PLUGIN(HdGatlingMdlDiscoveryPlugin);
+
+#else
+
 NdrNodeDiscoveryResultVec HdGatlingMdlDiscoveryPlugin::DiscoverNodes([[maybe_unused]] const Context& ctx)
 {
   NdrNodeDiscoveryResultVec result;
@@ -48,5 +78,6 @@ const NdrStringVec& HdGatlingMdlDiscoveryPlugin::GetSearchURIs() const
 }
 
 NDR_REGISTER_DISCOVERY_PLUGIN(HdGatlingMdlDiscoveryPlugin);
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE

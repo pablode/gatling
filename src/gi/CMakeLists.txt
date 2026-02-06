@@ -45,8 +45,9 @@ target_compile_definitions(
 
 target_link_libraries(
   gi
-  PRIVATE
+  PUBLIC
     gb
+  PRIVATE
     mc
     cgpu
     ggpu
@@ -61,6 +62,7 @@ target_link_libraries(
     blosc2_static
     efsw-static
     OffsetAllocator
+    xxHash
 )
 
 if(OpenMP_CXX_FOUND)
@@ -85,5 +87,11 @@ install(
 install(
   DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mdl/"
   DESTINATION "${GTL_HDGATLING_RESOURCES_DIR}/mdl"
+  COMPONENT hdGatling
+)
+
+install(
+  DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/mtlx/"
+  DESTINATION "./hdGatling/resources/mtlx"
   COMPONENT hdGatling
 )

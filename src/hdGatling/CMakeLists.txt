@@ -56,10 +56,19 @@ target_compile_definitions(
     # Required for PLUG_THIS_PLUGIN macro
     MFB_PACKAGE_NAME=hdGatling
   PRIVATE
-    GI_LICENSE_FILE_NAME="LICENSE"
+    HDGATLING_LICENSE_FILE_NAME="LICENSE"
     # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
     "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
 )
+
+if (APPLE)
+  target_compile_definitions(
+    hdGatling
+    PRIVATE
+      # TODO: this feature causes artifacts on Metal which need to be investigated
+      HDGATLING_DISABLE_VOLUME_SAMPLING=1
+  )
+endif()
 
 # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
 if(MSVC_VERSION GREATER_EQUAL 1920)
@@ -67,7 +76,9 @@ if(MSVC_VERSION GREATER_EQUAL 1920)
 endif()
 
 if(TARGET usd_ms)
-  set(USD_LIBS_PUBLIC usd_ms)
+  set(USD_LIBS_PUBLIC usd_ms) # before v25.11
+elseif(TARGET usd_m)
+  set(USD_LIBS_PUBLIC usd_m)  # equal and after v25.11
 else()
   set(USD_LIBS_PUBLIC hd)
   set(USD_LIBS_PRIVATE usdImaging usdMtlx hdMtlx glf)
@@ -89,6 +100,11 @@ endif()
 
 set(PLUGINFO_PATH "${CMAKE_CURRENT_BINARY_DIR}/plugInfo.json")
 set(PLUG_INFO_LIBRARY_PATH "${PLUGINFO_LIBPATH_PREFIX}/hdGatling${CMAKE_SHARED_LIBRARY_SUFFIX}")
+if(PXR_VERSION GREATER_EQUAL 2508)
+  set(USD_NODE_LIB "Sdr")
+else()
+  set(USD_NODE_LIB "Ndr")
+endif()
 configure_file(plugInfo.json.in "${PLUGINFO_PATH}" @ONLY)
 
 install(

@@ -545,6 +545,10 @@ TEST_SUITE("Graphical")
   {
   }
 
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "MaterialX.ColorSpaces")
+  {
+  }
+
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Mesh.PrimvarInterpolation")
   {
   }

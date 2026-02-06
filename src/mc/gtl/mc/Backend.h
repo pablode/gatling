@@ -71,9 +71,9 @@ namespace gtl
   public:
     bool init(McRuntime& runtime);
 
-    bool genGlsl(const McMdlMaterial& material,
-                 McDfMap dfMap,
-                 McGlslGenResult& result);
+    void setAuxiliaryOutputEnabled(bool enabled);
+
+    bool genGlsl(const McMdlMaterial& material, McDfMap dfMap, McGlslGenResult& result);
 
   private:
     class _Impl;

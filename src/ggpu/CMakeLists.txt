@@ -1,12 +1,14 @@
 add_library(
   ggpu STATIC
-  gtl/ggpu/DelayedResourceDestroyer.h
+  gtl/ggpu/BumpAllocator.h
+  gtl/ggpu/DeleteQueue.h
   gtl/ggpu/DenseDataStore.h
   gtl/ggpu/LinearDataStore.h
   gtl/ggpu/ResizableBuffer.h
   gtl/ggpu/Stager.h
   gtl/ggpu/SyncBuffer.h
-  impl/DelayedResourceDestroyer.cpp
+  impl/BumpAllocator.cpp
+  impl/DeleteQueue.cpp
   impl/DenseDataStore.cpp
   impl/LinearDataStore.cpp
   impl/ResizableBuffer.cpp

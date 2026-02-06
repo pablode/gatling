@@ -20,7 +20,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <memory>
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 #include "ResizableBuffer.h"
@@ -28,24 +30,18 @@
 namespace gtl
 {
   class GgpuStager;
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   class GgpuSyncBuffer
   {
   public:
-    enum class UpdateStrategy
-    {
-      PersistentMapping,
-      OptimalStaging
-    };
+    GB_DECLARE_NONCOPY(GgpuSyncBuffer);
 
-  public:
-    GgpuSyncBuffer(CgpuDevice device,
+    GgpuSyncBuffer(CgpuContext* ctx,
                    GgpuStager& stager,
-                   GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
+                   GgpuDeleteQueue& deleteQueue,
                    uint64_t elementSize,
-                   UpdateStrategy updateStrategy = UpdateStrategy::OptimalStaging,
-                   CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER);
+                   CgpuBufferUsage bufferUsage = CgpuBufferUsage::Storage);
 
     ~GgpuSyncBuffer();
 
@@ -66,7 +62,7 @@ namespace gtl
       return (T*) write(offset * m_elementSize, range * m_elementSize);
     }
 
-    bool resize(CgpuDevice device, CgpuCommandBuffer commandBuffer, uint64_t newSize);
+    bool resize(CgpuContext* ctx, CgpuCommandBuffer commandBuffer, uint64_t newSize);
 
     CgpuBuffer buffer() const;
 
@@ -75,16 +71,15 @@ namespace gtl
     bool commitChanges();
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     GgpuStager& m_stager;
     uint64_t m_elementSize;
-    UpdateStrategy m_updateStrategy;
 
     uint64_t m_size = 0;
-    GgpuResizableBuffer m_deviceBuffer; // only for OptimalStaging strategy
-    GgpuResizableBuffer m_hostBuffer;
+    GgpuResizableBuffer m_deviceBuffer;
+    std::unique_ptr<uint8_t[]> m_hostMem;
 
-    uint8_t* m_mappedHostMem = nullptr;
+    // TODO: list of ranges or an interval tree for fine granular tracking
     uint64_t m_dirtyRangeBegin = UINT64_MAX;
     uint64_t m_dirtyRangeEnd = 0;
   };

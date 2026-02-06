@@ -38,74 +38,86 @@ namespace mx = MaterialX;
 
 namespace
 {
-  bool _IsBxdfWithInputValue(mx::NodePtr node,
-                             const std::string& category,
-                             const std::string& inputName,
-                             mx::ValuePtr expectedValue)
+  enum class OpacityEstimation
+  {
+    OPAQUE, TRANSPARENT, UNKNOWN
+  };
+
+  OpacityEstimation _EstimateOpacityFromInput(mx::NodePtr node,
+                                              const std::string& category,
+                                              const std::string& inputName,
+                                              mx::ValuePtr defaultValue)
   {
     if (!node || node->getCategory() != category)
     {
-      return false;
+      return OpacityEstimation::UNKNOWN;
+    }
+
+    if (node->getConnectedNode(inputName) != nullptr)
+    {
+      return OpacityEstimation::TRANSPARENT; // custom logic hooked up
     }
 
     mx::ValuePtr inputValue = node->getInputValue(inputName);
     float floatEps = 0.0001f;
 
-    if (inputValue && inputValue->isA<float>() && expectedValue->isA<float>())
+    if (inputValue && inputValue->isA<float>() && defaultValue->isA<float>())
     {
-      return fabs(inputValue->asA<float>() - expectedValue->asA<float>()) < floatEps;
+      return (fabs(inputValue->asA<float>() - defaultValue->asA<float>()) < floatEps) ? OpacityEstimation::OPAQUE : OpacityEstimation::TRANSPARENT;
     }
 
-    if (inputValue && inputValue->isA<mx::Color3>() && expectedValue->isA<mx::Color3>())
+    if (inputValue && inputValue->isA<mx::Color3>() && defaultValue->isA<mx::Color3>())
     {
-      mx::Color3 diff = inputValue->asA<mx::Color3>() - expectedValue->asA<mx::Color3>();
-      return fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps;
+      mx::Color3 diff = inputValue->asA<mx::Color3>() - defaultValue->asA<mx::Color3>();
+      return (fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps) ? OpacityEstimation::OPAQUE : OpacityEstimation::TRANSPARENT;
     }
 
-    if (inputValue && inputValue->isA<int>() && expectedValue->isA<int>())
+    if (inputValue && inputValue->isA<int>() && defaultValue->isA<int>())
     {
-      return inputValue->asA<int>() == expectedValue->asA<int>();
+      return (inputValue->asA<int>() == defaultValue->asA<int>()) ? OpacityEstimation::OPAQUE : OpacityEstimation::TRANSPARENT;
     }
 
-    return false;
+    return OpacityEstimation::UNKNOWN;
   }
 
-  bool _HasSurfaceShaderNoCutoutTransparency(mx::TypedElementPtr element)
+  struct OpacityInputDescription
+  {
+    const char* nodeCategory;
+    const char* inputName;
+    mx::ValuePtr defaultValue;
+  };
+
+  const static std::vector<OpacityInputDescription> OPACITY_INPUT_DESCRIPTIONS = {
+    { "UsdPreviewSurface", "opacity", mx::Value::createValue(1.0f) },
+    { "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f)) },
+    { "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* OPAQUE */) },
+    { "gltf_pbr", "alpha_mode", mx::Value::createValue(2 /* BLEND */) },
+    { "open_pbr_surface", "geometry_opacity", mx::Value::createValue(1.0f) }
+  };
+
+  bool _HasSurfaceShaderCutoutTransparency(mx::TypedElementPtr element)
   {
     mx::NodePtr node = element->asA<mx::Node>();
 
-    if (_IsBxdfWithInputValue(node, "UsdPreviewSurface", "opacity", mx::Value::createValue(1.0f)))
+    for (const auto& inputDesc : OPACITY_INPUT_DESCRIPTIONS)
     {
-      return true;
-    }
+      OpacityEstimation opacity = _EstimateOpacityFromInput(node, inputDesc.nodeCategory, inputDesc.inputName, inputDesc.defaultValue);
 
-    if (_IsBxdfWithInputValue(node, "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f))))
-    {
-      return true;
-    }
-
-    if (_IsBxdfWithInputValue(node, "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* OPAQUE */)) ||
-        _IsBxdfWithInputValue(node, "gltf_pbr", "alpha_mode", mx::Value::createValue(2 /* BLEND */)))
-    {
-      return true;
-    }
-
-    if (_IsBxdfWithInputValue(node, "open_pbr_surface", "geometry_opacity", mx::Value::createValue(1.0f)))
-    {
-      return true;
+      if (opacity != OpacityEstimation::UNKNOWN)
+      {
+        return opacity == OpacityEstimation::TRANSPARENT;
+      }
     }
 
     // Use MaterialX helper function as fallback (not accurate, has false positives)
-    return !mx::isTransparentSurface(element);
+    return mx::isTransparentSurface(element);
   }
 
   mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc)
   {
     // Find renderable element.
     std::vector<mx::TypedElementPtr> renderableElements;
-#if (MATERIALX_MAJOR_VERSION > 1) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION > 38) || \
-    (MATERIALX_MAJOR_VERSION == 1 && MATERIALX_MINOR_VERSION == 38 && MATERIALX_BUILD_VERSION > 7)
+#if MATERIALX_VERSION > 13807
     renderableElements = mx::findRenderableElements(doc);
 #else
     mx::findRenderableElements(doc, renderableElements);
@@ -141,7 +153,7 @@ namespace
 
 namespace gtl
 {
-  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const mx::DocumentPtr mtlxStdLib)
+  McMtlxMdlCodeGen::McMtlxMdlCodeGen(const mx::DocumentPtr mtlxStdLib, const std::string& customNodesPath)
   {
     // Init shadergen.
     m_shaderGen = mx::MdlShaderGenerator::create();
@@ -168,6 +180,8 @@ namespace gtl
 
     unitSystem->setUnitConverterRegistry(unitRegistry);
     m_shaderGen->setUnitSystem(unitSystem);
+
+    m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customNodesPath);
   }
 
   bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
@@ -187,7 +201,7 @@ namespace gtl
     }
   }
 
-  bool McMtlxMdlCodeGen::translate(MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
+  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -200,16 +214,15 @@ namespace gtl
     mx::ShaderPtr shader = nullptr;
     try
     {
-      McMtlxDocumentPatcher patcher;
-      patcher.patch(mtlxDoc);
+      mx::DocumentPtr patchedDoc = m_docPatcher->patch(mtlxDoc);
 
       if (getenv("GTL_DUMP_MTLX"))
       {
-        std::string mtlxSrc = mx::writeToXmlString(mtlxDoc);
+        std::string mtlxSrc = mx::writeToXmlString(patchedDoc);
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
       }
 
-      mx::TypedElementPtr element = _FindSurfaceShaderElement(mtlxDoc);
+      mx::TypedElementPtr element = _FindSurfaceShaderElement(patchedDoc);
       if (!element)
       {
         GB_ERROR("generation failed: surface shader not found");
@@ -217,7 +230,7 @@ namespace gtl
       }
 
       subIdentifier = element->getName();
-      hasCutoutTransparency = !_HasSurfaceShaderNoCutoutTransparency(element);
+      hasCutoutTransparency = _HasSurfaceShaderCutoutTransparency(element);
       shader = m_shaderGen->generate(subIdentifier, element, context);
     }
     catch (const std::exception& ex)

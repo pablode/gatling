@@ -26,6 +26,7 @@
 #include "light.h"
 
 #include <pxr/base/arch/fileSystem.h>
+#include <pxr/imaging/hd/extComputation.h>
 #include <pxr/imaging/hd/resourceRegistry.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/base/gf/vec4f.h>
@@ -50,7 +51,8 @@ namespace
     HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->diskLight,
     HdPrimTypeTokens->domeLight,
-    HdPrimTypeTokens->simpleLight // Required for usdview domeLight creation
+    HdPrimTypeTokens->simpleLight, // Required for usdview domeLight creation
+    HdPrimTypeTokens->extComputation
   };
 
   const static TfTokenVector _supportedBprimTypes =
@@ -98,10 +100,12 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Light intensity multiplier", HdGatlingSettingsTokens->lightIntensityMultiplier, VtValue{1.0f} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->nextEventEstimation, VtValue{false} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Clipping planes", HdGatlingSettingsTokens->clippingPlanes, VtValue{false} });
+#ifndef HDGATLING_DISABLE_VOLUME_SAMPLING
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Medium stack size", HdGatlingSettingsTokens->mediumStackSize, VtValue{0} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max volume walk length", HdGatlingSettingsTokens->maxVolumeWalkLength, VtValue{7} });
+#endif
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Jittered sampling", HdGatlingSettingsTokens->jitteredSampling, VtValue{true} });
-  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Meters per scene unit", HdGatlingSettingsTokens->metersPerSceneUnit, VtValue{1.0f} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Meters per scene unit", HdGatlingSettingsTokens->stageMetersPerUnit, VtValue{1.0f} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Denoise color AOV", HdGatlingSettingsTokens->denoiseColorAov, VtValue{false} });
 
   _debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressiveAccumulation, VtValue{true} });
@@ -168,7 +172,7 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, [[maybe_unus
 {
   if (command == HdGatlingCommandTokens->printLicenses)
   {
-    std::string licenseFilePath = TfStringCatPaths(_resourcePath, GI_LICENSE_FILE_NAME);
+    std::string licenseFilePath = TfStringCatPaths(_resourcePath, HDGATLING_LICENSE_FILE_NAME);
     std::string errorMessage;
 
     ArchConstFileMapping mapping = ArchMapFileReadOnly(licenseFilePath, &errorMessage);
@@ -227,13 +231,17 @@ HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& 
   }
   else if (name == HdAovTokens->depth)
   {
-    return HdAovDescriptor(HdFormatFloat32, true, VtValue(1.0f));
+    return HdAovDescriptor(HdFormatFloat32, false, VtValue(1.0f));
   }
   else if (name == HdAovTokens->primId ||
            name == HdAovTokens->elementId ||
            name == HdAovTokens->instanceId)
   {
-    return HdAovDescriptor(HdFormatInt32, true, VtValue(-1));
+    return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
+  }
+  else if (name == HdAovTokens->normal)
+  {
+    return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(GfVec4f(0.5f)));
   }
 
   return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(GfVec4f(0.0f)));
@@ -302,6 +310,10 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   else if (typeId == HdPrimTypeTokens->simpleLight)
   {
     return new HdGatlingSimpleLight(sprimId, _giScene);
+  }
+  else if (typeId == HdPrimTypeTokens->extComputation)
+  {
+    return new HdExtComputation(sprimId);
   }
 
   return nullptr;

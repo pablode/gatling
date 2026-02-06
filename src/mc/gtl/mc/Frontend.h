@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 
+#include "MaterialParameters.h"
+
 namespace gtl
 {
   struct McMaterial;
@@ -33,17 +35,18 @@ namespace gtl
   {
   public:
     McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
+               const std::string& customMtlxNodesPath,
                McRuntime& mdlRuntime);
-
-  private:
-    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool isOpaque);
 
   public:
     McMaterial* createFromMtlxStr(std::string_view docStr);
 
     McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc);
 
-    McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier);
+    McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
+
+  private:
+    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool isOpaque);
 
   private:
     std::shared_ptr<McMdlMaterialCompiler> m_mdlMaterialCompiler;

@@ -19,19 +19,22 @@
 
 #include <stdint.h>
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 namespace gtl
 {
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
 
   class GgpuResizableBuffer
   {
   public:
-    GgpuResizableBuffer(CgpuDevice device,
-                        GgpuDelayedResourceDestroyer& delayedResourceDestroyer,
-                        CgpuBufferUsageFlags usageFlags,
-                        CgpuMemoryPropertyFlags memoryProperties);
+    GB_DECLARE_NONCOPY(GgpuResizableBuffer);
+
+    GgpuResizableBuffer(CgpuContext* ctx,
+                        GgpuDeleteQueue& deleteQueue,
+                        CgpuBufferUsage usageFlags,
+                        CgpuMemoryProperties memoryProperties);
 
     ~GgpuResizableBuffer();
 
@@ -43,10 +46,10 @@ namespace gtl
     bool resize(uint64_t newSize, CgpuCommandBuffer commandBuffer);
 
   private:
-    CgpuDevice m_device;
-    GgpuDelayedResourceDestroyer& m_delayedResourceDestroyer;
-    CgpuBufferUsageFlags m_usageFlags;
-    CgpuMemoryPropertyFlags m_memoryProperties;
+    CgpuContext* m_ctx;
+    GgpuDeleteQueue& m_deleteQueue;
+    CgpuBufferUsage m_usageFlags;
+    CgpuMemoryProperties m_memoryProperties;
 
     CgpuBuffer m_buffer;
     uint64_t m_size = 0;

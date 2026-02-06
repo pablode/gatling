@@ -1,7 +1,13 @@
+if (APPLE)
+  set(CGPU_IMPL_FILE_NAME "impl/CgpuMtl.cpp")
+else()
+  set(CGPU_IMPL_FILE_NAME "impl/CgpuVk.cpp")
+endif()
+
 add_library(
   cgpu STATIC
   gtl/cgpu/Cgpu.h
-  impl/Cgpu.cpp
+  ${CGPU_IMPL_FILE_NAME}
   impl/ShaderReflection.cpp
   impl/ShaderReflection.h
 )
@@ -15,13 +21,28 @@ target_include_directories(
     impl
 )
 
+if (APPLE)
+  set(
+    CGPU_IMPL_LIBRARIES
+      metal-cpp
+      spirv-cross-c
+      "-framework Metal"
+      "-framework Foundation"
+  )
+else()
+  set(
+    CGPU_IMPL_LIBRARIES
+      volk
+      VulkanMemoryAllocator
+  )
+endif()
+
 target_link_libraries(
   cgpu
   PRIVATE
     gb
-    volk
-    VulkanMemoryAllocator
     spirv-reflect-static
+    ${CGPU_IMPL_LIBRARIES}
 )
 
 set_target_properties(

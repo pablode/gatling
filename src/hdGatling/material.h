@@ -37,7 +37,7 @@ public:
                     gtl::GiScene* scene,
                     const MaterialNetworkCompiler& materialNetworkCompiler);
 
-  ~HdGatlingMaterial() override;
+  void Finalize(HdRenderParam* renderParam) override;
 
 public:
   HdDirtyBits GetInitialDirtyBitsMask() const override;

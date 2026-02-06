@@ -2,12 +2,6 @@ name: Build for Houdini 20
 
 on:
   workflow_call:
-    inputs:
-      mdl-sdk-cache-key-prefix:
-        description: "Prefix of the MDL SDK cache key"
-        required: false
-        type: string
-        default: "MDL-SDK"
 
 jobs:
   build:
@@ -17,20 +11,21 @@ jobs:
       matrix:
         include:
         - name: Windows (MSVC)
-          image: windows-2019
+          image: windows-2022
+          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-nt-x86-64.zip"
           usd-download-url: "https://github.com/pablode/USD/releases/download/houdini20.0-ci-release/USD23.08_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
           archive-name: gatling_Houdini20_Windows_x64
-          cmake-params: -G"Visual Studio 16 2019" -Ax64
+          cmake-params: -G"Visual Studio 17 2022" -Ax64
 
     uses: ./.github/workflows/build.yml
     with:
       image: ${{ matrix.image }}
       build-config: Release
+      mdl-download-url: ${{ matrix.mdl-download-url }}
       usd-download-url: ${{ matrix.usd-download-url }}
       usd-install-path: ${{ matrix.usd-install-path }}
       upload-install-artifacts: true
       archive-name: ${{ matrix.archive-name }}
-      mdl-sdk-cache-key: ${{ inputs.mdl-sdk-cache-key-prefix }}_windows-2022
       cmake-params: ${{ matrix.cmake-params }} -DPLUGINFO_LIBPATH_PREFIX=../../usd
       houdini-packaging: true

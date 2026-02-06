@@ -21,6 +21,7 @@
 #include "utils.h"
 
 #include <pxr/base/gf/matrix4f.h>
+#include <pxr/imaging/hd/extComputationUtils.h>
 #include <pxr/imaging/hd/meshUtil.h>
 #include <pxr/imaging/hd/vertexAdjacency.h>
 #include <pxr/imaging/hd/smoothNormals.h>
@@ -41,6 +42,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (st_1)
   (UV0)
   (UV1)
+  (map1)
   (tangents)
   (tangentSigns)
   (bitangentSigns)
@@ -418,7 +420,8 @@ namespace
     _tokens->st1,
     _tokens->st_1,
     _tokens->UV0,
-    _tokens->UV1
+    _tokens->UV1,
+    _tokens->map1
   };
 
   bool _IsPrimvarEligibleForVertexData(const TfToken& name, const TfToken& role)
@@ -452,7 +455,7 @@ HdGatlingMesh::HdGatlingMesh(const SdfPath& id,
 {
 }
 
-HdGatlingMesh::~HdGatlingMesh()
+void HdGatlingMesh::Finalize(HdRenderParam* renderParam)
 {
   if (_baseMesh)
   {
@@ -482,7 +485,8 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
     (*dirtyBits & HdChangeTracker::DirtyPoints) |
     (*dirtyBits & HdChangeTracker::DirtyNormals) |
     (*dirtyBits & HdChangeTracker::DirtyPrimvar) |
-    (*dirtyBits & HdChangeTracker::DirtyTopology);
+    (*dirtyBits & HdChangeTracker::DirtyTopology) |
+    (*dirtyBits & HdChangeTracker::DirtyComputationPrimvarDesc);
 
   if (updateGeometry)
   {
@@ -685,10 +689,17 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
 
     HdMeshTopology topology = GetMeshTopology(sceneDelegate);
     HdMeshUtil meshUtil(&topology, id);
+#if PXR_VERSION >= 2511
+    if (meshUtil.ComputeTriangulatedFaceVaryingPrimvar(buffer.GetData(),
+                                                       buffer.GetNumElements(),
+                                                       type,
+                                                       &result) == HdMeshComputationResult::Error)
+#else
     if (!meshUtil.ComputeTriangulatedFaceVaryingPrimvar(buffer.GetData(),
                                                         buffer.GetNumElements(),
                                                         type,
                                                         &result))
+#endif
     {
       return std::nullopt;
     }
@@ -779,11 +790,13 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
     const TfToken& name = it->first;
     const ProcessedPrimvar& p = it->second;
 
+
     if (name.IsEmpty() ||
-#if 0
-        // FIXME: optimization disabled, see MtlxDocumentPatcher.cpp
+#if 0 // NOTE: temporarily disabled, see MtlxDocumentPatcher.cpp.
+        // We skip secondary primvars likely to be already encoded in vertex data as an optimization.
+        // The corresponding change to the shading network happens in the MaterialX document patcher.
         name == _tokens->st || name == _tokens->st0 || name == _tokens->st_0 ||
-        name == _tokens->UV0 || name == _tokens->tangents ||
+        name == _tokens->UV0 || name == _tokens->map1 || name == _tokens->tangents ||
 #endif
         name == HdTokens->points || name == HdTokens->normals)
     {
@@ -835,8 +848,40 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
   meshUtil.ComputeTriangleIndices(&faces, &primitiveParams);
   auto faceCount = uint32_t(faces.size());
 
-  // Points (required; one per vertex)
-  VtValue boxedPoints = GetPoints(sceneDelegate);
+  // Points (required; vertex interpolation)
+  VtValue boxedPoints;
+
+  const HdExtComputationPrimvarDescriptorVector& extComputationDescs =
+    sceneDelegate->GetExtComputationPrimvarDescriptors(id, HdInterpolationVertex);
+
+  for (const HdExtComputationPrimvarDescriptor& desc : extComputationDescs)
+  {
+    if (desc.name != HdTokens->points)
+    {
+      continue;
+    }
+
+    HdExtComputationUtils::SampledValueStore<1> valueStore;
+    HdExtComputationUtils::SampleComputedPrimvarValues({ desc }, sceneDelegate, 1, &valueStore);
+
+    auto storeIt = valueStore.find(desc.name);
+    if (storeIt != valueStore.end())
+    {
+      const auto& values = storeIt->second.values;
+
+      if (!values.empty() && values[0].IsHolding<VtVec3fArray>())
+      {
+        boxedPoints = values[0];
+      }
+    }
+
+    break;
+  }
+
+  if (boxedPoints.IsEmpty())
+  {
+    boxedPoints = GetPoints(sceneDelegate);
+  }
 
   if (boxedPoints.IsEmpty() || !boxedPoints.IsHolding<VtVec3fArray>())
   {
@@ -1103,7 +1148,8 @@ HdDirtyBits HdGatlingMesh::GetInitialDirtyBitsMask() const
          HdChangeTracker::DirtyTransform |
          HdChangeTracker::DirtyMaterialId |
          HdChangeTracker::DirtyVisibility |
-         HdChangeTracker::DirtyDoubleSided;
+         HdChangeTracker::DirtyDoubleSided |
+         HdChangeTracker::DirtyComputationPrimvarDesc;
 }
 
 HdDirtyBits HdGatlingMesh::_PropagateDirtyBits(HdDirtyBits bits) const

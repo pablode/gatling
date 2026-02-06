@@ -1,10 +1,12 @@
 add_library(
   gb STATIC
+  gtl/gb/Class.h
   gtl/gb/Enum.h
   gtl/gb/Fmt.h
   gtl/gb/HandleStore.h
   gtl/gb/LinearDataStore.h
   gtl/gb/Log.h
+  gtl/gb/ParamTypes.h
   gtl/gb/SmallVector.h
   impl/HandleStore.cpp
   impl/LinearDataStore.cpp
@@ -26,10 +28,6 @@ target_link_libraries(
   PUBLIC
     quill
 )
-
-if(GTL_VERBOSE)
-  target_compile_definitions(gb PUBLIC GTL_VERBOSE=1)
-endif()
 
 # Required since library is linked into hdGatling DSO
 set_target_properties(gb PROPERTIES POSITION_INDEPENDENT_CODE ON)

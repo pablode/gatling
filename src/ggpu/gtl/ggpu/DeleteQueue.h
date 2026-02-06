@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <gtl/gb/Class.h>
 #include <gtl/cgpu/Cgpu.h>
 
 #include <functional>
@@ -25,35 +26,38 @@
 
 namespace gtl
 {
-  class GgpuDelayedResourceDestroyer
+  class GgpuDeleteQueue
   {
   private:
     constexpr static uint32_t FrameCount = 4;
 
   public:
-    GgpuDelayedResourceDestroyer(CgpuDevice device);
+    GB_DECLARE_NONCOPY(GgpuDeleteQueue);
 
-    ~GgpuDelayedResourceDestroyer();
+    GgpuDeleteQueue(CgpuContext* ctx);
+
+    ~GgpuDeleteQueue();
 
   public:
     void nextFrame();
+    void housekeep();
 
     void destroyAll();
 
     template<typename T, typename... U>
-    void enqueueDestruction(T handle, U... moreHandles)
+    void pushBack(T handle, U... moreHandles)
     {
-      enqueueDestruction(handle);
-      enqueueDestruction(moreHandles...);
+      pushBack(handle);
+      pushBack(moreHandles...);
     }
 
-    void enqueueDestruction(CgpuBuffer handle);
-    void enqueueDestruction(CgpuImage handle);
-    void enqueueDestruction(CgpuPipeline handle);
-    void enqueueDestruction(CgpuSemaphore handle);
-    void enqueueDestruction(CgpuCommandBuffer handle);
-    void enqueueDestruction(CgpuBlas handle);
-    void enqueueDestruction(CgpuTlas handle);
+    void pushBack(CgpuBuffer handle);
+    void pushBack(CgpuImage handle);
+    void pushBack(CgpuPipeline handle);
+    void pushBack(CgpuSemaphore handle);
+    void pushBack(CgpuCommandBuffer handle);
+    void pushBack(CgpuBlas handle);
+    void pushBack(CgpuTlas handle);
 
   private:
     using DestroyFunc = std::function<void()>;
@@ -61,7 +65,7 @@ namespace gtl
     void enqueueDestroyFunc(DestroyFunc fun);
 
   private:
-    CgpuDevice m_device;
+    CgpuContext* m_ctx;
     uint32_t m_frameIndex = 0;
     std::vector<DestroyFunc> m_pendingDestructions[FrameCount];
   };
