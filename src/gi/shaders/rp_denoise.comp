@@ -1,8 +1,236 @@
-layout (local_size_x = 32) in;
+#extension GL_GOOGLE_include_directive: require
+#extension GL_EXT_shader_16bit_storage: require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16: require
+#extension GL_EXT_control_flow_attributes: require
 
-layout(binding = 0, std430) writeonly buffer OutputBuffer { vec4 framebuffer[]; };
+#include "interface/rp_oidn.h"
+
+layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
+
+layout(binding = BINDING_INDEX_INPUT_BUF1, std430) readonly buffer InputBuffer { float16_t inPixels[]; };
+#ifdef OUT_CHANNEL_F32
+layout(binding = BINDING_INDEX_OUTPUT_BUF, std430) writeonly buffer OutputBuffer { float outPixels[]; };
+#else
+layout(binding = BINDING_INDEX_OUTPUT_BUF, std430) writeonly buffer OutputBuffer { float16_t outPixels[]; };
+#endif
+layout(binding = BINDING_INDEX_TENSOR_BUF, std430) readonly buffer TensorBuffer { float16_t tensors[]; };
+#ifdef OP_CONCAT
+layout(binding = BINDING_INDEX_INPUT_BUF2, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
+#endif
+// TODO: in hindsight, it would be much nicer to rename this to MaxLuminanceBuffer & maxLuminance
+#if defined(SCALE_INPUT_INV) || defined(SCALE_OUTPUT)
+layout(binding = BINDING_INDEX_VALUE_SCALE_BUF, std430) readonly buffer ValueScaleBuffer { float valueScale; };
+#endif
+
+layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
+
+#define KERNEL_SIZE 3
+#define KERNEL_SIZE_SQ (KERNEL_SIZE * KERNEL_SIZE)
+#define KERNEL_BIAS (KERNEL_SIZE / 2)
+
+#if CONV_IMPL == CONV_IMPL_SHMEM
+shared float16_t sh_window[WG_SIZE_Y + 2][WG_SIZE_X + 2];
+#endif
+shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][CONV_CHANNEL_COUNT];
 
 void main()
 {
-  framebuffer[gl_GlobalInvocationID.x] = vec4(1, 0, 0, 1);
+#ifdef SCALE_INPUT_INV
+  float16_t invValueScale = float16_t(1.0 / valueScale);
+#endif
+
+#if CONV_IMPL == CONV_IMPL_SEQ
+
+  // naive
+  for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
+  {
+    float16_t result = float16_t(0.0);
+
+    for (uint i = 0; i < KERNEL_SIZE; i++)
+    for (uint j = 0; j < KERNEL_SIZE; j++)
+    {
+      ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
+
+      if (any(greaterThanEqual(uvec2(coord), uvec2(PC.imageWidth, PC.imageHeight))))
+      {
+        continue; // oob
+      }
+
+      int coordIdx = int(coord.y * PC.imageWidth + coord.x);
+
+      for (uint ic = 0; ic < IN1_CHANNEL_COUNT; ic++)
+      {
+        uint inIndexIj = coordIdx * IN1_CHANNEL_COUNT + ic;
+
+        uint weightIndex = (oc * IN1_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
+
+        float16_t weight = tensors[PC.weightOffset + weightIndex];
+
+        float16_t inValue = inPixels[inIndexIj];
+
+#ifdef SCALE_INPUT_INV
+        inValue *= invValueScale;
+#endif
+
+        result += inValue * weight;
+      }
+    }
+
+    sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] = result;
+
+    barrier(); // TODO: artifacts without. why?
+  }
+
+#elif CONV_IMPL == CONV_IMPL_SHMEM
+
+  // shared mem v1
+  ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(WG_SIZE_X, WG_SIZE_Y);
+
+  for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
+    sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] = float16_t(0.0);
+
+  barrier();
+
+  [[unroll]]
+  for (uint ic = 0; ic < IN1_CHANNEL_COUNT; ic++)
+  {
+    [[unroll]] for (int y = 0; y <= 1; y++)
+    [[unroll]] for (int x = 0; x <= 1; x++)
+    {
+      int lx = int(gl_LocalInvocationID.x) + x * int(WG_SIZE_X);
+      int ly = int(gl_LocalInvocationID.y) + y * int(WG_SIZE_Y);
+
+      if (lx < int(WG_SIZE_X + 2) && ly < int(WG_SIZE_Y + 2))
+      {
+        ivec2 coord = wgBase + ivec2(lx - 1, ly - 1);
+
+        uint inPixelIdx = uint(coord.y * PC.imageWidth + coord.x) * IN1_CHANNEL_COUNT + ic;
+
+        bool oob = any(greaterThanEqual(uvec2(coord), uvec2(PC.imageWidth, PC.imageHeight)));
+
+        float16_t inValue = oob ? float16_t(0.0) : inPixels[inPixelIdx];
+
+#ifdef SCALE_INPUT_INV
+        inValue *= invValueScale;
+#endif
+
+        sh_window[ly][lx] = inValue;
+      }
+    }
+
+    barrier();
+
+    [[unroll]]
+    for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
+    {
+      uint weightIndexOffset = (oc * IN1_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ); // OIHW
+
+      float16_t result = float16_t(0.0);
+
+      [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
+      [[unroll]] for (uint i = 0; i < KERNEL_SIZE; i++)
+      {
+        ivec2 lCoord = ivec2(gl_LocalInvocationID.xy) + ivec2(i, j);
+
+        uint weightIndex = weightIndexOffset + (j * KERNEL_SIZE + i);
+        float16_t weight = tensors[PC.weightOffset + weightIndex];
+
+        result += sh_window[lCoord.y][lCoord.x] * weight;
+      }
+
+      sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] += result;
+
+      barrier(); // TODO: artifacts without. why?
+    }
+  }
+
+#else
+
+#error Unsupported convolution mode.
+
+#endif
+
+
+  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
+    return;
+
+
+#ifdef OP_UPSAMPLE
+  uint outIdx0 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 0) * PC.imageWidth * 2);
+  uint outIdx1 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 0) * PC.imageWidth * 2);
+  uint outIdx2 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 1) * PC.imageWidth * 2);
+  uint outIdx3 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 1) * PC.imageWidth * 2);
+#endif
+
+
+#ifdef OP_MAX_POOL
+  // TODO: this leads to thread divergence; we can instead discard whole warp (respect tile size)
+  if (bool(gl_LocalInvocationID.x & 1) || bool(gl_LocalInvocationID.y & 1)) return;
+
+  int inIdx = int(gl_GlobalInvocationID.y / 2 * PC.imageWidth / 2 + gl_GlobalInvocationID.x / 2);
+#else
+
+  int inIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
+#endif
+
+
+  for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
+  {
+    float16_t result;
+
+#ifndef OP_MAX_POOL
+    result = sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc];
+
+    result += tensors[PC.biasOffset + oc];
+
+    result = max(result, float16_t(0.0)); // ReLU activation
+#else
+    f16vec4 results = f16vec4(
+      sh_results[gl_LocalInvocationID.y + 0][gl_LocalInvocationID.x + 0][oc],
+      sh_results[gl_LocalInvocationID.y + 1][gl_LocalInvocationID.x + 0][oc],
+      sh_results[gl_LocalInvocationID.y + 0][gl_LocalInvocationID.x + 1][oc],
+      sh_results[gl_LocalInvocationID.y + 1][gl_LocalInvocationID.x + 1][oc]
+    );
+
+    results += f16vec4(tensors[PC.biasOffset + oc]);
+
+    float16_t maxPool = max(max(results.x, results.y), max(results.z, results.w));
+
+    result = max(float16_t(0.0) /*ReLU*/, maxPool);
+#endif
+
+#ifdef SCALE_OUTPUT
+    result *= float16_t(valueScale);
+#endif
+
+#ifdef OUT_CHANNEL_F32
+    float convertedResult = float(result);
+#else
+    float16_t convertedResult = result;
+#endif
+
+#ifdef OP_UPSAMPLE
+    outPixels[outIdx0 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+    outPixels[outIdx1 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+    outPixels[outIdx2 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+    outPixels[outIdx3 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+#else
+    outPixels[inIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
+#endif
+  }
+
+#ifdef OP_CONCAT
+  for (int i = 0; i < IN2_CHANNEL_COUNT; i++)
+  {
+#ifndef OP_UPSAMPLE
+    outPixels[inIdx * OUT_CHANNEL_COUNT + IN1_CHANNEL_COUNT + i] = inPixels2[inIdx * IN2_CHANNEL_COUNT + i];
+#else
+    outPixels[outIdx0 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx0 * IN2_CHANNEL_COUNT + i];
+    outPixels[outIdx1 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx1 * IN2_CHANNEL_COUNT + i];
+    outPixels[outIdx2 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx2 * IN2_CHANNEL_COUNT + i];
+    outPixels[outIdx3 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx3 * IN2_CHANNEL_COUNT + i];
+#endif
+  }
+#endif
+
 }

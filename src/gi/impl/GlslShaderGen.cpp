@@ -291,12 +291,60 @@ namespace gtl
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::AnyHit, source, spv);
   }
 
-  bool GiGlslShaderGen::generateDenoisingSpirv(std::vector<uint8_t>& spv)
+  bool GiGlslShaderGen::generateDenoisingSpirv(const OidnParams& params, std::vector<uint8_t>& spv)
   {
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
 
+    stitcher.appendDefine("IN1_CHANNEL_COUNT", params.in1ChannelCount);
+    stitcher.appendDefine("OUT_CHANNEL_COUNT", params.outChannelCount);
+    stitcher.appendDefine("CONV_CHANNEL_COUNT", params.convChannelCount);
+    stitcher.appendDefine("CONV_IMPL", params.convolutionImpl);
+    stitcher.appendDefine("WG_SIZE_X", params.wgSizeX);
+    stitcher.appendDefine("WG_SIZE_Y", params.wgSizeY);
+
+    if (bool(params.postOp & OidnPostOp::MaxPool))
+    {
+      stitcher.appendDefine("OP_MAX_POOL");
+    }
+    if (bool(params.postOp & OidnPostOp::Upsample))
+    {
+      stitcher.appendDefine("OP_UPSAMPLE");
+    }
+    if (bool(params.postOp & OidnPostOp::Concat))
+    {
+      stitcher.appendDefine("OP_CONCAT");
+      stitcher.appendDefine("IN2_CHANNEL_COUNT", params.in2ChannelCount);
+    }
+    if (bool(params.postOp & OidnPostOp::WriteBackRgba32))
+    {
+      stitcher.appendDefine("OUT_CHANNEL_F32");
+    }
+    if (bool(params.postOp & OidnPostOp::ScaleInputInv))
+    {
+      stitcher.appendDefine("SCALE_INPUT_INV");
+    }
+    if (bool(params.postOp & OidnPostOp::ScaleOutput))
+    {
+      stitcher.appendDefine("SCALE_OUTPUT");
+    }
+
     fs::path filePath = m_shaderPath / "rp_denoise.comp";
+    if (!stitcher.appendSourceFile(filePath))
+    {
+      return false;
+    }
+
+    std::string source = stitcher.source();
+    return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::Compute, source, spv);
+  }
+
+  bool GiGlslShaderGen::generateMaxLuminanceReductionSpirv(std::vector<uint8_t>& spv)
+  {
+    GiGlslStitcher stitcher;
+    stitcher.appendVersion();
+
+    fs::path filePath = m_shaderPath / "rp_max_luminance.comp";
     if (!stitcher.appendSourceFile(filePath))
     {
       return false;

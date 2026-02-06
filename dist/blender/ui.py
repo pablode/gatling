@@ -48,6 +48,7 @@ class GATLING_HYDRA_RENDER_PT_quality_viewport(Panel):
         layout.prop(settings, 'clipping_planes')
         layout.prop(settings, 'medium_stack_size')
         layout.prop(settings, 'max_volume_walk_length')
+        layout.prop(settings, 'denoise_color_aov')
 
 
 class GATLING_HYDRA_RENDER_PT_quality_render(Panel):
@@ -69,6 +70,7 @@ class GATLING_HYDRA_RENDER_PT_quality_render(Panel):
         layout.prop(settings, 'clipping_planes')
         layout.prop(settings, 'medium_stack_size')
         layout.prop(settings, 'max_volume_walk_length')
+        layout.prop(settings, 'denoise_color_aov')
 
 
 #

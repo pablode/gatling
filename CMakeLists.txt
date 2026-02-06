@@ -23,6 +23,8 @@ foreach(CONFIG_TYPE ${CMAKE_CONFIGURATION_TYPES})
 endforeach()
 
 set(GTL_TEST_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/TEST")
+set(GTL_HDGATLING_RESOURCES_DIR "./hdGatling/resources")
+set(GTL_OIDN_WEIGHTS_FILE "rt_hdr_small.tza")
 
 option(GTL_VERBOSE "Enable verbose logging." OFF)
 

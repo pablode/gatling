@@ -24,6 +24,7 @@
 #include <memory>
 #include <filesystem>
 
+#include <gtl/gb/Enum.h>
 #include <gtl/mc/Backend.h>
 
 namespace fs = std::filesystem;
@@ -107,16 +108,44 @@ namespace gtl
       uint32_t textureIndexOffset;
     };
 
+    enum class OidnPostOp : uint32_t
+    {
+      None            = 0,
+      MaxPool         = (1 << 0),
+      Upsample        = (1 << 1),
+      Concat          = (1 << 2),
+      WriteBackRgba32 = (1 << 3),
+      // TODO: this is not a post op. -> rename enum?
+      ScaleInputInv   = (1 << 4),
+      ScaleOutput     = (1 << 5)
+// TODO: rename -> ScaleLuminance(Inv)
+    };
+
+    struct OidnParams
+    {
+      int wgSizeX;
+      int wgSizeY;
+      int in1ChannelCount;
+      int in2ChannelCount = 0;
+      int outChannelCount;
+      int convChannelCount;
+      int convolutionImpl;
+      OidnPostOp postOp = OidnPostOp::None;
+    };
+
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);
     bool generateMissSpirv(std::string_view fileName, const MissShaderParams& params, std::vector<uint8_t>& spv);
     bool generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv);
     bool generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv);
 
-    bool generateDenoisingSpirv(std::vector<uint8_t>& spv);
+    bool generateDenoisingSpirv(const OidnParams& params, std::vector<uint8_t>& spv);
+    bool generateMaxLuminanceReductionSpirv(std::vector<uint8_t>& spv);
 
   private:
     std::shared_ptr<McBackend> m_mcBackend;
     std::shared_ptr<GiGlslShaderCompiler> m_shaderCompiler;
     fs::path m_shaderPath;
   };
+
+  GB_DECLARE_ENUM_BITOPS(GiGlslShaderGen::OidnPostOp)
 }

@@ -1,0 +1,46 @@
+#extension GL_GOOGLE_include_directive: require
+#extension GL_EXT_shader_16bit_storage: require
+#extension GL_KHR_shader_subgroup_arithmetic: require
+
+#include "interface/rp_max_luminance.h"
+
+layout(binding = BINDING_INDEX_INPUT_BUF, std430) readonly buffer InputBuffer { float16_t inVals[]; };
+layout(binding = BINDING_INDEX_OUTPUT_BUF, std430) writeonly buffer OutputBuffer { uint/*alias float*/ outVal; };
+
+layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
+
+layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
+
+shared uint sh_val;
+
+void main()
+{
+  float r = float(inVals[(gl_GlobalInvocationID.y * PC.imageWidth * 3) + gl_GlobalInvocationID.x + 0]);
+  float g = float(inVals[(gl_GlobalInvocationID.y * PC.imageWidth * 3) + gl_GlobalInvocationID.x + 1]);
+  float b = float(inVals[(gl_GlobalInvocationID.y * PC.imageWidth * 3) + gl_GlobalInvocationID.x + 2]);
+
+  vec3 color = vec3(r, g, b);
+
+  float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+
+  uint uLuminance = floatBitsToUint(luminance);
+
+  uint sg_val = subgroupMax(uLuminance);
+
+  if (gl_LocalInvocationIndex == 0)
+  {
+	sh_val = 0;
+  }
+
+  barrier();
+
+  atomicMax(sh_val, sg_val);
+
+  barrier();
+
+  if (gl_LocalInvocationIndex == 0)
+  {
+	atomicMax(outVal, sh_val);
+  }
+}
+

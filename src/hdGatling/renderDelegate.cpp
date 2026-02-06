@@ -89,7 +89,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
 #endif
 
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Samples per pixel", HdGatlingSettingsTokens->spp, VtValue{1} });
-  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max bounces", HdGatlingSettingsTokens->maxBounces, VtValue{13} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max bounces", HdGatlingSettingsTokens->maxBounces, VtValue{2} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette bounce offset", HdGatlingSettingsTokens->rrBounceOffset, VtValue{3} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Russian roulette inverse minimum terminate probability", HdGatlingSettingsTokens->rrInvMinTermProb, VtValue{0.95f} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max sample value", HdGatlingSettingsTokens->maxSampleValue, VtValue{10.0f} });
@@ -102,6 +102,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Max volume walk length", HdGatlingSettingsTokens->maxVolumeWalkLength, VtValue{7} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Jittered sampling", HdGatlingSettingsTokens->jitteredSampling, VtValue{true} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Meters per scene unit", HdGatlingSettingsTokens->metersPerSceneUnit, VtValue{1.0f} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Denoise color AOV", HdGatlingSettingsTokens->denoiseColorAov, VtValue{false} });
 
   _debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressiveAccumulation, VtValue{true} });
 

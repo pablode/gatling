@@ -134,6 +134,7 @@ namespace gtl
   struct GiRenderSettings
   {
     bool     clippingPlanes;
+    bool     denoiseColorAov;
     bool     depthOfField;
     bool     domeLightCameraVisible;
     bool     filterImportanceSampling;
@@ -170,7 +171,7 @@ namespace gtl
   struct GiInitParams
   {
     std::string_view shaderPath;
-    std::string_view mdlRuntimePath;
+    std::string_view mdlRuntimePath; // TODO: rename, not only for MDL
     const std::vector<std::string>& mdlSearchPaths;
     const std::shared_ptr<void/*MaterialX::Document*/> mtlxStdLib;
   };

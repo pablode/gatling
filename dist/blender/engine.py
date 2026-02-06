@@ -38,7 +38,7 @@ class GatlingHydraRenderEngine(bpy.types.HydraRenderEngine):
             'clipping-planes': settings.clipping_planes,
             'medium-stack-size': settings.medium_stack_size,
             'max-volume-walk-length': settings.max_volume_walk_length,
-            'progressive-accumulation': settings.progressive_accumulation,
+            'denoise-color-aov': settings.denoise_color_aov,
             'enableInteractive': True if engine_type == 'VIEWPORT' else False
         }
 

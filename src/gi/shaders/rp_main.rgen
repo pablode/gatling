@@ -6,6 +6,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int16: require
 #extension GL_EXT_shader_explicit_arithmetic_types_int64: require
 #extension GL_EXT_buffer_reference: require
+#extension GL_EXT_shader_16bit_storage: require
 
 #ifdef REORDER_INVOCATIONS
 #extension GL_NV_shader_invocation_reorder: require
@@ -400,6 +401,13 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
   DoubleSidedAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_DOUBLE_SIDED].rgb;
 #endif
+#if (AOV_MASK & AOV_BIT_OIDN) != 0
+  const int CHANNEL_COUNT = 3;
+  for (int i = 0; PC.sampleOffset == 0 && i < CHANNEL_COUNT; i++)
+  {
+    OidnAov[pixelIndex * CHANNEL_COUNT + i] = float16_t(0.0);
+  }
+#endif
 }
 
 void main()
@@ -515,5 +523,12 @@ void main()
 #endif
 
     ColorAov[pixel_index] = vec4(pixel_color, 1.0);
+#endif
+
+#if (AOV_MASK & AOV_BIT_OIDN) != 0
+    const int CHANNEL_COUNT = 3;
+    OidnAov[pixel_index * CHANNEL_COUNT + 0] = float16_t(pixel_color.r);
+    OidnAov[pixel_index * CHANNEL_COUNT + 1] = float16_t(pixel_color.g);
+    OidnAov[pixel_index * CHANNEL_COUNT + 2] = float16_t(pixel_color.b);
 #endif
 }

@@ -25,6 +25,9 @@
 #include "AssetReader.h"
 #include "GlslShaderGen.h"
 #include "MeshProcessing.h"
+#include "Oidn.h"
+#include "Tza.h"
+#include "Mmap.h"
 #include "interface/rp_main.h"
 
 #include <stdlib.h>
@@ -112,7 +115,6 @@ namespace gtl
     std::vector<const GiMaterial*> materials;
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
-    CgpuPipeline                   denoisePipeline;
     CgpuShader                     rgenShader;
     GiScene*                       scene;
     bool                           resetSampleOffset = true;
@@ -224,6 +226,7 @@ namespace gtl
     uint32_t sampleOffset = 0;
     CgpuBuffer sceneParams;
     OffsetAllocator::Allocator texAllocator{rp::MAX_TEXTURE_COUNT};
+    GiOidnState* denoiserState;
   };
 
   struct GiRenderBuffer
@@ -251,6 +254,7 @@ namespace gtl
   std::unique_ptr<GiTextureManager> s_texSys;
   std::atomic_bool s_forceShaderCacheInvalid = false;
   std::atomic_bool s_resetSampleOffset = false;
+  std::string s_resourcePath;
 
 #ifdef GI_SHADER_HOTLOADING
   class ShaderFileListener : public efsw::FileWatchListener
@@ -361,6 +365,7 @@ namespace gtl
     // Use shaders dir in source tree for auto-reloading
     std::string_view shaderPath = GI_SHADER_SOURCE_DIR;
 #endif
+    s_resourcePath = params.mdlRuntimePath;
 
     mx::DocumentPtr mtlxStdLib = std::static_pointer_cast<mx::Document>(params.mtlxStdLib);
     if (!mtlxStdLib)
@@ -1313,6 +1318,11 @@ cleanup:
       aovMask |= (1 << int(binding.aovId));
     }
 
+    if (renderSettings.denoiseColorAov && bool(aovMask & (1 << int(GiAovId::Color))))
+    {
+      aovMask |= (1 << 16/*OIDN, internal*/);
+    }
+
     std::set<GiMaterial*> materialSet;
     for (auto* m : scene->meshes)
     {
@@ -1333,7 +1343,6 @@ cleanup:
 
     GiShaderCache* cache = nullptr;
     CgpuPipeline pipeline;
-    CgpuPipeline denoisePipeline;
     CgpuShader rgenShader;
     std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
@@ -1757,34 +1766,6 @@ cleanup:
       }
     }
 
-    // Create denoising pipeline
-    {
-      std::vector<uint8_t> spv;
-      if (!s_shaderGen->generateDenoisingSpirv(spv))
-      {
-        goto cleanup;
-      }
-
-      CgpuShader shader;
-      if (!cgpuCreateShader(s_device, {
-                              .size = spv.size(),
-                              .source = spv.data(),
-                              .stageFlags = CGPU_SHADER_STAGE_FLAG_MISS,
-                              .maxRayPayloadSize = maxRayPayloadSize,
-                              .maxRayHitAttributeSize = maxRayHitAttributeSize
-                            }, &shader))
-      {
-        goto cleanup;
-      }
-
-      if (!cgpuCreateComputePipeline(s_device, { .shader = shader , .debugName = "Denoiser" }, &denoisePipeline))
-      {
-        goto cleanup;
-      }
-
-      cgpuDestroyShader(s_device, shader);
-    }
-
     cache = new GiShaderCache;
     cache->aovMask = aovMask;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
@@ -1798,7 +1779,6 @@ cleanup:
     }
     cache->missShaders = missShaders;
     cache->pipeline = pipeline;
-    cache->denoisePipeline = denoisePipeline;
     cache->rgenShader = rgenShader;
     cache->scene = scene;
 
@@ -1823,10 +1803,6 @@ cleanup:
       {
         cgpuDestroyPipeline(s_device, pipeline);
       }
-      if (denoisePipeline.handle)
-      {
-        cgpuDestroyPipeline(s_device, denoisePipeline);
-      }
       for (GiMaterialGpuData& gpuData : newMaterialGpuDatas)
       {
         giDestroyMaterialGpuData(scene, gpuData);
@@ -1850,7 +1826,6 @@ cleanup:
       cgpuDestroyShader(s_device, shader);
     }
     cgpuDestroyPipeline(s_device, cache->pipeline);
-    cgpuDestroyPipeline(s_device, cache->denoisePipeline);
     delete cache;
   }
 
@@ -1924,32 +1899,14 @@ cleanup:
     }
 
     if (ra.mediumStackSize != rb.mediumStackSize ||
-        ra.nextEventEstimation != rb.nextEventEstimation)
+        ra.nextEventEstimation != rb.nextEventEstimation ||
+        ra.denoiseColorAov != rb.denoiseColorAov)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersAll;
     }
 
     return flags;
   }
-
-
-
-  // simple function that just writes red into the color AOV
-  void oidnDenoisePass(const GiAovBinding* colorBinding,
-                       const GiShaderCache* shaderCache,
-                       CgpuCommandBuffer commandBuffer)
-  {
-    CgpuBufferBinding buffer = { .binding = 0, .buffer = colorBinding->renderBuffer->deviceMem };
-
-    CgpuBindings bindings0 = { .bufferCount = 1, .buffers = &buffer };
-    cgpuCmdUpdateBindings(commandBuffer, shaderCache->denoisePipeline, 0/*descriptorSetIndex*/, &bindings0);
-
-    cgpuCmdBindPipeline(commandBuffer, shaderCache->denoisePipeline);
-
-    cgpuCmdDispatch(commandBuffer, 2048, 1, 1);
-  }
-
-
 
   GiStatus giRender(const GiRenderParams& params)
   {
@@ -2300,6 +2257,56 @@ cleanup:
       buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
     }
 
+    // <OIDN AOV>
+    bool enableDenoiser = false;
+
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      if (binding.aovId == GiAovId::Color)
+      {
+        enableDenoiser = renderSettings.denoiseColorAov;
+        break;
+      }
+    }
+
+    if (enableDenoiser)
+    {
+      if (!scene->denoiserState)
+      {
+        std::string filePath = GB_FMT("{}/{}", s_resourcePath, GI_OIDN_WEIGHTS_FILE);
+
+        GiFile* oidnWeightsFile;
+        bool s = giFileOpen(filePath.c_str(), GiFileUsage::Read, &oidnWeightsFile);
+        if (!s) GB_FATAL("can't read OIDN weights");
+
+        size_t tensorSize = giFileSize(oidnWeightsFile);
+        auto tensorData = (const uint8_t*) giMmap(oidnWeightsFile, 0, tensorSize);
+        if (!tensorData) GB_FATAL("can't read OIDN weights");
+
+        GiTzaTensorDescriptions tensorDescs = giTzaParseTensors(tensorData, tensorSize);
+
+        scene->denoiserState = giOidnCreateState(s_device, *s_shaderGen,
+          *s_stager, *s_delayedResourceDestroyer, tensorDescs, tensorData);
+        // TODO: handle failure
+
+        giMunmap(oidnWeightsFile, (void*) tensorData);
+        giFileClose(oidnWeightsFile);
+      }
+
+      bool b = giOidnUpdateState(scene->denoiserState, s_device, imageWidth, imageHeight);
+      assert(b); // TODO: handle
+
+      CgpuBuffer oidnBuffer = giOidnGetInputBuffer(scene->denoiserState);
+
+      buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_OIDN, .buffer = oidnBuffer });
+    }
+    else if (scene->denoiserState)
+    {
+      giOidnDestroyState(scene->denoiserState);
+      scene->denoiserState = nullptr;
+    }
+    // </OIDN AOV>
+
     size_t imageCount = shaderCache->imageBindings2d.size() + shaderCache->imageBindings3d.size() + 2/* dome lights */;
 
     std::vector<CgpuImageBinding> images;
@@ -2369,44 +2376,11 @@ cleanup:
 
     cgpuCmdTraceRays(commandBuffer, shaderCache->pipeline, imageWidth, imageHeight);
 
-
-
-    // <DUMMY DENOISING PASS>
+    // Denoise color AOV.
+    if (enableDenoiser)
     {
-      const GiAovBinding* colorBinding = nullptr;
-
-      for (const GiAovBinding& binding : params.aovBindings)
-      {
-        if (binding.aovId != GiAovId::Color)
-        {
-          continue;
-        }
-
-        colorBinding = &binding;
-        break;
-      }
-      assert(colorBinding); // TODO
-
-      CgpuBufferMemoryBarrier bufferBarrier {
-        .buffer = colorBinding->renderBuffer->deviceMem,
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER,
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
-      };
-
-      CgpuPipelineBarrier barrier = {
-        .bufferBarrierCount = 1,
-        .bufferBarriers = &bufferBarrier
-      };
-      cgpuCmdPipelineBarrier(commandBuffer, &barrier);
-
-      oidnDenoisePass(colorBinding, shaderCache, commandBuffer);
+      giOidnRender(scene->denoiserState, commandBuffer);
     }
-    // </DUMMY DENOISING PASS>
-
-
-
 
     // Copy device to host memory.
     {
@@ -2450,7 +2424,13 @@ cleanup:
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-        cgpuCmdCopyBuffer(commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
+        CgpuBuffer deviceMem = renderBuffer->deviceMem;
+        if (binding.aovId == GiAovId::Color && renderSettings.denoiseColorAov)
+        {
+          deviceMem = giOidnGetOutputBuffer(scene->denoiserState);
+        }
+
+        cgpuCmdCopyBuffer(commandBuffer, deviceMem, 0, renderBuffer->hostMem);
 
         if (!cgpuInvalidateMappedMemory(s_device, renderBuffer->hostMem, 0, CGPU_WHOLE_SIZE))
           goto cleanup;
@@ -2541,6 +2521,11 @@ cleanup:
       cgpuDestroyBuffer(s_device, scene->sceneParams);
     }
     cgpuDestroyImage(s_device, scene->fallbackDomeLightTexture);
+
+    if (scene->denoiserState)
+    {
+      giOidnDestroyState(scene->denoiserState);
+    }
     delete scene;
   }
 
@@ -2957,7 +2942,8 @@ cleanup:
 
     CgpuBuffer deviceMem;
     if (!cgpuCreateBuffer(s_device, {
-                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC,
+                            .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC |
+                                     CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*TODO: replace OIDN->renderBuffer transfer with direct shader write*/,
                             .memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL,
                             .size = bufferSize,
                             .debugName = "RenderBufferGpu"

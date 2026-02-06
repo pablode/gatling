@@ -304,8 +304,8 @@ namespace gtl
 
   struct CgpuBufferCreateInfo
   {
-    CgpuBufferUsageFlags usage;
-    CgpuMemoryPropertyFlags memoryProperties;
+    CgpuBufferUsageFlags usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER;
+    CgpuMemoryPropertyFlags memoryProperties = CGPU_MEMORY_PROPERTY_FLAG_DEVICE_LOCAL;
     uint64_t size;
     const char* debugName = nullptr;
     uint32_t alignment = 0; // no explicit alignment

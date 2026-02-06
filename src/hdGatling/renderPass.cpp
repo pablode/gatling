@@ -224,6 +224,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     .domeLight = renderParam->ActiveDomeLight(),
     .renderSettings = {
       .clippingPlanes = clippingPlanes,
+      .denoiseColorAov = _settings.find(HdGatlingSettingsTokens->denoiseColorAov)->second.Get<bool>(),
       .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
       .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
       .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),

@@ -31,6 +31,7 @@
 #define GB_LOG(fmt, ...) QUILL_LOG_INFO(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_DEBUG(fmt, ...) QUILL_LOG_DEBUG(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_DEBUG_DYN(fmt, ...) QUILL_LOG_DYNAMIC(gtl::gbGetLogger(), quill::LogLevel::Debug, fmt, ##__VA_ARGS__)
+#define GB_FATAL(msg) { GB_ERROR("{}:{} {}", __FILE__, __LINE__, msg); exit(-1); }
 
 namespace gtl
 {
