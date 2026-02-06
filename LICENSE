@@ -982,7 +982,9 @@ POSSIBILITY OF SUCH DAMAGE.
     Vulkan-Headers
     SPIRV-Tools
     SPIRV-Reflect
+    SPIRV-Cross
     MaterialX
+    metal-cpp
 ============================================================
 
 
