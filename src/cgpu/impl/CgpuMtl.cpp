@@ -90,9 +90,9 @@ namespace gtl
 
     MTL4::CommandBufferOptions* commandBufferOptions;
 
+    MTL4::CommitOptions* commitOptions = nullptr; // non-null in debug
 #ifndef NDEBUG
     MTL::LogState*       logState; // nullable
-    MTL4::CommitOptions* commitOptions;
 #endif
   };
 
@@ -159,9 +159,7 @@ namespace gtl
     MTL::ResidencySet* deviceResidencySet;
     std::vector<MTL::ResidencySet*> residencySets;
     CgpuIPipeline* pipeline = nullptr;
-#ifndef NDEBUG
     MTL4::CommitOptions* commitOptions;
-#endif
     MTL4::CommandBufferOptions* commandBufferOptions;
   };
 
@@ -521,8 +519,8 @@ namespace gtl
     idevice->commandQueue = commandQueue;
 #ifndef NDEBUG
     idevice->logState = logState;
-    idevice->commitOptions = commitOptions;
 #endif
+    idevice->commitOptions = commitOptions;
     idevice->uniqueShaderEntryPointCounter = 0;
     idevice->residencySet = residencySet;
     idevice->commandBufferOptions = commandBufferOptions;
@@ -535,8 +533,8 @@ namespace gtl
     idevice->commandBufferOptions->release();
     idevice->residencySet->release();
 #ifndef NDEBUG
-    idevice->commitOptions->release();
     idevice->logState->release();
+    idevice->commitOptions->release();
 #endif
     idevice->commandQueue->release();
     idevice->device->release();
@@ -1793,9 +1791,7 @@ namespace gtl
 
     icommandBuffer->commandAllocator = commandAllocator;
     icommandBuffer->commandBuffer = mtlCommandBuffer;
-#ifndef NDEBUG
     icommandBuffer->commitOptions = idevice->commitOptions;
-#endif
     icommandBuffer->commandBufferOptions = idevice->commandBufferOptions;
     icommandBuffer->auxResidencySet = auxResidencySet;
     icommandBuffer->deviceResidencySet = idevice->residencySet;
