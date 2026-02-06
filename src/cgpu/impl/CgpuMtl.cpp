@@ -1734,7 +1734,7 @@ namespace gtl
 
       CGPU_RESOLVE_IMAGE(ctx, b.image, iimage);
 
-      // We only support two kinds of descriptor sets - texture heaps (basically as single array
+      // We only support two kinds of descriptor sets - texture heaps (basically a single array
       // of textures) and 'no texture' descriptor sets. This makes it possible to bind single images
       // to array slots below. Putting the arrays into separate sets also fixes a crash on AMD.
       assert(bindings->bufferCount == 0);
