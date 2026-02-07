@@ -2050,7 +2050,7 @@ namespace gtl
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
 
-    NS::Range range(dstOffset, size);
+    NS::Range range(dstOffset, (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size);
     encoder->fillBuffer(ibuffer->buffer, range, data);
 
     encoder->endEncoding();
