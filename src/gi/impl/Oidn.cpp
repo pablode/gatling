@@ -276,7 +276,8 @@ namespace gtl
 
     void reallocBuffers(CgpuContext* gpuCtx, uint32_t width, uint32_t height)
     {
-      GB_LOG("{} x {}", width, height);
+      GB_LOG("oidn resize: {} x {}", width, height);
+
       m_deleteQueue.pushBack(m_pool0, m_pool1, m_pool2, m_pool3, m_scratchMem[0], m_scratchMem[1], m_outputPool);
 
       uint64_t pixelCount = width * height;
@@ -487,8 +488,8 @@ namespace gtl
         }
 
         // TODO: can we do it in advance?
-        CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
-        cgpuUpdateBindSet(gpuCtx, step.bindSet, &bindings0);
+        CgpuBindings bindings = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
+        cgpuUpdateBindSet(gpuCtx, step.bindSet, &bindings);
 
         std::array<uint32_t, 1> dynamicOffsets { uniformData.bufferOffset };
         cgpuCmdBindPipeline(gpuCtx, commandBuffer, step.pipeline, &step.bindSet, 1, uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
@@ -638,7 +639,7 @@ state->imageHeight = imageHeight;
 
     // TODO: do in advance
     std::vector<CgpuBufferBinding> bufferBindings = {
-      CgpuBufferBinding{.binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = bumpAlloc.getBuffer(), .size = sizeof(rp::UniformData)},
+      CgpuBufferBinding{.binding = rp_ml::BINDING_INDEX_UNIFORM_DATA, .buffer = bumpAlloc.getBuffer(), .size = sizeof(rp_ml::UniformData)},
       CgpuBufferBinding{.binding = rp_ml::BINDING_INDEX_INPUT_BUF, .buffer = state->net.getInputBuffer() },
       CgpuBufferBinding{.binding = rp_ml::BINDING_INDEX_OUTPUT_BUF, .buffer = state->maxLuminanceBuffer }
     };
@@ -646,7 +647,7 @@ state->imageHeight = imageHeight;
     CgpuBindings bindings = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
     cgpuUpdateBindSet(gpuCtx, state->maxLuminanceBindSet, &bindings);
 
-    auto uniformData = bumpAlloc.alloc<rp::UniformData>();
+    auto uniformData = bumpAlloc.alloc<rp_ml::UniformData>();
     *uniformData.cpuPtr = {
       .imageWidth = state->imageWidth,
       .imageHeight = state->imageHeight

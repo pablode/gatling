@@ -182,11 +182,11 @@ void clearAovs(uint pixelIndex)
     AlbedoAov[pixelIndex] = ClearValuesF[AOV_ID_ALBEDO].rgb;
 #endif
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
-  const int CHANNEL_COUNT = 3;
-  for (int i = 0; ubo.sampleOffset == 0 && i < CHANNEL_COUNT; i++)
-  {
-    OidnAov[pixelIndex * CHANNEL_COUNT + i] = float16_t(0.0);
-  }
+    const int CHANNEL_COUNT = 3;
+    for (int i = 0; ubo.sampleOffset == 0 && i < CHANNEL_COUNT; i++)
+    {
+      OidnAov[pixelIndex * CHANNEL_COUNT + i] = float16_t(0.0);
+    }
 #endif
 }
 

@@ -28,7 +28,7 @@ void main()
 
   if (gl_LocalInvocationIndex == 0)
   {
-	sh_val = 0;
+    sh_val = 0;
   }
 
   barrier();
@@ -39,7 +39,7 @@ void main()
 
   if (gl_LocalInvocationIndex == 0)
   {
-	atomicMax(outVal, sh_val);
+    atomicMax(outVal, sh_val);
   }
 }
 
