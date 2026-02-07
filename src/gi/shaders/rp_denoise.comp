@@ -7,6 +7,7 @@
 
 layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
+layout(binding = BINDING_INDEX_UNIFORM_DATA, std140) uniform UniformDataUbo { UniformData ubo; };
 layout(binding = BINDING_INDEX_INPUT_BUF1, std430) readonly buffer InputBuffer { float16_t inPixels[]; };
 #ifdef OUT_CHANNEL_F32
 layout(binding = BINDING_INDEX_OUTPUT_BUF, std430) writeonly buffer OutputBuffer { float outPixels[]; };
@@ -21,8 +22,6 @@ layout(binding = BINDING_INDEX_INPUT_BUF2, std430) readonly buffer InputBuffer2 
 #if defined(SCALE_INPUT_INV) || defined(SCALE_OUTPUT)
 layout(binding = BINDING_INDEX_VALUE_SCALE_BUF, std430) readonly buffer ValueScaleBuffer { float valueScale; };
 #endif
-
-layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
 #define KERNEL_SIZE 3
 #define KERNEL_SIZE_SQ (KERNEL_SIZE * KERNEL_SIZE)
@@ -51,12 +50,12 @@ void main()
     {
       ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
 
-      if (any(greaterThanEqual(uvec2(coord), uvec2(PC.imageWidth, PC.imageHeight))))
+      if (any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight))))
       {
         continue; // oob
       }
 
-      int coordIdx = int(coord.y * PC.imageWidth + coord.x);
+      int coordIdx = int(coord.y * ubo.imageWidth + coord.x);
 
       for (uint ic = 0; ic < IN1_CHANNEL_COUNT; ic++)
       {
@@ -64,7 +63,7 @@ void main()
 
         uint weightIndex = (oc * IN1_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
 
-        float16_t weight = tensors[PC.weightOffset + weightIndex];
+        float16_t weight = tensors[ubo.weightOffset + weightIndex];
 
         float16_t inValue = inPixels[inIndexIj];
 
@@ -104,9 +103,9 @@ void main()
       {
         ivec2 coord = wgBase + ivec2(lx - 1, ly - 1);
 
-        uint inPixelIdx = uint(coord.y * PC.imageWidth + coord.x) * IN1_CHANNEL_COUNT + ic;
+        uint inPixelIdx = uint(coord.y * ubo.imageWidth + coord.x) * IN1_CHANNEL_COUNT + ic;
 
-        bool oob = any(greaterThanEqual(uvec2(coord), uvec2(PC.imageWidth, PC.imageHeight)));
+        bool oob = any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight)));
 
         float16_t inValue = oob ? float16_t(0.0) : inPixels[inPixelIdx];
 
@@ -133,7 +132,7 @@ void main()
         ivec2 lCoord = ivec2(gl_LocalInvocationID.xy) + ivec2(i, j);
 
         uint weightIndex = weightIndexOffset + (j * KERNEL_SIZE + i);
-        float16_t weight = tensors[PC.weightOffset + weightIndex];
+        float16_t weight = tensors[ubo.weightOffset + weightIndex];
 
         result += sh_window[lCoord.y][lCoord.x] * weight;
       }
@@ -151,15 +150,15 @@ void main()
 #endif
 
 
-  if (gl_GlobalInvocationID.x >= PC.imageWidth || gl_GlobalInvocationID.y >= PC.imageHeight)
+  if (gl_GlobalInvocationID.x >= ubo.imageWidth || gl_GlobalInvocationID.y >= ubo.imageHeight)
     return;
 
 
 #ifdef OP_UPSAMPLE
-  uint outIdx0 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 0) * PC.imageWidth * 2);
-  uint outIdx1 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 0) * PC.imageWidth * 2);
-  uint outIdx2 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 1) * PC.imageWidth * 2);
-  uint outIdx3 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 1) * PC.imageWidth * 2);
+  uint outIdx0 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 0) * ubo.imageWidth * 2);
+  uint outIdx1 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 0) * ubo.imageWidth * 2);
+  uint outIdx2 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 1) * ubo.imageWidth * 2);
+  uint outIdx3 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 1) * ubo.imageWidth * 2);
 #endif
 
 
@@ -167,10 +166,10 @@ void main()
   // TODO: this leads to thread divergence; we can instead discard whole warp (respect tile size)
   if (bool(gl_LocalInvocationID.x & 1) || bool(gl_LocalInvocationID.y & 1)) return;
 
-  int inIdx = int(gl_GlobalInvocationID.y / 2 * PC.imageWidth / 2 + gl_GlobalInvocationID.x / 2);
+  int inIdx = int(gl_GlobalInvocationID.y / 2 * ubo.imageWidth / 2 + gl_GlobalInvocationID.x / 2);
 #else
 
-  int inIdx = int(gl_GlobalInvocationID.y * PC.imageWidth + gl_GlobalInvocationID.x);
+  int inIdx = int(gl_GlobalInvocationID.y * ubo.imageWidth + gl_GlobalInvocationID.x);
 #endif
 
 
@@ -181,7 +180,7 @@ void main()
 #ifndef OP_MAX_POOL
     result = sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc];
 
-    result += tensors[PC.biasOffset + oc];
+    result += tensors[ubo.biasOffset + oc];
 
     result = max(result, float16_t(0.0)); // ReLU activation
 #else
@@ -192,7 +191,7 @@ void main()
       sh_results[gl_LocalInvocationID.y + 1][gl_LocalInvocationID.x + 1][oc]
     );
 
-    results += f16vec4(tensors[PC.biasOffset + oc]);
+    results += f16vec4(tensors[ubo.biasOffset + oc]);
 
     float16_t maxPool = max(max(results.x, results.y), max(results.z, results.w));
 

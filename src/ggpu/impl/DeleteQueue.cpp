@@ -81,6 +81,7 @@ namespace gtl
   {
     if (!handle.handle) { return; }
     enqueueDestroyFunc([this, handle]() { cgpuDestroySemaphore(m_ctx, handle); });
+  }
 
   void GgpuDeleteQueue::pushBack(CgpuCommandBuffer handle)
   {

@@ -183,7 +183,7 @@ void clearAovs(uint pixelIndex)
 #endif
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
   const int CHANNEL_COUNT = 3;
-  for (int i = 0; PC.sampleOffset == 0 && i < CHANNEL_COUNT; i++)
+  for (int i = 0; ubo.sampleOffset == 0 && i < CHANNEL_COUNT; i++)
   {
     OidnAov[pixelIndex * CHANNEL_COUNT + i] = float16_t(0.0);
   }
@@ -519,7 +519,8 @@ void main()
         prevColor = ColorAov[pixelIndex].rgb;
     }
 #endif
-    ColorAov[pixelIndex] = vec4(mix(prevColor, pixel_color, ubo.invSampleCount), 1.0);
+    vec3 accumColor = mix(prevColor, pixel_color, ubo.invSampleCount);
+    ColorAov[pixelIndex] = vec4(accumColor, 1.0);
 #endif
 
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
@@ -529,8 +530,8 @@ void main()
 
 #if (AOV_MASK & AOV_BIT_OIDN) != 0
     const int CHANNEL_COUNT = 3;
-    OidnAov[pixel_index * CHANNEL_COUNT + 0] = float16_t(pixel_color.r);
-    OidnAov[pixel_index * CHANNEL_COUNT + 1] = float16_t(pixel_color.g);
-    OidnAov[pixel_index * CHANNEL_COUNT + 2] = float16_t(pixel_color.b);
+    OidnAov[pixelIndex * CHANNEL_COUNT + 0] = float16_t(accumColor.r);
+    OidnAov[pixelIndex * CHANNEL_COUNT + 1] = float16_t(accumColor.g);
+    OidnAov[pixelIndex * CHANNEL_COUNT + 2] = float16_t(accumColor.b);
 #endif
 }

@@ -20,7 +20,8 @@
 #include "interface/rp_oidn.h"
 #include "interface/rp_max_luminance.h"
 
-#include <gtl/ggpu/DelayedResourceDestroyer.h>
+#include <gtl/ggpu/BumpAllocator.h>
+#include <gtl/ggpu/DeleteQueue.h>
 #include <gtl/ggpu/Stager.h>
 #include <gtl/gb/Enum.h>
 #include <gtl/gb/Log.h>
@@ -53,6 +54,7 @@ namespace gtl
       uint32_t biasOffset;
       GiOidnPostOp postOp;
       uint32_t outDims;
+      CgpuBindSet bindSet;
     };
 
   private:
@@ -72,7 +74,7 @@ namespace gtl
     uint32_t m_wgSizeX;
     uint32_t m_wgSizeY;
 
-    GgpuDelayedResourceDestroyer& m_resourceDestroyer;
+    GgpuDeleteQueue& m_deleteQueue;
 
     std::array<uint32_t, int(Buffer::COUNT)> m_bufferSizeMuls;
     std::array<uint32_t, int(Buffer::COUNT)> m_bufferLastDims;
@@ -87,7 +89,7 @@ namespace gtl
 
     struct BuildContext
     {
-      CgpuDevice device;
+      CgpuContext* gpuCtx;
       GiGlslShaderGen& shaderGen;
       GgpuStager& stager;
       const GiTzaTensorDescriptions& tensorDescriptions;
@@ -109,8 +111,8 @@ namespace gtl
         bufferSize += (tensorDesc.dataSize + 4 - 1) / 4 * 4; // Vk requires 4 byte size
       }
 
-      CgpuBufferUsageFlags bufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-      if (!cgpuCreateBuffer(c.device, { .usage = bufferUsage, .size = bufferSize }, &m_tensorBuffer))
+      CgpuBufferUsage bufferUsage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst;
+      if (!cgpuCreateBuffer(c.gpuCtx, { .usage = bufferUsage, .size = bufferSize }, &m_tensorBuffer))
       {
         GB_FATAL("failed to alloc tensor buffer");
       }
@@ -187,12 +189,16 @@ namespace gtl
       std::string debugName = makeConvolutionPipelineDebugName(in1Dims, outDims, postOp);
 
       int convImpl = rp::CONV_IMPL_SHMEM;
+      /*
+      // TODO
       if (c.vendorId == CGPU_VENDOR_ID_MESA)
       {
         // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
         // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
         convImpl = rp::CONV_IMPL_SEQ;
       }
+      */
+        //convImpl = rp::CONV_IMPL_SEQ;
 
       GiGlslShaderGen::OidnParams sgParams{
         .wgSizeX = int(m_wgSizeX),
@@ -215,17 +221,15 @@ namespace gtl
       }
 
       CgpuShader shader;
-      if (!cgpuCreateShader(c.device, { .size = spv.size(), .source = spv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE }, &shader))
+      if (!cgpuCreateShader(c.gpuCtx, { .size = spv.size(), .source = spv.data(), .stageFlags = CgpuShaderStage::Compute }, &shader))
       {
         GB_FATAL("failed to create OIDN shader");
       }
 
       CgpuPipeline pipeline;
-      if (!cgpuCreateComputePipeline(c.device, { .shader = shader , .debugName = debugName.c_str() }, &pipeline))
-      {
-        GB_FATAL("failed to create OIDN pipeline");
-      }
-      cgpuDestroyShader(c.device, shader);
+      cgpuCreateComputePipeline(c.gpuCtx, { .shader = shader , .debugName = debugName.c_str() }, &pipeline);
+
+      cgpuDestroyShader(c.gpuCtx, shader);
 
       uint32_t inSizeMul = in1Dims / std::pow(2, c.depth) * sizeof(float)/2;
 
@@ -254,6 +258,9 @@ namespace gtl
       if (bias.layout != GiTzaTensorLayout::x) { GB_FATAL("unexpected tensor layout"); }
       if (weights.dimensions.size() != 4 || weights.dimensions[2] != 3 || weights.dimensions[3] != 3) { GB_FATAL("unsupported kernel dimensions"); }
 
+      CgpuBindSet bindSet;
+      cgpuCreateBindSets(c.gpuCtx, pipeline, &bindSet, 1);
+
       m_steps.push_back(PipelineStep{
         .pipeline = pipeline,
         .input1 = input1,
@@ -262,19 +269,21 @@ namespace gtl
         .weightOffset = weights.offset / 2,
         .biasOffset = bias.offset / 2,
         .postOp = postOp,
-        .outDims = uint32_t(outDims)
+        .outDims = uint32_t(outDims),
+        .bindSet = bindSet
       });
     }
 
-    void reallocBuffers(CgpuDevice device, uint32_t width, uint32_t height)
+    void reallocBuffers(CgpuContext* gpuCtx, uint32_t width, uint32_t height)
     {
-      m_resourceDestroyer.enqueueDestruction(m_pool0, m_pool1, m_pool2, m_pool3, m_scratchMem[0], m_scratchMem[1], m_outputPool);
+      GB_LOG("{} x {}", width, height);
+      m_deleteQueue.pushBack(m_pool0, m_pool1, m_pool2, m_pool3, m_scratchMem[0], m_scratchMem[1], m_outputPool);
 
       uint64_t pixelCount = width * height;
       uint64_t pool0Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool0)];
 
-      CgpuBufferUsageFlags pool0Usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-      if (!cgpuCreateBuffer(device, { .usage = pool0Usage, .size = pool0Size }, &m_pool0))
+      CgpuBufferUsage pool0Usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc | CgpuBufferUsage::TransferDst;
+      if (!cgpuCreateBuffer(gpuCtx, { .usage = pool0Usage, .size = pool0Size }, &m_pool0))
       {
         GB_FATAL("failed to allocate OIDN buffer");
       }
@@ -282,40 +291,39 @@ namespace gtl
       uint64_t pool1Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool1)];
       uint64_t pool2Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool2)];
       uint64_t pool3Size = pixelCount * m_bufferSizeMuls[int(Buffer::Pool3)];
-      CgpuBufferUsageFlags poolNBufferUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC;
-      if (!cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool1Size }, &m_pool1) ||
-          !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool2Size }, &m_pool2) ||
-          !cgpuCreateBuffer(device, { .usage = poolNBufferUsage, .size = pool3Size }, &m_pool3))
+      CgpuBufferUsage poolNBufferUsage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc;
+      if (!cgpuCreateBuffer(gpuCtx, { .usage = poolNBufferUsage, .size = pool1Size }, &m_pool1) ||
+          !cgpuCreateBuffer(gpuCtx, { .usage = poolNBufferUsage, .size = pool2Size }, &m_pool2) ||
+          !cgpuCreateBuffer(gpuCtx, { .usage = poolNBufferUsage, .size = pool3Size }, &m_pool3))
       {
         GB_FATAL("failed to allocate OIDN buffer");
       }
 
       uint64_t scratchSize = pixelCount * m_bufferSizeMuls[int(Buffer::Scratch)];
-      CgpuBufferUsageFlags scratchUsage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST/*concat*/;
-      if (!cgpuCreateBuffer(device, { .usage = scratchUsage, .size = scratchSize }, &m_scratchMem[0]) ||
-          !cgpuCreateBuffer(device, { .usage = scratchUsage, .size = scratchSize }, &m_scratchMem[1]))
+      CgpuBufferUsage scratchUsage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst/*concat*/;
+      if (!cgpuCreateBuffer(gpuCtx, { .usage = scratchUsage, .size = scratchSize }, &m_scratchMem[0]) ||
+          !cgpuCreateBuffer(gpuCtx, { .usage = scratchUsage, .size = scratchSize }, &m_scratchMem[1]))
       {
         GB_FATAL("failed to allocate OIDN buffer");
       }
 
       uint64_t outputSize = pixelCount * m_bufferSizeMuls[int(Buffer::Output)];
-      if (!cgpuCreateBuffer(device, { .usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_SRC, .size = outputSize }, &m_outputPool))
+      if (!cgpuCreateBuffer(gpuCtx, { .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc, .size = outputSize }, &m_outputPool))
       {
         GB_FATAL("failed to allocate OIDN buffer");
       }
     }
 
   public:
-    GiOidnNet(CgpuDevice device,
-           GiGlslShaderGen& shaderGen,
-           GgpuStager& stager,
-           GgpuDelayedResourceDestroyer& resourceDestroyer,
-           const GiTzaTensorDescriptions& tensorDescs,
-           const uint8_t* tensorData)
-      : m_resourceDestroyer(resourceDestroyer)
+    GiOidnNet(CgpuContext* gpuCtx,
+              GiGlslShaderGen& shaderGen,
+              GgpuStager& stager,
+              GgpuDeleteQueue& deleteQueue,
+              const GiTzaTensorDescriptions& tensorDescs,
+              const uint8_t* tensorData)
+      : m_deleteQueue(deleteQueue)
     {
-      CgpuPhysicalDeviceProperties deviceProperties;
-      cgpuGetPhysicalDeviceProperties(device, deviceProperties);
+      CgpuDeviceProperties deviceProperties = cgpuGetDeviceProperties(gpuCtx);
 
       uint32_t shmemSize = deviceProperties.maxComputeSharedMemorySize;
 
@@ -326,7 +334,7 @@ namespace gtl
       for (uint32_t& i : m_bufferLastDims) { i = 0; }
       for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
 
-      BuildContext c{ device, shaderGen, stager, tensorDescs, tensorData, deviceProperties.vendorId };
+      BuildContext c{ gpuCtx, shaderGen, stager, tensorDescs, tensorData, /*deviceProperties.vendorId*/0 };
 
       uploadTensors(c);
 
@@ -352,23 +360,23 @@ namespace gtl
 
     ~GiOidnNet()
     {
-      m_resourceDestroyer.enqueueDestruction(m_pool0, m_pool1, m_pool2, m_pool3, m_scratchMem[0], m_scratchMem[1], m_outputPool, m_tensorBuffer);
+      m_deleteQueue.pushBack(m_pool0, m_pool1, m_pool2, m_pool3, m_scratchMem[0], m_scratchMem[1], m_outputPool, m_tensorBuffer);
 
       for (const PipelineStep& step : m_steps)
       {
-        m_resourceDestroyer.enqueueDestruction(step.pipeline);
+        m_deleteQueue.pushBack(step.pipeline);
       }
     }
 
     // TODO: need to call this before getting pool0 outside (e.g. in giRender at the start of frame)
-    void updateViewport(CgpuDevice device, uint32_t width, uint32_t height)
+    void updateViewport(CgpuContext* gpuCtx, uint32_t width, uint32_t height)
     {
       if (width == m_imageWidth && height == m_imageHeight)
       {
         return;
       }
 
-      reallocBuffers(device, width, height);
+      reallocBuffers(gpuCtx, width, height);
 
       m_imageWidth = width;
       m_imageHeight = height;
@@ -384,7 +392,7 @@ namespace gtl
       return m_outputPool;
     }
 
-    void runInference(CgpuCommandBuffer commandBuffer, CgpuBuffer valueScaleBuffer)
+    void runInference(CgpuContext* gpuCtx, CgpuCommandBuffer commandBuffer, GgpuBumpAllocator& bumpAlloc, CgpuBuffer valueScaleBuffer)
     {
       uint32_t scratchIdx = 0; // ping pong
 
@@ -426,36 +434,37 @@ namespace gtl
         // TODO: minimize (src) barriers depending on op
         bufferBarriers.push_back(CgpuBufferMemoryBarrier{
           .buffer = inBuffer1,
-          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER | CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+          .srcStageMask = CgpuPipelineStage::RayTracingShader | CgpuPipelineStage::ComputeShader | CgpuPipelineStage::Transfer,
+          .srcAccessMask = CgpuMemoryAccess::ShaderWrite | CgpuMemoryAccess::TransferWrite,
+          .dstStageMask = CgpuPipelineStage::ComputeShader,
+          .dstAccessMask = CgpuMemoryAccess::ShaderWrite
         });
         if (bool(step.postOp & GiOidnPostOp::Concat))
         {
           bufferBarriers.push_back(CgpuBufferMemoryBarrier{
             .buffer = inBuffer2,
-            .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER | CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-            .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-            .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-            .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+            .srcStageMask = CgpuPipelineStage::RayTracingShader | CgpuPipelineStage::ComputeShader | CgpuPipelineStage::Transfer,
+            .srcAccessMask = CgpuMemoryAccess::ShaderWrite | CgpuMemoryAccess::TransferWrite,
+            .dstStageMask = CgpuPipelineStage::ComputeShader,
+            .dstAccessMask = CgpuMemoryAccess::ShaderWrite
           });
         }
         bufferBarriers.push_back(CgpuBufferMemoryBarrier{
           .buffer = outBuffer,
-          .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER | CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-          .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE | CGPU_MEMORY_ACCESS_FLAG_TRANSFER_WRITE,
-          .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-          .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+          .srcStageMask = CgpuPipelineStage::RayTracingShader | CgpuPipelineStage::ComputeShader | CgpuPipelineStage::Transfer,
+          .srcAccessMask = CgpuMemoryAccess::ShaderWrite | CgpuMemoryAccess::TransferWrite,
+          .dstStageMask = CgpuPipelineStage::ComputeShader,
+          .dstAccessMask = CgpuMemoryAccess::ShaderWrite
         });
 
         CgpuPipelineBarrier barrier = {
           .bufferBarrierCount = (uint32_t) bufferBarriers.size(),
           .bufferBarriers = bufferBarriers.data()
         };
-        cgpuCmdPipelineBarrier(commandBuffer, &barrier);
+        cgpuCmdPipelineBarrier(gpuCtx, commandBuffer, &barrier);
 
-        rp::PushConstants pushData = {
+        auto uniformData = bumpAlloc.alloc<rp::UniformData>();
+        *uniformData.cpuPtr = {
           .imageWidth = imageWidth,
           .imageHeight = imageHeight,
           .weightOffset = step.weightOffset,
@@ -463,6 +472,7 @@ namespace gtl
         };
 
         std::vector<CgpuBufferBinding> bufferBindings = {
+          CgpuBufferBinding{.binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = bumpAlloc.getBuffer(), .size = sizeof(rp::UniformData)},
           CgpuBufferBinding{.binding = rp::BINDING_INDEX_INPUT_BUF1, .buffer = inBuffer1 },
           CgpuBufferBinding{.binding = rp::BINDING_INDEX_OUTPUT_BUF, .buffer = outBuffer },
           CgpuBufferBinding{.binding = rp::BINDING_INDEX_TENSOR_BUF, .buffer = m_tensorBuffer }
@@ -476,16 +486,16 @@ namespace gtl
           bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_VALUE_SCALE_BUF, .buffer = valueScaleBuffer });
         }
 
+        // TODO: can we do it in advance?
         CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
-        cgpuCmdUpdateBindings(commandBuffer, step.pipeline, 0/*descriptorSetIndex*/, &bindings0);
+        cgpuUpdateBindSet(gpuCtx, step.bindSet, &bindings0);
 
-        cgpuCmdBindPipeline(commandBuffer, step.pipeline);
-
-        cgpuCmdPushConstants(commandBuffer, step.pipeline, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+        std::array<uint32_t, 1> dynamicOffsets { uniformData.bufferOffset };
+        cgpuCmdBindPipeline(gpuCtx, commandBuffer, step.pipeline, &step.bindSet, 1, uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
 
         uint32_t wgCountX = (imageWidth + m_wgSizeX - 1) / m_wgSizeX;
         uint32_t wgCountY = (imageHeight + m_wgSizeY - 1) / m_wgSizeY;
-        cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
+        cgpuCmdDispatch(gpuCtx, commandBuffer, wgCountX, wgCountY, 1);
 
         if (bool(step.postOp & GiOidnPostOp::MaxPool))
         {
@@ -504,17 +514,17 @@ namespace gtl
       // output buffer barrier
       CgpuBufferMemoryBarrier bufferBarrier{
         .buffer = m_outputPool,
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_MEMORY_READ
+        .srcStageMask = CgpuPipelineStage::ComputeShader,
+        .srcAccessMask = CgpuMemoryAccess::ShaderWrite,
+        .dstStageMask = CgpuPipelineStage::Transfer,
+        .dstAccessMask = CgpuMemoryAccess::MemoryRead
       };
 
       CgpuPipelineBarrier barrier = {
         .bufferBarrierCount = 1,
         .bufferBarriers = &bufferBarrier
       };
-      cgpuCmdPipelineBarrier(commandBuffer, &barrier);
+      cgpuCmdPipelineBarrier(gpuCtx, commandBuffer, &barrier);
     }
   };
 
@@ -524,15 +534,16 @@ namespace gtl
     GiOidnNet net;
 // TODO: it is not clear if luminance reduction belongs here
     CgpuPipeline maxLuminanceReduction;
+    CgpuBindSet maxLuminanceBindSet;
     CgpuBuffer maxLuminanceBuffer;
 uint32_t imageWidth=0;
 uint32_t imageHeight=0;
   };
 
-  GiOidnState* giOidnCreateState(CgpuDevice device,
+  GiOidnState* giOidnCreateState(CgpuContext* gpuCtx,
                                  GiGlslShaderGen& shaderGen,
                                  GgpuStager& stager,
-                                 GgpuDelayedResourceDestroyer& resourceDestroyer,
+                                 GgpuDeleteQueue& deleteQueue,
                                  const GiTzaTensorDescriptions& tensorDescriptions,
                                  const uint8_t* tensorData)
   {
@@ -543,28 +554,30 @@ uint32_t imageHeight=0;
     }
 
     CgpuShader shader;
-    if (!cgpuCreateShader(device, { .size = spv.size(), .source = spv.data(), .stageFlags = CGPU_SHADER_STAGE_FLAG_COMPUTE }, &shader))
+    if (!cgpuCreateShader(gpuCtx, { .size = spv.size(), .source = spv.data(), .stageFlags = CgpuShaderStage::Compute }, &shader))
     {
       GB_FATAL("failed to create shader");
     }
 
     CgpuPipeline pipeline;
-    if (!cgpuCreateComputePipeline(device, { .shader = shader , .debugName = "Max luminance reduction" }, &pipeline))
-    {
-      GB_FATAL("failed to create pipeline");
-    }
-    cgpuDestroyShader(device, shader);
+    cgpuCreateComputePipeline(gpuCtx, { .shader = shader , .debugName = "Max luminance reduction" }, &pipeline);
+
+    cgpuDestroyShader(gpuCtx, shader);
 
     CgpuBuffer buffer;
-    CgpuBufferUsageFlags usage = CGPU_BUFFER_USAGE_FLAG_STORAGE_BUFFER | CGPU_BUFFER_USAGE_FLAG_TRANSFER_DST;
-    if (!cgpuCreateBuffer(device, { .usage = usage, .size = sizeof(float) }, &buffer))
+    CgpuBufferUsage usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst;
+    if (!cgpuCreateBuffer(gpuCtx, { .usage = usage, .size = sizeof(float) }, &buffer))
     {
       GB_FATAL("failed to allocate OIDN buffer");
     }
 
+    CgpuBindSet bindSet;
+    cgpuCreateBindSets(gpuCtx, pipeline, &bindSet, 1);
+
     return new GiOidnState {
-      GiOidnNet { device, shaderGen, stager, resourceDestroyer, tensorDescriptions, tensorData },
+      GiOidnNet { gpuCtx, shaderGen, stager, deleteQueue, tensorDescriptions, tensorData },
       pipeline,
+      bindSet,
       buffer
     };
   }
@@ -575,11 +588,11 @@ uint32_t imageHeight=0;
     delete state;
   }
 
-  bool giOidnUpdateState(GiOidnState* state, CgpuDevice device, uint32_t imageWidth, uint32_t imageHeight)
+  bool giOidnUpdateState(GiOidnState* state, CgpuContext* gpuCtx, uint32_t imageWidth, uint32_t imageHeight)
   {
 state->imageWidth = imageWidth;
 state->imageHeight = imageHeight;
-    state->net.updateViewport(device, imageWidth, imageHeight);
+    state->net.updateViewport(gpuCtx, imageWidth, imageHeight);
     return true;
   }
 
@@ -593,24 +606,27 @@ state->imageHeight = imageHeight;
     return state->net.getOutputBuffer();
   }
 
-  void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer)
+  void giOidnRender(CgpuContext* gpuCtx,
+                    GiOidnState* state,
+                    CgpuCommandBuffer commandBuffer,
+                    GgpuBumpAllocator& bumpAlloc)
   {
-    cgpuCmdFillBuffer(commandBuffer, state->maxLuminanceBuffer);
+    cgpuCmdFillBuffer(gpuCtx, commandBuffer, state->maxLuminanceBuffer);
 
     CgpuBufferMemoryBarrier bufferBarriers[2] = {
       {
         .buffer = state->net.getInputBuffer(),
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_RAY_TRACING_SHADER | CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE,
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_READ
+        .srcStageMask = CgpuPipelineStage::RayTracingShader | CgpuPipelineStage::ComputeShader,
+        .srcAccessMask = CgpuMemoryAccess::ShaderWrite,
+        .dstStageMask = CgpuPipelineStage::ComputeShader,
+        .dstAccessMask = CgpuMemoryAccess::ShaderRead
       },
       {
         .buffer = state->maxLuminanceBuffer,
-        .srcStageMask = CGPU_PIPELINE_STAGE_FLAG_TRANSFER,
-        .srcAccessMask = CGPU_MEMORY_ACCESS_FLAG_MEMORY_WRITE,
-        .dstStageMask = CGPU_PIPELINE_STAGE_FLAG_COMPUTE_SHADER,
-        .dstAccessMask = CGPU_MEMORY_ACCESS_FLAG_SHADER_WRITE
+        .srcStageMask = CgpuPipelineStage::Transfer,
+        .srcAccessMask = CgpuMemoryAccess::MemoryWrite,
+        .dstStageMask = CgpuPipelineStage::ComputeShader,
+        .dstAccessMask = CgpuMemoryAccess::ShaderWrite
       }
     };
 
@@ -618,29 +634,32 @@ state->imageHeight = imageHeight;
       .bufferBarrierCount = 2,
       .bufferBarriers = bufferBarriers
     };
-    cgpuCmdPipelineBarrier(commandBuffer, &barrier);
+    cgpuCmdPipelineBarrier(gpuCtx, commandBuffer, &barrier);
 
-    rp::PushConstants pushData = {
-      .imageWidth = state->imageWidth,
-      .imageHeight = state->imageHeight
-    };
-
+    // TODO: do in advance
     std::vector<CgpuBufferBinding> bufferBindings = {
+      CgpuBufferBinding{.binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = bumpAlloc.getBuffer(), .size = sizeof(rp::UniformData)},
       CgpuBufferBinding{.binding = rp_ml::BINDING_INDEX_INPUT_BUF, .buffer = state->net.getInputBuffer() },
       CgpuBufferBinding{.binding = rp_ml::BINDING_INDEX_OUTPUT_BUF, .buffer = state->maxLuminanceBuffer }
     };
 
-    CgpuBindings bindings0 = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
-    cgpuCmdUpdateBindings(commandBuffer, state->maxLuminanceReduction, 0/*descriptorSetIndex*/, &bindings0);
+    CgpuBindings bindings = { .bufferCount = (uint32_t) bufferBindings.size(), .buffers = bufferBindings.data() };
+    cgpuUpdateBindSet(gpuCtx, state->maxLuminanceBindSet, &bindings);
 
-    cgpuCmdBindPipeline(commandBuffer, state->maxLuminanceReduction);
+    auto uniformData = bumpAlloc.alloc<rp::UniformData>();
+    *uniformData.cpuPtr = {
+      .imageWidth = state->imageWidth,
+      .imageHeight = state->imageHeight
+    };
 
-    cgpuCmdPushConstants(commandBuffer, state->maxLuminanceReduction, CGPU_SHADER_STAGE_FLAG_COMPUTE, sizeof(pushData), &pushData);
+    std::array<uint32_t, 1> dynamicOffsets { uniformData.bufferOffset };
+    cgpuCmdBindPipeline(gpuCtx, commandBuffer, state->maxLuminanceReduction, &state->maxLuminanceBindSet, 1,
+      uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
 
     uint32_t wgCountX = (state->imageWidth + rp_ml::WG_SIZE_X - 1) / rp_ml::WG_SIZE_X;
     uint32_t wgCountY = (state->imageHeight + rp_ml::WG_SIZE_Y - 1) / rp_ml::WG_SIZE_Y;
-    cgpuCmdDispatch(commandBuffer, wgCountX, wgCountY, 1);
+    cgpuCmdDispatch(gpuCtx, commandBuffer, wgCountX, wgCountY, 1);
 
-    state->net.runInference(commandBuffer, state->maxLuminanceBuffer);
+    state->net.runInference(gpuCtx, commandBuffer, bumpAlloc, state->maxLuminanceBuffer);
   }
 }

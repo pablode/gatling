@@ -4,10 +4,9 @@
 
 #include "interface/rp_max_luminance.h"
 
+layout(binding = BINDING_INDEX_UNIFORM_DATA, std140) uniform UniformDataUbo { UniformData ubo; };
 layout(binding = BINDING_INDEX_INPUT_BUF, std430) readonly buffer InputBuffer { float16_t inVals[]; };
 layout(binding = BINDING_INDEX_OUTPUT_BUF, std430) writeonly buffer OutputBuffer { uint/*alias float*/ outVal; };
-
-layout(push_constant) uniform PushConstantBlock { PushConstants PC; };
 
 layout (local_size_x = WG_SIZE_X, local_size_y = WG_SIZE_Y) in;
 
@@ -15,9 +14,9 @@ shared uint sh_val;
 
 void main()
 {
-  float r = float(inVals[(gl_GlobalInvocationID.y * PC.imageWidth * 3) + gl_GlobalInvocationID.x + 0]);
-  float g = float(inVals[(gl_GlobalInvocationID.y * PC.imageWidth * 3) + gl_GlobalInvocationID.x + 1]);
-  float b = float(inVals[(gl_GlobalInvocationID.y * PC.imageWidth * 3) + gl_GlobalInvocationID.x + 2]);
+  float r = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * 3) + gl_GlobalInvocationID.x + 0]);
+  float g = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * 3) + gl_GlobalInvocationID.x + 1]);
+  float b = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * 3) + gl_GlobalInvocationID.x + 2]);
 
   vec3 color = vec3(r, g, b);
 

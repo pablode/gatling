@@ -25,15 +25,16 @@ GI_INTERFACE_BEGIN(rp_max_luminance)
 const GI_UINT WG_SIZE_X = 32;
 const GI_UINT WG_SIZE_Y = 32;
 
-struct PushConstants
+struct UniformData
 {
   GI_UINT imageWidth;
   GI_UINT imageHeight;
 };
 
 // set 0
-GI_BINDING_INDEX(INPUT_BUF, 0)
-GI_BINDING_INDEX(OUTPUT_BUF, 1)
+GI_BINDING_INDEX(UNIFORM_DATA, 0)
+GI_BINDING_INDEX(INPUT_BUF, 1)
+GI_BINDING_INDEX(OUTPUT_BUF, 2)
 
 GI_INTERFACE_END()
 

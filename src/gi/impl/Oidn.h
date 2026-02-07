@@ -27,24 +27,28 @@
 namespace gtl
 {
   class GiGlslShaderGen;
-  class GgpuDelayedResourceDestroyer;
+  class GgpuDeleteQueue;
   class GgpuStager;
+  class GgpuBumpAllocator;
 
   struct GiOidnState;
 
-  GiOidnState* giOidnCreateState(CgpuDevice device,
+  GiOidnState* giOidnCreateState(CgpuContext* gpuCtx,
                                  GiGlslShaderGen& shaderGen,
                                  GgpuStager& stager,
-                                 GgpuDelayedResourceDestroyer& resourceDestroyer,
+                                 GgpuDeleteQueue& deleteQueue,
                                  const GiTzaTensorDescriptions& tensorDescriptions,
                                  const uint8_t* tensorData);
 
   void giOidnDestroyState(GiOidnState* state);
 
-  bool giOidnUpdateState(GiOidnState* state, CgpuDevice device, uint32_t imageWidth, uint32_t imageHeight);
+  bool giOidnUpdateState(GiOidnState* state, CgpuContext* gpuCtx, uint32_t imageWidth, uint32_t imageHeight);
 
   CgpuBuffer giOidnGetInputBuffer(GiOidnState* state);
   CgpuBuffer giOidnGetOutputBuffer(GiOidnState* state);
 
-  void giOidnRender(GiOidnState* state, CgpuCommandBuffer commandBuffer);
+  void giOidnRender(CgpuContext* gpuCtx,
+                    GiOidnState* state,
+                    CgpuCommandBuffer commandBuffer,
+                    GgpuBumpAllocator& bumpAlloc);
 }
