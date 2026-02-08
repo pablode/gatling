@@ -188,17 +188,9 @@ namespace gtl
 
       std::string debugName = makeConvolutionPipelineDebugName(in1Dims, outDims, postOp);
 
-      int convImpl = rp::CONV_IMPL_SHMEM;
-      /*
-      // TODO
-      if (c.vendorId == CGPU_VENDOR_ID_MESA)
-      {
-        // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
-        // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
-        convImpl = rp::CONV_IMPL_SEQ;
-      }
-      */
-        //convImpl = rp::CONV_IMPL_SEQ;
+      // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
+      // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
+      int convImpl = c.softwareEmulated ? rp::CONV_IMPL_SEQ : rp::CONV_IMPL_SHMEM;
 
       GiGlslShaderGen::OidnParams sgParams{
         .wgSizeX = int(m_wgSizeX),
@@ -324,7 +316,7 @@ namespace gtl
               const uint8_t* tensorData)
       : m_deleteQueue(deleteQueue)
     {
-      CgpuDeviceProperties deviceProperties = cgpuGetDeviceProperties(gpuCtx);
+      const CgpuDeviceProperties& deviceProperties = cgpuGetDeviceProperties(gpuCtx);
 
       uint32_t shmemSize = deviceProperties.maxComputeSharedMemorySize;
 
@@ -335,7 +327,7 @@ namespace gtl
       for (uint32_t& i : m_bufferLastDims) { i = 0; }
       for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
 
-      BuildContext c{ gpuCtx, shaderGen, stager, tensorDescs, tensorData, /*deviceProperties.vendorId*/0 };
+      BuildContext c{ gpuCtx, shaderGen, stager, tensorDescs, tensorData, deviceProperties.softwareEmulated };
 
       uploadTensors(c);
 
