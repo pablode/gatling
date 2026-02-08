@@ -494,8 +494,8 @@ namespace gtl
         std::array<uint32_t, 1> dynamicOffsets { uniformData.bufferOffset };
         cgpuCmdBindPipeline(gpuCtx, commandBuffer, step.pipeline, &step.bindSet, 1, uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
 
-        uint32_t wgCountX = (imageWidth + m_wgSizeX - 1) / m_wgSizeX;
-        uint32_t wgCountY = (imageHeight + m_wgSizeY - 1) / m_wgSizeY;
+        uint32_t wgCountX = (imageWidth + m_wgSizeX - 1) / m_wgSizeX * m_wgSizeX;
+        uint32_t wgCountY = (imageHeight + m_wgSizeY - 1) / m_wgSizeY * m_wgSizeY;
         cgpuCmdDispatch(gpuCtx, commandBuffer, wgCountX, wgCountY, 1);
 
         if (bool(step.postOp & GiOidnPostOp::MaxPool))
