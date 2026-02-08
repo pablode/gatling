@@ -74,6 +74,7 @@ namespace gtl
     .minUniformBufferOffsetAlignment = 4,
     .maxComputeSharedMemorySize = 32 * 1024,
     .maxRayHitAttributeSize = UINT32_MAX,
+    .softwareEmulated = false,
     .subgroupSize = 32
   };
 

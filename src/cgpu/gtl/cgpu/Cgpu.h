@@ -307,6 +307,7 @@ namespace gtl
     uint64_t minUniformBufferOffsetAlignment;
     uint32_t maxComputeSharedMemorySize;
     uint32_t maxRayHitAttributeSize;
+    bool     softwareEmulated;
     uint32_t subgroupSize;
   };
 

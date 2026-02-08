@@ -94,7 +94,7 @@ namespace gtl
       GgpuStager& stager;
       const GiTzaTensorDescriptions& tensorDescriptions;
       const uint8_t* tensorData;
-      uint32_t vendorId;
+      bool softwareEmulated;
 
       int depth = 0; // track up- and downsampling
       std::unordered_map<std::string, TensorUpload> tensorUploads;

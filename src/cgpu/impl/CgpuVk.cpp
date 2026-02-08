@@ -497,13 +497,15 @@ namespace gtl
 
   static CgpuDeviceProperties cgpuGetDeviceProperties(const CgpuDevicePropertyChain& chain)
   {
-    const VkPhysicalDeviceLimits& limits = chain.properties2.properties.limits;
+    const VkPhysicalDeviceProperties& properties = chain.properties2.properties;
+    const VkPhysicalDeviceLimits& limits = properties.limits;
 
     return CgpuDeviceProperties {
       .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
       .minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment,
       .maxComputeSharedMemorySize = limits.maxComputeSharedMemorySize,
       .maxRayHitAttributeSize = chain.rayTracingPipeline.maxRayHitAttributeSize,
+      .softwareEmulated = (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU),
       .subgroupSize = chain.subgroup.subgroupSize
     };
   }
@@ -1026,6 +1028,8 @@ namespace gtl
     {
       GB_LOG("> vendor: Unknown ({:#08x})", properties.vendorID);
     }
+
+    GB_LOG("> type: {}", int(properties.deviceType));
 
     if (candidate.internalFeatures.driverProperties)
     {
