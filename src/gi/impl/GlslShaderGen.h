@@ -58,6 +58,8 @@ namespace gtl
       uint32_t aovMask;
       bool debugPrintf;
       uint32_t mediumStackSize;
+      bool oidnEnabled;
+      uint32_t oidnChannelCount;
       bool progressiveAccumulation;
     };
 
@@ -142,7 +144,7 @@ namespace gtl
     bool generateAnyHitSpirv(const AnyHitShaderParams& params, std::vector<uint8_t>& spv);
 
     bool generateDenoisingSpirv(const OidnParams& params, std::vector<uint8_t>& spv);
-    bool generateMaxLuminanceReductionSpirv(std::vector<uint8_t>& spv);
+    bool generateMaxLuminanceReductionSpirv(uint32_t oidnChannelCount, std::vector<uint8_t>& spv);
 
   private:
     std::shared_ptr<McBackend> m_mcBackend;

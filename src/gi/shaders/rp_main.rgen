@@ -181,11 +181,11 @@ void clearAovs(uint pixelIndex)
 #if (AOV_MASK & AOV_BIT_ALBEDO) != 0
     AlbedoAov[pixelIndex] = ClearValuesF[AOV_ID_ALBEDO].rgb;
 #endif
-#if (AOV_MASK & AOV_BIT_OIDN) != 0
-    const int CHANNEL_COUNT = 3;
-    for (int i = 0; ubo.sampleOffset == 0 && i < CHANNEL_COUNT; i++)
+
+#ifdef OIDN_ENABLED
+    for (int i = 0; ubo.sampleOffset == 0 && i < OIDN_CHANNEL_COUNT; i++)
     {
-      OidnAov[pixelIndex * CHANNEL_COUNT + i] = float16_t(0.0);
+      OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + i] = float16_t(0.0);
     }
 #endif
 }
@@ -528,10 +528,10 @@ void main()
     NormalsAov[pixelIndex] = (normalize(normal) + 1.0) * 0.5;
 #endif
 
-#if (AOV_MASK & AOV_BIT_OIDN) != 0
-    const int CHANNEL_COUNT = 3;
-    OidnAov[pixelIndex * CHANNEL_COUNT + 0] = float16_t(accumColor.r);
-    OidnAov[pixelIndex * CHANNEL_COUNT + 1] = float16_t(accumColor.g);
-    OidnAov[pixelIndex * CHANNEL_COUNT + 2] = float16_t(accumColor.b);
+#ifdef OIDN_ENABLED
+    const int CHANNEL_COUNT = 9;
+    OidnPool0[pixelIndex * CHANNEL_COUNT + 0] = float16_t(accumColor.r);
+    OidnPool0[pixelIndex * CHANNEL_COUNT + 1] = float16_t(accumColor.g);
+    OidnPool0[pixelIndex * CHANNEL_COUNT + 2] = float16_t(accumColor.b);
 #endif
 }

@@ -116,6 +116,7 @@ namespace gtl
   {
     uint32_t                       aovMask;
     std::array<CgpuBindSet, 3>     bindSets;
+    bool                           denoiserEnabled;
     bool                           domeLightCameraVisible;
     std::vector<GiImageBinding>    imageBindings;
     std::vector<const GiMaterial*> materials;
@@ -1360,11 +1361,6 @@ cleanup:
       aovMask |= (1 << int(binding.aovId));
     }
 
-    if (renderSettings.denoiseColorAov && bool(aovMask & (1 << int(GiAovId::Color))))
-    {
-      aovMask |= (1 << int(GiAovId::Oidn));
-    }
-
     std::set<GiMaterial*> materialSet;
     for (auto* m : scene->meshes)
     {
@@ -1395,6 +1391,7 @@ cleanup:
     uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
     uint32_t maxRayHitAttributeSize = _GetRpMainMaxRayHitAttributeSize();
     uint32_t maxTextureIndex = 0;
+    auto denoiserEnabled = bool(scene->denoiserState);
 
     GiGlslShaderGen::CommonShaderParams commonParams = {
       .aovMask = aovMask,
@@ -1404,11 +1401,12 @@ cleanup:
       .debugPrintf = false,
 #endif
       .mediumStackSize = renderSettings.mediumStackSize,
+      .oidnEnabled = denoiserEnabled,
+      .oidnChannelCount = denoiserEnabled ? giOidnGetInputChannelCount(scene->denoiserState) : UINT32_MAX,
       .progressiveAccumulation = renderSettings.progressiveAccumulation
     };
 
-    bool needsAuxOutput = bool(aovMask & (1 << int(GiAovId::Albedo))) ||
-                          bool(aovMask & (1 << int(GiAovId::Oidn)));
+    bool needsAuxOutput = denoiserEnabled || bool(aovMask & (1 << int(GiAovId::Albedo)));
     s_shaderGen->setAuxiliaryOutputEnabled(needsAuxOutput);
 
     // Create per-material hit shaders.
@@ -1810,6 +1808,7 @@ cleanup:
     cache = new GiShaderCache;
     cache->aovMask = aovMask;
     cache->bindSets = bindSets;
+    cache->denoiserEnabled = denoiserEnabled;
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
     cache->imageBindings = std::move(imageBindings);
     cache->maxTextureIndex = maxTextureIndex;
@@ -1963,8 +1962,15 @@ cleanup:
     const GiRenderSettings& renderSettings = params.renderSettings;
 
     // Allocate memory for render buffers
+    bool foundColorAov = false;
+
     for (const GiAovBinding& binding : params.aovBindings)
     {
+      if (binding.aovId == GiAovId::Color)
+      {
+        foundColorAov = true;
+      }
+
       GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
       if (renderBuffer->deviceMem.handle)
@@ -2021,12 +2027,12 @@ cleanup:
       scene->oldRenderParams = params;
     }
 
-    // Denoiser state management
-    bool enableDenoiser = renderSettings.denoiseColorAov;
-
     // FIXME: use values from Hydra camera and ensure they match the render buffers
     uint32_t imageWidth = params.aovBindings[0].renderBuffer->width;
     uint32_t imageHeight = params.aovBindings[0].renderBuffer->height;
+
+    // Denoiser state management
+    bool enableDenoiser = foundColorAov && renderSettings.denoiseColorAov;
 
     if (enableDenoiser)
     {
@@ -2327,10 +2333,10 @@ cleanup:
         rp::BINDING_INDEX_AOV_ALBEDO
       };
 
-      if (enableDenoiser)
+      if (shaderCache->denoiserEnabled)
       {
         CgpuBuffer oidnBuffer = giOidnGetInputBuffer(scene->denoiserState);
-        buffers.push_back({ .binding = rp::BINDING_INDEX_AOV_OIDN, .buffer = oidnBuffer });
+        buffers.push_back({ .binding = rp::BINDING_INDEX_OIDN_POOL0, .buffer = oidnBuffer });
       }
 
       for (const GiAovBinding& binding : params.aovBindings)
@@ -2450,7 +2456,7 @@ cleanup:
     cgpuCmdTraceRays(s_ctx, commandBuffer, imageWidth, imageHeight);
 
     // Denoise color AOV
-    if (enableDenoiser)
+    if (shaderCache->denoiserEnabled)
     {
       giOidnRender(s_ctx, scene->denoiserState, commandBuffer, *s_bumpAlloc);
     }

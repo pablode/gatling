@@ -69,6 +69,11 @@ namespace gtl
     {
       stitcher.appendDefine("PROGRESSIVE_ACCUMULATION");
     }
+    if (params.oidnEnabled)
+    {
+      stitcher.appendDefine("OIDN_ENABLED");
+      stitcher.appendDefine("OIDN_CHANNEL_COUNT", (int) params.oidnChannelCount);
+    }
   }
 
   bool GiGlslShaderGen::generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv)
@@ -348,10 +353,12 @@ namespace gtl
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::Compute, source, spv);
   }
 
-  bool GiGlslShaderGen::generateMaxLuminanceReductionSpirv(std::vector<uint8_t>& spv)
+  bool GiGlslShaderGen::generateMaxLuminanceReductionSpirv(uint32_t oidnChannelCount, std::vector<uint8_t>& spv)
   {
     GiGlslStitcher stitcher;
     stitcher.appendVersion();
+
+    stitcher.appendDefine("OIDN_CHANNEL_COUNT", int(oidnChannelCount));
 
     fs::path filePath = m_shaderPath / "rp_max_luminance.comp";
     if (!stitcher.appendSourceFile(filePath))

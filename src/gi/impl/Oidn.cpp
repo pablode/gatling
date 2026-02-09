@@ -380,6 +380,11 @@ namespace gtl
       return m_pool0;
     }
 
+    uint32_t getInputChannelCount() const
+    {
+      return m_bufferLastDims[int(GiOidnNet::Buffer::Pool0)];
+    }
+
     CgpuBuffer getOutputBuffer() const
     {
       return m_outputPool;
@@ -540,8 +545,14 @@ uint32_t imageHeight=0;
                                  const GiTzaTensorDescriptions& tensorDescriptions,
                                  const uint8_t* tensorData)
   {
+    auto state = new GiOidnState {
+      GiOidnNet { gpuCtx, shaderGen, stager, deleteQueue, tensorDescriptions, tensorData }
+    };
+
+    uint32_t inChannelCount = state->net.getInputChannelCount();
+
     std::vector<uint8_t> spv;
-    if (!shaderGen.generateMaxLuminanceReductionSpirv(spv))
+    if (!shaderGen.generateMaxLuminanceReductionSpirv(inChannelCount, spv))
     {
       GB_FATAL("failed to compile shader");
     }
@@ -567,12 +578,11 @@ uint32_t imageHeight=0;
     CgpuBindSet bindSet;
     cgpuCreateBindSets(gpuCtx, pipeline, &bindSet, 1);
 
-    return new GiOidnState {
-      GiOidnNet { gpuCtx, shaderGen, stager, deleteQueue, tensorDescriptions, tensorData },
-      pipeline,
-      bindSet,
-      buffer
-    };
+    state->maxLuminanceReduction = pipeline;
+    state->maxLuminanceBindSet = bindSet;
+    state->maxLuminanceBuffer = buffer;
+
+    return state;
   }
 
   void giOidnDestroyState(GiOidnState* state)
@@ -592,6 +602,11 @@ state->imageHeight = imageHeight;
   CgpuBuffer giOidnGetInputBuffer(GiOidnState* state)
   {
     return state->net.getInputBuffer();
+  }
+
+  uint32_t giOidnGetInputChannelCount(GiOidnState* state)
+  {
+    return state->net.getInputChannelCount();
   }
 
   CgpuBuffer giOidnGetOutputBuffer(GiOidnState* state)

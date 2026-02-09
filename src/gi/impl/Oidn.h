@@ -45,6 +45,8 @@ namespace gtl
   bool giOidnUpdateState(GiOidnState* state, CgpuContext* gpuCtx, uint32_t imageWidth, uint32_t imageHeight);
 
   CgpuBuffer giOidnGetInputBuffer(GiOidnState* state);
+  uint32_t giOidnGetInputChannelCount(GiOidnState* state);
+
   CgpuBuffer giOidnGetOutputBuffer(GiOidnState* state);
 
   void giOidnRender(CgpuContext* gpuCtx,

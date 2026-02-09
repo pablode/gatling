@@ -249,19 +249,43 @@ void main()
 #endif
 
         // Accumulating AOVs
-#if (AOV_MASK & AOV_BIT_NORMAL) != 0
-        vec3 posNormal = (normal + vec3(1.0)) * 0.5;
-        vec3 prevNormal = posNormal;
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0 || defined(OIDN_ENABLED)
+        vec3 prevNormal = normal;
 #ifdef PROGRESSIVE_ACCUMULATION
         if (ubo.sampleOffset > 0)
         {
-            prevNormal = NormalsAov[pixelIndex];
+            vec3 prevPosNormal;
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+            prevPosNormal = (NormalsAov[pixelIndex];
+#endif
+#ifdef OIDN_ENABLED
+#if OIDN_CHANNEL_COUNT <= 9
+            prevPosNormal = vec3(
+                float(OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 6]),
+                float(OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 7]),
+                float(OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 8])
+            );
+#endif
+#endif
+            prevNormal = prevPosNormal * 2.0 - 1.0;
         }
 #endif
-        NormalsAov[pixelIndex] = mix(prevNormal, posNormal, ubo.invSampleCount);
+        vec3 accumNormal = normalize(mix(prevNormal, normal, ubo.invSampleCount));
+        vec3 accumPosNormal = (accumNormal + 1.0) * 0.5;
+
+#if (AOV_MASK & AOV_BIT_NORMAL) != 0
+        NormalsAov[pixelIndex] = accumPosNormal;
+#endif
+#ifdef OIDN_ENABLED
+#if OIDN_CHANNEL_COUNT <= 9
+        OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 6] = float16_t(accumPosNormal.x);
+        OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 7] = float16_t(accumPosNormal.y);
+        OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 8] = float16_t(accumPosNormal.z);
+#endif
+#endif
 #endif
 
-#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0 || defined(OIDN_ENABLED)
         Bsdf_auxiliary_data bsdf_aux_data;
         bsdf_aux_data.ior1 = iorCurrent;
         bsdf_aux_data.ior2 = iorOther;
@@ -283,10 +307,32 @@ void main()
 #ifdef PROGRESSIVE_ACCUMULATION
         if (ubo.sampleOffset > 0)
         {
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
             prevAlbedo = AlbedoAov[pixelIndex];
+#endif
+#ifdef OIDN_ENABLED
+#if OIDN_CHANNEL_COUNT <= 6
+            prevAlbedo = vec3(
+                float(OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 3]),
+                float(OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 4]),
+                float(OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 5])
+            );
+#endif
+#endif
         }
 #endif
-        AlbedoAov[pixelIndex] = mix(prevAlbedo, albedo, ubo.invSampleCount);
+        vec3 accumAlbedo = mix(prevAlbedo, albedo, ubo.invSampleCount);
+
+#if (AOV_MASK & AOV_BIT_ALBEDO) != 0
+        AlbedoAov[pixelIndex] = accumAlbedo;
+#endif
+#ifdef OIDN_ENABLED
+#if OIDN_CHANNEL_COUNT <= 6
+        OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 3] = float16_t(accumAlbedo.r);
+        OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 4] = float16_t(accumAlbedo.g);
+        OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + 5] = float16_t(accumAlbedo.b);
+#endif
+#endif
 #endif
     }
 

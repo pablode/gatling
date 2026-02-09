@@ -14,9 +14,9 @@ shared uint sh_val;
 
 void main()
 {
-  float r = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * 3) + gl_GlobalInvocationID.x + 0]);
-  float g = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * 3) + gl_GlobalInvocationID.x + 1]);
-  float b = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * 3) + gl_GlobalInvocationID.x + 2]);
+  float r = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * OIDN_CHANNEL_COUNT) + gl_GlobalInvocationID.x + 0]);
+  float g = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * OIDN_CHANNEL_COUNT) + gl_GlobalInvocationID.x + 1]);
+  float b = float(inVals[(gl_GlobalInvocationID.y * ubo.imageWidth * OIDN_CHANNEL_COUNT) + gl_GlobalInvocationID.x + 2]);
 
   vec3 color = vec3(r, g, b);
 

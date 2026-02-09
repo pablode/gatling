@@ -52,7 +52,6 @@ namespace gtl
     InstanceId,
     DoubleSided,
     Albedo,
-    Oidn,
     COUNT
   };
 
