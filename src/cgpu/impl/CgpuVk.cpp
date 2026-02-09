@@ -3462,18 +3462,18 @@ namespace gtl
 
   void cgpuCmdDispatch(CgpuContext* ctx,
                        CgpuCommandBuffer commandBuffer,
-                       uint32_t dimX,
-                       uint32_t dimY,
-                       uint32_t dimZ)
+                       uint32_t wgCountX,
+                       uint32_t wgCountY,
+                       uint32_t wgCountZ)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
     CgpuIDevice* idevice = &ctx->idevice;
 
     idevice->table.vkCmdDispatch(
       icommandBuffer->commandBuffer,
-      dimX,
-      dimY,
-      dimZ
+      wgCountX,
+      wgCountY,
+      wgCountZ
     );
   }
 
