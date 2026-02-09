@@ -1957,27 +1957,20 @@ namespace gtl
 
   void cgpuCmdDispatch(CgpuContext* ctx,
                        CgpuCommandBuffer commandBuffer,
-                       uint32_t dimX,
-                       uint32_t dimY,
-                       uint32_t dimZ)
+                       uint32_t wgCountX,
+                       uint32_t wgCountY,
+                       uint32_t wgCountZ)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
     CgpuIPipeline* ipipeline = icommandBuffer->pipeline;
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
 
-    for (const CgpuRtFunctionTables& fts : ipipeline->fts)
-    {
-      icommandBuffer->auxResidencySet->addAllocation(fts.ift);
-      icommandBuffer->auxResidencySet->addAllocation(fts.missVft);
-      icommandBuffer->auxResidencySet->addAllocation(fts.chitVft);
-    }
-
     encoder->setComputePipelineState(ipipeline->state);
     encoder->setArgumentTable(ipipeline->argumentTable);
 
-    auto threadsPerGrid = MTL::Size(dimX, dimY, dimZ);
-    encoder->dispatchThreads(threadsPerGrid, ipipeline->threadsPerGroup);
+    auto threadgroups = MTL::Size(wgCountX, wgCountY, wgCountZ);
+    encoder->dispatchThreadgroups(threadgroups, ipipeline->threadsPerGroup);
 
     encoder->endEncoding();
   }
@@ -2030,8 +2023,24 @@ namespace gtl
                         uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CgpuIPipeline* ipipeline = icommandBuffer->pipeline;
 
-    cgpuCmdDispatch(ctx, commandBuffer, width, height, 1);
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
+
+    for (const CgpuRtFunctionTables& fts : ipipeline->fts)
+    {
+      icommandBuffer->auxResidencySet->addAllocation(fts.ift);
+      icommandBuffer->auxResidencySet->addAllocation(fts.missVft);
+      icommandBuffer->auxResidencySet->addAllocation(fts.chitVft);
+    }
+
+    encoder->setComputePipelineState(ipipeline->state);
+    encoder->setArgumentTable(ipipeline->argumentTable);
+
+    auto threads = MTL::Size(width, height, 1);
+    encoder->dispatchThreads(threads, ipipeline->threadsPerGroup);
+
+    encoder->endEncoding();
   }
 
   void cgpuCmdFillBuffer(CgpuContext* ctx,
