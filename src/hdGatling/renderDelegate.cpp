@@ -106,7 +106,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
 #endif
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Jittered sampling", HdGatlingSettingsTokens->jitteredSampling, VtValue{true} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Meters per scene unit", HdGatlingSettingsTokens->stageMetersPerUnit, VtValue{1.0f} });
-  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Denoise color AOV", HdGatlingSettingsTokens->denoiseColorAov, VtValue{false} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Denoise color AOV", HdGatlingSettingsTokens->denoiseColorAov, VtValue{true} });
 
   _debugSettingDescriptors.push_back(HdRenderSettingDescriptor{ "Progressive accumulation", HdGatlingSettingsTokens->progressiveAccumulation, VtValue{true} });
 
