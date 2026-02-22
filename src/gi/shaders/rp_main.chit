@@ -257,7 +257,7 @@ void main()
             prevNormal = NormalsAov[pixelIndex];
         }
 #endif
-        NormalsAov[pixelIndex] = mix(prevNormal, posNormal, ubo.invSampleCount);
+        NormalsAov[pixelIndex] = (prevNormal * ubo.sampleOffset + posNormal * ubo.spp) * ubo.invTotalSampleCount;
 #endif
 
 #if (AOV_MASK & AOV_BIT_ALBEDO) != 0
@@ -285,7 +285,7 @@ void main()
             prevAlbedo = AlbedoAov[pixelIndex];
         }
 #endif
-        AlbedoAov[pixelIndex] = mix(prevAlbedo, albedo, ubo.invSampleCount);
+        AlbedoAov[pixelIndex] = (prevAlbedo * ubo.sampleOffset + albedo * ubo.spp) * ubo.invTotalSampleCount;
 #endif
     }
 

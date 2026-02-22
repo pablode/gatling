@@ -2367,7 +2367,7 @@ cleanup:
         .sampleOffset = scene->sampleOffset,
         .lensRadius = lensRadius,
         .spp = renderSettings.spp,
-        .invSampleCount = 1.0f / float(scene->sampleOffset + renderSettings.spp),
+        .invTotalSampleCount = 1.0f / float(scene->sampleOffset + renderSettings.spp),
         .maxSampleValue = renderSettings.maxSampleValue,
         .maxBouncesAndRrBounceOffset = ((renderSettings.maxBounces << 16) | renderSettings.rrBounceOffset),
         .rrInvMinTermProb = renderSettings.rrInvMinTermProb,

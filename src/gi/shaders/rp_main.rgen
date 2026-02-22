@@ -511,7 +511,7 @@ void main()
         prevColor = ColorAov[pixelIndex].rgb;
     }
 #endif
-    ColorAov[pixelIndex] = vec4(mix(prevColor, pixel_color, ubo.invSampleCount), 1.0);
+    ColorAov[pixelIndex] = vec4((prevColor * ubo.sampleOffset + pixel_color * ubo.spp) * ubo.invTotalSampleCount, 1.0);
 #endif
 
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
