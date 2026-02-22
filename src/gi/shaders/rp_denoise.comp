@@ -88,8 +88,6 @@ void main()
   for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
     sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] = float16_t(0.0);
 
-  barrier();
-
   [[unroll]]
   for (uint ic = 0; ic < IN1_CHANNEL_COUNT; ic++)
   {
