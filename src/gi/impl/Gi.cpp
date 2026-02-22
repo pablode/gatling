@@ -208,6 +208,7 @@ namespace gtl
     DirtyPipeline           = (1 << 6),
     DirtyAovBindingDefaults = (1 << 7),
     DirtyBindSets           = (1 << 8),
+    DirtyDenoiser           = (1 << 9),
     All                     = ~0u
   };
   GB_DECLARE_ENUM_BITOPS(GiSceneDirtyFlags)
@@ -2011,7 +2012,7 @@ cleanup:
 
     if (s_forceShaderCacheInvalid)
     {
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyShadersAll | GiSceneDirtyFlags::DirtyFramebuffer;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyShadersAll | GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyDenoiser;
       s_forceShaderCacheInvalid = false;
     }
 
@@ -2034,9 +2035,16 @@ cleanup:
     // Denoiser state management
     bool enableDenoiser = foundColorAov && renderSettings.denoiseColorAov;
 
+    if (!enableDenoiser && scene->denoiserState || enableDenoiser && bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyDenoiser))
+    {
+      giOidnDestroyState(scene->denoiserState);
+      scene->denoiserState = nullptr;
+      scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyDenoiser;
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets | GiSceneDirtyFlags::DirtyFramebuffer;
+    }
+
     if (enableDenoiser)
     {
-      // TODO: add aux AOVs (& denoiser AOV?)
       if (!scene->denoiserState)
       {
         std::string filePath = GB_FMT("{}/{}", s_resourcePath, GI_OIDN_WEIGHTS_FILE);
@@ -2062,12 +2070,6 @@ cleanup:
 
       bool b = giOidnUpdateState(scene->denoiserState, s_ctx, imageWidth, imageHeight);
       assert(b); // TODO: handle
-    }
-    else if (scene->denoiserState)
-    {
-      giOidnDestroyState(scene->denoiserState);
-      scene->denoiserState = nullptr;
-      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets | GiSceneDirtyFlags::DirtyFramebuffer;
     }
 
     if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyShadersHit))
