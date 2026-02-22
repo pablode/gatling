@@ -519,7 +519,7 @@ void main()
         prevColor = ColorAov[pixelIndex].rgb;
     }
 #endif
-    vec3 accumColor = mix(prevColor, pixel_color, ubo.invSampleCount);
+    vec3 accumColor = (prevColor * ubo.sampleOffset + pixel_color * ubo.spp) * ubo.invTotalSampleCount;
     ColorAov[pixelIndex] = vec4(accumColor, 1.0);
 #endif
 

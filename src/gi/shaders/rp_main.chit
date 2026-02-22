@@ -270,7 +270,7 @@ void main()
             prevNormal = prevPosNormal * 2.0 - 1.0;
         }
 #endif
-        vec3 accumNormal = normalize(mix(prevNormal, normal, ubo.invSampleCount));
+        vec3 accumNormal = normalize((prevNormal * ubo.sampleOffset + normal * ubo.spp) * ubo.invTotalSampleCount);
         vec3 accumPosNormal = (accumNormal + 1.0) * 0.5;
 
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
@@ -321,7 +321,7 @@ void main()
 #endif
         }
 #endif
-        vec3 accumAlbedo = mix(prevAlbedo, albedo, ubo.invSampleCount);
+        vec3 accumAlbedo = (prevAlbedo * ubo.sampleOffset + albedo * ubo.spp) * ubo.invTotalSampleCount;
 
 #if (AOV_MASK & AOV_BIT_ALBEDO) != 0
         AlbedoAov[pixelIndex] = accumAlbedo;
