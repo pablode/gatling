@@ -579,10 +579,11 @@ namespace gtl
   {
     mx::FileSearchPath bxdfFiles;
 
-#if MATERIALX_VERSION >= 13900
+    // Workaround for incorrect rendering due to MDL codegen limitation, fixed by MaterialX PRs 2539, 2759
+#if MATERIALX_VERSION >= 13900 && MATERIALX_VERSION < 13940
     bxdfFiles.append("open_pbr_surface.xml");
 #elif MATERIALX_VERSION == 13810
-    // Detect MaterialX 1.38.10-OpenPBR version
+    // Detect MaterialX 1.38.10-OpenPBR version so we can add a fallback impl if vanilla version is used
     if (mtlxStdLib->getNodeGraph("NG_mx39_open_pbr_surface_surfaceshader") != nullptr)
     {
       bxdfFiles.append("open_pbr_surface_1_38.xml");
@@ -610,7 +611,9 @@ namespace gtl
 
     _PatchNodeNames(docCopy);
 
+#if MATERIALX_VERSION >= 13810 && MATERIALX_VERSION < 13940
     _PatchOpenPbrBxdf(docCopy, m_customNodesDoc);
+#endif
 
     // NOTE: this optimization is currently disabled due to a subtle bug with multi-output
     //       nodes in MaterialX (presumably it's an edge case in the flattening logic).
