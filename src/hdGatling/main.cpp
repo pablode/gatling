@@ -262,11 +262,11 @@ public:
     m_sceneDelegate->SetTime(0);
     m_sceneDelegate->SetRefineLevelFallback(4);
 
-    SdfPath renderSettingsPrimPath;
+    std::string renderSettingsPrimPath;
     REQUIRE(m_stage->HasMetadata(UsdRenderTokens->renderSettingsPrimPath));
     m_stage->GetMetadata(UsdRenderTokens->renderSettingsPrimPath, &renderSettingsPrimPath);
 
-    auto renderSettings = UsdRenderSettings(m_stage->GetPrimAtPath(renderSettingsPrimPath));
+    auto renderSettings = UsdRenderSettings(m_stage->GetPrimAtPath(SdfPath(renderSettingsPrimPath)));
     REQUIRE(renderSettings);
 
     auto namespaces = TfTokenVector(1, _tokens->gtl);
