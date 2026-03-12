@@ -443,6 +443,32 @@ void _PatchColorNodes(mx::DocumentPtr document)
   }
 }
 
+void _PatchFrameNodes(mx::DocumentPtr document)
+{
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    mx::NodePtr node = elem->asA<mx::Node>();
+    if (!node)
+    {
+      continue;
+    }
+
+    const mx::string& category = node->getCategory();
+    if (category != "frame")
+    {
+      continue;
+    }
+
+    node->setCategory("geompropvalue");
+    node->setType(TYPE_FLOAT);
+    node->addInput("geomprop", mx::FILENAME_TYPE_STRING)->setValueString("FRAME");
+
+    GB_DEBUG("replaced frame node \"{}\" with geompropvalue", node->getNamePath());
+  }
+}
+
 // We're guaranteed to use st/st0/UV0 as texture coordinates in our vertex data, so prefer
 // this to explicitly sampling a primvar for performance reasons.
 void _PatchDefaultGeomprops(mx::DocumentPtr document)
@@ -633,6 +659,9 @@ namespace gtl
     _PatchSecondaryTexcoordIndices(docCopy);
 
     _PatchColorNodes(docCopy);
+#if MATERIALX_VERSION <= 13940
+    _PatchFrameNodes(docCopy);
+#endif
 
     _PatchDefaultGeomprops(docCopy);
 

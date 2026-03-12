@@ -40,5 +40,6 @@ namespace gtl
     bool requiresSceneTransforms;
     std::vector<const char*> sceneDataNames;
     int cameraPositionSceneDataIndex;
+    int frameSceneDataIndex;
   };
 }

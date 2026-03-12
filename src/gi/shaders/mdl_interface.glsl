@@ -387,6 +387,13 @@ vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default
 
 float scene_data_lookup_float(inout State state, int scene_data_id, float default_value, bool uniform_lookup)
 {
+#ifdef FRAME_SCENE_DATA_INDEX
+    if (scene_data_id == FRAME_SCENE_DATA_INDEX)
+    {
+      return ubo.frame;
+    }
+#endif
+
 #if SCENE_DATA_COUNT > 0
     if (scene_data_isvalid(state, scene_data_id))
     {

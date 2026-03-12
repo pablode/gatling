@@ -142,6 +142,7 @@ namespace gtl
     bool     depthOfField;
     bool     domeLightCameraVisible;
     bool     filterImportanceSampling;
+    float    frame;
     bool     jitteredSampling;
     float    lightIntensityMultiplier;
     uint32_t maxBounces;

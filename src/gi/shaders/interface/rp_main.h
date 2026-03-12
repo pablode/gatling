@@ -51,6 +51,7 @@ struct UniformData
   GI_FLOAT lightIntensityMultiplier;
   GI_UINT  clipRangePacked;
   GI_FLOAT sensorExposure;
+  GI_FLOAT frame;
 };
 
 struct FVertex

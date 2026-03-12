@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/imaging/hd/camera.h>
+#include <pxr/imaging/hd/utils.h>
 #include <pxr/base/gf/matrix3d.h>
 #include <pxr/base/gf/camera.h>
 
@@ -211,6 +212,14 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
 
+  HdSceneIndexBaseRefPtr terminalSi = renderIndex->GetTerminalSceneIndex();
+
+  double frame;
+  if (!HdUtils::GetCurrentFrame(terminalSi, &frame))
+  {
+    frame = 0.0;
+  }
+
   bool clippingPlanes = renderPassState->GetClippingEnabled() &&
                         _settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
 
@@ -228,6 +237,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
       .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
       .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
+      .frame = float(frame),
       .jitteredSampling = _settings.find(HdGatlingSettingsTokens->jitteredSampling)->second.Get<bool>(),
       .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),
       .maxBounces = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<uint32_t>(),

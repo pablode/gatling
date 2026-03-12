@@ -1500,7 +1500,8 @@ cleanup:
 
         uint32_t texOffset = newMaterialGpuDatas[i].texOffsetAllocation.offset;
         auto sceneDataCount = uint32_t(mcMat->sceneDataNames.size())
-          - int(bool(mcMat->cameraPositionSceneDataIndex));
+          - int(bool(mcMat->cameraPositionSceneDataIndex))
+          - int(bool(mcMat->frameSceneDataIndex));
 
         // Closest hit
         {
@@ -1510,6 +1511,7 @@ cleanup:
             .directionalBias = mcMat->directionalBias,
             .enableSceneTransforms = mcMat->requiresSceneTransforms,
             .cameraPositionSceneDataIndex = mcMat->cameraPositionSceneDataIndex,
+            .frameSceneDataIndex = mcMat->frameSceneDataIndex,
             .hasBackfaceBsdf = mcMat->hasBackfaceBsdf,
             .hasBackfaceEdf = mcMat->hasBackfaceEdf,
             .hasCutoutTransparency = mcMat->hasCutoutTransparency,
@@ -1538,6 +1540,7 @@ cleanup:
             .commonParams = commonParams,
             .enableSceneTransforms = mcMat->requiresSceneTransforms,
             .cameraPositionSceneDataIndex = mcMat->cameraPositionSceneDataIndex,
+            .frameSceneDataIndex = mcMat->frameSceneDataIndex,
             .opacityEvalGlsl = compInfo.genInfo.glslSource,
             .sceneDataCount = sceneDataCount,
             .textureIndexOffset = texOffset
@@ -2374,6 +2377,7 @@ cleanup:
         .lightIntensityMultiplier = renderSettings.lightIntensityMultiplier,
         .clipRangePacked = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
         .sensorExposure = params.camera.exposure,
+        .frame = renderSettings.frame,
       };
 
       uniformOffset = uniformData.bufferOffset;
