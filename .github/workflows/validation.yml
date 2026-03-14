@@ -16,6 +16,22 @@ jobs:
     name: Build for Blender 5.0
     uses: ./.github/workflows/build-blender50.yml
 
+  build-2603:
+    name: Build for USD v26.03
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 26.03
+      run-graphical-tests: true
+      upload-test-artifacts: true
+
+  build-2511:
+    name: Build for USD v25.11
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 25.11
+      run-graphical-tests: true
+      upload-test-artifacts: true
+
   build-2508:
     name: Build for USD v25.08
     uses: ./.github/workflows/build-usd.yml

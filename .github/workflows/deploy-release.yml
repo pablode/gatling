@@ -19,6 +19,22 @@ on:
         type: boolean
 
 jobs:
+  build-usd2603:
+    name: Build for USD v26.03
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 26.03
+      upload-install-artifacts: true
+      run-graphical-tests: true
+
+  build-usd2511:
+    name: Build for USD v25.11
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 25.11
+      upload-install-artifacts: true
+      run-graphical-tests: true
+
   build-usd2508:
     name: Build for USD v25.08
     uses: ./.github/workflows/build-usd.yml
@@ -61,7 +77,7 @@ jobs:
 
   deploy-release:
     name: Deploy Release
-    needs: [build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender50]
+    needs: [build-usd2603, build-usd2511, build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender50]
     runs-on: ubuntu-latest
 
     steps:
