@@ -59,7 +59,9 @@ struct State // Shading_state_material
 
     /// The result of state::animation_time().
     /// It represents the time of the current sample in seconds.
+#ifdef IS_ANIMATED
     float               animation_time;
+#endif
 
     /// An array containing the results of state::texture_coordinate(i).
     /// The i-th entry represents the texture coordinates of the i-th texture space at the

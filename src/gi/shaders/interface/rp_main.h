@@ -52,6 +52,7 @@ struct UniformData
   GI_UINT  clipRangePacked;
   GI_FLOAT sensorExposure;
   GI_FLOAT frame;
+  GI_FLOAT time;
 };
 
 struct FVertex

@@ -197,12 +197,13 @@ namespace gtl
     std::string mdlSrc;
     std::string subIdentifier;
     bool hasCutoutTransparency;
-    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier, hasCutoutTransparency))
+    bool isAnimated;
+    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
     {
       return nullptr;
     }
 
-    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
+    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
   }
 
   McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc)
@@ -210,12 +211,13 @@ namespace gtl
     std::string mdlSrc;
     std::string subIdentifier;
     bool hasCutoutTransparency;
-    if (!m_mtlxMdlCodeGen->translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency))
+    bool isAnimated;
+    if (!m_mtlxMdlCodeGen->translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
     {
       return nullptr;
     }
 
-    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency);
+    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
   }
 
   McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& params)
@@ -238,6 +240,7 @@ namespace gtl
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
       .hasCutoutTransparency = _HasCompiledMaterialCutoutTransparency(compiledMaterial),
+      .isAnimated = false, // don't support animated MDL files.. might introduce automatic detection later
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
       .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),
@@ -250,7 +253,7 @@ namespace gtl
     };
   }
 
-  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency)
+  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency, bool isAnimated)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
     if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
@@ -267,6 +270,7 @@ namespace gtl
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
       .hasCutoutTransparency = hasCutoutTransparency,
+      .isAnimated = isAnimated,
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
       .directionalBias = _GetCompiledMaterialDirectionalBias(compiledMaterial),

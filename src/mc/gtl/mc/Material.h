@@ -32,6 +32,7 @@ namespace gtl
     bool hasVolumeAbsorptionCoeff;
     bool hasVolumeScatteringCoeff;
     bool hasCutoutTransparency;
+    bool isAnimated;
     bool isEmissive;
     bool isThinWalled;
     float directionalBias;

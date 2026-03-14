@@ -84,7 +84,9 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     state.position = pos;
     state.tangent_u[0] = tangent;
     state.tangent_v[0] = bitangent;
-    state.animation_time = 0.0;
+#ifdef IS_ANIMATED
+    state.animation_time = ubo.time;
+#endif
     state.text_coords[0] = vec3(uv, 0.0);
 #ifdef SCENE_TRANSFORMS
     state.world_to_object = mat4(gl_WorldToObjectEXT);

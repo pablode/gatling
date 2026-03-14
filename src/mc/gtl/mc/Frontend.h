@@ -46,7 +46,7 @@ namespace gtl
     McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
 
   private:
-    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool isOpaque);
+    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency, bool isAnimated);
 
   private:
     std::shared_ptr<McMdlMaterialCompiler> m_mdlMaterialCompiler;

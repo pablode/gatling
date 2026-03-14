@@ -22,6 +22,7 @@
 #include "instancer.h"
 #include "tokens.h"
 
+#include <pxr/imaging/hd/sceneGlobalsSchema.h>
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/rprim.h>
@@ -213,11 +214,30 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
 
   HdSceneIndexBaseRefPtr terminalSi = renderIndex->GetTerminalSceneIndex();
+  HdSceneGlobalsSchema sgSchema = HdSceneGlobalsSchema::GetFromSceneIndex(terminalSi);
 
-  double frame;
-  if (!HdUtils::GetCurrentFrame(terminalSi, &frame))
+  double time = -1.0;
+  double frame = 0.0;
+  if (sgSchema)
   {
-    frame = 0.0;
+    auto extractDoubleWithFallback = [](HdDoubleDataSourceHandle handle, double fallback = 0.0) {
+      if (!handle)
+      {
+        return fallback;
+      }
+      const double value = handle->GetTypedValue(0);
+      return std::isnan(value) ? fallback : value;
+    };
+
+    frame = extractDoubleWithFallback(sgSchema.GetCurrentFrame());
+
+    double startTimeCode = extractDoubleWithFallback(sgSchema.GetStartTimeCode());
+    double endTimeCode = extractDoubleWithFallback(sgSchema.GetEndTimeCode());
+    if (endTimeCode > startTimeCode)
+    {
+      double timeCodesPerSecond = extractDoubleWithFallback(sgSchema.GetTimeCodesPerSecond());
+      time = (frame == 0.0) ? 0.0 : (frame / timeCodesPerSecond);
+    }
   }
 
   bool clippingPlanes = renderPassState->GetClippingEnabled() &&
@@ -251,7 +271,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
       .rrBounceOffset = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<uint32_t>(),
       .rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>(),
-      .spp = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<uint32_t>()
+      .spp = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<uint32_t>(),
+      .time = float(time)
     },
     .scene = _scene
   };

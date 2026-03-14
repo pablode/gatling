@@ -228,6 +228,10 @@ namespace gtl
     {
       stitcher.appendDefine("HAS_VOLUME_SCATTERING_COEFF");
     }
+    if (params.isAnimated)
+    {
+      stitcher.appendDefine("IS_ANIMATED");
+    }
     if (params.isEmissive)
     {
       stitcher.appendDefine("IS_EMISSIVE");
@@ -294,6 +298,10 @@ namespace gtl
     if (params.frameSceneDataIndex > 0)
     {
       stitcher.appendDefine("FRAME_SCENE_DATA_INDEX", params.frameSceneDataIndex);
+    }
+    if (params.isAnimated)
+    {
+      stitcher.appendDefine("IS_ANIMATED");
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;

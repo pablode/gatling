@@ -155,6 +155,7 @@ namespace gtl
     uint32_t rrBounceOffset;
     float    rrInvMinTermProb;
     uint32_t spp;
+    float    time;
   };
 
   struct GiAovBinding

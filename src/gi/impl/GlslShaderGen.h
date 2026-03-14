@@ -91,6 +91,7 @@ namespace gtl
       bool hasCutoutTransparency;
       bool hasVolumeAbsorptionCoeff;
       bool hasVolumeScatteringCoeff;
+      bool isAnimated;
       bool isEmissive;
       bool isThinWalled;
       bool nextEventEstimation;
@@ -110,6 +111,7 @@ namespace gtl
       uint32_t sceneDataCount;
       bool shadowTest;
       uint32_t textureIndexOffset;
+      bool isAnimated;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);

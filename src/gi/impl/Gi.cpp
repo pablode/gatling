@@ -1517,6 +1517,7 @@ cleanup:
             .hasCutoutTransparency = mcMat->hasCutoutTransparency,
             .hasVolumeAbsorptionCoeff = mcMat->hasVolumeAbsorptionCoeff,
             .hasVolumeScatteringCoeff = mcMat->hasVolumeScatteringCoeff,
+            .isAnimated = mcMat->isAnimated,
             .isEmissive = mcMat->isEmissive,
             .isThinWalled = mcMat->isThinWalled,
             .nextEventEstimation = renderSettings.nextEventEstimation,
@@ -1543,7 +1544,8 @@ cleanup:
             .frameSceneDataIndex = mcMat->frameSceneDataIndex,
             .opacityEvalGlsl = compInfo.genInfo.glslSource,
             .sceneDataCount = sceneDataCount,
-            .textureIndexOffset = texOffset
+            .textureIndexOffset = texOffset,
+            .isAnimated = mcMat->isAnimated
           };
 
           hitParams.shadowTest = false;
@@ -2378,6 +2380,7 @@ cleanup:
         .clipRangePacked = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
         .sensorExposure = params.camera.exposure,
         .frame = renderSettings.frame,
+        .time = renderSettings.time,
       };
 
       uniformOffset = uniformData.bufferOffset;

@@ -113,6 +113,36 @@ namespace
     return mx::isTransparentSurface(element);
   }
 
+  bool _HasDocumentTimeNode(mx::DocumentPtr doc)
+  {
+    for (mx::NodeGraphPtr graph : doc->getNodeGraphs())
+    {
+      if (graph->getActiveSourceUri() != doc->getSourceUri())
+      {
+        continue;
+      }
+
+      for (auto treeIt = graph->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+      {
+        mx::ElementPtr elem = treeIt.getElement();
+
+        mx::NodePtr node = elem->asA<mx::Node>();
+        if (!node)
+        {
+          continue;
+        }
+
+        const mx::string& category = node->getCategory();
+        if (category == "time")
+        {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc)
   {
     // Find renderable element.
@@ -184,7 +214,7 @@ namespace gtl
     m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customNodesPath);
   }
 
-  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
+  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
   {
     try
     {
@@ -192,7 +222,7 @@ namespace gtl
       doc->importLibrary(m_baseDoc);
       mx::readFromXmlString(doc, mtlxStr.data());
 
-      return translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency);
+      return translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
     }
     catch (const std::exception& ex)
     {
@@ -201,7 +231,7 @@ namespace gtl
     }
   }
 
-  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency)
+  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -231,6 +261,7 @@ namespace gtl
 
       subIdentifier = element->getName();
       hasCutoutTransparency = _HasSurfaceShaderCutoutTransparency(element);
+      isAnimated = _HasDocumentTimeNode(patchedDoc);
       shader = m_shaderGen->generate(subIdentifier, element, context);
     }
     catch (const std::exception& ex)
