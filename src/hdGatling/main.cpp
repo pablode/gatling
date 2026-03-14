@@ -47,6 +47,7 @@
 #include <pxr/imaging/hio/image.h>
 #include <pxr/imaging/hio/imageRegistry.h>
 #include <pxr/imaging/hio/types.h>
+#include <pxr/imaging/hdsi/sceneGlobalsSceneIndex.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdRender/settings.h>
@@ -191,6 +192,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   _nsTokens,
   ((spp, "gtl:spp"))
   ((errorPixelThreshold, "gtl:errorPixelThreshold"))
+  ((frame, "gtl:frame"))
   ((jitteredSampling, "gtl:jitteredSampling"))
   ((clippingPlanes, "gtl:clippingPlanes"))
 );
@@ -231,6 +233,7 @@ private:
   {
     uint32_t spp = 1;
     uint32_t errorPixelThreshold = 0;
+    double frame = 0.0;
     bool jitteredSampling = true;
     bool clippingPlanes = false;
   };
@@ -298,6 +301,14 @@ private:
       {
         REQUIRE(it->second.IsHolding<int>());
         settings.errorPixelThreshold = it->second.UncheckedGet<int>();
+      }
+    }
+    {
+      auto it = ns.find(_nsTokens->frame);
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<double>());
+        settings.frame = it->second.UncheckedGet<double>();
       }
     }
     {
@@ -382,7 +393,13 @@ private:
     setRenderSetting(HdGatlingSettingsTokens->jitteredSampling, VtValue(namespacedSettings.jitteredSampling));
     setRenderSetting(HdGatlingSettingsTokens->clippingPlanes, VtValue(namespacedSettings.clippingPlanes));
 
-    // Set up rendering state.
+    REQUIRE(HdRenderIndex::IsSceneIndexEmulationEnabled());
+    HdSceneIndexBaseRefPtr sceneIndex = m_renderIndex->GetEmulationSceneIndex();
+    REQUIRE(sceneIndex);
+    HdsiSceneGlobalsSceneIndexRefPtr sgSceneIndex = HdsiSceneGlobalsSceneIndex::New(sceneIndex);
+    sgSceneIndex->SetCurrentFrame(namespacedSettings.frame);
+    m_renderIndex->InsertSceneIndex(sgSceneIndex, m_sceneDelegate->GetDelegateID());
+
     uint32_t width = product.resolution[0];
     uint32_t height = product.resolution[1];
 
@@ -542,6 +559,9 @@ public:
 TEST_SUITE("Graphical")
 {
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
+  {
+  }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxFrame")
   {
   }
 

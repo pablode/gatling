@@ -132,7 +132,7 @@ install(
 )
 
 add_executable(hdGatling_test main.cpp tokens.h tokens.cpp)
-target_link_libraries(hdGatling_test gt gb hd hio usd usdGeom usdImaging usdRender)
+target_link_libraries(hdGatling_test gt gb hd hdsi hio usd usdGeom usdImaging usdRender)
 
 add_dependencies(hdGatling_test hdGatling)
 
