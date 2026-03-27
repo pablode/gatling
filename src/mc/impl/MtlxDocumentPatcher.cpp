@@ -390,6 +390,7 @@ void _PatchSecondaryTexcoordIndices(mx::DocumentPtr document)
       continue;
     }
 
+    node->setNodeDefString(GB_FMT("ND_geompropvalue_{}", node->getType()));
     node->setCategory("geompropvalue");
 
     for (mx::InputPtr input : node->getInputs())
@@ -425,6 +426,7 @@ void _PatchColorNodes(mx::DocumentPtr document)
       continue;
     }
 
+    node->setNodeDefString("ND_geompropvalue_color3");
     node->setCategory("geompropvalue");
     node->setType(TYPE_COLOR3); // FIXME: hook up displayOpacity if type is color4
 
@@ -461,6 +463,7 @@ void _PatchFrameNodes(mx::DocumentPtr document)
       continue;
     }
 
+    node->setNodeDefString("ND_geompropvalue_float");
     node->setCategory("geompropvalue");
     node->setType(TYPE_FLOAT);
     node->addInput("geomprop", mx::STRING_TYPE_STRING)->setValueString("FRAME");
@@ -522,7 +525,11 @@ void _PatchDefaultGeomprops(mx::DocumentPtr document)
       node->removeInput(i->getName());
     }
 
-    node->setCategory(isTexcoord ? "texcoord" : "tangent");
+    mx::string newCategory = isTexcoord ? "texcoord" : "tangent";
+    mx::string newNodeDef = GB_FMT("ND_{}_{}", newCategory, node->getType());
+
+    node->setNodeDefString(newNodeDef);
+    node->setCategory(newCategory);
   }
 }
 
