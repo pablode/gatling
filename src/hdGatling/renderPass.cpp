@@ -156,6 +156,7 @@ namespace
 
     frame = extractDoubleWithFallback(sgSchema.GetCurrentFrame());
 
+#if PXR_VERSION >= 2505
     double startTimeCode = extractDoubleWithFallback(sgSchema.GetStartTimeCode());
     double endTimeCode = extractDoubleWithFallback(sgSchema.GetEndTimeCode());
     if (endTimeCode > startTimeCode)
@@ -163,6 +164,7 @@ namespace
       double timeCodesPerSecond = extractDoubleWithFallback(sgSchema.GetTimeCodesPerSecond());
       time = (frame == 0.0) ? 0.0 : (frame / timeCodesPerSecond);
     }
+#endif
   }
 }
 
