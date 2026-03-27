@@ -127,6 +127,43 @@ namespace
 
     return true;
   }
+
+  void _ExtractFrameTime(HdRenderIndex* renderIndex, float& frame, float& time)
+  {
+    time = -1.0;
+    frame = 0.0;
+
+    HdSceneIndexBaseRefPtr terminalSi = renderIndex->GetTerminalSceneIndex();
+    if (!terminalSi)
+    {
+      return;
+    }
+
+    HdSceneGlobalsSchema sgSchema = HdSceneGlobalsSchema::GetFromSceneIndex(terminalSi);
+    if (!sgSchema)
+    {
+      return;
+    }
+
+    auto extractDoubleWithFallback = [](HdDoubleDataSourceHandle handle, double fallback = 0.0) {
+      if (!handle)
+      {
+        return fallback;
+      }
+      const double value = handle->GetTypedValue(0);
+      return std::isnan(value) ? fallback : value;
+    };
+
+    frame = extractDoubleWithFallback(sgSchema.GetCurrentFrame());
+
+    double startTimeCode = extractDoubleWithFallback(sgSchema.GetStartTimeCode());
+    double endTimeCode = extractDoubleWithFallback(sgSchema.GetEndTimeCode());
+    if (endTimeCode > startTimeCode)
+    {
+      double timeCodesPerSecond = extractDoubleWithFallback(sgSchema.GetTimeCodesPerSecond());
+      time = (frame == 0.0) ? 0.0 : (frame / timeCodesPerSecond);
+    }
+  }
 }
 
 HdGatlingRenderPass::HdGatlingRenderPass(HdRenderIndex* index,
@@ -213,32 +250,8 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());
 
-  HdSceneIndexBaseRefPtr terminalSi = renderIndex->GetTerminalSceneIndex();
-  HdSceneGlobalsSchema sgSchema = HdSceneGlobalsSchema::GetFromSceneIndex(terminalSi);
-
-  double time = -1.0;
-  double frame = 0.0;
-  if (sgSchema)
-  {
-    auto extractDoubleWithFallback = [](HdDoubleDataSourceHandle handle, double fallback = 0.0) {
-      if (!handle)
-      {
-        return fallback;
-      }
-      const double value = handle->GetTypedValue(0);
-      return std::isnan(value) ? fallback : value;
-    };
-
-    frame = extractDoubleWithFallback(sgSchema.GetCurrentFrame());
-
-    double startTimeCode = extractDoubleWithFallback(sgSchema.GetStartTimeCode());
-    double endTimeCode = extractDoubleWithFallback(sgSchema.GetEndTimeCode());
-    if (endTimeCode > startTimeCode)
-    {
-      double timeCodesPerSecond = extractDoubleWithFallback(sgSchema.GetTimeCodesPerSecond());
-      time = (frame == 0.0) ? 0.0 : (frame / timeCodesPerSecond);
-    }
-  }
+  float frame, time;
+  _ExtractFrameTime(renderIndex, frame, time);
 
   bool clippingPlanes = renderPassState->GetClippingEnabled() &&
                         _settings.find(HdGatlingSettingsTokens->clippingPlanes)->second.Get<bool>();
