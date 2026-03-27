@@ -463,7 +463,7 @@ void _PatchFrameNodes(mx::DocumentPtr document)
 
     node->setCategory("geompropvalue");
     node->setType(TYPE_FLOAT);
-    node->addInput("geomprop", mx::FILENAME_TYPE_STRING)->setValueString("FRAME");
+    node->addInput("geomprop", mx::STRING_TYPE_STRING)->setValueString("FRAME");
 
     GB_DEBUG("replaced frame node \"{}\" with geompropvalue", node->getNamePath());
   }
