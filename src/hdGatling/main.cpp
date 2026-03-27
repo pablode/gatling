@@ -393,12 +393,14 @@ private:
     setRenderSetting(HdGatlingSettingsTokens->jitteredSampling, VtValue(namespacedSettings.jitteredSampling));
     setRenderSetting(HdGatlingSettingsTokens->clippingPlanes, VtValue(namespacedSettings.clippingPlanes));
 
+#if PXR_VERSION >= 2603
     REQUIRE(HdRenderIndex::IsSceneIndexEmulationEnabled());
     HdSceneIndexBaseRefPtr sceneIndex = m_renderIndex->GetEmulationSceneIndex();
     REQUIRE(sceneIndex);
     HdsiSceneGlobalsSceneIndexRefPtr sgSceneIndex = HdsiSceneGlobalsSceneIndex::New(sceneIndex);
     sgSceneIndex->SetCurrentFrame(namespacedSettings.frame);
     m_renderIndex->InsertSceneIndex(sgSceneIndex, m_sceneDelegate->GetDelegateID());
+#endif
 
     uint32_t width = product.resolution[0];
     uint32_t height = product.resolution[1];
@@ -561,9 +563,11 @@ TEST_SUITE("Graphical")
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
   {
   }
+#if PXR_VERSION >= 2603
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxFrame")
   {
   }
+#endif
 
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "MaterialX.ColorSpaces")
   {
