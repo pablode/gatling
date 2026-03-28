@@ -1907,8 +1907,50 @@ cleanup:
       flags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
     }
 
-    if (memcmp(&a.camera, &b.camera, sizeof(GiCameraDesc)) != 0 ||
-        memcmp(&a.renderSettings, &b.renderSettings, sizeof(GiRenderSettings)) != 0)
+    const GiCameraDesc& ac = a.camera;
+    const GiCameraDesc& bc = b.camera;
+
+    bool cameraChanged =
+      ac.position[0] != bc.position[0] ||
+      ac.position[1] != bc.position[1] ||
+      ac.position[2] != bc.position[2] ||
+      ac.forward[0] != bc.forward[0] ||
+      ac.forward[1] != bc.forward[1] ||
+      ac.forward[2] != bc.forward[2] ||
+      ac.up[0] != bc.up[0] ||
+      ac.up[1] != bc.up[1] ||
+      ac.up[2] != bc.up[2] ||
+      ac.vfov != bc.vfov ||
+      ac.fStop != bc.fStop ||
+      ac.focusDistance != bc.focusDistance ||
+      ac.focalLength != bc.focalLength ||
+      ac.clipStart != bc.clipStart ||
+      ac.clipEnd != bc.clipEnd ||
+      ac.exposure != bc.exposure;
+
+    const GiRenderSettings& ars = a.renderSettings;
+    const GiRenderSettings& brs = b.renderSettings;
+
+    bool renderSettingsChanged =
+      ars.clippingPlanes != brs.clippingPlanes ||
+      ars.depthOfField != brs.depthOfField ||
+      ars.domeLightCameraVisible != brs.domeLightCameraVisible ||
+      ars.filterImportanceSampling != brs.filterImportanceSampling ||
+      ars.frame != brs.frame ||
+      ars.jitteredSampling != brs.jitteredSampling ||
+      ars.lightIntensityMultiplier != brs.lightIntensityMultiplier ||
+      ars.maxBounces != brs.maxBounces ||
+      ars.maxSampleValue != brs.maxSampleValue ||
+      ars.maxVolumeWalkLength != brs.maxVolumeWalkLength ||
+      ars.mediumStackSize != brs.mediumStackSize ||
+      ars.metersPerSceneUnit != brs.metersPerSceneUnit ||
+      ars.nextEventEstimation != brs.nextEventEstimation ||
+      ars.progressiveAccumulation != brs.progressiveAccumulation ||
+      ars.rrBounceOffset != brs.rrBounceOffset ||
+      ars.rrInvMinTermProb != brs.rrInvMinTermProb ||
+      ars.spp != brs.spp;
+
+    if (cameraChanged || renderSettingsChanged)
     {
       flags |= GiSceneDirtyFlags::DirtyFramebuffer;
     }
@@ -1920,26 +1962,23 @@ cleanup:
       flags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;
     }
 
-    const GiRenderSettings& ra = a.renderSettings;
-    const GiRenderSettings& rb = b.renderSettings;
-
-    if (ra.domeLightCameraVisible != rb.domeLightCameraVisible)
+    if (ars.domeLightCameraVisible != brs.domeLightCameraVisible)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersMiss;
     }
 
-    if (ra.clippingPlanes != rb.clippingPlanes ||
-        ra.depthOfField != rb.depthOfField ||
-        ra.filterImportanceSampling != rb.filterImportanceSampling ||
-        ra.jitteredSampling != rb.jitteredSampling ||
-        ra.maxVolumeWalkLength != rb.maxVolumeWalkLength)
+    if (ars.clippingPlanes != brs.clippingPlanes ||
+        ars.depthOfField != brs.depthOfField ||
+        ars.filterImportanceSampling != brs.filterImportanceSampling ||
+        ars.jitteredSampling != brs.jitteredSampling ||
+        ars.maxVolumeWalkLength != brs.maxVolumeWalkLength)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersRgen;
     }
 
-    if (ra.mediumStackSize != rb.mediumStackSize ||
-        ra.nextEventEstimation != rb.nextEventEstimation ||
-        ra.progressiveAccumulation != rb.progressiveAccumulation)
+    if (ars.mediumStackSize != brs.mediumStackSize ||
+        ars.nextEventEstimation != brs.nextEventEstimation ||
+        ars.progressiveAccumulation != brs.progressiveAccumulation)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersAll;
     }
