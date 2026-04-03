@@ -69,6 +69,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (diffuseColor)
   (specularColor)
   (emissiveColor)
+  (file)
   (sourceColorSpace)
   (raw)
   (rgb)
@@ -294,7 +295,7 @@ void _PatchMaterialXBoolValueMismatches(HdMaterialNetwork2& network)
 
 bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
 {
-  // First pass: substitute UsdUVTexture:sourceColorSpace input with parent input colorSpace attribute
+  // First pass: fixup UsdUVTexture color spaces
   for (auto nodeIt = network.nodes.begin(); nodeIt != network.nodes.end(); nodeIt++)
   {
     TfToken& nodeTypeId = nodeIt->second.nodeTypeId;
@@ -304,36 +305,54 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
       continue;
     }
 
-    auto handleUsdUVTextureSourceColorSpaceInput = [&](HdMaterialNode2& parentNode, TfToken input, HdMaterialNode2& node)
+    auto handleUsdUVTextureColorSpace = [&](HdMaterialNode2& parentNode, TfToken input, HdMaterialNode2& node)
     {
       auto& parameters = node.parameters;
 
-      auto sourceColorSpace = parameters.find(_tokens->sourceColorSpace);
-      if (sourceColorSpace == parameters.end())
+#if PXR_VERSION >= 2603
+      TfToken paramName(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, _tokens->file));
+
+      auto colorSpaceParam = parameters.find(paramName);
+      if (colorSpaceParam == parameters.end())
       {
         return;
       }
 
-      TfToken colorSpaceInputName(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, input));
+      if (colorSpaceParam->second == _tokens->raw)
+      {
+        colorSpaceParam->second = _tokens->lin_rec709;
+      }
+      else if (colorSpaceParam->second == _tokens->sRGB)
+      {
+        colorSpaceParam->second = _tokens->srgb_texture;
+      }
+      else if (colorSpaceParam->second == _tokens->_auto)
+      {
+        // remove input since a color space with this name does not exist.
+        parameters.erase(colorSpaceParam);
+      }
+#else
+      TfToken srcParamName = _tokens->sourceColorSpace;
+      TfToken dstParamName(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, input));
 
-      if (sourceColorSpace->second == _tokens->raw)
+      auto colorSpaceParam = parameters.find(srcParamName);
+      if (colorSpaceParam == parameters.end())
       {
-        parentNode.parameters[colorSpaceInputName] = _tokens->lin_rec709;
-      }
-      else if (sourceColorSpace->second == _tokens->sRGB)
-      {
-        parentNode.parameters[colorSpaceInputName] = _tokens->srgb_texture;
-      }
-      else if (sourceColorSpace->second == _tokens->_auto)
-      {
-        // don't set color space explicitly
-      }
-      else
-      {
-        TF_CODING_ERROR("Unsupported UsdUVTexture color space");
+        return;
       }
 
-      parameters.erase(sourceColorSpace);
+      if (colorSpaceParam->second == _tokens->raw)
+      {
+        parentNode.parameters[dstParamName] = _tokens->lin_rec709;
+      }
+      else if (colorSpaceParam->second == _tokens->sRGB)
+      {
+        parentNode.parameters[dstParamName] = _tokens->srgb_texture;
+      }
+      // auto: ignore input to rely on default color space
+
+      parameters.erase(colorSpaceParam);
+#endif
     };
 
     for (const auto& inputConnections : nodeIt->second.inputConnections)
@@ -354,7 +373,7 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
           continue;
         }
 
-        handleUsdUVTextureSourceColorSpaceInput(nodeIt->second, input, upstreamNode->second);
+        handleUsdUVTextureColorSpace(nodeIt->second, input, upstreamNode->second);
       }
     }
   }
