@@ -20,8 +20,6 @@
 
 #include <pxr/imaging/hd/sceneDelegate.h>
 #include <pxr/base/gf/matrix4f.h>
-#include <pxr/base/gf/quath.h>
-#include <pxr/base/gf/quatf.h>
 #include <pxr/base/gf/quatd.h>
 
 using namespace gtl;
@@ -82,15 +80,6 @@ void HdGatlingInstancer::Sync(HdSceneDelegate* sceneDelegate,
 
     _primvarMap[primName] = value;
   }
-}
-
-namespace
-{
-  template <class To>
-  struct _TypeConversionHelper {
-    template <class From>
-    inline To operator()(From const &from) const { return To(from); }
-  };
 }
 
 std::vector<GiPrimvarData> HdGatlingInstancer::ComputeFlattenedPrimvars(const SdfPath& prototypeId)
@@ -163,6 +152,7 @@ std::vector<GiPrimvarData> HdGatlingInstancer::MakeGiPrimvars(const SdfPath& pro
 
       if (!HdGatlingIsPrimvarTypeSupported(values))
       {
+        TF_WARN("type of primvar not supported: %s:%s", id.GetText(), name.GetText());
         continue;
       }
 
@@ -220,46 +210,14 @@ VtMatrix4fArray HdGatlingInstancer::ComputeFlattenedTransforms(const SdfPath& pr
 #endif
 
   VtVec3dArray translations;
-  if (boxedTranslations.CanCast<VtVec3dArray>())
-  {
-    translations = boxedTranslations.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
-  }
-  else if (!boxedTranslations.IsEmpty())
-  {
-    TF_CODING_WARNING("Instancer translate value type %s not supported", boxedTranslations.GetTypeName().c_str());
-  }
-
   VtQuatdArray rotations;
-  if (boxedRotations.IsHolding<VtQuatdArray>())
-  {
-    rotations = boxedRotations.UncheckedGet<VtQuatdArray>();
-  }
-  else if (boxedRotations.IsHolding<VtQuatfArray>())
-  {
-    auto& rawArray = boxedRotations.UncheckedGet<VtQuatfArray>();
-    rotations.resize(rawArray.size());
-    std::transform(rawArray.begin(), rawArray.end(), rotations.begin(), _TypeConversionHelper<GfQuatd>());
-  }
-  else if (boxedRotations.IsHolding<VtQuathArray>())
-  {
-    auto& rawArray = boxedRotations.UncheckedGet<VtQuathArray>();
-    rotations.resize(rawArray.size());
-    std::transform(rawArray.begin(), rawArray.end(), rotations.begin(), _TypeConversionHelper<GfQuatd>());
-  }
-  else if (!boxedRotations.IsEmpty())
-  {
-    TF_CODING_WARNING("Instancer rotate value type %s not supported", boxedRotations.GetTypeName().c_str());
-  }
-
   VtVec3dArray scales;
-  if (boxedScales.CanCast<VtVec3dArray>())
-  {
-    scales = boxedScales.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
-  }
-  else if (!boxedScales.IsEmpty())
-  {
-    TF_CODING_WARNING("Instancer scale value type %s not supported", boxedScales.GetTypeName().c_str());
-  }
+  HdGatlingUnboxPRSPrimvars(boxedTranslations,
+                            boxedRotations,
+                            boxedScales,
+                            translations,
+                            rotations,
+                            scales);
 
   VtMatrix4dArray instanceTransforms;
   if (boxedInstanceTransforms.CanCast<VtMatrix4dArray>())
@@ -268,46 +226,16 @@ VtMatrix4fArray HdGatlingInstancer::ComputeFlattenedTransforms(const SdfPath& pr
   }
 
   GfMatrix4d instancerTransform = sceneDelegate->GetInstancerTransform(id);
-
   const VtIntArray& instanceIndices = sceneDelegate->GetInstanceIndices(id, prototypeId);
 
   VtMatrix4fArray transforms;
-  transforms.resize(instanceIndices.size());
-
-  for (size_t i = 0; i < instanceIndices.size(); i++)
-  {
-    int instanceIndex = instanceIndices[i];
-
-    auto mat = GfMatrix4f(instancerTransform);
-
-    GfMatrix4f temp;
-
-    if (i < translations.size())
-    {
-      auto t = GfVec3f(translations[instanceIndex]);
-      temp.SetTranslate(t);
-      mat = temp * mat;
-    }
-    if (i < rotations.size())
-    {
-      auto r = GfQuatf(rotations[instanceIndex]);
-      temp.SetRotate(r);
-      mat = temp * mat;
-    }
-    if (i < scales.size())
-    {
-      auto s = GfVec3f(scales[instanceIndex]);
-      temp.SetScale(s);
-      mat = temp * mat;
-    }
-    if (i < instanceTransforms.size())
-    {
-      temp = GfMatrix4f(instanceTransforms[instanceIndex]);
-      mat = temp * mat;
-    }
-
-    transforms[i] = mat;
-  }
+  HdGatlingPRSToTransforms(instanceIndices,
+                           instancerTransform,
+                           instanceTransforms,
+                           translations,
+                           rotations,
+                           scales,
+                           transforms);
 
   // Calculate instance transforms for all instancer instances.
   const SdfPath& parentId = GetParentId();

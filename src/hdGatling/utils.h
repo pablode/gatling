@@ -30,4 +30,19 @@ gtl::GiPrimvarType HdGatlingGetGiPrimvarType(HdType type);
 
 void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values);
 
+bool HdGatlingUnboxPRSPrimvars(VtValue& boxedTranslations,
+                               VtValue& boxedRotations,
+                               VtValue& boxedScales,
+                               VtVec3dArray& translations,
+                               VtQuatdArray& rotations,
+                               VtVec3dArray& scales);
+
+void HdGatlingPRSToTransforms(const VtIntArray& indices,
+                              const GfMatrix4d& rootTransform,
+                              const VtMatrix4dArray& instanceTransforms,
+                              const VtVec3dArray& translations,
+                              const VtQuatdArray& rotations,
+                              const VtVec3dArray& scales,
+                              VtMatrix4fArray& transforms);
+
 PXR_NAMESPACE_CLOSE_SCOPE

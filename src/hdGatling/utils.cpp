@@ -17,12 +17,28 @@
 
 #include "utils.h"
 
+#include <gtl/gi/Gi.h>
+
+#include <pxr/base/gf/matrix4f.h>
+#include <pxr/base/gf/matrix4d.h>
+#include <pxr/base/gf/quath.h>
+#include <pxr/base/gf/quatf.h>
+#include <pxr/base/gf/quatd.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/types.h>
 
 using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+namespace
+{
+  template <class To>
+  struct _TypeConversionHelper {
+    template <class From>
+    inline To operator()(From const &from) const { return To(from); }
+  };
+}
 
 bool HdGatlingIsPrimvarTypeSupported(const VtValue& value)
 {
@@ -74,6 +90,104 @@ void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values)
   }
 
   values = std::move(intArray);
+}
+
+bool HdGatlingUnboxPRSPrimvars(VtValue& boxedTranslations,
+                               VtValue& boxedRotations,
+                               VtValue& boxedScales,
+                               VtVec3dArray& translations,
+                               VtQuatdArray& rotations,
+                               VtVec3dArray& scales)
+{
+  if (boxedTranslations.CanCast<VtVec3dArray>())
+  {
+    translations = boxedTranslations.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
+  }
+  else if (!boxedTranslations.IsEmpty())
+  {
+    TF_CODING_WARNING("Translation value type %s not supported", boxedTranslations.GetTypeName().c_str());
+    return false;
+  }
+
+  if (boxedRotations.IsHolding<VtQuatdArray>())
+  {
+    rotations = boxedRotations.UncheckedGet<VtQuatdArray>();
+  }
+  else if (boxedRotations.IsHolding<VtQuatfArray>())
+  {
+    auto& rawArray = boxedRotations.UncheckedGet<VtQuatfArray>();
+    rotations.resize(rawArray.size());
+    std::transform(rawArray.begin(), rawArray.end(), rotations.begin(), _TypeConversionHelper<GfQuatd>());
+  }
+  else if (boxedRotations.IsHolding<VtQuathArray>())
+  {
+    auto& rawArray = boxedRotations.UncheckedGet<VtQuathArray>();
+    rotations.resize(rawArray.size());
+    std::transform(rawArray.begin(), rawArray.end(), rotations.begin(), _TypeConversionHelper<GfQuatd>());
+  }
+  else if (!boxedRotations.IsEmpty())
+  {
+    TF_CODING_WARNING("Rotation value type %s not supported", boxedRotations.GetTypeName().c_str());
+    return false;
+  }
+
+  if (boxedScales.CanCast<VtVec3dArray>())
+  {
+    scales = boxedScales.Cast<VtVec3dArray>().UncheckedGet<VtVec3dArray>();
+  }
+  else if (!boxedScales.IsEmpty())
+  {
+    TF_CODING_WARNING("Sale value type %s not supported", boxedScales.GetTypeName().c_str());
+    return false;
+  }
+
+  return true;
+}
+
+void HdGatlingPRSToTransforms(const VtIntArray& indices,
+                              const GfMatrix4d& rootTransform,
+                              const VtMatrix4dArray& instanceTransforms,
+                              const VtVec3dArray& translations,
+                              const VtQuatdArray& rotations,
+                              const VtVec3dArray& scales,
+                              VtMatrix4fArray& transforms)
+{
+  transforms.resize(indices.size());
+
+  for (size_t i = 0; i < indices.size(); i++)
+  {
+    int instanceIndex = indices[i];
+
+    auto mat = GfMatrix4f(rootTransform);
+
+    GfMatrix4f temp;
+
+    if (i < translations.size())
+    {
+      auto t = GfVec3f(translations[instanceIndex]);
+      temp.SetTranslate(t);
+      mat = temp * mat;
+    }
+    if (i < rotations.size())
+    {
+      auto r = GfQuatf(rotations[instanceIndex]);
+      temp.SetRotate(r);
+      mat = temp * mat;
+    }
+    if (i < scales.size())
+    {
+      auto s = GfVec3f(scales[instanceIndex]);
+      temp.SetScale(s);
+      mat = temp * mat;
+    }
+    if (i < instanceTransforms.size())
+    {
+      temp = GfMatrix4f(instanceTransforms[instanceIndex]);
+      mat = temp * mat;
+    }
+
+    transforms[i] = mat;
+  }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
