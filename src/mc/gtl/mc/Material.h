@@ -40,7 +40,5 @@ namespace gtl
     std::shared_ptr<McMdlMaterial> mdlMaterial;
     bool requiresSceneTransforms;
     std::vector<const char*> sceneDataNames;
-    int cameraPositionSceneDataIndex;
-    int frameSceneDataIndex;
   };
 }

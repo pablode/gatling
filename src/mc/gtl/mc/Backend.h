@@ -46,6 +46,7 @@ namespace gtl
   {
     std::string source;
     std::vector<McTextureDescription> textureDescriptions;
+    std::vector<std::string> stringConstants;
   };
 
   enum class McDf

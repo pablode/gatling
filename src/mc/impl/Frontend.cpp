@@ -167,18 +167,6 @@ namespace
 
     return names;
   }
-
-  int _FindNamedSceneDataIndex(const char* name, mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
-  {
-    for (mi::Size i = 0; i < compiledMaterial->get_referenced_scene_data_count(); i++)
-    {
-      if (strcmp(name, compiledMaterial->get_referenced_scene_data_name(i)) == 0)
-      {
-        return int(i) + 1; // index 0 is invalid
-      }
-    }
-    return 0;
-  }
 }
 
 namespace gtl
@@ -247,9 +235,7 @@ namespace gtl
       .resourcePathPrefix = resourcePathPrefix,
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
-      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial),
-      .cameraPositionSceneDataIndex = _FindNamedSceneDataIndex("CAMERA_POSITION", compiledMaterial),
-      .frameSceneDataIndex = _FindNamedSceneDataIndex("FRAME", compiledMaterial)
+      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial)
     };
   }
 
@@ -277,9 +263,7 @@ namespace gtl
       .resourcePathPrefix = "", // no source file
       .mdlMaterial = mdlMaterial,
       .requiresSceneTransforms = compiledMaterial->depends_on_state_transform(),
-      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial),
-      .cameraPositionSceneDataIndex = _FindNamedSceneDataIndex("CAMERA_POSITION", compiledMaterial),
-      .frameSceneDataIndex = _FindNamedSceneDataIndex("FRAME", compiledMaterial)
+      .sceneDataNames = _ExtractSceneDataNames(compiledMaterial)
     };
   }
 }

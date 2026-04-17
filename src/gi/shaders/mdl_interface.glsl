@@ -265,8 +265,8 @@ layout(buffer_reference, std430, buffer_reference_align = 16/* largest type */) 
 
 bool scene_data_isvalid(inout State state, int scene_data_id)
 {
-#if SCENE_DATA_COUNT > 0
-    if (scene_data_id == 0 || scene_data_id > SCENE_DATA_COUNT)
+#ifdef MAX_SCENE_DATA_ID
+    if (scene_data_id == 0 || scene_data_id > MAX_SCENE_DATA_ID)
     {
       return false;
     }
@@ -277,7 +277,7 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
     return false;
 }
 
-#if SCENE_DATA_COUNT > 0
+#ifdef MAX_SCENE_DATA_ID
 uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uniformLookup)
 {
   // contains GiPrimvarInterpolation enum
@@ -302,7 +302,7 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uni
 
 vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default_value, bool uniform_lookup)
 {
-#if SCENE_DATA_COUNT > 0
+#ifdef MAX_SCENE_DATA_ID
     if (scene_data_isvalid(state, scene_data_id))
     {
         mdl_renderer_state rs = state.renderer_state;
@@ -326,14 +326,14 @@ vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default
 
 vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default_value, bool uniform_lookup)
 {
-#ifdef CAMERA_POSITION_SCENE_DATA_INDEX
-    if (scene_data_id == CAMERA_POSITION_SCENE_DATA_INDEX)
+#ifdef SCENE_DATA_INDEX_CAMERA_POSITION
+    if (scene_data_id == SCENE_DATA_INDEX_CAMERA_POSITION)
     {
       return ubo.cameraPosition;
     }
 #endif
 
-#if SCENE_DATA_COUNT > 0
+#ifdef MAX_SCENE_DATA_ID
     if (scene_data_isvalid(state, scene_data_id))
     {
         mdl_renderer_state rs = state.renderer_state;
@@ -363,7 +363,7 @@ vec3 scene_data_lookup_color(inout State state, int scene_data_id, vec3 default_
 
 vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default_value, bool uniform_lookup)
 {
-#if SCENE_DATA_COUNT > 0
+#ifdef MAX_SCENE_DATA_ID
     if (scene_data_isvalid(state, scene_data_id))
     {
         mdl_renderer_state rs = state.renderer_state;
@@ -387,14 +387,14 @@ vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default
 
 float scene_data_lookup_float(inout State state, int scene_data_id, float default_value, bool uniform_lookup)
 {
-#ifdef FRAME_SCENE_DATA_INDEX
-    if (scene_data_id == FRAME_SCENE_DATA_INDEX)
+#ifdef SCENE_DATA_INDEX_FRAME
+    if (scene_data_id == SCENE_DATA_INDEX_FRAME)
     {
       return ubo.frame;
     }
 #endif
 
-#if SCENE_DATA_COUNT > 0
+#ifdef MAX_SCENE_DATA_ID
     if (scene_data_isvalid(state, scene_data_id))
     {
         mdl_renderer_state rs = state.renderer_state;
@@ -416,7 +416,7 @@ float scene_data_lookup_float(inout State state, int scene_data_id, float defaul
 
 int scene_data_lookup_int(inout State state, int scene_data_id, int index_offset, int default_value, bool uniform_lookup)
 {
-#if SCENE_DATA_COUNT > 0
+#ifdef MAX_SCENE_DATA_ID
     if (scene_data_isvalid(state, scene_data_id))
     {
         mdl_renderer_state rs = state.renderer_state;

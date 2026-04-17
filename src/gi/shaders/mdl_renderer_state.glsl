@@ -7,7 +7,7 @@ struct mdl_renderer_state
   vec2 hitBarycentrics;
 
   uint64_t sceneDataBufferAddress;
-  uint sceneDataInfos[SCENE_DATA_COUNT];
+  uint sceneDataInfos[MAX_SCENE_DATA_ID];
 };
 
 #endif

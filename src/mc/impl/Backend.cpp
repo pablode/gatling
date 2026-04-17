@@ -75,7 +75,8 @@ namespace gtl
     bool generateGlslWithDfs(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                              std::string& glslSrc,
-                             std::vector<McTextureDescription>& textureDescriptions)
+                             std::vector<McTextureDescription>& textureDescriptions,
+                             std::vector<std::string>& stringConstants)
     {
       mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), m_context.get()));
       m_logger->flushContextMessages(m_context.get());
@@ -109,9 +110,28 @@ namespace gtl
       assert(targetCode->get_ro_data_segment_count() == 0);
 
       extractTextureInfos(targetCode, textureDescriptions);
+      extractStringConstants(targetCode, stringConstants);
       glslSrc = targetCode->get_code();
 
       return true;
+    }
+
+    void extractStringConstants(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
+                                std::vector<std::string>& stringConstants)
+    {
+      size_t count = targetCode->get_string_constant_count();
+
+      if (count == 0)
+      {
+        return;
+      }
+
+      stringConstants.resize(count - 1); // empty string at loc 0
+
+      for (size_t i = 1; i < count; i++)
+      {
+        stringConstants[i - 1] = std::string(targetCode->get_string_constant(i));
+      }
     }
 
     void extractTextureInfos(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
@@ -283,6 +303,7 @@ namespace gtl
       fDescs.push_back(mi::neuraylib::Target_function_description(DF_NAMES[size_t(kv.first)], kv.second));
     }
 
-    return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source, result.textureDescriptions);
+    return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source,
+                                       result.textureDescriptions, result.stringConstants);
   }
 }

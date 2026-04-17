@@ -54,7 +54,21 @@ namespace gtl
     m_mcBackend->setAuxiliaryOutputEnabled(enabled);
   }
 
-  void _sgGenerateCommonDefines(GiGlslStitcher& stitcher, const GiGlslShaderGen::CommonShaderParams& params)
+  void _sgGenerateSceneDataDefines(GiGlslStitcher& stitcher,
+                                   const GiGlslShaderGen::BuiltinSceneDataIndices& indices)
+  {
+    if (indices.cameraPosition >= 0)
+    {
+      stitcher.appendDefine("SCENE_DATA_INDEX_CAMERA_POSITION", indices.cameraPosition);
+    }
+    if (indices.frame >= 0)
+    {
+      stitcher.appendDefine("SCENE_DATA_INDEX_FRAME", indices.frame);
+    }
+  }
+
+  void _sgGenerateCommonDefines(GiGlslStitcher& stitcher,
+                                const GiGlslShaderGen::CommonShaderParams& params)
   {
 #if defined(NDEBUG)
     stitcher.appendDefine("NDEBUG");
@@ -147,6 +161,7 @@ namespace gtl
 
   bool _MakeMaterialGenInfo(const McGlslGenResult& codeGenResult,
                             const std::string& resourcePathPrefix,
+                            const std::vector<const char*>& sceneDataNames,
                             fs::path shaderPath,
                             GiGlslShaderGen::MaterialGenInfo& genInfo)
   {
@@ -168,9 +183,45 @@ namespace gtl
     assert(mdlCodeOffset != std::string::npos);
     glslSource = glslSource.substr(mdlCodeOffset, glslSource.size() - mdlCodeOffset);
 
+    // Extract builtin scene data indices and max scene data index
+    uint32_t maxSceneDataId = 0;
+    GiGlslShaderGen::BuiltinSceneDataIndices bsdIndices;
+    for (size_t i = 0; i < codeGenResult.stringConstants.size(); i++)
+    {
+      uint32_t id = i + 1; // 0 = invalid id
+      const std::string& str = codeGenResult.stringConstants[i];
+
+      if (str == "CAMERA_POSITION")
+      {
+        bsdIndices.cameraPosition = id;
+        continue;
+      }
+      else if (str == "FRAME")
+      {
+        bsdIndices.frame = id;
+        continue;
+      }
+
+      for (size_t j = 0; j < sceneDataNames.size(); j++)
+      {
+        if (str != sceneDataNames[j])
+        {
+          continue;
+        }
+        if (id > maxSceneDataId)
+        {
+          maxSceneDataId = id;
+        }
+        break;
+      }
+    }
+
     genInfo = GiGlslShaderGen::MaterialGenInfo {
       .glslSource = glslSource,
-      .textureDescriptions = textureDescriptions
+      .textureDescriptions = textureDescriptions,
+      .stringConstants = codeGenResult.stringConstants,
+      .builtinSceneDataIndices = bsdIndices,
+      .maxSceneDataId = maxSceneDataId
     };
 
     return true;
@@ -198,7 +249,8 @@ namespace gtl
       return false;
     }
 
-    return _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, m_shaderPath, genInfo);
+    return _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, material.sceneDataNames,
+                                m_shaderPath, genInfo);
   }
 
   bool GiGlslShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)
@@ -207,11 +259,15 @@ namespace gtl
     stitcher.appendVersion();
 
     _sgGenerateCommonDefines(stitcher, params.commonParams);
+    _sgGenerateSceneDataDefines(stitcher, params.builtinSceneDataIndices);
 
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
     stitcher.appendDefine("MEDIUM_DIRECTIONAL_BIAS", params.directionalBias);
-    stitcher.appendDefine("SCENE_DATA_COUNT", (int32_t) params.sceneDataCount);
 
+    if (params.maxSceneDataId > 0)
+    {
+      stitcher.appendDefine("MAX_SCENE_DATA_ID", (int32_t) params.maxSceneDataId);
+    }
     if (params.hasBackfaceBsdf)
     {
       stitcher.appendDefine("HAS_BACKFACE_BSDF");
@@ -252,14 +308,6 @@ namespace gtl
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
     }
-    if (params.cameraPositionSceneDataIndex > 0)
-    {
-      stitcher.appendDefine("CAMERA_POSITION_SCENE_DATA_INDEX", params.cameraPositionSceneDataIndex);
-    }
-    if (params.frameSceneDataIndex > 0)
-    {
-      stitcher.appendDefine("FRAME_SCENE_DATA_INDEX", params.frameSceneDataIndex);
-    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
@@ -279,10 +327,14 @@ namespace gtl
     stitcher.appendVersion();
 
     _sgGenerateCommonDefines(stitcher, params.commonParams);
+    _sgGenerateSceneDataDefines(stitcher, params.builtinSceneDataIndices);
 
     stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
-    stitcher.appendDefine("SCENE_DATA_COUNT", (int32_t) params.sceneDataCount);
 
+    if (params.maxSceneDataId > 0)
+    {
+      stitcher.appendDefine("MAX_SCENE_DATA_ID", (int32_t) params.maxSceneDataId);
+    }
     if (params.shadowTest)
     {
       stitcher.appendDefine("SHADOW_TEST");
@@ -290,14 +342,6 @@ namespace gtl
     if (params.enableSceneTransforms)
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
-    }
-    if (params.cameraPositionSceneDataIndex > 0)
-    {
-      stitcher.appendDefine("CAMERA_POSITION_SCENE_DATA_INDEX", params.cameraPositionSceneDataIndex);
-    }
-    if (params.frameSceneDataIndex > 0)
-    {
-      stitcher.appendDefine("FRAME_SCENE_DATA_INDEX", params.frameSceneDataIndex);
     }
     if (params.isAnimated)
     {

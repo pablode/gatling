@@ -43,10 +43,19 @@ namespace gtl
     void setAuxiliaryOutputEnabled(bool enabled);
 
   public:
+    struct BuiltinSceneDataIndices
+    {
+      int cameraPosition = -1;
+      int frame = -1;
+    };
+
     struct MaterialGenInfo
     {
       std::string glslSource;
       std::vector<McTextureDescription> textureDescriptions;
+      std::vector<std::string> stringConstants;
+      BuiltinSceneDataIndices builtinSceneDataIndices;
+      uint32_t maxSceneDataId;
     };
 
     bool generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo);
@@ -84,8 +93,7 @@ namespace gtl
       CommonShaderParams commonParams;
       float directionalBias;
       bool enableSceneTransforms;
-      int cameraPositionSceneDataIndex;
-      int frameSceneDataIndex;
+      BuiltinSceneDataIndices builtinSceneDataIndices;
       bool hasBackfaceBsdf;
       bool hasBackfaceEdf;
       bool hasCutoutTransparency;
@@ -95,7 +103,7 @@ namespace gtl
       bool isEmissive;
       bool isThinWalled;
       bool nextEventEstimation;
-      uint32_t sceneDataCount;
+      uint32_t maxSceneDataId;
       std::string_view shadingGlsl;
       uint32_t textureIndexOffset;
     };
@@ -105,10 +113,9 @@ namespace gtl
       std::string_view baseFileName;
       CommonShaderParams commonParams;
       bool enableSceneTransforms;
-      int cameraPositionSceneDataIndex;
-      int frameSceneDataIndex;
+      BuiltinSceneDataIndices builtinSceneDataIndices;
       std::string_view opacityEvalGlsl;
-      uint32_t sceneDataCount;
+      uint32_t maxSceneDataId;
       bool shadowTest;
       uint32_t textureIndexOffset;
       bool isAnimated;

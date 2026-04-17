@@ -11,7 +11,7 @@
 
 #include "colormap.glsl"
 
-#if SCENE_DATA_COUNT > 0
+#ifdef MAX_SCENE_DATA_ID
 #include "mdl_renderer_state.glsl"
 #define RENDERER_STATE_TYPE mdl_renderer_state
 #endif

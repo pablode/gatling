@@ -130,6 +130,7 @@ namespace gtl
     std::vector<CgpuShader> anyHits; // optional
     OffsetAllocator::Allocation texOffsetAllocation;
     std::vector<GiImagePtr> images;
+    std::vector<std::string> stringConstants;
   };
 
   struct GiMaterial
@@ -886,25 +887,19 @@ fail:
 
         // Prepare scene data & preamble
         std::vector<const GiPrimvarData*> primvars;
+
         if (material)
         {
-          const std::vector<const char*> sceneDataNames = material->mcMat->sceneDataNames;
+          const std::vector<const char*>& sceneDataNames = material->mcMat->sceneDataNames;
+          const std::vector<std::string>& stringConstants = material->gpuData->stringConstants;
 
           size_t sceneDataCount = sceneDataNames.size();
-          int overflowCount = int(sceneDataCount) - int(rp::MAX_SCENE_DATA_COUNT);
-
-          if (overflowCount > 0)
-          {
-              GB_ERROR("max scene data count exceeded for {}; ignoring {} scene data", mesh->name, overflowCount);
-              sceneDataCount = rp::MAX_SCENE_DATA_COUNT;
-          }
-
-          primvars.resize(sceneDataCount, nullptr);
-
           if (sceneDataCount > 0)
           {
             GB_DEBUG("scene data for mesh {} with material {}:", mesh->name, material->name);
           }
+
+          primvars.resize(rp::MAX_SCENE_DATA_COUNT, nullptr);
           for (size_t i = 0; i < sceneDataCount; i++)
           {
             const char* sceneDataName = sceneDataNames[i];
@@ -928,14 +923,28 @@ fail:
               }
             }
 
+            int index = -1;
+            for (size_t j = 0; j < stringConstants.size(); j++)
+            {
+              if (std::string(sceneDataName) != stringConstants[j])
+              {
+                continue;
+              }
+              index = j;
+              break;
+            }
+
+            assert(index != -1);
+
             if (!primvar)
             {
-              GB_DEBUG("> [{}] {} (not found!)", i, sceneDataName);
+              // TODO: check if reserved scene data
+              GB_DEBUG("> [{}] {} (not found!)", index, sceneDataName);
               continue;
             }
 
-            GB_DEBUG("> [{}] {}", i, sceneDataName);
-            primvars[i] = primvar;
+            GB_DEBUG("> [{}] {}", index, sceneDataName);
+            primvars[index] = primvar;
           }
         }
 
@@ -951,37 +960,42 @@ fail:
           .objectId = mesh->id,
           .faceIdsInfo = (faceIdStride << rp::FACE_ID_STRIDE_OFFSET) | uint32_t(faceIdsBufferOffset)
         };
+        for (size_t i = 0; i < rp::MAX_SCENE_DATA_COUNT; i++)
+        {
+          preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
+        }
 
-        std::vector<uint32_t> sceneDataOffsets(primvars.size());
+        std::vector<uint32_t> sceneDataBufferOffsets(primvars.size());
         for (size_t i = 0; i < primvars.size(); i++)
         {
           const GiPrimvarData* primvar = primvars[i];
 
           if (!primvar)
           {
-            preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
             continue;
           }
 
           uint64_t newPayloadBufferSize = payloadBufferSize;
-          uint64_t sceneDataOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
+          uint64_t bufferOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
 
-          if (sceneDataOffset >= UINT32_MAX)
+          if (bufferOffset >= UINT32_MAX)
           {
             GB_ERROR("scene data too large");
-            preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
             continue;
           }
 
-          if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset || sceneDataOffset == rp::SCENE_DATA_OFFSET_MASK)
+          uint32_t sceneDataOffset = bufferOffset / rp::SCENE_DATA_ALIGNMENT;
+          if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset)
           {
             GB_ERROR("max scene data offset exceeded");
-            preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
             continue;
           }
 
+          uint32_t index = i;//sceneDataIndices[i];
+          assert(index != -1); // every scene data has a string constant
+
           payloadBufferSize = newPayloadBufferSize;
-          sceneDataOffsets[i] = uint32_t(sceneDataOffset);
+          sceneDataBufferOffsets[i] = uint32_t(bufferOffset);
 
           uint32_t stride = 0;
           switch (primvar->type)
@@ -1012,10 +1026,10 @@ fail:
           assert(stride < 4);
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
 
-          uint32_t info = ((uint32_t(sceneDataOffset) / rp::SCENE_DATA_ALIGNMENT) & rp::SCENE_DATA_OFFSET_MASK) |
+          uint32_t info = uint32_t(sceneDataOffset) |
                           (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
                           (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
-          preamble.sceneDataInfos[i] = info;
+          preamble.sceneDataInfos[index] = info;
         }
 
         // Upload GPU data
@@ -1089,7 +1103,8 @@ fail:
           }
 
           const GiPrimvarData* s = primvars[i];
-          if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer, sceneDataOffsets[i]))
+
+          if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer, sceneDataBufferOffsets[i]))
           {
             GB_ERROR("failed to stage BLAS primvar");
             goto fail_cleanup;
@@ -1473,6 +1488,7 @@ cleanup:
         auto texCount = uint32_t(genInfo.textureDescriptions.size());
 
         GiMaterialGpuData gpuData;
+        gpuData.stringConstants = genInfo.stringConstants;
         if (texCount > 0)
         {
           gpuData.texOffsetAllocation = texAllocator.allocate(texCount);
@@ -1499,9 +1515,6 @@ cleanup:
         const McMaterial* mcMat = material->mcMat;
 
         uint32_t texOffset = newMaterialGpuDatas[i].texOffsetAllocation.offset;
-        auto sceneDataCount = uint32_t(mcMat->sceneDataNames.size())
-          - int(bool(mcMat->cameraPositionSceneDataIndex))
-          - int(bool(mcMat->frameSceneDataIndex));
 
         // Closest hit
         {
@@ -1510,8 +1523,7 @@ cleanup:
             .commonParams = commonParams,
             .directionalBias = mcMat->directionalBias,
             .enableSceneTransforms = mcMat->requiresSceneTransforms,
-            .cameraPositionSceneDataIndex = mcMat->cameraPositionSceneDataIndex,
-            .frameSceneDataIndex = mcMat->frameSceneDataIndex,
+            .builtinSceneDataIndices = compInfo.genInfo.builtinSceneDataIndices,
             .hasBackfaceBsdf = mcMat->hasBackfaceBsdf,
             .hasBackfaceEdf = mcMat->hasBackfaceEdf,
             .hasCutoutTransparency = mcMat->hasCutoutTransparency,
@@ -1521,7 +1533,7 @@ cleanup:
             .isEmissive = mcMat->isEmissive,
             .isThinWalled = mcMat->isThinWalled,
             .nextEventEstimation = renderSettings.nextEventEstimation,
-            .sceneDataCount = sceneDataCount,
+            .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .shadingGlsl = compInfo.genInfo.glslSource,
             .textureIndexOffset = texOffset
           };
@@ -1540,10 +1552,9 @@ cleanup:
             .baseFileName = "rp_main.ahit",
             .commonParams = commonParams,
             .enableSceneTransforms = mcMat->requiresSceneTransforms,
-            .cameraPositionSceneDataIndex = mcMat->cameraPositionSceneDataIndex,
-            .frameSceneDataIndex = mcMat->frameSceneDataIndex,
+            .builtinSceneDataIndices = compInfo.genInfo.builtinSceneDataIndices,
             .opacityEvalGlsl = compInfo.genInfo.glslSource,
-            .sceneDataCount = sceneDataCount,
+            .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .textureIndexOffset = texOffset,
             .isAnimated = mcMat->isAnimated
           };
