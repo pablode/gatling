@@ -23,6 +23,7 @@
 
 namespace gtl
 {
+  struct GiMesh;
   struct GiScene;
 }
 
@@ -115,6 +116,7 @@ private:
   std::unique_ptr<HdRenderParam> _renderParam;
   GiScene* _giScene = nullptr;
   GiMaterial* _defaultMaterial = nullptr;
+  GiMaterial* _gsSh0CoefMaterial = nullptr;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -301,7 +301,7 @@ void main()
         edf_evaluate_data.k1 = -gl_WorldRayDirectionEXT;
         edf_evaluate_data.pdf = 0.0;
 
-        if (isFrontFace || !isDoubleSided)
+        if (true)//(isFrontFace || !isDoubleSided)
         {
             mdl_edf_emission_init(shading_state);
             mdl_edf_emission_evaluate(edf_evaluate_data, shading_state);
@@ -315,11 +315,12 @@ void main()
         }
 #endif
 
-        if (edf_evaluate_data.pdf > 0.0)
+// TODO: why is this 0.0?
+        //if (edf_evaluate_data.pdf > 0.0)
         {
             vec3 emission_intensity = vec3(0.0);
 
-            if (isFrontFace || !isDoubleSided)
+            if (true)// (isFrontFace || !isDoubleSided)
             {
                 emission_intensity = mdl_edf_emission_intensity(shading_state);
             }

@@ -14,6 +14,8 @@ add_library(
   mdlParserPlugin.h
   mesh.cpp
   mesh.h
+  particleField.cpp
+  particleField.h
   previewSurfaceNetworkPatcher.cpp
   previewSurfaceNetworkPatcher.h
   renderBuffer.cpp

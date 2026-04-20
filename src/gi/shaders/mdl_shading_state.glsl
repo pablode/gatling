@@ -89,8 +89,9 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
 #endif
     state.text_coords[0] = vec3(uv, 0.0);
 #ifdef SCENE_TRANSFORMS
-    state.world_to_object = mat4(gl_WorldToObjectEXT);
-    state.object_to_world = mat4(gl_ObjectToWorldEXT);
+    // TODO: transpose on SPIRV-Cross side
+    state.world_to_object = mat4(gl_WorldToObject3x4EXT);
+    state.object_to_world = mat4(gl_ObjectToWorld3x4EXT);
 #endif
 #ifdef MAX_SCENE_DATA_ID
     state.renderer_state = rendererState;

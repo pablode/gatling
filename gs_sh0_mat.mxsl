@@ -1,0 +1,115 @@
+#define SH_DEGREES 3
+
+material main()
+{
+    ///
+    /// SPHERICAL HARMONICS
+    ///
+
+    vector3 splatPos = transformpoint(vector3(0.0), "object", "world");
+    vector3 camPos = geompropvalue("CAMERA_POSITION");
+    vector3 dir = normalize(splatPos - camPos);
+
+    const float C0 = 0.28209479177387814;
+    color3 sh0c0 = geompropvalue("__gtl_gs_sh0c0");
+    color3 col = C0 * sh0c0;
+
+#if SH_DEGREES >= 1
+    const float C1 = 0.4886025119029199;
+
+    color3 sh1c0 = geompropvalue("__gtl_gs_sh1c0");
+    color3 sh1c1 = geompropvalue("__gtl_gs_sh1c1");
+    color3 sh1c2 = geompropvalue("__gtl_gs_sh1c2");
+
+    col -= sh1c0 * C1 * dir.y;
+    col += sh1c1 * C1 * dir.z;
+    col -= sh1c2 * C1 * dir.x;
+#endif
+
+#if SH_DEGREES >= 2
+    const float C2_0 = 1.0925484305920792;
+    const float C2_1 = -1.0925484305920792;
+    const float C2_2 = 0.31539156525252005;
+    const float C2_3 = -1.0925484305920792;
+    const float C2_4 = 0.5462742152960396;
+
+    color3 sh2c0 = geompropvalue("__gtl_gs_sh2c0");
+    color3 sh2c1 = geompropvalue("__gtl_gs_sh2c1");
+    color3 sh2c2 = geompropvalue("__gtl_gs_sh2c2");
+    color3 sh2c3 = geompropvalue("__gtl_gs_sh2c3");
+    color3 sh2c4 = geompropvalue("__gtl_gs_sh2c4");
+
+    float xx = dir.x * dir.x;
+    float yy = dir.y * dir.y;
+    float zz = dir.z * dir.z;
+    float xy = dir.x * dir.y;
+    float yz = dir.y * dir.z;
+    float xz = dir.x * dir.z;
+
+    col += C2_0 * xy * sh2c0;
+    col += C2_1 * yz * sh2c1;
+    col += C2_2 * (2.0 * zz - xx - yy) * sh2c2;
+    col += C2_3 * xz * sh2c3;
+    col += C2_4 * (xx - yy) * sh2c4;
+#endif
+
+#if SH_DEGREES >= 3
+    const float C3_0 = -0.5900435899266435;
+    const float C3_1 = 2.890611442640554;
+    const float C3_2 = -0.4570457994644658;
+    const float C3_3 = 0.3731763325901154;
+    const float C3_4 = -0.4570457994644658;
+    const float C3_5 = 1.445305721320277;
+    const float C3_6 = -0.5900435899266435;
+
+    color3 sh3c0 = geompropvalue("__gtl_gs_sh3c0");
+    color3 sh3c1 = geompropvalue("__gtl_gs_sh3c1");
+    color3 sh3c2 = geompropvalue("__gtl_gs_sh3c2");
+    color3 sh3c3 = geompropvalue("__gtl_gs_sh3c3");
+    color3 sh3c4 = geompropvalue("__gtl_gs_sh3c4");
+    color3 sh3c5 = geompropvalue("__gtl_gs_sh3c5");
+    color3 sh3c6 = geompropvalue("__gtl_gs_sh3c6");
+
+    col += C3_0 * dir.y * (3.0 * xx - yy) * sh3c0;
+    col += C3_1 * dir.z * xy * sh3c1;
+    col += C3_2 * dir.y * (4.0 * zz - xx - yy) * sh3c2;
+    col += C3_3 * dir.z * (2.0 * zz - 3.0 * xx - 3.0 * yy) * sh3c3;
+    col += C3_4 * dir.x * (4.0 * zz - xx - yy) * sh3c4;
+    col += C3_5 * dir.z * (xx - yy) * sh3c5;
+    col += C3_6 * dir.x * (xx - 3.0 * yy) * sh3c6;
+#endif
+
+    ///
+    /// GAUSSIAN OPACITY
+    ///
+
+    // compute point of max response [Moenne-Loccoz et al. 2024]
+    vector3 o_g = position("object");
+    vector3 d_g = normalize( viewdirection("object") );
+
+    float t_max = -dotproduct(o_g, d_g) / max(0.000001, dotproduct(d_g, d_g)); // Eq. 8
+    vector3 pos = o_g + t_max * d_g;
+
+    float greyDist = dotproduct(pos, pos);
+
+    //float maxResponse = exp(-0.5 * greyDist);
+    float maxResponse = exp(- greyDist); // TODO: Grok says no 0.5 in the exponent bc of scaling
+
+    float baseOpacity = geompropvalue("__gtl_gs_opacity", 1.0);
+    float alpha = min(0.99, maxResponse * baseOpacity); // TODO: min?
+
+#if 1
+    surfaceshader su = surface_unlit(
+      emission_color=col,
+      opacity=alpha
+    );
+#else
+    surfaceshader su = standard_surface(
+      emission=1.0,
+      emission_color=col,
+      opacity=color3(alpha)
+    );
+#endif
+
+    return surfacematerial(su);
+}

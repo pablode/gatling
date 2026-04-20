@@ -1,0 +1,544 @@
+<?xml version="1.0"?>
+<materialx version="1.39">
+  <nodedef name="ND_main" node="main">
+    <output name="out" type="material" default="" />
+  </nodedef>
+  <nodegraph name="NG_main" nodedef="ND_main">
+    <transformpoint name="splatPos" type="vector3">
+      <input name="in" type="vector3" value="0, 0, 0" />
+      <input name="fromspace" type="string" value="object" />
+      <input name="tospace" type="string" value="world" />
+    </transformpoint>
+    <geompropvalue name="camPos" type="vector3">
+      <input name="geomprop" type="string" value="CAMERA_POSITION" />
+    </geompropvalue>
+    <subtract name="node7" type="vector3">
+      <input name="in1" type="vector3" nodename="splatPos" />
+      <input name="in2" type="vector3" nodename="camPos" />
+    </subtract>
+    <normalize name="dir" type="vector3">
+      <input name="in" type="vector3" nodename="node7" />
+    </normalize>
+    <geompropvalue name="sh0c0" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh0c0" />
+    </geompropvalue>
+    <multiply name="col" type="color3">
+      <input name="in1" type="color3" nodename="sh0c0" />
+      <input name="in2" type="float" value="0.282095" />
+    </multiply>
+    <geompropvalue name="sh1c0" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh1c0" />
+    </geompropvalue>
+    <geompropvalue name="sh1c1" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh1c1" />
+    </geompropvalue>
+    <geompropvalue name="sh1c2" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh1c2" />
+    </geompropvalue>
+    <multiply name="node17" type="color3">
+      <input name="in1" type="color3" nodename="sh1c0" />
+      <input name="in2" type="float" value="0.488603" />
+    </multiply>
+    <extract name="node19" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <multiply name="node20" type="color3">
+      <input name="in1" type="color3" nodename="node17" />
+      <input name="in2" type="float" nodename="node19" />
+    </multiply>
+    <subtract name="col2" type="color3">
+      <input name="in1" type="color3" nodename="col" />
+      <input name="in2" type="color3" nodename="node20" />
+    </subtract>
+    <multiply name="node24" type="color3">
+      <input name="in1" type="color3" nodename="sh1c1" />
+      <input name="in2" type="float" value="0.488603" />
+    </multiply>
+    <extract name="node26" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <multiply name="node27" type="color3">
+      <input name="in1" type="color3" nodename="node24" />
+      <input name="in2" type="float" nodename="node26" />
+    </multiply>
+    <add name="col3" type="color3">
+      <input name="in1" type="color3" nodename="col2" />
+      <input name="in2" type="color3" nodename="node27" />
+    </add>
+    <multiply name="node31" type="color3">
+      <input name="in1" type="color3" nodename="sh1c2" />
+      <input name="in2" type="float" value="0.488603" />
+    </multiply>
+    <extract name="node33" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <multiply name="node34" type="color3">
+      <input name="in1" type="color3" nodename="node31" />
+      <input name="in2" type="float" nodename="node33" />
+    </multiply>
+    <subtract name="col4" type="color3">
+      <input name="in1" type="color3" nodename="col3" />
+      <input name="in2" type="color3" nodename="node34" />
+    </subtract>
+    <geompropvalue name="sh2c0" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh2c0" />
+    </geompropvalue>
+    <geompropvalue name="sh2c1" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh2c1" />
+    </geompropvalue>
+    <geompropvalue name="sh2c2" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh2c2" />
+    </geompropvalue>
+    <geompropvalue name="sh2c3" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh2c3" />
+    </geompropvalue>
+    <geompropvalue name="sh2c4" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh2c4" />
+    </geompropvalue>
+    <extract name="node41" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <extract name="node43" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <multiply name="xx" type="float">
+      <input name="in1" type="float" nodename="node41" />
+      <input name="in2" type="float" nodename="node43" />
+    </multiply>
+    <extract name="node45" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <extract name="node47" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <multiply name="yy" type="float">
+      <input name="in1" type="float" nodename="node45" />
+      <input name="in2" type="float" nodename="node47" />
+    </multiply>
+    <extract name="node49" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <extract name="node51" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <multiply name="zz" type="float">
+      <input name="in1" type="float" nodename="node49" />
+      <input name="in2" type="float" nodename="node51" />
+    </multiply>
+    <extract name="node53" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <extract name="node55" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <multiply name="xy" type="float">
+      <input name="in1" type="float" nodename="node53" />
+      <input name="in2" type="float" nodename="node55" />
+    </multiply>
+    <extract name="node57" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <extract name="node59" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <multiply name="yz" type="float">
+      <input name="in1" type="float" nodename="node57" />
+      <input name="in2" type="float" nodename="node59" />
+    </multiply>
+    <extract name="node61" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <extract name="node63" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <multiply name="xz" type="float">
+      <input name="in1" type="float" nodename="node61" />
+      <input name="in2" type="float" nodename="node63" />
+    </multiply>
+    <multiply name="in3" type="float">
+      <input name="in1" type="float" value="1.09255" />
+      <input name="in2" type="float" nodename="xy" />
+    </multiply>
+    <multiply name="node69" type="color3">
+      <input name="in1" type="color3" nodename="sh2c0" />
+      <input name="in2" type="float" nodename="in3" />
+    </multiply>
+    <add name="col5" type="color3">
+      <input name="in1" type="color3" nodename="col4" />
+      <input name="in2" type="color3" nodename="node69" />
+    </add>
+    <multiply name="in5" type="float">
+      <input name="in1" type="float" value="-1.09255" />
+      <input name="in2" type="float" nodename="yz" />
+    </multiply>
+    <multiply name="node75" type="color3">
+      <input name="in1" type="color3" nodename="sh2c1" />
+      <input name="in2" type="float" nodename="in5" />
+    </multiply>
+    <add name="col6" type="color3">
+      <input name="in1" type="color3" nodename="col5" />
+      <input name="in2" type="color3" nodename="node75" />
+    </add>
+    <multiply name="node80" type="float">
+      <input name="in1" type="float" value="2" />
+      <input name="in2" type="float" nodename="zz" />
+    </multiply>
+    <subtract name="node82" type="float">
+      <input name="in1" type="float" nodename="node80" />
+      <input name="in2" type="float" nodename="xx" />
+    </subtract>
+    <subtract name="node84" type="float">
+      <input name="in1" type="float" nodename="node82" />
+      <input name="in2" type="float" nodename="yy" />
+    </subtract>
+    <multiply name="in7" type="float">
+      <input name="in1" type="float" value="0.315392" />
+      <input name="in2" type="float" nodename="node84" />
+    </multiply>
+    <multiply name="node87" type="color3">
+      <input name="in1" type="color3" nodename="sh2c2" />
+      <input name="in2" type="float" nodename="in7" />
+    </multiply>
+    <add name="col7" type="color3">
+      <input name="in1" type="color3" nodename="col6" />
+      <input name="in2" type="color3" nodename="node87" />
+    </add>
+    <multiply name="in9" type="float">
+      <input name="in1" type="float" value="-1.09255" />
+      <input name="in2" type="float" nodename="xz" />
+    </multiply>
+    <multiply name="node93" type="color3">
+      <input name="in1" type="color3" nodename="sh2c3" />
+      <input name="in2" type="float" nodename="in9" />
+    </multiply>
+    <add name="col8" type="color3">
+      <input name="in1" type="color3" nodename="col7" />
+      <input name="in2" type="color3" nodename="node93" />
+    </add>
+    <subtract name="node98" type="float">
+      <input name="in1" type="float" nodename="xx" />
+      <input name="in2" type="float" nodename="yy" />
+    </subtract>
+    <multiply name="in11" type="float">
+      <input name="in1" type="float" value="0.546274" />
+      <input name="in2" type="float" nodename="node98" />
+    </multiply>
+    <multiply name="node101" type="color3">
+      <input name="in1" type="color3" nodename="sh2c4" />
+      <input name="in2" type="float" nodename="in11" />
+    </multiply>
+    <add name="col9" type="color3">
+      <input name="in1" type="color3" nodename="col8" />
+      <input name="in2" type="color3" nodename="node101" />
+    </add>
+    <geompropvalue name="sh3c0" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh3c0" />
+    </geompropvalue>
+    <geompropvalue name="sh3c1" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh3c1" />
+    </geompropvalue>
+    <geompropvalue name="sh3c2" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh3c2" />
+    </geompropvalue>
+    <geompropvalue name="sh3c3" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh3c3" />
+    </geompropvalue>
+    <geompropvalue name="sh3c4" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh3c4" />
+    </geompropvalue>
+    <geompropvalue name="sh3c5" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh3c5" />
+    </geompropvalue>
+    <geompropvalue name="sh3c6" type="color3">
+      <input name="geomprop" type="string" value="__gtl_gs_sh3c6" />
+    </geompropvalue>
+    <extract name="node112" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <multiply name="node113" type="float">
+      <input name="in1" type="float" value="-0.590044" />
+      <input name="in2" type="float" nodename="node112" />
+    </multiply>
+    <multiply name="node116" type="float">
+      <input name="in1" type="float" value="3" />
+      <input name="in2" type="float" nodename="xx" />
+    </multiply>
+    <subtract name="node118" type="float">
+      <input name="in1" type="float" nodename="node116" />
+      <input name="in2" type="float" nodename="yy" />
+    </subtract>
+    <multiply name="in13" type="float">
+      <input name="in1" type="float" nodename="node113" />
+      <input name="in2" type="float" nodename="node118" />
+    </multiply>
+    <multiply name="node121" type="color3">
+      <input name="in1" type="color3" nodename="sh3c0" />
+      <input name="in2" type="float" nodename="in13" />
+    </multiply>
+    <add name="col10" type="color3">
+      <input name="in1" type="color3" nodename="col9" />
+      <input name="in2" type="color3" nodename="node121" />
+    </add>
+    <extract name="node125" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <multiply name="node126" type="float">
+      <input name="in1" type="float" value="2.89061" />
+      <input name="in2" type="float" nodename="node125" />
+    </multiply>
+    <multiply name="in15" type="float">
+      <input name="in1" type="float" nodename="node126" />
+      <input name="in2" type="float" nodename="xy" />
+    </multiply>
+    <multiply name="node130" type="color3">
+      <input name="in1" type="color3" nodename="sh3c1" />
+      <input name="in2" type="float" nodename="in15" />
+    </multiply>
+    <add name="col11" type="color3">
+      <input name="in1" type="color3" nodename="col10" />
+      <input name="in2" type="color3" nodename="node130" />
+    </add>
+    <extract name="node134" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="1" />
+    </extract>
+    <multiply name="node135" type="float">
+      <input name="in1" type="float" value="-0.457046" />
+      <input name="in2" type="float" nodename="node134" />
+    </multiply>
+    <multiply name="node138" type="float">
+      <input name="in1" type="float" value="4" />
+      <input name="in2" type="float" nodename="zz" />
+    </multiply>
+    <subtract name="node140" type="float">
+      <input name="in1" type="float" nodename="node138" />
+      <input name="in2" type="float" nodename="xx" />
+    </subtract>
+    <subtract name="node142" type="float">
+      <input name="in1" type="float" nodename="node140" />
+      <input name="in2" type="float" nodename="yy" />
+    </subtract>
+    <multiply name="in17" type="float">
+      <input name="in1" type="float" nodename="node135" />
+      <input name="in2" type="float" nodename="node142" />
+    </multiply>
+    <multiply name="node145" type="color3">
+      <input name="in1" type="color3" nodename="sh3c2" />
+      <input name="in2" type="float" nodename="in17" />
+    </multiply>
+    <add name="col12" type="color3">
+      <input name="in1" type="color3" nodename="col11" />
+      <input name="in2" type="color3" nodename="node145" />
+    </add>
+    <extract name="node149" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <multiply name="node150" type="float">
+      <input name="in1" type="float" value="0.373176" />
+      <input name="in2" type="float" nodename="node149" />
+    </multiply>
+    <multiply name="node153" type="float">
+      <input name="in1" type="float" value="2" />
+      <input name="in2" type="float" nodename="zz" />
+    </multiply>
+    <multiply name="node156" type="float">
+      <input name="in1" type="float" value="3" />
+      <input name="in2" type="float" nodename="xx" />
+    </multiply>
+    <subtract name="node157" type="float">
+      <input name="in1" type="float" nodename="node153" />
+      <input name="in2" type="float" nodename="node156" />
+    </subtract>
+    <multiply name="node160" type="float">
+      <input name="in1" type="float" value="3" />
+      <input name="in2" type="float" nodename="yy" />
+    </multiply>
+    <subtract name="node161" type="float">
+      <input name="in1" type="float" nodename="node157" />
+      <input name="in2" type="float" nodename="node160" />
+    </subtract>
+    <multiply name="in19" type="float">
+      <input name="in1" type="float" nodename="node150" />
+      <input name="in2" type="float" nodename="node161" />
+    </multiply>
+    <multiply name="node164" type="color3">
+      <input name="in1" type="color3" nodename="sh3c3" />
+      <input name="in2" type="float" nodename="in19" />
+    </multiply>
+    <add name="col13" type="color3">
+      <input name="in1" type="color3" nodename="col12" />
+      <input name="in2" type="color3" nodename="node164" />
+    </add>
+    <extract name="node168" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <multiply name="node169" type="float">
+      <input name="in1" type="float" value="-0.457046" />
+      <input name="in2" type="float" nodename="node168" />
+    </multiply>
+    <multiply name="node172" type="float">
+      <input name="in1" type="float" value="4" />
+      <input name="in2" type="float" nodename="zz" />
+    </multiply>
+    <subtract name="node174" type="float">
+      <input name="in1" type="float" nodename="node172" />
+      <input name="in2" type="float" nodename="xx" />
+    </subtract>
+    <subtract name="node176" type="float">
+      <input name="in1" type="float" nodename="node174" />
+      <input name="in2" type="float" nodename="yy" />
+    </subtract>
+    <multiply name="in21" type="float">
+      <input name="in1" type="float" nodename="node169" />
+      <input name="in2" type="float" nodename="node176" />
+    </multiply>
+    <multiply name="node179" type="color3">
+      <input name="in1" type="color3" nodename="sh3c4" />
+      <input name="in2" type="float" nodename="in21" />
+    </multiply>
+    <add name="col14" type="color3">
+      <input name="in1" type="color3" nodename="col13" />
+      <input name="in2" type="color3" nodename="node179" />
+    </add>
+    <extract name="node183" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="2" />
+    </extract>
+    <multiply name="node184" type="float">
+      <input name="in1" type="float" value="1.44531" />
+      <input name="in2" type="float" nodename="node183" />
+    </multiply>
+    <subtract name="node187" type="float">
+      <input name="in1" type="float" nodename="xx" />
+      <input name="in2" type="float" nodename="yy" />
+    </subtract>
+    <multiply name="in23" type="float">
+      <input name="in1" type="float" nodename="node184" />
+      <input name="in2" type="float" nodename="node187" />
+    </multiply>
+    <multiply name="node190" type="color3">
+      <input name="in1" type="color3" nodename="sh3c5" />
+      <input name="in2" type="float" nodename="in23" />
+    </multiply>
+    <add name="col15" type="color3">
+      <input name="in1" type="color3" nodename="col14" />
+      <input name="in2" type="color3" nodename="node190" />
+    </add>
+    <extract name="node194" type="float">
+      <input name="in" type="vector3" nodename="dir" />
+      <input name="index" type="integer" value="0" />
+    </extract>
+    <multiply name="node195" type="float">
+      <input name="in1" type="float" value="-0.590044" />
+      <input name="in2" type="float" nodename="node194" />
+    </multiply>
+    <multiply name="node199" type="float">
+      <input name="in1" type="float" value="3" />
+      <input name="in2" type="float" nodename="yy" />
+    </multiply>
+    <subtract name="node200" type="float">
+      <input name="in1" type="float" nodename="xx" />
+      <input name="in2" type="float" nodename="node199" />
+    </subtract>
+    <multiply name="in25" type="float">
+      <input name="in1" type="float" nodename="node195" />
+      <input name="in2" type="float" nodename="node200" />
+    </multiply>
+    <multiply name="node203" type="color3">
+      <input name="in1" type="color3" nodename="sh3c6" />
+      <input name="in2" type="float" nodename="in25" />
+    </multiply>
+    <add name="col16" type="color3">
+      <input name="in1" type="color3" nodename="col15" />
+      <input name="in2" type="color3" nodename="node203" />
+    </add>
+    <position name="o_g" type="vector3">
+      <input name="space" type="string" value="object" />
+    </position>
+    <viewdirection name="node206" type="vector3">
+      <input name="space" type="string" value="object" />
+    </viewdirection>
+    <normalize name="d_g" type="vector3">
+      <input name="in" type="vector3" nodename="node206" />
+    </normalize>
+    <dotproduct name="node209" type="float">
+      <input name="in1" type="vector3" nodename="o_g" />
+      <input name="in2" type="vector3" nodename="d_g" />
+    </dotproduct>
+    <subtract name="node210" type="float">
+      <input name="in1" type="float" value="0" />
+      <input name="in2" type="float" nodename="node209" />
+    </subtract>
+    <dotproduct name="node214" type="float">
+      <input name="in1" type="vector3" nodename="d_g" />
+      <input name="in2" type="vector3" nodename="d_g" />
+    </dotproduct>
+    <max name="node215" type="float">
+      <input name="in1" type="float" value="1e-06" />
+      <input name="in2" type="float" nodename="node214" />
+    </max>
+    <divide name="t_max" type="float">
+      <input name="in1" type="float" nodename="node210" />
+      <input name="in2" type="float" nodename="node215" />
+    </divide>
+    <multiply name="node219" type="vector3">
+      <input name="in1" type="vector3" nodename="d_g" />
+      <input name="in2" type="float" nodename="t_max" />
+    </multiply>
+    <add name="pos" type="vector3">
+      <input name="in1" type="vector3" nodename="o_g" />
+      <input name="in2" type="vector3" nodename="node219" />
+    </add>
+    <dotproduct name="greyDist" type="float">
+      <input name="in1" type="vector3" nodename="pos" />
+      <input name="in2" type="vector3" nodename="pos" />
+    </dotproduct>
+    <subtract name="node223" type="float">
+      <input name="in1" type="float" value="0" />
+      <input name="in2" type="float" nodename="greyDist" />
+    </subtract>
+    <exp name="maxResponse" type="float">
+      <input name="in" type="float" nodename="node223" />
+    </exp>
+    <geompropvalue name="baseOpacity" type="float">
+      <input name="geomprop" type="string" value="__gtl_gs_opacity" />
+      <input name="default" type="float" value="1" />
+    </geompropvalue>
+    <multiply name="node229" type="float">
+      <input name="in1" type="float" nodename="maxResponse" />
+      <input name="in2" type="float" nodename="baseOpacity" />
+    </multiply>
+    <min name="alpha" type="float">
+      <input name="in1" type="float" value="0.99" />
+      <input name="in2" type="float" nodename="node229" />
+    </min>
+    <surface_unlit name="su" type="surfaceshader">
+      <input name="emission_color" type="color3" nodename="col16" />
+      <input name="opacity" type="float" nodename="alpha" />
+    </surface_unlit>
+    <surfacematerial name="node235" type="material">
+      <input name="surfaceshader" type="surfaceshader" nodename="su" />
+    </surfacematerial>
+    <output name="out" type="material" nodename="node235" />
+  </nodegraph>
+  <main name="node1" type="material" />
+</materialx>

@@ -24,14 +24,18 @@
 #include "material.h"
 #include "tokens.h"
 #include "light.h"
+#include "particleField.h"
 
 #include <pxr/base/arch/fileSystem.h>
 #include <pxr/imaging/hd/extComputation.h>
 #include <pxr/imaging/hd/resourceRegistry.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/base/gf/vec4f.h>
+#include <pxr/base/gf/matrix4f.h>
 
 #include <memory>
+
+#include <fstream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -39,7 +43,10 @@ namespace
 {
   const static TfTokenVector _supportedRprimTypes =
   {
-    HdPrimTypeTokens->mesh
+    HdPrimTypeTokens->mesh,
+#if PXR_VERSION >= 2603
+    HdPrimTypeTokens->particleField
+#endif
   };
 
   const static TfTokenVector _supportedSprimTypes =
@@ -61,7 +68,7 @@ namespace
   };
 
   // By default, we visualize the display color if it exists (otherwise grey).
-  static const char* _defaultMaterialXMaterial = R"(
+  static const char* _defaultMaterialXMaterialStr = R"(
     <?xml version="1.0"?>
     <materialx version="1.38">
       <geompropvalue name="gatling_GP_default" type="color3">
@@ -127,12 +134,18 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
 
   _giScene = giCreateScene();
 
-  _defaultMaterial = giCreateMaterialFromMtlxStr(_giScene, "__gatling_default", _defaultMaterialXMaterial);
+  _defaultMaterial = giCreateMaterialFromMtlxStr(_giScene, "__gtl_defaultmat", _defaultMaterialXMaterialStr);
   TF_AXIOM(_defaultMaterial);
+
+std::ifstream gsSh0CoefMatFile("/Users/pablode/Work/gatling/gs_sh0_mat.mtlx");
+std::string gsSh0CoefMaterialStr(std::istreambuf_iterator<char>{gsSh0CoefMatFile}, std::istreambuf_iterator<char>{});
+  _gsSh0CoefMaterial = giCreateMaterialFromMtlxStr(_giScene, "__gtl_gssh0coefmat", gsSh0CoefMaterialStr.c_str());
+  TF_AXIOM(_gsSh0CoefMaterial);
 }
 
 HdGatlingRenderDelegate::~HdGatlingRenderDelegate()
 {
+  giDestroyMaterial(_gsSh0CoefMaterial);
   giDestroyMaterial(_defaultMaterial);
   giDestroyScene(_giScene);
 }
@@ -261,6 +274,10 @@ HdRprim* HdGatlingRenderDelegate::CreateRprim(const TfToken& typeId, const SdfPa
   if (typeId == HdPrimTypeTokens->mesh)
   {
     return new HdGatlingMesh(rprimId, _giScene, _defaultMaterial);
+  }
+  else if (typeId == HdPrimTypeTokens->particleField)
+  {
+    return new HdGatlingParticleField(rprimId, _giScene, _gsSh0CoefMaterial);
   }
 
   return nullptr;

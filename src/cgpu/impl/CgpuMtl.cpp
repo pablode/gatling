@@ -1391,7 +1391,9 @@ namespace gtl
         CGPU_RESOLVE_BLAS(ctx, instance.as, iblas);
         blases.insert(iblas->as);
 
-        MTL::AccelerationStructureInstanceOptions options = MTL::AccelerationStructureInstanceOptionDisableTriangleCulling;
+        MTL::AccelerationStructureInstanceOptions options = MTL::AccelerationStructureInstanceOptionNone;
+        // TODO: depending on param
+        //MTL::AccelerationStructureInstanceOptionDisableTriangleCulling;
         if (iblas->isOpaque)
         {
           options |= MTL::AccelerationStructureInstanceOptionOpaque;

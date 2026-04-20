@@ -348,13 +348,15 @@ void main()
             // Closest hit shading
             rayPayload.neeContrib = vec3(0.0);
 
+            uint rayFlags = gl_RayFlagsCullBackFacingTrianglesEXT;
+
 #ifdef REORDER_INVOCATIONS
             hitObjectNV hitObject;
 
             hitObjectTraceRayNV(
                 hitObject,             // hit object
                 sceneAS,               // top-level AS
-                0,                     // ray flags
+                rayFlags,              // ray flags
                 0xFF,                  // cull mask
                 0,                     // sbt record offset
                 2,                     // sbt record stride
@@ -380,7 +382,7 @@ void main()
 #else
             traceRayEXT(
                 sceneAS,               // top-level AS
-                0,                     // ray flags
+                rayFlags,              // ray flags
                 0xFF,                  // cull mask
                 0,                     // sbt record offset
                 2,                     // sbt record stride
