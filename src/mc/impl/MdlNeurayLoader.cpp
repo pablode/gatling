@@ -31,8 +31,6 @@
 
 #include <string>
 
-#define GTL_RECOMMENDED_NEURAYLIB_VERSION 56
-#define GTL_RECOMMENDED_NEURAYLIB_VERSION_STRING "2024.1"
 #define GTL_LATEST_TESTED_NEURAYLIB_VERSION 57
 
 static_assert(MI_NEURAYLIB_API_VERSION >= 48, "MDL SDK version is too old!");
@@ -173,11 +171,6 @@ namespace
     {
       GB_ERROR("failed to load MDL library: unknown error");
       return {};
-    }
-
-    if (MI_NEURAYLIB_API_VERSION != GTL_RECOMMENDED_NEURAYLIB_VERSION)
-    {
-      GB_WARN("not using recommended MDL SDK version {}", GTL_RECOMMENDED_NEURAYLIB_VERSION_STRING);
     }
 
     return neuray;
