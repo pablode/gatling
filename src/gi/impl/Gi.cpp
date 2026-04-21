@@ -143,6 +143,7 @@ namespace gtl
 
   struct GiMesh
   {
+    GiCullMode cullMode;
     glm::mat3x4 transform;
     bool doubleSided;
     bool flipFacing;
@@ -313,6 +314,27 @@ namespace gtl
     default:
       assert(false);
       return 0;
+    }
+  }
+
+  std::optional<CgpuCullMode> _GiTranslateCullMode(GiCullMode cullMode, bool doubleSided)
+  {
+    switch (cullMode)
+    {
+    case GiCullMode::Backface:
+      return CgpuCullMode::Backface;
+    case GiCullMode::BackfaceUnlessDoubleSided:
+      return doubleSided ? CgpuCullMode::None : CgpuCullMode::Backface;
+    case GiCullMode::Frontface:
+      return CgpuCullMode::Frontface;
+    case GiCullMode::FrontfaceUnlessDoubleSided:
+      return doubleSided ? CgpuCullMode::None : CgpuCullMode::Frontface;
+    case GiCullMode::None:
+      return CgpuCullMode::None;
+    case GiCullMode::DontCare:
+      return std::nullopt;
+    default:
+      GI_FATAL("coding error: unhandled case");
     }
   }
 
@@ -621,6 +643,7 @@ fail:
   GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc)
   {
     GiMesh* mesh = new GiMesh {
+      .cullMode = desc.cullMode,
       .transform = glm::mat3x4(1.0f),
       .doubleSided = desc.isDoubleSided,
       .flipFacing = desc.isLeftHanded,
@@ -783,6 +806,7 @@ fail:
   }
 
   void _giBuildGeometryStructures(GiScene* scene,
+                                  const GiRenderSettings& renderSettings,
                                   const GiShaderCache* shaderCache,
                                   std::vector<CgpuBlasInstance>& blasInstances,
                                   std::vector<rp::BlasPayload>& blasPayloads,
@@ -1205,12 +1229,23 @@ fail_cleanup:
         // Create BLAS instance for TLAS.
         glm::mat3x4 transform = glm::mat3x4(glm::mat4(mesh->transform) * glm::mat4(mesh->instanceTransforms[i]));
 
+        std::optional<CgpuCullMode> cullMode = _GiTranslateCullMode(mesh->cullMode, mesh->doubleSided);
+        if (!cullMode.has_value())
+        {
+          cullMode = _GiTranslateCullMode(renderSettings.cullMode, mesh->doubleSided);
+        }
+        if (!cullMode.has_value())
+        {
+          cullMode = CgpuCullMode::None;
+        }
+        assert(cullMode.has_value());
+
         CgpuBlasInstance blasInstance;
         blasInstance.as = data->blas;
         blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
         blasInstance.instanceCustomIndex = uint32_t(blasPayloads.size());
         memcpy(blasInstance.transform, glm::value_ptr(transform), sizeof(float) * 12);
-        blasInstance.cullMode = CgpuCullMode::Frontface;
+        blasInstance.cullMode = *cullMode;
 
         blasInstances.push_back(blasInstance);
         blasPayloads.push_back(data->payload);
@@ -1219,7 +1254,9 @@ fail_cleanup:
     }
   }
 
-  GiBvh* _giCreateBvh(GiScene* scene, const GiShaderCache* shaderCache)
+  GiBvh* _giCreateBvh(GiScene* scene,
+                      const GiRenderSettings& renderSettings,
+                      const GiShaderCache* shaderCache)
   {
     GiBvh* bvh = nullptr;
 
@@ -1236,7 +1273,7 @@ fail_cleanup:
     CgpuBuffer blasPayloadsBuffer;
     CgpuBuffer instanceIdsBuffer;
 
-    _giBuildGeometryStructures(scene, shaderCache, blasInstances, blasPayloads, instanceIds, indicesSize, verticesSize);
+    _giBuildGeometryStructures(scene, renderSettings, shaderCache, blasInstances, blasPayloads, instanceIds, indicesSize, verticesSize);
 
     GB_LOG("BLAS builds finished");
     GB_LOG("> {} unique BLAS", blasPayloads.size());
@@ -2128,7 +2165,7 @@ cleanup:
     {
       if (scene->bvh) _giDestroyBvh(scene->bvh);
 
-      scene->bvh = _giCreateBvh(scene, scene->shaderCache);
+      scene->bvh = _giCreateBvh(scene, renderSettings, scene->shaderCache);
 
       scene->dirtyFlags &= ~GiSceneDirtyFlags::DirtyBvh;
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer | GiSceneDirtyFlags::DirtyBindSets;

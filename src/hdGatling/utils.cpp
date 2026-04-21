@@ -79,6 +79,28 @@ GiPrimvarType HdGatlingGetGiPrimvarType(HdType type)
   }
 }
 
+GiCullMode HdGatlingGetGiCullMode(HdCullStyle cullStyle)
+{
+  switch (cullStyle)
+  {
+  case HdCullStyle::HdCullStyleDontCare:
+    return GiCullMode::DontCare;
+  case HdCullStyle::HdCullStyleNothing:
+    return GiCullMode::None;
+  case HdCullStyle::HdCullStyleBack:
+    return GiCullMode::Backface;
+  case HdCullStyle::HdCullStyleFront:
+    return GiCullMode::Frontface;
+  case HdCullStyle::HdCullStyleBackUnlessDoubleSided:
+    return GiCullMode::BackfaceUnlessDoubleSided;
+  case HdCullStyle::HdCullStyleFrontUnlessDoubleSided:
+    return GiCullMode::FrontfaceUnlessDoubleSided;
+  default:
+    TF_CODING_ERROR("unhandled cull style");
+    return GiCullMode::DontCare;
+  }
+}
+
 void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values)
 {
   auto boolArray = values.Get<VtBoolArray>();

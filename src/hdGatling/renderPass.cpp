@@ -20,6 +20,7 @@
 #include "renderParam.h"
 #include "mesh.h"
 #include "instancer.h"
+#include "utils.h"
 #include "tokens.h"
 
 #include <pxr/imaging/hd/sceneGlobalsSchema.h>
@@ -269,6 +270,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     .domeLight = renderParam->ActiveDomeLight(),
     .renderSettings = {
       .clippingPlanes = clippingPlanes,
+      .cullMode = HdGatlingGetGiCullMode(renderPassState->GetCullStyle()),
       .depthOfField = _settings.find(HdGatlingSettingsTokens->depthOfField)->second.Get<bool>(),
       .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
       .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),

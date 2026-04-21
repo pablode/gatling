@@ -28,6 +28,8 @@ bool HdGatlingIsPrimvarTypeSupported(const VtValue& value);
 
 gtl::GiPrimvarType HdGatlingGetGiPrimvarType(HdType type);
 
+gtl::GiCullMode HdGatlingGetGiCullMode(HdCullStyle cullStyle);
+
 void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values);
 
 bool HdGatlingUnboxPRSPrimvars(VtValue& boxedTranslations,

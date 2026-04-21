@@ -1090,6 +1090,7 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
     }
 
     GiMeshDesc desc = {
+      .cullMode = HdGatlingGetGiCullMode(GetCullStyle(sceneDelegate)),
       .faces = subMesh.faces,
       .faceIds = subMesh.faceIds,
       .id = GetPrimId(),

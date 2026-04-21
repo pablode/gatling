@@ -121,8 +121,19 @@ namespace gtl
     uint32_t v_i[3];
   };
 
+  enum class GiCullMode
+  {
+    DontCare,
+    None,
+    Backface,
+    Frontface,
+    BackfaceUnlessDoubleSided,
+    FrontfaceUnlessDoubleSided
+  };
+
   struct GiMeshDesc
   {
+    GiCullMode                        cullMode;
     uint32_t                          faceCount;
     const std::vector<GiFace>&        faces;
     const std::vector<int>&           faceIds;
@@ -138,24 +149,25 @@ namespace gtl
 
   struct GiRenderSettings
   {
-    bool     clippingPlanes;
-    bool     depthOfField;
-    bool     domeLightCameraVisible;
-    bool     filterImportanceSampling;
-    float    frame;
-    bool     jitteredSampling;
-    float    lightIntensityMultiplier;
-    uint32_t maxBounces;
-    float    maxSampleValue;
-    uint32_t maxVolumeWalkLength;
-    uint32_t mediumStackSize;
-    float    metersPerSceneUnit;
-    bool     nextEventEstimation;
-    bool     progressiveAccumulation;
-    uint32_t rrBounceOffset;
-    float    rrInvMinTermProb;
-    uint32_t spp;
-    float    time;
+    bool       clippingPlanes;
+    GiCullMode cullMode;
+    bool       depthOfField;
+    bool       domeLightCameraVisible;
+    bool       filterImportanceSampling;
+    float      frame;
+    bool       jitteredSampling;
+    float      lightIntensityMultiplier;
+    uint32_t   maxBounces;
+    float      maxSampleValue;
+    uint32_t   maxVolumeWalkLength;
+    uint32_t   mediumStackSize;
+    float      metersPerSceneUnit;
+    bool       nextEventEstimation;
+    bool       progressiveAccumulation;
+    uint32_t   rrBounceOffset;
+    float      rrInvMinTermProb;
+    uint32_t   spp;
+    float      time;
   };
 
   struct GiAovBinding
@@ -211,6 +223,7 @@ namespace gtl
   void giSetMeshInstanceTransforms(GiMesh* mesh, uint32_t count, const float(*transforms)[4][4]);
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars);
   void giSetMeshInstanceIds(GiMesh* mesh, uint32_t count, int* ids);
+  void giSetMeshInstanceCullMode(GiMesh* mesh, GiCullMode cullMode);
   void giSetMeshMaterial(GiMesh* mesh, GiMaterial* mat);
   void giSetMeshVisibility(GiMesh* mesh, bool visible);
   void giDestroyMesh(GiMesh* mesh);
