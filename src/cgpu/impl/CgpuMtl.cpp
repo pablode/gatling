@@ -1391,7 +1391,17 @@ namespace gtl
         CGPU_RESOLVE_BLAS(ctx, instance.as, iblas);
         blases.insert(iblas->as);
 
-        MTL::AccelerationStructureInstanceOptions options = MTL::AccelerationStructureInstanceOptionDisableTriangleCulling;
+        MTL::AccelerationStructureInstanceOptions options = MTL::AccelerationStructureInstanceOptionNone;
+
+        if (instance.cullMode == CgpuCullMode::None)
+        {
+          options |= MTL::AccelerationStructureInstanceOptionDisableTriangleCulling;
+        }
+        else if (instance.cullMode == CgpuCullMode::Frontface)
+        {
+          options |= MTL::AccelerationStructureInstanceOptionTriangleFrontFacingWindingCounterClockwise;
+        }
+
         if (iblas->isOpaque)
         {
           options |= MTL::AccelerationStructureInstanceOptionOpaque;

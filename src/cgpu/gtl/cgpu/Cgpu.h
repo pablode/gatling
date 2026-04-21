@@ -170,12 +170,18 @@ namespace gtl
     const char* debugName = nullptr;
   };
 
+  enum class CgpuCullMode
+  {
+    None, Backface, Frontface
+  };
+
   struct CgpuBlasInstance
   {
     CgpuBlas as;
     uint32_t hitGroupIndex;
     uint32_t instanceCustomIndex;
     float transform[3][4];
+    CgpuCullMode cullMode;
   };
 
   struct CgpuRtHitGroup

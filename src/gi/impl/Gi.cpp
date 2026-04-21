@@ -1210,6 +1210,7 @@ fail_cleanup:
         blasInstance.hitGroupIndex = materialIndex * 2; // always two hit groups per material: regular & shadow
         blasInstance.instanceCustomIndex = uint32_t(blasPayloads.size());
         memcpy(blasInstance.transform, glm::value_ptr(transform), sizeof(float) * 12);
+        blasInstance.cullMode = CgpuCullMode::Frontface;
 
         blasInstances.push_back(blasInstance);
         blasPayloads.push_back(data->payload);

@@ -2802,12 +2802,22 @@ namespace gtl
           CGPU_FATAL("instanceCustomIndex must be equal to or smaller than 2^24");
         }
 
+        VkGeometryInstanceFlagsKHR flags = 0;
+        if (instanceDesc.cullMode == CgpuCullMode::None)
+        {
+          flags |= VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        }
+        else if (instanceDesc.cullMode == CgpuCullMode::Frontface)
+        {
+          flags |= VK_GEOMETRY_INSTANCE_TRIANGLE_FLIP_FACING_BIT_KHR;
+        }
+
         VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];
         memcpy(&asInstance->transform, &instanceDesc.transform, sizeof(VkTransformMatrixKHR));
         asInstance->instanceCustomIndex = instanceCustomIndex;
         asInstance->mask = 0xFF;
         asInstance->instanceShaderBindingTableRecordOffset = instanceDesc.hitGroupIndex;
-        asInstance->flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        asInstance->flags = flags;
         asInstance->accelerationStructureReference = iblas->address;
 
         areAllBlasOpaque &= iblas->isOpaque;
