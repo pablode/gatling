@@ -64,15 +64,15 @@ namespace
   static const char* _defaultMaterialXMaterial = R"(
     <?xml version="1.0"?>
     <materialx version="1.38">
-      <geompropvalue name="gatling_GP_default" type="color3">
+      <geompropvalue name="gtl__defaultmat_gp" type="color3">
         <input name="geomprop" type="string" value="displayColor" />
         <input name="default" type="color3" value="0.18, 0.18, 0.18" />
       </geompropvalue>
-      <UsdPreviewSurface name="gatling_SR_default" type="surfaceshader">
-        <input name="diffuseColor" type="color3" nodename="gatling_GP_default" />
+      <UsdPreviewSurface name="gtl__defaultmat_ps" type="surfaceshader">
+        <input name="diffuseColor" type="color3" nodename="gtl__defaultmat_gp" />
       </UsdPreviewSurface>
-      <surfacematerial name="gatling_MAT_default" type="material">
-        <input name="surfaceshader" type="surfaceshader" nodename="gatling_SR_default" />
+      <surfacematerial name="gtl__defaultmat" type="material">
+        <input name="surfaceshader" type="surfaceshader" nodename="gtl__defaultmat_ps" />
       </surfacematerial>
     </materialx>
   )";
@@ -127,7 +127,7 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
 
   _giScene = giCreateScene();
 
-  _defaultMaterial = giCreateMaterialFromMtlxStr(_giScene, "__gatling_default", _defaultMaterialXMaterial);
+  _defaultMaterial = giCreateMaterialFromMtlxStr(_giScene, "gtl__defaultmat", _defaultMaterialXMaterial);
   TF_AXIOM(_defaultMaterial);
 }
 

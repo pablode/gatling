@@ -308,7 +308,7 @@ bool _MakeValidMDLIdentifier(std::string& str)
   bool usePrefix = invalidFirstChar || isReservedKeyword;
   if (usePrefix)
   {
-    str = GB_FMT("GAT{}", str);
+    str = GB_FMT("gtl__{}", str);
     strChanged |= true;
   }
 
