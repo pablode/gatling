@@ -143,7 +143,7 @@ namespace
     return false;
   }
 
-  mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc)
+  mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc, const char* name)
   {
     // Find renderable element.
     std::vector<mx::TypedElementPtr> renderableElements;
@@ -153,31 +153,57 @@ namespace
     mx::findRenderableElements(doc, renderableElements);
 #endif
 
+    // Find material in document that matches the name provided by USD
+    mx::NodePtr materialNode = nullptr;
+
+    GB_DEBUG("finding material {} in mtlx document", name);
     for (mx::TypedElementPtr elem : renderableElements)
     {
-      // Extract surface shader node.
-      mx::TypedElementPtr renderableElement = renderableElements.at(0);
-      mx::NodePtr node = renderableElement->asA<mx::Node>();
-
-      if (node && node->getType() == mx::MATERIAL_TYPE_STRING)
+      if (!elem)
       {
-        auto shaderNodes = mx::getShaderNodes(node, mx::SURFACE_SHADER_TYPE_STRING);
-        if (!shaderNodes.empty())
-        {
-          renderableElement = *shaderNodes.begin();
-        }
+        continue;
       }
 
-      mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
-      if (!surfaceElement)
+      mx::NodePtr node = elem->asA<mx::Node>();
+      if (!node || node->getType() != mx::MATERIAL_TYPE_STRING)
       {
-        return nullptr;
+        continue;
       }
 
-      return surfaceElement->asA<mx::TypedElement>();
+      if (node->getName() != name)
+      {
+        GB_DEBUG("> ignoring material mismatch {}", node->getName());
+        continue;
+      }
+
+      materialNode = node;
+      break;
     }
 
-    return nullptr;
+    if (!materialNode)
+    {
+      GB_WARN("material {} not found in MaterialX document", name);
+      return nullptr;
+    }
+
+    // Extract surface shader node
+    auto surfaceShaderNodes = mx::getShaderNodes(materialNode, mx::SURFACE_SHADER_TYPE_STRING);
+
+    mx::TypedElementPtr renderableElement = materialNode;
+    if (!surfaceShaderNodes.empty())
+    {
+      renderableElement = *surfaceShaderNodes.begin();
+    }
+
+    mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
+    if (!surfaceElement)
+    {
+      GB_WARN("could not find surface shader for material {}", name);
+      return nullptr;
+    }
+
+    GB_DEBUG("found surface shader {}", surfaceElement->getName());
+    return surfaceElement->asA<mx::TypedElement>();
   }
 }
 
@@ -214,7 +240,7 @@ namespace gtl
     m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customNodesPath);
   }
 
-  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
+  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
   {
     try
     {
@@ -222,7 +248,7 @@ namespace gtl
       doc->importLibrary(m_baseDoc);
       mx::readFromXmlString(doc, mtlxStr.data());
 
-      return translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
+      return translate(doc, name, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
     }
     catch (const std::exception& ex)
     {
@@ -231,7 +257,7 @@ namespace gtl
     }
   }
 
-  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
+  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -252,7 +278,7 @@ namespace gtl
         GB_LOG("MaterialX source: \n{}", mtlxSrc);
       }
 
-      mx::TypedElementPtr element = _FindSurfaceShaderElement(patchedDoc);
+      mx::TypedElementPtr element = _FindSurfaceShaderElement(patchedDoc, name);
       if (!element)
       {
         GB_ERROR("generation failed: surface shader not found");

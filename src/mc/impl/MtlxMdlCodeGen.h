@@ -34,8 +34,8 @@ namespace gtl
     explicit McMtlxMdlCodeGen(const MaterialX::DocumentPtr mtlxStdLib, const std::string& customNodesPath);
 
   public:
-    bool translate(const MaterialX::DocumentPtr mtlxDoc, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated);
-    bool translate(std::string_view mtlxStr, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated);
+    bool translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated);
+    bool translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated);
 
   private:
     MaterialX::FileSearchPath m_mtlxSearchPath;

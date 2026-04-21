@@ -680,7 +680,9 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMdlNetwork(GiScene* scene, const
   const std::string& fileUri = sdrNode->GetResolvedImplementationURI();
 
   GiMaterialParameters params = _TranslateMaterialParameters(node.parameters);
-  return giCreateMaterialFromMdlFile(scene, id.GetText(), fileUri.c_str(), subIdentifier.c_str(), params);
+  std::string name = id.GetName();
+
+  return giCreateMaterialFromMdlFile(scene, name.c_str(), fileUri.c_str(), subIdentifier.c_str(), params);
 }
 
 GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const
@@ -701,7 +703,8 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(GiScene* scene, cons
     return nullptr;
   }
 
-  return giCreateMaterialFromMtlxDoc(scene, id.GetText(), doc);
+  std::string name = id.GetName();
+  return giCreateMaterialFromMtlxDoc(scene, name.c_str(), doc);
 }
 
 mx::DocumentPtr MaterialNetworkCompiler::_CreateMaterialXDocumentFromNetwork(const SdfPath& id,

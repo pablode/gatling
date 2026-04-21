@@ -39,9 +39,9 @@ namespace gtl
                McRuntime& mdlRuntime);
 
   public:
-    McMaterial* createFromMtlxStr(std::string_view docStr);
+    McMaterial* createFromMtlxStr(std::string_view docStr, const char* name);
 
-    McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc);
+    McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc, const char* name);
 
     McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
 

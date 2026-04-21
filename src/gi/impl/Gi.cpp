@@ -517,7 +517,7 @@ fail:
 
   GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc)
   {
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc);
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc, name);
     if (!mcMat)
     {
       return nullptr;
@@ -544,7 +544,7 @@ fail:
       return nullptr;
     }
 
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc);
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc, name);
     if (!mcMat)
     {
       return nullptr;

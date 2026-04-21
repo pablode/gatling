@@ -180,13 +180,13 @@ namespace gtl
     m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib, customMtlxNodesPath);
   }
 
-  McMaterial* McFrontend::createFromMtlxStr(std::string_view docStr)
+  McMaterial* McFrontend::createFromMtlxStr(std::string_view docStr, const char* name)
   {
     std::string mdlSrc;
     std::string subIdentifier;
     bool hasCutoutTransparency;
     bool isAnimated;
-    if (!m_mtlxMdlCodeGen->translate(docStr, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
+    if (!m_mtlxMdlCodeGen->translate(docStr, name, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
     {
       return nullptr;
     }
@@ -194,13 +194,13 @@ namespace gtl
     return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
   }
 
-  McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc)
+  McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc, const char* name)
   {
     std::string mdlSrc;
     std::string subIdentifier;
     bool hasCutoutTransparency;
     bool isAnimated;
-    if (!m_mtlxMdlCodeGen->translate(doc, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
+    if (!m_mtlxMdlCodeGen->translate(doc, name, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
     {
       return nullptr;
     }
