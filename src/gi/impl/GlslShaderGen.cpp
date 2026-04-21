@@ -70,8 +70,11 @@ namespace gtl
   void _sgGenerateCommonDefines(GiGlslStitcher& stitcher,
                                 const GiGlslShaderGen::CommonShaderParams& params)
   {
-#if defined(NDEBUG)
+#ifdef NDEBUG
     stitcher.appendDefine("NDEBUG");
+#endif
+#ifdef __APPLE__
+    stitcher.appendDefine("METAL");
 #endif
     stitcher.appendDefine("AOV_MASK", (int) params.aovMask);
     if (params.debugPrintf)
