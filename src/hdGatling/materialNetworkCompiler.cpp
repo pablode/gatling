@@ -94,6 +94,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (ND_convert_vector3_color3)
   (ND_convert_float_color3)
   (ND_convert_float_vector3)
+  (ND_normalmap)
   (periodic)
   (srgb_texture)
   (lin_rec709)
@@ -430,6 +431,12 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
     auto mappingIt = _usdMtlxNodeTypeIdMappings.find(nodeTypeId);
     if (mappingIt == _usdMtlxNodeTypeIdMappings.end())
     {
+      // work around MaterialX 1.39 normalmap upgrade issue
+      if (nodeTypeId == _tokens->ND_normalmap)
+      {
+        continue;
+      }
+
       TF_WARN("Unable to translate material node of type %s to MaterialX counterpart", nodeTypeId.GetText());
       return false;
     }
