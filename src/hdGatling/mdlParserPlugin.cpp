@@ -80,7 +80,11 @@ const NdrTokenVec& HdGatlingMdlParserPlugin::GetDiscoveryTypes() const
 }
 #endif
 
+#if PXR_VERSION >= 2605
+const TfToken& HdGatlingMdlParserPlugin::GetShadingSystem() const
+#else
 const TfToken& HdGatlingMdlParserPlugin::GetSourceType() const
+#endif
 {
   return HdGatlingSourceTypes->mdl;
 }

@@ -34,7 +34,11 @@ public:
 
   const SdrTokenVec& GetDiscoveryTypes() const override;
 
+#if PXR_VERSION >= 2605
+  const TfToken& GetShadingSystem() const override;
+#else
   const TfToken& GetSourceType() const override;
+#endif
 };
 #else
 class HdGatlingMdlParserPlugin final : public NdrParserPlugin
