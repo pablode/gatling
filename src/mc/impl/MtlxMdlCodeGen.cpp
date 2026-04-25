@@ -38,24 +38,21 @@ namespace mx = MaterialX;
 
 namespace
 {
-  enum class OpacityEstimation
-  {
-    OPAQUE, TRANSPARENT, UNKNOWN
-  };
+  using namespace gtl;
 
-  OpacityEstimation _EstimateOpacityFromInput(mx::NodePtr node,
-                                              const std::string& category,
-                                              const std::string& inputName,
-                                              mx::ValuePtr defaultValue)
+  std::optional<McOpacityClassification> _EstimateNodeOpacityFromInput(mx::NodePtr node,
+                                                                       const std::string& category,
+                                                                       const std::string& inputName,
+                                                                       mx::ValuePtr defaultValue)
   {
     if (!node || node->getCategory() != category)
     {
-      return OpacityEstimation::UNKNOWN;
+      return std::nullopt;
     }
 
     if (node->getConnectedNode(inputName) != nullptr)
     {
-      return OpacityEstimation::TRANSPARENT; // custom logic hooked up
+      return McOpacityClassification::NonBinary; // custom logic hooked up
     }
 
     mx::ValuePtr inputValue = node->getInputValue(inputName);
@@ -63,21 +60,21 @@ namespace
 
     if (inputValue && inputValue->isA<float>() && defaultValue->isA<float>())
     {
-      return (fabs(inputValue->asA<float>() - defaultValue->asA<float>()) < floatEps) ? OpacityEstimation::OPAQUE : OpacityEstimation::TRANSPARENT;
+      return (fabs(inputValue->asA<float>() - defaultValue->asA<float>()) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
     }
 
     if (inputValue && inputValue->isA<mx::Color3>() && defaultValue->isA<mx::Color3>())
     {
       mx::Color3 diff = inputValue->asA<mx::Color3>() - defaultValue->asA<mx::Color3>();
-      return (fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps) ? OpacityEstimation::OPAQUE : OpacityEstimation::TRANSPARENT;
+      return (fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
     }
 
     if (inputValue && inputValue->isA<int>() && defaultValue->isA<int>())
     {
-      return (inputValue->asA<int>() == defaultValue->asA<int>()) ? OpacityEstimation::OPAQUE : OpacityEstimation::TRANSPARENT;
+      return (inputValue->asA<int>() == defaultValue->asA<int>()) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
     }
 
-    return OpacityEstimation::UNKNOWN;
+    return std::nullopt;
   }
 
   struct OpacityInputDescription
@@ -87,30 +84,50 @@ namespace
     mx::ValuePtr defaultValue;
   };
 
-  const static std::vector<OpacityInputDescription> OPACITY_INPUT_DESCRIPTIONS = {
+  const static std::vector<OpacityInputDescription> NONBINARY_OPACITY_INPUT_DESCRIPTIONS = {
     { "UsdPreviewSurface", "opacity", mx::Value::createValue(1.0f) },
     { "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f)) },
-    { "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* OPAQUE */) },
-    { "gltf_pbr", "alpha_mode", mx::Value::createValue(2 /* BLEND */) },
+    { "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* Opaque */) },
     { "open_pbr_surface", "geometry_opacity", mx::Value::createValue(1.0f) }
   };
 
-  bool _HasSurfaceShaderCutoutTransparency(mx::TypedElementPtr element)
+  McOpacityClassification _ClassifySurfaceShaderOpacity(mx::TypedElementPtr element)
   {
     mx::NodePtr node = element->asA<mx::Node>();
 
-    for (const auto& inputDesc : OPACITY_INPUT_DESCRIPTIONS)
+    // Detect alpha cutout
+    if (node->getCategory() == "UsdPreviewSurface")
     {
-      OpacityEstimation opacity = _EstimateOpacityFromInput(node, inputDesc.nodeCategory, inputDesc.inputName, inputDesc.defaultValue);
+      mx::ValuePtr inputValue = node->getInputValue("opacityThreshold");
 
-      if (opacity != OpacityEstimation::UNKNOWN)
+      if (inputValue && inputValue->isA<float>() && inputValue->asA<float>() > 0.0f)
       {
-        return opacity == OpacityEstimation::TRANSPARENT;
+        return McOpacityClassification::Cutout;
+      }
+    }
+    else if (node->getCategory() == "gltf_pbr")
+    {
+      mx::ValuePtr inputValue = node->getInputValue("alpha_mode");
+
+      if (inputValue && inputValue->isA<int>() && inputValue->asA<int>() == 1 /*MASK*/)
+      {
+        return McOpacityClassification::Cutout;
       }
     }
 
-    // Use MaterialX helper function as fallback (not accurate, has false positives)
-    return mx::isTransparentSurface(element);
+    // Otherwise decide between opaque and non-binary opacity
+    for (const auto& inputDesc : NONBINARY_OPACITY_INPUT_DESCRIPTIONS)
+    {
+      std::optional<McOpacityClassification> opacity = _EstimateNodeOpacityFromInput(node, inputDesc.nodeCategory, inputDesc.inputName, inputDesc.defaultValue);
+
+      if (opacity.has_value())
+      {
+        return *opacity;
+      }
+    }
+
+    // Use MaterialX helper function as fallback and assume worst case (not accurate, has false positives)
+    return mx::isTransparentSurface(element) ? McOpacityClassification::NonBinary : McOpacityClassification::Opaque;
   }
 
   bool _HasDocumentTimeNode(mx::DocumentPtr doc)
@@ -240,7 +257,7 @@ namespace gtl
     m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customNodesPath);
   }
 
-  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
+  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated)
   {
     try
     {
@@ -248,7 +265,7 @@ namespace gtl
       doc->importLibrary(m_baseDoc);
       mx::readFromXmlString(doc, mtlxStr.data());
 
-      return translate(doc, name, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
+      return translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated);
     }
     catch (const std::exception& ex)
     {
@@ -257,7 +274,7 @@ namespace gtl
     }
   }
 
-  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated)
+  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -286,7 +303,7 @@ namespace gtl
       }
 
       subIdentifier = element->getName();
-      hasCutoutTransparency = _HasSurfaceShaderCutoutTransparency(element);
+      opacityClass = _ClassifySurfaceShaderOpacity(element);
       isAnimated = _HasDocumentTimeNode(patchedDoc);
       shader = m_shaderGen->generate(subIdentifier, element, context);
     }

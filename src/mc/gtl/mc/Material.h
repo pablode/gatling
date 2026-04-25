@@ -25,13 +25,20 @@ namespace gtl
 {
   struct McMdlMaterial;
 
+  enum class McOpacityClassification
+  {
+    Opaque,
+    Cutout,
+    NonBinary
+  };
+
   struct McMaterial
   {
     bool hasBackfaceBsdf;
     bool hasBackfaceEdf;
     bool hasVolumeAbsorptionCoeff;
     bool hasVolumeScatteringCoeff;
-    bool hasCutoutTransparency;
+    McOpacityClassification opacityClass;
     bool isAnimated;
     bool isEmissive;
     bool isThinWalled;

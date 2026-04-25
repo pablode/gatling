@@ -9,8 +9,6 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64: require
 #extension GL_EXT_buffer_reference: require
 
-#include "colormap.glsl"
-
 #ifdef MAX_SCENE_DATA_ID
 #include "mdl_renderer_state.glsl"
 #define RENDERER_STATE_TYPE mdl_renderer_state
@@ -39,13 +37,13 @@ void main()
   bool isFrontFace;
   setup_mdl_shading_state(hit_bc, shading_state, isFrontFace);
 
-  float opacity = mdl_cutout_opacity(shading_state);
+  float opacity = mdl_opacity(shading_state);
 
 #ifndef SHADOW_TEST
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
   uint imageWidth = ubo.imageDims & 0xFFFFu;
   uint pixelIndex = rayPayload.pixelIndex;
-  OpacityAov[pixelIndex] = (opacity == 0.0) ? vec3(1.0) : colormap_viridis(opacity);
+  OpacityAov[pixelIndex] = mix(vec3(1.0), vec3(0.0,1.0,1.0), opacity);
 #endif
 #endif
 

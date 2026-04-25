@@ -29,6 +29,8 @@
 
 namespace
 {
+  using namespace gtl;
+
   bool _IsExpressionBlackColor(mi::base::Handle<const mi::neuraylib::IExpression> expr)
   {
     if (expr->get_kind() != mi::neuraylib::IExpression::Kind::EK_CONSTANT)
@@ -95,10 +97,25 @@ namespace
     return !value || value->get_value();
   }
 
-  bool _HasCompiledMaterialCutoutTransparency(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
+  McOpacityClassification _GetCompiledMaterialOpacityClass(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
   {
-    float opacity = -1.0;
-    return !compiledMaterial->get_cutout_opacity(&opacity) || opacity < 1.0f;
+    float cutoutOpacity = -1.0;
+    if (compiledMaterial->get_cutout_opacity(&cutoutOpacity) && cutoutOpacity < 1.0f)
+    {
+      return McOpacityClassification::Cutout;
+    }
+
+    // claims to check for transmissive BSDF.. but never seems to return opaque :(
+    // FIXME: if this works reliably in the future we can get rid of the MaterialX heuristics
+    mi::neuraylib::Material_opacity surfaceOpacity = compiledMaterial->get_surface_opacity();
+
+    if (surfaceOpacity == mi::neuraylib::OPACITY_OPAQUE)
+    {
+      return McOpacityClassification::Opaque;
+    }
+
+    // case TRANSPARENT and UNKNOWN (need to assume worst case)
+    return McOpacityClassification::NonBinary;
   }
 
   bool _HasCompiledMaterialBackfaceBsdf(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
@@ -184,28 +201,28 @@ namespace gtl
   {
     std::string mdlSrc;
     std::string subIdentifier;
-    bool hasCutoutTransparency;
+    McOpacityClassification opacityClass;
     bool isAnimated;
-    if (!m_mtlxMdlCodeGen->translate(docStr, name, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
+    if (!m_mtlxMdlCodeGen->translate(docStr, name, mdlSrc, subIdentifier, opacityClass, isAnimated))
     {
       return nullptr;
     }
 
-    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
+    return createFromMdlStr(mdlSrc, subIdentifier, opacityClass, isAnimated);
   }
 
   McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc, const char* name)
   {
     std::string mdlSrc;
     std::string subIdentifier;
-    bool hasCutoutTransparency;
+    McOpacityClassification opacityClass;
     bool isAnimated;
-    if (!m_mtlxMdlCodeGen->translate(doc, name, mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated))
+    if (!m_mtlxMdlCodeGen->translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated))
     {
       return nullptr;
     }
 
-    return createFromMdlStr(mdlSrc, subIdentifier, hasCutoutTransparency, isAnimated);
+    return createFromMdlStr(mdlSrc, subIdentifier, opacityClass, isAnimated);
   }
 
   McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& params)
@@ -227,7 +244,7 @@ namespace gtl
       .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
-      .hasCutoutTransparency = _HasCompiledMaterialCutoutTransparency(compiledMaterial),
+      .opacityClass = _GetCompiledMaterialOpacityClass(compiledMaterial),
       .isAnimated = false, // don't support animated MDL files.. might introduce automatic detection later
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),
@@ -239,7 +256,7 @@ namespace gtl
     };
   }
 
-  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency, bool isAnimated)
+  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, McOpacityClassification opacityClass, bool isAnimated)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
     if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
@@ -255,7 +272,7 @@ namespace gtl
       .hasBackfaceEdf = _HasCompiledMaterialBackfaceEdf(compiledMaterial),
       .hasVolumeAbsorptionCoeff = _HasCompiledMaterialVolumeAbsorptionCoefficient(compiledMaterial),
       .hasVolumeScatteringCoeff = _HasCompiledMaterialVolumeScatteringCoefficient(compiledMaterial),
-      .hasCutoutTransparency = hasCutoutTransparency,
+      .opacityClass = opacityClass,
       .isAnimated = isAnimated,
       .isEmissive = _IsCompiledMaterialEmissive(compiledMaterial),
       .isThinWalled = _IsCompiledMaterialThinWalled(compiledMaterial),

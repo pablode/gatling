@@ -239,7 +239,7 @@ namespace gtl
       { McDf::ThinWalled, "mdl_thin_walled" },
       { McDf::VolumeAbsorption, "mdl_volume_absorption_coefficient" },
       { McDf::VolumeScattering, "mdl_volume_scattering_coefficient" },
-      { McDf::CutoutOpacity, "mdl_cutout_opacity" },
+      { McDf::Opacity, "mdl_opacity" },
       { McDf::Ior, "mdl_ior" },
       { McDf::BackfaceScattering, "mdl_backface_bsdf_scattering" },
       { McDf::BackfaceEmission, "mdl_backface_edf_emission" },
@@ -295,9 +295,9 @@ namespace gtl
     {
       stitcher.appendDefine("IS_EMISSIVE");
     }
-    if (params.hasCutoutTransparency)
+    if (params.evaluateOpacity)
     {
-      stitcher.appendDefine("HAS_CUTOUT_TRANSPARENCY");
+      stitcher.appendDefine("EVALUATE_OPACITY");
     }
     if (params.isThinWalled)
     {
@@ -318,7 +318,7 @@ namespace gtl
       return false;
     }
 
-    stitcher.replaceFirst("#pragma mdl_generated_code", params.shadingGlsl);
+    stitcher.replaceFirst("#pragma mdl_generated_code", params.dfGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::ClosestHit, source, spv);
@@ -357,7 +357,7 @@ namespace gtl
       return false;
     }
 
-    stitcher.replaceFirst("#pragma mdl_generated_code", params.opacityEvalGlsl);
+    stitcher.replaceFirst("#pragma mdl_generated_code", params.dfGlsl);
 
     std::string source = stitcher.source();
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::AnyHit, source, spv);

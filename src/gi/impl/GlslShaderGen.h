@@ -96,7 +96,7 @@ namespace gtl
       BuiltinSceneDataIndices builtinSceneDataIndices;
       bool hasBackfaceBsdf;
       bool hasBackfaceEdf;
-      bool hasCutoutTransparency;
+      bool evaluateOpacity;
       bool hasVolumeAbsorptionCoeff;
       bool hasVolumeScatteringCoeff;
       bool isAnimated;
@@ -104,7 +104,7 @@ namespace gtl
       bool isThinWalled;
       bool nextEventEstimation;
       uint32_t maxSceneDataId;
-      std::string_view shadingGlsl;
+      std::string_view dfGlsl;
       uint32_t textureIndexOffset;
     };
 
@@ -114,7 +114,7 @@ namespace gtl
       CommonShaderParams commonParams;
       bool enableSceneTransforms;
       BuiltinSceneDataIndices builtinSceneDataIndices;
-      std::string_view opacityEvalGlsl;
+      std::string_view dfGlsl;
       uint32_t maxSceneDataId;
       bool shadowTest;
       uint32_t textureIndexOffset;

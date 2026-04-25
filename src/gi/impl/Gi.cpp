@@ -735,7 +735,7 @@ fail:
     if (oldMcMat && newMcMat)
     {
       // material data such as alpha is used in the BVH build
-      transparencyChanged |= (newMcMat->hasCutoutTransparency != oldMcMat->hasCutoutTransparency);
+      transparencyChanged |= (newMcMat->opacityClass != oldMcMat->opacityClass);
 
       const auto& newPrimvarNames = newMcMat->sceneDataNames;
       const auto& oldPrimvarNames = oldMcMat->sceneDataNames;
@@ -1140,13 +1140,14 @@ fail:
         // Build BLAS
         {
           const GiMaterial* material = shaderCache->materials[materialIndex];
+          bool isOpaque = (material->mcMat->opacityClass != McOpacityClassification::Cutout); // does not require any-hit invocation
 
           bool blasCreated = cgpuCreateBlas(s_ctx, {
                                               .vertexPosBuffer = tmpPositionBuffer,
                                               .indexBuffer = tmpIndexBuffer,
                                               .maxVertex = (uint32_t) positionData.size(),
                                               .triangleCount = (uint32_t) indexData.size() / 3,
-                                              .isOpaque = !material->mcMat->hasCutoutTransparency,
+                                              .isOpaque = isOpaque,
                                               .debugName = mesh->name.c_str()
                                             }, &blas);
 
@@ -1483,7 +1484,7 @@ cleanup:
         groupInfo.material = material;
         groupInfo.genInfo = genInfo;
 
-        if (material->mcMat->hasCutoutTransparency)
+        if (material->mcMat->opacityClass == McOpacityClassification::Cutout)
         {
           groupInfo.anyHitInfo = HitShaderCompInfo{};
         }
@@ -1556,6 +1557,8 @@ cleanup:
 
         // Closest hit
         {
+          bool evaluateOpacity = (mcMat->opacityClass == McOpacityClassification::NonBinary);
+
           GiGlslShaderGen::ClosestHitShaderParams hitParams = {
             .baseFileName = "rp_main.chit",
             .commonParams = commonParams,
@@ -1564,7 +1567,7 @@ cleanup:
             .builtinSceneDataIndices = compInfo.genInfo.builtinSceneDataIndices,
             .hasBackfaceBsdf = mcMat->hasBackfaceBsdf,
             .hasBackfaceEdf = mcMat->hasBackfaceEdf,
-            .hasCutoutTransparency = mcMat->hasCutoutTransparency,
+            .evaluateOpacity = evaluateOpacity,
             .hasVolumeAbsorptionCoeff = mcMat->hasVolumeAbsorptionCoeff,
             .hasVolumeScatteringCoeff = mcMat->hasVolumeScatteringCoeff,
             .isAnimated = mcMat->isAnimated,
@@ -1572,7 +1575,7 @@ cleanup:
             .isThinWalled = mcMat->isThinWalled,
             .nextEventEstimation = renderSettings.nextEventEstimation,
             .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
-            .shadingGlsl = compInfo.genInfo.glslSource,
+            .dfGlsl = compInfo.genInfo.glslSource,
             .textureIndexOffset = texOffset
           };
 
@@ -1583,6 +1586,8 @@ cleanup:
           }
         }
 
+        assert(!compInfo.anyHitInfo || mcMat->opacityClass == McOpacityClassification::Cutout);
+
         // Any hit
         if (compInfo.anyHitInfo)
         {
@@ -1591,7 +1596,7 @@ cleanup:
             .commonParams = commonParams,
             .enableSceneTransforms = mcMat->requiresSceneTransforms,
             .builtinSceneDataIndices = compInfo.genInfo.builtinSceneDataIndices,
-            .opacityEvalGlsl = compInfo.genInfo.glslSource,
+            .dfGlsl = compInfo.genInfo.glslSource,
             .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .textureIndexOffset = texOffset,
             .isAnimated = mcMat->isAnimated

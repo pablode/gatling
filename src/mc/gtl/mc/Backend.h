@@ -57,7 +57,7 @@ namespace gtl
     ThinWalled,
     VolumeAbsorption,
     VolumeScattering,
-    CutoutOpacity,
+    Opacity,
     Ior,
     BackfaceScattering,
     BackfaceEmission,

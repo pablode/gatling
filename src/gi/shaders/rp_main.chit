@@ -19,6 +19,7 @@
 #include "mdl_interface.glsl"
 #include "mdl_shading_state.glsl"
 #include "rp_main_payload.glsl"
+#include "colormap.glsl"
 
 #pragma mdl_generated_code
 
@@ -131,13 +132,12 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
 void main()
 {
-    /* 1. Get hit info. */
+    /* 1. Set up shading state. */
     vec2 hit_bc = baryCoord;
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
     bool isLeftHanded = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_FLIP_FACING) != 0);
     bool isDoubleSided = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED) != 0);
 
-    /* 2. Set up shading state. */
     State shading_state; // Shading_state_material
     bool isFrontFace;
     setup_mdl_shading_state(hit_bc, shading_state, isFrontFace);
@@ -146,10 +146,47 @@ void main()
     // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
     const vec3 normal = shading_state.normal;
 
+    uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
+
+    /* 2. Evaluate non-cutout opacity */
+#ifdef EVALUATE_OPACITY
+
+#ifdef RAND_4D
+    float xiOpacity = rng4d_next4f(rayPayload.rng_state).x;
+#else
+    float xiOpacity = rng1d_next1f(rayPayload.rng_state);
+#endif
+
+    float opacity = mdl_opacity(shading_state);
+
+    bool ignoreHit = xiOpacity > opacity;
+
+#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
+    if (bounce == 0)
+    {
+      OpacityAov[rayPayload.pixelIndex] = colormap_viridis(opacity);
+    }
+#endif
+
+    if (ignoreHit)
+    {
+      const float RAY_EPS = 1e-4;
+      rayPayload.ray_origin = shading_state.position + rayPayload.ray_dir * RAY_EPS;
+      return;
+    }
+
+#else
+#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
+    if (bounce == 0)
+    {
+      OpacityAov[rayPayload.pixelIndex] = vec3(1.0, 0.0, 1.0); // magenta == solid opaque
+    }
+#endif
+#endif
+
+    /* 3. Apply volume attenuation */
     vec3 throughput = vec3(rayPayload.throughput);
     vec3 radiance = vec3(rayPayload.radiance);
-
-    uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
     uint mediumIdx = shadeRayPayloadGetMediumIdx(rayPayload);
 
     bool thinWalled = false;
@@ -157,7 +194,6 @@ void main()
     thinWalled = mdl_thin_walled(shading_state);
 #endif
 
-    /* 3. Apply volume attenuation */
     vec3 prevMediumIor = vec3(1.0);
     vec3 nextMediumIor = vec3(1.0);
 
@@ -195,15 +231,7 @@ void main()
         IndexBuffer indices = IndexBuffer(payload.bufferAddress);
         BlasPayloadBufferPreamble preamble = indices.preamble;
 #endif
-        uint imageWidth = ubo.imageDims & 0xFFFFu;
         uint pixelIndex = rayPayload.pixelIndex;
-#if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-#ifndef HAS_CUTOUT_TRANSPARENCY
-        OpacityAov[pixelIndex] = vec3(1.0, 0.0, 0.0); // Distinct from viridis heatmap set in any-hit shader
-#else
-        // Payload fields have been set in any-hit shader.
-#endif
-#endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
         TangentsAov[pixelIndex] = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
 #endif

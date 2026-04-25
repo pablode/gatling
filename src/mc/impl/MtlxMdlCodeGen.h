@@ -24,6 +24,8 @@
 #include <MaterialXFormat/File.h>
 #include <MaterialXGenShader/ShaderGenerator.h>
 
+#include "Material.h"
+
 namespace gtl
 {
   class McMtlxDocumentPatcher;
@@ -34,8 +36,8 @@ namespace gtl
     explicit McMtlxMdlCodeGen(const MaterialX::DocumentPtr mtlxStdLib, const std::string& customNodesPath);
 
   public:
-    bool translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated);
-    bool translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, bool& hasCutoutTransparency, bool& isAnimated);
+    bool translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated);
+    bool translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated);
 
   private:
     MaterialX::FileSearchPath m_mtlxSearchPath;

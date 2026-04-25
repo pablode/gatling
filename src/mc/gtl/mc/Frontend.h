@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include "Material.h"
 #include "MaterialParameters.h"
 
 namespace gtl
@@ -46,7 +47,7 @@ namespace gtl
     McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
 
   private:
-    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, bool hasCutoutTransparency, bool isAnimated);
+    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, McOpacityClassification opacityClass, bool isAnimated);
 
   private:
     std::shared_ptr<McMdlMaterialCompiler> m_mdlMaterialCompiler;
