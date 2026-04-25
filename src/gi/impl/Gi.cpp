@@ -958,7 +958,12 @@ fail:
               break;
             }
 
-            assert(index != -1);
+            if (index == -1)
+            {
+              // Apparently this can happen when scene data usage is optimized away
+              GB_DEBUG("> no string constant found for {}:{}", material->name, sceneDataName);
+              continue;
+            }
 
             if (!primvar)
             {
