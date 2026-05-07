@@ -10,7 +10,6 @@
 #ifdef REORDER_INVOCATIONS
 #extension GL_NV_shader_invocation_reorder: require
 // For hit shader invocation reordering hint
-#extension GL_EXT_buffer_reference: require
 #extension GL_EXT_buffer_reference_uvec2: require
 #endif
 
