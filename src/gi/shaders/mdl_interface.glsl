@@ -255,8 +255,6 @@ vec3 mdl_adapt_normal(State state, vec3 normal)
     return new_normal;
 }
 
-#endif
-
 // Buffer references to read different data types
 layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefInt { int data[]; };
 layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefFloat { float data[]; };
@@ -477,3 +475,5 @@ mat4 scene_data_lookup_float4x4(inout State state, int scene_data_id, mat4 defau
 {
     return default_value; // TODO: not implemented
 }
+
+#endif
