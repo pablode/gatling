@@ -530,9 +530,9 @@ bool _ConvertUsdNodesToMtlxNodes(HdMaterialNetwork2& network)
   return true;
 }
 
-bool _GetMaterialNetworkSurfaceTerminal(const HdMaterialNetwork2& network2, HdMaterialNode2& terminalNode, SdfPath& terminalPath)
+bool _GetMaterialNetworkTerminal(const HdMaterialNetwork2& network2, TfToken terminal, HdMaterialNode2& terminalNode, SdfPath& terminalPath)
 {
-  const auto& connectionIt = network2.terminals.find(HdMaterialTerminalTokens->surface);
+  const auto& connectionIt = network2.terminals.find(terminal);
 
   if (connectionIt == network2.terminals.end())
   {
@@ -719,31 +719,20 @@ mx::DocumentPtr MaterialNetworkCompiler::_CreateMaterialXDocumentFromNetwork(con
 {
   HdMaterialNode2 terminalNode;
   SdfPath terminalPath;
-  if (!_GetMaterialNetworkSurfaceTerminal(network, terminalNode, terminalPath))
+  if (!_GetMaterialNetworkTerminal(network, HdMaterialTerminalTokens->surface, terminalNode, terminalPath))
   {
     TF_WARN("Unable to find surface terminal for material network");
     return nullptr;
   }
 
-#if PXR_VERSION >= 2211
   HdMtlxTexturePrimvarData mxHdData;
-#else
-  std::set<SdfPath> hdTextureNodes;
-  mx::StringMap mxHdTextureMap;
-#endif
-
   return HdMtlxCreateMtlxDocumentFromHdNetwork(
     network,
     terminalNode,
     terminalPath,
     id,
     _mtlxStdLib,
-#if PXR_VERSION >= 2211
     &mxHdData
-#else
-    &hdTextureNodes,
-    &mxHdTextureMap
-#endif
   );
 }
 
