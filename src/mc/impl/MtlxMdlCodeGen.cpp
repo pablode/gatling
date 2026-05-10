@@ -162,46 +162,17 @@ namespace
 
   mx::TypedElementPtr _FindSurfaceShaderElement(mx::DocumentPtr doc, const char* name)
   {
-    // Find renderable element.
-    std::vector<mx::TypedElementPtr> renderableElements;
-#if MATERIALX_VERSION > 13807
-    renderableElements = mx::findRenderableElements(doc);
-#else
-    mx::findRenderableElements(doc, renderableElements);
-#endif
+    // Find material in document
+    auto materialNodes = doc->getMaterialNodes();
 
-    // Find material in document that matches the name provided by USD
-    mx::NodePtr materialNode = nullptr;
-
-    GB_DEBUG("finding material {} in mtlx document", name);
-    for (mx::TypedElementPtr elem : renderableElements)
+    if (materialNodes.size() != 1)
     {
-      if (!elem)
-      {
-        continue;
-      }
-
-      mx::NodePtr node = elem->asA<mx::Node>();
-      if (!node || node->getType() != mx::MATERIAL_TYPE_STRING)
-      {
-        continue;
-      }
-
-      if (node->getName() != name)
-      {
-        GB_DEBUG("> ignoring material mismatch {}", node->getName());
-        continue;
-      }
-
-      materialNode = node;
-      break;
-    }
-
-    if (!materialNode)
-    {
-      GB_WARN("material {} not found in MaterialX document", name);
+      // HdMtlx generates a new document for each material; there should be a single material
+      GB_ERROR("unexpected material count in mtlx document for material {}", name);
       return nullptr;
     }
+
+    mx::NodePtr materialNode = materialNodes[0];
 
     // Extract surface shader node
     auto surfaceShaderNodes = mx::getShaderNodes(materialNode, mx::SURFACE_SHADER_TYPE_STRING);
@@ -210,6 +181,11 @@ namespace
     if (!surfaceShaderNodes.empty())
     {
       renderableElement = *surfaceShaderNodes.begin();
+
+      if (surfaceShaderNodes.size() > 1)
+      {
+        GB_WARN("found multiple surface shaders for material {}; choosing first", name);
+      }
     }
 
     mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
@@ -219,7 +195,7 @@ namespace
       return nullptr;
     }
 
-    GB_DEBUG("found surface shader {}", surfaceElement->getName());
+    GB_DEBUG("found surface shader: {}", surfaceElement->getName());
     return surfaceElement->asA<mx::TypedElement>();
   }
 }
