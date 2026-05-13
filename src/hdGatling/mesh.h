@@ -52,9 +52,9 @@ protected:
                  HdDirtyBits *dirtyBits) override;
 
 private:
-  void _AnalyzePrimvars(HdSceneDelegate* sceneDelegate,
-                        bool& foundNormals,
-                        bool& indexingAllowed);
+  void _AnalyzeBuiltinPrimvars(HdSceneDelegate* sceneDelegate,
+                               bool& foundNormals,
+                               bool& indexingAllowed);
 
   struct ProcessedPrimvar
   {

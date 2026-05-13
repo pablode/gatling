@@ -426,7 +426,8 @@ namespace
 
   bool _IsPrimvarEligibleForVertexData(const TfToken& name, const TfToken& role)
   {
-    if (name == HdTokens->normals ||
+    if (name == HdTokens->points ||
+        name == HdTokens->normals ||
         name == _tokens->tangents ||
         name == _tokens->bitangentSigns ||
         role == HdPrimvarRoleTokens->textureCoordinate)
@@ -608,10 +609,9 @@ void HdGatlingMesh::Sync(HdSceneDelegate* sceneDelegate,
   *dirtyBits = HdChangeTracker::Clean;
 }
 
-
-void HdGatlingMesh::_AnalyzePrimvars(HdSceneDelegate* sceneDelegate,
-                                     bool& foundNormals,
-                                     bool& indexingAllowed)
+void HdGatlingMesh::_AnalyzeBuiltinPrimvars(HdSceneDelegate* sceneDelegate,
+                                            bool& foundNormals,
+                                            bool& indexingAllowed)
 {
   const SdfPath& id = GetId();
 
@@ -631,9 +631,10 @@ void HdGatlingMesh::_AnalyzePrimvars(HdSceneDelegate* sceneDelegate,
         continue;
       }
 
-      if (primvar.interpolation == HdInterpolationFaceVarying)
+      // if a shared vertex can have more than one value, we can't use indexing.
+      if (primvar.interpolation == HdInterpolationFaceVarying || primvar.interpolation == HdInterpolationUniform)
       {
-        indexingAllowed = false;
+        indexingAllowed &= !_IsPrimvarEligibleForVertexData(primvar.name, primvar.role);
       }
 
       if (primvar.name == HdTokens->normals)
@@ -685,8 +686,6 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   }
   else if (primvarDesc.interpolation == HdInterpolationFaceVarying)
   {
-    TF_AXIOM(!indexingAllowed);
-
     HdMeshTopology topology = GetMeshTopology(sceneDelegate);
     HdMeshUtil meshUtil(&topology, id);
 #if PXR_VERSION >= 2511
@@ -892,7 +891,7 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
   // Analyze primvars
   bool foundNormals;
   bool useIndexing;
-  _AnalyzePrimvars(sceneDelegate, foundNormals, useIndexing);
+  _AnalyzeBuiltinPrimvars(sceneDelegate, foundNormals, useIndexing);
 
   // Generate fallback normals on original points
   VtVec3fArray normals;
