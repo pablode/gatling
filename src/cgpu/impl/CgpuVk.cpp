@@ -268,11 +268,8 @@ namespace gtl
     return false;              \
   } while (false)
 
-#define CGPU_FATAL(msg)  \
-  do {                   \
-    CGPU_LOG_ERROR(msg); \
-    exit(EXIT_FAILURE);  \
-  } while (false)
+#define CGPU_VK_CHK(X, E)    \
+  do { GB_EXPECT(X == VK_SUCCESS, E); } while (false)
 
 #define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)                            \
   CGPU_INLINE static bool cgpuResolve##RESOURCE_NAME(CgpuContext* ctx, HANDLE_TYPE handle, IRESOURCE_TYPE** idata) \
@@ -293,8 +290,8 @@ namespace gtl
 
 #define CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, ITYPE, RESOLVE_FUNC) \
   ITYPE* VAR_NAME;                                                       \
-  if (!RESOLVE_FUNC(CTX, HANDLE, &VAR_NAME)) [[unlikely]] {                   \
-    CGPU_FATAL("invalid handle!");                                       \
+  if (!RESOLVE_FUNC(CTX, HANDLE, &VAR_NAME)) [[unlikely]] {              \
+    GB_FATAL("invalid handle!");                                         \
   }
 
 #define CGPU_RESOLVE_BUFFER(CTX, HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBuffer, cgpuResolveBuffer)
@@ -1386,10 +1383,7 @@ namespace gtl
                                                             nullptr,
                                                             pipelineLayout);
 
-    if (result != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to create pipeline layout");
-    }
+    CGPU_VK_CHK(result, "failed to create pipeline layout");
   }
 
   static void cgpuCreatePipelineDescriptorSet(CgpuIDevice* idevice,
@@ -1454,10 +1448,7 @@ namespace gtl
       &descriptorSetLayout
     );
 
-    if (result != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to create descriptor set layout");
-    }
+    CGPU_VK_CHK(result, "failed to create descriptor set layout");
   }
 
   static void cgpuCreatePipelineDescriptorSets(CgpuIDevice* idevice,
@@ -1472,10 +1463,7 @@ namespace gtl
     const std::vector<CgpuShaderReflectionDescriptorSet>& descriptorSets = shaderReflection->descriptorSets;
 
     descriptorSetCount = uint32_t(descriptorSets.size());
-    if (descriptorSetCount >= CGPU_MAX_DESCRIPTOR_SET_COUNT)
-    {
-      CGPU_FATAL("max descriptor set count exceeded");
-    }
+    GB_EXPECT(descriptorSetCount < CGPU_MAX_DESCRIPTOR_SET_COUNT, "max descriptor set count exceeded");
 
     for (uint32_t i = 0; i < descriptorSetCount; i++)
     {
@@ -1540,16 +1528,17 @@ namespace gtl
       .basePipelineIndex = -1
     };
 
-    if (idevice->table.vkCreateRayTracingPipelinesKHR(idevice->logicalDevice,
-                                                      VK_NULL_HANDLE,
-                                                      idevice->pipelineCache,
-                                                      1,
-                                                      &rtPipelineCreateInfo,
-                                                      nullptr,
-                                                      &library.pipeline) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to create RT pipeline library");
-    }
+    VkResult result = idevice->table.vkCreateRayTracingPipelinesKHR(
+        idevice->logicalDevice,
+        VK_NULL_HANDLE,
+        idevice->pipelineCache,
+        1,
+        &rtPipelineCreateInfo,
+        nullptr,
+        &library.pipeline
+    );
+
+    CGPU_VK_CHK(result, "failed to create RT pipeline library");
   }
 
   static void cgpuCreateShader(CgpuContext* ctx,
@@ -1562,7 +1551,7 @@ namespace gtl
 
     if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
     {
-      CGPU_FATAL("failed to reflect shader");
+      GB_FATAL("failed to reflect shader");
     }
 
 #ifndef NDEBUG
@@ -1592,10 +1581,7 @@ namespace gtl
         &ishader->module
       );
 
-      if (result != VK_SUCCESS)
-      {
-        CGPU_FATAL("failed to create shader module");
-      }
+      CGPU_VK_CHK(result, "failed to create shader module");
 
       if (ctx->debugUtilsEnabled && createInfo.debugName)
       {
@@ -2066,7 +2052,7 @@ namespace gtl
         case VK_DESCRIPTOR_TYPE_SAMPLER: samplerCount += binding->count; break;
         case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: asCount += binding->count; break;
         default: {
-          CGPU_FATAL("invalid descriptor type");
+          GB_FATAL("invalid descriptor type");
         }
         }
       }
@@ -2128,10 +2114,7 @@ namespace gtl
       nullptr,
       &ipipeline->descriptorPool
     );
-    if (result != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to create descriptor pool");
-    }
+    CGPU_VK_CHK(result, "failed to create descriptor pool");
   }
 
   void cgpuCreateComputePipeline(CgpuContext* ctx,
@@ -2179,10 +2162,7 @@ namespace gtl
       &ipipeline->pipeline
     );
 
-    if (result != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to create compute pipeline");
-    }
+    CGPU_VK_CHK(result, "failed to create compute pipeline");
 
     if (ctx->debugUtilsEnabled && createInfo.debugName)
     {
@@ -2271,10 +2251,15 @@ namespace gtl
     uint32_t dataSize = handleSize * groupCount;
 
     std::vector<uint8_t> handleData(dataSize);
-    if (idevice->table.vkGetRayTracingShaderGroupHandlesKHR(idevice->logicalDevice, ipipeline->pipeline, firstGroup, groupCount, handleData.size(), handleData.data()) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to create sbt handles");
-    }
+    VkResult result = idevice->table.vkGetRayTracingShaderGroupHandlesKHR(
+      idevice->logicalDevice,
+      ipipeline->pipeline,
+      firstGroup,
+      groupCount,
+      handleData.size(),
+      handleData.data()
+    );
+    CGPU_VK_CHK(result, "failed to create sbt handles");
 
     VkDeviceSize sbtSize = ipipeline->sbtRgen.size + ipipeline->sbtMiss.size + ipipeline->sbtHit.size;
 
@@ -2288,7 +2273,7 @@ namespace gtl
 
     if (!cgpuCreateBuffer(ctx, sbtCreateInfo, &ipipeline->sbt))
     {
-      CGPU_FATAL("failed to create sbt buffer");
+      GB_FATAL("failed to create sbt buffer");
     }
 
     CGPU_RESOLVE_BUFFER(ctx, ipipeline->sbt, isbt);
@@ -2325,7 +2310,7 @@ namespace gtl
 
     if (!cgpuCopyMemoryToBuffer(ctx, &sbtMem[0], sbtSize, ipipeline->sbt))
     {
-      CGPU_FATAL("failed to copy to sbt buffer");
+      GB_FATAL("failed to copy to sbt buffer");
     }
   }
 
@@ -2513,16 +2498,16 @@ namespace gtl
         .basePipelineIndex = -1
       };
 
-      if (idevice->table.vkCreateRayTracingPipelinesKHR(idevice->logicalDevice,
-                                                        VK_NULL_HANDLE,
-                                                        idevice->pipelineCache,
-                                                        1,
-                                                        &rtPipelineCreateInfo,
-                                                        nullptr,
-                                                        &ipipeline->pipeline) != VK_SUCCESS)
-      {
-        CGPU_FATAL("failed to create RT pipeline");
-      }
+      VkResult result = idevice->table.vkCreateRayTracingPipelinesKHR(
+        idevice->logicalDevice,
+        VK_NULL_HANDLE,
+        idevice->pipelineCache,
+        1,
+        &rtPipelineCreateInfo,
+        nullptr,
+        &ipipeline->pipeline
+      );
+      CGPU_VK_CHK(result, "failed to create RT pipeline");
 
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
@@ -2788,7 +2773,7 @@ namespace gtl
       uint8_t* mapped_mem;
       if (vmaMapMemory(idevice->allocator, instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
       {
-        CGPU_FATAL("failed to map buffer memory");
+        GB_FATAL("failed to map buffer memory");
       }
 
       for (uint32_t i = 0; i < createInfo.instanceCount; i++)
@@ -2797,10 +2782,7 @@ namespace gtl
         CGPU_RESOLVE_BLAS(ctx, instanceDesc.as, iblas);
 
         uint32_t instanceCustomIndex = instanceDesc.instanceCustomIndex;
-        if ((instanceCustomIndex & 0xFF000000u) != 0u)
-        {
-          CGPU_FATAL("instanceCustomIndex must be equal to or smaller than 2^24");
-        }
+        GB_EXPECT((instanceCustomIndex & 0xFF000000u) == 0u, "instanceCustomIndex must be equal to or smaller than 2^24");
 
         VkGeometryInstanceFlagsKHR flags = 0;
         if (instanceDesc.cullMode == CgpuCullMode::None)
@@ -2890,10 +2872,7 @@ namespace gtl
     CgpuIDevice* idevice = &ctx->idevice;
     CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
 
-    if (ipipeline->descriptorSetCount != bindSetCount)
-    {
-      CGPU_FATAL("descriptor set count mismatch");
-    }
+    GB_EXPECT(ipipeline->descriptorSetCount == bindSetCount, "descriptor set count mismatch");
 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
@@ -2910,11 +2889,7 @@ namespace gtl
       &descriptorSetAllocateInfo,
       descriptorSets
     );
-
-    if (result != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to allocate descriptor set");
-    }
+    CGPU_VK_CHK(result, "failed to allocate descriptor set");
 
     for (uint32_t i = 0; i < bindSetCount; i++)
     {
@@ -2993,10 +2968,7 @@ namespace gtl
             continue;
           }
 
-          if (bufferBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
+          GB_EXPECT(bufferBinding->index < layoutBinding->descriptorCount, "descriptor binding out of range");
 
           CGPU_RESOLVE_BUFFER(ctx, bufferBinding->buffer, ibuffer);
 
@@ -3023,10 +2995,7 @@ namespace gtl
             continue;
           }
 
-          if (imageBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
+          GB_EXPECT(imageBinding->index < layoutBinding->descriptorCount, "descriptor binding out of range");
 
           CGPU_RESOLVE_IMAGE(ctx, imageBinding->image, iimage);
 
@@ -3054,10 +3023,7 @@ namespace gtl
             continue;
           }
 
-          if (samplerBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
+          GB_EXPECT(samplerBinding->index < layoutBinding->descriptorCount, "descriptor binding out of range");
 
           CGPU_RESOLVE_SAMPLER(ctx, samplerBinding->sampler, isampler);
 
@@ -3083,10 +3049,7 @@ namespace gtl
             continue;
           }
 
-          if (asBinding->index >= layoutBinding->descriptorCount)
-          {
-            CGPU_FATAL("descriptor binding out of range");
-          }
+          GB_EXPECT(asBinding->index < layoutBinding->descriptorCount, "descriptor binding out of range");
 
           CGPU_RESOLVE_TLAS(ctx, asBinding->as, itlas);
 
@@ -3129,12 +3092,12 @@ namespace gtl
       .commandBufferCount = 1,
     };
 
-    if (idevice->table.vkAllocateCommandBuffers(idevice->logicalDevice,
-                                                &cmdbufAllocInfo,
-                                                &icommandBuffer->commandBuffer) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to allocate command buffer");
-    }
+    VkResult result = idevice->table.vkAllocateCommandBuffers(
+      idevice->logicalDevice,
+      &cmdbufAllocInfo,
+      &icommandBuffer->commandBuffer
+    );
+    CGPU_VK_CHK(result, "failed to allocate command buffer");
 
     commandBuffer->handle = handle;
     return true;
@@ -3235,10 +3198,7 @@ namespace gtl
 
     const CgpuShaderReflection* reflection = &ishader->reflection;
     const std::vector<CgpuShaderReflectionDescriptorSet>& descriptorSets = reflection->descriptorSets;
-    if (descriptorSetIndex >= descriptorSets.size())
-    {
-      CGPU_FATAL("descriptor set index out of bounds");
-    }
+    GB_EXPECT(descriptorSetIndex < descriptorSets.size(), "descriptor set index out of bounds");
 
     const CgpuShaderReflectionDescriptorSet& descriptorSet = descriptorSets[descriptorSetIndex];
     const std::vector<CgpuShaderReflectionBinding>& bindings = descriptorSet.bindings;
@@ -3772,13 +3732,13 @@ namespace gtl
       .pSignalSemaphoreInfos = signalSubmitInfos.data()
     };
 
-    if (idevice->table.vkQueueSubmit2KHR(idevice->computeQueue,
-                                         1,
-                                         &submitInfo,
-                                         VK_NULL_HANDLE) != VK_SUCCESS)
-    {
-      CGPU_FATAL("failed to submit command buffer");
-    }
+    VkResult result = idevice->table.vkQueueSubmit2KHR(
+      idevice->computeQueue,
+      1,
+      &submitInfo,
+      VK_NULL_HANDLE
+    );
+    CGPU_VK_CHK(result, "failed to submit command buffer");
   }
 
   const CgpuDeviceFeatures& cgpuGetDeviceFeatures(CgpuContext* ctx)

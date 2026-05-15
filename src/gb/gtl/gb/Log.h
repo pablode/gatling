@@ -26,12 +26,17 @@
 #include <quill/std/UnorderedSet.h>
 #include <quill/std/Vector.h>
 
+#include <stdio.h>
+
 #define GB_ERROR(fmt, ...) QUILL_LOG_ERROR(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_ERROR_DYN(fmt, ...) QUILL_LOG_DYNAMIC(gtl::gbGetLogger(), quill::LogLevel::Error, fmt, ##__VA_ARGS__)
 #define GB_WARN(fmt, ...) QUILL_LOG_WARNING(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_LOG(fmt, ...) QUILL_LOG_INFO(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_DEBUG(fmt, ...) QUILL_LOG_DEBUG(gtl::gbGetLogger(), fmt, ##__VA_ARGS__)
 #define GB_DEBUG_DYN(fmt, ...) QUILL_LOG_DYNAMIC(gtl::gbGetLogger(), quill::LogLevel::Debug, fmt, ##__VA_ARGS__)
+
+#define GB_FATAL(msg) do { GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); gbLogFlush(); assert(false); exit(EXIT_FAILURE); } while (false)
+#define GB_EXPECT(cond, msg) do { if (!(cond)) { GB_FATAL(msg); } } while (false)
 
 namespace gtl
 {

@@ -66,12 +66,6 @@
 
 #include <offsetAllocator.hpp>
 
-#define GI_FATAL(msg)                               \
-  do {                                              \
-    GB_ERROR("{}:{}: {}", __FILE__, __LINE__, msg); \
-    exit(EXIT_FAILURE);                             \
-  } while (false)
-
 namespace mx = MaterialX;
 
 namespace gtl
@@ -334,7 +328,7 @@ namespace gtl
     case GiCullMode::DontCare:
       return std::nullopt;
     default:
-      GI_FATAL("coding error: unhandled case");
+      GB_FATAL("coding error: unhandled case");
     }
   }
 
@@ -1537,10 +1531,7 @@ cleanup:
         {
           gpuData.texOffsetAllocation = texAllocator.allocate(texCount);
 
-          if (gpuData.texOffsetAllocation.offset == OffsetAllocator::Allocation::NO_SPACE)
-          {
-            GI_FATAL("max number of textures exceeded");
-          }
+          GB_EXPECT(gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE, "max number of textures exceeded");
         }
         for (const McTextureDescription& tr : genInfo.textureDescriptions)
         {
@@ -2414,10 +2405,7 @@ cleanup:
       CgpuBindings bindings1 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
       CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
 
-      if (shaderCache->imageBindings.size() > rp::MAX_TEXTURE_COUNT)
-      {
-        GI_FATAL("max number of textures exceeded");
-      }
+      GB_EXPECT(shaderCache->imageBindings.size() <= rp::MAX_TEXTURE_COUNT, "max number of textures exceeded");
 
       cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
 
@@ -2599,10 +2587,7 @@ cleanup:
     };
 
     scene->domeLightsAllocation = scene->texAllocator.allocate(2); // primary + fallback
-    if (scene->domeLightsAllocation.offset == OffsetAllocator::Allocation::NO_SPACE)
-    {
-      GI_FATAL("max number of textures exceeded");
-    }
+      GB_EXPECT(scene->domeLightsAllocation.offset != OffsetAllocator::Allocation::NO_SPACE, "max number of textures exceeded");
 
     return scene;
   }

@@ -228,12 +228,6 @@ namespace gtl
     return false;              \
   } while (false)
 
-#define CGPU_FATAL(msg)  \
-  do {                   \
-    CGPU_LOG_ERROR(msg); \
-    exit(EXIT_FAILURE);  \
-  } while (false)
-
 #define CGPU_LOG_MTL_ERR(E) \
   do { if (E) {             \
     GB_ERROR("{}:{}: {} (code {})", __FILE__, __LINE__, E->localizedDescription()->utf8String(), E->code()); \
@@ -243,9 +237,9 @@ namespace gtl
 #define CGPU_CHK(X, E)    \
   do { if (!X) { CGPU_LOG_MTL_ERR(E); assert(false); exit(EXIT_FAILURE); } } while (false)
 
-#define CGPU_CHK_NP(X)                 \
-  do { if (!X) {                       \
-    CGPU_FATAL("encountered nullptr"); \
+#define CGPU_CHK_NP(X)               \
+  do { if (!X) {                     \
+    GB_FATAL("encountered nullptr"); \
   } } while(false)
 
 #define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)                            \
@@ -267,8 +261,8 @@ namespace gtl
 
 #define CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, ITYPE, RESOLVE_FUNC) \
   ITYPE* VAR_NAME;                                                       \
-  if (!RESOLVE_FUNC(CTX, HANDLE, &VAR_NAME)) [[unlikely]] {                   \
-    CGPU_FATAL("invalid handle!");                                       \
+  if (!RESOLVE_FUNC(CTX, HANDLE, &VAR_NAME)) [[unlikely]] {              \
+    GB_FATAL("invalid handle!");                                         \
   }
 
 #define CGPU_RESOLVE_BUFFER(CTX, HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBuffer, cgpuResolveBuffer)
@@ -336,7 +330,7 @@ namespace gtl
     case CgpuImageFormat::R32Sfloat:
       return MTL::PixelFormatR32Float;
     default:
-      CGPU_FATAL("unhandled image format");
+      GB_FATAL("unhandled image format");
     }
   }
 
@@ -350,7 +344,7 @@ namespace gtl
     case CgpuImageFormat::R16G16B16A16Sfloat:
       return 8;
     default:
-      CGPU_FATAL("unhandled image format");
+      GB_FATAL("unhandled image format");
     }
   }
 
@@ -367,7 +361,7 @@ namespace gtl
     case CgpuSamplerAddressMode::ClampToBlack:
       return MTL::SamplerAddressModeClampToBorderColor;
     default:
-      CGPU_FATAL("sampler address mode not handled");
+      GB_FATAL("sampler address mode not handled");
     }
   };
 
@@ -552,7 +546,7 @@ namespace gtl
     spvc_context spvc;
     if (spvc_result r = spvc_context_create(&spvc); r != SPVC_SUCCESS)
     {
-      CGPU_FATAL("failed to init SPIRV-Cross");
+      GB_FATAL("failed to init SPIRV-Cross");
     }
 
     spvc_context_set_error_callback(spvc, [](void *userData, const char *error) {
@@ -608,7 +602,7 @@ namespace gtl
 
     if (!cgpuReflectShader((uint32_t*) createInfo.source, createInfo.size, &ishader->reflection))
     {
-      CGPU_FATAL("failed to reflect shader");
+      GB_FATAL("failed to reflect shader");
     }
 
 #define CHK_SPVC(X) \
@@ -1590,7 +1584,7 @@ namespace gtl
           dataType = MTL::DataTypeInstanceAccelerationStructure;
           break;
         default:
-          CGPU_FATAL("unhandled data type");
+          GB_FATAL("unhandled data type");
         }
 
         MTL::BindingAccess access;
@@ -1624,7 +1618,7 @@ namespace gtl
             textureType = MTL::TextureType3D;
             break;
           default:
-            CGPU_FATAL("unsupported image dimensions");
+            GB_FATAL("unsupported image dimensions");
           }
         }
 
