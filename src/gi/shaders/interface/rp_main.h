@@ -22,24 +22,25 @@
 
 GI_INTERFACE_BEGIN(rp_main)
 
+// NOTE: don't use vec3s here
 struct UniformData
 {
-  GI_VEC4 domeLightRotation;
-  GI_VEC3 domeLightEmissionMultiplier;
-  GI_UINT domeLightDiffuseSpecularPacked;
-  GI_UINT maxTextureIndex;
-  GI_UINT sphereLightCount;
-  GI_UINT distantLightCount;
-  GI_UINT rectLightCount;
-  GI_UINT diskLightCount;
-  GI_UINT totalLightCount;
+  GI_VEC4  cameraPosition;
+  GI_VEC4  cameraForward;
+  GI_VEC4  cameraUp;
+  GI_VEC4  domeLightRotation;
+  GI_VEC4  domeLightEmissionMultiplier;
+  GI_UINT  domeLightDiffuseSpecularPacked;
+  GI_UINT  maxTextureIndex;
+  GI_UINT  sphereLightCount;
+  GI_UINT  distantLightCount;
+  GI_UINT  rectLightCount;
+  GI_UINT  diskLightCount;
+  GI_UINT  totalLightCount;
   GI_FLOAT metersPerSceneUnit;
-  GI_UINT  maxVolumeWalkLength; // NOTE: can be quantized
-  GI_VEC3  cameraPosition;
+  GI_UINT  maxVolumeWalkLength;
   GI_UINT  imageDims;
-  GI_VEC3  cameraForward;
   GI_FLOAT focusDistance;
-  GI_VEC3  cameraUp;
   GI_FLOAT cameraVFoV;
   GI_UINT  sampleOffset;
   GI_FLOAT lensRadius;

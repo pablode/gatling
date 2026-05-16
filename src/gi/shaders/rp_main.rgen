@@ -195,7 +195,7 @@ void main()
 
     clearAovs(pixelIndex);
 
-    vec3 camera_right = cross(ubo.cameraForward, ubo.cameraUp);
+    vec3 camera_right = cross(ubo.cameraForward.xyz, ubo.cameraUp.xyz);
     float aspect_ratio = float(imageWidth) / float(imageHeight);
 
     float H = 1.0;
@@ -205,8 +205,8 @@ void main()
     float WX = W / float(imageWidth);
     float HY = H / float(imageHeight);
 
-    vec3 C = ubo.cameraPosition + ubo.cameraForward * d;
-    vec3 L = C - camera_right * W * 0.5 - ubo.cameraUp * H * 0.5;
+    vec3 C = ubo.cameraPosition.xyz + ubo.cameraForward.xyz * d;
+    vec3 L = C - camera_right * W * 0.5 - ubo.cameraUp.xyz * H * 0.5;
 
     float invSpp = 1.0 / float(ubo.spp);
 
@@ -238,9 +238,9 @@ void main()
         vec3 P =
             L +
             (float(pixel_pos.x) + sampleOffset.x) * camera_right * WX +
-            (float(pixel_pos.y) + sampleOffset.y) * ubo.cameraUp * HY;
+            (float(pixel_pos.y) + sampleOffset.y) * ubo.cameraUp.xyz * HY;
 
-        vec3 ray_origin = ubo.cameraPosition;
+        vec3 ray_origin = ubo.cameraPosition.xyz;
         vec3 ray_dir = normalize(P - ray_origin);
 
         // Depth of Field
@@ -259,7 +259,7 @@ void main()
             vec2 apertureSample = sample_hemisphere(rand2_zw).xy * ubo.lensRadius;
 
             ray_origin += apertureSample.x * camera_right;
-            ray_origin += apertureSample.y * ubo.cameraUp;
+            ray_origin += apertureSample.y * ubo.cameraUp.xyz;
 
             ray_dir = normalize(focalPoint - ray_origin);
         }
@@ -283,7 +283,7 @@ void main()
 
         // Correct clip plane curving by getting the hypothenuse length (our current ray)
         // from the adjacent edge (the forward vector) the angle between both.
-        float cosConeAngle = max(1e-5, dot(ray_dir, ubo.cameraForward));
+        float cosConeAngle = max(1e-5, dot(ray_dir, ubo.cameraForward.xyz));
         vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked) / cosConeAngle;
 
         // Path trace

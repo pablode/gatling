@@ -81,7 +81,7 @@ void main()
 
     uint domeLightIndex = useFallbackDomeLight ? 0 : 1;
     vec3 sampleDir = normalize(quatRotateDir(ubo.domeLightRotation, gl_WorldRayDirectionEXT));
-    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * ubo.domeLightEmissionMultiplier;
+    vec3 radiance = sampleDomeLight(domeLightIndex, sampleDir) * ubo.domeLightEmissionMultiplier.rgb;
 
     rayPayload.radiance += rayPayload.throughput * radiance;
 }

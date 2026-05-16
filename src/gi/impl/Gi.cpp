@@ -2420,6 +2420,7 @@ cleanup:
     // Update uniforms
     uint32_t uniformOffset;
     {
+      auto camPos = glm::make_vec3(params.camera.position);
       auto camForward = glm::normalize(glm::make_vec3(params.camera.forward));
       auto camUp = glm::normalize(glm::make_vec3(params.camera.up));
 
@@ -2439,8 +2440,11 @@ cleanup:
       auto uniformData = s_bumpAlloc->alloc<rp::UniformData>();
 
       *uniformData.cpuPtr = {
+        .cameraPosition = glm::vec4(camPos, 0.0f),
+        .cameraForward = glm::vec4(camForward, 0.0f),
+        .cameraUp = glm::vec4(camUp, 0.0f),
         .domeLightRotation = glm::make_vec4(&domeLightRotation[0]),
-        .domeLightEmissionMultiplier = domeLightEmissionMultiplier,
+        .domeLightEmissionMultiplier = glm::vec4(domeLightEmissionMultiplier, 0.0f),
         .domeLightDiffuseSpecularPacked = domeLightDiffuseSpecularPacked,
         .maxTextureIndex = shaderCache->maxTextureIndex,
         .sphereLightCount = scene->sphereLights.elementCount(),
@@ -2450,11 +2454,8 @@ cleanup:
         .totalLightCount = totalLightCount,
         .metersPerSceneUnit = renderSettings.metersPerSceneUnit,
         .maxVolumeWalkLength = renderSettings.maxVolumeWalkLength,
-        .cameraPosition = glm::make_vec3(params.camera.position),
         .imageDims = ((imageHeight << 16) | imageWidth),
-        .cameraForward = camForward,
         .focusDistance = params.camera.focusDistance,
-        .cameraUp = camUp,
         .cameraVFoV = params.camera.vfov,
         .sampleOffset = scene->sampleOffset,
         .lensRadius = lensRadius,
