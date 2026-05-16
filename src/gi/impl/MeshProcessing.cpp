@@ -109,6 +109,44 @@ namespace
     return true;
   }
 
+  bool _CanConvertToUniformPrimvar(GiPrimvarInterpolation interpolation,
+                                   const std::vector<GiFace>& faces,
+                                   const std::vector<uint8_t>& data,
+                                   uint32_t typeSize)
+  {
+    assert((data.size() % typeSize) == 0);
+    assert(interpolation == GiPrimvarInterpolation::Vertex || interpolation == GiPrimvarInterpolation::FaceVarying);
+
+    for (size_t i = 0; i < faces.size(); i++)
+    {
+      uint32_t s0, s1, s2;
+      if (interpolation == GiPrimvarInterpolation::Vertex)
+      {
+        const GiFace& f = faces[i];
+        s0 = f.v_i[0];
+        s1 = f.v_i[1];
+        s2 = f.v_i[2];
+      }
+      else
+      {
+        s0 = i * 3 + 0;
+        s1 = i * 3 + 1;
+        s2 = i * 3 + 2;
+      }
+
+      int memCmpRes = 0;
+      memCmpRes += memcmp(&data[s0 * typeSize], &data[s1 * typeSize], typeSize);
+      memCmpRes += memcmp(&data[s0 * typeSize], &data[s2 * typeSize], typeSize);
+
+      if (memCmpRes != 0)
+      {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   GiMeshData _CompressData(const std::vector<GiFace>& faces,
                            const std::vector<int>& faceIds,
                            const std::vector<GiVertex>& vertices,
@@ -146,18 +184,36 @@ namespace
 
       if (p.interpolation != GiPrimvarInterpolation::Constant && _CanConvertToConstantPrimvar(p.data, typeSize))
       {
-        std::vector<uint8_t> data(typeSize);
-        memcpy(&data[0], &p.data[0], typeSize);
+        std::vector<uint8_t> newData(typeSize);
+        memcpy(&newData[0], &p.data[0], typeSize);
 
         o.interpolation = GiPrimvarInterpolation::Constant;
         o.buffer = GiMeshBuffer {
           .isCompressed = false,
           .uncompressedSize = typeSize,
-          .data = std::move(data)
+          .data = std::move(newData)
         };
 
         float savedMb = (p.data.size() <= typeSize) ? 0.0f : (p.data.size() - typeSize) / (1024.0f * 1024.0f);
         GB_DEBUG("converted {} to constant interpolation (saved {:.2f} MB)", p.name, savedMb);
+      }
+      else if ((p.interpolation == GiPrimvarInterpolation::Vertex || p.interpolation == GiPrimvarInterpolation::FaceVarying) &&
+                _CanConvertToUniformPrimvar(p.interpolation, faces, p.data, typeSize))
+      {
+        std::vector<uint8_t> newData(faces.size() * 3 * typeSize);
+        for (size_t i = 0; i < faces.size(); i++)
+        {
+          uint32_t s0 = (p.interpolation == GiPrimvarInterpolation::Vertex) ? faces[i].v_i[0] : (i * 3);
+          memcpy(&newData[i * typeSize], &p.data[s0 * typeSize], typeSize);
+        }
+
+        o.interpolation = GiPrimvarInterpolation::Uniform;
+        o.buffer = _CompressMeshBuffer(newData);
+
+        float savedMb = float(newData.size() * 2.0f) / (1024.0f * 1024.0f);
+        GB_DEBUG("converted {} to uniform interpolation (saved {:.2f} MB)", p.name, savedMb);
+
+        logBufferCompression(p.name, o.buffer);
       }
       else
       {
