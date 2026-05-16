@@ -818,7 +818,11 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
     else if (p.interpolation == HdInterpolationUniform) {
       interpolation = GiPrimvarInterpolation::Uniform;
     }
+    else if (p.interpolation == HdInterpolationFaceVarying) {
+      interpolation = GiPrimvarInterpolation::FaceVarying;
+    }
     else {
+      TF_AXIOM(p.interpolation == HdInterpolationVertex || p.interpolation == HdInterpolationVarying);
       interpolation = GiPrimvarInterpolation::Vertex;
     }
 

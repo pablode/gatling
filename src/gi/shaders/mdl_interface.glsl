@@ -278,8 +278,18 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
 #ifdef MAX_SCENE_DATA_ID
 uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uniformLookup)
 {
-  // contains GiPrimvarInterpolation enum
+  // see Gi.h GiPrimvarInterpolation enum
   uint interpolation = (sceneDataInfo & SCENE_DATA_INTERPOLATION_MASK) >> SCENE_DATA_INTERPOLATION_OFFSET;
+
+  if (interpolation == 4/*faceVarying*/)
+  {
+    return uvec3(gl_PrimitiveID * 3) + uvec3(0, 1, 2);
+  }
+
+  if (interpolation == 3/*vertex*/)
+  {
+    return rs.hitIndices;
+  }
 
   if (interpolation == 2/*uniform*/)
   {
@@ -292,9 +302,8 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uni
     return uvec3(instanceId);
   }
 
-  bool sceneDataConstant = (interpolation == 0/*constant*/);
-
-  return rs.hitIndices * int(!uniformLookup && !sceneDataConstant);
+  ASSERT(interpolation == 0, "Error: unhandled primvar interpolation");
+  return uvec3(0);
 }
 #endif
 

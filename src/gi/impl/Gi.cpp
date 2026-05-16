@@ -1047,7 +1047,7 @@ fail:
           stride -= 1; // [0, 3] range -> 2 bit
 
           assert(stride < 4);
-          static_assert(int(GiPrimvarInterpolation::COUNT) <= 4, "Enum exceeds 2 bits");
+          static_assert(int(GiPrimvarInterpolation::COUNT) <= 8, "Enum exceeds 3 bits");
 
           uint32_t info = uint32_t(sceneDataOffset) |
                           (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
