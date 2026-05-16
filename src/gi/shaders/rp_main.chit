@@ -170,8 +170,7 @@ void main()
 
     if (ignoreHit)
     {
-      const float RAY_EPS = 1e-4;
-      rayPayload.ray_origin = shading_state.position + rayPayload.ray_dir * RAY_EPS;
+      rayPayload.ray_origin = offset_ray_origin(shading_state.position, -shading_state.geom_normal);
       return;
     }
 
