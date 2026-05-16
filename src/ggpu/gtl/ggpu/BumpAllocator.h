@@ -37,14 +37,17 @@ namespace gtl
   class GgpuBumpAllocator
   {
   public:
-    static std::shared_ptr<GgpuBumpAllocator> make(CgpuContext* ctx, GgpuDeleteQueue& deleteQueue, uint32_t size);
+    static std::shared_ptr<GgpuBumpAllocator> make(CgpuContext* ctx, GgpuDeleteQueue& deleteQueue,
+                                                   uint32_t size, uint32_t alignment);
 
   public:
     GB_DECLARE_NONCOPY(GgpuBumpAllocator);
 
     GgpuBumpAllocator(CgpuContext* ctx,
                       GgpuDeleteQueue& deleteQueue,
-                      CgpuBuffer buffer, uint32_t size);
+                      CgpuBuffer buffer,
+                      uint32_t size,
+                      uint32_t alignment);
 
     ~GgpuBumpAllocator();
 
@@ -65,7 +68,7 @@ namespace gtl
     CgpuBuffer m_buffer;
     uint8_t* m_cpuPtr;
     uint32_t m_offset;
-    uint32_t m_size;
-    uint32_t m_align;
+    const uint32_t m_size;
+    const uint32_t m_align;
   };
 }

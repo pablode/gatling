@@ -24,32 +24,36 @@ namespace gtl
 {
   std::shared_ptr<GgpuBumpAllocator> GgpuBumpAllocator::make(CgpuContext* ctx,
                                                              GgpuDeleteQueue& deleteQueue,
-                                                             uint32_t size)
+                                                             uint32_t size,
+                                                             uint32_t alignment)
   {
     CgpuBuffer buffer;
     if (!cgpuCreateBuffer(ctx, { .usage = CgpuBufferUsage::Uniform,
                                  .memoryProperties = CgpuMemoryProperties::DeviceLocal | CgpuMemoryProperties::HostVisible,
                                  .size = size,
-                                 .debugName = "[BumpAlloc]"
+                                 .debugName = "[BumpAlloc]",
+                                 .alignment = alignment
                                }, &buffer))
     {
       return nullptr;
     }
 
-    return std::make_shared<GgpuBumpAllocator>(ctx, deleteQueue, buffer, size);
+    return std::make_shared<GgpuBumpAllocator>(ctx, deleteQueue, buffer, size, alignment);
   }
 
   GgpuBumpAllocator::GgpuBumpAllocator(CgpuContext* ctx,
                                        GgpuDeleteQueue& deleteQueue,
-                                       CgpuBuffer buffer, uint32_t size)
+                                       CgpuBuffer buffer,
+                                       uint32_t size,
+                                       uint32_t alignment)
     : m_deleteQueue(deleteQueue)
     , m_buffer(buffer)
+    , m_offset(0)
     , m_size(size)
+    , m_align(alignment)
   {
-    const CgpuDeviceProperties& properties = cgpuGetDeviceProperties(ctx);
-
     m_cpuPtr = (uint8_t*) cgpuGetBufferCpuPtr(ctx, buffer);
-    m_align = properties.minUniformBufferOffsetAlignment;
+    assert(m_align > 0);
   }
 
   GgpuBumpAllocator::~GgpuBumpAllocator()
@@ -65,11 +69,11 @@ namespace gtl
   // TODO: proper error handling and possibly overflow tracking
   GgpuTempAllocation<uint8_t> GgpuBumpAllocator::alloc(uint32_t size)
   {
-    assert(size < m_size);
+    assert(size <= m_size);
 
     m_offset = (m_offset + m_align - 1) / m_align * m_align;
 
-    if (m_offset + size > m_size)
+    if ((m_offset + size) > m_size)
     {
       m_offset = 0;
     }

@@ -434,7 +434,8 @@ namespace gtl
     }
 
     constexpr static uint32_t BUMP_ALLOC_SIZE = CGPU_MIN_UNIFORM_BUFFER_SIZE;
-    s_bumpAlloc = GgpuBumpAllocator::make(s_ctx, *s_deleteQueue, BUMP_ALLOC_SIZE);
+
+    s_bumpAlloc = GgpuBumpAllocator::make(s_ctx, *s_deleteQueue, BUMP_ALLOC_SIZE, s_ctxProperties.minUniformBufferOffsetAlignment);
 
     if (!s_bumpAlloc)
     {
