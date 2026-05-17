@@ -260,7 +260,7 @@ namespace gtl
         return false;
       }
 
-      uint8_t black[4] = { 0, 0, 0, 0 };
+      uint8_t black[4] = { 0, 0, 0, 255 };
       if (!m_stager.stageToImage(black, 4, *image, 1, 1, 1))
       {
         return false;
