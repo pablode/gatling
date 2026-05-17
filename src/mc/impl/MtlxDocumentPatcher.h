@@ -19,6 +19,11 @@
 
 #include <MaterialXCore/Document.h>
 
+#ifdef OCIO
+#include <OpenColorIO/OpenColorIO.h>
+namespace ocio = OCIO_NAMESPACE;
+#endif
+
 #include <memory>
 
 namespace gtl
@@ -32,5 +37,8 @@ namespace gtl
 
   private:
     MaterialX::DocumentPtr m_customNodesDoc;
+#ifdef OCIO
+    ocio::ConstConfigRcPtr m_ocioConfig;
+#endif
   };
 }

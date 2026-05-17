@@ -46,5 +46,10 @@ target_link_libraries(
     MaterialXGenMdl
 )
 
+if(TARGET OpenColorIO::OpenColorIO)
+  target_link_libraries(mc PRIVATE OpenColorIO::OpenColorIO)
+  target_compile_definitions(mc PRIVATE OCIO)
+endif()
+
 # Required since library is linked into hdGatling DSO
 set_target_properties(mc PROPERTIES POSITION_INDEPENDENT_CODE ON)

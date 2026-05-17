@@ -46,6 +46,7 @@ find_package(MaterialX REQUIRED HINTS ${USD_ROOT})
 find_package(USD REQUIRED HINTS ${USD_ROOT} NAMES pxr)
 find_package(MDL REQUIRED)
 find_package(OpenMP)
+find_package(OpenColorIO HINTS ${USD_ROOT})
 
 if(GTL_VERBOSE)
   add_compile_definitions(GTL_VERBOSE=1)

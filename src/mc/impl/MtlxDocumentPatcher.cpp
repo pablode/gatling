@@ -618,9 +618,80 @@ void _PatchOpenPbrBxdf(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc
   lib->importLibrary(customNodesDoc);
 }
 
+#ifdef OCIO
+void _PatchNonACESColorSpaces(mx::DocumentPtr document, ocio::ConstConfigRcPtr ocioConfig)
+{
+  // https://github.com/AcademySoftwareFoundation/MaterialX/blob/main/documents/Specification/MaterialX.Specification.md#color-spaces-and-color-management-systems
+  const static std::unordered_set<std::string_view> MTLX_COLOR_SPACES = {
+    "srgb_texture", "lin_rec709", "g22_rec709", "g18_rec709", "acescg", "g22_ap1", "g18_ap1",
+    "lin_srgb", "adobergb", "lin_adobergb", "srgb_displayp3", "lin_displayp3"
+  };
+
+  for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
+  {
+    mx::ElementPtr elem = treeIt.getElement();
+
+    if (!elem || !elem->hasColorSpace() || elem->getActiveSourceUri() != document->getSourceUri())
+    {
+      continue;
+    }
+
+    const std::string& colorSpaceName = elem->getColorSpace();
+
+    const char* acesColorSpaceName = nullptr;
+    if (colorSpaceName == "Raw" || colorSpaceName == "raw")
+    {
+      acesColorSpaceName = "lin_rec709";
+    }
+    else
+    {
+      ocio::ConstColorSpaceRcPtr colorSpace = ocioConfig->getColorSpace(colorSpaceName.c_str());
+
+      if (!colorSpace)
+      {
+        GB_WARN("canonical color space for {} not found", colorSpaceName);
+        continue;
+      }
+
+      for (size_t i = 0; i < colorSpace->getNumAliases(); i++)
+      {
+        const char* alias = colorSpace->getAlias(i);
+
+        if (MTLX_COLOR_SPACES.find(alias) == MTLX_COLOR_SPACES.end())
+        {
+          continue;
+        }
+
+        acesColorSpaceName = alias;
+
+        if (alias == colorSpaceName)
+        {
+          break;
+        }
+      }
+    }
+
+    if (!acesColorSpaceName || strcmp(acesColorSpaceName, "") == 0)
+    {
+      GB_WARN("canonical color space for {} not found", colorSpaceName);
+      continue;
+    }
+
+    if (acesColorSpaceName == colorSpaceName)
+    {
+      continue;
+    }
+
+    GB_DEBUG("patched color space {} to {}", colorSpaceName, acesColorSpaceName);
+    elem->setColorSpace(acesColorSpaceName);
+  }
+}
+#endif
+
 namespace gtl
 {
-  McMtlxDocumentPatcher::McMtlxDocumentPatcher([[maybe_unused]] const mx::DocumentPtr mtlxStdLib, const std::string& customNodesPath)
+  McMtlxDocumentPatcher::McMtlxDocumentPatcher([[maybe_unused]] const mx::DocumentPtr mtlxStdLib,
+                                               const std::string& customNodesPath)
   {
     mx::FileSearchPath bxdfFiles;
 
@@ -637,6 +708,14 @@ namespace gtl
 
     m_customNodesDoc = mx::createDocument();
     mx::loadLibraries(mx::FilePathVec{ customNodesPath }, bxdfFiles, m_customNodesDoc);
+
+#ifdef OCIO
+    m_ocioConfig = ocio::Config::CreateFromBuiltinConfig("cg-config-v1.0.0_aces-v1.3_ocio-v2.1");
+    if (!m_ocioConfig)
+    {
+      GB_ERROR("failed to load OCIO config");
+    }
+#endif
   }
 
   mx::DocumentPtr McMtlxDocumentPatcher::patch(const mx::DocumentPtr document)
@@ -685,6 +764,13 @@ namespace gtl
     _PatchDefaultGeomprops(docCopy);
 
     _PatchGeompropPrimvarPrefix(docCopy);
+
+#ifdef OCIO
+    if (m_ocioConfig)
+    {
+      _PatchNonACESColorSpaces(docCopy, m_ocioConfig);
+    }
+#endif
 
     return docCopy;
   }
