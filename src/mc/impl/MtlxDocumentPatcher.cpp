@@ -589,20 +589,18 @@ void _PatchGeompropPrimvarPrefix(mx::DocumentPtr document)
   }
 }
 
-// The MDL generator has some limitations when it comes to layering & mixing layers. This causes
-// problems with the OpenPBR BXDF: https://github.com/AcademySoftwareFoundation/MaterialX/pull/2215
-void _PatchOpenPbrBxdf(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc)
+void _RemoveNodeDefAndImpl(mx::DocumentPtr lib, std::string_view name)
 {
   for (mx::NodeDefPtr nd : lib->getNodeDefs())
   {
     const std::string& nodeName = nd->getNodeString();
 
-    if (nodeName != "open_pbr_surface")
+    if (nodeName != name)
     {
       continue;
     }
 
-    GB_DEBUG("patching {}", nodeName);
+    GB_DEBUG("removing {}", nodeName);
 
     lib->removeNodeDef(nd->getName());
 
@@ -614,8 +612,6 @@ void _PatchOpenPbrBxdf(mx::DocumentPtr lib, const mx::DocumentPtr customNodesDoc
 
     lib->removeNodeGraph(impl->getName());
   }
-
-  lib->importLibrary(customNodesDoc);
 }
 
 #ifdef OCIO
@@ -706,6 +702,11 @@ namespace gtl
     }
 #endif
 
+#if MATERIALX_VERSION >= 13900 && MATERIALX_VERSION < 13950
+    // Backwards compatible implemenation with 'opacityMode' input
+    bxdfFiles.append("usd_preview_surface.xml");
+#endif
+
     m_customNodesDoc = mx::createDocument();
     mx::loadLibraries(mx::FilePathVec{ customNodesPath }, bxdfFiles, m_customNodesDoc);
 
@@ -735,9 +736,21 @@ namespace gtl
 
     _PatchNodeNames(docCopy);
 
+    bool importCustomNodes = false;
 #if MATERIALX_VERSION >= 13810 && MATERIALX_VERSION < 13940
-    _PatchOpenPbrBxdf(docCopy, m_customNodesDoc);
+    _RemoveNodeDefAndImpl(docCopy, "open_pbr_surface");
+
+    importCustomNodes = true;
 #endif
+#if MATERIALX_VERSION >= 13810 && MATERIALX_VERSION < 13950
+    _RemoveNodeDefAndImpl(docCopy, "UsdPreviewSurface");
+
+    importCustomNodes = true;
+#endif
+    if (importCustomNodes)
+    {
+      docCopy->importLibrary(m_customNodesDoc);
+    }
 
     // NOTE: this optimization is currently disabled due to a subtle bug with multi-output
     //       nodes in MaterialX (presumably it's an edge case in the flattening logic).
