@@ -31,12 +31,15 @@
 namespace mx = MaterialX;
 
 const char* TYPE_COLOR3 = "color3";
+const char* TYPE_COLOR4 = "color4";
 const char* TYPE_VECTOR3 = "vector3";
 const char* TYPE_FLOAT = "float";
 const char* TYPE_BOOL = "boolean";
 
 const char* ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING =
   "GTL_DISABLE_MTLX_USDUVTEXTURE_COLOR_SPACE_PATCHING";
+
+const char* ENVVAR_GEOMCOLOR_PRIMVAR_NAME = "GTL_GEOMCOLOR_PRIMVAR_NAME";
 
 void _SanitizeFilePath(std::string& path)
 {
@@ -410,7 +413,7 @@ void _PatchSecondaryTexcoordIndices(mx::DocumentPtr document)
       node->removeInput(input->getName());
     }
 
-    mx::InputPtr geompropInput = node->addInput("geomprop", mx::FILENAME_TYPE_STRING);
+    mx::InputPtr geompropInput = node->addInput("geomprop", mx::STRING_TYPE_STRING);
 
     std::string primvarName = GB_FMT("st{}", index);
     geompropInput->setValueString(primvarName);
@@ -420,8 +423,14 @@ void _PatchSecondaryTexcoordIndices(mx::DocumentPtr document)
   }
 }
 
-void _PatchColorNodes(mx::DocumentPtr document)
+void _PatchGeomColorNodes(mx::DocumentPtr document)
 {
+  const char* primvarBaseName = getenv(ENVVAR_GEOMCOLOR_PRIMVAR_NAME);
+  if (!primvarBaseName)
+  {
+    primvarBaseName = "displayColor";
+  }
+
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
   {
     mx::ElementPtr elem = treeIt.getElement();
@@ -433,26 +442,47 @@ void _PatchColorNodes(mx::DocumentPtr document)
     }
 
     const mx::string& category = node->getCategory();
-    if (category != "color")
+    if (category != "geomcolor")
     {
       continue;
     }
 
+    const mx::string& nodeType = node->getType();
+    if (nodeType != TYPE_COLOR3)
+    {
+      if (nodeType != TYPE_COLOR4 && nodeType != TYPE_FLOAT)
+      {
+        // FIXME: we could implement these types via 'displayOpacity' and <separate>
+        GB_WARN("unsupported geomcolor type {}", nodeType);
+      }
+      continue;
+    }
+
+    std::string primvarName = primvarBaseName;
+    if (auto indexInput = node->getInput("index"); indexInput && indexInput->hasValue())
+    {
+      mx::ValuePtr value = indexInput->getValue();
+      if (value->isA<int>())
+      {
+        int index = value->asA<int>();
+        if (index > 0)
+        {
+          primvarName = GB_FMT("{}{}", primvarName, index);
+        }
+      }
+    }
+
     node->setNodeDefString("ND_geompropvalue_color3");
     node->setCategory("geompropvalue");
-    node->setType(TYPE_COLOR3); // FIXME: hook up displayOpacity if type is color4
-
     for (mx::InputPtr input : node->getInputs())
     {
       node->removeInput(input->getName());
     }
 
-    mx::InputPtr geompropInput = node->addInput("geomprop", mx::FILENAME_TYPE_STRING);
-
-    std::string primvarName = "displayColor";
+    mx::InputPtr geompropInput = node->addInput("geomprop", mx::STRING_TYPE_STRING);
     geompropInput->setValueString(primvarName);
 
-    GB_WARN("replaced color node \"{}\" with geompropvalue of \"{}\"",
+    GB_WARN("replaced color node \"{}\" with geompropvalue \"{}\"",
       node->getNamePath(), primvarName);
   }
 }
@@ -769,7 +799,7 @@ namespace gtl
 
     _PatchSecondaryTexcoordIndices(docCopy);
 
-    _PatchColorNodes(docCopy);
+    _PatchGeomColorNodes(docCopy);
 #if MATERIALX_VERSION <= 13940
     _PatchFrameNodes(docCopy);
 #endif
