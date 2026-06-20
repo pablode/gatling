@@ -45,27 +45,6 @@ layout(buffer_reference, hitobjectshaderrecordnv) buffer ShaderRecordBuffer
 //
 
 #if MEDIUM_STACK_SIZE > 0
-float sampleDistance(vec3 albedo, vec3 throughput, vec3 sigma_t, float xi, out vec3 pdf)
-{
-    vec3 weights = throughput * albedo;
-
-    float sum = weights.x + weights.y + weights.z;
-
-    pdf = (sum > 1e-9) ? (weights / sum) : vec3(1.0 / 3.0);
-
-    if (xi < pdf.x)
-    {
-        return sigma_t.x;
-    }
-    else if (xi < (pdf.x + pdf.y))
-    {
-        return sigma_t.y;
-    }
-    else
-    {
-        return sigma_t.z;
-    }
-}
 
 // cmp. d'Eon: "A Hitchhiker's Guide to Multiple Scattering"
 float sampleHenyeyGreensteinCos(float r, float g)
@@ -277,7 +256,7 @@ void main()
         rayPayload.ray_origin     = ray_origin;
         rayPayload.ray_dir        = ray_dir;
 #if MEDIUM_STACK_SIZE > 0
-        rayPayload.walkSegmentPdf = vec3(1.0);
+        rayPayload.walkSegmentPdf = 1.0;
 #endif
         rayPayload.pixelIndex     = pixelIndex;
 
@@ -320,7 +299,7 @@ void main()
             {
                 Medium m = rayPayload.media[mediumIdx - 1];
 
-                rayPayload.walkSegmentPdf = vec3(1.0);
+                rayPayload.walkSegmentPdf = 1.0;
 
                 uint walkLength = shadeRayPayloadGetWalk(rayPayload);
                 bool hasScattering = any(greaterThan(m.sigma_s, vec3(0.0)));
@@ -335,11 +314,46 @@ void main()
                     vec2 xi = rng1d_next2f(rayPayload.rng_state);
 #endif
 
-                    float s = sampleDistance(albedo, rayPayload.throughput, m.sigma_t, xi.x, rayPayload.walkSegmentPdf);
+                    float s_coeff_max = max(m.sigma_s.r, max(m.sigma_s.g, m.sigma_s.b));
+                    float t_coeff_min = min(m.sigma_t.r, min(m.sigma_t.g, m.sigma_t.b));
 
-                    s *= ubo.metersPerSceneUnit;
+                    float sample_coeff = 0.0f;
+                    if (s_coeff_max <= t_coeff_min)
+                    {
+                        // can use common coefficient for distance importance sampling while keeping variance bounded (see MDL SDK)
+                        sample_coeff = t_coeff_min;
+                    }
+                    else if ((rayPayload.bitfield & SHADE_RAY_PAYLOAD_VOLUME_SAMPLING_CHANNEL_MASK) == 0)
+                    {
+                        // switch to single color
+                        if (xi.x < (1.0 / 3.0))
+                        {
+                            rayPayload.bitfield |= (1 << SHADE_RAY_PAYLOAD_VOLUME_SAMPLING_CHANNEL_OFFSET);
+                            rayPayload.throughput *= vec3(3.0, 0.0, 0.0);
+                        }
+                        else if (xi.x < (2.0 / 3.0))
+                        {
+                            rayPayload.bitfield |= (2 << SHADE_RAY_PAYLOAD_VOLUME_SAMPLING_CHANNEL_OFFSET);
+                            rayPayload.throughput *= vec3(0.0, 3.0, 0.0);
+                        }
+                        else
+                        {
+                            rayPayload.bitfield |= (3 << SHADE_RAY_PAYLOAD_VOLUME_SAMPLING_CHANNEL_OFFSET);
+                            rayPayload.throughput *= vec3(0.0, 0.0, 3.0);
+                        }
+                    }
 
-                    tMax = -log(1.0 - xi.y) / s; // collision free distance (mean free path)
+                    uint channel = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_VOLUME_SAMPLING_CHANNEL_MASK) >> SHADE_RAY_PAYLOAD_VOLUME_SAMPLING_CHANNEL_OFFSET;
+
+                    if (channel > 0)
+                    {
+                      sample_coeff = m.sigma_t[channel - 1];
+                    }
+
+                    sample_coeff *= ubo.metersPerSceneUnit;
+
+                    tMax = -log(1.0 - xi.y) / sample_coeff; // collision free distance (mean free path)
+                    rayPayload.walkSegmentPdf = sample_coeff;
                 }
             }
 #endif

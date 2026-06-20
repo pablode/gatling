@@ -488,7 +488,7 @@ void main()
                 m.ior = mdl_ior(shading_state);
                 m.sigma_s = sigma_s;
                 m.sigma_t = sigma_t;
-                m.bias = MEDIUM_DIRECTIONAL_BIAS;
+                m.bias = MEDIUM_DIRECTIONAL_BIAS; // mdl_volume_scattering_directional_bias(state); // TODO
                 rayPayload.media[mediumIdx - 1] = m;
             }
         }

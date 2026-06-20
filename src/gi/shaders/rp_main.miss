@@ -15,10 +15,11 @@ layout(location = PAYLOAD_INDEX_SHADE) rayPayloadInEXT ShadeRayPayload rayPayloa
 #if MEDIUM_STACK_SIZE > 0
 void stepVolume(uint mediumIdx)
 {
-    float distance = gl_RayTmaxEXT * ubo.metersPerSceneUnit;
+    float distance = gl_RayTmaxEXT / ubo.metersPerSceneUnit;
 
     Medium m = rayPayload.media[mediumIdx - 1];
 
+#if 0
     vec3 transmittance = exp(m.sigma_t * -distance);
 
     vec3 density = m.sigma_t * transmittance;
@@ -26,6 +27,16 @@ void stepVolume(uint mediumIdx)
     float pdf = dot(rayPayload.walkSegmentPdf, density);
 
     rayPayload.throughput *= (m.sigma_s * transmittance) / pdf;
+#else
+    float pdf = rayPayload.walkSegmentPdf * exp(-rayPayload.walkSegmentPdf * distance);
+
+    if (rayPayload.throughput.r > 0.0)
+      rayPayload.throughput.r *= m.sigma_s.r * exp(-m.sigma_t.r * distance) / pdf;
+    if (rayPayload.throughput.g > 0.0)
+      rayPayload.throughput.g *= m.sigma_s.g * exp(-m.sigma_t.g * distance) / pdf;
+    if (rayPayload.throughput.b > 0.0)
+      rayPayload.throughput.b *= m.sigma_s.b * exp(-m.sigma_t.b * distance) / pdf;
+#endif
 
     rayPayload.ray_origin += gl_WorldRayDirectionEXT * distance;
 
