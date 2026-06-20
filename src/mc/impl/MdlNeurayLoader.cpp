@@ -31,7 +31,7 @@
 
 #include <string>
 
-#define GTL_LATEST_TESTED_NEURAYLIB_VERSION 57
+#define GTL_LATEST_TESTED_NEURAYLIB_VERSION 58
 
 static_assert(MI_NEURAYLIB_API_VERSION >= 48, "MDL SDK version is too old!");
 #if MATERIALX_VERSION >= 13900
