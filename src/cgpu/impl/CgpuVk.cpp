@@ -1137,8 +1137,10 @@ namespace gtl
       .vkGetDeviceImageMemoryRequirements = vkGetDeviceImageMemoryRequirements,
     };
 
-    VmaAllocatorCreateFlags allocatorCreateFlags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT |
+    VmaAllocatorCreateFlags allocatorCreateFlags = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT |
+                                                   VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT |
                                                    VMA_ALLOCATOR_CREATE_KHR_MAINTENANCE5_BIT;
+
     if (candidate.internalFeatures.pageableDeviceLocalMemory)
     {
       allocatorCreateFlags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_PRIORITY_BIT;
