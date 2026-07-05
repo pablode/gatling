@@ -93,7 +93,7 @@ namespace gtl
 
   struct CgpuIDeviceProperties
   {
-    VkDriverId  driverID;
+    VkDriverId driverID;
     uint32_t minAccelerationStructureScratchOffsetAlignment;
     size_t   minMemoryMapAlignment;
     uint64_t optimalBufferCopyOffsetAlignment;
