@@ -174,7 +174,7 @@ namespace gtl
         // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
         dstBinding.readAccess = srcBinding->accessed;
         const SpvReflectTypeDescription* typeDescription = srcBinding->type_description;
-        dstBinding.writeAccess = srcBinding->accessed && ~(typeDescription->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+        dstBinding.writeAccess = srcBinding->accessed && !(typeDescription->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
         dstBinding.dim = uint32_t(srcBinding->image.dim) + 1; // enum starts with 0
       }
     }

@@ -2408,7 +2408,11 @@ cleanup:
 
       GB_EXPECT(shaderCache->imageBindings.size() <= rp::MAX_TEXTURE_COUNT, "max number of textures exceeded");
 
-      cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, 1/*descriptorSetIndex*/, (uint32_t) images.size(), images.data());
+      if (images.size() > 0)
+      {
+        uint32_t texDescriptorSetIndex = 1;
+        cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, texDescriptorSetIndex, (uint32_t) images.size(), images.data());
+      }
 
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[0], &bindings0);
       cgpuUpdateBindSet(s_ctx, shaderCache->bindSets[1], &bindings1);

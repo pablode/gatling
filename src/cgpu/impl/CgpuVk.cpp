@@ -192,7 +192,7 @@ namespace gtl
   struct CgpuICommandBuffer
   {
     VkCommandBuffer commandBuffer;
-    CgpuIPipeline* pipeline = nullptr;
+    CgpuPipeline pipeline;
   };
 
   struct CgpuIBlas
@@ -269,7 +269,7 @@ namespace gtl
   } while (false)
 
 #define CGPU_VK_CHK(X, E)    \
-  do { GB_EXPECT(X == VK_SUCCESS, E); } while (false)
+  do { GB_EXPECT((X) == VK_SUCCESS, E); } while (false)
 
 #define CGPU_RESOLVE_HANDLE(RESOURCE_NAME, HANDLE_TYPE, IRESOURCE_TYPE, RESOURCE_STORE)                            \
   CGPU_INLINE static bool cgpuResolve##RESOURCE_NAME(CgpuContext* ctx, HANDLE_TYPE handle, IRESOURCE_TYPE** idata) \
@@ -1218,6 +1218,8 @@ namespace gtl
 
   static void cgpuDestroyIDevice(CgpuContext* ctx, CgpuIDevice* idevice)
   {
+    idevice->table.vkDeviceWaitIdle(idevice->logicalDevice);
+
     cgpuDestroyMemoryPool(idevice->allocator, idevice->asScratchMemoryPool);
 
     if (idevice->pipelineCache != VK_NULL_HANDLE)
@@ -1253,7 +1255,7 @@ namespace gtl
 
     if (instanceVersion < CGPU_MIN_VK_API_VERSION)
     {
-      GB_ERROR("Vulkan instance version does match minimum of {}.{}.{}",
+      GB_ERROR("Vulkan instance version does not match minimum of {}.{}.{}",
         VK_VERSION_MAJOR(CGPU_MIN_VK_API_VERSION), VK_VERSION_MINOR(CGPU_MIN_VK_API_VERSION),
         VK_VERSION_PATCH(CGPU_MIN_VK_API_VERSION));
       return nullptr;
@@ -1465,7 +1467,7 @@ namespace gtl
     const std::vector<CgpuShaderReflectionDescriptorSet>& descriptorSets = shaderReflection->descriptorSets;
 
     descriptorSetCount = uint32_t(descriptorSets.size());
-    GB_EXPECT(descriptorSetCount < CGPU_MAX_DESCRIPTOR_SET_COUNT, "max descriptor set count exceeded");
+    GB_EXPECT(descriptorSetCount <= CGPU_MAX_DESCRIPTOR_SET_COUNT, "max descriptor set count exceeded");
 
     for (uint32_t i = 0; i < descriptorSetCount; i++)
     {
@@ -1680,8 +1682,7 @@ namespace gtl
                                 const char* debugName,
                                 VmaPool memoryPool = VK_NULL_HANDLE)
   {
-    constexpr static uint64_t BASE_ALIGNMENT = 32; // size of largest math primitive (vec4); ensure that
-                                                   // compiler can emit wide loads.
+    constexpr static uint64_t BASE_ALIGNMENT = 32; // ensure that compiler can emit wide loads.
 
     uint64_t newSize = cgpuAlign(size, BASE_ALIGNMENT); // required for vkCmdFillBuffer to clear whole range
 
@@ -1713,7 +1714,6 @@ namespace gtl
     allocCreateInfo.pool = memoryPool;
     allocCreateInfo.priority = priority;
 
-    size_t newAlignment = alignment;
     size_t mmapAlign = idevice->internalProperties.minMemoryMapAlignment;
 
     if (bool(memoryProperties & CgpuMemoryProperties::HostVisible) && alignment < mmapAlign)
@@ -1721,7 +1721,7 @@ namespace gtl
       alignment = mmapAlign;
     }
 
-    newAlignment = cgpuAlign(alignment, BASE_ALIGNMENT);
+    size_t newAlignment = cgpuAlign(alignment, BASE_ALIGNMENT);
 
     VkResult result = vmaCreateBufferWithAlignment(
       idevice->allocator,
@@ -1742,7 +1742,7 @@ namespace gtl
     {
       vmaSetAllocationName(idevice->allocator, ibuffer->allocation, debugName);
     }
-    
+
     if (bool(usage & CgpuBufferUsage::ShaderDeviceAddress))
     {
       VkBufferDeviceAddressInfoKHR addressInfo = {
@@ -1915,8 +1915,8 @@ namespace gtl
     );
     if (result != VK_SUCCESS)
     {
-      ctx->iimageStore.free(handle);
       vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
+      ctx->iimageStore.free(handle);
       CGPU_RETURN_ERROR("failed to create image view");
     }
 
@@ -1929,7 +1929,7 @@ namespace gtl
     iimage->height = createInfo.height;
     iimage->depth = createInfo.is3d ? createInfo.depth : 1;
     iimage->layout = imageCreateInfo.initialLayout;
-    iimage->accessMask = 0;
+    iimage->accessMask = VK_ACCESS_2_NONE_KHR;
 
     image->handle = handle;
     return true;
@@ -2330,7 +2330,7 @@ namespace gtl
     size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
     std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups(groupCount);
 
-    for (uint32_t i = 0; i < groups.size(); i++)
+    for (uint32_t i = 0; i < (uint32_t) groups.size(); i++)
     {
       VkRayTracingShaderGroupCreateInfoKHR groupCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
@@ -2346,9 +2346,6 @@ namespace gtl
       groups[i] = groupCreateInfo;
     }
 
-    bool anyNullClosestHitShader = false;
-    bool anyNullAnyHitShader = false;
-
     uint32_t hitStageAndGroupOffset = 1/*rgen*/ + createInfo.missShaderCount;
     uint32_t hitShaderStageIndex = hitStageAndGroupOffset;
     for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
@@ -2363,18 +2360,9 @@ namespace gtl
       {
         groups[groupIndex].closestHitShader = (hitShaderStageIndex++);
       }
-      else
-      {
-        anyNullClosestHitShader |= true;
-      }
-
       if (hit_group->anyHitShader.handle)
       {
         groups[groupIndex].anyHitShader = (hitShaderStageIndex++);
-      }
-      else
-      {
-        anyNullAnyHitShader |= true;
       }
     }
 
@@ -3181,7 +3169,7 @@ namespace gtl
       dynamicOffsets
     );
 
-    icommandBuffer->pipeline = ipipeline;
+    icommandBuffer->pipeline = pipeline;
   }
 
   void cgpuCmdTransitionShaderImageLayouts(CgpuContext* ctx,
@@ -3252,10 +3240,10 @@ namespace gtl
 
         VkAccessFlags2KHR accessMask = VK_ACCESS_2_NONE_KHR;
         if (binding->readAccess) {
-          accessMask = VK_ACCESS_2_SHADER_READ_BIT_KHR;
+          accessMask |= VK_ACCESS_2_SHADER_READ_BIT_KHR;
         }
         if (binding->writeAccess) {
-          accessMask = VK_ACCESS_2_SHADER_WRITE_BIT_KHR;
+          accessMask |= VK_ACCESS_2_SHADER_WRITE_BIT_KHR;
         }
 
         VkImageSubresourceRange range = {
@@ -3519,8 +3507,8 @@ namespace gtl
         .srcAccessMask = iimage->accessMask,
         .dstStageMask = (VkPipelineStageFlagBits2KHR) bCgpu->dstStageMask,
         .dstAccessMask = accessMask,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .oldLayout = iimage->layout,
+        .newLayout = iimage->layout,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image = iimage->image,
@@ -3552,7 +3540,7 @@ namespace gtl
                         uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-    CgpuIPipeline* ipipeline = icommandBuffer->pipeline;
+    CGPU_RESOLVE_PIPELINE(ctx, icommandBuffer->pipeline, ipipeline);
     CgpuIDevice* idevice = &ctx->idevice;
 
     VkStridedDeviceAddressRegionKHR callableSBT = {};

@@ -92,7 +92,7 @@ namespace gtl
 
     MTL4::CommitOptions* commitOptions = nullptr; // non-null in debug
 #ifndef NDEBUG
-    MTL::LogState*       logState; // nullable
+    MTL::LogState*       logState = nullptr;
 #endif
   };
 
@@ -158,7 +158,8 @@ namespace gtl
     // following member's memory is not owned:
     MTL::ResidencySet* deviceResidencySet;
     std::vector<MTL::ResidencySet*> residencySets;
-    CgpuIPipeline* pipeline = nullptr;
+
+    CgpuPipeline pipeline;
     MTL4::CommitOptions* commitOptions;
     MTL4::CommandBufferOptions* commandBufferOptions;
   };
@@ -235,10 +236,10 @@ namespace gtl
   } } while (false)
 
 #define CGPU_CHK(X, E)    \
-  do { if (!X) { CGPU_LOG_MTL_ERR(E); assert(false); exit(EXIT_FAILURE); } } while (false)
+  do { if (!(X)) { CGPU_LOG_MTL_ERR(E); assert(false); exit(EXIT_FAILURE); } } while (false)
 
 #define CGPU_CHK_NP(X)               \
-  do { if (!X) {                     \
+  do { if (!(X)) {                   \
     GB_FATAL("encountered nullptr"); \
   } } while(false)
 
@@ -402,30 +403,37 @@ namespace gtl
 
     if (!mtlDevice->supportsFamily(MTL::GPUFamilyApple9)) // needed for buffer-based AS builds
     {
+      mtlDevice->release();
       CGPU_RETURN_ERROR("GPU not supported (too old)");
     }
     if (!mtlDevice->supportsRaytracing())
     {
+      mtlDevice->release();
       CGPU_RETURN_ERROR("ray tracing not supported");
     }
     if (!mtlDevice->supportsShaderBarycentricCoordinates())
     {
+      mtlDevice->release();
       CGPU_RETURN_ERROR("barycentric coordinates not supported");
     }
     if (mtlDevice->argumentBuffersSupport() != MTL::ArgumentBuffersTier2)
     {
+      mtlDevice->release();
       CGPU_RETURN_ERROR("tier 2 argument buffers not supported");
     }
     if (!mtlDevice->hasUnifiedMemory())
     {
+      mtlDevice->release();
       CGPU_RETURN_ERROR("UMA not supported");
     }
     if (!mtlDevice->supportsFunctionPointers())
     {
+      mtlDevice->release();
       CGPU_RETURN_ERROR("function pointers not supported");
     }
     if (!mtlDevice->readWriteTextureSupport())
     {
+      mtlDevice->release();
       CGPU_RETURN_ERROR("R/W textures not supported");
     }
 
@@ -452,6 +460,7 @@ namespace gtl
 
       NS::Error* error = nullptr;
       logState = mtlDevice->newLogState(desc, &error);
+      CGPU_CHK(logState, error);
       desc->release();
 
       auto logHandler = [](NS::String* subsystem, NS::String* category, MTL::LogLevel logLevel, NS::String* message) {
@@ -482,6 +491,7 @@ namespace gtl
     }
 
     MTL4::CommitOptions* commitOptions = MTL4::CommitOptions::alloc()->init();
+    CGPU_CHK_NP(commitOptions);
 
     commitOptions->addFeedbackHandler([](MTL4::CommitFeedback* feedback) {
       NS::Error* error = feedback->error();
@@ -513,8 +523,8 @@ namespace gtl
     idevice->commandQueue = commandQueue;
 #ifndef NDEBUG
     idevice->logState = logState;
-#endif
     idevice->commitOptions = commitOptions;
+#endif
     idevice->uniqueShaderEntryPointCounter = 0;
     idevice->residencySet = residencySet;
     idevice->commandBufferOptions = commandBufferOptions;
@@ -668,8 +678,6 @@ namespace gtl
     MTL4::CompilerTask* task = idevice->compiler->newLibrary(libDesc, [&](MTL::Library* result, NS::Error* error) {
       if (result)
       {
-        std::unique_lock<std::mutex> lock(mutex);
-        ishader->library = result;
         result->retain();
       }
       else
@@ -678,14 +686,20 @@ namespace gtl
         gbLogFlush();
         CGPU_LOG_MTL_ERR(error);
       }
-      done = true;
+
+      {
+        std::unique_lock<std::mutex> lock(mutex);
+        ishader->library = result;
+        done = true;
+      }
+
       cv.notify_one();
     });
     CGPU_CHK_NP(task);
 
     {
       std::unique_lock<std::mutex> lock(mutex);
-      cv.wait(lock, [&]() { return done; });
+      cv.wait(lock, [&done]() { return done; });
     }
 
     mslStr->release();
@@ -789,8 +803,7 @@ namespace gtl
 
     CGPU_RESOLVE_BUFFER(ctx, { handle }, ibuffer);
 
-    constexpr static uint64_t BASE_ALIGNMENT = 32; // size of largest math primitive (vec4); ensure that
-                                                   // compiler can emit wide loads.
+    constexpr static uint64_t BASE_ALIGNMENT = 32; // ensure that compiler can emit wide loads.
     uint64_t size = cgpuAlign(createInfo.size, BASE_ALIGNMENT);
     assert(size > 0);
 
@@ -861,13 +874,14 @@ namespace gtl
 
     MTL::TextureUsage usage = cgpuTranslateImageUsage(createInfo.usage);
     MTL::PixelFormat pixelFormat = cgpuTranslateImageFormat(createInfo.format);
+    int depth = createInfo.is3d ? createInfo.depth : 1;
 
     MTL::TextureDescriptor* descriptor = MTL::TextureDescriptor::alloc()->init();
     descriptor->setTextureType(createInfo.is3d ? MTL::TextureType3D : MTL::TextureType2D);
     descriptor->setPixelFormat(pixelFormat);
     descriptor->setWidth(createInfo.width);
     descriptor->setHeight(createInfo.height);
-    descriptor->setDepth(createInfo.depth);
+    descriptor->setDepth(depth);
     descriptor->setUsage(usage);
     descriptor->setStorageMode(MTL::StorageModeShared);
     descriptor->setAllowGPUOptimizedContents(true);
@@ -892,7 +906,7 @@ namespace gtl
     iimage->texture = texture;
     iimage->width = createInfo.width;
     iimage->height = createInfo.height;
-    iimage->depth = createInfo.is3d ? createInfo.depth : 1;
+    iimage->depth = depth;
     iimage->format = createInfo.format;
 
     image->handle = handle;
@@ -1051,6 +1065,7 @@ namespace gtl
       auto* desc = MTL::IntersectionFunctionTableDescriptor::alloc()->init();
       desc->setFunctionCount(hitFunctionCount);
       ift = pipeline->newIntersectionFunctionTable(desc);
+      CGPU_CHK_NP(ift);
       desc->release();
     }
 
@@ -1059,6 +1074,7 @@ namespace gtl
       auto* desc = MTL::VisibleFunctionTableDescriptor::alloc()->init();
       desc->setFunctionCount(missFunctionCount);
       missVft = pipeline->newVisibleFunctionTable(desc);
+      CGPU_CHK_NP(missVft);
       desc->release();
     }
 
@@ -1067,6 +1083,7 @@ namespace gtl
       auto* desc = MTL::VisibleFunctionTableDescriptor::alloc()->init();
       desc->setFunctionCount(hitFunctionCount);
       chitVft = pipeline->newVisibleFunctionTable(desc);
+      CGPU_CHK_NP(chitVft);
       desc->release();
     }
 
@@ -1266,6 +1283,7 @@ namespace gtl
     auto* triDesc = MTL4::AccelerationStructureTriangleGeometryDescriptor::alloc()->init();
     triDesc->setVertexBuffer(vertexBufferRange);
     triDesc->setVertexFormat(MTL::AttributeFormatFloat3);
+    triDesc->setVertexStride(3 * sizeof(float));
     triDesc->setIndexBuffer(indexBufferRange);
     triDesc->setIndexType(MTL::IndexTypeUInt32);
     triDesc->setTriangleCount(createInfo.triangleCount);
@@ -1287,6 +1305,7 @@ namespace gtl
       blasDesc->release();
       geoDescs->release();
       triDesc->release();
+      ctx->iblasStore.free(handle);
       CGPU_RETURN_ERROR("failed to allocate BLAS scratch buffer");
     }
     scratchBuffer->setLabel(MTLSTR("[AS scratch buffer]"));
@@ -1298,6 +1317,7 @@ namespace gtl
       geoDescs->release();
       triDesc->release();
       scratchBuffer->release();
+      ctx->iblasStore.free(handle);
       CGPU_RETURN_ERROR("failed to allocate BLAS");
     }
 
@@ -1428,6 +1448,7 @@ namespace gtl
       instanceBuffer = idevice->device->newBuffer(instanceBufferSize, CGPU_DEFAULT_RESOURCE_OPTIONS);
       if (!instanceBuffer)
       {
+        ctx->itlasStore.free(handle);
         CGPU_RETURN_ERROR("failed to create TLAS instance buffer");
       }
       instanceBuffer->setLabel(MTLSTR("[TLAS instance buffer]"));
@@ -1457,6 +1478,7 @@ namespace gtl
       {
         instanceBuffer->release();
         descriptor->release();
+        ctx->itlasStore.free(handle);
         CGPU_RETURN_ERROR("failed to create TLAS");
       }
 
@@ -1466,6 +1488,7 @@ namespace gtl
         as->release();
         instanceBuffer->release();
         descriptor->release();
+        ctx->itlasStore.free(handle);
         CGPU_RETURN_ERROR("failed to create TLAS scratch buffer");
       }
       scratchBuffer->setLabel(MTLSTR("[TLAS scratch buffer]"));
@@ -1571,6 +1594,7 @@ namespace gtl
         {
         case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
         case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+        case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
           dataType = MTL::DataTypeTexture;
           break;
         case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
@@ -1602,9 +1626,7 @@ namespace gtl
         }
 
         MTL::TextureType textureType;
-        if (descriptorType == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
-            descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
-            descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
+        if (dataType == MTL::DataTypeTexture)
         {
           switch (binding.dim)
           {
@@ -1627,7 +1649,10 @@ namespace gtl
         desc->setIndex(binding.binding);
         desc->setAccess(access);
         desc->setArrayLength(binding.count);
-        desc->setTextureType(textureType);
+        if (dataType == MTL::DataTypeTexture)
+        {
+          desc->setTextureType(textureType);
+        }
 
         argumentDescriptors.push_back(desc);
       }
@@ -1841,7 +1866,7 @@ namespace gtl
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
     CGPU_RESOLVE_PIPELINE(ctx, pipeline, ipipeline);
 
-    icommandBuffer->pipeline = ipipeline;
+    icommandBuffer->pipeline = pipeline;
 
     uint32_t dynamicBufferIndex = 0;
 
@@ -1882,6 +1907,8 @@ namespace gtl
                                            uint32_t imageCount,
                                            const CgpuImageBinding* images)
   {
+    assert(imageCount > 0);
+
     CGPU_RESOLVE_SHADER(ctx, shader, ishader);
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
 
@@ -1912,7 +1939,12 @@ namespace gtl
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
 
-    uint64_t rangeSize = (size == CGPU_WHOLE_SIZE) ? std::min(isrcBuffer->size, idstBuffer->size) : size;
+    uint64_t rangeSize = size;
+    if (rangeSize == CGPU_WHOLE_SIZE)
+    {
+      assert(srcOffset <= rangeSize);
+      rangeSize = std::min(isrcBuffer->size, idstBuffer->size) - srcOffset;
+    }
     encoder->copyFromBuffer(isrcBuffer->buffer, srcOffset, idstBuffer->buffer, dstOffset, rangeSize);
 
     icommandBuffer->auxResidencySet->addAllocation(isrcBuffer->buffer);
@@ -1966,7 +1998,7 @@ namespace gtl
                        uint32_t wgCountZ)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-    CgpuIPipeline* ipipeline = icommandBuffer->pipeline;
+    CGPU_RESOLVE_PIPELINE(ctx, icommandBuffer->pipeline, ipipeline);
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
 
@@ -2027,7 +2059,7 @@ namespace gtl
                         uint32_t height)
   {
     CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-    CgpuIPipeline* ipipeline = icommandBuffer->pipeline;
+    CGPU_RESOLVE_PIPELINE(ctx, icommandBuffer->pipeline, ipipeline);
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
 
@@ -2059,7 +2091,8 @@ namespace gtl
 
     MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
 
-    NS::Range range(dstOffset, (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size);
+    assert(dstOffset <= ibuffer->size);
+    NS::Range range(dstOffset, (size == CGPU_WHOLE_SIZE) ? (ibuffer->size - dstOffset) : size);
     encoder->fillBuffer(ibuffer->buffer, range, data);
 
     encoder->endEncoding();
@@ -2092,7 +2125,12 @@ namespace gtl
     MTL::SharedEvent* event = idevice->device->newSharedEvent();
     if (!event)
     {
+      ctx->isemaphoreStore.free(handle);
       CGPU_RETURN_ERROR("failed to create event");
+    }
+    if (initialValue != 0)
+    {
+      event->setSignaledValue(initialValue);
     }
 
     isemaphore->event = event;
