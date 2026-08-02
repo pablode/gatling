@@ -732,35 +732,40 @@ namespace gtl
     std::vector<std::string> errorMessages; // if size() > 0: device is unsuitable
   };
 
-  static void cgpuQueryDeviceCandidate(VkPhysicalDevice device, bool debugUtilsEnabled, CgpuDeviceCandidate& c)
+  // Candidates should always be heap-allocated because of their self-referencing pNext pointers.
+  using CgpuDeviceCandidatePtr = std::unique_ptr<CgpuDeviceCandidate>;
+
+  static CgpuDeviceCandidatePtr cgpuQueryDeviceCandidate(VkPhysicalDevice device, bool debugUtilsEnabled)
   {
-    c.device = device;
+    CgpuDeviceCandidatePtr c = std::make_unique<CgpuDeviceCandidate>();
+
+    c->device = device;
 
     // query & check queue
     uint32_t queueFamilyCount;
-    vkGetPhysicalDeviceQueueFamilyProperties(c.device, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(c->device, &queueFamilyCount, nullptr);
 
     GbSmallVector<VkQueueFamilyProperties, 8> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(c.device, &queueFamilyCount, queueFamilies.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(c->device, &queueFamilyCount, queueFamilies.data());
 
-    c.queueFamilyIndex = UINT32_MAX;
+    c->queueFamilyIndex = UINT32_MAX;
     for (uint32_t i = 0; i < queueFamilyCount; ++i)
     {
       const VkQueueFamilyProperties* queueFamily = &queueFamilies[i];
 
       if ((queueFamily->queueFlags & VK_QUEUE_COMPUTE_BIT) && (queueFamily->queueFlags & VK_QUEUE_TRANSFER_BIT))
       {
-        c.queueFamilyIndex = i;
+        c->queueFamilyIndex = i;
       }
     }
-    if (c.queueFamilyIndex == UINT32_MAX)
+    if (c->queueFamilyIndex == UINT32_MAX)
     {
-      c.errorMessages.push_back("no suitable queue family");
+      c->errorMessages.push_back("no suitable queue family");
     }
 
     // query & check memory
     VkPhysicalDeviceMemoryProperties memoryProperties;
-    vkGetPhysicalDeviceMemoryProperties(c.device, &memoryProperties);
+    vkGetPhysicalDeviceMemoryProperties(c->device, &memoryProperties);
 
     VkDeviceSize largestDeviceLocalHeapSize = 0;
     bool isHeapHostAccessible = false;
@@ -790,10 +795,10 @@ namespace gtl
 
     // query & check extensions
     uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(c.device, nullptr, &extensionCount, nullptr);
+    vkEnumerateDeviceExtensionProperties(c->device, nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> extensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(c.device, nullptr, &extensionCount, extensions.data());
+    vkEnumerateDeviceExtensionProperties(c->device, nullptr, &extensionCount, extensions.data());
 
     for (uint32_t j = 0; j < CGPU_REQUIRED_EXTENSIONS.size(); j++)
     {
@@ -801,10 +806,10 @@ namespace gtl
 
       if (!cgpuFindExtension(extension, extensionCount, extensions.data()))
       {
-        c.errorMessages.push_back(GB_FMT("extension {} missing", extension));
+        c->errorMessages.push_back(GB_FMT("extension {} missing", extension));
       }
 
-      c.enabledExtensions.push_back(CGPU_REQUIRED_EXTENSIONS[j]);
+      c->enabledExtensions.push_back(CGPU_REQUIRED_EXTENSIONS[j]);
     }
 
     const auto findExtension = [&](const char* name)
@@ -813,15 +818,15 @@ namespace gtl
     };
 
     // query & check properties
-    cgpuSetupDevicePropertyChain(c.propertyChain, extensions.data(), extensionCount);
-    vkGetPhysicalDeviceProperties2(c.device, &c.propertyChain.properties2);
+    cgpuSetupDevicePropertyChain(c->propertyChain, extensions.data(), extensionCount);
+    vkGetPhysicalDeviceProperties2(c->device, &c->propertyChain.properties2);
 
-    const VkPhysicalDeviceProperties& properties = c.propertyChain.properties2.properties;
+    const VkPhysicalDeviceProperties& properties = c->propertyChain.properties2.properties;
 
     uint32_t apiVersion = properties.apiVersion;
     if (apiVersion < CGPU_MIN_VK_API_VERSION)
     {
-      c.errorMessages.push_back(GB_FMT("outdated Vulkan API {}.{}.{}", VK_API_VERSION_MAJOR(apiVersion),
+      c->errorMessages.push_back(GB_FMT("outdated Vulkan API {}.{}.{}", VK_API_VERSION_MAJOR(apiVersion),
         VK_API_VERSION_MINOR(apiVersion), VK_API_VERSION_PATCH(apiVersion)));
     }
 
@@ -829,16 +834,16 @@ namespace gtl
     CgpuDeviceFeatureChain tempFeatureChain;
     cgpuSetupDeviceFeatureChain(tempFeatureChain, extensions.data(), extensionCount,
                                 debugUtilsEnabled, properties.vendorID);
-    vkGetPhysicalDeviceFeatures2(c.device, &tempFeatureChain.features2);
+    vkGetPhysicalDeviceFeatures2(c->device, &tempFeatureChain.features2);
 
-#define CGPU_REQUIRE_FEATURE(STRUCT, FIELD)                              \
-      if (tempFeatureChain.STRUCT.FIELD) {                               \
-        c.featureChain.STRUCT.FIELD = VK_TRUE;                           \
-      } else {                                                           \
-        c.errorMessages.push_back(GB_FMT("feature {} missing", #FIELD)); \
+#define CGPU_REQUIRE_FEATURE(STRUCT, FIELD)                               \
+      if (tempFeatureChain.STRUCT.FIELD) {                                \
+        c->featureChain.STRUCT.FIELD = VK_TRUE;                           \
+      } else {                                                            \
+        c->errorMessages.push_back(GB_FMT("feature {} missing", #FIELD)); \
       }
 
-    cgpuSetupDeviceFeatureChain(c.featureChain, extensions.data(), extensionCount,
+    cgpuSetupDeviceFeatureChain(c->featureChain, extensions.data(), extensionCount,
                                 debugUtilsEnabled, properties.vendorID);
     CGPU_REQUIRE_FEATURE(maintenance5, maintenance5);
     CGPU_REQUIRE_FEATURE(timelineSemaphore, timelineSemaphore);
@@ -857,25 +862,25 @@ namespace gtl
 #undef CGPU_REQUIRE_FEATURE
 
 #define CGPU_ENABLE_FEATURE(STRUCT, FIELD) \
-      bool(c.featureChain.STRUCT.FIELD = tempFeatureChain.STRUCT.FIELD)
+      bool(c->featureChain.STRUCT.FIELD = tempFeatureChain.STRUCT.FIELD)
 
     bool pageableDeviceLocalMemory = tempFeatureChain.memoryPriority.memoryPriority &&
                                      tempFeatureChain.pageableDeviceLocalMemory.pageableDeviceLocalMemory;
 
     if (pageableDeviceLocalMemory)
     {
-      c.featureChain.memoryPriority.memoryPriority = VK_TRUE;
-      c.featureChain.pageableDeviceLocalMemory.pageableDeviceLocalMemory = VK_TRUE;
+      c->featureChain.memoryPriority.memoryPriority = VK_TRUE;
+      c->featureChain.pageableDeviceLocalMemory.pageableDeviceLocalMemory = VK_TRUE;
     }
 
-    c.features = {
+    c->features = {
       .debugPrintf = findExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME),
       .rayTracingInvocationReorder = CGPU_ENABLE_FEATURE(rayTracingInvocationReorder, rayTracingInvocationReorder),
       .shaderClock = CGPU_ENABLE_FEATURE(shaderClock, shaderSubgroupClock),
       .sharedMemory = isHeapHostAccessible // UMA or ReBAR
     };
 
-    c.internalFeatures =
+    c->internalFeatures =
     {
       .driverProperties = findExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME),
       .maintenance4 = CGPU_ENABLE_FEATURE(maintenance4, maintenance4),
@@ -884,30 +889,32 @@ namespace gtl
       .rayTracingValidation = CGPU_ENABLE_FEATURE(rayTracingValidation, rayTracingValidation)
     };
 
-    cgpuAddFeatureExtensions(c.features, c.internalFeatures, c.enabledExtensions);
+    cgpuAddFeatureExtensions(c->features, c->internalFeatures, c->enabledExtensions);
 #undef CGPU_ENABLE_FEATURE
 
     // calculate score
-    c.score = 0;
+    c->score = 0;
 
-    if (!c.errorMessages.empty())
+    if (!c->errorMessages.empty())
     {
-      return;
+      return c; // unsuitable
     }
 
     if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
     {
-      c.score += 10000;
+      c->score += 10000;
     }
     else if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU)
     {
-      c.score += 8000; // can be a masked dGPU
+      c->score += 8000; // can be a masked dGPU
     }
 
-    c.score += int(largestDeviceLocalHeapSize / uint64_t(1024 * 1024 * 1024)); // bytes to gigabytes
+    c->score += int(largestDeviceLocalHeapSize / uint64_t(1024 * 1024 * 1024)); // bytes to gigabytes
+
+    return c;
   }
 
-  using CgpuCandidateVector = GbSmallVector<CgpuDeviceCandidate, CGPU_INITIAL_PHYSICAL_DEVICE_COUNT>;
+  using CgpuCandidateVector = GbSmallVector<CgpuDeviceCandidatePtr, CGPU_INITIAL_PHYSICAL_DEVICE_COUNT>;
 
   static CgpuCandidateVector cgpuQueryDeviceCandidates(VkInstance instance, bool debugUtilsEnabled)
   {
@@ -922,13 +929,12 @@ namespace gtl
     GbSmallVector<VkPhysicalDevice, CGPU_INITIAL_PHYSICAL_DEVICE_COUNT> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
-    CgpuCandidateVector candidates(deviceCount);
+    CgpuCandidateVector candidates;
+    candidates.reserve(deviceCount);
 
     for (uint32_t deviceIdx = 0; deviceIdx < deviceCount; deviceIdx++)
     {
-      CgpuDeviceCandidate& c = candidates[deviceIdx];
-
-      cgpuQueryDeviceCandidate(devices[deviceIdx], debugUtilsEnabled, c);
+      candidates.push_back(cgpuQueryDeviceCandidate(devices[deviceIdx], debugUtilsEnabled));
     }
 
     return candidates;
@@ -965,8 +971,8 @@ namespace gtl
       return false;
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const CgpuDeviceCandidate& a, const CgpuDeviceCandidate& b) {
-      return a.score > b.score;
+    std::sort(candidates.begin(), candidates.end(), [](const CgpuDeviceCandidatePtr& a, const CgpuDeviceCandidatePtr& b) {
+      return a->score > b->score;
     });
 
     uint32_t deviceIndex = 0;
@@ -981,7 +987,7 @@ namespace gtl
     GB_LOG("Device list:");
     for (uint32_t i = 0; i < candidates.size(); i++)
     {
-      const CgpuDeviceCandidate& candidate = candidates[i];
+      const CgpuDeviceCandidate& candidate = *candidates[i];
       const VkPhysicalDeviceProperties& properties = candidate.propertyChain.properties2.properties;
 
       std::string idxStr = (i == deviceIndex) ? "x" : GB_FMT("{}", i);
@@ -994,13 +1000,13 @@ namespace gtl
       }
     }
 
-    if (candidates[deviceIndex].score == 0)
+    if (candidates[deviceIndex]->score == 0)
     {
       GB_ERROR("GPU not suitable");
       return false;
     }
 
-    const CgpuDeviceCandidate& candidate = candidates[deviceIndex];
+    const CgpuDeviceCandidate& candidate = *candidates[deviceIndex];
 
     // print info
     const VkPhysicalDeviceProperties& properties = candidate.propertyChain.properties2.properties;
