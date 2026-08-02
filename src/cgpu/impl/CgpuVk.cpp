@@ -768,22 +768,23 @@ namespace gtl
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++)
     {
       const auto& memoryType = memoryProperties.memoryTypes[i];
-      VkDeviceSize heapSize = memoryProperties.memoryHeaps[memoryType.heapIndex].size;
 
-      if (!bool(memoryType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) || heapSize < largestDeviceLocalHeapSize)
+      if (!bool(memoryType.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
       {
         continue;
       }
 
-      largestDeviceLocalHeapSize = heapSize;
+      VkDeviceSize heapSize = memoryProperties.memoryHeaps[memoryType.heapIndex].size;
+      bool isHostVisible = bool(memoryType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-      if (bool(memoryType.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
+      if (heapSize > largestDeviceLocalHeapSize)
       {
-        isHeapHostAccessible = true;
+        largestDeviceLocalHeapSize = heapSize;
+        isHeapHostAccessible = isHostVisible;
       }
-      else if (heapSize > largestDeviceLocalHeapSize)
+      else if (heapSize == largestDeviceLocalHeapSize)
       {
-        isHeapHostAccessible = false;
+        isHeapHostAccessible |= isHostVisible;
       }
     }
 
