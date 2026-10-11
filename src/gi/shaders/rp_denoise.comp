@@ -2,6 +2,8 @@
 #extension GL_EXT_shader_16bit_storage: require
 #extension GL_EXT_shader_explicit_arithmetic_types_float16: require
 #extension GL_EXT_control_flow_attributes: require
+#extension GL_KHR_cooperative_matrix: enable
+#extension GL_KHR_memory_scope_semantics: enable
 
 #include "interface/rp_oidn.h"
 
@@ -52,11 +54,69 @@ layout(binding = BINDING_INDEX_VALUE_SCALE_BUF, std430) readonly buffer ValueSca
 #define BLOCK_TAPS(j, i) f16vec2(win[j][i], win[j + 1][i])
 #endif
 
+// Cooperative matrix tile sizes (rows x columns x reduction). The host must set
+// these to a combination the device supports for f16 operands and accumulators
+// (VkPhysicalDeviceCooperativeMatrixPropertiesKHR), and CM_SUBGROUP_SIZE to the
+// device's subgroup size (VkPhysicalDeviceSubgroupProperties).
+#ifndef CM_M
+#define CM_M 16
+#endif
+#ifndef CM_N
+#define CM_N 16
+#endif
+#ifndef CM_K
+#define CM_K 16
+#endif
+#ifndef CM_SUBGROUP_SIZE
+#define CM_SUBGROUP_SIZE 32
+#endif
+
+#if CONV_IMPL == CONV_IMPL_COOP_MATRIX
+#if WG_SIZE_X % CM_SUBGROUP_SIZE != 0
+#error The workgroup size in X must be a multiple of CM_SUBGROUP_SIZE.
+#endif
+
+#define CM_TYPE_A coopmat<float16_t, gl_ScopeSubgroup, CM_M, CM_K, gl_MatrixUseA>
+#define CM_TYPE_B coopmat<float16_t, gl_ScopeSubgroup, CM_K, CM_N, gl_MatrixUseB>
+#define CM_TYPE_C coopmat<float16_t, gl_ScopeSubgroup, CM_M, CM_N, gl_MatrixUseAccumulator>
+
+// Output tiles are CM_N pixels wide; the pixel columns of the last tile of a
+// row may overhang the workgroup tile, which the result readback ignores.
+#define CM_TILES_PER_ROW ((TILE_SIZE_X + CM_N - 1) / CM_N)
+#define CM_RESULT_SIZE_X (CM_TILES_PER_ROW * CM_N)
+#define CM_RESULT_CHANNEL_COUNT (((CONV_CHANNEL_COUNT + CM_M - 1) / CM_M) * CM_M)
+#define CM_CHANNEL_TILES ((CONV_CHANNEL_COUNT + CM_M - 1) / CM_M)
+#define CM_WINDOW_ROW_SIZE (CM_RESULT_SIZE_X + 2)
+#define CM_PIXEL_TILES (TILE_SIZE_Y * CM_TILES_PER_ROW)
+#define CM_SUBGROUP_COUNT ((WG_SIZE_X * WG_SIZE_Y) / CM_SUBGROUP_SIZE)
+#define CM_PIXEL_TILES_PER_WARP ((CM_PIXEL_TILES + CM_SUBGROUP_COUNT - 1) / CM_SUBGROUP_COUNT)
+#else
+#define CM_RESULT_SIZE_X TILE_SIZE_X
+#define CM_RESULT_CHANNEL_COUNT CONV_CHANNEL_COUNT
+#endif
+
 #if CONV_IMPL == CONV_IMPL_SHMEM
 shared float16_t sh_window[TILE_SIZE_Y + 2][TILE_SIZE_X + 2];
+#elif CONV_IMPL == CONV_IMPL_COOP_MATRIX
+// [(TILE_SIZE_Y + 2) rows][CM_WINDOW_ROW_SIZE pixels][CM_K channels], flat so it
+// can be handed to coopMatLoad. CM_K and CM_RESULT_CHANNEL_COUNT are multiples
+// of 8 elements, which keeps the matrix offsets and strides 16 byte aligned as
+// required by the extension.
+shared float16_t sh_window[(TILE_SIZE_Y + 2) * CM_WINDOW_ROW_SIZE * CM_K];
+// Double buffered staging for the weight tiles.
+shared float16_t sh_weights[2 * CM_RESULT_CHANNEL_COUNT * CM_K];
 #endif
-#ifndef OP_MAX_POOL
+
+#if CONV_IMPL == CONV_IMPL_COOP_MATRIX
+// Flat with the output channels innermost and the pixel columns padded to a
+// multiple of CM_N, so cooperative matrix tiles can be stored directly. Pooled
+// layers read the results back, too, as the pre-pooling distribution across a
+// subgroup is implementation defined.
+shared float16_t sh_results[TILE_SIZE_Y * CM_RESULT_SIZE_X * CM_RESULT_CHANNEL_COUNT];
+#define RESULT_AT(y, x, oc) sh_results[((y) * CM_RESULT_SIZE_X + (x)) * CM_RESULT_CHANNEL_COUNT + (oc)]
+#elif !defined(OP_MAX_POOL)
 shared float16_t sh_results[TILE_SIZE_Y][TILE_SIZE_X][CONV_CHANNEL_COUNT];
+#define RESULT_AT(y, x, oc) sh_results[(y)][(x)][(oc)]
 #endif
 
 void main()
@@ -173,7 +233,7 @@ void main()
       result *= invValueScale;
 #endif
 
-      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r][gl_LocalInvocationID.x][oc] = result;
+      RESULT_AT(gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r, gl_LocalInvocationID.x, oc) = result;
     }
 
     // No barrier is needed: the shared results are only read back by the
@@ -190,7 +250,7 @@ void main()
 #ifndef OP_MAX_POOL
   for (uint r = 0; r < OUT_ROWS_PER_THREAD; r++)
   for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
-    sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r][gl_LocalInvocationID.x][oc] = float16_t(0.0);
+    RESULT_AT(gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r, gl_LocalInvocationID.x, oc) = float16_t(0.0);
 #else
   // Accumulate the convolution results of the pooling block across input
   // channels in registers, then reduce them once.
@@ -259,8 +319,8 @@ void main()
 #ifdef OP_MAX_POOL
       accs[oc] += result;
 #else
-      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 0][gl_LocalInvocationID.x][oc] += result.x;
-      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 1][gl_LocalInvocationID.x][oc] += result.y;
+      RESULT_AT(gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 0, gl_LocalInvocationID.x, oc) += result.x;
+      RESULT_AT(gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 1, gl_LocalInvocationID.x, oc) += result.y;
 #endif
     }
 
@@ -287,6 +347,191 @@ void main()
   }
 #endif
 
+#elif CONV_IMPL == CONV_IMPL_COOP_MATRIX
+
+  // Cooperative matrix convolution. Each subgroup computes CM_M output channels
+  // for CM_N consecutive pixels per multiply-add, accumulating over the kernel
+  // taps and the input channel chunks:
+  //    out[oc][pix] = sum over ic, tap of weight[oc][ic][tap] * window[ic][pix + tap]
+  // The weight operand (A) is restaged per (channel chunk, tap); the input
+  // operand (B) is loaded directly from the window, whose channel index is
+  // contiguous and serves as the reduction (row) dimension of the matrix.
+  //
+  // NOTE: the accumulators live across the chunk loop, so the register budget
+  // is CM_CHANNEL_TILES * CM_PIXEL_TILES_PER_WARP matrices; large output channel
+  // counts or workgroup tiles may require picking a smaller workgroup size.
+  // The shared memory used by a workgroup is
+  //   (TILE_SIZE_Y + 2) * CM_WINDOW_ROW_SIZE * CM_K window elements
+  // + TILE_SIZE_Y * CM_RESULT_SIZE_X * CM_RESULT_CHANNEL_COUNT result elements
+  // + 2 * CM_RESULT_CHANNEL_COUNT * CM_K weight elements
+  // and must be taken into account when the host picks the workgroup size!
+  ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(TILE_SIZE_X, TILE_SIZE_Y);
+
+  const uint cmSubgroupId = gl_LocalInvocationIndex / uint(CM_SUBGROUP_SIZE);
+
+  CM_TYPE_C cmAccs[CM_CHANNEL_TILES][CM_PIXEL_TILES_PER_WARP];
+
+  [[unroll]]
+  for (uint m = 0; m < CM_CHANNEL_TILES; m++)
+  [[unroll]]
+  for (uint j = 0; j < CM_PIXEL_TILES_PER_WARP; j++)
+  {
+    cmAccs[m][j] = CM_TYPE_C(float16_t(0.0));
+  }
+
+  for (uint chunk = 0; chunk < uint((IN1_CHANNEL_COUNT + CM_K - 1) / CM_K); chunk++)
+  {
+    // ---- Load this chunk's input channels into the window ----
+    [[unroll]]
+    for (uint rr = 0; rr < uint((TILE_SIZE_Y + 2 + WG_SIZE_Y - 1) / WG_SIZE_Y); rr++)
+    [[unroll]]
+    for (uint cc = 0; cc < uint((CM_WINDOW_ROW_SIZE + WG_SIZE_X - 1) / WG_SIZE_X); cc++)
+    {
+      uint r = gl_LocalInvocationID.y + rr * WG_SIZE_Y;
+      uint c = gl_LocalInvocationID.x + cc * WG_SIZE_X;
+
+      if (r < uint(TILE_SIZE_Y + 2) && c < uint(CM_WINDOW_ROW_SIZE))
+      {
+        ivec2 coord = wgBase + ivec2(int(c) - 1, int(r) - 1);
+
+        bool oob = any(lessThan(coord, ivec2(0))) ||
+                   any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight)));
+
+        // Zero out of bounds pixels, the tile padding columns as well as the
+        // channels past the end of the input.
+        bool pad = (c >= uint(TILE_SIZE_X + 2));
+
+        uint base = (r * uint(CM_WINDOW_ROW_SIZE) + c) * uint(CM_K);
+
+        [[unroll]]
+        for (uint k = 0; k < CM_K; k++)
+        {
+          uint ic = chunk * uint(CM_K) + k;
+
+          float16_t value = float16_t(0.0);
+
+          if (!oob && !pad && ic < uint(IN1_CHANNEL_COUNT))
+          {
+            value = inPixels[(coord.y * ubo.imageWidth + coord.x) * IN1_CHANNEL_COUNT + ic];
+
+#ifdef SCALE_INPUT_INV
+            value *= invValueScale;
+#endif
+          }
+
+          sh_window[base + k] = value;
+        }
+      }
+    }
+
+    barrier();
+
+    for (uint tap = 0; tap < KERNEL_SIZE_SQ; tap++)
+    {
+      // ---- Stage the weights of all output channels for this tap ----
+      const uint aBufferOffset = (tap & 1) * uint(CM_RESULT_CHANNEL_COUNT * CM_K);
+
+      for (uint i = gl_LocalInvocationIndex; i < uint(CM_RESULT_CHANNEL_COUNT * CM_K); i += uint(WG_SIZE_X * WG_SIZE_Y))
+      {
+        uint m = i / uint(CM_K);
+        uint ic = chunk * uint(CM_K) + (i % uint(CM_K));
+
+        float16_t value = float16_t(0.0);
+
+        if (m < uint(CONV_CHANNEL_COUNT) && ic < uint(IN1_CHANNEL_COUNT))
+        {
+          value = tensors[ubo.weightOffset + (m * uint(IN1_CHANNEL_COUNT) + ic) * uint(KERNEL_SIZE_SQ) + tap]; // OIHW
+        }
+
+        sh_weights[aBufferOffset + i] = value;
+      }
+
+      barrier();
+
+      // ---- Gather the weight (A) operands ----
+      CM_TYPE_A cmWeights[CM_CHANNEL_TILES];
+
+      [[unroll]]
+      for (uint m = 0; m < CM_CHANNEL_TILES; m++)
+      {
+        coopMatLoad(cmWeights[m], sh_weights, aBufferOffset + m * uint(CM_M * CM_K), uint(CM_K), gl_CooperativeMatrixLayoutRowMajor);
+      }
+
+      // ---- Multiply-add for each pixel tile owned by this subgroup ----
+      [[unroll]]
+      for (uint j = 0; j < CM_PIXEL_TILES_PER_WARP; j++)
+      {
+        const uint pixelTile = cmSubgroupId * uint(CM_PIXEL_TILES_PER_WARP) + j;
+
+        if (pixelTile < uint(CM_PIXEL_TILES))
+        {
+          const uint tileX = (pixelTile % uint(CM_TILES_PER_ROW)) * uint(CM_N);
+          const uint tileY = pixelTile / uint(CM_TILES_PER_ROW);
+
+          // The columns of B are consecutive pixels of a window row.
+          uint bElement = ((tileY + tap / uint(KERNEL_SIZE)) * uint(CM_WINDOW_ROW_SIZE) + tileX + (tap % uint(KERNEL_SIZE))) * uint(CM_K);
+
+          CM_TYPE_B cmWindow;
+          coopMatLoad(cmWindow, sh_window, bElement, uint(CM_K), gl_CooperativeMatrixLayoutColumnMajor);
+
+          [[unroll]]
+          for (uint m = 0; m < CM_CHANNEL_TILES; m++)
+          {
+            cmAccs[m][j] = coopMatMulAdd(cmWeights[m], cmWindow, cmAccs[m][j]);
+          }
+        }
+      }
+    }
+  }
+
+  // ---- Store the per-pixel results for the post processing ----
+  [[unroll]]
+  for (uint m = 0; m < CM_CHANNEL_TILES; m++)
+  [[unroll]]
+  for (uint j = 0; j < CM_PIXEL_TILES_PER_WARP; j++)
+  {
+    const uint pixelTile = cmSubgroupId * uint(CM_PIXEL_TILES_PER_WARP) + j;
+
+    if (pixelTile < uint(CM_PIXEL_TILES))
+    {
+      const uint tileX = (pixelTile % uint(CM_TILES_PER_ROW)) * uint(CM_N);
+      const uint tileY = pixelTile / uint(CM_TILES_PER_ROW);
+
+      coopMatStore(cmAccs[m][j], sh_results,
+                   (tileY * uint(CM_RESULT_SIZE_X) + tileX) * uint(CM_RESULT_CHANNEL_COUNT) + m * uint(CM_M),
+                   uint(CM_RESULT_CHANNEL_COUNT), gl_CooperativeMatrixLayoutColumnMajor);
+    }
+  }
+
+  // The results are read back by invocations other than the ones that stored them.
+  barrier();
+
+#ifdef OP_MAX_POOL
+  // Pool the 2x2 convolution result block of this invocation. The results had to
+  // be exchanged through shared memory, as their pre-pooling distribution across
+  // a subgroup is implementation defined.
+  if (gl_GlobalInvocationID.x < ubo.imageWidth / 2 &&
+      gl_GlobalInvocationID.y < ubo.imageHeight / 2)
+  {
+    uint lx = uint(gl_LocalInvocationID.x) * uint(OUT_COLS_PER_THREAD);
+    uint ly = uint(gl_LocalInvocationID.y) * uint(OUT_ROWS_PER_THREAD);
+
+    int inIdx = int(gl_GlobalInvocationID.y * (ubo.imageWidth / 2) + gl_GlobalInvocationID.x);
+
+    for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
+    {
+      float16_t result = max(max(RESULT_AT(ly, lx, oc), RESULT_AT(ly, lx + 1, oc)),
+                             max(RESULT_AT(ly + 1, lx, oc), RESULT_AT(ly + 1, lx + 1, oc)));
+
+      result += tensors[ubo.biasOffset + oc];
+
+      result = max(result, float16_t(0.0)); // ReLU activation
+
+      outPixels[inIdx * OUT_CHANNEL_COUNT + oc] = result;
+    }
+  }
+#endif
+
 #else
 
 #error Unsupported convolution mode.
@@ -296,8 +541,10 @@ void main()
 
 #ifndef OP_MAX_POOL
 
-  // The shared results are only read back by the invocation that wrote them;
-  // pooled layers write their output directly above.
+  // For the shader implementations that keep per-invocation results, the shared
+  // results are only read back by the invocation that wrote them (pooled layers
+  // write their output directly above). The cooperative matrix implementation
+  // exchanges them across the workgroup instead, hence the barrier.
   for (uint r = 0; r < OUT_ROWS_PER_THREAD; r++)
   {
     uint outY = gl_GlobalInvocationID.y * OUT_ROWS_PER_THREAD + r;
@@ -316,7 +563,7 @@ void main()
 
     for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
     {
-      float16_t result = sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r][gl_LocalInvocationID.x][oc];
+      float16_t result = RESULT_AT(gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r, gl_LocalInvocationID.x, oc);
 
       result += tensors[ubo.biasOffset + oc];
 

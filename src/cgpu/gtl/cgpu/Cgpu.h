@@ -295,6 +295,7 @@ namespace gtl
 
   struct CgpuDeviceFeatures
   {
+    bool cooperativeMatrix;
     bool debugPrintf;
     bool rayTracingInvocationReorder;
     bool shaderClock;
@@ -303,11 +304,14 @@ namespace gtl
 
   struct CgpuDeviceProperties
   {
+    uint32_t cooperativeMatrixSizeM;
+    uint32_t cooperativeMatrixSizeN;
+    uint32_t cooperativeMatrixSizeK;
     uint64_t minStorageBufferOffsetAlignment;
     uint64_t minUniformBufferOffsetAlignment;
     uint32_t maxComputeSharedMemorySize;
     uint32_t maxRayHitAttributeSize;
-    bool     softwareEmulated;
+    bool     softwareEmulated; // TODO: should be in features?
     uint32_t subgroupSize;
   };
 

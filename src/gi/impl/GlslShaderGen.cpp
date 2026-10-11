@@ -316,6 +316,10 @@ namespace gtl
     stitcher.appendDefine("CONV_IMPL", params.convolutionImpl);
     stitcher.appendDefine("WG_SIZE_X", params.wgSizeX);
     stitcher.appendDefine("WG_SIZE_Y", params.wgSizeY);
+    stitcher.appendDefine("CM_SUBGROUP_SIZE", params.subgroupSize);
+    stitcher.appendDefine("CM_M", params.coopMatSizeM);
+    stitcher.appendDefine("CM_N", params.coopMatSizeN);
+    stitcher.appendDefine("CM_K", params.coopMatSizeK);
 
     if (bool(params.postOp & OidnPostOp::MaxPool))
     {

@@ -110,6 +110,7 @@ namespace gtl
     bool pageableDeviceLocalMemory;
     bool pipelineLibraries;
     bool rayTracingValidation;
+    bool vulkanMemoryModel;
   };
 
   struct CgpuIDevice
@@ -452,6 +453,7 @@ namespace gtl
     VkPhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructure;
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipeline;
     VkPhysicalDeviceSubgroupProperties subgroup;
+    VkPhysicalDeviceCooperativeMatrixPropertiesKHR cooperativeMatrix;
   };
 
   static void cgpuSetupDevicePropertyChain(CgpuDevicePropertyChain& chain,
@@ -477,6 +479,16 @@ namespace gtl
       pNext = &chain.driver;
     }
 
+    chain.cooperativeMatrix = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_PROPERTIES_KHR,
+      .pNext = pNext
+    };
+
+    if (findExtension(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME))
+    {
+      pNext = &chain.cooperativeMatrix;
+    }
+
     chain.accelerationStructure = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR,
       .pNext = pNext
@@ -495,12 +507,69 @@ namespace gtl
     };
   }
 
-  static CgpuDeviceProperties cgpuGetDeviceProperties(const CgpuDevicePropertyChain& chain)
+  static CgpuDeviceProperties cgpuGetDeviceProperties(VkPhysicalDevice physicalDevice,
+                                                      const CgpuDevicePropertyChain& chain,
+                                                      bool cooperativeMatrix)
   {
     const VkPhysicalDeviceProperties& properties = chain.properties2.properties;
     const VkPhysicalDeviceLimits& limits = properties.limits;
 
+    uint32_t cooperativeMatrixSizeM = 0;
+    uint32_t cooperativeMatrixSizeN = 0;
+    uint32_t cooperativeMatrixSizeK = 0;
+
+    if (cooperativeMatrix)
+    {
+      uint32_t coopMatrixPropertyCount = 0;
+      vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(physicalDevice, &coopMatrixPropertyCount, nullptr);
+
+      std::vector<VkCooperativeMatrixPropertiesKHR> coopMatrixProperties(coopMatrixPropertyCount);
+
+      for (VkCooperativeMatrixPropertiesKHR& coopMatrixProperty : coopMatrixProperties)
+      {
+        coopMatrixProperty = { .sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR };
+      }
+
+      vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(physicalDevice, &coopMatrixPropertyCount, coopMatrixProperties.data());
+
+      uint64_t bestScore = 0;
+
+      for (const VkCooperativeMatrixPropertiesKHR& coopMatrixProperty : coopMatrixProperties)
+      {
+        // The denoising convolutions multiply f16 weights and activations within
+        // a single subgroup, without saturating accumulation.
+        if (coopMatrixProperty.scope != VK_SCOPE_SUBGROUP_KHR ||
+            coopMatrixProperty.saturatingAccumulation != VK_FALSE ||
+            coopMatrixProperty.AType != VK_COMPONENT_TYPE_FLOAT16_KHR ||
+            coopMatrixProperty.BType != VK_COMPONENT_TYPE_FLOAT16_KHR ||
+            coopMatrixProperty.CType != VK_COMPONENT_TYPE_FLOAT16_KHR ||
+            coopMatrixProperty.ResultType != VK_COMPONENT_TYPE_FLOAT16_KHR)
+        {
+          continue;
+        }
+
+        // Pick the configuration that computes the most multiply-adds per
+        // matrix instruction; tie-break towards the largest reduction depth, as
+        // convolution outputs accumulate many products.
+        const uint64_t score = uint64_t(coopMatrixProperty.MSize) *
+                               uint64_t(coopMatrixProperty.NSize) *
+                               uint64_t(coopMatrixProperty.KSize);
+
+        if (score > bestScore || (score == bestScore && coopMatrixProperty.KSize > cooperativeMatrixSizeK))
+        {
+          bestScore = score;
+
+          cooperativeMatrixSizeM = coopMatrixProperty.MSize;
+          cooperativeMatrixSizeN = coopMatrixProperty.NSize;
+          cooperativeMatrixSizeK = coopMatrixProperty.KSize;
+        }
+      }
+    }
+
     return CgpuDeviceProperties {
+      .cooperativeMatrixSizeM = cooperativeMatrixSizeM,
+      .cooperativeMatrixSizeN = cooperativeMatrixSizeN,
+      .cooperativeMatrixSizeK = cooperativeMatrixSizeK,
       .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
       .minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment,
       .maxComputeSharedMemorySize = limits.maxComputeSharedMemorySize,
@@ -546,6 +615,8 @@ namespace gtl
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexing;
     VkPhysicalDeviceShaderFloat16Int8Features shaderFloat16Int8;
     VkPhysicalDevice16BitStorageFeatures storage16Bit;
+    VkPhysicalDeviceCooperativeMatrixFeaturesKHR cooperativeMatrix;
+    VkPhysicalDeviceVulkanMemoryModelFeaturesKHR vulkanMemoryModel;
   };
 
   static void cgpuSetupDeviceFeatureChain(CgpuDeviceFeatureChain& chain,
@@ -636,6 +707,26 @@ namespace gtl
     }
 #endif
 
+    chain.cooperativeMatrix = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR,
+      .pNext = pNext
+    };
+
+    if (findExtension(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME))
+    {
+      pNext = &chain.cooperativeMatrix;
+    }
+
+    chain.vulkanMemoryModel = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES_KHR,
+      .pNext = pNext
+    };
+
+    if (findExtension(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME))
+    {
+      pNext = &chain.vulkanMemoryModel;
+    }
+
     chain.maintenance5 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_5_FEATURES_KHR,
       .pNext = pNext
@@ -696,6 +787,10 @@ namespace gtl
     {
       extensions.push_back(VK_KHR_SHADER_CLOCK_EXTENSION_NAME);
     }
+    if (features.cooperativeMatrix)
+    {
+      extensions.push_back(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+    }
 
     if (internalFeatures.driverProperties)
     {
@@ -718,6 +813,10 @@ namespace gtl
     if (internalFeatures.rayTracingValidation)
     {
       extensions.push_back(VK_NV_RAY_TRACING_VALIDATION_EXTENSION_NAME);
+    }
+    if (internalFeatures.vulkanMemoryModel)
+    {
+      extensions.push_back(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME);
     }
   }
 
@@ -872,20 +971,43 @@ namespace gtl
       c.featureChain.pageableDeviceLocalMemory.pageableDeviceLocalMemory = VK_TRUE;
     }
 
+    bool cooperativeMatrix = tempFeatureChain.cooperativeMatrix.cooperativeMatrix &&
+                             (c.propertyChain.cooperativeMatrix.cooperativeMatrixSupportedStages & VK_SHADER_STAGE_COMPUTE_BIT);
+
+    if (cooperativeMatrix)
+    {
+        c.featureChain.cooperativeMatrix.cooperativeMatrix = VK_TRUE;
+    }
+
+    // The cooperative matrix shaders use the Vulkan memory model, so it must be
+    // enabled together with the extension if both are supported. The other
+    // shaders use device scope atomics, which require the device scope feature.
+    bool vulkanMemoryModel = cooperativeMatrix &&
+                             findExtension(VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME) &&
+                             tempFeatureChain.vulkanMemoryModel.vulkanMemoryModel &&
+                             tempFeatureChain.vulkanMemoryModel.vulkanMemoryModelDeviceScope;
+
+    if (vulkanMemoryModel)
+    {
+      c.featureChain.vulkanMemoryModel.vulkanMemoryModel = VK_TRUE;
+      c.featureChain.vulkanMemoryModel.vulkanMemoryModelDeviceScope = VK_TRUE;
+    }
+
     c.features = {
+      .cooperativeMatrix = cooperativeMatrix,
       .debugPrintf = findExtension(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME),
       .rayTracingInvocationReorder = CGPU_ENABLE_FEATURE(rayTracingInvocationReorder, rayTracingInvocationReorder),
       .shaderClock = CGPU_ENABLE_FEATURE(shaderClock, shaderSubgroupClock),
       .sharedMemory = isHeapHostAccessible // UMA or ReBAR
     };
 
-    c.internalFeatures =
-    {
+    c.internalFeatures = {
       .driverProperties = findExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME),
       .maintenance4 = CGPU_ENABLE_FEATURE(maintenance4, maintenance4),
       .pageableDeviceLocalMemory = pageableDeviceLocalMemory,
       .pipelineLibraries = CGPU_ENABLE_FEATURE(groupHandles, pipelineLibraryGroupHandles),
-      .rayTracingValidation = CGPU_ENABLE_FEATURE(rayTracingValidation, rayTracingValidation)
+      .rayTracingValidation = CGPU_ENABLE_FEATURE(rayTracingValidation, rayTracingValidation),
+      .vulkanMemoryModel = vulkanMemoryModel
     };
 
     cgpuAddFeatureExtensions(c.features, c.internalFeatures, c.enabledExtensions);
@@ -945,6 +1067,7 @@ namespace gtl
 #define CGPU_PRINT_FEATURE(STRUCT, FIELD) \
     if (STRUCT.FIELD) GB_LOG("- " #FIELD);
 
+    CGPU_PRINT_FEATURE(features,         cooperativeMatrix);
     CGPU_PRINT_FEATURE(features,         debugPrintf);
     CGPU_PRINT_FEATURE(internalFeatures, driverProperties);
     CGPU_PRINT_FEATURE(internalFeatures, maintenance4);
@@ -954,6 +1077,7 @@ namespace gtl
     CGPU_PRINT_FEATURE(internalFeatures, rayTracingValidation);
     CGPU_PRINT_FEATURE(features,         shaderClock);
     CGPU_PRINT_FEATURE(features,         sharedMemory);
+    CGPU_PRINT_FEATURE(internalFeatures, vulkanMemoryModel);
 
 #undef CGPU_PRINT_FEATURE
   }
@@ -1046,7 +1170,8 @@ namespace gtl
 
     idevice->features = candidate.features;
     idevice->internalFeatures = candidate.internalFeatures;
-    idevice->properties = cgpuGetDeviceProperties(candidate.propertyChain);
+    idevice->properties = cgpuGetDeviceProperties(candidate.device, candidate.propertyChain,
+                                                  candidate.features.cooperativeMatrix);
     idevice->internalProperties = cgpuGetInternalDeviceProperties(candidate.propertyChain);
 
     const float queuePriority = 1.0f;
@@ -1758,7 +1883,7 @@ namespace gtl
     {
       vmaSetAllocationName(idevice->allocator, ibuffer->allocation, debugName);
     }
-    
+
     if (bool(usage & CgpuBufferUsage::ShaderDeviceAddress))
     {
       VkBufferDeviceAddressInfoKHR addressInfo = {

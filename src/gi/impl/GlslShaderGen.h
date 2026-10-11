@@ -138,6 +138,10 @@ namespace gtl
       int outChannelCount;
       int convChannelCount;
       int convolutionImpl;
+      int subgroupSize;
+      int coopMatSizeM;
+      int coopMatSizeN;
+      int coopMatSizeK;
       OidnPostOp postOp = OidnPostOp::None;
     };
 

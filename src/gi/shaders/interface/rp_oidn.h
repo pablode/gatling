@@ -25,9 +25,11 @@ GI_INTERFACE_BEGIN(rp_oidn)
 #ifdef __cplusplus
 const GI_INT CONV_IMPL_SEQ = 0;
 const GI_INT CONV_IMPL_SHMEM = 1;
+const GI_INT CONV_IMPL_COOP_MATRIX = 2;
 #else
 #define CONV_IMPL_SEQ 0
 #define CONV_IMPL_SHMEM 1
+#define CONV_IMPL_COOP_MATRIX 2
 #endif
 
 struct UniformData

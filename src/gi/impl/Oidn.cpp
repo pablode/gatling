@@ -79,6 +79,14 @@ namespace gtl
     std::array<uint32_t, int(Buffer::COUNT)> m_bufferSizeMuls;
     std::array<uint32_t, int(Buffer::COUNT)> m_bufferLastDims;
 
+    uint32_t m_subgroupSize;
+    uint32_t m_maxComputeSharedMemorySize;
+
+    bool m_coopMatrixSupported;
+    uint32_t m_coopMatSizeM;
+    uint32_t m_coopMatSizeN;
+    uint32_t m_coopMatSizeK;
+
   private:
     struct TensorUpload
     {
@@ -95,6 +103,7 @@ namespace gtl
       const GiTzaTensorDescriptions& tensorDescriptions;
       const uint8_t* tensorData;
       bool softwareEmulated;
+      bool coopMatrixSupport;
 
       int depth = 0; // track up- and downsampling
       std::unordered_map<std::string, TensorUpload> tensorUploads;
@@ -152,6 +161,30 @@ namespace gtl
       return GB_FMT("Oidn_{}->{}{}", inDims, outDims, opStr);
     }
 
+    // The cooperative matrix implementation has its own shared memory footprint
+    // and workgroup size constraints; see rp_denoise.comp.
+    bool coopMatrixUsable(const BuildContext& c, GiOidnPostOp postOp, int convDims) const
+    {
+      if (!c.coopMatrixSupport || m_subgroupSize == 0 ||
+          m_coopMatSizeM == 0 || m_coopMatSizeN == 0 || m_coopMatSizeK == 0 ||
+          m_wgSizeX % m_subgroupSize != 0)
+      {
+        return false;
+      }
+
+      uint32_t tileSizeX = (bool(postOp & GiOidnPostOp::MaxPool) ? 2u : 1u) * m_wgSizeX;
+      uint32_t tileSizeY = 2u * m_wgSizeY;
+
+      uint32_t resultSizeX = ((tileSizeX + m_coopMatSizeN - 1) / m_coopMatSizeN) * m_coopMatSizeN;
+      uint32_t resultChannelCount = ((uint32_t(convDims) + m_coopMatSizeM - 1) / m_coopMatSizeM) * m_coopMatSizeM;
+
+      uint32_t windowCount = (tileSizeY + 2u) * (resultSizeX + 2u) * m_coopMatSizeK;
+      uint32_t resultCount = tileSizeY * resultSizeX * resultChannelCount;
+      uint32_t weightCount = 2u * resultChannelCount * m_coopMatSizeK;
+
+      return (windowCount + resultCount + weightCount) * sizeof(uint16_t) <= m_maxComputeSharedMemorySize;
+    }
+
     void addConvReLU(BuildContext& c, Buffer input1, Buffer output, std::string_view tensor, GiOidnPostOp postOp = GiOidnPostOp::None, Buffer input2 = Buffer::Invalid)
     {
       std::string weightName = GB_FMT("{}.weight", tensor);
@@ -190,9 +223,29 @@ namespace gtl
 
       std::string debugName = makeConvolutionPipelineDebugName(in1Dims, outDims, postOp);
 
-      // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
-      // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
-      int convImpl = c.softwareEmulated ? rp::CONV_IMPL_SEQ : rp::CONV_IMPL_SHMEM;
+      int convImpl;
+      if (coopMatrixUsable(c, postOp, convDims))
+      {
+        convImpl = rp::CONV_IMPL_COOP_MATRIX;
+      }
+      else
+      {
+        if (c.coopMatrixSupport)
+        {
+          GB_LOG("layer {}: falling back from cooperative matrix convolution", tensor);
+        }
+
+        if (c.softwareEmulated)
+        {
+          // Shared memory implementation is orders of magnitude slower on SW Vulkan runtime
+          // Mesa lavapipe (used in CI graphical tests). Prefer sequential path.
+          convImpl = rp::CONV_IMPL_SEQ;
+        }
+        else
+        {
+          convImpl = rp::CONV_IMPL_SHMEM;
+        }
+      }
 
       GiGlslShaderGen::OidnParams sgParams{
         .wgSizeX = int(m_wgSizeX),
@@ -201,6 +254,10 @@ namespace gtl
         .outChannelCount = outDims,
         .convChannelCount = convDims,
         .convolutionImpl = convImpl,
+        .subgroupSize = int(m_subgroupSize),
+        .coopMatSizeM = int(m_coopMatSizeM),
+        .coopMatSizeN = int(m_coopMatSizeN),
+        .coopMatSizeK = int(m_coopMatSizeK),
         .postOp = postOp
       };
       if (bool(postOp & GiOidnPostOp::Concat))
@@ -319,6 +376,13 @@ namespace gtl
       : m_deleteQueue(deleteQueue)
     {
       const CgpuDeviceProperties& deviceProperties = cgpuGetDeviceProperties(gpuCtx);
+      const CgpuDeviceFeatures& deviceFeatures = cgpuGetDeviceFeatures(gpuCtx);
+
+      m_subgroupSize = deviceProperties.subgroupSize;
+      m_maxComputeSharedMemorySize = deviceProperties.maxComputeSharedMemorySize;
+      m_coopMatSizeM = deviceProperties.cooperativeMatrixSizeM;
+      m_coopMatSizeN = deviceProperties.cooperativeMatrixSizeN;
+      m_coopMatSizeK = deviceProperties.cooperativeMatrixSizeK;
 
       uint32_t shmemSize = deviceProperties.maxComputeSharedMemorySize;
 
@@ -346,9 +410,18 @@ namespace gtl
 
       // Larger tiles amortize the uniform weight loads better, so pick the first
       // candidate that fits. Keep the sizes in sync with rp_denoise.comp!
-      constexpr uint32_t wgSizeCandidates[][2] = {
+      std::vector<std::array<uint32_t, 2>> wgSizeCandidates = {
         { 24, 16 }, { 16, 16 }, { 24, 8 }, { 16, 8 }, { 24, 4 }, { 16, 4 }, { 8, 4 }
       };
+
+      if (deviceFeatures.cooperativeMatrix && m_subgroupSize > 0)
+      {
+        // Cooperative matrix pipelines require the workgroup size in X to be a
+        // multiple of the subgroup size, so try complying candidates first.
+        wgSizeCandidates.insert(wgSizeCandidates.begin(), {
+          { m_subgroupSize, 8u }, { m_subgroupSize, 4u }, { m_subgroupSize, 2u }
+        });
+      }
 
       // Fall back to the smallest candidate if none fits.
       m_wgSizeX = 8;
@@ -369,7 +442,7 @@ namespace gtl
       for (uint32_t& i : m_bufferLastDims) { i = 0; }
       for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
 
-      BuildContext c{ gpuCtx, shaderGen, stager, tensorDescs, tensorData, deviceProperties.softwareEmulated };
+      BuildContext c{ gpuCtx, shaderGen, stager, tensorDescs, tensorData, deviceProperties.softwareEmulated, deviceFeatures.cooperativeMatrix };
 
       uploadTensors(c);
 
