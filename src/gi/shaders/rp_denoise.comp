@@ -35,7 +35,9 @@ shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][CONV_CHANNEL_COUNT];
 void main()
 {
 #if defined(SCALE_INPUT_INV) || defined(SCALE_INPUT2_INV)
-  float16_t invValueScale = float16_t(1.0 / valueScale);
+  // A black frame yields a maximum luminance of 0; fall back to 1 as the reference
+  // does, and keep the reciprocal within half-float range.
+  float16_t invValueScale = float16_t((valueScale > 0.0) ? min(1.0 / valueScale, 65504.0) : 1.0);
 #endif
 
 #if CONV_IMPL == CONV_IMPL_SEQ
