@@ -29,6 +29,9 @@ struct UniformData
 {
   GI_UINT imageWidth;
   GI_UINT imageHeight;
+  // Row pitch of the input buffer in pixels, which is padded to a multiple of
+  // the denoiser's pooling factor.
+  GI_UINT imageStride;
 };
 
 // set 0

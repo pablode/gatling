@@ -130,7 +130,7 @@ vec2 fisGauss(vec2 xi)
     return vec2(cos(phi), sin(phi)) * r;
 }
 
-void clearAovs(uint pixelIndex)
+void clearAovs(uint pixelIndex, uint oidnIndex)
 {
 #if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
     BarycentricsAov[pixelIndex] = ClearValuesF[AOV_ID_DEBUG_BARYCENTRICS].rgb;
@@ -185,7 +185,7 @@ void clearAovs(uint pixelIndex)
 #ifdef OIDN_ENABLED
     for (int i = 0; ubo.sampleOffset == 0 && i < OIDN_CHANNEL_COUNT; i++)
     {
-      OidnPool0[pixelIndex * OIDN_CHANNEL_COUNT + i] = float16_t(0.0);
+      OidnPool0[oidnIndex * OIDN_CHANNEL_COUNT + i] = float16_t(0.0);
     }
 #endif
 }
@@ -201,8 +201,10 @@ void main()
     uint imageHeight = ubo.imageDims >> 16;
 
     uint pixelIndex = pixel_pos.x + pixel_pos.y * imageWidth;
+    // The denoiser input buffer is padded to a multiple of the pooling factor.
+    uint oidnIndex = pixel_pos.x + pixel_pos.y * ubo.oidnImageWidth;
 
-    clearAovs(pixelIndex);
+    clearAovs(pixelIndex, oidnIndex);
 
     vec3 camera_right = cross(ubo.cameraForward, ubo.cameraUp);
     float aspect_ratio = float(imageWidth) / float(imageHeight);
@@ -530,8 +532,8 @@ void main()
 
 #ifdef OIDN_ENABLED
     const int CHANNEL_COUNT = 9;
-    OidnPool0[pixelIndex * CHANNEL_COUNT + 0] = float16_t(accumColor.r);
-    OidnPool0[pixelIndex * CHANNEL_COUNT + 1] = float16_t(accumColor.g);
-    OidnPool0[pixelIndex * CHANNEL_COUNT + 2] = float16_t(accumColor.b);
+    OidnPool0[oidnIndex * CHANNEL_COUNT + 0] = float16_t(accumColor.r);
+    OidnPool0[oidnIndex * CHANNEL_COUNT + 1] = float16_t(accumColor.g);
+    OidnPool0[oidnIndex * CHANNEL_COUNT + 2] = float16_t(accumColor.b);
 #endif
 }

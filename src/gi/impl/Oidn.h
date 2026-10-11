@@ -46,6 +46,13 @@ namespace gtl
 
   CgpuBuffer giOidnGetInputBuffer(GiOidnState* state);
   uint32_t giOidnGetInputChannelCount(GiOidnState* state);
+  // Row pitch in pixels of the denoiser's internal buffers; the imageWidth
+  // passed to giOidnUpdateState rounded up to a multiple of the pooling factor.
+  uint32_t giOidnGetBufferWidth(GiOidnState* state);
+
+  // Clears the denoiser input buffer including its padding margin. Must be
+  // called before rendering into it when the frame buffer size has changed.
+  void giOidnClearInputBuffer(GiOidnState* state, CgpuContext* gpuCtx, CgpuCommandBuffer commandBuffer);
 
   CgpuBuffer giOidnGetOutputBuffer(GiOidnState* state);
 

@@ -1922,6 +1922,35 @@ namespace gtl
     encoder->endEncoding();
   }
 
+  void cgpuCmdCopyBufferRows(CgpuContext* ctx,
+                             CgpuCommandBuffer commandBuffer,
+                             CgpuBuffer srcBuffer,
+                             uint64_t srcOffset,
+                             uint64_t srcStride,
+                             CgpuBuffer dstBuffer,
+                             uint64_t dstOffset,
+                             uint64_t dstStride,
+                             uint64_t rowSize,
+                             uint32_t rowCount)
+  {
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, srcBuffer, isrcBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
+
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
+
+    for (uint32_t i = 0; i < rowCount; i++)
+    {
+      encoder->copyFromBuffer(isrcBuffer->buffer, srcOffset + i * srcStride,
+                              idstBuffer->buffer, dstOffset + i * dstStride, rowSize);
+    }
+
+    icommandBuffer->auxResidencySet->addAllocation(isrcBuffer->buffer);
+    icommandBuffer->auxResidencySet->addAllocation(idstBuffer->buffer);
+
+    encoder->endEncoding();
+  }
+
   void cgpuCmdCopyBufferToImage(CgpuContext* ctx,
                                 CgpuCommandBuffer commandBuffer,
                                 CgpuBuffer buffer,

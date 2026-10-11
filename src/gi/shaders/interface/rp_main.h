@@ -51,6 +51,10 @@ struct UniformData
   GI_FLOAT lightIntensityMultiplier;
   GI_UINT  clipRangePacked;
   GI_FLOAT sensorExposure;
+  // Row pitch of the denoiser input buffer in pixels; equals imageWidth when
+  // denoising is disabled. The internal buffers are padded to a multiple of the
+  // denoiser's pooling factor.
+  GI_UINT  oidnImageWidth;
 };
 
 struct FVertex

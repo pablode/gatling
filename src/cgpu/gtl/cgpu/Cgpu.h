@@ -507,6 +507,22 @@ namespace gtl
     uint64_t size = CGPU_WHOLE_SIZE
   );
 
+  // Copies rowCount rows of rowSize bytes, with the given source and destination
+  // strides in bytes, so that for example padded buffers can be copied without
+  // their padding.
+  void cgpuCmdCopyBufferRows(
+    CgpuContext* ctx,
+    CgpuCommandBuffer commandBuffer,
+    CgpuBuffer srcBuffer,
+    uint64_t srcOffset,
+    uint64_t srcStride,
+    CgpuBuffer dstBuffer,
+    uint64_t dstOffset,
+    uint64_t dstStride,
+    uint64_t rowSize,
+    uint32_t rowCount
+  );
+
   void cgpuCmdCopyBufferToImage(
     CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,

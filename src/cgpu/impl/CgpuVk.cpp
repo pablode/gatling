@@ -3490,6 +3490,42 @@ namespace gtl
     );
   }
 
+  void cgpuCmdCopyBufferRows(CgpuContext* ctx,
+                             CgpuCommandBuffer commandBuffer,
+                             CgpuBuffer srcBuffer,
+                             uint64_t srcOffset,
+                             uint64_t srcStride,
+                             CgpuBuffer dstBuffer,
+                             uint64_t dstOffset,
+                             uint64_t dstStride,
+                             uint64_t rowSize,
+                             uint32_t rowCount)
+  {
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, srcBuffer, isrcBuffer);
+    CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    GbSmallVector<VkBufferCopy, 8> regions(rowCount);
+
+    for (uint32_t i = 0; i < rowCount; i++)
+    {
+      regions[i] = {
+        .srcOffset = srcOffset + i * srcStride,
+        .dstOffset = dstOffset + i * dstStride,
+        .size = rowSize
+      };
+    }
+
+    idevice->table.vkCmdCopyBuffer(
+      icommandBuffer->commandBuffer,
+      isrcBuffer->buffer,
+      idstBuffer->buffer,
+      uint32_t(regions.size()),
+      regions.data()
+    );
+  }
+
   void cgpuCmdCopyBufferToImage(CgpuContext* ctx,
                                 CgpuCommandBuffer commandBuffer,
                                 CgpuBuffer buffer,

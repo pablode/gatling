@@ -2413,6 +2413,9 @@ cleanup:
 
       auto uniformData = s_bumpAlloc->alloc<rp::UniformData>();
 
+      uint32_t oidnImageWidth = shaderCache->denoiserEnabled ?
+        giOidnGetBufferWidth(scene->denoiserState) : imageWidth;
+
       *uniformData.cpuPtr = {
         .domeLightRotation = glm::make_vec4(&domeLightRotation[0]),
         .domeLightEmissionMultiplier = domeLightEmissionMultiplier,
@@ -2441,6 +2444,7 @@ cleanup:
         .lightIntensityMultiplier = renderSettings.lightIntensityMultiplier,
         .clipRangePacked = glm::packHalf2x16(glm::vec2(params.camera.clipStart, params.camera.clipEnd)),
         .sensorExposure = params.camera.exposure,
+        .oidnImageWidth = oidnImageWidth,
       };
 
       uniformOffset = uniformData.bufferOffset;
@@ -2452,6 +2456,12 @@ cleanup:
       cgpuCmdBindPipeline(s_ctx, commandBuffer, shaderCache->pipeline,
                           shaderCache->bindSets.data(), uint32_t(shaderCache->bindSets.size()),
                           uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
+    }
+
+    // Clear the denoiser input buffer if the frame buffer size has changed
+    if (shaderCache->denoiserEnabled)
+    {
+      giOidnClearInputBuffer(scene->denoiserState, s_ctx, commandBuffer);
     }
 
     // Trace rays
@@ -2504,13 +2514,20 @@ cleanup:
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-        CgpuBuffer deviceMem = renderBuffer->deviceMem;
         if (binding.aovId == GiAovId::Color && renderSettings.denoiseColorAov)
         {
-          deviceMem = giOidnGetOutputBuffer(scene->denoiserState);
+          // The denoiser output is padded, so copy only the valid rows.
+          uint64_t pixelSize = renderBuffer->size / (uint64_t(imageWidth) * imageHeight);
+          CgpuBuffer denoisedBuffer = giOidnGetOutputBuffer(scene->denoiserState);
+          uint64_t srcStride = uint64_t(giOidnGetBufferWidth(scene->denoiserState)) * pixelSize;
+          uint64_t dstStride = uint64_t(imageWidth) * pixelSize;
+
+          cgpuCmdCopyBufferRows(s_ctx, commandBuffer, denoisedBuffer, 0, srcStride,
+                                renderBuffer->hostMem, 0, dstStride, dstStride, imageHeight);
+          continue;
         }
 
-        cgpuCmdCopyBuffer(s_ctx, commandBuffer, deviceMem, 0, renderBuffer->hostMem);
+        cgpuCmdCopyBuffer(s_ctx, commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
       }
 
       CgpuPipelineBarrier postBarrier = {

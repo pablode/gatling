@@ -69,8 +69,14 @@ namespace gtl
 
     std::vector<PipelineStep> m_steps;
 
-    uint32_t m_imageWidth = 0; // 16px multiple
-    uint32_t m_imageHeight = 0; // 16px multiple
+    uint32_t m_imageWidth = 0; // padded to a multiple of the pooling factor
+    uint32_t m_imageHeight = 0;
+    uint32_t m_viewportWidth = 0; // unpadded frame buffer size
+    uint32_t m_viewportHeight = 0;
+    uint32_t m_allocWidth = 0; // buffer capacity, grow-only
+    uint32_t m_allocHeight = 0;
+    uint32_t m_padAlignment = 1;
+    bool m_inputBufferDirty = false;
     uint32_t m_wgSizeX;
     uint32_t m_wgSizeY;
 
@@ -106,6 +112,7 @@ namespace gtl
       bool coopMatrixSupport;
 
       int depth = 0; // track up- and downsampling
+      int maxDepth = 0; // number of pooling levels
       std::unordered_map<std::string, TensorUpload> tensorUploads;
     };
 
@@ -287,6 +294,7 @@ namespace gtl
       if (bool(postOp & GiOidnPostOp::MaxPool))
       {
         c.depth++;
+        c.maxDepth = std::max(c.maxDepth, c.depth);
       }
       else if (bool(postOp & GiOidnPostOp::Upsample))
       {
@@ -464,6 +472,9 @@ namespace gtl
       addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", GiOidnPostOp::ScaleOutput | GiOidnPostOp::WriteBackRgba32);
 
       if (c.depth != 0) { GB_FATAL("invalid network architecture"); }
+
+      // The padding factor makes every network level an exact halving.
+      m_padAlignment = 1u << uint32_t(c.maxDepth);
     }
 
     ~GiOidnNet()
@@ -479,15 +490,38 @@ namespace gtl
     // TODO: need to call this before getting pool0 outside (e.g. in giRender at the start of frame)
     void updateViewport(CgpuContext* gpuCtx, uint32_t width, uint32_t height)
     {
-      if (width == m_imageWidth && height == m_imageHeight)
+      // The denoiser runs on the frame buffer size rounded up to the pooling
+      // factor, so that every network level is an exact halving. Rendering and
+      // the final readback stay at the true size.
+      uint32_t paddedWidth = (width + m_padAlignment - 1) & ~(m_padAlignment - 1);
+      uint32_t paddedHeight = (height + m_padAlignment - 1) & ~(m_padAlignment - 1);
+
+      bool viewportChanged = (width != m_viewportWidth || height != m_viewportHeight);
+      bool paddedChanged = (paddedWidth != m_imageWidth || paddedHeight != m_imageHeight);
+
+      if (!viewportChanged && !paddedChanged)
       {
         return;
       }
 
-      reallocBuffers(gpuCtx, width, height);
+      m_viewportWidth = width;
+      m_viewportHeight = height;
+      m_imageWidth = paddedWidth;
+      m_imageHeight = paddedHeight;
+      // Resizing can leave stale pixels in the padding margin.
+      m_inputBufferDirty = true;
 
-      m_imageWidth = width;
-      m_imageHeight = height;
+      // Grow-only, so that resizing the window doesn't constantly reallocate.
+      uint32_t allocWidth = std::max(m_allocWidth, paddedWidth);
+      uint32_t allocHeight = std::max(m_allocHeight, paddedHeight);
+
+      if (allocWidth != m_allocWidth || allocHeight != m_allocHeight)
+      {
+        reallocBuffers(gpuCtx, allocWidth, allocHeight);
+
+        m_allocWidth = allocWidth;
+        m_allocHeight = allocHeight;
+      }
     }
 
     CgpuBuffer getInputBuffer() const
@@ -503,6 +537,18 @@ namespace gtl
     CgpuBuffer getOutputBuffer() const
     {
       return m_outputPool;
+    }
+
+    uint32_t getImageWidth() const
+    {
+      return m_imageWidth;
+    }
+
+    bool consumeInputBufferDirty()
+    {
+      bool dirty = m_inputBufferDirty;
+      m_inputBufferDirty = false;
+      return dirty;
     }
 
     void runInference(CgpuContext* gpuCtx, CgpuCommandBuffer commandBuffer, GgpuBumpAllocator& bumpAlloc, CgpuBuffer valueScaleBuffer)
@@ -658,6 +704,7 @@ namespace gtl
     CgpuBuffer maxLuminanceBuffer;
 uint32_t imageWidth=0;
 uint32_t imageHeight=0;
+uint32_t bufferWidth=0;
   };
 
   GiOidnState* giOidnCreateState(CgpuContext* gpuCtx,
@@ -718,6 +765,7 @@ uint32_t imageHeight=0;
 state->imageWidth = imageWidth;
 state->imageHeight = imageHeight;
     state->net.updateViewport(gpuCtx, imageWidth, imageHeight);
+    state->bufferWidth = state->net.getImageWidth();
     return true;
   }
 
@@ -734,6 +782,37 @@ state->imageHeight = imageHeight;
   CgpuBuffer giOidnGetOutputBuffer(GiOidnState* state)
   {
     return state->net.getOutputBuffer();
+  }
+
+  uint32_t giOidnGetBufferWidth(GiOidnState* state)
+  {
+    return state->bufferWidth;
+  }
+
+  void giOidnClearInputBuffer(GiOidnState* state, CgpuContext* gpuCtx, CgpuCommandBuffer commandBuffer)
+  {
+    if (!state->net.consumeInputBufferDirty())
+    {
+      return;
+    }
+
+    CgpuBuffer inputBuffer = state->net.getInputBuffer();
+
+    cgpuCmdFillBuffer(gpuCtx, commandBuffer, inputBuffer);
+
+    CgpuBufferMemoryBarrier bufferBarrier = {
+      .buffer = inputBuffer,
+      .srcStageMask = CgpuPipelineStage::Transfer,
+      .srcAccessMask = CgpuMemoryAccess::TransferWrite,
+      .dstStageMask = CgpuPipelineStage::RayTracingShader,
+      .dstAccessMask = CgpuMemoryAccess::ShaderWrite
+    };
+
+    CgpuPipelineBarrier barrier = {
+      .bufferBarrierCount = 1,
+      .bufferBarriers = &bufferBarrier
+    };
+    cgpuCmdPipelineBarrier(gpuCtx, commandBuffer, &barrier);
   }
 
   void giOidnRender(CgpuContext* gpuCtx,
@@ -779,7 +858,8 @@ state->imageHeight = imageHeight;
     auto uniformData = bumpAlloc.alloc<rp_ml::UniformData>();
     *uniformData.cpuPtr = {
       .imageWidth = state->imageWidth,
-      .imageHeight = state->imageHeight
+      .imageHeight = state->imageHeight,
+      .imageStride = state->bufferWidth
     };
 
     std::array<uint32_t, 1> dynamicOffsets { uniformData.bufferOffset };
