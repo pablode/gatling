@@ -19,7 +19,7 @@ layout(binding = BINDING_INDEX_TENSOR_BUF, std430) readonly buffer TensorBuffer 
 layout(binding = BINDING_INDEX_INPUT_BUF2, std430) readonly buffer InputBuffer2 { float16_t inPixels2[]; };
 #endif
 // TODO: in hindsight, it would be much nicer to rename this to MaxLuminanceBuffer & maxLuminance
-#if defined(SCALE_INPUT_INV) || defined(SCALE_OUTPUT)
+#if defined(SCALE_INPUT_INV) || defined(SCALE_INPUT2_INV) || defined(SCALE_OUTPUT)
 layout(binding = BINDING_INDEX_VALUE_SCALE_BUF, std430) readonly buffer ValueScaleBuffer { float valueScale; };
 #endif
 
@@ -34,7 +34,7 @@ shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][CONV_CHANNEL_COUNT];
 
 void main()
 {
-#ifdef SCALE_INPUT_INV
+#if defined(SCALE_INPUT_INV) || defined(SCALE_INPUT2_INV)
   float16_t invValueScale = float16_t(1.0 / valueScale);
 #endif
 
@@ -220,12 +220,32 @@ void main()
   for (int i = 0; i < IN2_CHANNEL_COUNT; i++)
   {
 #ifndef OP_UPSAMPLE
-    outPixels[inIdx * OUT_CHANNEL_COUNT + IN1_CHANNEL_COUNT + i] = inPixels2[inIdx * IN2_CHANNEL_COUNT + i];
+    float16_t in2Value = inPixels2[inIdx * IN2_CHANNEL_COUNT + i];
+
+#ifdef SCALE_INPUT2_INV
+    // As in the reference, only the color channels are normalized, not albedo/normal.
+    in2Value *= (i < 3) ? invValueScale : float16_t(1.0);
+#endif
+
+    outPixels[inIdx * OUT_CHANNEL_COUNT + IN1_CHANNEL_COUNT + i] = in2Value;
 #else
-    outPixels[outIdx0 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx0 * IN2_CHANNEL_COUNT + i];
-    outPixels[outIdx1 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx1 * IN2_CHANNEL_COUNT + i];
-    outPixels[outIdx2 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx2 * IN2_CHANNEL_COUNT + i];
-    outPixels[outIdx3 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = inPixels2[outIdx3 * IN2_CHANNEL_COUNT + i];
+    float16_t in2Value0 = inPixels2[outIdx0 * IN2_CHANNEL_COUNT + i];
+    float16_t in2Value1 = inPixels2[outIdx1 * IN2_CHANNEL_COUNT + i];
+    float16_t in2Value2 = inPixels2[outIdx2 * IN2_CHANNEL_COUNT + i];
+    float16_t in2Value3 = inPixels2[outIdx3 * IN2_CHANNEL_COUNT + i];
+
+#ifdef SCALE_INPUT2_INV
+    float16_t in2Scale = (i < 3) ? invValueScale : float16_t(1.0);
+    in2Value0 *= in2Scale;
+    in2Value1 *= in2Scale;
+    in2Value2 *= in2Scale;
+    in2Value3 *= in2Scale;
+#endif
+
+    outPixels[outIdx0 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value0;
+    outPixels[outIdx1 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value1;
+    outPixels[outIdx2 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value2;
+    outPixels[outIdx3 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value3;
 #endif
   }
 #endif

@@ -147,6 +147,8 @@ namespace gtl
       else if (bool(postOp & GiOidnPostOp::ScaleOutput)) { opStr += "_ScaleOutput"; }
       else if (postOp != GiOidnPostOp::None) { GB_FATAL("Unhandled OIDN post op"); }
 
+      if (bool(postOp & GiOidnPostOp::ScaleInput2Inv)) { opStr += "_ScaleInput2Inv"; }
+
       return GB_FMT("Oidn_{}->{}{}", inDims, outDims, opStr);
     }
 
@@ -343,7 +345,7 @@ namespace gtl
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv3b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat, Buffer::Pool1);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2a");
-      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat, Buffer::Pool0);
+      addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv2b", GiOidnPostOp::Upsample | GiOidnPostOp::Concat | GiOidnPostOp::ScaleInput2Inv, Buffer::Pool0);
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1a");
       addConvReLU(c, Buffer::Scratch, Buffer::Scratch, "dec_conv1b");
       addConvReLU(c, Buffer::Scratch, Buffer::Output, "dec_conv0", GiOidnPostOp::ScaleOutput | GiOidnPostOp::WriteBackRgba32);
@@ -479,7 +481,9 @@ namespace gtl
         {
           bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_INPUT_BUF2, .buffer = inBuffer2 });
         }
-        if (bool(step.postOp & GiOidnPostOp::ScaleInputInv) || bool(step.postOp & GiOidnPostOp::ScaleOutput))
+        if (bool(step.postOp & GiOidnPostOp::ScaleInputInv) ||
+            bool(step.postOp & GiOidnPostOp::ScaleInput2Inv) ||
+            bool(step.postOp & GiOidnPostOp::ScaleOutput))
         {
           bufferBindings.push_back(CgpuBufferBinding{ .binding = rp::BINDING_INDEX_VALUE_SCALE_BUF, .buffer = valueScaleBuffer });
         }

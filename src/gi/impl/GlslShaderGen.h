@@ -122,7 +122,10 @@ namespace gtl
       WriteBackRgba32 = (1 << 3),
       // TODO: this is not a post op. -> rename enum?
       ScaleInputInv   = (1 << 4),
-      ScaleOutput     = (1 << 5)
+      ScaleOutput     = (1 << 5),
+      // Scales the color channels of the second (concatenated) input by the
+      // inverse value scale, matching the normalized conv input.
+      ScaleInput2Inv  = (1 << 6)
 // TODO: rename -> ScaleLuminance(Inv)
     };
 

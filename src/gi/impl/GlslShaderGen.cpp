@@ -342,6 +342,10 @@ namespace gtl
     {
       stitcher.appendDefine("SCALE_OUTPUT");
     }
+    if (bool(params.postOp & OidnPostOp::ScaleInput2Inv))
+    {
+      stitcher.appendDefine("SCALE_INPUT2_INV");
+    }
 
     fs::path filePath = m_shaderPath / "rp_denoise.comp";
     if (!stitcher.appendSourceFile(filePath))
