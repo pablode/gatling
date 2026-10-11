@@ -322,12 +322,49 @@ namespace gtl
 
       uint32_t shmemSize = deviceProperties.maxComputeSharedMemorySize;
 
-      // The tile computed by a workgroup is 2 * wgSizeY rows tall (each invocation
-      // computes two output rows), which doubles the shared memory required for the
-      // intermediate results.
-      if (shmemSize >= 65536) { m_wgSizeX = 24; m_wgSizeY = 16; }
-      else if (shmemSize >= 49152) { m_wgSizeX = 16; m_wgSizeY = 16; }
-      else { m_wgSizeX = 16; m_wgSizeY = 4; }
+      // A workgroup covers a wgSizeX x (2 * wgSizeY) pixel tile (each invocation
+      // computes two output rows, and two columns when pooling), so the shared
+      // memory it requires is the input window plus, unless pooling, the conv
+      // results of all output channels.
+      uint32_t maxConvChannelCount = 0;
+      for (const auto& ntPair : tensorDescs)
+      {
+        const auto& tensorDesc = ntPair.second;
+        if (tensorDesc.dimensions.size() == 4 && tensorDesc.dimensions[2] == 3 && tensorDesc.dimensions[3] == 3)
+        {
+          maxConvChannelCount = std::max(maxConvChannelCount, uint32_t(tensorDesc.dimensions[0]));
+        }
+      }
+
+      auto sharedMemorySize = [&](uint32_t wgSizeX, uint32_t wgSizeY)
+      {
+        uint32_t tileSizeY = 2 * wgSizeY;
+        uint32_t windowCount = (tileSizeY + 2) * (wgSizeX + 2);
+        uint32_t resultCount = tileSizeY * wgSizeX * maxConvChannelCount;
+        return (windowCount + resultCount) * uint32_t(sizeof(uint16_t));
+      };
+
+      // Larger tiles amortize the uniform weight loads better, so pick the first
+      // candidate that fits. Keep the sizes in sync with rp_denoise.comp!
+      constexpr uint32_t wgSizeCandidates[][2] = {
+        { 24, 16 }, { 16, 16 }, { 24, 8 }, { 16, 8 }, { 24, 4 }, { 16, 4 }, { 8, 4 }
+      };
+
+      // Fall back to the smallest candidate if none fits.
+      m_wgSizeX = 8;
+      m_wgSizeY = 4;
+
+      for (const auto& candidate : wgSizeCandidates)
+      {
+        if (sharedMemorySize(candidate[0], candidate[1]) <= shmemSize)
+        {
+          m_wgSizeX = candidate[0];
+          m_wgSizeY = candidate[1];
+          break;
+        }
+      }
+
+      GB_LOG("oidn workgroup size: {} x {} (max {} conv channels)", m_wgSizeX, m_wgSizeY, maxConvChannelCount);
 
       for (uint32_t& i : m_bufferLastDims) { i = 0; }
       for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
