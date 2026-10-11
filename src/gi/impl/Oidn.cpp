@@ -322,9 +322,12 @@ namespace gtl
 
       uint32_t shmemSize = deviceProperties.maxComputeSharedMemorySize;
 
+      // The tile computed by a workgroup is 2 * wgSizeY rows tall (each invocation
+      // computes two output rows), which doubles the shared memory required for the
+      // intermediate results.
       if (shmemSize >= 65536) { m_wgSizeX = 24; m_wgSizeY = 16; }
       else if (shmemSize >= 49152) { m_wgSizeX = 16; m_wgSizeY = 16; }
-      else { m_wgSizeX = 16; m_wgSizeY = 8; }
+      else { m_wgSizeX = 16; m_wgSizeY = 4; }
 
       for (uint32_t& i : m_bufferLastDims) { i = 0; }
       for (uint32_t& i : m_bufferSizeMuls) { i = 0; }
@@ -495,8 +498,11 @@ namespace gtl
         std::array<uint32_t, 1> dynamicOffsets { uniformData.bufferOffset };
         cgpuCmdBindPipeline(gpuCtx, commandBuffer, step.pipeline, &step.bindSet, 1, uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
 
+        // Each invocation computes OUT_ROWS_PER_THREAD output rows; keep in sync
+        // with rp_denoise.comp!
+        uint32_t tileSizeY = 2 * m_wgSizeY;
         uint32_t wgCountX = (imageWidth + m_wgSizeX - 1) / m_wgSizeX;
-        uint32_t wgCountY = (imageHeight + m_wgSizeY - 1) / m_wgSizeY;
+        uint32_t wgCountY = (imageHeight + tileSizeY - 1) / tileSizeY;
         cgpuCmdDispatch(gpuCtx, commandBuffer, wgCountX, wgCountY, 1);
 
         if (bool(step.postOp & GiOidnPostOp::MaxPool))

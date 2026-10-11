@@ -27,10 +27,25 @@ layout(binding = BINDING_INDEX_VALUE_SCALE_BUF, std430) readonly buffer ValueSca
 #define KERNEL_SIZE_SQ (KERNEL_SIZE * KERNEL_SIZE)
 #define KERNEL_BIAS (KERNEL_SIZE / 2)
 
+// Each invocation computes a block of OUT_ROWS_PER_THREAD x OUT_COLS_PER_THREAD
+// output pixels to amortize the uniform weight loads. Must match the dispatch
+// size computation in Oidn.cpp!
+#define OUT_ROWS_PER_THREAD 2
+#define OUT_COLS_PER_THREAD 1
+
+#define TILE_SIZE_X (WG_SIZE_X * OUT_COLS_PER_THREAD)
+#define TILE_SIZE_Y (WG_SIZE_Y * OUT_ROWS_PER_THREAD)
+#define LOAD_PASSES_X ((TILE_SIZE_X + 2 + WG_SIZE_X - 1) / WG_SIZE_X)
+#define LOAD_PASSES_Y ((TILE_SIZE_Y + 2 + WG_SIZE_Y - 1) / WG_SIZE_Y)
+
+// Vector of convolution results for the invocation's output block.
+#define BLOCK_VECTOR f16vec2
+#define BLOCK_TAPS(j, i) f16vec2(win[j][i], win[j + 1][i])
+
 #if CONV_IMPL == CONV_IMPL_SHMEM
-shared float16_t sh_window[WG_SIZE_Y + 2][WG_SIZE_X + 2];
+shared float16_t sh_window[TILE_SIZE_Y + 2][TILE_SIZE_X + 2];
 #endif
-shared float16_t sh_results[WG_SIZE_Y][WG_SIZE_X][CONV_CHANNEL_COUNT];
+shared float16_t sh_results[TILE_SIZE_Y][TILE_SIZE_X][CONV_CHANNEL_COUNT];
 
 void main()
 {
@@ -45,40 +60,45 @@ void main()
   // naive
   for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
   {
-    float16_t result = float16_t(0.0);
-
-    for (uint i = 0; i < KERNEL_SIZE; i++)
-    for (uint j = 0; j < KERNEL_SIZE; j++)
+    [[unroll]]
+    for (uint r = 0; r < OUT_ROWS_PER_THREAD; r++)
     {
-      ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
+      float16_t result = float16_t(0.0);
 
-      if (any(lessThan(coord, ivec2(0))) ||
-          any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight))))
+      for (uint i = 0; i < KERNEL_SIZE; i++)
+      for (uint j = 0; j < KERNEL_SIZE; j++)
       {
-        continue; // oob
-      }
+        ivec2 coord = ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y * OUT_ROWS_PER_THREAD + r)
+                    + ivec2(i, j) - ivec2(KERNEL_BIAS);
 
-      int coordIdx = int(coord.y * ubo.imageWidth + coord.x);
+        if (any(lessThan(coord, ivec2(0))) ||
+            any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight))))
+        {
+          continue; // oob
+        }
 
-      for (uint ic = 0; ic < IN1_CHANNEL_COUNT; ic++)
-      {
-        uint inIndexIj = coordIdx * IN1_CHANNEL_COUNT + ic;
+        int coordIdx = int(coord.y * ubo.imageWidth + coord.x);
 
-        uint weightIndex = (oc * IN1_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
+        for (uint ic = 0; ic < IN1_CHANNEL_COUNT; ic++)
+        {
+          uint inIndexIj = coordIdx * IN1_CHANNEL_COUNT + ic;
 
-        float16_t weight = tensors[ubo.weightOffset + weightIndex];
+          uint weightIndex = (oc * IN1_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ) + (j * KERNEL_SIZE + i); // OIHW
 
-        float16_t inValue = inPixels[inIndexIj];
+          float16_t weight = tensors[ubo.weightOffset + weightIndex];
+
+          float16_t inValue = inPixels[inIndexIj];
 
 #ifdef SCALE_INPUT_INV
-        inValue *= invValueScale;
+          inValue *= invValueScale;
 #endif
 
-        result += inValue * weight;
+          result += inValue * weight;
+        }
       }
-    }
 
-    sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] = result;
+      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r][gl_LocalInvocationID.x][oc] = result;
+    }
 
     barrier(); // TODO: artifacts without. why?
   }
@@ -86,21 +106,22 @@ void main()
 #elif CONV_IMPL == CONV_IMPL_SHMEM
 
   // shared mem v1
-  ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(WG_SIZE_X, WG_SIZE_Y);
+  ivec2 wgBase = ivec2(gl_WorkGroupID.xy) * ivec2(TILE_SIZE_X, TILE_SIZE_Y);
 
+  for (uint r = 0; r < OUT_ROWS_PER_THREAD; r++)
   for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
-    sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] = float16_t(0.0);
+    sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r][gl_LocalInvocationID.x][oc] = float16_t(0.0);
 
   [[unroll]]
   for (uint ic = 0; ic < IN1_CHANNEL_COUNT; ic++)
   {
-    [[unroll]] for (int y = 0; y <= 1; y++)
-    [[unroll]] for (int x = 0; x <= 1; x++)
+    [[unroll]] for (int y = 0; y < int(LOAD_PASSES_Y); y++)
+    [[unroll]] for (int x = 0; x < int(LOAD_PASSES_X); x++)
     {
       int lx = int(gl_LocalInvocationID.x) + x * int(WG_SIZE_X);
       int ly = int(gl_LocalInvocationID.y) + y * int(WG_SIZE_Y);
 
-      if (lx < int(WG_SIZE_X + 2) && ly < int(WG_SIZE_Y + 2))
+      if (lx < int(TILE_SIZE_X + 2) && ly < int(TILE_SIZE_Y + 2))
       {
         ivec2 coord = wgBase + ivec2(lx - 1, ly - 1);
 
@@ -123,11 +144,11 @@ void main()
 
     // Cache the window in registers so that it is not re-read from shared memory
     // for every output channel below.
-    float16_t win[KERNEL_SIZE][KERNEL_SIZE];
-    [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
-    [[unroll]] for (uint i = 0; i < KERNEL_SIZE; i++)
+    float16_t win[KERNEL_SIZE + OUT_ROWS_PER_THREAD - 1][KERNEL_SIZE + OUT_COLS_PER_THREAD - 1];
+    [[unroll]] for (uint j = 0; j < KERNEL_SIZE + OUT_ROWS_PER_THREAD - 1; j++)
+    [[unroll]] for (uint i = 0; i < KERNEL_SIZE + OUT_COLS_PER_THREAD - 1; i++)
     {
-      win[j][i] = sh_window[gl_LocalInvocationID.y + j][gl_LocalInvocationID.x + i];
+      win[j][i] = sh_window[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + j][gl_LocalInvocationID.x * OUT_COLS_PER_THREAD + i];
     }
 
     [[unroll]]
@@ -135,7 +156,7 @@ void main()
     {
       uint weightIndexOffset = (oc * IN1_CHANNEL_COUNT * KERNEL_SIZE_SQ) + (ic * KERNEL_SIZE_SQ); // OIHW
 
-      float16_t result = float16_t(0.0);
+      BLOCK_VECTOR result = BLOCK_VECTOR(0.0);
 
       [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
       [[unroll]] for (uint i = 0; i < KERNEL_SIZE; i++)
@@ -143,10 +164,11 @@ void main()
         uint weightIndex = weightIndexOffset + (j * KERNEL_SIZE + i);
         float16_t weight = tensors[ubo.weightOffset + weightIndex];
 
-        result += win[j][i] * weight;
+        result += BLOCK_TAPS(j, i) * weight;
       }
 
-      sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] += result;
+      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 0][gl_LocalInvocationID.x][oc] += result.x;
+      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 1][gl_LocalInvocationID.x][oc] += result.y;
     }
 
     // Barrier for the window WAR hazard across iterations, and to publish
@@ -161,53 +183,34 @@ void main()
 #endif
 
 
-  if (gl_GlobalInvocationID.x >= ubo.imageWidth || gl_GlobalInvocationID.y >= ubo.imageHeight)
-    return;
-
-
-#ifdef OP_UPSAMPLE
-  uint outIdx0 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 0) * ubo.imageWidth * 2);
-  uint outIdx1 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 0) * ubo.imageWidth * 2);
-  uint outIdx2 = uint(gl_GlobalInvocationID.x * 2 + 0 + (gl_GlobalInvocationID.y * 2 + 1) * ubo.imageWidth * 2);
-  uint outIdx3 = uint(gl_GlobalInvocationID.x * 2 + 1 + (gl_GlobalInvocationID.y * 2 + 1) * ubo.imageWidth * 2);
-#endif
-
-
 #ifdef OP_MAX_POOL
+
+  // The rows of each pooling block belong to the same invocation; the neighbour
+  // column is read from shared memory.
   // TODO: this leads to thread divergence; we can instead discard whole warp (respect tile size)
-  if (bool(gl_LocalInvocationID.x & 1) || bool(gl_LocalInvocationID.y & 1)) return;
+  if (gl_GlobalInvocationID.x >= ubo.imageWidth ||
+      gl_GlobalInvocationID.y * OUT_ROWS_PER_THREAD >= ubo.imageHeight ||
+      bool(gl_LocalInvocationID.x & 1))
+  {
+    return;
+  }
 
-  int inIdx = int(gl_GlobalInvocationID.y / 2 * ubo.imageWidth / 2 + gl_GlobalInvocationID.x / 2);
-#else
-
-  int inIdx = int(gl_GlobalInvocationID.y * ubo.imageWidth + gl_GlobalInvocationID.x);
-#endif
-
+  int inIdx = int(gl_GlobalInvocationID.y * (ubo.imageWidth / 2) + gl_GlobalInvocationID.x / 2);
 
   for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
   {
-    float16_t result;
-
-#ifndef OP_MAX_POOL
-    result = sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc];
-
-    result += tensors[ubo.biasOffset + oc];
-
-    result = max(result, float16_t(0.0)); // ReLU activation
-#else
     f16vec4 results = f16vec4(
-      sh_results[gl_LocalInvocationID.y + 0][gl_LocalInvocationID.x + 0][oc],
-      sh_results[gl_LocalInvocationID.y + 1][gl_LocalInvocationID.x + 0][oc],
-      sh_results[gl_LocalInvocationID.y + 0][gl_LocalInvocationID.x + 1][oc],
-      sh_results[gl_LocalInvocationID.y + 1][gl_LocalInvocationID.x + 1][oc]
+      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 0][gl_LocalInvocationID.x + 0][oc],
+      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 1][gl_LocalInvocationID.x + 0][oc],
+      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 0][gl_LocalInvocationID.x + 1][oc],
+      sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + 1][gl_LocalInvocationID.x + 1][oc]
     );
 
     results += f16vec4(tensors[ubo.biasOffset + oc]);
 
     float16_t maxPool = max(max(results.x, results.y), max(results.z, results.w));
 
-    result = max(float16_t(0.0) /*ReLU*/, maxPool);
-#endif
+    float16_t result = max(float16_t(0.0) /*ReLU*/, maxPool);
 
 #ifdef SCALE_OUTPUT
     result *= float16_t(valueScale);
@@ -219,48 +222,90 @@ void main()
     float16_t convertedResult = result;
 #endif
 
-#ifdef OP_UPSAMPLE
-    outPixels[outIdx0 * OUT_CHANNEL_COUNT + oc] = convertedResult;
-    outPixels[outIdx1 * OUT_CHANNEL_COUNT + oc] = convertedResult;
-    outPixels[outIdx2 * OUT_CHANNEL_COUNT + oc] = convertedResult;
-    outPixels[outIdx3 * OUT_CHANNEL_COUNT + oc] = convertedResult;
-#else
     outPixels[inIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
-#endif
   }
+
+#else
+
+  for (uint r = 0; r < OUT_ROWS_PER_THREAD; r++)
+  {
+    uint outY = gl_GlobalInvocationID.y * OUT_ROWS_PER_THREAD + r;
+
+    if (gl_GlobalInvocationID.x >= ubo.imageWidth || outY >= ubo.imageHeight)
+      continue;
+
+#ifdef OP_UPSAMPLE
+    uint outIdx0 = uint(gl_GlobalInvocationID.x * 2 + 0 + (outY * 2 + 0) * ubo.imageWidth * 2);
+    uint outIdx1 = uint(gl_GlobalInvocationID.x * 2 + 1 + (outY * 2 + 0) * ubo.imageWidth * 2);
+    uint outIdx2 = uint(gl_GlobalInvocationID.x * 2 + 0 + (outY * 2 + 1) * ubo.imageWidth * 2);
+    uint outIdx3 = uint(gl_GlobalInvocationID.x * 2 + 1 + (outY * 2 + 1) * ubo.imageWidth * 2);
+#endif
+
+    int inIdx = int(outY * ubo.imageWidth + gl_GlobalInvocationID.x);
+
+    for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
+    {
+      float16_t result = sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r][gl_LocalInvocationID.x][oc];
+
+      result += tensors[ubo.biasOffset + oc];
+
+      result = max(result, float16_t(0.0)); // ReLU activation
+
+#ifdef SCALE_OUTPUT
+      result *= float16_t(valueScale);
+#endif
+
+#ifdef OUT_CHANNEL_F32
+      float convertedResult = float(result);
+#else
+      float16_t convertedResult = result;
+#endif
+
+#ifdef OP_UPSAMPLE
+      outPixels[outIdx0 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+      outPixels[outIdx1 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+      outPixels[outIdx2 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+      outPixels[outIdx3 * OUT_CHANNEL_COUNT + oc] = convertedResult;
+#else
+      outPixels[inIdx * OUT_CHANNEL_COUNT + oc] = convertedResult;
+#endif
+    }
 
 #ifdef OP_CONCAT
-  for (int i = 0; i < IN2_CHANNEL_COUNT; i++)
-  {
+    for (int i = 0; i < IN2_CHANNEL_COUNT; i++)
+    {
 #ifndef OP_UPSAMPLE
-    float16_t in2Value = inPixels2[inIdx * IN2_CHANNEL_COUNT + i];
+      float16_t in2Value = inPixels2[inIdx * IN2_CHANNEL_COUNT + i];
 
 #ifdef SCALE_INPUT2_INV
-    // As in the reference, only the color channels are normalized, not albedo/normal.
-    in2Value *= (i < 3) ? invValueScale : float16_t(1.0);
+      // As in the reference, only the color channels are normalized, not albedo/normal.
+      in2Value *= (i < 3) ? invValueScale : float16_t(1.0);
 #endif
 
-    outPixels[inIdx * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value;
+      outPixels[inIdx * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value;
 #else
-    float16_t in2Value0 = inPixels2[outIdx0 * IN2_CHANNEL_COUNT + i];
-    float16_t in2Value1 = inPixels2[outIdx1 * IN2_CHANNEL_COUNT + i];
-    float16_t in2Value2 = inPixels2[outIdx2 * IN2_CHANNEL_COUNT + i];
-    float16_t in2Value3 = inPixels2[outIdx3 * IN2_CHANNEL_COUNT + i];
+      float16_t in2Value0 = inPixels2[outIdx0 * IN2_CHANNEL_COUNT + i];
+      float16_t in2Value1 = inPixels2[outIdx1 * IN2_CHANNEL_COUNT + i];
+      float16_t in2Value2 = inPixels2[outIdx2 * IN2_CHANNEL_COUNT + i];
+      float16_t in2Value3 = inPixels2[outIdx3 * IN2_CHANNEL_COUNT + i];
 
 #ifdef SCALE_INPUT2_INV
-    float16_t in2Scale = (i < 3) ? invValueScale : float16_t(1.0);
-    in2Value0 *= in2Scale;
-    in2Value1 *= in2Scale;
-    in2Value2 *= in2Scale;
-    in2Value3 *= in2Scale;
+      float16_t in2Scale = (i < 3) ? invValueScale : float16_t(1.0);
+      in2Value0 *= in2Scale;
+      in2Value1 *= in2Scale;
+      in2Value2 *= in2Scale;
+      in2Value3 *= in2Scale;
 #endif
 
-    outPixels[outIdx0 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value0;
-    outPixels[outIdx1 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value1;
-    outPixels[outIdx2 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value2;
-    outPixels[outIdx3 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value3;
+      outPixels[outIdx0 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value0;
+      outPixels[outIdx1 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value1;
+      outPixels[outIdx2 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value2;
+      outPixels[outIdx3 * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value3;
+#endif
+    }
 #endif
   }
+
 #endif
 
 }
