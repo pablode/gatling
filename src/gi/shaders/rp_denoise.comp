@@ -52,7 +52,8 @@ void main()
     {
       ivec2 coord = ivec2(gl_GlobalInvocationID.xy) + ivec2(i, j) - ivec2(KERNEL_BIAS);
 
-      if (any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight))))
+      if (any(lessThan(coord, ivec2(0))) ||
+          any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight))))
       {
         continue; // oob
       }
@@ -105,7 +106,8 @@ void main()
 
         uint inPixelIdx = uint(coord.y * ubo.imageWidth + coord.x) * IN1_CHANNEL_COUNT + ic;
 
-        bool oob = any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight)));
+        bool oob = any(lessThan(coord, ivec2(0))) ||
+                   any(greaterThanEqual(uvec2(coord), uvec2(ubo.imageWidth, ubo.imageHeight)));
 
         float16_t inValue = oob ? float16_t(0.0) : inPixels[inPixelIdx];
 
