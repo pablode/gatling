@@ -229,7 +229,7 @@ void main()
     in2Value *= (i < 3) ? invValueScale : float16_t(1.0);
 #endif
 
-    outPixels[inIdx * OUT_CHANNEL_COUNT + IN1_CHANNEL_COUNT + i] = in2Value;
+    outPixels[inIdx * OUT_CHANNEL_COUNT + CONV_CHANNEL_COUNT + i] = in2Value;
 #else
     float16_t in2Value0 = inPixels2[outIdx0 * IN2_CHANNEL_COUNT + i];
     float16_t in2Value1 = inPixels2[outIdx1 * IN2_CHANNEL_COUNT + i];
