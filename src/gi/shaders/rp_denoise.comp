@@ -121,6 +121,15 @@ void main()
 
     barrier();
 
+    // Cache the window in registers so that it is not re-read from shared memory
+    // for every output channel below.
+    float16_t win[KERNEL_SIZE][KERNEL_SIZE];
+    [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
+    [[unroll]] for (uint i = 0; i < KERNEL_SIZE; i++)
+    {
+      win[j][i] = sh_window[gl_LocalInvocationID.y + j][gl_LocalInvocationID.x + i];
+    }
+
     [[unroll]]
     for (uint oc = 0; oc < CONV_CHANNEL_COUNT; oc++)
     {
@@ -131,18 +140,18 @@ void main()
       [[unroll]] for (uint j = 0; j < KERNEL_SIZE; j++)
       [[unroll]] for (uint i = 0; i < KERNEL_SIZE; i++)
       {
-        ivec2 lCoord = ivec2(gl_LocalInvocationID.xy) + ivec2(i, j);
-
         uint weightIndex = weightIndexOffset + (j * KERNEL_SIZE + i);
         float16_t weight = tensors[ubo.weightOffset + weightIndex];
 
-        result += sh_window[lCoord.y][lCoord.x] * weight;
+        result += win[j][i] * weight;
       }
 
       sh_results[gl_LocalInvocationID.y][gl_LocalInvocationID.x][oc] += result;
-
-      barrier(); // TODO: artifacts without. why?
     }
+
+    // Barrier for the window WAR hazard across iterations, and to publish
+    // sh_results to OP_MAX_POOL invocations reading neighbouring pixels.
+    barrier();
   }
 
 #else
