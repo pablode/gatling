@@ -498,10 +498,12 @@ namespace gtl
         std::array<uint32_t, 1> dynamicOffsets { uniformData.bufferOffset };
         cgpuCmdBindPipeline(gpuCtx, commandBuffer, step.pipeline, &step.bindSet, 1, uint32_t(dynamicOffsets.size()), dynamicOffsets.data());
 
-        // Each invocation computes OUT_ROWS_PER_THREAD output rows; keep in sync
-        // with rp_denoise.comp!
+        // OP_MAX_POOL invocations compute a 2x2 pixel block each, other invocations
+        // two rows; keep in sync with rp_denoise.comp!
+        bool maxPool = bool(step.postOp & GiOidnPostOp::MaxPool);
+        uint32_t tileSizeX = maxPool ? 2 * m_wgSizeX : m_wgSizeX;
         uint32_t tileSizeY = 2 * m_wgSizeY;
-        uint32_t wgCountX = (imageWidth + m_wgSizeX - 1) / m_wgSizeX;
+        uint32_t wgCountX = (imageWidth + tileSizeX - 1) / tileSizeX;
         uint32_t wgCountY = (imageHeight + tileSizeY - 1) / tileSizeY;
         cgpuCmdDispatch(gpuCtx, commandBuffer, wgCountX, wgCountY, 1);
 
