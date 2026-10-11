@@ -168,6 +168,8 @@ namespace gtl
 #endif
 
     glslang::TIntermediate* intermediate = program.getIntermediate(language);
+    // GlslangToSpv appends to the output vector instead of replacing its contents.
+    spv.clear();
     glslang::GlslangToSpv(*intermediate, *reinterpret_cast<std::vector<unsigned int>*>(&spv), &spvOptions);
     return true;
   }
