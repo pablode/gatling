@@ -164,20 +164,20 @@ void main()
 
           float16_t weight = tensors[ubo.weightOffset + weightIndex];
 
-          float16_t inValue = inPixels[inIndexIj];
-
-#ifdef SCALE_INPUT_INV
-          inValue *= invValueScale;
-#endif
-
-          result += inValue * weight;
+          result += inPixels[inIndexIj] * weight;
         }
       }
+
+      // Scale once after the accumulation instead of for every tap.
+#ifdef SCALE_INPUT_INV
+      result *= invValueScale;
+#endif
 
       sh_results[gl_LocalInvocationID.y * OUT_ROWS_PER_THREAD + r][gl_LocalInvocationID.x][oc] = result;
     }
 
-    barrier(); // TODO: artifacts without. why?
+    // No barrier is needed: the shared results are only read back by the
+    // invocation that wrote them.
   }
 
 #endif
