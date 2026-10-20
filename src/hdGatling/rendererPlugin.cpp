@@ -209,7 +209,12 @@ void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDeleg
   delete renderDelegate;
 }
 
-#if PXR_VERSION >= 2511
+#if PXR_VERSION >= 2608
+bool HdGatlingRendererPlugin::IsSupported(const HdRendererCreateArgsSchema& createArgs,
+                                          [[maybe_unused]] std::string* reasonWhyNot) const
+{
+  bool gpuEnabled = createArgs.GetGpuEnabled();
+#elif PXR_VERSION >= 2511
 bool HdGatlingRendererPlugin::IsSupported(const HdRendererCreateArgs& createArgs,
                                           [[maybe_unused]] std::string* reasonWhyNot) const
 {

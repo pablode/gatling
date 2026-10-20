@@ -37,7 +37,10 @@ public:
 
   void DeleteRenderDelegate(HdRenderDelegate* renderDelegate) override;
 
-#if PXR_VERSION >= 2511
+#if PXR_VERSION >= 2608
+  bool IsSupported(const HdRendererCreateArgsSchema& createArgs,
+                   std::string* reasonWhyNot = nullptr) const override;
+#elif PXR_VERSION >= 2511
   bool IsSupported(const HdRendererCreateArgs& createArgs,
                    std::string* reasonWhyNot = nullptr) const override;
 #else
