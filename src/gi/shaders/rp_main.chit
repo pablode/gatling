@@ -30,7 +30,9 @@ hitAttributeEXT vec2 baryCoord;
 #ifdef NEXT_EVENT_ESTIMATION
 void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, out vec3 power, out float invPdf, out uint diffuseSpecularPacked)
 {
-    if ((k4.x * ubo.totalLightCount) <= ubo.sphereLightCount)
+    float lightSample = k4.x * float(ubo.totalLightCount);
+
+    if (lightSample < float(ubo.sphereLightCount))
     {
         uint lightIndex = min(uint(k4.y * ubo.sphereLightCount), ubo.sphereLightCount - 1);
 
@@ -51,7 +53,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
-    else if ((k4.x * ubo.totalLightCount) <= (ubo.sphereLightCount + ubo.distantLightCount))
+    else if (lightSample < float(ubo.sphereLightCount + ubo.distantLightCount))
     {
         uint lightIndex = min(uint(k4.y * ubo.distantLightCount), ubo.distantLightCount - 1);
 
@@ -75,7 +77,7 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
             dirToLight = normalize(sinTheta * (cos(phi) * t1 + sin(phi) * t2) + cosTheta * dirToLight);
         }
     }
-    else if ((k4.x * ubo.totalLightCount) <= (ubo.sphereLightCount + ubo.distantLightCount + ubo.rectLightCount))
+    else if (lightSample < float(ubo.sphereLightCount + ubo.distantLightCount + ubo.rectLightCount))
     {
         uint lightIndex = min(uint(k4.y * ubo.rectLightCount), ubo.rectLightCount - 1);
 
