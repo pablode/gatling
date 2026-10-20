@@ -27,7 +27,7 @@ void stepVolume(uint mediumIdx)
 
     rayPayload.throughput *= (m.sigma_s * transmittance) / pdf;
 
-    rayPayload.ray_origin += gl_WorldRayDirectionEXT * distance;
+    rayPayload.ray_origin += gl_WorldRayDirectionEXT * gl_RayTmaxEXT;
 
     rayPayload.bitfield |= SHADE_RAY_PAYLOAD_VOLUME_WALK_MISS_FLAG;
     shadeRayPayloadIncrementWalk(rayPayload);
