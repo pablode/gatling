@@ -168,14 +168,22 @@ namespace gtl
                             fs::path shaderPath,
                             GiGlslShaderGen::MaterialGenInfo& genInfo)
   {
-    // Append resource path prefix for file-backed MDL modules.
+    // Resolve paths relative to file-backed MDL modules. The backend already makes paths
+    // of textures referenced by the module absolute, so those must not be prefixed again.
     std::vector<McTextureDescription> textureDescriptions = codeGenResult.textureDescriptions;
 
     if (!resourcePathPrefix.empty())
     {
       for (McTextureDescription& texRes : textureDescriptions)
       {
-        texRes.filePath = resourcePathPrefix + texRes.filePath;
+        fs::path texPath(texRes.filePath);
+
+        if (texRes.filePath.empty() || texPath.is_absolute())
+        {
+          continue;
+        }
+
+        texRes.filePath = (fs::path(resourcePathPrefix) / texPath.relative_path()).string();
       }
     }
 
