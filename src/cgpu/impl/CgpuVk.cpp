@@ -2240,12 +2240,13 @@ namespace gtl
                                       CgpuIPipeline* ipipeline,
                                       uint32_t groupCount,
                                       uint32_t missShaderCount,
-                                      uint32_t hitGroupCount)
+                                      const std::vector<uint32_t>& hitGroupIndices)
   {
     CgpuIDevice* idevice = &ctx->idevice;
 
     const CgpuIDeviceProperties& properties = idevice->internalProperties;
 
+    uint32_t hitGroupCount = (uint32_t) hitGroupIndices.size();
     uint32_t handleSize = properties.shaderGroupHandleSize;
     uint32_t alignedHandleSize = cgpuAlign(handleSize, properties.shaderGroupHandleAlignment);
 
@@ -2311,9 +2312,12 @@ namespace gtl
     }
     // Hit
     sbtMemPtr = sbtMemHit;
-    for (uint32_t i = 0; i < hitGroupCount; i++)
+    for (uint32_t groupIndex : hitGroupIndices)
     {
-      memcpy(sbtMemPtr, &handleData[handleSize * (handleCount++)], handleSize);
+      if (groupIndex != VK_SHADER_UNUSED_KHR)
+      {
+        memcpy(sbtMemPtr, &handleData[handleSize * groupIndex], handleSize);
+      }
       sbtMemPtr += ipipeline->sbtHit.stride;
     }
 
@@ -2334,10 +2338,12 @@ namespace gtl
     CGPU_RESOLVE_PIPELINE(ctx, { handle }, ipipeline);
 
     // Gather groups.
-    size_t groupCount = 1/*rgen*/ + createInfo.missShaderCount + createInfo.hitGroupCount;
-    std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups(groupCount);
+    uint32_t baseGroupCount = 1/*rgen*/ + createInfo.missShaderCount;
 
-    for (uint32_t i = 0; i < (uint32_t) groups.size(); i++)
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> groups;
+    groups.reserve(baseGroupCount + createInfo.hitGroupCount);
+
+    for (uint32_t i = 0; i < baseGroupCount; i++)
     {
       VkRayTracingShaderGroupCreateInfoKHR groupCreateInfo = {
         .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
@@ -2350,27 +2356,44 @@ namespace gtl
         .pShaderGroupCaptureReplayHandle = nullptr,
       };
 
-      groups[i] = groupCreateInfo;
+      groups.push_back(groupCreateInfo);
     }
 
-    uint32_t hitStageAndGroupOffset = 1/*rgen*/ + createInfo.missShaderCount;
-    uint32_t hitShaderStageIndex = hitStageAndGroupOffset;
+    // Empty hit groups crash Intel's compiler; skip them and use zero SBT records instead.
+    std::vector<uint32_t> hitGroupIndices(createInfo.hitGroupCount, VK_SHADER_UNUSED_KHR);
+
+    uint32_t hitShaderStageIndex = baseGroupCount;
     for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
     {
-      const CgpuRtHitGroup* hit_group = &createInfo.hitGroups[i];
+      const CgpuRtHitGroup* hitGroup = &createInfo.hitGroups[i];
 
-      uint32_t groupIndex = hitStageAndGroupOffset + i;
-      groups[groupIndex].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-      groups[groupIndex].generalShader = VK_SHADER_UNUSED_KHR;
+      if (!hitGroup->closestHitShader.handle && !hitGroup->anyHitShader.handle)
+      {
+        continue;
+      }
 
-      if (hit_group->closestHitShader.handle)
+      VkRayTracingShaderGroupCreateInfoKHR groupCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
+        .pNext = nullptr,
+        .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR,
+        .generalShader = VK_SHADER_UNUSED_KHR,
+        .closestHitShader = VK_SHADER_UNUSED_KHR,
+        .anyHitShader = VK_SHADER_UNUSED_KHR,
+        .intersectionShader = VK_SHADER_UNUSED_KHR,
+        .pShaderGroupCaptureReplayHandle = nullptr,
+      };
+
+      if (hitGroup->closestHitShader.handle)
       {
-        groups[groupIndex].closestHitShader = (hitShaderStageIndex++);
+        groupCreateInfo.closestHitShader = (hitShaderStageIndex++);
       }
-      if (hit_group->anyHitShader.handle)
+      if (hitGroup->anyHitShader.handle)
       {
-        groups[groupIndex].anyHitShader = (hitShaderStageIndex++);
+        groupCreateInfo.anyHitShader = (hitShaderStageIndex++);
       }
+
+      hitGroupIndices[i] = (uint32_t) groups.size();
+      groups.push_back(groupCreateInfo);
     }
 
     // Create descriptor backing and pipeline layout.
@@ -2384,6 +2407,8 @@ namespace gtl
     // Collect pipeline libraries OR stages.
     std::vector<VkPipeline> libraries;
     std::vector<VkPipelineShaderStageCreateInfo> stages;
+
+    uint32_t groupCount = (uint32_t) groups.size();
     if (idevice->internalFeatures.pipelineLibraries)
     {
       libraries.reserve(groupCount * 2);
@@ -2509,7 +2534,7 @@ namespace gtl
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
 
       // Create the SBT.
-      cgpuCreateRtPipelineSbt(ctx, ipipeline, groupCount, createInfo.missShaderCount, createInfo.hitGroupCount);
+      cgpuCreateRtPipelineSbt(ctx, ipipeline, groupCount, createInfo.missShaderCount, hitGroupIndices);
 
       if (ctx->debugUtilsEnabled && createInfo.debugName)
       {
