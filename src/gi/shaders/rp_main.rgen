@@ -314,6 +314,8 @@ void main()
 
             // Calculate distance for volume sampling
 #if MEDIUM_STACK_SIZE > 0
+            rayPayload.bitfield &= ~SHADE_RAY_PAYLOAD_VOLUME_DISTANCE_SAMPLED_FLAG;
+
             uint mediumIdx = shadeRayPayloadGetMediumIdx(rayPayload);
 
             if (mediumIdx > 0)
@@ -340,6 +342,8 @@ void main()
                     s *= ubo.metersPerSceneUnit;
 
                     tMax = -log(1.0 - xi.y) / s; // collision free distance (mean free path)
+
+                    rayPayload.bitfield |= SHADE_RAY_PAYLOAD_VOLUME_DISTANCE_SAMPLED_FLAG;
                 }
             }
 #endif

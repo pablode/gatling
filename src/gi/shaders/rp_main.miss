@@ -59,9 +59,15 @@ void main()
 
     if (mediumIdx > 0)
     {
-        stepVolume(mediumIdx);
+        if ((rayPayload.bitfield & SHADE_RAY_PAYLOAD_VOLUME_DISTANCE_SAMPLED_FLAG) != 0)
+        {
+            stepVolume(mediumIdx);
 
-        return;
+            return;
+        }
+
+        Medium m = rayPayload.media[mediumIdx - 1];
+        rayPayload.throughput *= vec3(equal(m.sigma_t, vec3(0.0)));
     }
 #endif
 
