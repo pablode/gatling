@@ -81,7 +81,7 @@ float tex_lookup_float_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
 
 vec3 tex_lookup_color_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w, vec2 crop_u, vec2 crop_v, vec2 crop_w, float frame)
 {
-    return tex_lookup_float3_3d(tex, coord, wrap_u, wrap_v, wrap_v, crop_u, crop_v, crop_w, frame);
+    return tex_lookup_float3_3d(tex, coord, wrap_u, wrap_v, wrap_w, crop_u, crop_v, crop_w, frame);
 }
 
 vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
