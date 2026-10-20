@@ -24,6 +24,10 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec3 pos = vec3(gl_ObjectToWorldEXT * vec4(localPos, 1.0));
 
     vec3 geomNormal = normalize(cross(p_1 - p_0, p_2 - p_0));
+    if ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_FLIP_FACING) != 0)
+    {
+        geomNormal = -geomNormal;
+    }
     geomNormal = normalize(vec3(geomNormal * mat3(gl_WorldToObjectEXT)));
 
     // Shading normal
