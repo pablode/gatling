@@ -120,7 +120,7 @@ vec4 rng1d_next4f(inout uint rng_state)
 
 uint rng1d_init(uint pixel_index, uint sampleIndex)
 {
-    return hash_theironborn(pixel_index * (sampleIndex + 1));
+    return hash_theironborn(pixel_index ^ hash_theironborn(sampleIndex + 1));
 }
 #endif
 
