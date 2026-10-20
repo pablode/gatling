@@ -34,16 +34,22 @@ namespace gtl
 
     int subsamp;
     int colorspace;
+    int width;
+    int height;
     if (tjDecompressHeader3(instance, (const unsigned char*) data, (unsigned long) size,
-                            (int*) &img->width, (int*) &img->height,
+                            &width, &height,
                             &subsamp, &colorspace) < 0)
     {
       tjDestroy(instance);
       return ImgioError::UnsupportedEncoding;
     }
 
+    img->width = (uint32_t) width;
+    img->height = (uint32_t) height;
+
     int pixelFormat = TJPF_RGBA;
-    img->size = img->width * img->height * tjPixelSize[pixelFormat];
+    img->format = ImgioFormat::RGBA8_UNORM;
+    img->size = size_t(img->width) * img->height * tjPixelSize[pixelFormat];
     img->data.resize(img->size);
 
     int result = tjDecompress2(instance, (const unsigned char*) data, (unsigned long) size,

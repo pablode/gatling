@@ -34,10 +34,15 @@ bool _ReadFile(const fs::path& filePath, std::vector<uint8_t>& data)
     return false;
   }
   file.seekg(0, std::ios_base::end);
-  data.resize(file.tellg());
+  std::streampos size = file.tellg();
+  if (size <= 0)
+  {
+    return false;
+  }
   file.seekg(0, std::ios_base::beg);
-  file.read((char*) &data[0], data.size());
-  return file.good() && data.size() > 0;
+  data.resize((size_t) size);
+  file.read((char*) data.data(), (std::streamsize) data.size());
+  return file.good();
 }
 
 void _LoadOriented(const char* fileName, const std::vector<uint8_t>& ref)

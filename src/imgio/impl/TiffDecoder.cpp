@@ -50,16 +50,28 @@ namespace gtl
       return ImgioError::UnsupportedEncoding;
     }
 
-    TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &img->width);
-    TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &img->height);
+    if (!TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &img->width) ||
+        !TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &img->height) ||
+        img->width == 0 ||
+        img->height == 0)
+    {
+      TIFFClose(tiff);
+      return ImgioError::Decode;
+    }
 
-    img->size = img->width * img->height * 4;
+    img->format = ImgioFormat::RGBA8_UNORM;
+    img->size = size_t(img->width) * img->height * 4;
     img->data.resize(img->size);
 
     int result = TIFFReadRGBAImageOriented(tiff, img->width, img->height, (uint32_t*) &img->data[0], ORIENTATION_BOTLEFT, 1);
 
     TIFFClose(tiff);
 
-    return result ? ImgioError::None : ImgioError::Decode;
+    if (!result)
+    {
+      return ImgioError::Decode;
+    }
+
+    return ImgioError::None;
   }
 }

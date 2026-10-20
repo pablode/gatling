@@ -70,8 +70,8 @@ namespace
 
   uint8_t _FloatToByte(float value)
   {
-    int result = (int) std::floor(255 * value);
-    return std::min(255, std::max(0, result));
+    value = std::min(std::max(0.0f, value), 1.0f);
+    return (uint8_t) std::floor(255.0f * value);
   }
 }
 
@@ -103,12 +103,12 @@ namespace gtl
       const Imath::Box2i& dw = file.dataWindow();
       img->width = (dw.max.x - dw.min.x + 1);
       img->height = (dw.max.y - dw.min.y + 1);
-      img->size = img->width * img->height * bytesPerPixel;
+      img->size = size_t(img->width) * img->height * bytesPerPixel;
       img->data.resize(img->size);
       img->format = keepHdr ? ImgioFormat::RGBA16_FLOAT : ImgioFormat::RGBA8_UNORM;
 
       Imf::Array2D<Imf::Rgba> tmpPixels(img->height, img->width); // values are 16-bit floats
-      file.setFrameBuffer(&tmpPixels[0][0] - dw.min.x - dw.min.y * img->width, 1, img->width);
+      file.setFrameBuffer(&tmpPixels[0][0] - dw.min.x - (long long) dw.min.y * img->width, 1, img->width);
       file.readPixels(dw.min.y, dw.max.y);
 
       for (long h = 0; h < tmpPixels.height(); h++)

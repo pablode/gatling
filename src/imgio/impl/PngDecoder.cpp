@@ -72,6 +72,7 @@ namespace gtl
 
     img->width = ihdr.width;
     img->height = ihdr.height;
+    img->format = ImgioFormat::RGBA8_UNORM;
 
     spng_ctx_free(ctx);
 

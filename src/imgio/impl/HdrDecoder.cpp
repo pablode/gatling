@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <float.h>
 #include <half.h>
+#include <limits.h>
 
 namespace gtl
 {
@@ -40,16 +41,21 @@ namespace gtl
 
     stbi_set_flip_vertically_on_load(1);
 
-    float* hdrData = stbi_loadf_from_memory((const stbi_uc*) data, (int) size, (int*) &img->width, (int*) &img->height, nullptr, 4);
+    int width;
+    int height;
+    float* hdrData = stbi_loadf_from_memory((const stbi_uc*) data, (int) size, &width, &height, nullptr, 4);
 
     if (!hdrData)
     {
       return ImgioError::Decode;
     }
 
+    img->width = (uint32_t) width;
+    img->height = (uint32_t) height;
+
     uint32_t bytesPerPixel = keepHdr ? 8 : 4;
 
-    img->size = img->width * img->height * bytesPerPixel;
+    img->size = size_t(img->width) * img->height * bytesPerPixel;
     img->data.resize(img->size, 0);
     img->format = keepHdr ? ImgioFormat::RGBA16_FLOAT : ImgioFormat::RGBA8_UNORM;
 
@@ -70,7 +76,8 @@ namespace gtl
         }
         else
         {
-          byteDataOut[idx + k] = uint8_t(std::min(int(floatDataIn[idx + k] * 255.0f), 255));
+          float value = std::min(std::max(0.0f, floatDataIn[idx + k]), 1.0f);
+          byteDataOut[idx + k] = uint8_t(value * 255.0f);
         }
       }
     }

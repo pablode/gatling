@@ -25,8 +25,8 @@
 #define STBI_ONLY_TGA
 #include <stb_image.h>
 
-#include <algorithm>
-#include <float.h>
+#include <string.h>
+#include <limits.h>
 
 namespace gtl
 {
@@ -34,14 +34,24 @@ namespace gtl
   {
     stbi_set_flip_vertically_on_load(1);
 
+    int width;
+    int height;
     int num_components;
-    uint8_t* rgbaData = stbi_load_from_memory((const stbi_uc*) data, (int) size, (int*) &img->width, (int*) &img->height, &num_components, 4);
+    uint8_t* rgbaData = stbi_load_from_memory((const stbi_uc*) data, (int) size, &width, &height, &num_components, 4);
     if (!rgbaData)
     {
-      return ImgioError::Unknown;
+      const char* reason = stbi_failure_reason();
+      if (reason && strcmp(reason, "Image not of any known type, or corrupt") == 0)
+      {
+        return ImgioError::UnsupportedEncoding;
+      }
+      return ImgioError::Decode;
     }
 
-    img->size = img->width * img->height * 4;
+    img->width = (uint32_t) width;
+    img->height = (uint32_t) height;
+    img->format = ImgioFormat::RGBA8_UNORM;
+    img->size = size_t(img->width) * img->height * 4;
     img->data.resize(img->size);
     memcpy(&img->data[0], rgbaData, img->size);
 
@@ -49,4 +59,3 @@ namespace gtl
     return ImgioError::None;
   }
 }
-
