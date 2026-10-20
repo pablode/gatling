@@ -39,7 +39,7 @@ layout(binding = BINDING_INDEX_AOV_TEXCOORDS, std430) writeonly buffer Texcoords
 layout(binding = BINDING_INDEX_AOV_BOUNCES, std430) writeonly buffer BouncesBuffer { vec3 BouncesAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
-layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, std430) writeonly buffer ClockCyclesBuffer { uvec3 ClockCyclesAov[]; };
+layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, std430) writeonly buffer ClockCyclesBuffer { vec3 ClockCyclesAov[]; };
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
 layout(binding = BINDING_INDEX_AOV_OPACITY, std430) writeonly buffer OpacityBuffer { vec3 OpacityAov[]; };
