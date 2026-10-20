@@ -58,19 +58,17 @@ struct ShadowRayPayload
 };
 
 #if MEDIUM_STACK_SIZE > 0
-void shadeRayPayloadIncrementWalk(inout ShadeRayPayload payload)
-{
-    uint bitfield = payload.bitfield;
-    bitfield &= SHADE_RAY_PAYLOAD_WALK_MASK;
-    bitfield = min(bitfield + 1, SHADE_RAY_PAYLOAD_WALK_MASK);
-
-    payload.bitfield &= ~SHADE_RAY_PAYLOAD_WALK_MASK;
-    payload.bitfield |= bitfield;
-}
-
 uint shadeRayPayloadGetWalk(in ShadeRayPayload payload)
 {
     return (payload.bitfield & SHADE_RAY_PAYLOAD_WALK_MASK) >> SHADE_RAY_PAYLOAD_WALK_OFFSET;
+}
+
+void shadeRayPayloadIncrementWalk(inout ShadeRayPayload payload)
+{
+    uint walk = min(shadeRayPayloadGetWalk(payload) + 1, SHADE_RAY_PAYLOAD_WALK_MASK >> SHADE_RAY_PAYLOAD_WALK_OFFSET);
+
+    payload.bitfield &= ~SHADE_RAY_PAYLOAD_WALK_MASK;
+    payload.bitfield |= walk << SHADE_RAY_PAYLOAD_WALK_OFFSET;
 }
 #endif
 
