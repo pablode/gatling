@@ -218,6 +218,13 @@ void main()
         }
 
         transmittance = exp(-m.sigma_t * distance);
+
+        if ((rayPayload.bitfield & SHADE_RAY_PAYLOAD_VOLUME_DISTANCE_SAMPLED_FLAG) != 0)
+        {
+            // The surface was hit before the sampled scattering distance. Don't apply transmittance twice.
+            float survival = dot(rayPayload.walkSegmentPdf, transmittance);
+            transmittance = safe_div(transmittance, survival);
+        }
 #endif
 
         throughput *= transmittance;
