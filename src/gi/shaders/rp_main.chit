@@ -40,15 +40,25 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
 
         // TODO: sample solid angle of sphere light
         // https://schuttejoe.github.io/post/arealightsampling/
-        vec3 samplePos = light.pos + sample_sphere(k4.zw, light.radiusXYZ);
+        vec3 unitDir = sample_sphere(k4.zw, vec3(1.0));
+        vec3 sampleOffset = unitDir * light.radiusXYZ;
+        vec3 samplePos = light.pos + sampleOffset;
         vec3 dir = samplePos - surfacePos;
         dist = length(dir);
         dirToLight = safe_div(dir, dist);
 
         // https://graphics.cg.uni-saarland.de/courses/ris-2021/slides/03_ProbabilityTheory_MonteCarlo.pdf s.35
-        vec3 lightNormal = normalize(samplePos - light.pos);
+        vec3 radiusSqr = light.radiusXYZ * light.radiusXYZ;
+        vec3 lightNormal = normalize(safe_div(unitDir, light.radiusXYZ));
         float cosTheta = max(0.0, dot(-dirToLight, lightNormal));
-        invPdf = safe_div((light.area > 0.0) ? (light.area * cosTheta) : 1.0, dist * dist);
+
+        // Area Jacobian of the unit-sphere to ellipsoid mapping:
+        // dA_ellipsoid/dA_sphere = (rx*ry*rz) * length(unitDir / radius)
+        float jacobian = 4.0 * PI * sqrt(
+            unitDir.x * unitDir.x * radiusSqr.y * radiusSqr.z +
+            unitDir.y * unitDir.y * radiusSqr.x * radiusSqr.z +
+            unitDir.z * unitDir.z * radiusSqr.x * radiusSqr.y);
+        invPdf = safe_div((light.area > 0.0) ? (jacobian * cosTheta) : 1.0, dist * dist);
 
         power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;

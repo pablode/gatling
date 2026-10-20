@@ -219,7 +219,7 @@ vec3 sample_hemisphere(vec2 xi)
     );
 }
 
-// FIXME: sampling is nonuniform...
+// Samples a point on the unit sphere scaled by the given radii.
 vec3 sample_sphere(vec2 xi, vec3 radius)
 {
     float a = 1.0 - 2.0 * xi.x;
