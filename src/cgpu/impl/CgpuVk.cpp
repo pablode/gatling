@@ -1033,8 +1033,8 @@ namespace gtl
 
     if (candidate.internalFeatures.driverProperties)
     {
-      GB_LOG("> driver: {} ({})", candidate.propertyChain.driver.driverName,
-                                  candidate.propertyChain.driver.driverInfo);
+      GB_LOG("> driver: {} {}", candidate.propertyChain.driver.driverName,
+                                candidate.propertyChain.driver.driverInfo);
     }
 
     cgpuPrintEnabledFeatures(candidate.features, candidate.internalFeatures);
