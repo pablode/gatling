@@ -61,10 +61,7 @@ namespace gtl
       m_logger = mi::base::Handle<McMdlLogger>(runtime.getLogger());
       m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
       m_transaction = mi::base::Handle<mi::neuraylib::ITransaction>(runtime.getTransaction());
-
-      mi::base::Handle<mi::neuraylib::IMdl_factory> factory(runtime.getFactory());
-      m_context = mi::base::Handle<mi::neuraylib::IMdl_execution_context>(factory->create_execution_context());
-      m_context->set_option("resolve_resources", false);
+      m_factory = mi::base::Handle<mi::neuraylib::IMdl_factory>(runtime.getFactory());
     }
 
     void setAuxiliaryOutputEnabled(bool enabled)
@@ -78,8 +75,12 @@ namespace gtl
                              std::vector<McTextureDescription>& textureDescriptions,
                              std::vector<std::string>& stringConstants)
     {
-      mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), m_context.get()));
-      m_logger->flushContextMessages(m_context.get());
+      // Create a separate execution context for each thread.
+      mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
+      context->set_option("resolve_resources", false);
+
+      mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), context.get()));
+      m_logger->flushContextMessages(context.get());
 
       if (!linkUnit)
       {
@@ -90,17 +91,17 @@ namespace gtl
         compiledMaterial.get(),
         genFunctions.data(),
         genFunctions.size(),
-        m_context.get()
+        context.get()
       );
-      m_logger->flushContextMessages(m_context.get());
+      m_logger->flushContextMessages(context.get());
 
       if (linkResult)
       {
         return false;
       }
 
-      mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode(m_backend->translate_link_unit(linkUnit.get(), m_context.get()));
-      m_logger->flushContextMessages(m_context.get());
+      mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode(m_backend->translate_link_unit(linkUnit.get(), context.get()));
+      m_logger->flushContextMessages(context.get());
 
       if (!targetCode)
       {
@@ -267,7 +268,7 @@ namespace gtl
     mi::base::Handle<mi::neuraylib::IMdl_backend> m_backend;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
-    mi::base::Handle<mi::neuraylib::IMdl_execution_context> m_context;
+    mi::base::Handle<mi::neuraylib::IMdl_factory> m_factory;
   };
 
   bool McBackend::init(McRuntime& runtime)
