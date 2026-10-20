@@ -71,7 +71,7 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     rendererState.hitIndices[1] = f.v_1;
     rendererState.hitIndices[2] = f.v_2;
     rendererState.hitBarycentrics = hit_bc;
-    for (uint i = 0; i <= MAX_SCENE_DATA_ID; i++)
+    for (uint i = 0; i < MAX_SCENE_DATA_ID; i++)
     {
       rendererState.sceneDataInfos[i] = preamble.sceneDataInfos[i];
     }
