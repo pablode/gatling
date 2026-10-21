@@ -3201,6 +3201,8 @@ namespace gtl
       ipipeline->pipeline
     );
 
+    GB_EXPECT(bindSetCount == ipipeline->descriptorSetCount, "descriptor set count mismatch");
+
     std::array<VkDescriptorSet, CGPU_MAX_DESCRIPTOR_SET_COUNT> descriptorSets;
     for (uint32_t i = 0; i < bindSetCount; i++)
     {
