@@ -169,9 +169,11 @@ namespace gtl
     float      metersPerSceneUnit;
     bool       nextEventEstimation;
     bool       progressiveAccumulation;
+    uint32_t   risSampleCount;
     uint32_t   rrBounceOffset;
     float      rrInvMinTermProb;
     uint32_t   spp;
+    bool       streamingRis;
     float      time;
   };
 

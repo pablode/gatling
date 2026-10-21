@@ -28,6 +28,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((rrInvMinTermProb, "rr-inv-min-term-prob"))               \
   ((maxSampleValue, "max-sample-value"))                     \
   ((nextEventEstimation, "next-event-estimation"))           \
+  ((streamingRis, "streaming-ris"))                          \
+  ((risSampleCount, "ris-sample-count"))                     \
   ((progressiveAccumulation, "progressive-accumulation"))    \
   ((filterImportanceSampling, "filter-importance-sampling")) \
   ((depthOfField, "depth-of-field"))                         \

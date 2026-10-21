@@ -1571,6 +1571,7 @@ cleanup:
             .isEmissive = mcMat->isEmissive,
             .isThinWalled = mcMat->isThinWalled,
             .nextEventEstimation = renderSettings.nextEventEstimation,
+            .streamingRis = renderSettings.streamingRis,
             .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .dfGlsl = compInfo.genInfo.glslSource,
             .textureIndexOffset = texOffset
@@ -1730,7 +1731,8 @@ cleanup:
         .jitteredSampling = renderSettings.jitteredSampling,
         .materialCount = uint32_t(materials.size()),
         .nextEventEstimation = renderSettings.nextEventEstimation,
-        .reorderInvocations = s_ctxFeatures.rayTracingInvocationReorder
+        .reorderInvocations = s_ctxFeatures.rayTracingInvocationReorder,
+        .streamingRis = renderSettings.streamingRis
       };
 
       std::vector<uint8_t> spv;
@@ -1997,9 +1999,11 @@ cleanup:
       ars.metersPerSceneUnit != brs.metersPerSceneUnit ||
       ars.nextEventEstimation != brs.nextEventEstimation ||
       ars.progressiveAccumulation != brs.progressiveAccumulation ||
+      ars.risSampleCount != brs.risSampleCount ||
       ars.rrBounceOffset != brs.rrBounceOffset ||
       ars.rrInvMinTermProb != brs.rrInvMinTermProb ||
-      ars.spp != brs.spp;
+      ars.spp != brs.spp ||
+      ars.streamingRis != brs.streamingRis;
 
     if (cameraChanged || renderSettingsChanged)
     {
@@ -2029,7 +2033,8 @@ cleanup:
 
     if (ars.mediumStackSize != brs.mediumStackSize ||
         ars.nextEventEstimation != brs.nextEventEstimation ||
-        ars.progressiveAccumulation != brs.progressiveAccumulation)
+        ars.progressiveAccumulation != brs.progressiveAccumulation ||
+        ars.streamingRis != brs.streamingRis)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersAll;
     }
@@ -2456,6 +2461,7 @@ cleanup:
         .rectLightCount = scene->rectLights.elementCount(),
         .diskLightCount = scene->diskLights.elementCount(),
         .totalLightCount = totalLightCount,
+        .risSampleCount = renderSettings.risSampleCount,
         .metersPerSceneUnit = renderSettings.metersPerSceneUnit,
         .maxVolumeWalkLength = renderSettings.maxVolumeWalkLength,
         .imageDims = ((imageHeight << 16) | imageWidth),

@@ -79,6 +79,7 @@ namespace gtl
       uint32_t materialCount;
       bool nextEventEstimation;
       bool reorderInvocations;
+      bool streamingRis;
     };
 
     struct MissShaderParams
@@ -103,6 +104,7 @@ namespace gtl
       bool isEmissive;
       bool isThinWalled;
       bool nextEventEstimation;
+      bool streamingRis;
       uint32_t maxSceneDataId;
       std::string_view dfGlsl;
       uint32_t textureIndexOffset;

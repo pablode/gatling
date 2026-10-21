@@ -141,6 +141,40 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
     power *= exp2(ubo.sensorExposure);
     invPdf *= float(ubo.totalLightCount);
 }
+
+vec3 evaluateLightBsdf(vec3 k1,
+                       vec3 k2,
+                       vec3 ior1,
+                       vec3 ior2,
+                       bool isThinWalled,
+                       bool isDoubleSided,
+                       bool isFrontFace,
+                       inout State shadingState,
+                       uint diffuseSpecularPacked,
+                       out float pdf)
+{
+    Bsdf_evaluate_data bsdf_eval_data;
+    bsdf_eval_data.ior1 = ior1;
+    bsdf_eval_data.ior2 = ior2;
+    bsdf_eval_data.k1 = k1;
+    bsdf_eval_data.k2 = k2;
+
+#if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
+    if (!isDoubleSided && isThinWalled && !isFrontFace)
+    {
+        mdl_backface_bsdf_scattering_evaluate(bsdf_eval_data, shadingState);
+    }
+    else
+#endif
+    {
+        mdl_bsdf_scattering_evaluate(bsdf_eval_data, shadingState);
+    }
+
+    pdf = bsdf_eval_data.pdf;
+
+    vec2 diffuseSpecular = unpackHalf2x16(diffuseSpecularPacked);
+    return bsdf_eval_data.bsdf_diffuse * diffuseSpecular.x + bsdf_eval_data.bsdf_glossy * diffuseSpecular.y;
+}
 #endif
 
 void main()
@@ -450,6 +484,77 @@ void main()
         // reassign normal, see declaration of variable.
         shading_state.normal = normal;
 
+        vec3 dirToLight = vec3(0.0, 0.0, 1.0);
+        float lightDist = 0.0;
+        vec3 neeContrib = vec3(0.0);
+
+#ifdef STREAMING_RIS
+        uint sampleCount = (ubo.totalLightCount > 0) ? max(ubo.totalLightCount, ubo.risSampleCount) : 0;
+
+        float risWeightSum = 0.0;
+        vec3 risSelectedContribution = vec3(0.0);
+
+        for (uint i = 0; i < sampleCount; i++)
+        {
+#ifdef RAND_4D
+            vec4 k4 = rng4d_next4f(rayPayload.rng_state);
+            // TODO: we need a better solution, or decide on 1D vs 4D
+            float risRandom = rng4d_next4f(rayPayload.rng_state).x;
+#else
+            vec4 k4 = rng1d_next4f(rayPayload.rng_state);
+            float risRandom = rng1d_next1f(rayPayload.rng_state);
+#endif
+
+            vec3 sampleDirToLight;
+            float sampleLightDist;
+            vec3 sampleLightPower;
+            float sampleInvLightPdf;
+            uint sampleDiffuseSpecularPacked;
+            sampleLight(k4, shading_state.position, sampleDirToLight, sampleLightDist, sampleLightPower,
+                        sampleInvLightPdf, sampleDiffuseSpecularPacked);
+
+            if (sampleLightDist <= 0.0)
+            {
+                continue;
+            }
+
+            shading_state.normal = normal; // BSDF may modify the normal during sampling
+
+            float bsdfPdf;
+            vec3 bsdfTerm = evaluateLightBsdf(-gl_WorldRayDirectionEXT, sampleDirToLight, iorCurrent, iorOther,
+                                              thinWalled, isDoubleSided, isFrontFace, shading_state,
+                                              sampleDiffuseSpecularPacked, bsdfPdf);
+
+            if (bsdfPdf <= 0.0)
+            {
+                continue;
+            }
+
+            vec3 sampleContribution = bsdfTerm * sampleLightPower * sampleInvLightPdf;
+            float sampleWeight = luminance(sampleContribution);
+
+            if (sampleWeight <= 0.0)
+            {
+                continue;
+            }
+
+            risWeightSum += sampleWeight;
+            if (risRandom * risWeightSum < sampleWeight) // stream into 'reservoir'?
+            {
+                dirToLight = sampleDirToLight;
+                lightDist = sampleLightDist;
+                risSelectedContribution = sampleContribution;
+            }
+        }
+
+        float selectedWeight = luminance(risSelectedContribution);
+        if (selectedWeight > 0.0)
+        {
+            // RIS estimator: f(y) / p_hat(y) * 1/M * sum_i p_hat(x_i) / p(x_i).
+            neeContrib = throughputBeforeBsdf * risSelectedContribution *
+                         (risWeightSum / (float(sampleCount) * selectedWeight));
+        }
+#else
         // Sample light source
 #ifdef RAND_4D
         vec4 k4 = rng4d_next4f(rayPayload.rng_state);
@@ -457,45 +562,24 @@ void main()
         vec4 k4 = rng1d_next4f(rayPayload.rng_state);
 #endif
 
-        vec3 dirToLight;
-        float lightDist;
         vec3 lightPower;
         float invLightSamplePdf;
         uint diffuseSpecularPacked;
         sampleLight(k4, shading_state.position, dirToLight, lightDist, lightPower, invLightSamplePdf, diffuseSpecularPacked);
 
-        vec3 neeContrib = vec3(0.0);
-
         if (lightDist > 0.0)
         {
-            Bsdf_evaluate_data bsdf_eval_data;
-            bsdf_eval_data.ior1 = iorCurrent;
-            bsdf_eval_data.ior2 = iorOther;
-            bsdf_eval_data.k1 = -gl_WorldRayDirectionEXT;
-            bsdf_eval_data.k2 = dirToLight;
+            float bsdfPdf;
+            vec3 bsdfTerm = evaluateLightBsdf(-gl_WorldRayDirectionEXT, dirToLight, iorCurrent, iorOther,
+                                              thinWalled, isDoubleSided, isFrontFace, shading_state,
+                                              diffuseSpecularPacked, bsdfPdf);
 
-#if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
-            if (!isDoubleSided && thinWalled && !isFrontFace)
+            if (bsdfPdf > 0.0)
             {
-                mdl_backface_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);
-            }
-            else
-#endif
-            {
-                mdl_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);
-            }
-
-            if (bsdf_eval_data.pdf > 0.0)
-            {
-                vec2 diffuseSpecular = unpackHalf2x16(diffuseSpecularPacked);
-
-                vec3 neeRadiance = lightPower * invLightSamplePdf;
-
-                vec3 weight = throughputBeforeBsdf * neeRadiance;
-                neeContrib += weight * bsdf_eval_data.bsdf_diffuse * diffuseSpecular.x;
-                neeContrib += weight * bsdf_eval_data.bsdf_glossy * diffuseSpecular.y;
+                neeContrib = throughputBeforeBsdf * bsdfTerm * lightPower * invLightSamplePdf;
             }
         }
+#endif
 
         vec3 lightPos = shading_state.position + dirToLight * lightDist;
         vec3 toLight = lightPos - rayPayload.ray_origin;

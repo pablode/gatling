@@ -37,6 +37,7 @@ struct UniformData
   GI_UINT  rectLightCount;
   GI_UINT  diskLightCount;
   GI_UINT  totalLightCount;
+  GI_UINT  risSampleCount;
   GI_FLOAT metersPerSceneUnit;
   GI_UINT  maxVolumeWalkLength;
   GI_UINT  imageDims;

@@ -286,9 +286,11 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       .metersPerSceneUnit = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->stageMetersPerUnit)->second).Get<float>(),
       .nextEventEstimation = _settings.find(HdGatlingSettingsTokens->nextEventEstimation)->second.Get<bool>(),
       .progressiveAccumulation = _settings.find(HdGatlingSettingsTokens->progressiveAccumulation)->second.Get<bool>(),
+      .risSampleCount = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->risSampleCount)->second).Get<uint32_t>(),
       .rrBounceOffset = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->rrBounceOffset)->second).Get<uint32_t>(),
       .rrInvMinTermProb = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->rrInvMinTermProb)->second).Get<float>(),
       .spp = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->spp)->second).Get<uint32_t>(),
+      .streamingRis = _settings.find(HdGatlingSettingsTokens->streamingRis)->second.Get<bool>(),
       .time = float(time)
     },
     .scene = _scene

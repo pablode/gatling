@@ -99,6 +99,8 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Depth of field", HdGatlingSettingsTokens->depthOfField, VtValue{false} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Light intensity multiplier", HdGatlingSettingsTokens->lightIntensityMultiplier, VtValue{1.0f} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->nextEventEstimation, VtValue{false} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Streaming RIS", HdGatlingSettingsTokens->streamingRis, VtValue{false} });
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "RIS sample count", HdGatlingSettingsTokens->risSampleCount, VtValue{8} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Clipping planes", HdGatlingSettingsTokens->clippingPlanes, VtValue{false} });
 #ifndef HDGATLING_DISABLE_VOLUME_SAMPLING
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Medium stack size", HdGatlingSettingsTokens->mediumStackSize, VtValue{0} });

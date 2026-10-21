@@ -315,6 +315,10 @@ namespace gtl
     {
       stitcher.appendDefine("NEXT_EVENT_ESTIMATION");
     }
+    if (params.streamingRis)
+    {
+      stitcher.appendDefine("STREAMING_RIS");
+    }
     if (params.enableSceneTransforms)
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
