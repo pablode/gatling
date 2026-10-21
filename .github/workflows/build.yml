@@ -57,7 +57,7 @@ jobs:
 
     steps:
     - name: Check out repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         submodules: recursive
         lfs: true
@@ -128,7 +128,7 @@ jobs:
 
     - name: Install NASM
       if: runner.os == 'Windows'
-      uses: ilammy/setup-nasm@v1.4.0
+      run: choco install nasm --version=2.16.3 -y --no-progress
 
     - name: Generate build system files using CMake
       working-directory: BUILD
@@ -177,7 +177,7 @@ jobs:
 
     - name: Upload test artifacts
       if: ${{ inputs.run-graphical-tests && inputs.upload-test-artifacts && failure() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test-artifacts-${{ runner.os }}
         path: TEST/*
@@ -190,7 +190,7 @@ jobs:
 
     - name: Upload archive
       if: inputs.upload-install-artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.archive-name }}
         path: INSTALL/${{ inputs.archive-name }}.tar.gz
