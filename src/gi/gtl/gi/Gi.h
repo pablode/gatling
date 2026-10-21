@@ -64,6 +64,7 @@ namespace gtl
   struct GiDistantLight;
   struct GiRectLight;
   struct GiDiskLight;
+  struct GiCylinderLight;
   struct GiDomeLight;
   struct GiRenderBuffer;
 
@@ -267,6 +268,14 @@ namespace gtl
   void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb);
   void giSetDiskLightRadius(GiDiskLight* light, float radiusX, float radiusY);
   void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular);
+
+  GiCylinderLight* giCreateCylinderLight(GiScene* scene);
+  void giDestroyCylinderLight(GiScene* scene, GiCylinderLight* light);
+  void giSetCylinderLightOrigin(GiCylinderLight* light, float* origin);
+  void giSetCylinderLightAxis(GiCylinderLight* light, float* axis);
+  void giSetCylinderLightBaseEmission(GiCylinderLight* light, float* rgb);
+  void giSetCylinderLightDimensions(GiCylinderLight* light, float length, float radiusY, float radiusZ);
+  void giSetCylinderLightDiffuseSpecular(GiCylinderLight* light, float diffuse, float specular);
 
   GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
   void giDestroyDomeLight(GiDomeLight* light);

@@ -31,6 +31,8 @@
 
 #include <gtl/gi/Gi.h>
 
+#include <cmath>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace
@@ -41,6 +43,14 @@ namespace
     float ac = powf(radiusX * radiusZ, 1.6f);
     float bc = powf(radiusY * radiusZ, 1.6f);
     return powf((ab + ac + bc) / 3.0f, 1.0f / 1.6f) * 4.0f * M_PI;
+  }
+
+  float _AreaEllipse(float radiusX, float radiusY)
+  {
+    // Ramanujan's approximation.
+    return float(M_PI) *
+           (3.0f * (radiusX + radiusY) -
+            std::sqrt((3.0f * radiusX + radiusY) * (radiusX + 3.0f * radiusY)));
   }
 }
 
@@ -325,6 +335,68 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 void HdGatlingDiskLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
 {
   giDestroyDiskLight(_scene, _giDiskLight);
+}
+
+//
+// Cylinder Light
+//
+HdGatlingCylinderLight::HdGatlingCylinderLight(const SdfPath& id, GiScene* scene)
+  : HdGatlingLight(id, scene)
+{
+  _giCylinderLight = giCreateCylinderLight(scene);
+}
+
+void HdGatlingCylinderLight::Sync(HdSceneDelegate* sceneDelegate,
+                                  [[maybe_unused]] HdRenderParam* renderParam,
+                                  HdDirtyBits* dirtyBits)
+{
+  const SdfPath& id = GetId();
+
+  const GfMatrix4f transform(sceneDelegate->GetTransform(id));
+
+  if (*dirtyBits & DirtyBits::DirtyTransform)
+  {
+    GfVec3f origin = transform.Transform(GfVec3f(0.0f, 0.0f, 0.0f));
+    GfVec3f axis = transform.TransformDir(GfVec3f(1.0f, 0.0f, 0.0f));
+    axis.Normalize();
+
+    giSetCylinderLightOrigin(_giCylinderLight, origin.data());
+    giSetCylinderLightAxis(_giCylinderLight, axis.data());
+  }
+
+  if (*dirtyBits & DirtyBits::DirtyParams)
+  {
+    VtValue boxedLength = sceneDelegate->GetLightParamValue(id, HdLightTokens->length);
+    float length = boxedLength.GetWithDefault<float>(1.0f);
+    length = transform.TransformDir(GfVec3f{ length, 0.0f, 0.0f }).GetLength();
+
+    VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
+    float radius = boxedRadius.GetWithDefault<float>(0.5f);
+    float radiusY = transform.TransformDir(GfVec3f{ 0.0f, radius, 0.0f }).GetLength();
+    float radiusZ = transform.TransformDir(GfVec3f{ 0.0f, 0.0f, radius }).GetLength();
+
+    VtValue boxedNormalize = sceneDelegate->GetLightParamValue(id, HdLightTokens->normalize);
+    bool normalize = boxedNormalize.GetWithDefault<bool>(false);
+    float area = _AreaEllipse(radiusY, radiusZ) * length;
+    float normalizeFactor = (normalize && area > 0.0f) ? area : 1.0f;
+    GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate, normalizeFactor);
+
+    VtValue boxedDiffuse = sceneDelegate->GetLightParamValue(id, HdLightTokens->diffuse);
+    float diffuse = boxedDiffuse.GetWithDefault<float>(1.0f);
+    VtValue boxedSpecular = sceneDelegate->GetLightParamValue(id, HdLightTokens->specular);
+    float specular = boxedSpecular.GetWithDefault<float>(1.0f);
+
+    giSetCylinderLightDimensions(_giCylinderLight, length, radiusY, radiusZ);
+    giSetCylinderLightBaseEmission(_giCylinderLight, baseEmission.data());
+    giSetCylinderLightDiffuseSpecular(_giCylinderLight, diffuse, specular);
+  }
+
+  *dirtyBits = HdChangeTracker::Clean;
+}
+
+void HdGatlingCylinderLight::Finalize([[maybe_unused]] HdRenderParam* renderParam)
+{
+  giDestroyCylinderLight(_scene, _giCylinderLight);
 }
 
 //

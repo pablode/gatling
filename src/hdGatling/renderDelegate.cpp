@@ -50,6 +50,7 @@ namespace
     HdPrimTypeTokens->distantLight,
     HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->diskLight,
+    HdPrimTypeTokens->cylinderLight,
     HdPrimTypeTokens->domeLight,
     HdPrimTypeTokens->simpleLight, // Required for usdview domeLight creation
     HdPrimTypeTokens->extComputation
@@ -301,6 +302,10 @@ HdSprim* HdGatlingRenderDelegate::CreateSprim(const TfToken& typeId, const SdfPa
   else if (typeId == HdPrimTypeTokens->diskLight)
   {
     return new HdGatlingDiskLight(sprimId, _giScene);
+  }
+  else if (typeId == HdPrimTypeTokens->cylinderLight)
+  {
+    return new HdGatlingCylinderLight(sprimId, _giScene);
   }
   else if (typeId == HdPrimTypeTokens->domeLight)
   {

@@ -36,6 +36,7 @@ struct UniformData
   GI_UINT  distantLightCount;
   GI_UINT  rectLightCount;
   GI_UINT  diskLightCount;
+  GI_UINT  cylinderLightCount;
   GI_UINT  totalLightCount;
   GI_FLOAT metersPerSceneUnit;
   GI_UINT  maxVolumeWalkLength;
@@ -113,6 +114,18 @@ struct DiskLight
   GI_FLOAT padding;
 };
 
+struct CylinderLight
+{
+  GI_VEC3  origin;
+  GI_FLOAT lengthX;
+  GI_VEC3  baseEmission;
+  GI_FLOAT radiusY;
+  GI_FLOAT radiusZ;
+  GI_UINT  axisPacked;
+  GI_UINT  diffuseSpecularPacked;
+  GI_FLOAT padding;
+};
+
 const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);
 const GI_UINT BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED = (1 << 1);
 
@@ -154,7 +167,8 @@ GI_BINDING_INDEX(SPHERE_LIGHTS,   1)
 GI_BINDING_INDEX(DISTANT_LIGHTS,  2)
 GI_BINDING_INDEX(RECT_LIGHTS,     3)
 GI_BINDING_INDEX(DISK_LIGHTS,     4)
-GI_BINDING_INDEX(SAMPLER,         5)
+GI_BINDING_INDEX(CYLINDER_LIGHTS, 5)
+GI_BINDING_INDEX(SAMPLER,         7)
 GI_BINDING_INDEX(SCENE_AS,        8)
 GI_BINDING_INDEX(BLAS_PAYLOADS,   9)
 GI_BINDING_INDEX(INSTANCE_IDS,   10)

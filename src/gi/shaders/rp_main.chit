@@ -112,6 +112,45 @@ void sampleLight(vec4 k4, vec3 surfacePos, out vec3 dirToLight, out float dist, 
         power = light.baseEmission * ubo.lightIntensityMultiplier;
         diffuseSpecularPacked = light.diffuseSpecularPacked;
     }
+    else if (lightSample < float(ubo.sphereLightCount + ubo.distantLightCount + ubo.rectLightCount + ubo.cylinderLightCount))
+    {
+        uint lightIndex = min(uint(k4.y * ubo.cylinderLightCount), ubo.cylinderLightCount - 1);
+
+        CylinderLight light = cylinderLights[lightIndex];
+
+        vec3 axis = decode_direction(light.axisPacked);
+        vec3 t1, t2;
+        orthonormal_basis(axis, t1, t2);
+
+        // UsdLux cylinder lights emit from their side surface, not from the end caps.
+        float phi = k4.z * 2.0 * PI;
+        float cosPhi = cos(phi);
+        float sinPhi = sin(phi);
+
+        vec3 samplePos = light.origin + (k4.w - 0.5) * light.lengthX * axis +
+                         light.radiusY * cosPhi * t1 + light.radiusZ * sinPhi * t2;
+
+        vec3 dir = samplePos - surfacePos;
+        dist = length(dir);
+        dirToLight = safe_div(dir, dist);
+
+        vec3 lightNormal = axis;
+        if ((light.radiusY > 0.0) || (light.radiusZ > 0.0))
+        {
+            lightNormal = normalize(safe_div(cosPhi, light.radiusY) * t1 +
+                                    safe_div(sinPhi, light.radiusZ) * t2);
+        }
+        float cosTheta = max(0.0, dot(-dirToLight, lightNormal));
+
+        // Differential area of the elliptical cross-section at angle phi.
+        float curveSpeed = sqrt(light.radiusY * light.radiusY * sinPhi * sinPhi +
+                                light.radiusZ * light.radiusZ * cosPhi * cosPhi);
+        float area = 2.0 * PI * curveSpeed * light.lengthX;
+        invPdf = safe_div((area > 0.0) ? (area * cosTheta) : 1.0, dist * dist);
+
+        power = light.baseEmission * ubo.lightIntensityMultiplier;
+        diffuseSpecularPacked = light.diffuseSpecularPacked;
+    }
     else
     {
         uint lightIndex = min(uint(k4.y * ubo.diskLightCount), ubo.diskLightCount - 1);

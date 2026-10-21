@@ -26,6 +26,7 @@ namespace gtl
   struct GiDistantLight;
   struct GiRectLight;
   struct GiDiskLight;
+  struct GiCylinderLight;
   struct GiDomeLight;
 }
 
@@ -104,6 +105,21 @@ public:
 
 private:
   GiDiskLight* _giDiskLight;
+};
+
+
+class HdGatlingCylinderLight final : public HdGatlingLight
+{
+public:
+  HdGatlingCylinderLight(const SdfPath& id, GiScene* scene);
+
+public:
+  void Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam, HdDirtyBits* dirtyBits) override;
+
+  void Finalize(HdRenderParam* renderParam) override;
+
+private:
+  GiCylinderLight* _giCylinderLight;
 };
 
 

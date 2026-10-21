@@ -6,6 +6,7 @@ layout(binding = BINDING_INDEX_SPHERE_LIGHTS, std430) readonly buffer SphereLigh
 layout(binding = BINDING_INDEX_DISTANT_LIGHTS, std430) readonly buffer DistantLightBuffer { DistantLight distantLights[]; };
 layout(binding = BINDING_INDEX_RECT_LIGHTS, std430) readonly buffer RectLightBuffer { RectLight rectLights[]; };
 layout(binding = BINDING_INDEX_DISK_LIGHTS, std430) readonly buffer DiskLightBuffer { DiskLight diskLights[]; };
+layout(binding = BINDING_INDEX_CYLINDER_LIGHTS, std430) readonly buffer CylinderLightBuffer { CylinderLight cylinderLights[]; };
 
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 

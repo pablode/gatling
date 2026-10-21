@@ -178,6 +178,12 @@ namespace gtl
     uint64_t gpuHandle;
   };
 
+  struct GiCylinderLight
+  {
+    GiScene* scene;
+    uint64_t gpuHandle;
+  };
+
   struct GiDomeLight
   {
     GiScene* scene;
@@ -211,6 +217,7 @@ namespace gtl
     GgpuDenseDataStore distantLights;
     GgpuDenseDataStore rectLights;
     GgpuDenseDataStore diskLights;
+    GgpuDenseDataStore cylinderLights;
     GiImagePtr domeLightTexture;
     GiDomeLight* domeLight = nullptr; // weak ptr
     glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
@@ -2307,6 +2314,10 @@ cleanup:
     {
       GB_ERROR("{}:{}: light commit failed!", __FILE__, __LINE__);
     }
+    if (!scene->cylinderLights.commitChanges())
+    {
+      GB_ERROR("{}:{}: light commit failed!", __FILE__, __LINE__);
+    }
 
     if (!s_stager->flush())
     {
@@ -2343,6 +2354,7 @@ cleanup:
       buffers.push_back({ .binding = rp::BINDING_INDEX_DISTANT_LIGHTS, .buffer = scene->distantLights.buffer() });
       buffers.push_back({ .binding = rp::BINDING_INDEX_RECT_LIGHTS, .buffer = scene->rectLights.buffer() });
       buffers.push_back({ .binding = rp::BINDING_INDEX_DISK_LIGHTS, .buffer = scene->diskLights.buffer() });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_CYLINDER_LIGHTS, .buffer = scene->cylinderLights.buffer() });
       buffers.push_back({ .binding = rp::BINDING_INDEX_BLAS_PAYLOADS, .buffer = bvh->blasPayloadsBuffer });
       buffers.push_back({ .binding = rp::BINDING_INDEX_INSTANCE_IDS, .buffer = bvh->instanceIdsBuffer });
 
@@ -2439,7 +2451,7 @@ cleanup:
       uint32_t domeLightDiffuseSpecularPacked = glm::packHalf2x16(scene->domeLight ? glm::vec2(scene->domeLight->diffuse, scene->domeLight->specular) : glm::vec2(1.0f));
 
       uint32_t totalLightCount = scene->sphereLights.elementCount() + scene->distantLights.elementCount() +
-        scene->rectLights.elementCount() + scene->diskLights.elementCount();
+        scene->rectLights.elementCount() + scene->diskLights.elementCount() + scene->cylinderLights.elementCount();
 
       auto uniformData = s_bumpAlloc->alloc<rp::UniformData>();
 
@@ -2455,6 +2467,7 @@ cleanup:
         .distantLightCount = scene->distantLights.elementCount(),
         .rectLightCount = scene->rectLights.elementCount(),
         .diskLightCount = scene->diskLights.elementCount(),
+        .cylinderLightCount = scene->cylinderLights.elementCount(),
         .totalLightCount = totalLightCount,
         .metersPerSceneUnit = renderSettings.metersPerSceneUnit,
         .maxVolumeWalkLength = renderSettings.maxVolumeWalkLength,
@@ -2589,6 +2602,7 @@ cleanup:
       .distantLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DistantLight), 64),
       .rectLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::RectLight), 64),
       .diskLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DiskLight), 64),
+      .cylinderLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::CylinderLight), 64),
       .fallbackDomeLightTexture = fallbackDomeLightTexture,
     };
 
@@ -2983,6 +2997,105 @@ cleanup:
   void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular)
   {
     auto* data = light->scene->diskLights.write<rp::DiskLight>(light->gpuHandle);
+    assert(data);
+
+    data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
+  GiCylinderLight* giCreateCylinderLight(GiScene* scene)
+  {
+    std::lock_guard guard(scene->mutex);
+
+    auto* light = new GiCylinderLight;
+    light->scene = scene;
+    light->gpuHandle = scene->cylinderLights.allocate();
+
+    uint32_t axisPacked = _EncodeDirection(glm::vec3(1.0f, 0.0f, 0.0f));
+
+    auto* data = scene->cylinderLights.write<rp::CylinderLight>(light->gpuHandle);
+    assert(data);
+
+    data->origin[0] = 0.0f;
+    data->origin[1] = 0.0f;
+    data->origin[2] = 0.0f;
+    data->lengthX = 1.0f;
+    data->baseEmission[0] = 0.0f;
+    data->baseEmission[1] = 0.0f;
+    data->baseEmission[2] = 0.0f;
+    data->radiusY = 0.5f;
+    data->radiusZ = 0.5f;
+    data->axisPacked = axisPacked;
+    data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(1.0f));
+    data->padding = 0.0f;
+
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
+    return light;
+  }
+
+  void giDestroyCylinderLight(GiScene* scene, GiCylinderLight* light)
+  {
+    std::lock_guard guard(scene->mutex);
+
+    scene->cylinderLights.free(light->gpuHandle);
+    scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+
+    delete light;
+  }
+
+  void giSetCylinderLightOrigin(GiCylinderLight* light, float* origin)
+  {
+    auto* data = light->scene->cylinderLights.write<rp::CylinderLight>(light->gpuHandle);
+    assert(data);
+
+    data->origin[0] = origin[0];
+    data->origin[1] = origin[1];
+    data->origin[2] = origin[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
+  void giSetCylinderLightAxis(GiCylinderLight* light, float* axis)
+  {
+    uint32_t axisPacked = _EncodeDirection(glm::make_vec3(axis));
+
+    auto* data = light->scene->cylinderLights.write<rp::CylinderLight>(light->gpuHandle);
+    assert(data);
+
+    data->axisPacked = axisPacked;
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
+  void giSetCylinderLightBaseEmission(GiCylinderLight* light, float* rgb)
+  {
+    auto* data = light->scene->cylinderLights.write<rp::CylinderLight>(light->gpuHandle);
+    assert(data);
+
+    data->baseEmission[0] = rgb[0];
+    data->baseEmission[1] = rgb[1];
+    data->baseEmission[2] = rgb[2];
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
+  void giSetCylinderLightDimensions(GiCylinderLight* light, float length, float radiusY, float radiusZ)
+  {
+    auto* data = light->scene->cylinderLights.write<rp::CylinderLight>(light->gpuHandle);
+    assert(data);
+
+    data->lengthX = length;
+    data->radiusY = radiusY;
+    data->radiusZ = radiusZ;
+
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
+  void giSetCylinderLightDiffuseSpecular(GiCylinderLight* light, float diffuse, float specular)
+  {
+    auto* data = light->scene->cylinderLights.write<rp::CylinderLight>(light->gpuHandle);
     assert(data);
 
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
