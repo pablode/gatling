@@ -45,6 +45,10 @@ target_link_libraries(
     ${CGPU_IMPL_LIBRARIES}
 )
 
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(cgpu PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
 set_target_properties(
   cgpu
   PROPERTIES
