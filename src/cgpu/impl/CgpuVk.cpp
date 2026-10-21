@@ -29,6 +29,7 @@
 #include <atomic>
 #include <mutex>
 #include <algorithm>
+#include <utility>
 
 #include <volk.h>
 
@@ -116,19 +117,19 @@ namespace gtl
 
   struct CgpuIDevice
   {
-    VmaAllocator               allocator;
-    VmaPool                    asScratchMemoryPool;
-    VkQueue                    computeQueue;
-    VkCommandPool              commandPool;
-    CgpuDeviceFeatures         features;
-    CgpuIDeviceFeatures        internalFeatures;
-    CgpuIDeviceProperties      internalProperties;
-    VkDevice                   logicalDevice;
-    VkPhysicalDevice           physicalDevice;
-    VkPipelineCache            pipelineCache;
-    std::mutex                 pipelineCacheMutex;
-    CgpuDeviceProperties       properties;
-    VolkDeviceTable            table;
+    VmaAllocator                allocator;
+    VmaPool                     asScratchMemoryPool;
+    VkQueue                     computeQueue;
+    VkCommandPool               commandPool;
+    CgpuDeviceFeatures          features;
+    CgpuIDeviceFeatures         internalFeatures;
+    CgpuIDeviceProperties       internalProperties;
+    VkDevice                    logicalDevice;
+    VkPhysicalDevice            physicalDevice;
+    VkPipelineCache             pipelineCache;
+    std::unique_ptr<std::mutex> pipelineCacheMutex;
+    CgpuDeviceProperties        properties;
+    VolkDeviceTable             table;
   };
 
   struct CgpuIBuffer
@@ -1223,6 +1224,8 @@ namespace gtl
       idevice->pipelineCache = VK_NULL_HANDLE;
     }
 
+    idevice->pipelineCacheMutex = std::make_unique<std::mutex>();
+
     return true;
   }
 
@@ -1361,7 +1364,7 @@ namespace gtl
 
     CgpuContext* ctx = new CgpuContext {
       .instance = instance,
-      .idevice = idevice,
+      .idevice = std::move(idevice),
       .debugUtilsEnabled = debugUtilsEnabled
     };
 
@@ -1544,7 +1547,7 @@ namespace gtl
 
     VkResult result;
     {
-      std::lock_guard<std::mutex> lock(idevice->pipelineCacheMutex);
+      std::lock_guard<std::mutex> lock(*idevice->pipelineCacheMutex);
 
       result = idevice->table.vkCreateRayTracingPipelinesKHR(
           idevice->logicalDevice,
@@ -2171,7 +2174,7 @@ namespace gtl
 
     VkResult result;
     {
-      std::lock_guard<std::mutex> lock(idevice->pipelineCacheMutex);
+      std::lock_guard<std::mutex> lock(*idevice->pipelineCacheMutex);
 
       result = idevice->table.vkCreateComputePipelines(
         idevice->logicalDevice,
@@ -2533,7 +2536,7 @@ namespace gtl
 
       VkResult result;
       {
-        std::lock_guard<std::mutex> lock(idevice->pipelineCacheMutex);
+        std::lock_guard<std::mutex> lock(*idevice->pipelineCacheMutex);
 
         result = idevice->table.vkCreateRayTracingPipelinesKHR(
           idevice->logicalDevice,
