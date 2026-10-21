@@ -173,8 +173,8 @@ namespace gtl
         // Unfortunately SPIRV-Reflect lacks the functionality to detect read accesses:
         // https://github.com/KhronosGroup/SPIRV-Reflect/issues/99
         dstBinding.readAccess = srcBinding->accessed;
-        const SpvReflectTypeDescription* typeDescription = srcBinding->type_description;
-        dstBinding.writeAccess = srcBinding->accessed && !(typeDescription->decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+        const uint32_t decorationFlags = srcBinding->decoration_flags | srcBinding->block.decoration_flags;
+        dstBinding.writeAccess = srcBinding->accessed && !(decorationFlags & SPV_REFLECT_DECORATION_NON_WRITABLE);
         dstBinding.dim = uint32_t(srcBinding->image.dim) + 1; // enum starts with 0
       }
     }
