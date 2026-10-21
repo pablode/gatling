@@ -27,6 +27,7 @@
 #include <array>
 #include <memory>
 #include <atomic>
+#include <mutex>
 
 #include <volk.h>
 
@@ -124,6 +125,7 @@ namespace gtl
     VkDevice                   logicalDevice;
     VkPhysicalDevice           physicalDevice;
     VkPipelineCache            pipelineCache;
+    std::mutex                 pipelineCacheMutex;
     CgpuDeviceProperties       properties;
     VolkDeviceTable            table;
   };
@@ -1539,16 +1541,20 @@ namespace gtl
       .basePipelineIndex = -1
     };
 
-    VkResult result = idevice->table.vkCreateRayTracingPipelinesKHR(
-        idevice->logicalDevice,
-        VK_NULL_HANDLE,
-        idevice->pipelineCache,
-        1,
-        &rtPipelineCreateInfo,
-        nullptr,
-        &library.pipeline
-    );
+    VkResult result;
+    {
+      std::lock_guard<std::mutex> lock(idevice->pipelineCacheMutex);
 
+      result = idevice->table.vkCreateRayTracingPipelinesKHR(
+          idevice->logicalDevice,
+          VK_NULL_HANDLE,
+          idevice->pipelineCache,
+          1,
+          &rtPipelineCreateInfo,
+          nullptr,
+          &library.pipeline
+      );
+    }
     CGPU_VK_CHK(result, "failed to create RT pipeline library");
   }
 
@@ -2162,15 +2168,19 @@ namespace gtl
       .basePipelineIndex = -1
     };
 
-    VkResult result = idevice->table.vkCreateComputePipelines(
-      idevice->logicalDevice,
-      idevice->pipelineCache,
-      1,
-      &pipelineCreateInfo,
-      nullptr,
-      &ipipeline->pipeline
-    );
+    VkResult result;
+    {
+      std::lock_guard<std::mutex> lock(idevice->pipelineCacheMutex);
 
+      result = idevice->table.vkCreateComputePipelines(
+        idevice->logicalDevice,
+        idevice->pipelineCache,
+        1,
+        &pipelineCreateInfo,
+        nullptr,
+        &ipipeline->pipeline
+      );
+    }
     CGPU_VK_CHK(result, "failed to create compute pipeline");
 
     if (ctx->debugUtilsEnabled && createInfo.debugName)
@@ -2520,15 +2530,20 @@ namespace gtl
         .basePipelineIndex = -1
       };
 
-      VkResult result = idevice->table.vkCreateRayTracingPipelinesKHR(
-        idevice->logicalDevice,
-        VK_NULL_HANDLE,
-        idevice->pipelineCache,
-        1,
-        &rtPipelineCreateInfo,
-        nullptr,
-        &ipipeline->pipeline
-      );
+      VkResult result;
+      {
+        std::lock_guard<std::mutex> lock(idevice->pipelineCacheMutex);
+
+        result = idevice->table.vkCreateRayTracingPipelinesKHR(
+          idevice->logicalDevice,
+          VK_NULL_HANDLE,
+          idevice->pipelineCache,
+          1,
+          &rtPipelineCreateInfo,
+          nullptr,
+          &ipipeline->pipeline
+        );
+      }
       CGPU_VK_CHK(result, "failed to create RT pipeline");
 
       ipipeline->bindPoint = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
