@@ -28,6 +28,7 @@
 #include <memory>
 #include <atomic>
 #include <mutex>
+#include <algorithm>
 
 #include <volk.h>
 
@@ -3353,10 +3354,18 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
     CgpuIDevice* idevice = &ctx->idevice;
 
+    uint64_t rangeSize = size;
+    if (rangeSize == CGPU_WHOLE_SIZE)
+    {
+      GB_EXPECT(srcOffset <= isrcBuffer->size, "source offset out of bounds");
+      GB_EXPECT(dstOffset <= idstBuffer->size, "destination offset out of bounds");
+      rangeSize = std::min(isrcBuffer->size - srcOffset, idstBuffer->size - dstOffset);
+    }
+
     VkBufferCopy region = {
       .srcOffset = srcOffset,
       .dstOffset = dstOffset,
-      .size = (size == CGPU_WHOLE_SIZE) ? isrcBuffer->size : size,
+      .size = rangeSize,
     };
 
     idevice->table.vkCmdCopyBuffer(
@@ -3610,7 +3619,13 @@ namespace gtl
     CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
     CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t rangeSize = (size == CGPU_WHOLE_SIZE) ? ibuffer->size : size;
+    uint64_t rangeSize = size;
+    if (rangeSize == CGPU_WHOLE_SIZE)
+    {
+      GB_EXPECT(dstOffset <= ibuffer->size, "destination offset out of bounds");
+      rangeSize = ibuffer->size - dstOffset;
+    }
+
     idevice->table.vkCmdFillBuffer(icommandBuffer->commandBuffer, ibuffer->buffer, dstOffset, rangeSize, data);
   }
 

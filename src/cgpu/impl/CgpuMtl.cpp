@@ -29,6 +29,7 @@
 #include <atomic>
 #include <mutex>
 #include <string>
+#include <algorithm>
 
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
@@ -1961,8 +1962,9 @@ namespace gtl
     uint64_t rangeSize = size;
     if (rangeSize == CGPU_WHOLE_SIZE)
     {
-      assert(srcOffset <= rangeSize);
-      rangeSize = std::min(isrcBuffer->size, idstBuffer->size) - srcOffset;
+      assert(srcOffset <= isrcBuffer->size);
+      assert(dstOffset <= idstBuffer->size);
+      rangeSize = std::min(isrcBuffer->size - srcOffset, idstBuffer->size - dstOffset);
     }
     encoder->copyFromBuffer(isrcBuffer->buffer, srcOffset, idstBuffer->buffer, dstOffset, rangeSize);
 
