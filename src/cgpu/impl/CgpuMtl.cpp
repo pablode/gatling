@@ -1898,7 +1898,7 @@ namespace gtl
       {
         CGPU_RESOLVE_BUFFER(ctx, b.buffer, ibuffer);
 
-        uint32_t offset = b.offset + dynamicOffsets[dynamicBufferIndex];
+        uint64_t offset = b.offset + dynamicOffsets[dynamicBufferIndex];
         ibindSet->argumentEncoder->setBuffer(ibuffer->buffer, offset, b.binding);
 
         dynamicBufferIndex++;
