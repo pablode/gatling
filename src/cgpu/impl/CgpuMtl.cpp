@@ -27,6 +27,8 @@
 #include <array>
 #include <memory>
 #include <atomic>
+#include <mutex>
+#include <string>
 
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
@@ -545,6 +547,21 @@ namespace gtl
     idevice->compiler->release();
   }
 
+  static spvc_context cgpuCreateSpvcContext()
+  {
+    spvc_context spvc;
+    if (spvc_context_create(&spvc) != SPVC_SUCCESS)
+    {
+      GB_FATAL("failed to init SPIRV-Cross");
+    }
+
+    spvc_context_set_error_callback(spvc, [](void* userData, const char* error) {
+      GB_ERROR("[SPVC] {}", error);
+    }, nullptr);
+
+    return spvc;
+  }
+
   CgpuContext* cgpuCreateContext(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
   {
     CgpuIDevice idevice;
@@ -553,15 +570,7 @@ namespace gtl
       return nullptr;
     }
 
-    spvc_context spvc;
-    if (spvc_result r = spvc_context_create(&spvc); r != SPVC_SUCCESS)
-    {
-      GB_FATAL("failed to init SPIRV-Cross");
-    }
-
-    spvc_context_set_error_callback(spvc, [](void *userData, const char *error) {
-      GB_ERROR("[SPVC] {}", error);
-    }, nullptr);
+    spvc_context spvc = cgpuCreateSpvcContext();
 
 #ifdef CGPU_MTL_CAPTURE_ENABLED
     MTL::CaptureManager* captureManager = MTL::CaptureManager::sharedCaptureManager();
@@ -605,6 +614,7 @@ namespace gtl
   }
 
   static bool cgpuCreateShader(CgpuContext* ctx,
+                               spvc_context spvc,
                                const CgpuShaderCreateInfo& createInfo,
                                CgpuIShader* ishader)
   {
@@ -621,11 +631,12 @@ namespace gtl
       exit(EXIT_FAILURE);                                                  \
     }
 
-    spvc_compiler spvcCompiler;
+    std::string mslSrc;
     {
+      spvc_compiler spvcCompiler;
       spvc_parsed_ir ir;
-      CHK_SPVC(spvc_context_parse_spirv(ctx->spvc, (const SpvId*) createInfo.source, createInfo.size / sizeof(SpvId), &ir));
-      CHK_SPVC(spvc_context_create_compiler(ctx->spvc, SPVC_BACKEND_MSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &spvcCompiler));
+      CHK_SPVC(spvc_context_parse_spirv(spvc, (const SpvId*) createInfo.source, createInfo.size / sizeof(SpvId), &ir));
+      CHK_SPVC(spvc_context_create_compiler(spvc, SPVC_BACKEND_MSL, ir, SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, &spvcCompiler));
 
       SpvExecutionModel execModel = spvc_compiler_get_execution_model(spvcCompiler);
       CHK_SPVC(spvc_compiler_rename_entry_point(spvcCompiler, CGPU_SHADER_ENTRY_POINT, ishader->entryPointName->utf8String(), execModel));
@@ -641,10 +652,11 @@ namespace gtl
       CHK_SPVC(spvc_compiler_options_set_uint(spvcCompilerOptions, SPVC_COMPILER_OPTION_MSL_ENABLE_DECORATION_BINDING, 1)); // keep original resource binding indices
       CHK_SPVC(spvc_compiler_options_set_uint(spvcCompilerOptions, SPVC_COMPILER_OPTION_MSL_FORCE_NATIVE_ARRAYS, 1)); // otherwise can't access array in ray payload
       CHK_SPVC(spvc_compiler_install_compiler_options(spvcCompiler, spvcCompilerOptions));
-    }
 
-    const char* mslSrc; // owned by context
-    CHK_SPVC(spvc_compiler_compile(spvcCompiler, &mslSrc));
+      const char* compiledSrc = nullptr;
+      CHK_SPVC(spvc_compiler_compile(spvcCompiler, &compiledSrc));
+      mslSrc = compiledSrc;
+    }
 #undef CHK_SPVC
 
     if (getenv("GTL_DUMP_MSL"))
@@ -658,7 +670,7 @@ namespace gtl
     compileOptions->setEnableLogging(true);
 #endif
 
-    auto* mslStr = NS::String::alloc()->init(mslSrc, NS::UTF8StringEncoding);
+    auto* mslStr = NS::String::alloc()->init(mslSrc.c_str(), NS::UTF8StringEncoding);
 
     auto libDesc = MTL4::LibraryDescriptor::alloc()->init();
     if (createInfo.debugName)
@@ -722,7 +734,7 @@ namespace gtl
 
     ishader->entryPointName = cgpuMakeShaderEntryPointName(idevice);
 
-    if (cgpuCreateShader(ctx, createInfo, ishader))
+    if (cgpuCreateShader(ctx, ctx->spvc, createInfo, ishader))
     {
       return true;
     }
@@ -756,13 +768,20 @@ namespace gtl
       ishaders[i] = ishader;
     }
 
-#pragma omp parallel for schedule(dynamic, 1)
-    for (int i = 0; i < int(shaderCount); i++)
+#pragma omp parallel
     {
-      if (!cgpuCreateShader(ctx, createInfos[i], ishaders[i]))
+      spvc_context spvc = cgpuCreateSpvcContext();
+
+#pragma omp for schedule(dynamic, 1)
+      for (int i = 0; i < int(shaderCount); i++)
       {
-        success = false;
+        if (!cgpuCreateShader(ctx, spvc, createInfos[i], ishaders[i]))
+        {
+          success = false;
+        }
       }
+
+      spvc_context_destroy(spvc);
     }
 
     if (success)
