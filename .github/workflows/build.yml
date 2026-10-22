@@ -62,10 +62,11 @@ jobs:
         submodules: recursive
         lfs: true
 
-    - name: Install libgl1 package
+    - name: Install OpenGL & X11 development packages
       if: runner.os == 'Linux'
-      # There seems to be a transitive dependency on libGL (perhaps by hgi)
-      run: sudo apt-get update && sudo apt-get install libgl1-mesa-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev libsm-dev libice-dev libx11-dev libxext-dev
 
     - name: Install Mesa & Vulkan packages
       if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}
