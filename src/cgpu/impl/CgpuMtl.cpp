@@ -35,6 +35,7 @@
 #include <gtl/gb/Log.h>
 #include <gtl/gb/LinearDataStore.h>
 #include <gtl/gb/SmallVector.h>
+#include <gtl/gb/ThreadPool.h>
 
 #include <spirv_cross_c.h>
 
@@ -184,143 +185,6 @@ namespace gtl
     MTL::SamplerState* sampler;
   };
 
-  /* Thread pool */
-
-  class CgpuThreadPool
-  {
-  public:
-    CgpuThreadPool(const CgpuThreadPool&) = delete;
-    CgpuThreadPool& operator=(const CgpuThreadPool&) = delete;
-
-    CgpuThreadPool(uint32_t threadCount)
-    {
-      m_threads.reserve(threadCount);
-
-      for (uint32_t i = 0; i < threadCount; i++)
-      {
-        m_threads.emplace_back([this]() { workerLoop(); });
-      }
-    }
-
-    ~CgpuThreadPool()
-    {
-      {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_stopping = true;
-      }
-      m_cv.notify_all();
-
-      for (std::thread& thread : m_threads)
-      {
-        thread.join();
-      }
-    }
-
-    uint32_t getThreadCount() const
-    {
-      return (uint32_t) m_threads.size();
-    }
-
-    template<typename Function>
-    void parallelFor(uint32_t count, Function function)
-    {
-      if (count == 0)
-      {
-        return;
-      }
-
-      uint32_t participantCount = std::min(count, getThreadCount());
-      if (participantCount == 0 || count == 1)
-      {
-        for (uint32_t i = 0; i < count; i++)
-        {
-          function(i);
-        }
-        return;
-      }
-
-      struct Job
-      {
-        Job(Function function_, uint32_t count_)
-          : function(std::move(function_))
-          , count(count_)
-        {
-        }
-
-        Function function;
-        uint32_t count;
-        std::atomic<uint32_t> nextIndex = 0;
-        std::atomic<uint32_t> pendingTaskCount = 0;
-        std::mutex mutex;
-        std::condition_variable cv;
-        bool done = false;
-      };
-
-      auto job = std::make_shared<Job>(std::move(function), count);
-      job->pendingTaskCount = participantCount;
-
-      for (uint32_t i = 0; i < participantCount; i++)
-      {
-        enqueue([job]() {
-          uint32_t index;
-          while ((index = job->nextIndex.fetch_add(1, std::memory_order_relaxed)) < job->count)
-          {
-            job->function(index);
-          }
-
-          if (job->pendingTaskCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
-          {
-            std::lock_guard<std::mutex> lock(job->mutex);
-            job->done = true;
-            job->cv.notify_all();
-          }
-        });
-      }
-
-      std::unique_lock<std::mutex> lock(job->mutex);
-      job->cv.wait(lock, [&job]() { return job->done; });
-    }
-
-  private:
-    void enqueue(std::function<void()> task)
-    {
-      {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_tasks.push_back(std::move(task));
-      }
-      m_cv.notify_one();
-    }
-
-    void workerLoop()
-    {
-      while (true)
-      {
-        std::function<void()> task;
-        {
-          std::unique_lock<std::mutex> lock(m_mutex);
-          m_cv.wait(lock, [this]() { return m_stopping || !m_tasks.empty(); });
-
-          if (m_tasks.empty())
-          {
-            return;
-          }
-
-          task = std::move(m_tasks.front());
-          m_tasks.pop_front();
-        }
-
-        task();
-      }
-    }
-
-  private:
-    std::vector<std::thread> m_threads;
-    std::deque<std::function<void()>> m_tasks;
-    std::mutex m_mutex;
-    std::condition_variable m_cv;
-    bool m_stopping = false;
-  };
-
   /* Context */
 
   struct CgpuContext
@@ -330,7 +194,7 @@ namespace gtl
 #endif
     CgpuIDevice idevice;
     spvc_context spvc;
-    std::unique_ptr<CgpuThreadPool> threadPool;
+    std::unique_ptr<GbThreadPool> threadPool;
 
     GbLinearDataStore<CgpuIBuffer, 16> ibufferStore;
     GbLinearDataStore<CgpuIImage, 128> iimageStore;
@@ -746,7 +610,7 @@ namespace gtl
 #endif
       .idevice = idevice,
       .spvc = spvc,
-      .threadPool = std::make_unique<CgpuThreadPool>(threadCount)
+      .threadPool = std::make_unique<GbThreadPool>(threadCount)
     };
 
     return ctx;
