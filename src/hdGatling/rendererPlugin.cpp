@@ -20,6 +20,9 @@
 #include "materialNetworkCompiler.h"
 
 #include <pxr/imaging/hdMtlx/hdMtlx.h>
+#if PXR_VERSION >= 2608
+#include <pxr/imaging/hd/rendererCreateArgsSchema.h>
+#endif
 #include <pxr/imaging/hd/rendererPluginRegistry.h>
 #include <pxr/base/plug/plugin.h>
 #include <pxr/base/plug/thisPlugin.h>
@@ -213,15 +216,20 @@ void HdGatlingRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDeleg
 bool HdGatlingRendererPlugin::IsSupported(const HdRendererCreateArgsSchema& createArgs,
                                           [[maybe_unused]] std::string* reasonWhyNot) const
 {
-  bool gpuEnabled = createArgs.GetGpuEnabled();
+  HdBoolDataSourceHandle dataSource = createArgs.GetGpuEnabled();
+  float shutterOffset = 0.0f;
+  bool gpuEnabled = !dataSource || dataSource->GetTypedValue(shutterOffset);
+
 #elif PXR_VERSION >= 2511
 bool HdGatlingRendererPlugin::IsSupported(const HdRendererCreateArgs& createArgs,
                                           [[maybe_unused]] std::string* reasonWhyNot) const
 {
   bool gpuEnabled = createArgs.gpuEnabled;
+
 #else
 bool HdGatlingRendererPlugin::IsSupported(bool gpuEnabled) const
 {
+
 #endif
   // Note: we just assume that the renderer is supported on the system here because usdview
   // (and possibly other applications) instantiate the renderer plugin multiple times,
