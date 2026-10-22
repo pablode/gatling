@@ -176,30 +176,6 @@ namespace gtl
       return canonicalA == canonicalB;
     }
 
-    std::string _GetRootPackage(const std::string& moduleName)
-    {
-      size_t pos = moduleName.rfind("::");
-      return pos != std::string::npos ? moduleName.substr(0, pos) : std::string();
-    }
-
-    // Strips the per-root synthetic package so that the module can be looked
-    // up through the configured search paths.
-    std::string _GetCanonicalModuleName(const std::string& moduleName, const std::string& rootPackage)
-    {
-      if (rootPackage.empty())
-      {
-        return moduleName;
-      }
-
-      std::string prefix = rootPackage + "::";
-      if (moduleName.compare(0, prefix.size(), prefix) == 0)
-      {
-        return "::" + moduleName.substr(prefix.size());
-      }
-
-      return moduleName;
-    }
-
     // Returns the filename that the search paths resolve the absolute module
     // name to, or an empty string if there is no such module.
     std::string _FindCanonicalModule(mi::neuraylib::IMdl_entity_resolver* resolver,
@@ -311,9 +287,7 @@ namespace gtl
           // the search paths.
           if (isRelativeImport)
           {
-            std::string rootPackage = _GetRootPackage(userData->entryModuleName);
-            std::string canonicalModuleName = _GetCanonicalModuleName(absoluteModuleName, rootPackage);
-            std::string canonicalFile = _FindCanonicalModule(m_standardResolver.get(), canonicalModuleName);
+            std::string canonicalFile = _FindCanonicalModule(m_standardResolver.get(), absoluteModuleName);
 
             if (!canonicalFile.empty() && !_PathsAreEquivalent(canonicalFile.c_str(), filePath.c_str()))
             {
