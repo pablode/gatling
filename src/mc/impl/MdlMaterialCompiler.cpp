@@ -160,10 +160,14 @@ namespace gtl
 
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
-      McMdlEntityResolverUserData* userData = new McMdlEntityResolverUserData();
+      mi::base::Handle<McMdlEntityResolverUserData> userData(new McMdlEntityResolverUserData());
       userData->dirPrefix = fileDir;
 
-      context->set_option("user_data", userData); // pass to entity resolver
+      if (context->set_option("user_data", userData.get()) != 0) // pass to entity resolver
+      {
+        GB_ERROR("failed to pass user data to MDL entity resolver");
+        return -1;
+      }
 
       return m_impExpApi->load_module(m_transaction.get(), moduleName.c_str(), context);
     };
