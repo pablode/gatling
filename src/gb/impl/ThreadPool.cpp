@@ -58,7 +58,7 @@ namespace gtl
     return (uint32_t) m_threads.size();
   }
 
-  void GbThreadPool::enqueue(std::function<void()> task)
+  void GbThreadPool::submit(std::function<void()> task)
   {
     {
       std::lock_guard<std::mutex> lock(m_mutex);

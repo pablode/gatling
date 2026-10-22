@@ -20,6 +20,7 @@
 
 #include <gtl/mc/Backend.h>
 #include <gtl/gb/Log.h>
+#include <gtl/gb/ThreadPool.h>
 #include <gtl/ggpu/DeleteQueue.h>
 #include <gtl/ggpu/Stager.h>
 #include <gtl/imgio/Imgio.h>
@@ -29,6 +30,10 @@
 #include <assert.h>
 #include <string.h>
 #include <inttypes.h>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <unordered_set>
 
 namespace
 {
@@ -69,11 +74,12 @@ namespace
 namespace gtl
 {
   GiTextureManager::GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, GgpuStager& stager,
-                                     GgpuDeleteQueue& deleteQueue)
+                                     GgpuDeleteQueue& deleteQueue, GbThreadPool& threadPool)
     : m_ctx(ctx)
     , m_assetReader(assetReader)
     , m_stager(stager)
     , m_deleteQueue(deleteQueue)
+    , m_threadPool(threadPool)
   {
   }
 
@@ -126,6 +132,12 @@ namespace gtl
 
     GB_LOG("read image \"{}\" ({:.2f} MiB)", filePath, imageData.size * BYTES_TO_MIB);
 
+    return createImage(filePath, imageData, destroyImmediately, keepHdr);
+  }
+
+  GiImagePtr GiTextureManager::createImage(const char* filePath, const ImgioImage& imageData,
+                                           bool destroyImmediately, bool keepHdr)
+  {
     CgpuImageCreateInfo createInfo = {
       .width = imageData.width,
       .height = imageData.height,
@@ -177,6 +189,100 @@ namespace gtl
     GB_LOG("staging {} images", texCount);
 
     images.reserve(texCount);
+
+    std::vector<GiImagePtr> cachedImages(texCount);
+    std::vector<GiImagePtr> imagesByIndex(texCount);
+    std::vector<ImgioImage> imageDatas(texCount);
+    std::vector<uint32_t> loadIndices;
+    std::unordered_set<std::string> scheduledPaths;
+
+    loadIndices.reserve(texCount);
+    scheduledPaths.reserve(texCount);
+
+    for (size_t i = 0; i < texCount; i++)
+    {
+      const McTextureDescription& textureDescription = textureDescriptions[i];
+      if (textureDescription.filePath.empty())
+      {
+        continue;
+      }
+
+      auto cacheResult = m_fileCache.find(textureDescription.filePath);
+      if (cacheResult != m_fileCache.end())
+      {
+        cachedImages[i] = cacheResult->second.lock();
+
+        if (cachedImages[i])
+        {
+          GB_DEBUG("found image \"{}\" in cache", textureDescription.filePath);
+          continue;
+        }
+      }
+
+      if (!scheduledPaths.insert(textureDescription.filePath).second)
+      {
+        continue;
+      }
+
+      loadIndices.push_back((uint32_t) i);
+    }
+
+    std::mutex readyMutex;
+    std::condition_variable readyCv;
+    std::deque<uint32_t> readyIndices;
+    uint32_t pendingLoads = (uint32_t) loadIndices.size();
+
+    for (uint32_t i : loadIndices)
+    {
+      m_threadPool.submit([&, i]() {
+        const McTextureDescription& textureDescription = textureDescriptions[i];
+        ImgioImage& imageData = imageDatas[i];
+
+        bool success = _ReadImage(textureDescription.filePath.c_str(), m_assetReader, &imageData, ImgioLoadFlags::None) &&
+                       imageData.format != ImgioFormat::UNSUPPORTED;
+
+        if (success)
+        {
+          GB_LOG("read image \"{}\" ({:.2f} MiB)", textureDescription.filePath, imageData.size * BYTES_TO_MIB);
+        }
+        else
+        {
+          imageData = {};
+        }
+
+        {
+          std::lock_guard<std::mutex> lock(readyMutex);
+          if (success)
+          {
+            readyIndices.push_back(i);
+          }
+          pendingLoads--;
+        }
+        readyCv.notify_one();
+      });
+    }
+
+    while (true)
+    {
+      uint32_t i;
+
+      {
+        std::unique_lock<std::mutex> lock(readyMutex);
+        readyCv.wait(lock, [&]() { return !readyIndices.empty() || pendingLoads == 0; });
+
+        if (readyIndices.empty())
+        {
+          break;
+        }
+
+        i = readyIndices.front();
+        readyIndices.pop_front();
+      }
+
+      const char* filePath = textureDescriptions[i].filePath.c_str();
+      imagesByIndex[i] = createImage(filePath, imageDatas[i], false, false);
+      imageDatas[i] = {};
+    }
 
     for (size_t i = 0; i < texCount; i++)
     {
@@ -238,7 +344,21 @@ namespace gtl
         continue;
       }
 
-      GiImagePtr image = loadTextureFromFilePath(filePath);
+      GiImagePtr image = imagesByIndex[i];
+
+      if (!image)
+      {
+        image = cachedImages[i];
+      }
+
+      if (!image)
+      {
+        auto cacheResult = m_fileCache.find(filePath);
+        if (cacheResult != m_fileCache.end())
+        {
+          image = cacheResult->second.lock();
+        }
+      }
 
       if (image)
       {

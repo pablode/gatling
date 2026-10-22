@@ -450,7 +450,7 @@ namespace gtl
     s_aggregateAssetReader = std::make_unique<GiAggregateAssetReader>();
     s_aggregateAssetReader->addAssetReader(s_mmapAssetReader.get());
 
-    s_texSys = std::make_unique<GiTextureManager>(s_ctx, *s_aggregateAssetReader, *s_stager, *s_deleteQueue);
+    s_texSys = std::make_unique<GiTextureManager>(s_ctx, *s_aggregateAssetReader, *s_stager, *s_deleteQueue, *s_threadPool);
 
 #ifdef GI_SHADER_HOTLOADING
     s_fileWatcher = std::make_unique<efsw::FileWatcher>();
@@ -472,7 +472,6 @@ fail:
   void giTerminate()
   {
     GB_LOG("terminating...");
-    s_threadPool.reset();
   #ifdef GI_SHADER_HOTLOADING
     s_fileWatcher.reset();
   #endif
@@ -506,6 +505,7 @@ fail:
       cgpuDestroyContext(s_ctx);
       s_ctx = nullptr;
     }
+    s_threadPool.reset();
     s_mcFrontend.reset();
     s_mcRuntime.reset();
   }

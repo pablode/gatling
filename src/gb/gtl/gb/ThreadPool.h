@@ -41,6 +41,8 @@ namespace gtl
 
     uint32_t getThreadCount() const;
 
+    void submit(std::function<void()> task);
+
     template<typename Function>
     void parallelFor(uint32_t count, Function function)
     {
@@ -81,7 +83,7 @@ namespace gtl
 
       for (uint32_t i = 0; i < participantCount; i++)
       {
-        enqueue([job]() {
+        submit([job]() {
           uint32_t index;
           while ((index = job->nextIndex.fetch_add(1, std::memory_order_relaxed)) < job->count)
           {
@@ -102,7 +104,6 @@ namespace gtl
     }
 
   private:
-    void enqueue(std::function<void()> task);
     void workerLoop();
 
   private:

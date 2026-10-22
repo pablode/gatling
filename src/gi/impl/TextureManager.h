@@ -29,6 +29,8 @@ namespace gtl
   class GgpuDeleteQueue;
   class GgpuStager;
   class GiAssetReader;
+  class GbThreadPool;
+  struct ImgioImage;
 
   using GiImagePtr = std::shared_ptr<CgpuImage>;
 
@@ -36,7 +38,7 @@ namespace gtl
   {
   public:
     GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, gtl::GgpuStager& stager,
-                     GgpuDeleteQueue& deleteQueue);
+                     GgpuDeleteQueue& deleteQueue, GbThreadPool& threadPool);
 
     void housekeep();
 
@@ -53,11 +55,15 @@ namespace gtl
   private:
     GiImagePtr makeImagePtr(bool destroyImmediately = false);
 
+    GiImagePtr createImage(const char* filePath, const ImgioImage& imageData,
+                           bool destroyImmediately, bool keepHdr);
+
   private:
     CgpuContext* m_ctx;
     GiAssetReader& m_assetReader;
     gtl::GgpuStager& m_stager;
     GgpuDeleteQueue& m_deleteQueue;
+    GbThreadPool& m_threadPool;
     std::unordered_map<std::string, std::weak_ptr<CgpuImage>> m_fileCache;
     std::unordered_map<uint64_t, std::weak_ptr<CgpuImage>> m_binaryCache;
   };
