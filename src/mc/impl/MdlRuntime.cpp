@@ -68,12 +68,17 @@ namespace gtl
 
     m_impExpApi = mi::base::Handle<mi::neuraylib::IMdl_impexp_api>(m_neuray->get_api_component<mi::neuraylib::IMdl_impexp_api>());
 
-    mi::base::Handle<mi::neuraylib::IMdl_entity_resolver> standardResolver = mi::base::Handle<mi::neuraylib::IMdl_entity_resolver>(m_config->get_entity_resolver());
-    m_entityResolver = mi::base::Handle<McMdlEntityResolver>(new McMdlEntityResolver(m_impExpApi, standardResolver));
-    m_config->set_entity_resolver(m_entityResolver.get());
-
     m_config->add_mdl_system_paths();
     m_config->add_mdl_user_paths();
+
+    for (const std::string& s : mdlSearchPaths)
+    {
+      if (m_config->add_mdl_path(s.c_str()))
+      {
+        auto logMsg = GB_FMT("MDL search path could not be added: \"{}\"", s);
+        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, logMsg.c_str());
+      }
+    }
 
     if (m_config->get_mdl_paths_length() > 0)
     {
@@ -85,14 +90,11 @@ namespace gtl
       GB_LOG("prepended MDL search paths: {}", defaultSearchPaths);
     }
 
-    for (const std::string& s : mdlSearchPaths)
-    {
-      if (m_config->add_mdl_path(s.c_str()))
-      {
-        auto logMsg = GB_FMT("MDL search path could not be added: \"{}\"", s);
-        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, logMsg.c_str());
-      }
-    }
+    // The built-in resolver contains a copy of the search paths configured at
+    // this point, so it has to be obtained after all paths have been added.
+    mi::base::Handle<mi::neuraylib::IMdl_entity_resolver> standardResolver = mi::base::Handle<mi::neuraylib::IMdl_entity_resolver>(m_config->get_entity_resolver());
+    m_entityResolver = mi::base::Handle<McMdlEntityResolver>(new McMdlEntityResolver(m_impExpApi, standardResolver));
+    m_config->set_entity_resolver(m_entityResolver.get());
 
     m_database = mi::base::Handle<mi::neuraylib::IDatabase>(m_neuray->get_api_component<mi::neuraylib::IDatabase>());
     mi::base::Handle<mi::neuraylib::IScope> scope(m_database->get_global_scope());
