@@ -101,6 +101,13 @@ namespace gtl
 
     if (userData)
     {
+      // The top-level module of a file-backed compilation is mapped to the
+      // exact file it was requested for.
+      if (module_name && userData->entryModuleName == module_name)
+      {
+        return new McMdlResolvedModule(m_impExpApi, userData->entryModuleName, userData->entryFilePath);
+      }
+
       // Weird edge case found in some of the assets
       const char* newModuleName = module_name;
       if (strlen(newModuleName) > 2 && newModuleName[0] == '.' && newModuleName[1] == ':' && newModuleName[2] == ':')
@@ -109,7 +116,7 @@ namespace gtl
       }
 
       std::string moduleUrl = _ModuleNameToUrl(newModuleName);
-      std::string filePath = std::string(userData->dirPrefix) + moduleUrl + MDL_FILE_EXT;
+      std::string filePath = std::string(userData->rootDir) + moduleUrl + MDL_FILE_EXT;
 
       // Only resolve MDL file if it actually exists - fall back to standard
       // resolver with registered system/user/gatling search paths otherwise.

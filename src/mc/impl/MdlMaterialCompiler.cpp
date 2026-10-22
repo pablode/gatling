@@ -27,7 +27,10 @@
 
 #include <atomic>
 #include <cassert>
+#include <cstdint>
 #include <filesystem>
+#include <string_view>
+#include <system_error>
 
 namespace fs = std::filesystem;
 
@@ -41,6 +44,28 @@ namespace
   {
     uint32_t uniqueId = ++s_idCounter;
     return GB_FMT("::gatling::{}_{}", uniqueId, identifier);
+  }
+
+  uint64_t _HashString(std::string_view str)
+  {
+    // FNV-1a (64 bit).
+    uint64_t hash = 0xcbf29ce484222325ull;
+    for (char c : str)
+    {
+      hash ^= static_cast<uint64_t>(static_cast<unsigned char>(c));
+      hash *= 0x100000001b3ull;
+    }
+    return hash;
+  }
+
+  // Module names are process-global keys in the MDL database. Derive a unique
+  // name per file so that different files with the same basename cannot alias
+  // each other when materials are compiled in parallel. The root directory is
+  // part of the package so that relative imports are isolated per asset root.
+  std::string _MakeFileModuleName(std::string_view rootDir)
+  {
+    uint32_t uniqueId = ++s_idCounter;
+    return GB_FMT("::gatling::r{:x}::mdl_{}", _HashString(rootDir), uniqueId);
   }
 
   mi::base::Handle<mi::neuraylib::IValue> _TranslateParameterValue(mi::neuraylib::IMdl_execution_context* context,
@@ -155,13 +180,36 @@ namespace gtl
                                               mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
                                               const McMaterialParameters& params)
   {
-    std::string fileDir = fs::path(filePath).parent_path().string();
-    std::string moduleName = GB_FMT("::{}", fs::path(filePath).stem().string());
+    if (!filePath)
+    {
+      return false;
+    }
+
+    std::error_code errorCode;
+    fs::path absolutePath = fs::absolute(fs::path(filePath), errorCode);
+    if (errorCode)
+    {
+      GB_ERROR("failed to resolve MDL file path \"{}\": {}", filePath, errorCode.message());
+      return false;
+    }
+
+    // Resolving symlinks and redundant components makes the module identity
+    // stable and the paths passed to the entity resolver unambiguous.
+    fs::path canonicalPath = fs::weakly_canonical(absolutePath, errorCode);
+    if (errorCode)
+    {
+      canonicalPath = absolutePath.lexically_normal();
+    }
+
+    std::string fileDir = canonicalPath.parent_path().string();
+    std::string moduleName = _MakeFileModuleName(fileDir);
 
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
       mi::base::Handle<McMdlEntityResolverUserData> userData(new McMdlEntityResolverUserData());
-      userData->dirPrefix = fileDir;
+      userData->entryModuleName = moduleName;
+      userData->entryFilePath = canonicalPath.string();
+      userData->rootDir = fileDir;
 
       if (context->set_option("user_data", userData.get()) != 0) // pass to entity resolver
       {

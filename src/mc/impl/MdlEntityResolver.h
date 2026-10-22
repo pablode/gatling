@@ -30,7 +30,9 @@ namespace gtl
 {
   struct McMdlEntityResolverUserData : public mi::base::Interface_implement<mi::base::IInterface>
   {
-    std::string dirPrefix;
+    std::string entryModuleName;
+    std::string entryFilePath;
+    std::string rootDir;
   };
 
   class McMdlEntityResolver
