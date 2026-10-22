@@ -60,10 +60,6 @@ target_link_libraries(
     xxHash
 )
 
-if(OpenMP_CXX_FOUND)
-  target_link_libraries(gi PRIVATE OpenMP::OpenMP_CXX)
-endif()
-
 # Required since library is linked into hdGatling DSO
 set_target_properties(gi PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

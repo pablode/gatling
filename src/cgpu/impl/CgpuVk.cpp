@@ -37,6 +37,7 @@
 #include <gtl/gb/Log.h>
 #include <gtl/gb/LinearDataStore.h>
 #include <gtl/gb/SmallVector.h>
+#include <gtl/gb/ThreadPool.h>
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -231,6 +232,7 @@ namespace gtl
     VkInstance instance;
 
     CgpuIDevice idevice;
+    std::unique_ptr<GbThreadPool> threadPool;
 
     GbLinearDataStore<CgpuIBuffer, 16> ibufferStore;
     GbLinearDataStore<CgpuIImage, 128> iimageStore;
@@ -1362,9 +1364,12 @@ namespace gtl
       return nullptr;
     }
 
+    uint32_t threadCount = GbThreadPool::GetRecommendedThreadCount();
+
     CgpuContext* ctx = new CgpuContext {
       .instance = instance,
       .idevice = std::move(idevice),
+      .threadPool = std::make_unique<GbThreadPool>(threadCount),
       .debugUtilsEnabled = debugUtilsEnabled
     };
 
@@ -1373,6 +1378,8 @@ namespace gtl
 
   void cgpuDestroyContext(CgpuContext* ctx)
   {
+    ctx->threadPool.reset();
+
     cgpuDestroyIDevice(ctx, &ctx->idevice);
     vkDestroyInstance(ctx->instance, nullptr);
     delete ctx;
@@ -1650,11 +1657,9 @@ namespace gtl
     }
 
     // TODO: proper error handling
-#pragma omp parallel for schedule(dynamic, 1)
-    for (int i = 0; i < int(shaderCount); i++)
-    {
+    ctx->threadPool->parallelFor(shaderCount, [&](uint32_t i) {
       cgpuCreateShader(ctx, createInfos[i], ishaders[i]);
-    }
+    });
 
     return true;
   }

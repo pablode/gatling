@@ -377,16 +377,6 @@ namespace gtl
     return (value + (alignment - 1)) & ~(alignment - 1);
   }
 
-  static uint32_t cgpuGetThreadPoolThreadCount()
-  {
-    uint32_t threadCount = std::thread::hardware_concurrency();
-    if (threadCount == 0)
-    {
-      threadCount = 4;
-    }
-    return threadCount;
-  }
-
   static NS::String* cgpuMakeShaderEntryPointName(CgpuIDevice* idevice)
   {
     std::string name = GB_FMT("main{}", idevice->uniqueShaderEntryPointCounter++);
@@ -602,7 +592,7 @@ namespace gtl
     }
 #endif
 
-    uint32_t threadCount = cgpuGetThreadPoolThreadCount();
+    uint32_t threadCount = GbThreadPool::GetRecommendedThreadCount();
 
     CgpuContext* ctx = new CgpuContext {
 #ifdef CGPU_MTL_CAPTURE_ENABLED

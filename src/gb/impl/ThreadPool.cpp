@@ -19,6 +19,16 @@
 
 namespace gtl
 {
+  uint32_t GbThreadPool::GetRecommendedThreadCount()
+  {
+    uint32_t threadCount = std::thread::hardware_concurrency();
+    if (threadCount == 0)
+    {
+      threadCount = 4;
+    }
+    return threadCount;
+  }
+
   GbThreadPool::GbThreadPool(uint32_t threadCount)
   {
     m_threads.reserve(threadCount);

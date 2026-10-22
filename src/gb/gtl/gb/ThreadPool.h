@@ -29,6 +29,9 @@ namespace gtl
   class GbThreadPool
   {
   public:
+    static uint32_t GetRecommendedThreadCount();
+
+  public:
     GbThreadPool(const GbThreadPool&) = delete;
     GbThreadPool& operator=(const GbThreadPool&) = delete;
 

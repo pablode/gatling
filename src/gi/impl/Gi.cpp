@@ -59,6 +59,7 @@
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Enum.h>
 #include <gtl/gb/SmallVector.h>
+#include <gtl/gb/ThreadPool.h>
 
 #include <MaterialXCore/Document.h>
 
@@ -238,6 +239,7 @@ namespace gtl
   };
 
   CgpuContext* s_ctx = nullptr;
+  std::unique_ptr<GbThreadPool> s_threadPool;
   CgpuDeviceFeatures s_ctxFeatures;
   CgpuDeviceProperties s_ctxProperties;
   CgpuSampler s_texSampler;
@@ -399,6 +401,8 @@ namespace gtl
     if (!s_ctx)
       goto fail;
 
+    s_threadPool = std::make_unique<GbThreadPool>(GbThreadPool::GetRecommendedThreadCount());
+
     s_ctxFeatures = cgpuGetDeviceFeatures(s_ctx);
     s_ctxProperties = cgpuGetDeviceProperties(s_ctx);
 
@@ -468,6 +472,7 @@ fail:
   void giTerminate()
   {
     GB_LOG("terminating...");
+    s_threadPool.reset();
   #ifdef GI_SHADER_HOTLOADING
     s_fileWatcher.reset();
   #endif
@@ -1461,15 +1466,13 @@ cleanup:
       hitGroupCompInfos.reserve(materials.size());
 
       std::atomic_bool threadWorkFailed = false;
-#pragma omp parallel for
-      for (int i = 0; i < int(materials.size()); i++)
-      {
+      s_threadPool->parallelFor((uint32_t) materials.size(), [&](uint32_t i) {
         GiMaterial* material = materials[i];
         if (material->gpuData)
         {
           std::lock_guard guard(cachedMaterialsMutex);
           cachedMaterials.push_back(material);
-          continue;
+          return;
         }
 
         GiGlslShaderGen::MaterialGenInfo genInfo;
@@ -1477,7 +1480,7 @@ cleanup:
         {
           GB_ERROR("failed to generate code for material {}", material->name);
           threadWorkFailed = true;
-          continue;
+          return;
         }
 
         HitGroupCompInfo groupInfo;
@@ -1491,7 +1494,7 @@ cleanup:
 
         std::lock_guard guard(hitGroupCompInfoMutex);
         hitGroupCompInfos.push_back(groupInfo);
-      }
+      });
       if (threadWorkFailed)
       {
         goto cleanup;
@@ -1542,9 +1545,7 @@ cleanup:
       }
 
       // 4. Generate final hit shader GLSL sources.
-#pragma omp parallel for
-      for (int i = 0; i < int(hitGroupCompInfos.size()); i++)
-      {
+      s_threadPool->parallelFor((uint32_t) hitGroupCompInfos.size(), [&](uint32_t i) {
         HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
 
         GiMaterial* material = compInfo.material;
@@ -1579,7 +1580,7 @@ cleanup:
           if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
           {
             threadWorkFailed = true;
-            continue;
+            return;
           }
         }
 
@@ -1603,17 +1604,17 @@ cleanup:
           if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
           {
             threadWorkFailed = true;
-            continue;
+            return;
           }
 
           hitParams.shadowTest = true;
           if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->shadowSpv))
           {
             threadWorkFailed = true;
-            continue;
+            return;
           }
         }
-      }
+      });
       if (threadWorkFailed)
       {
         goto cleanup;
