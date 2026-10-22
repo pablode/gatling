@@ -244,7 +244,13 @@ public:
     HdRendererPluginRegistry& pluginRegistry = HdRendererPluginRegistry::GetInstance();
     m_plugin = pluginRegistry.GetOrCreateRendererPlugin(_tokens->HdGatlingRendererPlugin);
     REQUIRE(m_plugin);
+#if PXR_VERSION >= 2608
+    REQUIRE(m_plugin->IsSupported(HdRendererCreateArgsSchema(nullptr)));
+#elif PXR_VERSION >= 2511
+    REQUIRE(m_plugin->IsSupported(HdRendererCreateArgs()));
+#else
     REQUIRE(m_plugin->IsSupported());
+#endif
 
     m_renderDelegate = m_plugin->CreateRenderDelegate();
     REQUIRE(m_renderDelegate);

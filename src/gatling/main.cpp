@@ -103,7 +103,13 @@ int main(int argc, const char* argv[])
     return EXIT_FAILURE;
   }
 
+#if PXR_VERSION >= 2608
+  if (!plugin->IsSupported(HdRendererCreateArgsSchema(nullptr)))
+#elif PXR_VERSION >= 2511
+  if (!plugin->IsSupported(HdRendererCreateArgs()))
+#else
   if (!plugin->IsSupported())
+#endif
   {
     fprintf(stderr, "HdGatling plugin not supported\n");
     return EXIT_FAILURE;
