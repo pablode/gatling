@@ -17,30 +17,112 @@
 
 #include "MdlEntityResolver.h"
 
-#include <string>
-#include <string.h>
-#include <assert.h>
+#include <mi/base/config.h>
+
+#include <cassert>
 #include <filesystem>
+#include <string>
+#include <string_view>
+#include <system_error>
 
 namespace fs = std::filesystem;
 
 namespace gtl
 {
-  // adapted from MDL SDK compilercore_file_resolution.cpp
-  std::string _ModuleNameToUrl(const char* inputName)
+  namespace
   {
-    std::string inputUrl;
-    while (true)
-    {
-      char const* p = strstr(inputName, "::");
+    constexpr const char* MDL_FILE_EXT = ".mdl";
 
-      if (p == NULL) {
-        inputUrl.append(inputName);
-        return inputUrl;
+    std::string _GetDirectorySeparator()
+    {
+#ifdef MI_PLATFORM_WINDOWS
+      return "\\";
+#else
+      return "/";
+#endif
+    }
+
+    std::string _ReplaceAll(std::string str, std::string_view from, std::string_view to)
+    {
+      size_t pos = 0;
+      while ((pos = str.find(from.data(), pos, from.size())) != std::string::npos)
+      {
+        str.replace(pos, from.size(), to.data(), to.size());
+        pos += to.size();
       }
-      inputUrl.append(inputName, p - inputName);
-      inputUrl.append("/");
-      inputName = p + 2;
+      return str;
+    }
+
+    bool _IsAbsoluteModuleName(const char* moduleName)
+    {
+      return moduleName && moduleName[0] == ':' && moduleName[1] == ':';
+    }
+
+    struct AbsoluteModule
+    {
+      std::string moduleName;
+      std::string filePath;
+    };
+
+    // Adapted from the MDL SDK entity resolver example. Computes the absolute
+    // module name and filename for a relative module name and its owner.
+    AbsoluteModule _GetAbsoluteModule(const char* moduleName,
+                                      const char* ownerName,
+                                      const char* ownerFilePath)
+    {
+      assert(moduleName && ownerName && ownerFilePath);
+      assert(!_IsAbsoluteModuleName(moduleName));
+
+      const std::string separator = _GetDirectorySeparator();
+      std::string nameStart = ownerName;
+      std::string fileNameStart = fs::path(ownerFilePath).make_preferred().string();
+      std::string end = moduleName;
+
+      // Remove the owner module name and owner filename from the starts.
+      size_t namePos = nameStart.rfind("::");
+      size_t fileNamePos = fileNameStart.rfind(separator);
+      if (namePos == std::string::npos || fileNamePos == std::string::npos)
+      {
+        return {};
+      }
+      nameStart = nameStart.substr(0, namePos);
+      fileNameStart = fileNameStart.substr(0, fileNamePos);
+
+      // Strip ".::" prefix.
+      if (end.substr(0, 3) == ".::")
+      {
+        end = end.substr(3);
+      }
+
+      // Strip the last component from both starts for each "..::" prefix.
+      while (end.substr(0, 4) == "..::")
+      {
+        namePos = nameStart.rfind("::");
+        fileNamePos = fileNameStart.rfind(separator);
+        if (namePos == std::string::npos || fileNamePos == std::string::npos)
+        {
+          return {};
+        }
+        end = end.substr(4);
+        nameStart = nameStart.substr(0, namePos);
+        fileNameStart = fileNameStart.substr(0, fileNamePos);
+      }
+
+      AbsoluteModule result;
+      result.moduleName = nameStart + "::" + end;
+
+      std::string fileNameEnd = _ReplaceAll(end, "::", separator);
+      result.filePath = fileNameStart + separator + fileNameEnd + MDL_FILE_EXT;
+
+      return result;
+    }
+
+    // Maps an absolute module name to a file below the entry module's directory.
+    std::string _GetAbsoluteModuleFilePath(const std::string& rootDir, const char* moduleName)
+    {
+      const std::string separator = _GetDirectorySeparator();
+      std::string suffix = _ReplaceAll(moduleName, "::", separator);
+      return rootDir + suffix + MDL_FILE_EXT;
     }
   }
 
@@ -86,9 +168,6 @@ namespace gtl
                                                                            mi::Sint32 pos_column,
                                                                            mi::neuraylib::IMdl_execution_context* context)
   {
-    constexpr static const char* MTLX_SUBSTRING = "materialx";
-    constexpr static const char* MDL_FILE_EXT = ".mdl";
-
     const mi::base::IInterface* boxedUserData = nullptr;
     mi::Sint32 result = -1;
     if (context)
@@ -99,34 +178,46 @@ namespace gtl
     mi::base::Handle<const McMdlEntityResolverUserData> userData((boxedUserData && result == 0) ?
       boxedUserData->get_interface<McMdlEntityResolverUserData>() : nullptr);
 
-    if (userData)
+    if (userData && module_name)
     {
       // The top-level module of a file-backed compilation is mapped to the
       // exact file it was requested for.
-      if (module_name && userData->entryModuleName == module_name)
+      if (userData->entryModuleName == module_name)
       {
         return new McMdlResolvedModule(m_impExpApi, userData->entryModuleName, userData->entryFilePath);
       }
 
-      // Weird edge case found in some of the assets
-      const char* newModuleName = module_name;
-      if (strlen(newModuleName) > 2 && newModuleName[0] == '.' && newModuleName[1] == ':' && newModuleName[2] == ':')
+      std::string absoluteModuleName;
+      std::string filePath;
+
+      if (_IsAbsoluteModuleName(module_name))
       {
-        newModuleName++;
+        absoluteModuleName = module_name;
+        filePath = _GetAbsoluteModuleFilePath(userData->rootDir, module_name);
+      }
+      else if (owner_name && owner_file_path)
+      {
+        AbsoluteModule absoluteModule = _GetAbsoluteModule(module_name, owner_name, owner_file_path);
+        absoluteModuleName = absoluteModule.moduleName;
+        filePath = absoluteModule.filePath;
       }
 
-      std::string moduleUrl = _ModuleNameToUrl(newModuleName);
-      std::string filePath = std::string(userData->rootDir) + moduleUrl + MDL_FILE_EXT;
-
-      // Only resolve MDL file if it actually exists - fall back to standard
-      // resolver with registered system/user/gatling search paths otherwise.
-      if (fs::exists(fs::path(filePath)))
+      if (!absoluteModuleName.empty() && !filePath.empty())
       {
-        return new McMdlResolvedModule(m_impExpApi, newModuleName, filePath);
+        // Only resolve the MDL file if it actually exists - fall back to the
+        // standard resolver with the registered search paths otherwise.
+        std::error_code errorCode;
+        bool exists = fs::exists(fs::path(filePath), errorCode);
+
+        if (!errorCode && exists)
+        {
+          return new McMdlResolvedModule(m_impExpApi, absoluteModuleName, filePath);
+        }
       }
     }
 
-    // Fall back to default resolver
+    // Fall back to the default resolver. This also handles built-in modules and
+    // modules located in the configured system/user/application search paths.
     return m_standardResolver->resolve_module(module_name, owner_file_path, owner_name, pos_line, pos_column, context);
   }
 
