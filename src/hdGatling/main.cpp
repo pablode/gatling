@@ -411,7 +411,9 @@ private:
     setRenderSetting(HdGatlingSettingsTokens->nextEventEstimation, VtValue(namespacedSettings.nextEventEstimation));
 
 #if PXR_VERSION >= 2603
+#if PXR_VERSION < 2608
     REQUIRE(HdRenderIndex::IsSceneIndexEmulationEnabled());
+#endif
     HdSceneIndexBaseRefPtr sceneIndex = m_renderIndex->GetEmulationSceneIndex();
     REQUIRE(sceneIndex);
     HdsiSceneGlobalsSceneIndexRefPtr sgSceneIndex = HdsiSceneGlobalsSceneIndex::New(sceneIndex);
