@@ -195,6 +195,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   ((frame, "gtl:frame"))
   ((jitteredSampling, "gtl:jitteredSampling"))
   ((clippingPlanes, "gtl:clippingPlanes"))
+  ((nextEventEstimation, "gtl:nextEventEstimation"))
 );
 
 int main(int argc, char** argv)
@@ -236,6 +237,7 @@ private:
     double frame = 0.0;
     bool jitteredSampling = true;
     bool clippingPlanes = false;
+    bool nextEventEstimation = false;
   };
 
 public:
@@ -333,6 +335,14 @@ private:
         settings.clippingPlanes = it->second.UncheckedGet<bool>();
       }
     }
+    {
+      auto it = ns.find(_nsTokens->nextEventEstimation);
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<bool>());
+        settings.nextEventEstimation = it->second.UncheckedGet<bool>();
+      }
+    }
   }
 
   void diffAgainstRef(const std::vector<uint8_t>& testValues,
@@ -398,6 +408,7 @@ private:
     setRenderSetting(HdGatlingSettingsTokens->depthOfField, VtValue(!product.disableDepthOfField));
     setRenderSetting(HdGatlingSettingsTokens->jitteredSampling, VtValue(namespacedSettings.jitteredSampling));
     setRenderSetting(HdGatlingSettingsTokens->clippingPlanes, VtValue(namespacedSettings.clippingPlanes));
+    setRenderSetting(HdGatlingSettingsTokens->nextEventEstimation, VtValue(namespacedSettings.nextEventEstimation));
 
 #if PXR_VERSION >= 2603
     REQUIRE(HdRenderIndex::IsSceneIndexEmulationEnabled());
