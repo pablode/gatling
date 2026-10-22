@@ -598,6 +598,22 @@ public:
 
 TEST_SUITE("Graphical")
 {
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.Disk")
+  {
+  }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.Distant")
+  {
+  }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.Dome")
+  {
+  }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.Rect")
+  {
+  }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.Sphere")
+  {
+  }
+
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
   {
   }
