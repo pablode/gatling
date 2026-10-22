@@ -55,6 +55,9 @@
 #include <pxr/usdImaging/usdImaging/delegate.h>
 
 #include <filesystem>
+#include <optional>
+
+#include <pxr/base/gf/vec3f.h>
 
 namespace fs = std::filesystem;
 using namespace gtl;
@@ -196,6 +199,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   ((jitteredSampling, "gtl:jitteredSampling"))
   ((clippingPlanes, "gtl:clippingPlanes"))
   ((nextEventEstimation, "gtl:nextEventEstimation"))
+  ((backgroundColor, "gtl:backgroundColor"))
 );
 
 int main(int argc, char** argv)
@@ -238,6 +242,7 @@ private:
     bool jitteredSampling = true;
     bool clippingPlanes = false;
     bool nextEventEstimation = false;
+    std::optional<GfVec3f> backgroundColor;
   };
 
 public:
@@ -343,6 +348,14 @@ private:
         settings.nextEventEstimation = it->second.UncheckedGet<bool>();
       }
     }
+    {
+      auto it = ns.find(_nsTokens->backgroundColor);
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<GfVec3f>());
+        settings.backgroundColor = it->second.UncheckedGet<GfVec3f>();
+      }
+    }
   }
 
   void diffAgainstRef(const std::vector<uint8_t>& testValues,
@@ -429,6 +442,12 @@ private:
 
     auto aovName = TfToken(renderVar.sourceName);
     auto aovDesc = m_renderDelegate->GetDefaultAovDescriptor(aovName);
+
+    if (aovName == HdAovTokens->color && namespacedSettings.backgroundColor)
+    {
+      const GfVec3f& color = *namespacedSettings.backgroundColor;
+      aovDesc.clearValue = VtValue(GfVec4f(color[0], color[1], color[2], 1.0f));
+    }
 
     auto renderBuffer = static_cast<HdRenderBuffer*>(m_renderDelegate->CreateFallbackBprim(HdPrimTypeTokens->renderBuffer));
     REQUIRE(renderBuffer);
