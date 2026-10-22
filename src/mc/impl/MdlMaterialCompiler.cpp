@@ -62,10 +62,11 @@ namespace
   // name per file so that different files with the same basename cannot alias
   // each other when materials are compiled in parallel. The root directory is
   // part of the package so that relative imports are isolated per asset root.
-  std::string _MakeFileModuleName(std::string_view rootDir)
+  // Keying on the canonical path also lets repeated compiles of the same file
+  // reuse the already loaded module.
+  std::string _MakeFileModuleName(std::string_view rootDir, std::string_view filePath)
   {
-    uint32_t uniqueId = ++s_idCounter;
-    return GB_FMT("::gatling::r{:x}::mdl_{}", _HashString(rootDir), uniqueId);
+    return GB_FMT("::gatling::r{:x}::m{:x}", _HashString(rootDir), _HashString(filePath));
   }
 
   mi::base::Handle<mi::neuraylib::IValue> _TranslateParameterValue(mi::neuraylib::IMdl_execution_context* context,
@@ -202,7 +203,7 @@ namespace gtl
     }
 
     std::string fileDir = canonicalPath.parent_path().string();
-    std::string moduleName = _MakeFileModuleName(fileDir);
+    std::string moduleName = _MakeFileModuleName(fileDir, canonicalPath.string());
 
     auto modCreateFunc = [&](mi::neuraylib::IMdl_execution_context* context)
     {
