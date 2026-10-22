@@ -124,6 +124,98 @@ namespace gtl
       std::string suffix = _ReplaceAll(moduleName, "::", separator);
       return rootDir + suffix + MDL_FILE_EXT;
     }
+
+    void _AddErrorMessage(mi::neuraylib::IMdl_execution_context* context,
+                          const char* identifier,
+                          const std::string& reason)
+    {
+      if (!context)
+      {
+        return;
+      }
+
+      std::string message = "Failed to resolve \"";
+      message += identifier ? identifier : "";
+      message += "\" (";
+      message += reason;
+      message += ")";
+
+      context->add_message(mi::neuraylib::IMessage::MSG_INTEGRATION,
+                           mi::base::MESSAGE_SEVERITY_ERROR,
+                           -1,
+                           message.c_str());
+    }
+
+    bool _PathsAreEquivalent(const char* pathA, const char* pathB)
+    {
+      if (!pathA || !pathB)
+      {
+        return false;
+      }
+
+      std::error_code errorCode;
+      bool equivalent = fs::equivalent(pathA, pathB, errorCode);
+      if (!errorCode)
+      {
+        return equivalent;
+      }
+
+      errorCode.clear();
+      fs::path canonicalA = fs::weakly_canonical(pathA, errorCode);
+      if (errorCode)
+      {
+        return fs::path(pathA).lexically_normal() == fs::path(pathB).lexically_normal();
+      }
+
+      fs::path canonicalB = fs::weakly_canonical(pathB, errorCode);
+      if (errorCode)
+      {
+        return fs::path(pathA).lexically_normal() == fs::path(pathB).lexically_normal();
+      }
+
+      return canonicalA == canonicalB;
+    }
+
+    std::string _GetRootPackage(const std::string& moduleName)
+    {
+      size_t pos = moduleName.rfind("::");
+      return pos != std::string::npos ? moduleName.substr(0, pos) : std::string();
+    }
+
+    // Strips the per-root synthetic package so that the module can be looked
+    // up through the configured search paths.
+    std::string _GetCanonicalModuleName(const std::string& moduleName, const std::string& rootPackage)
+    {
+      if (rootPackage.empty())
+      {
+        return moduleName;
+      }
+
+      std::string prefix = rootPackage + "::";
+      if (moduleName.compare(0, prefix.size(), prefix) == 0)
+      {
+        return "::" + moduleName.substr(prefix.size());
+      }
+
+      return moduleName;
+    }
+
+    // Returns the filename that the search paths resolve the absolute module
+    // name to, or an empty string if there is no such module.
+    std::string _FindCanonicalModule(mi::neuraylib::IMdl_entity_resolver* resolver,
+                                     const std::string& absoluteModuleName)
+    {
+      mi::base::Handle<mi::neuraylib::IMdl_resolved_module> module(
+        resolver->resolve_module(absoluteModuleName.c_str(), nullptr, nullptr, 0, 0, nullptr));
+
+      if (!module)
+      {
+        return {};
+      }
+
+      const char* filename = module->get_filename();
+      return filename ? std::string(filename) : std::string();
+    }
   }
 
   class McMdlResolvedModule
@@ -189,6 +281,7 @@ namespace gtl
 
       std::string absoluteModuleName;
       std::string filePath;
+      bool isRelativeImport = false;
 
       if (_IsAbsoluteModuleName(module_name))
       {
@@ -197,6 +290,8 @@ namespace gtl
       }
       else if (owner_name && owner_file_path)
       {
+        isRelativeImport = true;
+
         AbsoluteModule absoluteModule = _GetAbsoluteModule(module_name, owner_name, owner_file_path);
         absoluteModuleName = absoluteModule.moduleName;
         filePath = absoluteModule.filePath;
@@ -211,6 +306,23 @@ namespace gtl
 
         if (!errorCode && exists)
         {
+          // Check 1 from section 2.2 of the MDL specification: a relative
+          // import must not resolve to a file that is shadowed by a module in
+          // the search paths.
+          if (isRelativeImport)
+          {
+            std::string rootPackage = _GetRootPackage(userData->entryModuleName);
+            std::string canonicalModuleName = _GetCanonicalModuleName(absoluteModuleName, rootPackage);
+            std::string canonicalFile = _FindCanonicalModule(m_standardResolver.get(), canonicalModuleName);
+
+            if (!canonicalFile.empty() && !_PathsAreEquivalent(canonicalFile.c_str(), filePath.c_str()))
+            {
+              std::string reason = "shadowing rule: \"" + canonicalFile + "\" shadows \"" + filePath + "\"";
+              _AddErrorMessage(context, module_name, reason);
+              return nullptr;
+            }
+          }
+
           return new McMdlResolvedModule(m_impExpApi, absoluteModuleName, filePath);
         }
       }
