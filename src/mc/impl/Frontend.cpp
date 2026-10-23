@@ -197,13 +197,13 @@ namespace gtl
     m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib, customMtlxNodesPath);
   }
 
-  McMaterial* McFrontend::createFromMtlxStr(std::string_view docStr, const char* name)
+  McMaterial* McFrontend::createFromMtlxStr(std::string_view docStr, const char* name, bool usdPreviewSurfacePresenceOverride)
   {
     std::string mdlSrc;
     std::string subIdentifier;
     McOpacityClassification opacityClass;
     bool isAnimated;
-    if (!m_mtlxMdlCodeGen->translate(docStr, name, mdlSrc, subIdentifier, opacityClass, isAnimated))
+    if (!m_mtlxMdlCodeGen->translate(docStr, name, mdlSrc, subIdentifier, opacityClass, isAnimated, usdPreviewSurfacePresenceOverride))
     {
       return nullptr;
     }
@@ -211,13 +211,13 @@ namespace gtl
     return createFromMdlStr(mdlSrc, subIdentifier, opacityClass, isAnimated);
   }
 
-  McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc, const char* name)
+  McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr doc, const char* name, bool usdPreviewSurfacePresenceOverride)
   {
     std::string mdlSrc;
     std::string subIdentifier;
     McOpacityClassification opacityClass;
     bool isAnimated;
-    if (!m_mtlxMdlCodeGen->translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated))
+    if (!m_mtlxMdlCodeGen->translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated, usdPreviewSurfacePresenceOverride))
     {
       return nullptr;
     }

@@ -33,7 +33,7 @@ namespace gtl
   public:
     McMtlxDocumentPatcher(const MaterialX::DocumentPtr mtlxStdLib, const std::string& customNodesPath);
 
-    MaterialX::DocumentPtr patch(const MaterialX::DocumentPtr document);
+    MaterialX::DocumentPtr patch(const MaterialX::DocumentPtr document, [[maybe_unused]] bool usdPreviewSurfacePresenceOverride);
 
   private:
     MaterialX::DocumentPtr m_customNodesDoc;

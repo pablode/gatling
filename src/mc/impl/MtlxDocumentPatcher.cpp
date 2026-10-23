@@ -34,6 +34,7 @@ const char* TYPE_COLOR3 = "color3";
 const char* TYPE_COLOR4 = "color4";
 const char* TYPE_VECTOR3 = "vector3";
 const char* TYPE_FLOAT = "float";
+const char* TYPE_INTEGER = "integer";
 const char* TYPE_BOOL = "boolean";
 
 const char* ENVVAR_DISABLE_USDUVTEXTURE_COLOR_SPACE_PATCHING =
@@ -644,6 +645,30 @@ void _RemoveNodeDefAndImpl(mx::DocumentPtr lib, std::string_view name)
   }
 }
 
+#if MATERIALX_VERSION >= 13900
+// Change the default UsdPreviewSurface opacity mode to 'presence'.
+void _PatchUsdPreviewSurfaceOpacityModeDefault(mx::DocumentPtr document)
+{
+  constexpr int OPACITY_MODE_PRESENCE = 1; // 'transparent' is 0
+
+  for (mx::NodeDefPtr nodeDef : document->getNodeDefs())
+  {
+    if (nodeDef->getNodeString() != "UsdPreviewSurface")
+    {
+      continue;
+    }
+
+    mx::InputPtr opacityModeInput = nodeDef->getActiveInput("opacityMode");
+    if (!opacityModeInput)
+    {
+      continue;
+    }
+
+    opacityModeInput->setValue(OPACITY_MODE_PRESENCE, TYPE_INTEGER);
+  }
+}
+#endif
+
 #ifdef OCIO
 void _PatchNonACESColorSpaces(mx::DocumentPtr document, ocio::ConstConfigRcPtr ocioConfig)
 {
@@ -762,7 +787,7 @@ namespace gtl
 #endif
   }
 
-  mx::DocumentPtr McMtlxDocumentPatcher::patch(const mx::DocumentPtr document)
+  mx::DocumentPtr McMtlxDocumentPatcher::patch(const mx::DocumentPtr document, [[maybe_unused]] bool usdPreviewSurfacePresenceOverride)
   {
     mx::DocumentPtr docCopy = document->copy();
 
@@ -794,6 +819,13 @@ namespace gtl
     {
       docCopy->importLibrary(m_customNodesDoc);
     }
+
+#if MATERIALX_VERSION >= 13900
+    if (usdPreviewSurfacePresenceOverride)
+    {
+      _PatchUsdPreviewSurfaceOpacityModeDefault(docCopy);
+    }
+#endif
 
     // NOTE: this optimization is currently disabled due to a subtle bug with multi-output
     //       nodes in MaterialX (presumably it's an edge case in the flattening logic).

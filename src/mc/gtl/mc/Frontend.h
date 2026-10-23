@@ -40,9 +40,9 @@ namespace gtl
                McRuntime& mdlRuntime);
 
   public:
-    McMaterial* createFromMtlxStr(std::string_view docStr, const char* name);
+    McMaterial* createFromMtlxStr(std::string_view docStr, const char* name, bool usdPreviewSurfacePresenceOverride);
 
-    McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc, const char* name);
+    McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr doc, const char* name, bool usdPreviewSurfacePresenceOverride);
 
     McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
 

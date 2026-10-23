@@ -233,7 +233,7 @@ namespace gtl
     m_docPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customNodesPath);
   }
 
-  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated)
+  bool McMtlxMdlCodeGen::translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride)
   {
     try
     {
@@ -241,7 +241,7 @@ namespace gtl
       doc->importLibrary(m_baseDoc);
       mx::readFromXmlString(doc, mtlxStr.data());
 
-      return translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated);
+      return translate(doc, name, mdlSrc, subIdentifier, opacityClass, isAnimated, usdPreviewSurfacePresenceOverride);
     }
     catch (const std::exception& ex)
     {
@@ -250,7 +250,7 @@ namespace gtl
     }
   }
 
-  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated)
+  bool McMtlxMdlCodeGen::translate(const MaterialX::DocumentPtr mtlxDoc, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride)
   {
     // Don't cache the context because it is thread-local.
     mx::GenContext context(m_shaderGen);
@@ -263,7 +263,7 @@ namespace gtl
     mx::ShaderPtr shader = nullptr;
     try
     {
-      mx::DocumentPtr patchedDoc = m_docPatcher->patch(mtlxDoc);
+      mx::DocumentPtr patchedDoc = m_docPatcher->patch(mtlxDoc, usdPreviewSurfacePresenceOverride);
 
       if (getenv("GTL_DUMP_MTLX"))
       {

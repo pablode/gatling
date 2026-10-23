@@ -79,7 +79,7 @@ namespace
 }
 
 HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                                                 const MaterialNetworkCompiler& materialNetworkCompiler,
+                                                 MaterialNetworkCompiler& materialNetworkCompiler,
                                                  std::string_view resourcePath)
   : _materialNetworkCompiler(materialNetworkCompiler)
   , _resourcePath(resourcePath)
@@ -99,6 +99,10 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Depth of field", HdGatlingSettingsTokens->depthOfField, VtValue{false} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Light intensity multiplier", HdGatlingSettingsTokens->lightIntensityMultiplier, VtValue{1.0f} });
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Next event estimation", HdGatlingSettingsTokens->nextEventEstimation, VtValue{false} });
+#if MATERIALX_VERSION >= 13900
+  // This setting is useful for old assets that were authored without explicit opacityMode, but intended to be rendered as 'presence'.
+  _settingDescriptors.push_back(HdRenderSettingDescriptor{ "UsdPreviewSurface presence override", HdGatlingSettingsTokens->usdPreviewSurfacePresenceOverride, VtValue{false} });
+#endif
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Clipping planes", HdGatlingSettingsTokens->clippingPlanes, VtValue{false} });
 #ifndef HDGATLING_DISABLE_VOLUME_SAMPLING
   _settingDescriptors.push_back(HdRenderSettingDescriptor{ "Medium stack size", HdGatlingSettingsTokens->mediumStackSize, VtValue{0} });
@@ -127,6 +131,13 @@ HdGatlingRenderDelegate::HdGatlingRenderDelegate(const HdRenderSettingsMap& sett
 
   _giScene = giCreateScene();
 
+  bool presenceOverride = false;
+#if MATERIALX_VERSION >= 13900
+  auto presenceOverrideIt = _settingsMap.find(HdGatlingSettingsTokens->usdPreviewSurfacePresenceOverride);
+  presenceOverride = presenceOverrideIt != _settingsMap.end() && presenceOverrideIt->second.GetWithDefault<bool>(false);
+#endif
+  _materialNetworkCompiler.SetUsdPreviewSurfacePresenceOverride(presenceOverride);
+
   _defaultMaterial = giCreateMaterialFromMtlxStr(_giScene, "gtl__defaultmat", _defaultMaterialXMaterial);
   TF_AXIOM(_defaultMaterial);
 }
@@ -144,6 +155,13 @@ HdRenderSettingDescriptorList HdGatlingRenderDelegate::GetRenderSettingDescripto
 
 void HdGatlingRenderDelegate::SetRenderSetting(const TfToken& key, const VtValue& value)
 {
+#if MATERIALX_VERSION >= 13900
+  if (key == HdGatlingSettingsTokens->usdPreviewSurfacePresenceOverride)
+  {
+    _materialNetworkCompiler.SetUsdPreviewSurfacePresenceOverride(value.GetWithDefault<bool>(false));
+  }
+#endif
+
 #ifdef NDEBUG
   // Disallow changing debug render settings in release config.
   for (const HdRenderSettingDescriptor& descriptor : _debugSettingDescriptors)

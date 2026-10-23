@@ -22,6 +22,8 @@
 
 #include <gtl/gi/Gi.h>
 
+#include <optional>
+
 using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -50,10 +52,16 @@ protected:
 
 private:
   void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera) const;
+#if MATERIALX_VERSION >= 13900
+  void _UpdateUsdPreviewSurfacePresenceOverride(HdRenderIndex* renderIndex);
+#endif
 
 private:
   GiScene* _scene;
   const HdRenderSettingsMap& _settings;
+#if MATERIALX_VERSION >= 13900
+  std::optional<bool> _usdPreviewSurfacePresenceOverride;
+#endif
   bool _isConverged;
 };
 

@@ -21,6 +21,8 @@
 
 #include <MaterialXCore/Document.h>
 
+#include <atomic>
+
 namespace gtl
 {
   struct GiMaterial;
@@ -38,6 +40,8 @@ class MaterialNetworkCompiler
 public:
   MaterialNetworkCompiler(const MaterialX::DocumentPtr mtlxStdLib);
 
+  void SetUsdPreviewSurfacePresenceOverride(bool enabled);
+
   GiMaterial* CompileNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const;
 
 private:
@@ -50,6 +54,7 @@ private:
 
 private:
   MaterialX::DocumentPtr _mtlxStdLib;
+  std::atomic_bool _usdPreviewSurfacePresenceOverride = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

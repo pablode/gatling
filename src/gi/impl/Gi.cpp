@@ -515,9 +515,9 @@ fail:
     s_aggregateAssetReader->addAssetReader(reader);
   }
 
-  GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc)
+  GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc, bool usdPreviewSurfacePresenceOverride)
   {
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc, name);
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxStr(mtlxSrc, name, usdPreviewSurfacePresenceOverride);
     if (!mcMat)
     {
       return nullptr;
@@ -536,7 +536,7 @@ fail:
     return mat;
   }
 
-  GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc)
+  GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc, bool usdPreviewSurfacePresenceOverride)
   {
     mx::DocumentPtr resolvedDoc = std::static_pointer_cast<mx::Document>(doc);
     if (!doc)
@@ -544,7 +544,7 @@ fail:
       return nullptr;
     }
 
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc, name);
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(resolvedDoc, name, usdPreviewSurfacePresenceOverride);
     if (!mcMat)
     {
       return nullptr;

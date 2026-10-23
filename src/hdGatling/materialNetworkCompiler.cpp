@@ -641,6 +641,11 @@ MaterialNetworkCompiler::MaterialNetworkCompiler(const mx::DocumentPtr mtlxStdLi
 {
 }
 
+void MaterialNetworkCompiler::SetUsdPreviewSurfacePresenceOverride(bool enabled)
+{
+  _usdPreviewSurfacePresenceOverride = enabled;
+}
+
 GiMaterial* MaterialNetworkCompiler::CompileNetwork(GiScene* scene, const SdfPath& id, const HdMaterialNetwork2& network) const
 {
   GiMaterial* result = _TryCompileMdlNetwork(scene, id, network);
@@ -711,7 +716,7 @@ GiMaterial* MaterialNetworkCompiler::_TryCompileMtlxNetwork(GiScene* scene, cons
   }
 
   std::string name = id.GetName();
-  return giCreateMaterialFromMtlxDoc(scene, name.c_str(), doc);
+  return giCreateMaterialFromMtlxDoc(scene, name.c_str(), doc, _usdPreviewSurfacePresenceOverride);
 }
 
 mx::DocumentPtr MaterialNetworkCompiler::_CreateMaterialXDocumentFromNetwork(const SdfPath& id,

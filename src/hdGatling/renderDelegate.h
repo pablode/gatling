@@ -34,7 +34,7 @@ class HdGatlingRenderDelegate final : public HdRenderDelegate
 {
 public:
   HdGatlingRenderDelegate(const HdRenderSettingsMap& settingsMap,
-                          const MaterialNetworkCompiler& materialNetworkCompiler,
+                          MaterialNetworkCompiler& materialNetworkCompiler,
                           std::string_view resourcePath);
 
   ~HdGatlingRenderDelegate() override;
@@ -107,7 +107,7 @@ public:
 #endif
 
 private:
-  const MaterialNetworkCompiler& _materialNetworkCompiler;
+  MaterialNetworkCompiler& _materialNetworkCompiler;
   const std::string _resourcePath;
   HdResourceRegistrySharedPtr _resourceRegistry;
   HdRenderSettingDescriptorList _settingDescriptors;

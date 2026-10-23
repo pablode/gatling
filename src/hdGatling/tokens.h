@@ -36,6 +36,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((maxVolumeWalkLength, "max-volume-walk-length"))          \
   ((jitteredSampling, "jittered-sampling"))                  \
   ((clippingPlanes, "clipping-planes"))                      \
+  ((usdPreviewSurfacePresenceOverride, "usd-preview-surface-presence-override")) \
   ((stageMetersPerUnit, "stage-meters-per-unit"))
 
 // mtlx node identifier is given by UsdMtlx.

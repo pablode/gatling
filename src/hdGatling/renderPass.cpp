@@ -26,6 +26,7 @@
 #include <pxr/imaging/hd/sceneGlobalsSchema.h>
 #include <pxr/imaging/hd/renderPassState.h>
 #include <pxr/imaging/hd/renderDelegate.h>
+#include <pxr/imaging/hd/material.h>
 #include <pxr/imaging/hd/rprim.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/utils.h>
@@ -228,10 +229,37 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.exposure = camera.GetExposure();
 }
 
+#if MATERIALX_VERSION >= 13900
+void HdGatlingRenderPass::_UpdateUsdPreviewSurfacePresenceOverride(HdRenderIndex* renderIndex)
+{
+  auto it = _settings.find(HdGatlingSettingsTokens->usdPreviewSurfacePresenceOverride);
+  bool newPresenceOverride = it != _settings.end() && it->second.GetWithDefault<bool>(false);
+
+  // Re-sync meshes as they hold pointers to the GiMaterials
+  if (_usdPreviewSurfacePresenceOverride.has_value() && newPresenceOverride != *_usdPreviewSurfacePresenceOverride)
+  {
+    HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
+
+    for (const SdfPath& materialId : renderIndex->GetSprimSubtree(HdPrimTypeTokens->material, SdfPath::AbsoluteRootPath()))
+    {
+      changeTracker.MarkSprimDirty(materialId, HdMaterial::DirtyBits::DirtyParams);
+    }
+    changeTracker.MarkAllRprimsDirty(HdChangeTracker::AllDirty);
+  }
+
+  _usdPreviewSurfacePresenceOverride = newPresenceOverride;
+}
+#endif
+
 void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassState,
                                    const TfTokenVector& renderTags)
 {
   TF_UNUSED(renderTags);
+
+  HdRenderIndex* renderIndex = GetRenderIndex();
+#if MATERIALX_VERSION >= 13900
+  _UpdateUsdPreviewSurfacePresenceOverride(renderIndex);
+#endif
 
   const HdCamera* camera = renderPassState->GetCamera();
   if (!camera)
@@ -248,7 +276,6 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
     return;
   }
 
-  HdRenderIndex* renderIndex = GetRenderIndex();
   HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
   HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
   HdGatlingRenderParam* renderParam = static_cast<HdGatlingRenderParam*>(renderDelegate->GetRenderParam());

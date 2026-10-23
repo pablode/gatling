@@ -218,8 +218,8 @@ namespace gtl
 
   void giRegisterAssetReader(GiAssetReader* reader);
 
-  GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc);
-  GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc);
+  GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc, bool usdPreviewSurfacePresenceOverride = false);
+  GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc, bool usdPreviewSurfacePresenceOverride = false);
   GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier, const GiMaterialParameters& params = {});
   void giDestroyMaterial(GiMaterial* mat);
 
