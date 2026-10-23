@@ -138,6 +138,21 @@ const GI_UINT SCENE_DATA_INTERPOLATION_OFFSET = 29; // bits
 const GI_UINT MAX_SCENE_DATA_COUNT = 30;
 const GI_UINT MAX_TEXTURE_COUNT = 65535;
 
+// Per-texture-resource information used to map MDL texture indices to GPU image array
+// indices. UDIM/UV-tile resources span multiple images which are laid out row-major
+// (u-major) in the descriptor array.
+struct TextureInfo
+{
+  GI_UINT imageIndex;
+  GI_INT  uvtileMinU;
+  GI_INT  uvtileMinV;
+  GI_UINT uvtileWidth;  // 0 if the resource is not a uv-tile set
+  GI_UINT uvtileHeight;
+};
+#ifdef __cplusplus
+static_assert(sizeof(TextureInfo) == 20);
+#endif
+
 struct BlasPayloadBufferPreamble
 {
   GI_INT objectId;
@@ -155,6 +170,7 @@ GI_BINDING_INDEX(DISTANT_LIGHTS,  2)
 GI_BINDING_INDEX(RECT_LIGHTS,     3)
 GI_BINDING_INDEX(DISK_LIGHTS,     4)
 GI_BINDING_INDEX(SAMPLER,         5)
+GI_BINDING_INDEX(TEXTURE_INFOS,   6)
 GI_BINDING_INDEX(SCENE_AS,        8)
 GI_BINDING_INDEX(BLAS_PAYLOADS,   9)
 GI_BINDING_INDEX(INSTANCE_IDS,   10)

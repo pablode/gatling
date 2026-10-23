@@ -203,6 +203,7 @@ namespace gtl
   class GiAssetReader
   {
   public:
+    virtual bool exists(const char* path) = 0;
     virtual GiAsset* open(const char* path) = 0;
     virtual size_t size(const GiAsset* asset) const = 0;
     virtual void* data(const GiAsset* asset) const = 0;

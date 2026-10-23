@@ -34,6 +34,17 @@ namespace gtl
 
   using GiImagePtr = std::shared_ptr<CgpuImage>;
 
+  // A loaded texture resource. Non-UDIM resources contain a single image; UDIM resources
+  // contain their images in row-major order (v-major) over the uv-tile bounding box.
+  struct GiTextureResource
+  {
+    std::vector<GiImagePtr> images;
+    int32_t uvtileMinU = 0;
+    int32_t uvtileMinV = 0;
+    uint32_t uvtileWidth = 0;  // 0 if this is not a uv-tile resource
+    uint32_t uvtileHeight = 0;
+  };
+
   class GiTextureManager
   {
   public:
@@ -50,10 +61,12 @@ namespace gtl
                                        bool keepHdr = false);
 
     bool loadTextureDescriptions(const std::vector<gtl::McTextureDescription>& textureDescriptions,
-                                 std::vector<GiImagePtr>& images);
+                                 std::vector<GiTextureResource>& resources);
 
   private:
     GiImagePtr makeImagePtr(bool destroyImmediately = false);
+
+    GiImagePtr getOrCreateFallbackImage();
 
     GiImagePtr createImage(const char* filePath, const ImgioImage& imageData,
                            bool destroyImmediately, bool keepHdr);
@@ -64,6 +77,8 @@ namespace gtl
     gtl::GgpuStager& m_stager;
     GgpuDeleteQueue& m_deleteQueue;
     GbThreadPool& m_threadPool;
+    CgpuImage m_fallbackImage = {};
+    GiImagePtr m_fallbackImagePtr;
     std::unordered_map<std::string, std::weak_ptr<CgpuImage>> m_fileCache;
     std::unordered_map<uint64_t, std::weak_ptr<CgpuImage>> m_binaryCache;
   };

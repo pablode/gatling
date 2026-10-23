@@ -78,7 +78,7 @@ A headless standalone is provided that accepts a USD file (.usd, .usda, .usdc, .
 
 ### Issues
 
-Certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (subdivision, UDIM, volumes, displacement) are not yet supported.
+Certain USD prim types (curves, cylinder lights), APIs (UsdLuxShapingAPI, UsdLuxShadowAPI) and features (subdivision, volumes, displacement) are not yet supported.
 
 ### License
 

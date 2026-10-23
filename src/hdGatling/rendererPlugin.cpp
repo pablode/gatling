@@ -105,6 +105,11 @@ private:
   };
 
 public:
+  bool exists(const char* path) override
+  {
+    return bool(ArGetResolver().Resolve(path));
+  }
+
   GiAsset* open(const char* path) override
   {
     ArResolver& resolver = ArGetResolver();

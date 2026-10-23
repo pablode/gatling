@@ -42,6 +42,45 @@ bool tex_texture_isvalid(int tex)
     return tex != 0;
 }
 
+// MDL texture indices are 1-based per material; textureInfos is indexed by the global array index.
+int tex_get_image_index(int tex)
+{
+    return int(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1].imageIndex);
+}
+
+int tex_get_uvtile_image_index(TextureInfo info, ivec2 uv_tile)
+{
+    if (info.uvtileWidth == 0)
+    {
+        return int(info.imageIndex);
+    }
+
+    ivec2 tile = uv_tile - ivec2(info.uvtileMinU, info.uvtileMinV);
+
+    if (tile.x < 0 || tile.y < 0 ||
+        tile.x >= int(info.uvtileWidth) || tile.y >= int(info.uvtileHeight))
+    {
+        return -1;
+    }
+
+    return int(info.imageIndex) + tile.y * int(info.uvtileWidth) + tile.x;
+}
+
+// For uv-tile sets, the UV coordinate implicitly selects the image; the returned coordinate is
+// local to that image. Note that wrap and crop modes are ignored for uv-tile sets (MDL spec 20.3).
+int tex_get_uvtile_image_index_and_update_uv(TextureInfo info, inout vec2 coord)
+{
+    if (info.uvtileWidth == 0)
+    {
+        return int(info.imageIndex);
+    }
+
+    ivec2 uv_tile = ivec2(floor(coord));
+    coord = fract(coord);
+
+    return tex_get_uvtile_image_index(info, uv_tile);
+}
+
 vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_w, vec2 crop_u, vec2 crop_v, vec2 crop_w, float frame)
 {
     if ((tex == 0) ||
@@ -52,7 +91,7 @@ vec4 tex_lookup_float4_3d(int tex, vec3 coord, int wrap_u, int wrap_v, int wrap_
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
+    uint array_idx = uint(tex_get_image_index(tex));
 
     int mipmap_level = 0;
     ivec3 res = textureSize(textures_3d[nonuniformEXT(array_idx)], mipmap_level);
@@ -91,7 +130,7 @@ vec4 tex_texel_float4_3d(int tex, ivec3 coord, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
+    uint array_idx = uint(tex_get_image_index(tex));
 
     int mipmap_level = 0;
     ivec3 res = textureSize(textures_3d[nonuniformEXT(array_idx)], mipmap_level);
@@ -126,19 +165,44 @@ vec3 tex_texel_color_3d(int tex, ivec3 coord, float frame)
 
 vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop_u, vec2 crop_v, float frame)
 {
-    if ((tex == 0) ||
-        (wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
-        (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
+    if (tex == 0)
     {
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
+    TextureInfo info = textureInfos[TEXTURE_INDEX_OFFSET + tex - 1];
+    bool isUvTile = info.uvtileWidth != 0;
+
+    int image_idx;
+    if (isUvTile)
+    {
+        image_idx = tex_get_uvtile_image_index_and_update_uv(info, coord);
+        if (image_idx < 0)
+        {
+            return vec4(0, 0, 0, 0);
+        }
+    }
+    else
+    {
+        if ((wrap_u == TEX_WRAP_CLIP && (coord.x < 0.0 || coord.x > 1.0)) ||
+            (wrap_v == TEX_WRAP_CLIP && (coord.y < 0.0 || coord.y > 1.0)))
+        {
+            return vec4(0, 0, 0, 0);
+        }
+
+        image_idx = int(info.imageIndex);
+    }
+
+    uint array_idx = uint(image_idx);
 
     int mipmap_level = 0;
     ivec2 res = textureSize(textures_2d[nonuniformEXT(array_idx)], mipmap_level);
-    coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
-    coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
+
+    if (!isUvTile)
+    {
+        coord.x = apply_wrap_and_crop(coord.x, wrap_u, crop_u, res.x);
+        coord.y = apply_wrap_and_crop(coord.y, wrap_v, crop_v, res.y);
+    }
 
     ASSERT(array_idx <= ubo.maxTextureIndex, "Error: invalid texture index");
     return texture(sampler2D(textures_2d[nonuniformEXT(array_idx)], tex_sampler), coord);
@@ -171,7 +235,13 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
         return vec4(0, 0, 0, 0);
     }
 
-    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
+    int image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1], uv_tile);
+    if (image_idx < 0)
+    {
+        return vec4(0, 0, 0, 0);
+    }
+
+    uint array_idx = uint(image_idx);
 
     int mipmap_level = 0;
     ivec2 res = textureSize(textures_2d[nonuniformEXT(array_idx)], mipmap_level);
@@ -211,7 +281,13 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
         return ivec2(0, 0);
     }
 
-    uint array_idx = TEXTURE_INDEX_OFFSET + tex - 1;
+    int image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1], uv_tile);
+    if (image_idx < 0)
+    {
+        return ivec2(0, 0);
+    }
+
+    uint array_idx = uint(image_idx);
 
     ASSERT(array_idx <= ubo.maxTextureIndex, "Error: invalid texture index");
 

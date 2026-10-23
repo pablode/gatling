@@ -9,6 +9,8 @@ layout(binding = BINDING_INDEX_DISK_LIGHTS, std430) readonly buffer DiskLightBuf
 
 layout(binding = BINDING_INDEX_SAMPLER) uniform sampler tex_sampler;
 
+layout(binding = BINDING_INDEX_TEXTURE_INFOS, std430) readonly buffer TextureInfoBuffer { TextureInfo textureInfos[]; };
+
 layout(binding = BINDING_INDEX_SCENE_AS) uniform accelerationStructureEXT sceneAS;
 
 layout(binding = BINDING_INDEX_BLAS_PAYLOADS, std430) readonly buffer BlasPayloadBuffer {
