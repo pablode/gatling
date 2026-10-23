@@ -719,26 +719,39 @@ namespace gtl
   McMtlxDocumentPatcher::McMtlxDocumentPatcher([[maybe_unused]] const mx::DocumentPtr mtlxStdLib,
                                                const std::string& customNodesPath)
   {
-    mx::FileSearchPath bxdfFiles;
+    const mx::FilePath customNodesDir{customNodesPath};
+
+    mx::FileSearchPath searchPath;
+    searchPath.append(customNodesDir);
+
+    m_customNodesDoc = mx::createDocument();
+
+    [[maybe_unused]] auto loadCustomNodeFile = [&](const char* fileName)
+    {
+      mx::FilePath filePath = customNodesDir / fileName;
+      if (!filePath.exists())
+      {
+        GB_ERROR("custom MaterialX library file {} missing", filePath.asString());
+        return;
+      }
+      mx::loadLibrary(filePath, m_customNodesDoc, searchPath);
+    };
 
     // Workaround for incorrect rendering due to MDL codegen limitation, fixed by MaterialX PRs 2539, 2759
 #if MATERIALX_VERSION >= 13900 && MATERIALX_VERSION < 13940
-    bxdfFiles.append("open_pbr_surface.xml");
+    loadCustomNodeFile("open_pbr_surface.mtlx");
 #elif MATERIALX_VERSION == 13810
     // Detect MaterialX 1.38.10-OpenPBR version so we can add a fallback impl if vanilla version is used
     if (mtlxStdLib->getNodeGraph("NG_mx39_open_pbr_surface_surfaceshader") != nullptr)
     {
-      bxdfFiles.append("open_pbr_surface_1_38.xml");
+      loadCustomNodeFile("open_pbr_surface_1_38.mtlx");
     }
 #endif
 
 #if MATERIALX_VERSION >= 13900 && MATERIALX_VERSION < 13950
-    // Backwards compatible implemenation with 'opacityMode' input
-    bxdfFiles.append("usd_preview_surface.xml");
+    // Backwards compatible implementation with 'opacityMode' input
+    loadCustomNodeFile("usd_preview_surface.mtlx");
 #endif
-
-    m_customNodesDoc = mx::createDocument();
-    mx::loadLibraries(mx::FilePathVec{ customNodesPath }, bxdfFiles, m_customNodesDoc);
 
 #ifdef OCIO
     m_ocioConfig = ocio::Config::CreateFromBuiltinConfig("cg-config-v1.0.0_aces-v1.3_ocio-v2.1");
