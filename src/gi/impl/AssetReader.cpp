@@ -50,6 +50,11 @@ namespace gtl
     return (GiAsset*)iasset;
   }
 
+  bool GiMmapAssetReader::exists(const char* path)
+  {
+    return giFileExists(path);
+  }
+
   size_t GiMmapAssetReader::size(const GiAsset* asset) const
   {
     auto iasset = (GiMmapAsset*)asset;
@@ -79,6 +84,18 @@ namespace gtl
   void GiAggregateAssetReader::addAssetReader(GiAssetReader* reader)
   {
     m_readers.push_back(reader);
+  }
+
+  bool GiAggregateAssetReader::exists(const char* path)
+  {
+    for (GiAssetReader* reader : m_readers)
+    {
+      if (reader->exists(path))
+      {
+        return true;
+      }
+    }
+    return false;
   }
 
   GiAsset* GiAggregateAssetReader::open(const char* path)

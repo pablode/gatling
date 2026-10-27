@@ -106,6 +106,7 @@ namespace gtl
       uint32_t maxSceneDataId;
       std::string_view dfGlsl;
       uint32_t textureIndexOffset;
+      bool hasUdimTextures;
     };
 
     struct AnyHitShaderParams
@@ -119,6 +120,7 @@ namespace gtl
       bool shadowTest;
       uint32_t textureIndexOffset;
       bool isAnimated;
+      bool hasUdimTextures;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);

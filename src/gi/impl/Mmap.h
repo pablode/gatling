@@ -30,6 +30,8 @@ namespace gtl
 
   bool giFileOpen(const char* path, GiFileUsage usage, GiFile** file);
 
+  bool giFileExists(const char* path);
+
   size_t giFileSize(GiFile* file);
 
   bool giFileClose(GiFile* file);

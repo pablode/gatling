@@ -192,6 +192,12 @@ namespace gtl
     return true;
   }
 
+  bool giFileExists(const char* path)
+  {
+    DWORD attributes = GetFileAttributesA(path);
+    return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+  }
+
   size_t giFileSize(GiFile* file)
   {
     return file->size;
@@ -315,6 +321,12 @@ namespace gtl
     memset((*file)->mappedRanges, 0, MAX_MAPPED_MEM_RANGES * sizeof(_MappedPosixRange));
 
     return true;
+  }
+
+  bool giFileExists(const char* path)
+  {
+    struct stat fileStats;
+    return stat(path, &fileStats) == 0 && S_ISREG(fileStats.st_mode);
   }
 
   size_t giFileSize(GiFile* file)

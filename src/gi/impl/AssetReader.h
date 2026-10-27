@@ -27,6 +27,8 @@ namespace gtl
   class GiMmapAssetReader : public GiAssetReader
   {
   public:
+    bool exists(const char* path) override;
+
     GiAsset* open(const char* path) override;
 
     size_t size(const GiAsset* asset) const override;
@@ -42,6 +44,8 @@ namespace gtl
     void addAssetReader(GiAssetReader* reader);
 
   public:
+    bool exists(const char* path) override;
+
     GiAsset* open(const char* path) override;
 
     size_t size(const GiAsset* asset) const override;

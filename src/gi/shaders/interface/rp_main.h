@@ -138,6 +138,21 @@ const GI_UINT SCENE_DATA_INTERPOLATION_OFFSET = 29; // bits
 const GI_UINT MAX_SCENE_DATA_COUNT = 30;
 const GI_UINT MAX_TEXTURE_COUNT = 65535;
 
+const GI_UINT TEXTURE_INFO_IMAGE_INDEX_MASK = 0xFFFFu;
+const GI_UINT TEXTURE_INFO_UVTILE_MIN_U_SHIFT = 16;
+const GI_UINT TEXTURE_INFO_UVTILE_MIN_V_SHIFT = 24;
+const GI_UINT TEXTURE_INFO_UVTILE_SIZE_MASK = 0xFFFFu;
+const GI_UINT TEXTURE_INFO_UVTILE_HEIGHT_SHIFT = 16;
+
+struct TextureInfo
+{
+  GI_UINT imageIndexAndUvtileMin; // imageIndex:16 | uvtileMinU:8 | uvtileMinV:8
+  GI_UINT uvtileWidthAndHeight;   // uvtileWidth:16 | uvtileHeight:16
+};
+#ifdef __cplusplus
+static_assert(sizeof(TextureInfo) == 8);
+#endif
+
 struct BlasPayloadBufferPreamble
 {
   GI_INT objectId;
@@ -155,6 +170,7 @@ GI_BINDING_INDEX(DISTANT_LIGHTS,  2)
 GI_BINDING_INDEX(RECT_LIGHTS,     3)
 GI_BINDING_INDEX(DISK_LIGHTS,     4)
 GI_BINDING_INDEX(SAMPLER,         5)
+GI_BINDING_INDEX(TEXTURE_INFOS,   6)
 GI_BINDING_INDEX(SCENE_AS,        8)
 GI_BINDING_INDEX(BLAS_PAYLOADS,   9)
 GI_BINDING_INDEX(INSTANCE_IDS,   10)

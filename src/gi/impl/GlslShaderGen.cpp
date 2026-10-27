@@ -319,6 +319,10 @@ namespace gtl
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
     }
+    if (params.hasUdimTextures)
+    {
+      stitcher.appendDefine("HAS_UDIM_TEXTURES");
+    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
@@ -357,6 +361,10 @@ namespace gtl
     if (params.isAnimated)
     {
       stitcher.appendDefine("IS_ANIMATED");
+    }
+    if (params.hasUdimTextures)
+    {
+      stitcher.appendDefine("HAS_UDIM_TEXTURES");
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
