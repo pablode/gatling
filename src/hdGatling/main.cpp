@@ -652,4 +652,8 @@ TEST_SUITE("Graphical")
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Render.Empty1x1")
   {
   }
+
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.CutoutOpacity")
+  {
+  }
 }
