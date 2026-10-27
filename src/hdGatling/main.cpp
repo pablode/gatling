@@ -197,6 +197,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   ((errorPixelThreshold, "gtl:errorPixelThreshold"))
   ((frame, "gtl:frame"))
   ((jitteredSampling, "gtl:jitteredSampling"))
+  ((greyscaleChannelToRgb, "gtl:greyscaleChannelToRgb"))
   ((clippingPlanes, "gtl:clippingPlanes"))
   ((nextEventEstimation, "gtl:nextEventEstimation"))
   ((backgroundColor, "gtl:backgroundColor"))
@@ -240,6 +241,7 @@ private:
     uint32_t errorPixelThreshold = 0;
     double frame = 0.0;
     bool jitteredSampling = true;
+    bool greyscaleChannelToRgb = true;
     bool clippingPlanes = false;
     bool nextEventEstimation = false;
     std::optional<GfVec3f> backgroundColor;
@@ -333,6 +335,14 @@ private:
       }
     }
     {
+      auto it = ns.find(_nsTokens->greyscaleChannelToRgb);
+      if (it != ns.end())
+      {
+        REQUIRE(it->second.IsHolding<bool>());
+        settings.greyscaleChannelToRgb = it->second.UncheckedGet<bool>();
+      }
+    }
+    {
       auto it = ns.find(_nsTokens->clippingPlanes);
       if (it != ns.end())
       {
@@ -420,6 +430,7 @@ private:
     setRenderSetting(HdGatlingSettingsTokens->spp, VtValue(namespacedSettings.spp));
     setRenderSetting(HdGatlingSettingsTokens->depthOfField, VtValue(!product.disableDepthOfField));
     setRenderSetting(HdGatlingSettingsTokens->jitteredSampling, VtValue(namespacedSettings.jitteredSampling));
+    setRenderSetting(HdGatlingSettingsTokens->greyscaleChannelToRgb, VtValue(namespacedSettings.greyscaleChannelToRgb));
     setRenderSetting(HdGatlingSettingsTokens->clippingPlanes, VtValue(namespacedSettings.clippingPlanes));
     setRenderSetting(HdGatlingSettingsTokens->nextEventEstimation, VtValue(namespacedSettings.nextEventEstimation));
 

@@ -62,6 +62,20 @@ namespace
     return loadResult;
   }
 
+  ImgioLoadFlags _MakeLoadFlags(bool keepHdr, bool greyscaleChannelToRgb)
+  {
+    ImgioLoadFlags flags = ImgioLoadFlags::None;
+    if (keepHdr)
+    {
+      flags |= ImgioLoadFlags::KeepHdr;
+    }
+    if (greyscaleChannelToRgb)
+    {
+      flags |= ImgioLoadFlags::GreyscaleChannelToRgb;
+    }
+    return flags;
+  }
+
   CgpuImageFormat _TranslateImageFormat(ImgioFormat format)
   {
     switch (format)
@@ -361,6 +375,17 @@ namespace gtl
     m_binaryCache.clear();
   }
 
+  void GiTextureManager::setGreyscaleChannelToRgb(bool enabled)
+  {
+    if (m_greyscaleChannelToRgb == enabled)
+    {
+      return;
+    }
+
+    m_greyscaleChannelToRgb = enabled;
+    m_fileCache.clear(); // we need to reload because channel layout changed
+  }
+
   GiImagePtr GiTextureManager::loadTextureFromFilePath(const char* filePath, bool destroyImmediately, bool keepHdr)
   {
     auto cacheResult = m_fileCache.find(filePath);
@@ -376,11 +401,7 @@ namespace gtl
       }
     }
 
-    ImgioLoadFlags loadFlags = ImgioLoadFlags::None;
-    if (keepHdr)
-    {
-      loadFlags |= ImgioLoadFlags::KeepHdr;
-    }
+    ImgioLoadFlags loadFlags = _MakeLoadFlags(keepHdr, m_greyscaleChannelToRgb);
 
     ImgioImage imageData;
     if (!_ReadImage(filePath, m_assetReader, &imageData, loadFlags) || imageData.format == ImgioFormat::UNSUPPORTED)
@@ -564,6 +585,7 @@ namespace gtl
     }
 
     // Load images in parallel.
+    const ImgioLoadFlags loadFlags = _MakeLoadFlags(false, m_greyscaleChannelToRgb);
     std::mutex readyMutex;
     std::condition_variable readyCv;
     std::deque<uint32_t> readyIndices;
@@ -574,7 +596,7 @@ namespace gtl
       m_threadPool.submit([&, i]() {
         LoadRequest& request = loadRequests[i];
 
-        bool success = _ReadImage(request.path.c_str(), m_assetReader, &request.imageData, ImgioLoadFlags::None) &&
+        bool success = _ReadImage(request.path.c_str(), m_assetReader, &request.imageData, loadFlags) &&
                        request.imageData.format != ImgioFormat::UNSUPPORTED;
 
         if (success)

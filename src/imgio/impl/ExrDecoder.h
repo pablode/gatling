@@ -28,6 +28,7 @@ namespace gtl
   class ImgioExrDecoder
   {
   public:
-    static ImgioError decode(size_t size, const void* data, ImgioImage* img, bool keepHdr);
+    static ImgioError decode(size_t size, const void* data, ImgioImage* img,
+                             bool keepHdr, bool greyscaleChannelToRgb);
   };
 }

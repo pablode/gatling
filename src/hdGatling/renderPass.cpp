@@ -229,6 +229,40 @@ void HdGatlingRenderPass::_ConstructGiCamera(const HdCamera& camera, GiCameraDes
   giCamera.exposure = camera.GetExposure();
 }
 
+void HdGatlingRenderPass::_UpdateGreyscaleChannelToRgb(HdRenderIndex* renderIndex)
+{
+  auto it = _settings.find(HdGatlingSettingsTokens->greyscaleChannelToRgb);
+  bool newValue = it == _settings.end() || it->second.GetWithDefault<bool>(true);
+
+  if (_greyscaleChannelToRgb.has_value() && newValue == *_greyscaleChannelToRgb)
+  {
+    return;
+  }
+
+  // Invalidate all prims that hold textures, and prims that are indirectly linked.
+  if (_greyscaleChannelToRgb.has_value())
+  {
+    HdChangeTracker& changeTracker = renderIndex->GetChangeTracker();
+
+    for (const SdfPath& materialId : renderIndex->GetSprimSubtree(HdPrimTypeTokens->material, SdfPath::AbsoluteRootPath()))
+    {
+      changeTracker.MarkSprimDirty(materialId, HdMaterial::DirtyBits::DirtyParams);
+    }
+
+    for (const TfToken& lightType : { HdPrimTypeTokens->domeLight, HdPrimTypeTokens->simpleLight })
+    {
+      for (const SdfPath& lightId : renderIndex->GetSprimSubtree(lightType, SdfPath::AbsoluteRootPath()))
+      {
+        changeTracker.MarkSprimDirty(lightId, HdChangeTracker::AllDirty);
+      }
+    }
+
+    changeTracker.MarkAllRprimsDirty(HdChangeTracker::AllDirty);
+  }
+
+  _greyscaleChannelToRgb = newValue;
+}
+
 #if MATERIALX_VERSION >= 13900
 void HdGatlingRenderPass::_UpdateUsdPreviewSurfacePresenceOverride(HdRenderIndex* renderIndex)
 {
@@ -257,6 +291,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
   TF_UNUSED(renderTags);
 
   HdRenderIndex* renderIndex = GetRenderIndex();
+  _UpdateGreyscaleChannelToRgb(renderIndex);
 #if MATERIALX_VERSION >= 13900
   _UpdateUsdPreviewSurfacePresenceOverride(renderIndex);
 #endif
@@ -302,6 +337,7 @@ void HdGatlingRenderPass::_Execute(const HdRenderPassStateSharedPtr& renderPassS
       .domeLightCameraVisible = (domeLightCameraVisibilityValueIt == _settings.end()) || domeLightCameraVisibilityValueIt->second.GetWithDefault<bool>(true),
       .filterImportanceSampling = _settings.find(HdGatlingSettingsTokens->filterImportanceSampling)->second.Get<bool>(),
       .frame = float(frame),
+      .greyscaleChannelToRgb = _settings.find(HdGatlingSettingsTokens->greyscaleChannelToRgb)->second.Get<bool>(),
       .jitteredSampling = _settings.find(HdGatlingSettingsTokens->jitteredSampling)->second.Get<bool>(),
       .lightIntensityMultiplier = VtValue::Cast<float>(_settings.find(HdGatlingSettingsTokens->lightIntensityMultiplier)->second).Get<float>(),
       .maxBounces = VtValue::Cast<uint32_t>(_settings.find(HdGatlingSettingsTokens->maxBounces)->second).Get<uint32_t>(),

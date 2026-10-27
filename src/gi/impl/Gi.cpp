@@ -2088,6 +2088,7 @@ cleanup:
       ars.domeLightCameraVisible != brs.domeLightCameraVisible ||
       ars.filterImportanceSampling != brs.filterImportanceSampling ||
       ars.frame != brs.frame ||
+      ars.greyscaleChannelToRgb != brs.greyscaleChannelToRgb ||
       ars.jitteredSampling != brs.jitteredSampling ||
       ars.lightIntensityMultiplier != brs.lightIntensityMultiplier ||
       ars.maxBounces != brs.maxBounces ||
@@ -2143,6 +2144,9 @@ cleanup:
 
     GiScene* scene = params.scene;
     const GiRenderSettings& renderSettings = params.renderSettings;
+
+    // Textures are decoded during shader cache creation, so update settings.
+    s_texSys->setGreyscaleChannelToRgb(renderSettings.greyscaleChannelToRgb);
 
     // Allocate memory for render buffers
     for (const GiAovBinding& binding : params.aovBindings)

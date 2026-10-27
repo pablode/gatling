@@ -52,6 +52,7 @@ protected:
 
 private:
   void _ConstructGiCamera(const HdCamera& camera, GiCameraDesc& giCamera) const;
+  void _UpdateGreyscaleChannelToRgb(HdRenderIndex* renderIndex);
 #if MATERIALX_VERSION >= 13900
   void _UpdateUsdPreviewSurfacePresenceOverride(HdRenderIndex* renderIndex);
 #endif
@@ -59,6 +60,7 @@ private:
 private:
   GiScene* _scene;
   const HdRenderSettingsMap& _settings;
+  std::optional<bool> _greyscaleChannelToRgb;
 #if MATERIALX_VERSION >= 13900
   std::optional<bool> _usdPreviewSurfacePresenceOverride;
 #endif

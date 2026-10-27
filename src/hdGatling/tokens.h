@@ -30,6 +30,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((nextEventEstimation, "next-event-estimation"))           \
   ((progressiveAccumulation, "progressive-accumulation"))    \
   ((filterImportanceSampling, "filter-importance-sampling")) \
+  ((greyscaleChannelToRgb, "greyscale-channel-to-rgb"))      \
   ((depthOfField, "depth-of-field"))                         \
   ((lightIntensityMultiplier, "light-intensity-multiplier")) \
   ((mediumStackSize, "medium-stack-size"))                   \

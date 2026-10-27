@@ -160,6 +160,7 @@ namespace gtl
     bool       domeLightCameraVisible;
     bool       filterImportanceSampling;
     float      frame;
+    bool       greyscaleChannelToRgb;
     bool       jitteredSampling;
     float      lightIntensityMultiplier;
     uint32_t   maxBounces;

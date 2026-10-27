@@ -27,7 +27,8 @@ namespace gtl
   enum class ImgioLoadFlags
   {
     None = 0,
-    KeepHdr
+    KeepHdr = (1 << 0),
+    GreyscaleChannelToRgb = (1 << 1)
   };
   GB_DECLARE_ENUM_BITOPS(ImgioLoadFlags);
 

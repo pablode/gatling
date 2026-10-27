@@ -53,6 +53,8 @@ namespace gtl
 
     void destroy();
 
+    void setGreyscaleChannelToRgb(bool enabled);
+
   public:
     GiImagePtr loadTextureFromFilePath(const char* filePath,
                                        bool destroyImmediately = false,
@@ -78,5 +80,6 @@ namespace gtl
     GiImagePtr m_fallbackImage;
     std::unordered_map<std::string, std::weak_ptr<CgpuImage>> m_fileCache;
     std::unordered_map<uint64_t, std::weak_ptr<CgpuImage>> m_binaryCache;
+    bool m_greyscaleChannelToRgb = true;
   };
 }

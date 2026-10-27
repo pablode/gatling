@@ -30,6 +30,7 @@ namespace gtl
   ImgioError ImgioLoadImage(const void* data, size_t size, ImgioImage* img, ImgioLoadFlags flags)
   {
     bool keepHdr = (flags & ImgioLoadFlags::KeepHdr) != ImgioLoadFlags::None;
+    bool greyscaleChannelToRgb = (flags & ImgioLoadFlags::GreyscaleChannelToRgb) != ImgioLoadFlags::None;
 
     ImgioError r = ImgioPngDecoder::decode(size, data, img);
 
@@ -40,7 +41,7 @@ namespace gtl
 
     if (r == ImgioError::UnsupportedEncoding)
     {
-      r = ImgioExrDecoder::decode(size, data, img, keepHdr);
+      r = ImgioExrDecoder::decode(size, data, img, keepHdr, greyscaleChannelToRgb);
     }
 
     if (r == ImgioError::UnsupportedEncoding)
