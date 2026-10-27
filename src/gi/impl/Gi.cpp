@@ -218,6 +218,7 @@ namespace gtl
     GiDomeLight* domeLight = nullptr; // weak ptr
     glm::vec4 backgroundColor = glm::vec4(-1.0f); // used to initialize fallback dome light
     CgpuImage fallbackDomeLightTexture;
+    CgpuImage uniformDomeLightTexture;
     std::unordered_set<GiMesh*> meshes;
     std::unordered_set<GiMaterial*> materials;
     std::mutex mutex;
@@ -2349,7 +2350,8 @@ cleanup:
     if (scene->domeLight != params.domeLight)
     {
       if (scene->domeLightTexture &&
-          scene->domeLightTexture->handle != scene->fallbackDomeLightTexture.handle)
+          scene->domeLightTexture->handle != scene->fallbackDomeLightTexture.handle &&
+          scene->domeLightTexture->handle != scene->uniformDomeLightTexture.handle)
       {
         // TODO: if we have multiple frames in flight, we need to wait for last frame's semaphore here
         scene->domeLightTexture.reset(); // frees memory immediately
@@ -2360,20 +2362,30 @@ cleanup:
       GiDomeLight* domeLight = params.domeLight;
       if (domeLight)
       {
-        const char* filePath = domeLight->textureFilePath.c_str();
-
-        bool destroyImmediately = true;
-        bool keepHdr = true;
-        scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, destroyImmediately, keepHdr);
-
-        if (!scene->domeLightTexture)
+        if (domeLight->textureFilePath.empty())
         {
-          GB_ERROR("unable to load dome light texture at {}", filePath);
+          // Bind white dome light which is impacted by light color and emission
+          scene->domeLightTexture = std::make_shared<CgpuImage>(scene->uniformDomeLightTexture);
+          scene->domeLight = domeLight;
+          scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
         }
         else
         {
-          scene->domeLight = domeLight;
-          scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
+          const char* filePath = domeLight->textureFilePath.c_str();
+
+          bool destroyImmediately = true;
+          bool keepHdr = true;
+          scene->domeLightTexture = s_texSys->loadTextureFromFilePath(filePath, destroyImmediately, keepHdr);
+
+          if (!scene->domeLightTexture)
+          {
+            GB_ERROR("unable to load dome light texture at {}", filePath);
+          }
+          else
+          {
+            scene->domeLight = domeLight;
+            scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBindSets;
+          }
         }
       }
     }
@@ -2683,12 +2695,28 @@ cleanup:
       return nullptr;
     }
 
+    CgpuImage uniformDomeLightTexture;
+    if (!cgpuCreateImage(s_ctx, { .width = 1, .height = 1 }, &uniformDomeLightTexture))
+    {
+      cgpuDestroyImage(s_ctx, fallbackDomeLightTexture);
+      return nullptr;
+    }
+
+    const uint8_t white[4] = { 255, 255, 255, 255 };
+    if (!s_stager->stageToImage(white, 4, uniformDomeLightTexture, 1, 1) || !s_stager->flush())
+    {
+      cgpuDestroyImage(s_ctx, uniformDomeLightTexture);
+      cgpuDestroyImage(s_ctx, fallbackDomeLightTexture);
+      return nullptr;
+    }
+
     GiScene* scene = new GiScene{
       .sphereLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::SphereLight), 64),
       .distantLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DistantLight), 64),
       .rectLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::RectLight), 64),
       .diskLights = GgpuDenseDataStore(s_ctx, *s_stager, *s_deleteQueue, sizeof(rp::DiskLight), 64),
       .fallbackDomeLightTexture = fallbackDomeLightTexture,
+      .uniformDomeLightTexture = uniformDomeLightTexture,
     };
 
     scene->domeLightsAllocation = scene->texAllocator.allocate(2); // primary + fallback
@@ -2716,6 +2744,7 @@ cleanup:
       cgpuDestroyBuffer(s_ctx, scene->aovDefaultValues);
     }
     cgpuDestroyImage(s_ctx, scene->fallbackDomeLightTexture);
+    cgpuDestroyImage(s_ctx, scene->uniformDomeLightTexture);
     delete scene;
   }
 

@@ -348,27 +348,23 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
 
   const SdfPath& id = GetId();
   VtValue boxedTextureFile = sceneDelegate->GetLightParamValue(id, HdLightTokens->textureFile);
-  if (boxedTextureFile.IsEmpty())
-  {
-    // Hydra runtime warns of empty path; we don't need to repeat it.
-    return;
-  }
 
-  if (!boxedTextureFile.IsHolding<SdfAssetPath>())
+  std::string path;
+  if (boxedTextureFile.IsHolding<SdfAssetPath>())
+  {
+    const SdfAssetPath& assetPath = boxedTextureFile.UncheckedGet<SdfAssetPath>();
+    path = assetPath.GetResolvedPath();
+
+    if (path.empty() && !assetPath.GetAssetPath().empty())
+    {
+      TF_WARN("Unable to resolve asset path \"%s\"; falling back to dome light color",
+              assetPath.GetAssetPath().c_str());
+    }
+  }
+  else if (!boxedTextureFile.IsEmpty())
   {
     TF_WARN("%s:%s does not hold SdfAssetPath - ignoring!",
       id.GetText(), HdLightTokens->textureFile.GetText());
-    return;
-  }
-
-  const SdfAssetPath& assetPath = boxedTextureFile.UncheckedGet<SdfAssetPath>();
-
-  std::string path = assetPath.GetResolvedPath();
-  if (path.empty())
-  {
-    // Texture file is missing
-    TF_WARN("Unable to resolve asset path \"%s\"", assetPath.GetAssetPath().c_str());
-    return;
   }
 
   if (_giDomeLight)
