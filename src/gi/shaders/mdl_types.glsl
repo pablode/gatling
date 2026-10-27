@@ -82,6 +82,10 @@ struct State // Shading_state_material
     /// of this texture space.
     vec3                tangent_v[1];
 
+    /// Results of expressions evaluated before the state normal is updated.
+    /// Must match the backend's "num_texture_results" option.
+    vec4                text_results[1];
+
 #if 0
     /// An offset for accesses to the read-only data segment. Will be added before
     /// calling any "mdl_read_rodata_as_*" function.

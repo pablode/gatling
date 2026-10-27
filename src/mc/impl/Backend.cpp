@@ -81,6 +81,8 @@ namespace gtl
       backend->set_option("enable_exceptions", "off");
       backend->set_option("use_renderer_adapt_normal", "on");
       backend->set_option("enable_auxiliary", needsAuxOutput ? "on" : "off");
+      // Pre-normal evaluation results (displacement, cutout opacity) need at least one slot.
+      backend->set_option("num_texture_results", "1");
 
       return _generateGlslWithDfs(*backend, compiledMaterial, genFunctions, glslSrc,
                                   textureDescriptions, stringConstants);
