@@ -2006,11 +2006,6 @@ cleanup:
   {
     GiSceneDirtyFlags flags = {};
 
-    if (memcmp(&a, &b, sizeof(GiRenderParams)) == 0)
-    {
-      return flags;
-    }
-
     bool aovCountChanged = a.aovBindings.size() != b.aovBindings.size();
     bool aovsChanged = aovCountChanged;
     bool aovDefaultsChanged = false;
@@ -2094,7 +2089,8 @@ cleanup:
       ars.progressiveAccumulation != brs.progressiveAccumulation ||
       ars.rrBounceOffset != brs.rrBounceOffset ||
       ars.rrInvMinTermProb != brs.rrInvMinTermProb ||
-      ars.spp != brs.spp;
+      ars.spp != brs.spp ||
+      ars.time != brs.time;
 
     if (cameraChanged || renderSettingsChanged)
     {
@@ -2111,6 +2107,11 @@ cleanup:
     if (ars.domeLightCameraVisible != brs.domeLightCameraVisible)
     {
       flags |= GiSceneDirtyFlags::DirtyShadersMiss;
+    }
+
+    if (ars.cullMode != brs.cullMode)
+    {
+      flags |= GiSceneDirtyFlags::DirtyBvh;
     }
 
     if (ars.clippingPlanes != brs.clippingPlanes ||
