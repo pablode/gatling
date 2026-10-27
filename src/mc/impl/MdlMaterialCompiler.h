@@ -73,8 +73,5 @@ namespace gtl
     mi::base::Handle<mi::neuraylib::IMdl_configuration> m_config;
     mi::base::Handle<mi::neuraylib::IMdl_factory> m_factory;
     mi::base::Handle<mi::neuraylib::IMdl_impexp_api> m_impExpApi;
-    mi::base::Handle<mi::neuraylib::IValue_factory> m_vf;
-    mi::base::Handle<mi::neuraylib::IType_factory> m_tf;
-    mi::base::Handle<mi::neuraylib::IExpression_factory> m_ef;
   };
 }

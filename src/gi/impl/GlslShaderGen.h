@@ -40,8 +40,6 @@ namespace gtl
   public:
     bool init(std::string_view shaderPath, McRuntime& runtime);
 
-    void setAuxiliaryOutputEnabled(bool enabled);
-
   public:
     struct BuiltinSceneDataIndices
     {
@@ -58,7 +56,7 @@ namespace gtl
       uint32_t maxSceneDataId;
     };
 
-    bool generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo);
+    bool generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo, bool needsAuxOutput);
 
   public:
     struct CommonShaderParams

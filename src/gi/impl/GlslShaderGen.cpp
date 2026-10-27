@@ -49,11 +49,6 @@ namespace gtl
     return true;
   }
 
-  void GiGlslShaderGen::setAuxiliaryOutputEnabled(bool enabled)
-  {
-    m_mcBackend->setAuxiliaryOutputEnabled(enabled);
-  }
-
   void _sgGenerateSceneDataDefines(GiGlslStitcher& stitcher,
                                    const GiGlslShaderGen::BuiltinSceneDataIndices& indices)
   {
@@ -238,7 +233,7 @@ namespace gtl
     return true;
   }
 
-  bool GiGlslShaderGen::generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo)
+  bool GiGlslShaderGen::generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo, bool needsAuxOutput)
   {
     const std::unordered_map<McDf, const char*> dfs = {
       { McDf::Scattering, "mdl_bsdf_scattering" },
@@ -255,7 +250,7 @@ namespace gtl
     };
 
     McGlslGenResult genResult;
-    if (!m_mcBackend->genGlsl(*material.mdlMaterial, dfs, genResult))
+    if (!m_mcBackend->genGlsl(*material.mdlMaterial, dfs, genResult, needsAuxOutput))
     {
       return false;
     }

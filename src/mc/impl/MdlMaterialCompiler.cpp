@@ -131,9 +131,6 @@ namespace gtl
     m_config = runtime.getConfig();
     m_factory = runtime.getFactory();
     m_impExpApi = runtime.getImpExpApi();
-    m_vf = m_factory->create_value_factory(m_transaction.get());
-    m_tf = m_factory->create_type_factory(m_transaction.get());
-    m_ef = m_factory->create_expression_factory(m_transaction.get());
   }
 
   bool McMdlMaterialCompiler::compileFromString(std::string_view srcStr,
@@ -228,18 +225,23 @@ namespace gtl
     mi::neuraylib::IExpression_list* paramList = nullptr;
     if (!params.empty())
     {
-      paramList = m_ef->create_expression_list();
+      // Factories are not thread-safe, so create them per compilation.
+      mi::base::Handle<mi::neuraylib::IType_factory> tf(m_factory->create_type_factory(m_transaction.get()));
+      mi::base::Handle<mi::neuraylib::IValue_factory> vf(m_factory->create_value_factory(m_transaction.get()));
+      mi::base::Handle<mi::neuraylib::IExpression_factory> ef(m_factory->create_expression_factory(m_transaction.get()));
+
+      paramList = ef->create_expression_list();
 
       for (const auto& nameValuePair : params)
       {
-        mi::base::Handle<mi::neuraylib::IValue> value = _TranslateParameterValue(context, m_transaction, m_factory, m_tf, m_vf, nameValuePair.second);
+        mi::base::Handle<mi::neuraylib::IValue> value = _TranslateParameterValue(context, m_transaction, m_factory, tf, vf, nameValuePair.second);
 
         if (!value)
         {
           continue;
         }
 
-        mi::base::Handle<mi::neuraylib::IExpression> expr(m_ef->create_constant(value.get()));
+        mi::base::Handle<mi::neuraylib::IExpression> expr(ef->create_constant(value.get()));
 
         const std::string& name = nameValuePair.first;
         paramList->add_expression(name.c_str(), expr.get());

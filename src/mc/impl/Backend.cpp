@@ -52,11 +52,9 @@ namespace gtl
   class McBackend::_Impl
   {
   public:
-    _Impl(McMdlRuntime& runtime, mi::base::Handle<mi::neuraylib::IMdl_backend> backend)
+    _Impl(McMdlRuntime& runtime, mi::base::Handle<mi::neuraylib::IMdl_backend_api> backendApi)
     {
-      m_backend = backend;
-      m_backend->set_option("enable_exceptions", "off");
-      m_backend->set_option("use_renderer_adapt_normal", "on");
+      m_backendApi = backendApi;
 
       m_logger = mi::base::Handle<McMdlLogger>(runtime.getLogger());
       m_database = mi::base::Handle<mi::neuraylib::IDatabase>(runtime.getDatabase());
@@ -64,22 +62,43 @@ namespace gtl
       m_factory = mi::base::Handle<mi::neuraylib::IMdl_factory>(runtime.getFactory());
     }
 
-    void setAuxiliaryOutputEnabled(bool enabled)
-    {
-      m_backend->set_option("enable_auxiliary", enabled ? "on" : "off");
-    }
-
     bool generateGlslWithDfs(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                              std::string& glslSrc,
                              std::vector<McTextureDescription>& textureDescriptions,
-                             std::vector<std::string>& stringConstants)
+                             std::vector<std::string>& stringConstants,
+                             bool needsAuxOutput)
+    {
+      // Backends are not thread-safe, so create one per generation. Creation is not expensive.
+      mi::base::Handle<mi::neuraylib::IMdl_backend> backend(m_backendApi->get_backend(mi::neuraylib::IMdl_backend_api::MB_GLSL));
+
+      if (!backend.is_valid_interface())
+      {
+        m_logger->message(mi::base::MESSAGE_SEVERITY_ERROR, "GLSL backend not supported by MDL runtime");
+        return false;
+      }
+
+      backend->set_option("enable_exceptions", "off");
+      backend->set_option("use_renderer_adapt_normal", "on");
+      backend->set_option("enable_auxiliary", needsAuxOutput ? "on" : "off");
+
+      return _generateGlslWithDfs(*backend, compiledMaterial, genFunctions, glslSrc,
+                                  textureDescriptions, stringConstants);
+    }
+
+  private:
+    bool _generateGlslWithDfs(mi::neuraylib::IMdl_backend& backend,
+                              mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
+                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
+                              std::string& glslSrc,
+                              std::vector<McTextureDescription>& textureDescriptions,
+                              std::vector<std::string>& stringConstants)
     {
       // Create a separate execution context for each thread.
       mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
       context->set_option("resolve_resources", false);
 
-      mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(m_backend->create_link_unit(m_transaction.get(), context.get()));
+      mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(backend.create_link_unit(m_transaction.get(), context.get()));
       m_logger->flushContextMessages(context.get());
 
       if (!linkUnit)
@@ -100,7 +119,7 @@ namespace gtl
         return false;
       }
 
-      mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode(m_backend->translate_link_unit(linkUnit.get(), context.get()));
+      mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode(backend.translate_link_unit(linkUnit.get(), context.get()));
       m_logger->flushContextMessages(context.get());
 
       if (!targetCode)
@@ -271,7 +290,7 @@ namespace gtl
 
   public:
     mi::base::Handle<McMdlLogger> m_logger;
-    mi::base::Handle<mi::neuraylib::IMdl_backend> m_backend;
+    mi::base::Handle<mi::neuraylib::IMdl_backend_api> m_backendApi;
     mi::base::Handle<mi::neuraylib::IDatabase> m_database;
     mi::base::Handle<mi::neuraylib::ITransaction> m_transaction;
     mi::base::Handle<mi::neuraylib::IMdl_factory> m_factory;
@@ -291,16 +310,11 @@ namespace gtl
       return false;
     }
 
-    m_impl = std::make_shared<_Impl>(mdlRuntime, backend);
+    m_impl = std::make_shared<_Impl>(mdlRuntime, backendApi);
     return true;
   }
 
-  void McBackend::setAuxiliaryOutputEnabled(bool enabled)
-  {
-    m_impl->setAuxiliaryOutputEnabled(enabled);
-  }
-
-  bool McBackend::genGlsl(const McMdlMaterial& material, McDfMap dfMap, McGlslGenResult& result)
+  bool McBackend::genGlsl(const McMdlMaterial& material, McDfMap dfMap, McGlslGenResult& result, bool needsAuxOutput)
   {
     std::vector<mi::neuraylib::Target_function_description> fDescs;
     fDescs.reserve(size_t(McDf::COUNT));
@@ -311,6 +325,6 @@ namespace gtl
     }
 
     return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source,
-                                       result.textureDescriptions, result.stringConstants);
+                                       result.textureDescriptions, result.stringConstants, needsAuxOutput);
   }
 }

@@ -1461,7 +1461,6 @@ cleanup:
     };
 
     bool needsAuxOutput = bool(aovMask & (1 << int(GiAovId::Albedo)));
-    s_shaderGen->setAuxiliaryOutputEnabled(needsAuxOutput);
 
     // Create per-material hit shaders.
     {
@@ -1481,7 +1480,7 @@ cleanup:
         }
 
         GiGlslShaderGen::MaterialGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialInfo(*material->mcMat, genInfo))
+        if (!s_shaderGen->generateMaterialInfo(*material->mcMat, genInfo, needsAuxOutput))
         {
           GB_ERROR("failed to generate code for material {}", material->name);
           threadWorkFailed = true;
