@@ -113,8 +113,7 @@ struct DiskLight
   GI_FLOAT padding;
 };
 
-const GI_UINT BLAS_PAYLOAD_BITFLAG_FLIP_FACING = (1 << 0);
-const GI_UINT BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED = (1 << 1);
+const GI_UINT BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED = (1 << 0);
 
 struct BlasPayload
 {

@@ -46,7 +46,6 @@ TF_DEFINE_PRIVATE_TOKENS(
   (tangents)
   (tangentSigns)
   (bitangentSigns)
-  (leftHanded)
 );
 
 namespace
@@ -848,7 +847,7 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
   HdMeshUtil meshUtil(&topology, id);
 
   VtIntArray primitiveParams;
-  meshUtil.ComputeTriangleIndices(&faces, &primitiveParams);
+  meshUtil.ComputeTriangleIndices(&faces, &primitiveParams); // normalizes winding order to right-handed
   auto faceCount = uint32_t(faces.size());
 
   // Points (required; vertex interpolation)
@@ -1083,9 +1082,6 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
   }
 
   // Create submeshes
-  TfToken orientation = topology.GetOrientation();
-  bool isLeftHanded = (orientation == _tokens->leftHanded);
-
   auto createMesh = [&](const SubMeshData& subMesh) -> GiMesh* {
     if (subMesh.maxFaceId == -1)
     {
@@ -1098,7 +1094,6 @@ void HdGatlingMesh::_CreateGiMeshes(HdSceneDelegate* sceneDelegate)
       .faceIds = subMesh.faceIds,
       .id = GetPrimId(),
       .isDoubleSided = IsDoubleSided(sceneDelegate),
-      .isLeftHanded = isLeftHanded,
       .name = id.GetText(),
       .maxFaceId = (uint32_t) subMesh.maxFaceId,
       .primvars = secondaryPrimvars,

@@ -144,7 +144,6 @@ namespace gtl
     GiCullMode cullMode;
     glm::mat3x4 transform;
     bool doubleSided;
-    bool flipFacing;
     int id;
     std::vector<glm::mat3x4> instanceTransforms;
     std::vector<int> instanceIds;
@@ -649,7 +648,6 @@ fail:
       .cullMode = desc.cullMode,
       .transform = glm::mat3x4(1.0f),
       .doubleSided = desc.isDoubleSided,
-      .flipFacing = desc.isLeftHanded,
       .id = desc.id,
       .scene = scene,
       .cpuData = giProcessMeshData(desc.faces, desc.faceIds, desc.vertices, desc.primvars),
@@ -1181,10 +1179,6 @@ fail:
           }
 
           uint32_t bitfield = 0;
-          if (mesh->flipFacing)
-          {
-            bitfield |= rp::BLAS_PAYLOAD_BITFLAG_FLIP_FACING;
-          }
           if (mesh->doubleSided)
           {
             bitfield |= rp::BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED;

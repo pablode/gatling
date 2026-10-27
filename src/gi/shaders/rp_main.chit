@@ -148,7 +148,6 @@ void main()
     /* 1. Set up shading state. */
     vec2 hit_bc = baryCoord;
     BlasPayload payload = blas_payloads[gl_InstanceCustomIndexEXT];
-    bool isLeftHanded = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_FLIP_FACING) != 0);
     bool isDoubleSided = ((payload.bitfield & BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED) != 0);
 
     State shading_state; // Shading_state_material
@@ -368,11 +367,6 @@ void main()
     /* 5. Add Emission */
 #ifdef IS_EMISSIVE
     {
-        if (isDoubleSided)
-        {
-            shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0); // account for geometry flip
-        }
-
         Edf_evaluate_data edf_evaluate_data;
         edf_evaluate_data.k1 = -gl_WorldRayDirectionEXT;
         edf_evaluate_data.pdf = 0.0;
@@ -409,11 +403,6 @@ void main()
             emission_intensity *= exp2(ubo.sensorExposure);
 
             radiance += throughput * edf_evaluate_data.edf * emission_intensity;
-        }
-
-        if (isDoubleSided)
-        {
-            shading_state.geom_normal *= (isLeftHanded ? -1.0 : 1.0);
         }
     }
 #endif

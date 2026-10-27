@@ -144,7 +144,6 @@ namespace gtl
     const std::vector<int>&           faceIds;
     int                               id;
     bool                              isDoubleSided;
-    bool                              isLeftHanded;
     const char*                       name;
     uint32_t                          maxFaceId;
     const std::vector<GiPrimvarData>& primvars;
