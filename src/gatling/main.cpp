@@ -193,7 +193,7 @@ int main(int argc, const char* argv[])
   HdRprimCollection renderCollection(HdTokens->geometry, HdReprSelector(HdReprTokens->refined));
   HdRenderPassSharedPtr renderPass = renderDelegate->CreateRenderPass(renderIndex, renderCollection);
 
-  TfTokenVector renderTags(1, HdRenderTagTokens->geometry);
+  TfTokenVector renderTags{ HdRenderTagTokens->geometry, HdRenderTagTokens->render };
   auto renderTask = std::make_shared<SimpleRenderTask>(renderPass, renderPassState, renderTags);
 
   HdTaskSharedPtrVector tasks;

@@ -107,7 +107,7 @@ namespace
   private:
     HdRenderPassSharedPtr m_renderPass;
     HdRenderPassStateSharedPtr m_renderPassState;
-    const TfTokenVector m_renderTags = TfTokenVector(1, HdRenderTagTokens->geometry);
+    const TfTokenVector m_renderTags = TfTokenVector{ HdRenderTagTokens->geometry, HdRenderTagTokens->render };
 
   public:
     _SimpleRenderTask(const HdRenderPassSharedPtr& renderPass, const HdRenderPassStateSharedPtr& renderPassState)
