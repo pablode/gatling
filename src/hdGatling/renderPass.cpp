@@ -77,13 +77,22 @@ namespace
         continue;
       }
 
-      auto valueType = HdGetValueTupleType(binding.clearValue).type;
-      size_t valueSize = HdDataSizeOfType(valueType);
-      const void* valuePtr = HdGetValueData(binding.clearValue);
+      std::array<uint8_t, GI_MAX_AOV_COMP_SIZE> clearValue;
+      clearValue.fill(0);
+
+      if (!binding.clearValue.IsEmpty())
+      {
+        auto valueType = HdGetValueTupleType(binding.clearValue).type;
+        size_t valueSize = HdDataSizeOfType(valueType);
+        if (valueSize > 0)
+        {
+          memcpy(clearValue.data(), HdGetValueData(binding.clearValue), valueSize);
+        }
+      }
 
       GiAovBinding b;
       b.aovId = it->second;
-      memcpy(&b.clearValue[0], valuePtr, valueSize);
+      memcpy(&b.clearValue[0], clearValue.data(), clearValue.size());
       b.renderBuffer = renderBuffer->GetGiRenderBuffer();
 
       result.push_back(b);
