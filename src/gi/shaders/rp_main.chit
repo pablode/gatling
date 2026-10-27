@@ -159,6 +159,15 @@ void main()
     // https://github.com/NVIDIA/MDL-SDK/blob/aa9642b2546ad7b6236b5627385d882c2ed83c5d/examples/mdl_sdk/dxr/content/mdl_hit_programs.hlsl#L411
     const vec3 normal = shading_state.normal;
 
+    // Evaluate the pre-normal expressions (e.g. texture results).
+    // Note that the init functions overwrite the state, so any other *_init
+    // call (e.g. for emission) requires a re-init before using the BSDF.
+    mdl_bsdf_scattering_init(shading_state);
+#if !defined(IS_EMISSIVE)
+    vec3 bsdfNormal = shading_state.normal;
+#endif
+    shading_state.normal = normal;
+
     uint bounce = (rayPayload.bitfield & SHADE_RAY_PAYLOAD_BOUNCES_MASK);
 
     /* 2. Evaluate non-cutout opacity */
@@ -206,6 +215,10 @@ void main()
     thinWalled = mdl_thin_walled(shading_state);
 #endif
 
+#if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
+    bool isBackface = !isDoubleSided && thinWalled && !isFrontFace;
+#endif
+
     vec3 prevMediumIor = vec3(1.0);
     vec3 nextMediumIor = vec3(1.0);
 
@@ -239,6 +252,15 @@ void main()
 
         throughput *= transmittance;
     }
+
+#if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF) && !defined(IS_EMISSIVE)
+    if (isBackface)
+    {
+        mdl_backface_bsdf_scattering_init(shading_state);
+        bsdfNormal = shading_state.normal;
+        shading_state.normal = normal;
+    }
+#endif
 
     const vec3 iorCurrent = (isFrontFace || thinWalled) ? prevMediumIor : vec3(BSDF_USE_MATERIAL_IOR);
     const vec3 iorOther = (isFrontFace || thinWalled) ? vec3(BSDF_USE_MATERIAL_IOR) : nextMediumIor;
@@ -313,9 +335,16 @@ void main()
         bsdf_aux_data.ior2 = iorOther;
         bsdf_aux_data.k1 = -gl_WorldRayDirectionEXT;
 
+        // The state has already been pre-evaluated (see above), so the auxiliary function can
+        // be called directly. The backface path was initialized before the volume pass,
+        // unless the material is emissive, in which case the init is done here.
 #if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
-        if (!isDoubleSided && thinWalled && !isFrontFace)
+        if (isBackface)
         {
+#if defined(IS_EMISSIVE)
+            mdl_backface_bsdf_scattering_init(shading_state);
+            shading_state.normal = normal;
+#endif
             mdl_backface_bsdf_scattering_auxiliary(bsdf_aux_data, shading_state);
         }
         else
@@ -389,20 +418,22 @@ void main()
     }
 #endif
 
-    // reassign normal, see declaration of variable.
-    shading_state.normal = normal;
-
-    // init once and share between *_evaluate and *_sample calls
+#if defined(IS_EMISSIVE)
 #if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
-    if (!isDoubleSided && thinWalled && !isFrontFace)
+    if (isBackface)
     {
+        shading_state.normal = normal;
         mdl_backface_bsdf_scattering_init(shading_state);
     }
     else
 #endif
     {
+        shading_state.normal = normal;
         mdl_bsdf_scattering_init(shading_state);
     }
+#else
+    shading_state.normal = bsdfNormal;
+#endif
 
     /* 6. BSDF importance sampling. */
 #ifdef NEXT_EVENT_ESTIMATION
@@ -422,7 +453,7 @@ void main()
 #endif
 
 #if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
-        if (!isDoubleSided && thinWalled && !isFrontFace)
+        if (isBackface)
         {
             mdl_backface_bsdf_scattering_sample(bsdf_sample_data, shading_state);
         }
@@ -447,9 +478,6 @@ void main()
     /* 7. NEE light sampling */
 #ifdef NEXT_EVENT_ESTIMATION
     {
-        // reassign normal, see declaration of variable.
-        shading_state.normal = normal;
-
         // Sample light source
 #ifdef RAND_4D
         vec4 k4 = rng4d_next4f(rayPayload.rng_state);
@@ -475,7 +503,7 @@ void main()
             bsdf_eval_data.k2 = dirToLight;
 
 #if defined(IS_THIN_WALLED) && defined(HAS_BACKFACE_BSDF)
-            if (!isDoubleSided && thinWalled && !isFrontFace)
+            if (isBackface)
             {
                 mdl_backface_bsdf_scattering_evaluate(bsdf_eval_data, shading_state);
             }
