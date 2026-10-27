@@ -618,6 +618,9 @@ TEST_SUITE("Graphical")
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.Dome")
   {
   }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.DomeColor")
+  {
+  }
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Lux.Rect")
   {
   }
