@@ -164,11 +164,13 @@ int main(int argc, const char* argv[])
   }
 
   // Set up rendering context.
-  HdRenderBuffer* renderBuffer = (HdRenderBuffer*) renderDelegate->CreateFallbackBprim(HdPrimTypeTokens->renderBuffer);
-  renderBuffer->Allocate(GfVec3i(settings.imageWidth, settings.imageHeight, 1), HdFormatFloat32Vec4, false);
+  const TfToken aovName(settings.aov);
+  const HdAovDescriptor aovDesc = renderDelegate->GetDefaultAovDescriptor(aovName);
+  HdRenderBuffer* renderBuffer = (HdRenderBuffer*)renderDelegate->CreateFallbackBprim(HdPrimTypeTokens->renderBuffer);
+  renderBuffer->Allocate(GfVec3i(settings.imageWidth, settings.imageHeight, 1), aovDesc.format, aovDesc.multiSampled);
 
   HdRenderPassAovBindingVector aovBindings(1);
-  aovBindings[0].aovName = TfToken(settings.aov);
+  aovBindings[0].aovName = aovName;
   aovBindings[0].renderBuffer = renderBuffer;
 
   CameraUtilFraming framing;
@@ -216,15 +218,51 @@ int main(int argc, const char* argv[])
   float* mappedMem = (float*) renderBuffer->Map();
   TF_AXIOM(mappedMem);
 
+  HdFormat format = renderBuffer->GetFormat();
+  int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
+
   if (settings.gammaCorrection)
   {
-    int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
+    if (aovName == HdAovTokens->color && format == HdFormatFloat32Vec4)
+    {
+      for (int i = 0; i < pixelCount; i++)
+      {
+        mappedMem[i * 4 + 0] = _AccurateLinearToSrgb(mappedMem[i * 4 + 0]);
+        mappedMem[i * 4 + 1] = _AccurateLinearToSrgb(mappedMem[i * 4 + 1]);
+        mappedMem[i * 4 + 2] = _AccurateLinearToSrgb(mappedMem[i * 4 + 2]);
+      }
+    }
+    else
+    {
+      printf("Warning: gamma correction not applicable\n");
+      fflush(stdout);
+    }
+  }
+
+  // Image writer doesn't support all render buffer formats, so convert formats appropriately.
+  HioFormat storageFormat = HioFormat::HioFormatFloat32Vec4;
+  std::vector<float> idMem;
+  const void* imageMem = mappedMem;
+
+  if (format == HdFormatFloat32)
+  {
+    storageFormat = HioFormat::HioFormatFloat32;
+  }
+  else if (format == HdFormatInt32)
+  {
+    const int* intMem = (const int*) mappedMem;
+    idMem.resize(size_t(pixelCount) * 4);
+
     for (int i = 0; i < pixelCount; i++)
     {
-      mappedMem[i * 4 + 0] = _AccurateLinearToSrgb(mappedMem[i * 4 + 0]);
-      mappedMem[i * 4 + 1] = _AccurateLinearToSrgb(mappedMem[i * 4 + 1]);
-      mappedMem[i * 4 + 2] = _AccurateLinearToSrgb(mappedMem[i * 4 + 2]);
+      int value = intMem[i];
+      idMem[i * 4 + 0] = float((value >> 0) & 0xFF) / 255.0f;
+      idMem[i * 4 + 1] = float((value >> 8) & 0xFF) / 255.0f;
+      idMem[i * 4 + 2] = float((value >> 16) & 0xFF) / 255.0f;
+      idMem[i * 4 + 3] = 1.0f;
     }
+
+    imageMem = idMem.data();
   }
 
   // Write image to file.
@@ -243,9 +281,9 @@ int main(int argc, const char* argv[])
   storage.width = (int) renderBuffer->GetWidth();
   storage.height = (int) renderBuffer->GetHeight();
   storage.depth = (int) renderBuffer->GetDepth();
-  storage.format = HioFormat::HioFormatFloat32Vec4;
+  storage.format = storageFormat;
   storage.flipped = true;
-  storage.data = mappedMem;
+  storage.data = (void*) imageMem;
 
   VtDictionary metadata;
   image->Write(storage, metadata);
