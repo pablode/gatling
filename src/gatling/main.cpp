@@ -165,7 +165,8 @@ int main(int argc, const char* argv[])
 
   // Set up rendering context.
   HdRenderBuffer* renderBuffer = (HdRenderBuffer*) renderDelegate->CreateFallbackBprim(HdPrimTypeTokens->renderBuffer);
-  renderBuffer->Allocate(GfVec3i(settings.imageWidth, settings.imageHeight, 1), HdFormatFloat32Vec4, false);
+  const HdAovDescriptor aovDesc = renderDelegate->GetDefaultAovDescriptor(TfToken(settings.aov));
+  renderBuffer->Allocate(GfVec3i(settings.imageWidth, settings.imageHeight, 1), aovDesc.format, aovDesc.multiSampled);
 
   HdRenderPassAovBindingVector aovBindings(1);
   aovBindings[0].aovName = TfToken(settings.aov);
@@ -216,15 +217,46 @@ int main(int argc, const char* argv[])
   float* mappedMem = (float*) renderBuffer->Map();
   TF_AXIOM(mappedMem);
 
-  if (settings.gammaCorrection)
+  const HdFormat format = renderBuffer->GetFormat();
+  const int compCount = HdGetComponentCount(format);
+  const bool isInt = (format == HdFormatInt32);
+  const int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
+
+  if (settings.gammaCorrection && format == HdFormatFloat32Vec4)
   {
-    int pixelCount = renderBuffer->GetWidth() * renderBuffer->GetHeight();
     for (int i = 0; i < pixelCount; i++)
     {
       mappedMem[i * 4 + 0] = _AccurateLinearToSrgb(mappedMem[i * 4 + 0]);
       mappedMem[i * 4 + 1] = _AccurateLinearToSrgb(mappedMem[i * 4 + 1]);
       mappedMem[i * 4 + 2] = _AccurateLinearToSrgb(mappedMem[i * 4 + 2]);
     }
+  }
+
+  std::vector<float> expandedMem;
+  const void* imageMem = mappedMem;
+  if (format != HdFormatFloat32Vec4)
+  {
+    expandedMem.resize(size_t(pixelCount) * 4);
+    for (int i = 0; i < pixelCount; i++)
+    {
+      if (isInt)
+      {
+        const int* intMem = (const int*) mappedMem;
+        const int value = intMem[i * compCount];
+        expandedMem[i * 4 + 0] = float((value >> 0) & 0xFF) / 255.0f;
+        expandedMem[i * 4 + 1] = float((value >> 8) & 0xFF) / 255.0f;
+        expandedMem[i * 4 + 2] = float((value >> 16) & 0xFF) / 255.0f;
+      }
+      else
+      {
+        for (int c = 0; c < 4; c++)
+        {
+          expandedMem[i * 4 + c] = mappedMem[i * compCount + (c < compCount ? c : compCount - 1)];
+        }
+      }
+      expandedMem[i * 4 + 3] = 1.0f;
+    }
+    imageMem = expandedMem.data();
   }
 
   // Write image to file.
@@ -245,7 +277,7 @@ int main(int argc, const char* argv[])
   storage.depth = (int) renderBuffer->GetDepth();
   storage.format = HioFormat::HioFormatFloat32Vec4;
   storage.flipped = true;
-  storage.data = mappedMem;
+  storage.data = (void*) imageMem;
 
   VtDictionary metadata;
   image->Write(storage, metadata);
