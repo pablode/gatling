@@ -284,7 +284,7 @@ void main()
         // Correct clip plane curving by getting the hypothenuse length (our current ray)
         // from the adjacent edge (the forward vector) the angle between both.
         float cosConeAngle = max(1e-5, dot(ray_dir, ubo.cameraForward.xyz));
-        vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked) / cosConeAngle;
+        vec2 clipRange = vec2(ubo.clipStart, ubo.clipEnd) / cosConeAngle;
 
         // Path trace
         uint rrBounceOffset = ubo.maxBouncesAndRrBounceOffset & 0xFFFFu;

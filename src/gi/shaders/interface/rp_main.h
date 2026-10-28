@@ -50,11 +50,18 @@ struct UniformData
   GI_UINT  maxBouncesAndRrBounceOffset;
   GI_FLOAT rrInvMinTermProb;
   GI_FLOAT lightIntensityMultiplier;
-  GI_UINT  clipRangePacked;
+  GI_FLOAT clipStart;
+  GI_FLOAT clipEnd;
   GI_FLOAT sensorExposure;
   GI_FLOAT frame;
   GI_FLOAT time;
+  GI_FLOAT padding0;
+  GI_FLOAT padding1;
+  GI_FLOAT padding2;
 };
+#ifdef __cplusplus
+static_assert((sizeof(UniformData) % 16) == 0);
+#endif
 
 struct FVertex
 {

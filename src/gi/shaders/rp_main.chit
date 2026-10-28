@@ -292,7 +292,7 @@ void main()
         ObjectIdAov[pixelIndex] = objectId;
 #endif
 #if (AOV_MASK & AOV_BIT_DEPTH) != 0
-        vec2 clipRange = unpackHalf2x16(ubo.clipRangePacked);
+        vec2 clipRange = vec2(ubo.clipStart, ubo.clipEnd);
         float logDepth = 2.0 * log(gl_HitTEXT / clipRange.x) / log(clipRange.y / clipRange.x) - 1.0;
         DepthAov[pixelIndex] = logDepth;
 #endif
