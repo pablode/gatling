@@ -121,12 +121,12 @@ namespace gtl
     VmaAllocator                allocator;
     VmaPool                     asScratchMemoryPool;
     VkQueue                     computeQueue;
-    VkCommandPool               commandPool;
     CgpuDeviceFeatures          features;
     CgpuIDeviceFeatures         internalFeatures;
     CgpuIDeviceProperties       internalProperties;
     VkDevice                    logicalDevice;
     VkPhysicalDevice            physicalDevice;
+    uint32_t                    queueFamilyIndex;
     VkPipelineCache             pipelineCache;
     std::unique_ptr<std::mutex> pipelineCacheMutex;
     CgpuDeviceProperties        properties;
@@ -197,7 +197,14 @@ namespace gtl
   struct CgpuICommandBuffer
   {
     VkCommandBuffer commandBuffer;
-    CgpuPipeline pipeline;
+    CgpuPipeline pipeline; // TODO: store it here?
+  };
+
+  struct CgpuICommandPool
+  {
+    VkCommandPool commandPool;
+    CgpuICommandBuffer* commandBuffers; // heap pointer, stable
+    uint32_t nextIndex;
   };
 
   struct CgpuIBlas
@@ -239,7 +246,7 @@ namespace gtl
     GbLinearDataStore<CgpuIShader, 32> ishaderStore;
     GbLinearDataStore<CgpuIPipeline, 8> ipipelineStore;
     GbLinearDataStore<CgpuISemaphore, 16> isemaphoreStore;
-    GbLinearDataStore<CgpuICommandBuffer, 16> icommandBufferStore;
+    GbLinearDataStore<CgpuICommandPool, 16> icommandPoolStore;
     GbLinearDataStore<CgpuISampler, 8> isamplerStore;
     GbLinearDataStore<CgpuIBlas, 1024> iblasStore;
     GbLinearDataStore<CgpuITlas, 1> itlasStore;
@@ -288,11 +295,17 @@ namespace gtl
   CGPU_RESOLVE_HANDLE(       Shader,        CgpuShader,        CgpuIShader,        ishaderStore)
   CGPU_RESOLVE_HANDLE(     Pipeline,      CgpuPipeline,      CgpuIPipeline,      ipipelineStore)
   CGPU_RESOLVE_HANDLE(    Semaphore,     CgpuSemaphore,     CgpuISemaphore,     isemaphoreStore)
-  CGPU_RESOLVE_HANDLE(CommandBuffer, CgpuCommandBuffer, CgpuICommandBuffer, icommandBufferStore)
+  CGPU_RESOLVE_HANDLE(  CommandPool,   CgpuCommandPool,   CgpuICommandPool,   icommandPoolStore)
   CGPU_RESOLVE_HANDLE(      Sampler,       CgpuSampler,       CgpuISampler,       isamplerStore)
   CGPU_RESOLVE_HANDLE(         Blas,          CgpuBlas,          CgpuIBlas,          iblasStore)
   CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,          itlasStore)
   CGPU_RESOLVE_HANDLE(      BindSet,       CgpuBindSet,       CgpuIBindSet,       ibindSetStore)
+
+  CGPU_INLINE static bool cgpuResolveCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer handle, CgpuICommandBuffer** idata) \
+  {                                                                                                                        \
+    *idata = (CgpuICommandBuffer*) handle.handle;                                                                          \
+    return bool(idata);                                                                                                    \
+  }
 
 #define CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, ITYPE, RESOLVE_FUNC) \
   ITYPE* VAR_NAME;                                                       \
@@ -305,11 +318,12 @@ namespace gtl
 #define CGPU_RESOLVE_SHADER(CTX, HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIShader, cgpuResolveShader)
 #define CGPU_RESOLVE_PIPELINE(CTX, HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIPipeline, cgpuResolvePipeline)
 #define CGPU_RESOLVE_SEMAPHORE(CTX, HANDLE, VAR_NAME)      CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuISemaphore, cgpuResolveSemaphore)
-#define CGPU_RESOLVE_COMMAND_BUFFER(CTX, HANDLE, VAR_NAME) CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuICommandBuffer, cgpuResolveCommandBuffer)
+#define CGPU_RESOLVE_COMMAND_POOL(CTX, HANDLE, VAR_NAME)   CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuICommandPool, cgpuResolveCommandPool)
 #define CGPU_RESOLVE_SAMPLER(CTX, HANDLE, VAR_NAME)        CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuISampler, cgpuResolveSampler)
 #define CGPU_RESOLVE_BLAS(CTX, HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBlas, cgpuResolveBlas)
 #define CGPU_RESOLVE_TLAS(CTX, HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
 #define CGPU_RESOLVE_BIND_SET(CTX, HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBindSet, cgpuResolveBindSet)
+#define CGPU_RESOLVE_COMMAND_BUFFER(CTX, HANDLE, VAR_NAME) CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuICommandBuffer, cgpuResolveCommandBuffer)
 
   /* Helper methods */
 
@@ -1094,32 +1108,14 @@ namespace gtl
 
     volkLoadDeviceTable(&idevice->table, idevice->logicalDevice);
 
+    idevice->queueFamilyIndex = candidate.queueFamilyIndex;
+
     idevice->table.vkGetDeviceQueue(
       idevice->logicalDevice,
-      candidate.queueFamilyIndex,
+      idevice->queueFamilyIndex,
       0,
       &idevice->computeQueue
     );
-
-    VkCommandPoolCreateInfo poolCreateInfo = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .pNext = nullptr,
-      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = candidate.queueFamilyIndex,
-    };
-
-    result = idevice->table.vkCreateCommandPool(
-      idevice->logicalDevice,
-      &poolCreateInfo,
-      nullptr,
-      &idevice->commandPool
-    );
-
-    if (result != VK_SUCCESS)
-    {
-      idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
-      CGPU_RETURN_ERROR("failed to create command pool");
-    }
 
     VmaVulkanFunctions vmaVulkanFunctions = {
       .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
@@ -1175,7 +1171,6 @@ namespace gtl
 
     if (result != VK_SUCCESS)
     {
-      idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
       CGPU_RETURN_ERROR("failed to create vma allocator");
@@ -1196,7 +1191,6 @@ namespace gtl
     if (result != VK_SUCCESS)
     {
       vmaDestroyAllocator(idevice->allocator);
-      idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
       idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
 
       CGPU_RETURN_ERROR("failed to create AS scratch memory pool");
@@ -1241,8 +1235,6 @@ namespace gtl
     {
       idevice->table.vkDestroyPipelineCache(idevice->logicalDevice, idevice->pipelineCache, nullptr);
     }
-
-    idevice->table.vkDestroyCommandPool(idevice->logicalDevice, idevice->commandPool, nullptr);
 
     vmaDestroyAllocator(idevice->allocator);
 
@@ -2219,13 +2211,13 @@ namespace gtl
 
     memcpy(istagingBuffer.cpuPtr, data, size);
 
-    CgpuCommandBuffer commandBuffer;
-    cgpuCreateCommandBuffer(ctx, &commandBuffer);
+    CgpuCommandPool commandPool = cgpuCreateCommandPool(ctx);
+    cgpuResetCommandPool(ctx, commandPool);
 
-    cgpuBeginCommandBuffer(ctx, commandBuffer);
+    CgpuCommandBuffer commandBuffer = cgpuBeginCommandBuffer(ctx, commandPool);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
 
     CGPU_RESOLVE_BUFFER(ctx, dstBuffer, idstBuffer);
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
 
     VkBufferCopy region = { 0, 0, size };
     idevice->table.vkCmdCopyBuffer(
@@ -2248,7 +2240,7 @@ namespace gtl
     cgpuWaitSemaphores(ctx, 1, &waitSemaphoreInfo);
 
     cgpuDestroySemaphore(ctx, semaphore);
-    cgpuDestroyCommandBuffer(ctx, commandBuffer);
+    cgpuDestroyCommandPool(ctx, commandPool);
 
     cgpuDestroyIBuffer(idevice, &istagingBuffer);
 
@@ -2684,20 +2676,13 @@ namespace gtl
 
     const VkAccelerationStructureBuildRangeInfoKHR* asBuildRangeInfoPtr = &asBuildRangeInfo;
 
-    CgpuCommandBuffer commandBuffer;
-    if (!cgpuCreateCommandBuffer(ctx, &commandBuffer))
-    {
-      cgpuDestroyIBuffer(idevice, iasBuffer);
-      cgpuDestroyIBuffer(idevice, &iscratchBuffer);
-      idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, *as, nullptr);
-      CGPU_RETURN_ERROR("failed to create AS build command buffer");
-    }
+    CgpuCommandPool commandPool = cgpuCreateCommandPool(ctx);
+    cgpuResetCommandPool(ctx, commandPool);
 
-    CgpuICommandBuffer* icommandBuffer;
-    cgpuResolveCommandBuffer(ctx, commandBuffer, &icommandBuffer);
+    CgpuCommandBuffer commandBuffer = cgpuBeginCommandBuffer(ctx, commandPool);
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
 
     // Build AS on device
-    cgpuBeginCommandBuffer(ctx, commandBuffer);
     idevice->table.vkCmdBuildAccelerationStructuresKHR(icommandBuffer->commandBuffer, 1, &asBuildGeomInfo, &asBuildRangeInfoPtr);
     cgpuEndCommandBuffer(ctx, commandBuffer);
 
@@ -2707,6 +2692,7 @@ namespace gtl
       cgpuDestroyIBuffer(idevice, iasBuffer);
       cgpuDestroyIBuffer(idevice, &iscratchBuffer);
       idevice->table.vkDestroyAccelerationStructureKHR(idevice->logicalDevice, *as, nullptr);
+      cgpuDestroyCommandPool(ctx, commandPool);
       CGPU_RETURN_ERROR("failed to create AS build semaphore");
     }
 
@@ -2717,7 +2703,7 @@ namespace gtl
 
     // Dispose resources
     cgpuDestroySemaphore(ctx, semaphore);
-    cgpuDestroyCommandBuffer(ctx, commandBuffer);
+    cgpuDestroyCommandPool(ctx, commandPool);
     cgpuDestroyIBuffer(idevice, &iscratchBuffer);
 
     return true;
@@ -3122,70 +3108,129 @@ namespace gtl
     );
   }
 
-  bool cgpuCreateCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer* commandBuffer)
+  CgpuCommandPool cgpuCreateCommandPool(CgpuContext* ctx)
   {
     CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = ctx->icommandBufferStore.allocate();
+    uint64_t handle = ctx->icommandPoolStore.allocate();
 
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, { handle }, icommandBuffer);
+    CGPU_RESOLVE_COMMAND_POOL(ctx, { handle }, icommandPool);
 
-    VkCommandBufferAllocateInfo cmdbufAllocInfo = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    VkCommandPoolCreateInfo createInfo = {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = nullptr,
-      .commandPool = idevice->commandPool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1,
+      .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+      .queueFamilyIndex = idevice->queueFamilyIndex
     };
 
-    VkResult result = idevice->table.vkAllocateCommandBuffers(
+    CGPU_VK_CHK(idevice->table.vkCreateCommandPool(
       idevice->logicalDevice,
-      &cmdbufAllocInfo,
-      &icommandBuffer->commandBuffer
-    );
-    CGPU_VK_CHK(result, "failed to allocate command buffer");
+      &createInfo,
+      nullptr,
+      &icommandPool->commandPool
+    ), "failed to create command pool");
 
-    commandBuffer->handle = handle;
-    return true;
+    icommandPool->commandBuffers = (CgpuICommandBuffer*) malloc(sizeof(CgpuICommandBuffer) * CGPU_COMMAND_POOL_SIZE);
+
+    VkCommandBufferAllocateInfo bufferAllocateInfo = {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .pNext = nullptr,
+      .commandPool = icommandPool->commandPool,
+      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = CGPU_COMMAND_POOL_SIZE
+    };
+
+    VkCommandBuffer bufferHandles[CGPU_COMMAND_POOL_SIZE];
+    CGPU_VK_CHK(idevice->table.vkAllocateCommandBuffers(
+      idevice->logicalDevice,
+      &bufferAllocateInfo,
+      bufferHandles
+    ), "failed to allocate command buffer");
+
+    for (uint32_t i = 0; i < CGPU_COMMAND_POOL_SIZE; i++)
+    {
+      CgpuICommandBuffer* commandBuffer = &icommandPool->commandBuffers[i];
+      commandBuffer->commandBuffer = bufferHandles[i];
+    }
+
+    return { handle };
   }
 
-  void cgpuDestroyCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
+  void cgpuDestroyCommandPool(CgpuContext* ctx, CgpuCommandPool commandPool)
   {
+    CGPU_RESOLVE_COMMAND_POOL(ctx, commandPool, icommandPool);
     CgpuIDevice* idevice = &ctx->idevice;
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+
+    VkCommandBuffer bufferHandles[CGPU_COMMAND_POOL_SIZE];
+    for (uint32_t i = 0; i < CGPU_COMMAND_POOL_SIZE; i++)
+    {
+      const CgpuICommandBuffer* commandBuffer = &icommandPool->commandBuffers[i];
+      bufferHandles[i] = commandBuffer->commandBuffer;
+    }
 
     idevice->table.vkFreeCommandBuffers(
       idevice->logicalDevice,
-      idevice->commandPool,
-      1,
-      &icommandBuffer->commandBuffer
+      icommandPool->commandPool,
+      CGPU_COMMAND_POOL_SIZE,
+      bufferHandles
     );
 
-    ctx->icommandBufferStore.free(commandBuffer.handle);
+    free(icommandPool->commandBuffers);
+
+    idevice->table.vkDestroyCommandPool(idevice->logicalDevice, icommandPool->commandPool, nullptr);
+
+    ctx->icommandPoolStore.free(commandPool.handle);
   }
 
-  bool cgpuBeginCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
+  void cgpuResetCommandPool(CgpuContext* ctx, CgpuCommandPool commandPool)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_COMMAND_POOL(ctx, commandPool, icommandPool);
     CgpuIDevice* idevice = &ctx->idevice;
+
+    icommandPool->nextIndex = 0;
+
+    VkCommandPoolResetFlags flags = 0;
+    CGPU_VK_CHK(
+      idevice->table.vkResetCommandPool(idevice->logicalDevice, icommandPool->commandPool, flags),
+      "command pool reset failed"
+    );
+  }
+
+  CgpuCommandBuffer cgpuBeginCommandBuffer(CgpuContext* ctx, CgpuCommandPool commandPool)
+  {
+    CGPU_RESOLVE_COMMAND_POOL(ctx, commandPool, icommandPool);
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    if (icommandPool->nextIndex >= CGPU_COMMAND_POOL_SIZE)
+    {
+      GB_FATAL("command pool exhausted"); // must be avoided by user space
+    }
+
+    CgpuICommandBuffer* icommandBuffer = &icommandPool->commandBuffers[icommandPool->nextIndex++];
 
     VkCommandBufferBeginInfo beginInfo = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
       .pNext = nullptr,
-      .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
+      .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
       .pInheritanceInfo = nullptr,
     };
 
-    VkResult result = idevice->table.vkBeginCommandBuffer(
+    CGPU_VK_CHK(idevice->table.vkBeginCommandBuffer(
       icommandBuffer->commandBuffer,
       &beginInfo
-    );
+    ), "failed to begin command buffer");
 
-    if (result != VK_SUCCESS) {
-      CGPU_RETURN_ERROR("failed to begin command buffer");
-    }
+    icommandBuffer->pipeline = { 0 };
 
-    return true;
+    return { (uint64_t) icommandBuffer }; // special handle
+  }
+
+  void cgpuEndCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
+  {
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    idevice->table.vkEndCommandBuffer(icommandBuffer->commandBuffer);
   }
 
   void cgpuCmdBindPipeline(CgpuContext* ctx,
@@ -3637,14 +3682,6 @@ namespace gtl
     }
 
     idevice->table.vkCmdFillBuffer(icommandBuffer->commandBuffer, ibuffer->buffer, dstOffset, rangeSize, data);
-  }
-
-  void cgpuEndCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-    CgpuIDevice* idevice = &ctx->idevice;
-
-    idevice->table.vkEndCommandBuffer(icommandBuffer->commandBuffer);
   }
 
   bool cgpuCreateSemaphore(CgpuContext* ctx, CgpuSemaphore* semaphore, uint64_t initialValue)
