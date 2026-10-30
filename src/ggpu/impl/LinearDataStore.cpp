@@ -39,7 +39,7 @@ namespace gtl
   GgpuLinearDataStore::GgpuLinearDataStore(CgpuContext* ctx,
                                            GgpuStager& stager,
                                            GgpuDeleteQueue& deleteQueue,
-                                           uint64_t elementSize, 
+                                           uint64_t elementSize,
                                            uint32_t minCapacity)
     : m_ctx(ctx)
     , m_elementSize(elementSize)
@@ -114,20 +114,20 @@ namespace gtl
 
       bool result = false;
 
-      CgpuCommandBuffer commandBuffer;
-      CgpuSemaphore semaphore;
+      CgpuCommandPool commandPool = cgpuCreateCommandPool(m_ctx);
+      cgpuResetCommandPool(m_ctx, commandPool);
+      CgpuCommandBuffer commandBuffer = cgpuBeginCommandBuffer(m_ctx, commandPool);
+      CgpuSemaphore semaphore = {};
       CgpuSignalSemaphoreInfo signalSemaphoreInfo;
       CgpuWaitSemaphoreInfo waitSemaphoreInfo;
-      if (!cgpuCreateCommandBuffer(m_ctx, &commandBuffer))
-        goto cleanup;
 
-      if (!cgpuBeginCommandBuffer(m_ctx, commandBuffer))
-        goto cleanup;
+      bool commandBufferEnded = false;
 
       if (!m_buffer.resize(m_ctx, commandBuffer, newSize))
         goto cleanup;
 
       cgpuEndCommandBuffer(m_ctx, commandBuffer);
+      commandBufferEnded = true;
 
       if (!cgpuCreateSemaphore(m_ctx, &semaphore))
         goto cleanup;
@@ -142,8 +142,11 @@ namespace gtl
       result = true;
 
 cleanup:
-      if (commandBuffer.handle)
-        cgpuDestroyCommandBuffer(m_ctx, commandBuffer);
+      if (!commandBufferEnded)
+        cgpuEndCommandBuffer(m_ctx, commandBuffer);
+
+      cgpuDestroyCommandPool(m_ctx, commandPool);
+
       if (semaphore.handle)
         cgpuDestroySemaphore(m_ctx, semaphore);
 
