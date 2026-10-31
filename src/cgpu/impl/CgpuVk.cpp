@@ -76,7 +76,7 @@ namespace gtl
 
   constexpr static const uint32_t CGPU_INITIAL_PHYSICAL_DEVICE_COUNT = 4;
 
-  static const std::array<const char*, 14> CGPU_REQUIRED_EXTENSIONS = {
+  static const std::array<const char*, 15> CGPU_REQUIRED_EXTENSIONS = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -85,6 +85,7 @@ namespace gtl
     VK_KHR_SPIRV_1_4_EXTENSION_NAME, // required by VK_KHR_ray_tracing_pipeline
     VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME, // required by VK_KHR_spirv_1_4
     VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME,
+    VK_KHR_SHADER_UNTYPED_POINTERS_EXTENSION_NAME,
     VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
     VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME,
     VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
@@ -561,6 +562,7 @@ namespace gtl
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexing;
     VkPhysicalDeviceShaderFloat16Int8Features shaderFloat16Int8;
     VkPhysicalDevice16BitStorageFeatures storage16Bit;
+    VkPhysicalDeviceShaderUntypedPointersFeaturesKHR shaderUntypedPointers;
   };
 
   static void cgpuSetupDeviceFeatureChain(CgpuDeviceFeatureChain& chain,
@@ -687,9 +689,13 @@ namespace gtl
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES,
       .pNext = &chain.shaderFloat16Int8
     };
+    chain.shaderUntypedPointers = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_UNTYPED_POINTERS_FEATURES_KHR,
+      .pNext = &chain.storage16Bit
+    };
     chain.features2 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &chain.storage16Bit
+      .pNext = &chain.shaderUntypedPointers
     };
   }
 
@@ -876,6 +882,7 @@ namespace gtl
     CGPU_REQUIRE_FEATURE(descriptorIndexing, runtimeDescriptorArray);
     CGPU_REQUIRE_FEATURE(shaderFloat16Int8, shaderFloat16);
     CGPU_REQUIRE_FEATURE(storage16Bit, storageBuffer16BitAccess);
+    CGPU_REQUIRE_FEATURE(shaderUntypedPointers, shaderUntypedPointers);
     CGPU_REQUIRE_FEATURE(features2.features, shaderSampledImageArrayDynamicIndexing);
     CGPU_REQUIRE_FEATURE(features2.features, shaderInt16);
     CGPU_REQUIRE_FEATURE(features2.features, shaderInt64);
