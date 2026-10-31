@@ -510,7 +510,7 @@ fail:
       commandPool = {};
     }
     s_commandPoolIndex = 0;
-    if (s_texSampler.handle)
+    if (s_texSampler)
     {
       cgpuDestroySampler(s_ctx, s_texSampler);
       s_texSampler = {};
@@ -610,7 +610,7 @@ fail:
     {
       scene->texAllocator.free(gpuData.texOffsetAllocation);
     }
-    if (gpuData.closestHit.handle)
+    if (gpuData.closestHit)
     {
       cgpuDestroyShader(s_ctx, gpuData.closestHit);
     }
@@ -1223,13 +1223,13 @@ fail:
         if (false) // not executed in success case
         {
 fail_cleanup:
-          if (payloadBuffer.handle)
+          if (payloadBuffer)
             cgpuDestroyBuffer(s_ctx, payloadBuffer);
-          if (tmpPositionBuffer.handle)
+          if (tmpPositionBuffer)
             cgpuDestroyBuffer(s_ctx, tmpPositionBuffer);
-          if (tmpIndexBuffer.handle)
+          if (tmpIndexBuffer)
             cgpuDestroyBuffer(s_ctx, tmpIndexBuffer);
-          if (blas.handle)
+          if (blas)
             cgpuDestroyBlas(s_ctx, blas);
 
           continue;
@@ -1371,15 +1371,15 @@ cleanup:
     if (!bvh)
     {
       assert(false);
-      if (blasPayloadsBuffer.handle)
+      if (blasPayloadsBuffer)
       {
         cgpuDestroyBuffer(s_ctx, blasPayloadsBuffer);
       }
-      if (instanceIdsBuffer.handle)
+      if (instanceIdsBuffer)
       {
         cgpuDestroyBuffer(s_ctx, instanceIdsBuffer);
       }
-      if (tlas.handle)
+      if (tlas)
       {
         cgpuDestroyTlas(s_ctx, tlas);
       }
@@ -1978,11 +1978,11 @@ cleanup:
     // compilation errors is that we want shader hotloading to not bloat resource usage.
     if (!cache)
     {
-      if (textureInfoBuffer.handle)
+      if (textureInfoBuffer)
       {
         cgpuDestroyBuffer(s_ctx, textureInfoBuffer);
       }
-      if (rgenShader.handle)
+      if (rgenShader)
       {
         cgpuDestroyShader(s_ctx, rgenShader);
       }
@@ -1990,7 +1990,7 @@ cleanup:
       {
         cgpuDestroyShader(s_ctx, shader);
       }
-      if (pipeline.handle)
+      if (pipeline)
       {
         cgpuDestroyBindSets(s_ctx, bindSets.data(), (uint32_t) bindSets.size());
         cgpuDestroyPipeline(s_ctx, pipeline);
@@ -2165,7 +2165,7 @@ cleanup:
     {
       GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-      if (renderBuffer->deviceMem.handle)
+      if (renderBuffer->deviceMem)
       {
         continue;
       }
@@ -2233,7 +2233,7 @@ cleanup:
         {
           scene->texAllocator.free(gpuData.texOffsetAllocation);
         }
-        if (gpuData.closestHit.handle)
+        if (gpuData.closestHit)
         {
           cgpuDestroyShader(s_ctx, gpuData.closestHit);
         }
@@ -2297,7 +2297,7 @@ cleanup:
 
     if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyAovBindingDefaults))
     {
-      if (scene->aovDefaultValues.handle)
+      if (scene->aovDefaultValues)
       {
         s_deleteQueue->pushBack(scene->aovDefaultValues);
       }
@@ -2368,8 +2368,8 @@ cleanup:
     if (scene->domeLight != params.domeLight)
     {
       if (scene->domeLightTexture &&
-          scene->domeLightTexture->handle != scene->fallbackDomeLightTexture.handle &&
-          scene->domeLightTexture->handle != scene->uniformDomeLightTexture.handle)
+          *scene->domeLightTexture != scene->fallbackDomeLightTexture &&
+          *scene->domeLightTexture != scene->uniformDomeLightTexture)
       {
         // TODO: if we have multiple frames in flight, we need to wait for last frame's semaphore here
         scene->domeLightTexture.reset(); // frees memory immediately
@@ -2699,7 +2699,7 @@ cleanup:
     result = GiStatus::Ok;
 
 cleanup:
-    if (semaphore.handle)
+    if (semaphore)
       cgpuDestroySemaphore(s_ctx, semaphore);
 
     return result;
@@ -2757,7 +2757,7 @@ cleanup:
     {
       scene->domeLightTexture.reset();
     }
-    if (scene->aovDefaultValues.handle)
+    if (scene->aovDefaultValues)
     {
       cgpuDestroyBuffer(s_ctx, scene->aovDefaultValues);
     }
@@ -3209,11 +3209,11 @@ cleanup:
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    if (renderBuffer->deviceMem.handle)
+    if (renderBuffer->deviceMem)
     {
       s_deleteQueue->pushBack(renderBuffer->deviceMem);
     }
-    if (renderBuffer->hostMem.handle)
+    if (renderBuffer->hostMem)
     {
       s_deleteQueue->pushBack(renderBuffer->hostMem);
     }

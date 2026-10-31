@@ -2378,7 +2378,7 @@ namespace gtl
     {
       const CgpuRtHitGroup* hitGroup = &createInfo.hitGroups[i];
 
-      if (!hitGroup->closestHitShader.handle && !hitGroup->anyHitShader.handle)
+      if (!hitGroup->closestHitShader && !hitGroup->anyHitShader)
       {
         continue;
       }
@@ -2394,11 +2394,11 @@ namespace gtl
         .pShaderGroupCaptureReplayHandle = nullptr,
       };
 
-      if (hitGroup->closestHitShader.handle)
+      if (hitGroup->closestHitShader)
       {
         groupCreateInfo.closestHitShader = (hitShaderStageIndex++);
       }
-      if (hitGroup->anyHitShader.handle)
+      if (hitGroup->anyHitShader)
       {
         groupCreateInfo.anyHitShader = (hitShaderStageIndex++);
       }
@@ -2439,13 +2439,13 @@ namespace gtl
       for (uint32_t i = 0; i < createInfo.hitGroupCount; i++)
       {
         CgpuShader closestHitShader = createInfo.hitGroups[i].closestHitShader;
-        if (closestHitShader.handle)
+        if (closestHitShader)
         {
           libraries.push_back(getShaderPipelineHandle(closestHitShader));
         }
 
         CgpuShader anyHitShader = createInfo.hitGroups[i].anyHitShader;
-        if (anyHitShader.handle)
+        if (anyHitShader)
         {
           libraries.push_back(getShaderPipelineHandle(anyHitShader));
         }
@@ -2481,13 +2481,13 @@ namespace gtl
       {
         const CgpuRtHitGroup* hitGroup = &createInfo.hitGroups[i];
 
-        if (hitGroup->closestHitShader.handle)
+        if (hitGroup->closestHitShader)
         {
           CGPU_RESOLVE_SHADER(ctx, hitGroup->closestHitShader, iclosestHitShader);
           pushStage(iclosestHitShader->stageFlags, iclosestHitShader->module);
         }
 
-        if (hitGroup->anyHitShader.handle)
+        if (hitGroup->anyHitShader)
         {
           CGPU_RESOLVE_SHADER(ctx, hitGroup->anyHitShader, ianyHitShader);
           pushStage(ianyHitShader->stageFlags, ianyHitShader->module);

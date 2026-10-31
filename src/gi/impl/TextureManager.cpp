@@ -340,7 +340,7 @@ namespace gtl
         !m_stager.stageToImage(black, 4, image, 1, 1, 1))
     {
       GB_ERROR("failed to create fallback image");
-      if (image.handle)
+      if (image)
       {
         cgpuDestroyImage(m_ctx, image);
       }

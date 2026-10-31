@@ -147,7 +147,7 @@ cleanup:
 
       cgpuDestroyCommandPool(m_ctx, commandPool);
 
-      if (semaphore.handle)
+      if (semaphore)
         cgpuDestroySemaphore(m_ctx, semaphore);
 
       if (!result)

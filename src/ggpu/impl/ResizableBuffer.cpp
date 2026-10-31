@@ -34,7 +34,7 @@ namespace gtl
 
   GgpuResizableBuffer::~GgpuResizableBuffer()
   {
-    if (m_buffer.handle)
+    if (m_buffer)
     {
       m_deleteQueue.pushBack(m_buffer);
     }
@@ -59,7 +59,7 @@ namespace gtl
 
     if (newSize == 0)
     {
-      if (m_buffer.handle)
+      if (m_buffer)
       {
         m_deleteQueue.pushBack(m_buffer);
         m_buffer.handle = 0;
@@ -101,7 +101,7 @@ namespace gtl
     result = true;
 
   cleanup:
-    if (buffer.handle)
+    if (buffer)
     {
       m_deleteQueue.pushBack(buffer);
     }

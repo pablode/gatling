@@ -61,37 +61,37 @@ namespace gtl
 
   void GgpuDeleteQueue::pushBack(CgpuBuffer handle)
   {
-    assert(handle.handle);
+    assert(handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyBuffer(m_ctx, handle); });
   }
 
   void GgpuDeleteQueue::pushBack(CgpuImage handle)
   {
-    assert(handle.handle);
+    assert(handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyImage(m_ctx, handle); });
   }
 
   void GgpuDeleteQueue::pushBack(CgpuPipeline handle)
   {
-    assert(handle.handle);
+    assert(handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyPipeline(m_ctx, handle); });
   }
 
   void GgpuDeleteQueue::pushBack(CgpuSemaphore handle)
   {
-    assert(handle.handle);
+    assert(handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroySemaphore(m_ctx, handle); });
   }
 
   void GgpuDeleteQueue::pushBack(CgpuBlas handle)
   {
-    assert(handle.handle);
+    assert(handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyBlas(m_ctx, handle); });
   }
 
   void GgpuDeleteQueue::pushBack(CgpuTlas handle)
   {
-    assert(handle.handle);
+    assert(handle);
     enqueueDestroyFunc([this, handle]() { cgpuDestroyTlas(m_ctx, handle); });
   }
 

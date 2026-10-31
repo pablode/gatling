@@ -117,17 +117,27 @@ namespace gtl
   GB_DECLARE_ENUM_BITOPS(CgpuPipelineStage);
 
   struct CgpuContext;
-  struct CgpuBuffer        { uint64_t handle = 0; };
-  struct CgpuImage         { uint64_t handle = 0; };
-  struct CgpuShader        { uint64_t handle = 0; };
-  struct CgpuPipeline      { uint64_t handle = 0; };
-  struct CgpuSemaphore     { uint64_t handle = 0; };
-  struct CgpuCommandPool   { uint64_t handle = 0; };
-  struct CgpuCommandBuffer { uint64_t handle = 0; };
-  struct CgpuSampler       { uint64_t handle = 0; };
-  struct CgpuBlas          { uint64_t handle = 0; };
-  struct CgpuTlas          { uint64_t handle = 0; };
-  struct CgpuBindSet       { uint64_t handle = 0; };
+
+  template<typename T>
+  struct CgpuHandle
+  {
+    uint64_t handle = 0;
+    explicit operator bool() const { return handle != 0; }
+    bool operator==(const CgpuHandle& other) const { return handle == other.handle; }
+    bool operator!=(const CgpuHandle& other) const { return handle != other.handle; }
+  };
+
+  using CgpuBuffer        = CgpuHandle<class CgpuBuffer_>;
+  using CgpuImage         = CgpuHandle<class CgpuImage_>;
+  using CgpuShader        = CgpuHandle<class CgpuShader_>;
+  using CgpuPipeline      = CgpuHandle<class CgpuPipeline_>;
+  using CgpuSemaphore     = CgpuHandle<class CgpuSemaphore_>;
+  using CgpuCommandPool   = CgpuHandle<class CgpuCommandPool_>;
+  using CgpuCommandBuffer = CgpuHandle<class CgpuCommandBuffer_>;
+  using CgpuSampler       = CgpuHandle<class CgpuSampler_>;
+  using CgpuBlas          = CgpuHandle<class CgpuBlas_>;
+  using CgpuTlas          = CgpuHandle<class CgpuTlas_>;
+  using CgpuBindSet       = CgpuHandle<class CgpuBindSet_>;
 
   struct CgpuImageCreateInfo
   {

@@ -1195,7 +1195,7 @@ namespace gtl
       CgpuShader chitShader = createInfo.hitGroups[i].closestHitShader;
       CgpuShader ahitShader = createInfo.hitGroups[i].anyHitShader;
 
-      if (chitShader.handle)
+      if (chitShader)
       {
         CGPU_RESOLVE_SHADER(ctx, chitShader, ishader);
 
@@ -1211,7 +1211,7 @@ namespace gtl
         linkedFunctions.push_back(fun);
       }
 
-      if (ahitShader.handle)
+      if (ahitShader)
       {
         CGPU_RESOLVE_SHADER(ctx, ahitShader, ishader);
 
