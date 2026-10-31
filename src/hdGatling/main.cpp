@@ -32,6 +32,7 @@
 #include <pxr/base/tf/setenv.h>
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/engine.h>
+#include <pxr/imaging/hd/light.h>
 #include <pxr/imaging/hd/renderBuffer.h>
 #include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/renderIndex.h>
@@ -50,6 +51,8 @@
 #include <pxr/imaging/hdsi/sceneGlobalsSceneIndex.h>
 #include <pxr/usd/usd/stage.h>
 #include <pxr/usd/usdGeom/camera.h>
+#include <pxr/usd/usdGeom/imageable.h>
+#include <pxr/usd/usdGeom/tokens.h>
 #include <pxr/usd/usdRender/settings.h>
 #include <pxr/usd/usdRender/spec.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
@@ -234,6 +237,7 @@ private:
 
   HdRenderDelegate* m_renderDelegate;
   HdRendererPluginHandle m_plugin;
+  bool m_sceneIndexInserted = false;
 
   struct NamespacedSettings
   {
@@ -414,7 +418,7 @@ private:
     REQUIRE(diffImage->Write(diffStorage, metadata));
   }
 
-  void produceProduct(const UsdRenderSpec::Product& product)
+  std::vector<uint8_t> produceProduct(const UsdRenderSpec::Product& product, bool compareAgainstRef)
   {
     const auto& renderVarIndices = product.renderVarIndices;
     REQUIRE_EQ(renderVarIndices.size(), 1);
@@ -440,9 +444,13 @@ private:
 #endif
     HdSceneIndexBaseRefPtr sceneIndex = m_renderIndex->GetEmulationSceneIndex();
     REQUIRE(sceneIndex);
-    HdsiSceneGlobalsSceneIndexRefPtr sgSceneIndex = HdsiSceneGlobalsSceneIndex::New(sceneIndex);
-    sgSceneIndex->SetCurrentFrame(namespacedSettings.frame);
-    m_renderIndex->InsertSceneIndex(sgSceneIndex, m_sceneDelegate->GetDelegateID());
+    if (!m_sceneIndexInserted)
+    {
+      HdsiSceneGlobalsSceneIndexRefPtr sgSceneIndex = HdsiSceneGlobalsSceneIndex::New(sceneIndex);
+      sgSceneIndex->SetCurrentFrame(namespacedSettings.frame);
+      m_renderIndex->InsertSceneIndex(sgSceneIndex, m_sceneDelegate->GetDelegateID());
+      m_sceneIndexInserted = true;
+    }
 #endif
 
     uint32_t width = product.resolution[0];
@@ -548,13 +556,18 @@ private:
     HioImage::StorageSpec testStorage = _MakeStorageSpec(width, height, byteValues.data());
     REQUIRE(image->Write(testStorage, metadata));
 
-    diffAgainstRef(byteValues, width, height, paths.refImg, paths.diffImg, namespacedSettings.errorPixelThreshold);
+    if (compareAgainstRef)
+    {
+      diffAgainstRef(byteValues, width, height, paths.refImg, paths.diffImg, namespacedSettings.errorPixelThreshold);
+    }
 
     // Dispose of resources.
     HdRenderParam* renderParam = m_renderDelegate->GetRenderParam();
     REQUIRE(renderParam);
     renderBuffer->Finalize(renderParam);
     m_renderDelegate->DestroyBprim(renderBuffer);
+
+    return byteValues;
   }
 
 public:
@@ -562,8 +575,34 @@ public:
   {
     for (const UsdRenderSpec::Product product : m_renderSpec.products)
     {
-      produceProduct(product);
+      produceProduct(product, /*compareAgainstRef*/ true);
     }
+  }
+
+  // Renders the first product and returns its sRGB-encoded RGBA pixels.
+  std::vector<uint8_t> renderProductImage(bool compareAgainstRef = true)
+  {
+    REQUIRE_EQ(m_renderSpec.products.size(), 1);
+    return produceProduct(m_renderSpec.products[0], compareAgainstRef);
+  }
+
+  void setPrimVisibility(const SdfPath& path, bool visible)
+  {
+    UsdPrim prim = m_stage->GetPrimAtPath(path);
+    REQUIRE(prim);
+
+    UsdGeomImageable imageable(prim);
+    REQUIRE(imageable);
+
+    UsdAttribute visibilityAttr = imageable.GetVisibilityAttr();
+    REQUIRE(visibilityAttr);
+    REQUIRE(visibilityAttr.Set(visible ? UsdGeomTokens->inherited : UsdGeomTokens->invisible));
+
+    m_sceneDelegate->ApplyPendingUpdates();
+
+    // The UsdImaging scene index path only marks DirtyParams on visibility
+    // changes. Reproduce that here so the test matches usdview behavior.
+    m_renderIndex->GetChangeTracker().MarkSprimClean(path, HdLight::DirtyParams);
   }
 
   const UsdStageRefPtr& getStage()
@@ -606,6 +645,40 @@ public:
     context.performTest();
   }
 };
+
+namespace
+{
+  float _CalculateMeanRgb(const std::vector<uint8_t>& rgba)
+  {
+    REQUIRE(!rgba.empty());
+
+    double sum = 0.0;
+    for (size_t i = 0; i < rgba.size(); i += 4)
+    {
+      sum += rgba[i] + rgba[i + 1] + rgba[i + 2];
+    }
+
+    return float(sum / (3.0 * double(rgba.size() / 4)));
+  }
+
+  void _VerifyLightVisibilityToggle(const SdfPath& lightPath)
+  {
+    GraphicalTestContext context(_GetTestInputDir() / "scene.usd");
+
+    std::vector<uint8_t> visibleImage = context.renderProductImage(/*compareAgainstRef*/ false);
+    float visibleMean = _CalculateMeanRgb(visibleImage);
+    REQUIRE_GT(visibleMean, 1.0f);
+
+    context.setPrimVisibility(lightPath, false);
+
+    std::vector<uint8_t> hiddenImage = context.renderProductImage(/*compareAgainstRef*/ false);
+    float hiddenMean = _CalculateMeanRgb(hiddenImage);
+
+    // The test scenes are lit only by the light under test, so hiding it must
+    // darken the image significantly.
+    REQUIRE_LT(hiddenMean, visibleMean * 0.5f);
+  }
+}
 
 TEST_SUITE("Graphical")
 {
@@ -655,5 +728,17 @@ TEST_SUITE("Graphical")
 
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.CutoutOpacity")
   {
+  }
+
+  TEST_CASE_FIXTURE(GraphicalTestFixture, "Lux.DomeVisibility")
+  {
+    _VerifyLightVisibilityToggle(SdfPath("/T_Scene/lights/dome_light"));
+  }
+
+  // TODO: enable once light visibility is taken into account during rendering
+  //       (NEE); giSet*LightVisibility currently only stores the flag.
+  TEST_CASE_FIXTURE(GraphicalTestFixture, "Lux.DistantVisibility" * doctest::skip())
+  {
+    _VerifyLightVisibilityToggle(SdfPath("/T_Scene/lights/distant_light"));
   }
 }

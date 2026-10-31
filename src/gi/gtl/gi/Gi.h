@@ -245,6 +245,7 @@ namespace gtl
   void giSetSphereLightBaseEmission(GiSphereLight* light, float* rgb);
   void giSetSphereLightRadius(GiSphereLight* light, float radiusX, float radiusY, float radiusZ);
   void giSetSphereLightDiffuseSpecular(GiSphereLight* light, float diffuse, float specular);
+  void giSetSphereLightVisibility(GiSphereLight* light, bool visible);
 
   GiDistantLight* giCreateDistantLight(GiScene* scene);
   void giDestroyDistantLight(GiScene* scene, GiDistantLight* light);
@@ -252,6 +253,7 @@ namespace gtl
   void giSetDistantLightBaseEmission(GiDistantLight* light, float* rgb);
   void giSetDistantLightAngle(GiDistantLight* light, float angle);
   void giSetDistantLightDiffuseSpecular(GiDistantLight* light, float diffuse, float specular);
+  void giSetDistantLightVisibility(GiDistantLight* light, bool visible);
 
   GiRectLight* giCreateRectLight(GiScene* scene);
   void giDestroyRectLight(GiScene* scene, GiRectLight* light);
@@ -260,6 +262,7 @@ namespace gtl
   void giSetRectLightBaseEmission(GiRectLight* light, float* rgb);
   void giSetRectLightDimensions(GiRectLight* light, float width, float height);
   void giSetRectLightDiffuseSpecular(GiRectLight* light, float diffuse, float specular);
+  void giSetRectLightVisibility(GiRectLight* light, bool visible);
 
   GiDiskLight* giCreateDiskLight(GiScene* scene);
   void giDestroyDiskLight(GiScene* scene, GiDiskLight* light);
@@ -268,6 +271,7 @@ namespace gtl
   void giSetDiskLightBaseEmission(GiDiskLight* light, float* rgb);
   void giSetDiskLightRadius(GiDiskLight* light, float radiusX, float radiusY);
   void giSetDiskLightDiffuseSpecular(GiDiskLight* light, float diffuse, float specular);
+  void giSetDiskLightVisibility(GiDiskLight* light, bool visible);
 
   GiDomeLight* giCreateDomeLight(GiScene* scene, const char* filePath);
   void giDestroyDomeLight(GiDomeLight* light);

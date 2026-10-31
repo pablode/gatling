@@ -161,24 +161,28 @@ namespace gtl
   {
     GiScene* scene;
     uint64_t gpuHandle;
+    bool visible = true;
   };
 
   struct GiDistantLight
   {
     GiScene* scene;
     uint64_t gpuHandle;
+    bool visible = true;
   };
 
   struct GiRectLight
   {
     GiScene* scene;
     uint64_t gpuHandle;
+    bool visible = true;
   };
 
   struct GiDiskLight
   {
     GiScene* scene;
     uint64_t gpuHandle;
+    bool visible = true;
   };
 
   struct GiDomeLight
@@ -2852,6 +2856,12 @@ cleanup:
     light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
+  void giSetSphereLightVisibility(GiSphereLight* light, bool visible)
+  {
+    light->visible = visible;
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
   GiDistantLight* giCreateDistantLight(GiScene* scene)
   {
     std::lock_guard guard(scene->mutex);
@@ -2933,6 +2943,12 @@ cleanup:
 
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
 
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
+  void giSetDistantLightVisibility(GiDistantLight* light, bool visible)
+  {
+    light->visible = visible;
     light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
@@ -3034,6 +3050,12 @@ cleanup:
     light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
+  void giSetRectLightVisibility(GiRectLight* light, bool visible)
+  {
+    light->visible = visible;
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
   GiDiskLight* giCreateDiskLight(GiScene* scene)
   {
     std::lock_guard guard(scene->mutex);
@@ -3129,6 +3151,12 @@ cleanup:
 
     data->diffuseSpecularPacked = glm::packHalf2x16(glm::vec2(diffuse, specular));
 
+    light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
+  }
+
+  void giSetDiskLightVisibility(GiDiskLight* light, bool visible)
+  {
+    light->visible = visible;
     light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 

@@ -119,6 +119,8 @@ void HdGatlingSphereLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
+    giSetSphereLightVisibility(_giSphereLight, sceneDelegate->GetVisible(id));
+
     VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
     float radius = boxedRadius.GetWithDefault<float>(0.5f);
     float radiusX = transform.TransformDir(GfVec3f{ radius, 0.0f, 0.0f })[0];
@@ -177,6 +179,8 @@ void HdGatlingDistantLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
+    giSetDistantLightVisibility(_giDistantLight, sceneDelegate->GetVisible(id));
+
     VtValue boxedAngle = sceneDelegate->GetLightParamValue(id, HdLightTokens->angle);
     float angle = GfDegreesToRadians(boxedAngle.GetWithDefault<float>(0.53f));
 
@@ -235,6 +239,8 @@ void HdGatlingRectLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
+    giSetRectLightVisibility(_giRectLight, sceneDelegate->GetVisible(id));
+
     VtValue boxedWidth = sceneDelegate->GetLightParamValue(id, HdLightTokens->width);
     float width = boxedWidth.GetWithDefault<float>(1.0f);
     width = transform.TransformDir(GfVec3f{ width, 0.0f, 0.0f })[0];
@@ -298,6 +304,8 @@ void HdGatlingDiskLight::Sync(HdSceneDelegate* sceneDelegate,
 
   if (*dirtyBits & DirtyBits::DirtyParams)
   {
+    giSetDiskLightVisibility(_giDiskLight, sceneDelegate->GetVisible(id));
+
     VtValue boxedRadius = sceneDelegate->GetLightParamValue(id, HdLightTokens->radius);
     float radius = boxedRadius.GetWithDefault<float>(0.5f);
     float radiusX = transform.TransformDir(GfVec3f{ radius, 0.0f, 0.0f })[0];
@@ -339,14 +347,12 @@ void HdGatlingDomeLight::Sync(HdSceneDelegate* sceneDelegate,
                               [[maybe_unused]] HdRenderParam* renderParam,
                               HdDirtyBits* dirtyBits)
 {
-  if (!HdChangeTracker::IsDirty(*dirtyBits))
-  {
-    return;
-  }
-
-  *dirtyBits = DirtyBits::Clean;
-
   const SdfPath& id = GetId();
+
+  // HdLight has no DirtyVisibility bit; visibility changes are delivered via
+  // DirtyParams. Don't gate this on HdChangeTracker::IsDirty, as that masks out
+  // bit 1, which is HdLight::DirtyParams.
+  *dirtyBits = DirtyBits::Clean;
   VtValue boxedTextureFile = sceneDelegate->GetLightParamValue(id, HdLightTokens->textureFile);
 
   std::string path;
@@ -473,6 +479,8 @@ void HdGatlingSimpleLight::Sync(HdSceneDelegate* sceneDelegate,
 
     if (*dirtyBits & DirtyBits::DirtyParams)
     {
+      giSetSphereLightVisibility(_giSphereLight, sceneDelegate->GetVisible(id));
+
       GfVec3f baseEmission = _CalcBaseEmission(sceneDelegate);
       giSetSphereLightBaseEmission(_giSphereLight, baseEmission.data());
     }
