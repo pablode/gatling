@@ -29,14 +29,22 @@ namespace gtl
     : GgpuLinearDataStore(ctx, stager, deleteQueue, elementSize, minCapacity)
     , m_elementSize(elementSize)
   {
-    m_indexMap.reserve(minCapacity);
+    m_handleSlots.reserve(minCapacity);
+    m_indexHandles.reserve(minCapacity);
   }
 
   uint64_t GgpuDenseDataStore::allocate()
   {
     uint64_t handle = GgpuLinearDataStore::allocate();
 
-    m_indexMap[handle] = m_highestIndex;
+    uint32_t handleIndex = uint32_t(handle);
+    if (handleIndex >= m_handleSlots.size())
+    {
+      m_handleSlots.resize(handleIndex + 1);
+    }
+
+    m_handleSlots[handleIndex] = { m_highestIndex, uint32_t(handle >> 32) };
+    m_indexHandles.push_back(handleIndex);
     m_highestIndex += 1;
 
     return handle;
@@ -44,25 +52,41 @@ namespace gtl
 
   void GgpuDenseDataStore::free(uint64_t handle)
   {
-    if (m_highestIndex == 1)
-    {
-      // No swapping needed/possible.
-      m_highestIndex = 0;
-      return;
-    }
-
-    auto indexIt = m_indexMap.find(handle);
-    if (indexIt == m_indexMap.end())
+    uint32_t handleIndex = uint32_t(handle);
+    if (handleIndex >= m_handleSlots.size())
     {
       assert(false);
       return;
     }
 
-    uint32_t freedIndex = indexIt->second;
-    uint8_t* dstPtr = GgpuLinearDataStore::writeToIndex(freedIndex);
-    uint8_t* srcPtr = GgpuLinearDataStore::readFromIndex(m_highestIndex);
+    HandleSlot& slot = m_handleSlots[handleIndex];
+    if (slot.version != uint32_t(handle >> 32) || slot.index == UINT32_MAX)
+    {
+      assert(false);
+      return;
+    }
 
-    memcpy((void*) dstPtr, (void*) srcPtr, m_elementSize);
+    uint32_t freedIndex = slot.index;
+    uint32_t lastIndex = m_highestIndex - 1;
+
+    // Move the last element into the freed slot to keep the storage dense.
+    if (freedIndex != lastIndex)
+    {
+      uint32_t lastHandleIndex = m_indexHandles[lastIndex];
+      HandleSlot& lastSlot = m_handleSlots[lastHandleIndex];
+      assert(lastSlot.index == lastIndex);
+
+      uint8_t* dstPtr = GgpuLinearDataStore::writeToIndex(freedIndex);
+      uint8_t* srcPtr = GgpuLinearDataStore::readFromIndex(lastIndex);
+      memcpy(dstPtr, srcPtr, m_elementSize);
+
+      lastSlot.index = freedIndex;
+      m_indexHandles[freedIndex] = lastHandleIndex;
+    }
+
+    slot.index = UINT32_MAX;
+    slot.version = 0;
+    m_indexHandles.pop_back();
     m_highestIndex--;
 
     GgpuLinearDataStore::free(handle);
@@ -70,25 +94,39 @@ namespace gtl
 
   uint8_t* GgpuDenseDataStore::readRaw(uint64_t handle)
   {
-    auto indexIt = m_indexMap.find(handle);
-    if (indexIt == m_indexMap.end())
+    uint32_t handleIndex = uint32_t(handle);
+    if (handleIndex >= m_handleSlots.size())
     {
       assert(false);
       return nullptr;
     }
 
-    return GgpuLinearDataStore::readFromIndex(indexIt->second);
+    const HandleSlot& slot = m_handleSlots[handleIndex];
+    if (slot.version != uint32_t(handle >> 32) || slot.index == UINT32_MAX)
+    {
+      assert(false);
+      return nullptr;
+    }
+
+    return GgpuLinearDataStore::readFromIndex(slot.index);
   }
 
   uint8_t* GgpuDenseDataStore::writeRaw(uint64_t handle)
   {
-    auto indexIt = m_indexMap.find(handle);
-    if (indexIt == m_indexMap.end())
+    uint32_t handleIndex = uint32_t(handle);
+    if (handleIndex >= m_handleSlots.size())
     {
       assert(false);
       return nullptr;
     }
 
-    return GgpuLinearDataStore::writeToIndex(indexIt->second);
+    const HandleSlot& slot = m_handleSlots[handleIndex];
+    if (slot.version != uint32_t(handle >> 32) || slot.index == UINT32_MAX)
+    {
+      assert(false);
+      return nullptr;
+    }
+
+    return GgpuLinearDataStore::writeToIndex(slot.index);
   }
 }

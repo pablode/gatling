@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
-#include <unordered_map>
+#include <vector>
 
 #include <gtl/gb/Class.h>
 
@@ -52,7 +52,14 @@ namespace gtl
     uint8_t* writeRaw(uint64_t handle) override;
 
   private:
-    std::unordered_map<uint64_t/*handle*/, uint32_t/*index*/> m_indexMap;
+    struct HandleSlot
+    {
+      uint32_t index = UINT32_MAX;
+      uint32_t version = 0;
+    };
+
+    std::vector<HandleSlot> m_handleSlots; // indexed by handle index
+    std::vector<uint32_t> m_indexHandles;  // indexed by dense index -> handle index
     uint64_t m_elementSize;
     uint32_t m_highestIndex = 0;
   };

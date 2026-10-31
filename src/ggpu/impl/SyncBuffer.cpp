@@ -74,21 +74,24 @@ namespace gtl
       return true;
     }
 
-    m_size = newSize;
-
     // Reset buffers if new size is 0.
     if (newSize == 0)
     {
       m_hostMem.reset();
       m_deviceBuffer.resize(0, commandBuffer);
+      m_size = 0;
       return true;
     }
 
     // Resize buffers.
-    m_deviceBuffer.resize(newSize, commandBuffer);
+    if (!m_deviceBuffer.resize(newSize, commandBuffer))
+    {
+      return false;
+    }
 
     m_hostMem = std::make_unique<uint8_t[]>(newSize);
 
+    m_size = newSize;
     return true;
   }
 
