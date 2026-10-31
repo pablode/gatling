@@ -5,6 +5,7 @@ on:
     branches:
       - 'master'
       - 'dev'
+      - 'wip/cgpu-improvements'
     paths-ignore:
       - '**.md'
   pull_request:
