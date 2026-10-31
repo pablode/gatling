@@ -76,7 +76,7 @@ namespace gtl
 
   constexpr static const uint32_t CGPU_INITIAL_PHYSICAL_DEVICE_COUNT = 4;
 
-  static const std::array<const char*, 15> CGPU_REQUIRED_EXTENSIONS = {
+  static const std::array<const char*, 16> CGPU_REQUIRED_EXTENSIONS = {
     VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
     VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
     VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME, // required by VK_KHR_acceleration_structure
@@ -91,7 +91,8 @@ namespace gtl
     VK_KHR_MAINTENANCE_5_EXTENSION_NAME,
     VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, // required by VK_KHR_maintenance5
     VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, // required by VK_KHR_dynamic_rendering
-    VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME // required by VK_KHR_depth_stencil_resolve
+    VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME, // required by VK_KHR_depth_stencil_resolve
+    VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME
   };
 
   /* Internal structures */
@@ -470,6 +471,7 @@ namespace gtl
     VkPhysicalDeviceAccelerationStructurePropertiesKHR accelerationStructure;
     VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingPipeline;
     VkPhysicalDeviceSubgroupProperties subgroup;
+    VkPhysicalDeviceDescriptorHeapPropertiesEXT descriptorHeap;
   };
 
   static void cgpuSetupDevicePropertyChain(CgpuDevicePropertyChain& chain,
@@ -507,21 +509,36 @@ namespace gtl
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
       .pNext = &chain.rayTracingPipeline
     };
+    chain.descriptorHeap = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_PROPERTIES_EXT,
+      .pNext = &chain.subgroup
+    };
     chain.properties2 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-      .pNext = &chain.subgroup
+      .pNext = &chain.descriptorHeap
     };
   }
 
   static CgpuDeviceProperties cgpuGetDeviceProperties(const CgpuDevicePropertyChain& chain)
   {
     const VkPhysicalDeviceLimits& limits = chain.properties2.properties.limits;
+    const VkPhysicalDeviceDescriptorHeapPropertiesEXT& descriptorHeap = chain.descriptorHeap;
 
     return CgpuDeviceProperties {
+      .bufferDescriptorAlignment = descriptorHeap.bufferDescriptorAlignment,
+      .imageDescriptorAlignment = descriptorHeap.imageDescriptorAlignment,
+      .imageDescriptorSize = descriptorHeap.imageDescriptorSize,
+      .maxComputeSharedMemorySize = limits.maxComputeSharedMemorySize,
+      .maxPushDataSize = descriptorHeap.maxPushDataSize,
+      .maxRayHitAttributeSize = chain.rayTracingPipeline.maxRayHitAttributeSize,
+      .minResourceHeapReservedRange = descriptorHeap.minResourceHeapReservedRange,
+      .minSamplerHeapReservedRange = descriptorHeap.minSamplerHeapReservedRange,
       .minStorageBufferOffsetAlignment = limits.minStorageBufferOffsetAlignment,
       .minUniformBufferOffsetAlignment = limits.minUniformBufferOffsetAlignment,
-      .maxComputeSharedMemorySize = limits.maxComputeSharedMemorySize,
-      .maxRayHitAttributeSize = chain.rayTracingPipeline.maxRayHitAttributeSize,
+      .resourceHeapAlignment = descriptorHeap.resourceHeapAlignment,
+      .samplerDescriptorAlignment = descriptorHeap.samplerDescriptorAlignment,
+      .samplerDescriptorSize = descriptorHeap.samplerDescriptorSize,
+      .samplerHeapAlignment = descriptorHeap.samplerHeapAlignment,
       .subgroupSize = chain.subgroup.subgroupSize
     };
   }
@@ -563,6 +580,7 @@ namespace gtl
     VkPhysicalDeviceShaderFloat16Int8Features shaderFloat16Int8;
     VkPhysicalDevice16BitStorageFeatures storage16Bit;
     VkPhysicalDeviceShaderUntypedPointersFeaturesKHR shaderUntypedPointers;
+    VkPhysicalDeviceDescriptorHeapFeaturesEXT descriptorHeap;
   };
 
   static void cgpuSetupDeviceFeatureChain(CgpuDeviceFeatureChain& chain,
@@ -693,9 +711,13 @@ namespace gtl
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_UNTYPED_POINTERS_FEATURES_KHR,
       .pNext = &chain.storage16Bit
     };
+    chain.descriptorHeap = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_HEAP_FEATURES_EXT,
+      .pNext = &chain.shaderUntypedPointers
+    };
     chain.features2 = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-      .pNext = &chain.shaderUntypedPointers
+      .pNext = &chain.descriptorHeap
     };
   }
 
@@ -883,6 +905,7 @@ namespace gtl
     CGPU_REQUIRE_FEATURE(shaderFloat16Int8, shaderFloat16);
     CGPU_REQUIRE_FEATURE(storage16Bit, storageBuffer16BitAccess);
     CGPU_REQUIRE_FEATURE(shaderUntypedPointers, shaderUntypedPointers);
+    CGPU_REQUIRE_FEATURE(descriptorHeap, descriptorHeap);
     CGPU_REQUIRE_FEATURE(features2.features, shaderSampledImageArrayDynamicIndexing);
     CGPU_REQUIRE_FEATURE(features2.features, shaderInt16);
     CGPU_REQUIRE_FEATURE(features2.features, shaderInt64);

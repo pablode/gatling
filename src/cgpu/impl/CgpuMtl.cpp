@@ -74,10 +74,10 @@ namespace gtl
   // See Apple Feature Set table PDF
   const static CgpuDeviceProperties CGPU_DEVICE_PROPERTIES =
   {
-    .minStorageBufferOffsetAlignment = 4,
-    .minUniformBufferOffsetAlignment = 4,
     .maxComputeSharedMemorySize = 32 * 1024,
     .maxRayHitAttributeSize = UINT32_MAX,
+    .minStorageBufferOffsetAlignment = 4,
+    .minUniformBufferOffsetAlignment = 4,
     .subgroupSize = 32
   };
 

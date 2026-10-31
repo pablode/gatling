@@ -321,10 +321,20 @@ namespace gtl
 
   struct CgpuDeviceProperties
   {
+    uint64_t bufferDescriptorAlignment;
+    uint64_t imageDescriptorAlignment;
+    uint64_t imageDescriptorSize;
+    uint32_t maxComputeSharedMemorySize;
+    uint64_t maxPushDataSize;
+    uint32_t maxRayHitAttributeSize;
+    uint64_t minResourceHeapReservedRange;
+    uint64_t minSamplerHeapReservedRange;
     uint64_t minStorageBufferOffsetAlignment;
     uint64_t minUniformBufferOffsetAlignment;
-    uint32_t maxComputeSharedMemorySize;
-    uint32_t maxRayHitAttributeSize;
+    uint64_t resourceHeapAlignment;
+    uint64_t samplerDescriptorAlignment;
+    uint64_t samplerDescriptorSize;
+    uint64_t samplerHeapAlignment;
     uint32_t subgroupSize;
   };
 
