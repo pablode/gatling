@@ -38,6 +38,14 @@ target_compile_definitions(
     GI_SHADER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders"
 )
 
+if (GTL_METAL_BACKEND)
+  target_compile_definitions(
+    gi
+    PRIVATE
+      GTL_METAL_BACKEND=1
+  )
+endif()
+
 target_link_libraries(
   gi
   PUBLIC

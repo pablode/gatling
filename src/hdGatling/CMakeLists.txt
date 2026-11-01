@@ -61,7 +61,7 @@ target_compile_definitions(
     "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
 )
 
-if (APPLE)
+if (GTL_METAL_BACKEND)
   target_compile_definitions(
     hdGatling
     PRIVATE

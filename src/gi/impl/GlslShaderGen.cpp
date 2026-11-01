@@ -68,7 +68,7 @@ namespace gtl
 #ifdef NDEBUG
     stitcher.appendDefine("NDEBUG");
 #endif
-#ifdef __APPLE__
+#ifdef GTL_METAL_BACKEND
     stitcher.appendDefine("METAL");
 #endif
     stitcher.appendDefine("AOV_MASK", (int) params.aovMask);

@@ -25,6 +25,7 @@ endforeach()
 set(GTL_TEST_OUTPUT_DIR "${PROJECT_SOURCE_DIR}/TEST")
 
 option(GTL_VERBOSE "Enable verbose logging." OFF)
+cmake_dependent_option(GTL_METAL_BACKEND "Use the Metal backend instead of Vulkan on Apple platforms." ON "APPLE" OFF)
 
 include(cmake/BuildConfig.cmake)
 

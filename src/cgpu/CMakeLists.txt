@@ -1,4 +1,4 @@
-if (APPLE)
+if (GTL_METAL_BACKEND)
   set(CGPU_IMPL_FILE_NAME "impl/CgpuMtl.cpp")
 else()
   set(CGPU_IMPL_FILE_NAME "impl/CgpuVk.cpp")
@@ -21,7 +21,7 @@ target_include_directories(
     impl
 )
 
-if (APPLE)
+if (GTL_METAL_BACKEND)
   set(
     CGPU_IMPL_LIBRARIES
       metal-cpp

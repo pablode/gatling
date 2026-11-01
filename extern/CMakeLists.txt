@@ -166,7 +166,7 @@ target_include_directories(OffsetAllocator PUBLIC OffsetAllocator)
 add_library(xxHash STATIC xxHash/xxhash.c)
 target_include_directories(xxHash PUBLIC xxHash)
 
-if (APPLE)
+if (GTL_METAL_BACKEND)
   #
   # metal-cpp
   #
