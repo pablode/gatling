@@ -530,6 +530,13 @@ fail:
     s_mcRuntime.reset();
   }
 
+#if !defined(NDEBUG) && !defined(GTL_METAL_BACKEND)
+  void giPrintVmaStatistics()
+  {
+    cgpuPrintVmaStatistics(s_ctx);
+  }
+#endif
+
   void giRegisterAssetReader(GiAssetReader* reader)
   {
     s_aggregateAssetReader->addAssetReader(reader);

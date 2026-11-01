@@ -217,6 +217,10 @@ namespace gtl
   GiStatus giInitialize(const GiInitParams& params);
   void giTerminate();
 
+#if !defined(NDEBUG) && !defined(GTL_METAL_BACKEND)
+  void giPrintVmaStatistics();
+#endif
+
   void giRegisterAssetReader(GiAssetReader* reader);
 
   GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc, bool usdPreviewSurfacePresenceOverride = false);

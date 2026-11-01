@@ -67,6 +67,7 @@ if (GTL_METAL_BACKEND)
     PRIVATE
       # TODO: this feature causes artifacts on Metal which need to be investigated
       HDGATLING_DISABLE_VOLUME_SAMPLING=1
+      GTL_METAL_BACKEND=1
   )
 endif()
 

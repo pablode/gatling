@@ -78,7 +78,8 @@ PXR_NAMESPACE_OPEN_SCOPE
   (albedo)
 
 #define HD_GATLING_COMMAND_TOKENS                    \
-  (printLicenses)
+  (printLicenses)                                    \
+  (printVmaStatistics)
 
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingSettingsTokens, HD_GATLING_SETTINGS_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(HdGatlingNodeIdentifiers, HD_GATLING_NODE_IDENTIFIER_TOKENS);

@@ -341,6 +341,34 @@ namespace gtl
     }
   }
 
+#ifndef NDEBUG
+  static std::string cgpuGetMemoryPropertyFlagsString(VkMemoryPropertyFlags flags)
+  {
+    static const std::pair<VkMemoryPropertyFlags, const char*> PROPERTY_NAMES[] = {
+      { VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, "DEVICE_LOCAL" },
+      { VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, "HOST_VISIBLE" },
+      { VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, "HOST_COHERENT" },
+      { VK_MEMORY_PROPERTY_HOST_CACHED_BIT, "HOST_CACHED" },
+    };
+
+    std::string result;
+    for (const auto& [property, name] : PROPERTY_NAMES)
+    {
+      if (flags & property)
+      {
+        if (result.empty())
+        {
+          result = name;
+          continue;
+        }
+        result = GB_FMT("{} | {}", result, name);
+      }
+    }
+
+    return result.empty() ? "(none)" : result;
+  }
+#endif
+
   static VkPipelineStageFlags2KHR CgpuPipelineStageFromShaderStageFlags(VkShaderStageFlags shaderStageFlags)
   {
     VkPipelineStageFlags2KHR pipelineStageFlags = VK_PIPELINE_STAGE_2_NONE_KHR;
@@ -3880,4 +3908,61 @@ namespace gtl
     CgpuIDevice* idevice = &ctx->idevice;
     return idevice->properties;
   }
+
+#ifndef NDEBUG
+  static void cgpuPrintDetailedStats(const char* indent, const VmaDetailedStatistics& stats)
+  {
+    const VmaStatistics& statistics = stats.statistics;
+
+    float usedMiB = (float) statistics.allocationBytes / (1024.0f * 1024.0f);
+    float blockMiB = (float) statistics.blockBytes / (1024.0f * 1024.0f);
+    float usedPercent = statistics.blockBytes > 0
+                        ? 100.0f * (float) statistics.allocationBytes / (float) statistics.blockBytes
+                        : 0.0f;
+    float largestFreeMiB = (float) stats.unusedRangeSizeMax / (1024.0f * 1024.0f);
+
+    GB_LOG("{}allocated {:.2f} MiB of reserved {:.2f} MiB ({:.1f}%)", indent, usedMiB, blockMiB, usedPercent);
+    GB_LOG("{}blocks: {}, allocations: {}, free ranges: {} (largest {:.2f} MiB)", indent,
+           statistics.blockCount, statistics.allocationCount,
+           stats.unusedRangeCount, largestFreeMiB);
+  }
+
+  void cgpuPrintVmaStatistics(CgpuContext* ctx)
+  {
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    const VkPhysicalDeviceMemoryProperties* memoryProperties;
+    vmaGetMemoryProperties(idevice->allocator, &memoryProperties);
+
+    VmaTotalStatistics statistics;
+    vmaCalculateStatistics(idevice->allocator, &statistics);
+
+    GB_LOG("VMA statistics:");
+
+    GB_LOG("  memory types:");
+    for (uint32_t i = 0; i < memoryProperties->memoryTypeCount; i++)
+    {
+      VkMemoryPropertyFlags flags = 0;
+      vmaGetMemoryTypeProperties(idevice->allocator, i, &flags);
+
+      GB_LOG("    [{}]", i);
+      GB_LOG("      heap index: {}", memoryProperties->memoryTypes[i].heapIndex);
+      GB_LOG("      flags: {}", cgpuGetMemoryPropertyFlagsString(flags));
+      cgpuPrintDetailedStats("      ", statistics.memoryType[i]);
+    }
+
+    GB_LOG("  memory heaps:");
+    for (uint32_t i = 0; i < memoryProperties->memoryHeapCount; i++)
+    {
+      const VkMemoryHeap& heap = memoryProperties->memoryHeaps[i];
+
+      GB_LOG("    [{}]", i);
+      GB_LOG("      size: {}", gbFmtByteSize(heap.size));
+      cgpuPrintDetailedStats("      ", statistics.memoryHeap[i]);
+    }
+
+    GB_LOG("  total:");
+    cgpuPrintDetailedStats("    ", statistics.total);
+  }
+#endif
 }

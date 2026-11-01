@@ -616,4 +616,8 @@ namespace gtl
   const CgpuDeviceProperties& cgpuGetDeviceProperties(
     CgpuContext* ctx
   );
+
+#ifndef NDEBUG
+  void cgpuPrintVmaStatistics(CgpuContext* ctx);
+#endif
 }

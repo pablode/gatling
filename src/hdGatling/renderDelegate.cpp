@@ -179,7 +179,10 @@ void HdGatlingRenderDelegate::SetRenderSetting(const TfToken& key, const VtValue
 
 const HdCommandDescriptors COMMAND_DESCRIPTORS =
 {
-  HdCommandDescriptor{ HdGatlingCommandTokens->printLicenses, "Print Licenses" }
+  HdCommandDescriptor{ HdGatlingCommandTokens->printLicenses, "Print Licenses" },
+#if !defined(NDEBUG) && !defined(GTL_METAL_BACKEND)
+  HdCommandDescriptor{ HdGatlingCommandTokens->printVmaStatistics, "Print VMA statistics" },
+#endif
 };
 
 HdCommandDescriptors HdGatlingRenderDelegate::GetCommandDescriptors() const
@@ -208,6 +211,14 @@ bool HdGatlingRenderDelegate::InvokeCommand(const TfToken& command, [[maybe_unus
 
     return true;
   }
+
+#if !defined(NDEBUG) && !defined(GTL_METAL_BACKEND)
+  if (command == HdGatlingCommandTokens->printVmaStatistics)
+  {
+    giPrintVmaStatistics();
+    return true;
+  }
+#endif
 
   TF_RUNTIME_ERROR("Unsupported command %s", command.GetText());
 
