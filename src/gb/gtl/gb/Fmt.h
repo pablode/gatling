@@ -22,3 +22,19 @@
 
 #define GB_FMT(fmt, ...) fmtquill::format(fmt, __VA_ARGS__)
 #define GB_FMT_SPRINTF(fmt, ...) fmtquill::sprintf(fmt, __VA_ARGS__)
+
+namespace gtl
+{
+  inline std::string gbFmtByteSize(uint64_t bytes)
+  {
+    constexpr uint64_t MIB = 1024 * 1024;
+    constexpr uint64_t GIB = 1024 * MIB;
+
+    if (bytes >= 1000 * MIB)
+    {
+      return GB_FMT("{:.2f} GiB", double(bytes) / double(GIB));
+    }
+
+    return GB_FMT("{:.2f} MiB", double(bytes) / double(MIB));
+  }
+}
