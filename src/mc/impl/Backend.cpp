@@ -25,6 +25,7 @@
 
 #include <gtl/gb/SmallVector.h>
 #include <gtl/gb/Fmt.h>
+#include <gtl/gb/Log.h>
 
 #include "MdlMaterial.h"
 #include "MdlLogger.h"
@@ -63,10 +64,12 @@ namespace gtl
     }
 
     bool generateGlslWithDfs(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
+                             const std::vector<McMdlTextureParameter>& textureParameters,
                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                              std::string& glslSrc,
                              std::vector<McTextureDescription>& textureDescriptions,
                              std::vector<std::string>& stringConstants,
+                             std::vector<McTextureParameterBinding>& textureParameterBindings,
                              bool needsAuxOutput)
     {
       // Backends are not thread-safe, so create one per generation. Creation is not expensive.
@@ -84,17 +87,19 @@ namespace gtl
       // Pre-normal evaluation results (displacement, cutout opacity) need at least one slot.
       backend->set_option("num_texture_results", "1");
 
-      return _generateGlslWithDfs(*backend, compiledMaterial, genFunctions, glslSrc,
-                                  textureDescriptions, stringConstants);
+      return _generateGlslWithDfs(*backend, compiledMaterial, textureParameters, genFunctions, glslSrc,
+                                  textureDescriptions, stringConstants, textureParameterBindings);
     }
 
   private:
     bool _generateGlslWithDfs(mi::neuraylib::IMdl_backend& backend,
                               mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
+                              const std::vector<McMdlTextureParameter>& textureParameters,
                               std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                               std::string& glslSrc,
                               std::vector<McTextureDescription>& textureDescriptions,
-                              std::vector<std::string>& stringConstants)
+                              std::vector<std::string>& stringConstants,
+                              std::vector<McTextureParameterBinding>& textureParameterBindings)
     {
       // Create a separate execution context for each thread.
       mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
@@ -133,7 +138,13 @@ namespace gtl
 
       extractTextureInfos(targetCode, textureDescriptions);
       extractStringConstants(targetCode, stringConstants);
+      extractTextureParameterBindings(targetCode, textureParameters, textureParameterBindings);
       glslSrc = targetCode->get_code();
+
+      if (getenv("GTL_DUMP_GLSL"))
+      {
+        GB_LOG("GLSL source: \n{}", glslSrc);
+      }
 
       return true;
     }
@@ -153,6 +164,32 @@ namespace gtl
       for (size_t i = 1; i < count; i++)
       {
         stringConstants[i - 1] = std::string(targetCode->get_string_constant(i));
+      }
+    }
+
+    // Resolves the texture indices that the generated code uses for the material's texture
+    // parameters. The MDL SDK does not expose the ordering of the texture table, but resources
+    // that were known at code generation time can be mapped to their index directly.
+    void extractTextureParameterBindings(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
+                                         const std::vector<McMdlTextureParameter>& textureParameters,
+                                         std::vector<McTextureParameterBinding>& textureParameterBindings)
+    {
+      for (const McMdlTextureParameter& textureParameter : textureParameters)
+      {
+        mi::Uint32 textureIndex = targetCode->get_known_resource_index(m_transaction.get(), textureParameter.value.get());
+
+        if (textureIndex == 0)
+        {
+          // The generated code only references textures which it actually samples. Parameters
+          // of unused network branches (e.g. displacement, which is not evaluated) are not part
+          // of the resource table, so this is expected and not an error.
+          const char* filePath = textureParameter.value->get_file_path();
+          std::string message = GB_FMT("texture parameter {} ({}) not used by target code", textureParameter.parameterName, filePath ? filePath : "<unknown>");
+          m_logger->message(mi::base::MESSAGE_SEVERITY_INFO, message.c_str());
+          continue;
+        }
+
+        textureParameterBindings.push_back({ textureParameter.parameterName, uint32_t(textureIndex) });
       }
     }
 
@@ -178,7 +215,6 @@ namespace gtl
 
         // 1x1 black fallback texture
         McTextureDescription textureResource = {
-          .binding = uint32_t(i - 1),
           .is3dImage = false,
           .isFloat = false,
           .width = 1,
@@ -326,7 +362,9 @@ namespace gtl
       fDescs.push_back(mi::neuraylib::Target_function_description(DF_NAMES[size_t(kv.first)], kv.second));
     }
 
-    return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source,
-                                       result.textureDescriptions, result.stringConstants, needsAuxOutput);
+    return m_impl->generateGlslWithDfs(material.compiledMaterial, material.textureParameters,
+                                       fDescs, result.source, result.textureDescriptions,
+                                       result.stringConstants, result.textureParameterBindings,
+                                       needsAuxOutput);
   }
 }

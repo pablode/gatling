@@ -656,4 +656,16 @@ TEST_SUITE("Graphical")
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.CutoutOpacity")
   {
   }
+
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.TopologicalDedup")
+  {
+  }
+
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.TopologicalDedupTextures")
+  {
+  }
+
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.TopologicalDedupVariants")
+  {
+  }
 }

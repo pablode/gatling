@@ -124,7 +124,6 @@ const GI_UINT BLAS_PAYLOAD_BITFLAG_DOUBLE_SIDED = (1 << 0);
 
 struct BlasPayload
 {
-  GI_UINT64 paramBufferAddress;
   GI_UINT64 bufferAddress;
   GI_UINT   vertexOffset;
   GI_UINT   bitfield;
@@ -137,13 +136,14 @@ const GI_UINT FACE_ID_STRIDE_OFFSET = 30;
 
 const GI_UINT SCENE_DATA_INVALID = 0xFFFFFFFFu;
 const GI_UINT SCENE_DATA_ALIGNMENT = 32; // must be equal or larger largest type
-const GI_UINT SCENE_DATA_OFFSET_MASK = 0x03FFFFFFu; // (1 << 27) - 1
+const GI_UINT SCENE_DATA_OFFSET_MASK = 0x03FFFFFFu; // (1 << 26) - 1
+const GI_UINT SCENE_DATA_MATERIAL_FLAG = 0x04000000u; // bit 26; read from material parameter buffer
 const GI_UINT SCENE_DATA_STRIDE_MASK = 0x18000000u; // 0001 1000...
 const GI_UINT SCENE_DATA_STRIDE_OFFSET = 27;
 const GI_UINT SCENE_DATA_INTERPOLATION_MASK = 0xE0000000u; // 1110 0000 ...
 const GI_UINT SCENE_DATA_INTERPOLATION_OFFSET = 29; // bits
 
-const GI_UINT MAX_SCENE_DATA_COUNT = 30;
+const GI_UINT MAX_SCENE_DATA_COUNT = 64;
 const GI_UINT MAX_TEXTURE_COUNT = 65535;
 
 const GI_UINT TEXTURE_INFO_IMAGE_INDEX_MASK = 0xFFFFu;
@@ -163,9 +163,13 @@ static_assert(sizeof(TextureInfo) == 8);
 
 struct BlasPayloadBufferPreamble
 {
+  GI_UINT64 paramBufferAddress;
   GI_INT objectId;
   GI_UINT faceIdsInfo;
+  GI_UINT materialId;
+  GI_UINT padding0;
   GI_UINT sceneDataInfos[MAX_SCENE_DATA_COUNT];
+  GI_UINT padding1[2];
 };
 #ifdef __cplusplus
 static_assert((sizeof(BlasPayloadBufferPreamble) % 32) == 0);
@@ -204,6 +208,7 @@ GI_BINDING_INDEX(AOV_INSTANCE_ID,  27)
 GI_BINDING_INDEX(AOV_DOUBLE_SIDED, 28)
 GI_BINDING_INDEX(AOV_ALBEDO,       29)
 GI_BINDING_INDEX(AOV_TOPOHASH,     30)
+GI_BINDING_INDEX(AOV_MATERIAL_ID,  31)
 
 // set 1 & set 2 (alised array)
 GI_BINDING_INDEX(TEXTURES,     0)

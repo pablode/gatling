@@ -10,6 +10,8 @@ add_library(
   impl/GlslShaderGen.cpp
   impl/GlslStitcher.h
   impl/GlslStitcher.cpp
+  impl/MaterialManager.h
+  impl/MaterialManager.cpp
   impl/Mmap.h
   impl/Mmap.cpp
   impl/MeshProcessing.h

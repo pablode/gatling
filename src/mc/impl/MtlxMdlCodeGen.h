@@ -17,14 +17,10 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <string>
 
 #include <MaterialXCore/Document.h>
-#include <MaterialXFormat/File.h>
 #include <MaterialXGenShader/ShaderGenerator.h>
-
-#include "Material.h"
 
 namespace gtl
 {
@@ -38,7 +34,6 @@ namespace gtl
                    const MaterialX::NodePtr& surfaceShader,
                    std::string& mdlSrc,
                    std::string& subIdentifier,
-                   McOpacityClassification& opacityClass,
                    bool& isAnimated);
 
   private:

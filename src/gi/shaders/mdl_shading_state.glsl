@@ -63,9 +63,11 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     vec2 uv_2 = vec2(v_2.field2.z, v_2.field2.w);
     vec2 uv = bc.x * uv_0 + bc.y * uv_1 + bc.z * uv_2;
 
-#ifdef MAX_SCENE_DATA_ID
+#if defined(MAX_SCENE_DATA_ID) || (defined(USE_TEXTURE_INDEX_LUT) && defined(TEXTURE_PARAMETER_SLOT_BASE))
     BlasPayloadBufferPreamble preamble = indices.preamble;
+#endif
 
+#ifdef MAX_SCENE_DATA_ID
     mdl_renderer_state rendererState;
     rendererState.hitIndices[0] = f.v_0;
     rendererState.hitIndices[1] = f.v_1;
@@ -76,6 +78,11 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
       rendererState.sceneDataInfos[i] = preamble.sceneDataInfos[i];
     }
     rendererState.sceneDataBufferAddress = payload.bufferAddress;
+    rendererState.paramBufferAddress = preamble.paramBufferAddress;
+#endif
+
+#if defined(USE_TEXTURE_INDEX_LUT) && defined(TEXTURE_PARAMETER_SLOT_BASE)
+    tex_parameter_buffer_address = preamble.paramBufferAddress;
 #endif
 
     // State

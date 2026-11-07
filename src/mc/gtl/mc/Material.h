@@ -17,8 +17,10 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <string>
 #include <memory>
+#include <variant>
 #include <vector>
 
 namespace gtl
@@ -31,6 +33,32 @@ namespace gtl
     Cutout,
     NonBinary
   };
+
+  // Categories of the custom nodes which replace parameterized inputs in the material network.
+  constexpr const char* MC_MTLX_SCALAR_PARAMETER_NODE_CATEGORY = "GTL_scalar_parameter";
+  constexpr const char* MC_MTLX_TEXTURE_FILE_NODE_CATEGORY = "GTL_texture_file";
+
+  struct McMtlxScalarNetworkParameter
+  {
+    std::string name;
+    std::vector<uint8_t> data;
+    uint32_t componentCount;
+  };
+
+  struct McMtlxTextureNetworkParameter
+  {
+    std::string name;
+    std::string mdlParameterName;
+    std::string uri;
+    std::string filePath;
+  };
+
+  using McMtlxNetworkParameter = std::variant<McMtlxScalarNetworkParameter, McMtlxTextureNetworkParameter>;
+
+  inline const std::string& McMtlxGetNetworkParameterName(const McMtlxNetworkParameter& parameter)
+  {
+    return std::visit([](const auto& p) -> const std::string& { return p.name; }, parameter);
+  }
 
   struct McMaterial
   {

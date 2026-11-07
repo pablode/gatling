@@ -19,35 +19,52 @@
 
 #include <MaterialXCore/Document.h>
 
+#include <memory>
 #include <string>
-#include <vector>
+#include <string_view>
 
 #include "Material.h"
 #include "MaterialParameters.h"
+#include "MtlxDocPatch.h"
 
 namespace gtl
 {
   struct McMaterial;
   class McMdlMaterialCompiler;
-  class McRuntime;
   class McMtlxMdlCodeGen;
+  class McRuntime;
 
   class McFrontend
   {
   public:
-    McFrontend(const MaterialX::DocumentPtr mtlxStdLib, McRuntime& mdlRuntime);
+    McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
+               const std::string& customMtlxNodesPath,
+               McRuntime& mdlRuntime);
 
   public:
+    MaterialX::DocumentPtr parseMtlxDoc(std::string_view mtlxSrc);
+
+    McMtlxMaterialDoc patchMtlxDoc(const MaterialX::DocumentPtr& doc,
+                                   const char* materialName,
+                                   bool usdPreviewSurfacePresenceOverride,
+                                   uint32_t maxParameterCount);
+
     McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
-                                  const MaterialX::NodePtr& surfaceShader);
+                                  const MaterialX::NodePtr& surfaceShader,
+                                  McOpacityClassification opacityClass);
 
     McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
 
   private:
-    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, McOpacityClassification opacityClass, bool isAnimated);
+    McMaterial* createFromMdlStr(std::string_view mdlSrc,
+                                 std::string_view subIdentifier,
+                                 McOpacityClassification opacityClass,
+                                 bool isAnimated);
 
   private:
+    MaterialX::DocumentPtr m_mtlxStdLib;
     std::shared_ptr<McMdlMaterialCompiler> m_mdlMaterialCompiler;
     std::shared_ptr<McMtlxMdlCodeGen> m_mtlxMdlCodeGen;
+    std::shared_ptr<McMtlxDocumentPatcher> m_mtlxDocPatcher;
   };
 }

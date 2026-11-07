@@ -53,6 +53,7 @@ namespace gtl
     DoubleSided,
     Albedo,
     TopoHash,
+    MaterialId,
     COUNT
   };
 

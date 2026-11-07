@@ -18,10 +18,12 @@
 #include "GlslShaderGen.h"
 #include "GlslShaderCompiler.h"
 #include "GlslStitcher.h"
+#include "interface/rp_main.h"
 
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Runtime.h>
 #include <gtl/mc/Backend.h>
+#include <gtl/gb/Log.h>
 
 #include <string>
 #include <sstream>
@@ -32,6 +34,8 @@
 
 namespace gtl
 {
+  namespace rp = shader_interface::rp_main;
+
   class McRuntime;
 
   bool GiGlslShaderGen::init(std::string_view shaderPath, McRuntime& mcRuntime)
@@ -157,10 +161,9 @@ namespace gtl
     return m_shaderCompiler->compileGlslToSpv(GiGlslShaderCompiler::ShaderStage::Miss, source, spv);
   }
 
-  bool _MakeMaterialGenInfo(const McGlslGenResult& codeGenResult,
+  void _MakeMaterialGenInfo(const McGlslGenResult& codeGenResult,
                             const std::string& resourcePathPrefix,
                             const std::vector<const char*>& sceneDataNames,
-                            fs::path shaderPath,
                             GiGlslShaderGen::MaterialGenInfo& genInfo)
   {
     // Resolve paths relative to file-backed MDL modules. The backend already makes paths
@@ -222,15 +225,20 @@ namespace gtl
       }
     }
 
+    if (maxSceneDataId > rp::MAX_SCENE_DATA_COUNT)
+    {
+      GB_ERROR("material references scene data ID {} but only {} slots are available", maxSceneDataId, rp::MAX_SCENE_DATA_COUNT);
+      maxSceneDataId = rp::MAX_SCENE_DATA_COUNT;
+    }
+
     genInfo = GiGlslShaderGen::MaterialGenInfo {
       .glslSource = glslSource,
       .textureDescriptions = textureDescriptions,
       .stringConstants = codeGenResult.stringConstants,
+      .textureParameterBindings = codeGenResult.textureParameterBindings,
       .builtinSceneDataIndices = bsdIndices,
       .maxSceneDataId = maxSceneDataId
     };
-
-    return true;
   }
 
   bool GiGlslShaderGen::generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo, bool needsAuxOutput)
@@ -255,8 +263,9 @@ namespace gtl
       return false;
     }
 
-    return _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, material.sceneDataNames,
-                                m_shaderPath, genInfo);
+    _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, material.sceneDataNames, genInfo);
+
+    return true;
   }
 
   bool GiGlslShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)
@@ -314,9 +323,13 @@ namespace gtl
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
     }
-    if (params.hasUdimTextures)
+    if (params.useTextureIndexLut)
     {
-      stitcher.appendDefine("HAS_UDIM_TEXTURES");
+      stitcher.appendDefine("USE_TEXTURE_INDEX_LUT");
+    }
+    if (params.hasTextureParameters)
+    {
+      stitcher.appendDefine("TEXTURE_PARAMETER_SLOT_BASE", (int) params.textureParameterSlotBase);
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
@@ -357,9 +370,13 @@ namespace gtl
     {
       stitcher.appendDefine("IS_ANIMATED");
     }
-    if (params.hasUdimTextures)
+    if (params.useTextureIndexLut)
     {
-      stitcher.appendDefine("HAS_UDIM_TEXTURES");
+      stitcher.appendDefine("USE_TEXTURE_INDEX_LUT");
+    }
+    if (params.hasTextureParameters)
+    {
+      stitcher.appendDefine("TEXTURE_PARAMETER_SLOT_BASE", (int) params.textureParameterSlotBase);
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;

@@ -20,10 +20,16 @@
 #include <MaterialXCore/Types.h>
 #include <MaterialXFormat/File.h>
 #include <MaterialXFormat/Util.h>
+#include <MaterialXGenShader/Util.h>
 
 #include <unordered_set>
+#include <algorithm>
 #include <assert.h>
 #include <ctype.h>
+#include <cmath>
+#include <cstring>
+#include <functional>
+#include <optional>
 
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
@@ -119,6 +125,12 @@ mx::string _GetPortType(mx::PortElementPtr port)
   return portInterface ? portInterface->getType() : port->getType();
 }
 
+bool _IsVectorOrColorType(const mx::string& type)
+{
+  return type == "color3" || type == "color4" ||
+         type == "vector2" || type == "vector3" || type == "vector4";
+}
+
 void _PatchBoolValueMismatches(mx::DocumentPtr document)
 {
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
@@ -177,20 +189,33 @@ void _PatchImplicitTypeConversions(mx::DocumentPtr document)
       continue;
     }
 
-    std::string conversionND = GB_FMT("ND_convert_{}_{}", inputType, outputType);
-    if (!document->getNodeDef(conversionND))
+    // MaterialX names conversions 'ND_convert_<from>_<to>', where '<from>' is the upstream
+    // output type and '<to>' is the downstream input type.
+    std::string conversionND = GB_FMT("ND_convert_{}_{}", outputType, inputType);
+
+    std::string nodeCategory;
+    if (document->getNodeDef(conversionND))
+    {
+      nodeCategory = "convert";
+    }
+    else if (inputType == "float" && _IsVectorOrColorType(outputType))
+    {
+      // There is no unambiguous conversion from a color or vector to a float, so assets
+      // commonly rely on an implicit first-channel conversion. 'extract' matches that.
+      nodeCategory = "extract";
+    }
+    else
     {
       GB_WARN("invalid connection types between {} ({}) -> {} ({})",
         input->getName(), inputType, output->getName(), outputType);
       continue;
     }
 
-    std::string nodeCategory = "convert";
     std::string nodeName = mx::EMPTY_STRING; // auto-assign
     std::string nodeType = inputType;
     mx::NodePtr node = document->addNode(nodeCategory, nodeName, nodeType);
 
-    mx::InputPtr convertInput = node->addInput("in");
+    mx::InputPtr convertInput = node->addInput("in", outputType);
     convertInput->setConnectedOutput(output);
 
     // Can't clear because we need to preserve other attributes like 'colorspace'.
@@ -739,6 +764,503 @@ void _PatchNonACESColorSpaces(mx::DocumentPtr document, ocio::ConstConfigRcPtr o
 }
 #endif
 
+namespace
+{
+  using gtl::McOpacityClassification;
+
+  // Prefix of the scene data names which parameterize constant inputs. Their values are read
+  // from the material's parameter buffer at render time.
+  constexpr const char* PARAMETER_SCENE_DATA_PREFIX = "__gtl_gp_";
+
+  // Prefix of the nodes which replace parameterized inputs in the network.
+  constexpr const char* PARAMETER_NODE_PREFIX = "GTL_gp_";
+
+  bool _GetParameterComponentCount(const std::string& type, uint32_t& componentCount)
+  {
+    if (type == "float" || type == "integer")
+    {
+      componentCount = 1;
+      return true;
+    }
+    if (type == "vector2")
+    {
+      componentCount = 2;
+      return true;
+    }
+    if (type == "vector3" || type == "color3")
+    {
+      componentCount = 3;
+      return true;
+    }
+    if (type == "vector4" || type == "color4")
+    {
+      componentCount = 4;
+      return true;
+    }
+    return false;
+  }
+
+  bool _ExtractParameterData(const mx::ValuePtr& value, uint32_t componentCount, std::vector<uint8_t>& data)
+  {
+    if (!value)
+    {
+      return false;
+    }
+
+    data.resize(componentCount * sizeof(float));
+
+    if (componentCount == 1 && value->isA<float>())
+    {
+      float v = value->asA<float>();
+      memcpy(data.data(), &v, sizeof(float));
+      return true;
+    }
+    if (componentCount == 1 && value->isA<int>())
+    {
+      int v = value->asA<int>();
+      memcpy(data.data(), &v, sizeof(int));
+      return true;
+    }
+    if (componentCount == 2 && value->isA<mx::Vector2>())
+    {
+      mx::Vector2 v = value->asA<mx::Vector2>();
+      memcpy(data.data(), &v[0], sizeof(float) * 2);
+      return true;
+    }
+    if (componentCount == 3 && value->isA<mx::Vector3>())
+    {
+      mx::Vector3 v = value->asA<mx::Vector3>();
+      memcpy(data.data(), &v[0], sizeof(float) * 3);
+      return true;
+    }
+    if (componentCount == 3 && value->isA<mx::Color3>())
+    {
+      mx::Color3 v = value->asA<mx::Color3>();
+      memcpy(data.data(), &v[0], sizeof(float) * 3);
+      return true;
+    }
+    if (componentCount == 4 && value->isA<mx::Vector4>())
+    {
+      mx::Vector4 v = value->asA<mx::Vector4>();
+      memcpy(data.data(), &v[0], sizeof(float) * 4);
+      return true;
+    }
+    if (componentCount == 4 && value->isA<mx::Color4>())
+    {
+      mx::Color4 v = value->asA<mx::Color4>();
+      memcpy(data.data(), &v[0], sizeof(float) * 4);
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _IsTextureFileInput(const mx::NodePtr& node, const mx::InputPtr& input)
+  {
+    if (input->getType() != "filename")
+    {
+      return false;
+    }
+
+    // Only texture file inputs can be mapped to GPU resources; other filename inputs
+    // (e.g. primvar fallbacks) have no representation in the shader.
+    const std::string& category = node->getCategory();
+    return category == "image" || category == "tiledimage" || category == "UsdUVTexture";
+  }
+
+  std::string _UnsanitizeFilePath(std::string path)
+  {
+#if _WIN32
+    if (path.size() > 2 && path[0] == '/' && path[2] == '/')
+    {
+      path[0] = path[1];
+      path[1] = ':';
+    }
+#endif
+    return path;
+  }
+
+  // Adds a NodeDef for texture file parameters to the document. Its inputs are a URI string,
+  // which carries the texture file path through the document, and a uniform texture value that
+  // the MDL frontend binds the actual texture to. The implementation emits the texture value
+  // directly.
+  void _AddTextureFileNodeDef(mx::DocumentPtr doc)
+  {
+    constexpr const char* NODEDEF_NAME = "ND_GTL_texture_file_filename";
+
+    if (doc->getNodeDef(NODEDEF_NAME))
+    {
+      return;
+    }
+
+    mx::NodeDefPtr nodeDef = doc->addNodeDef(NODEDEF_NAME, mx::FILENAME_TYPE_STRING, gtl::MC_MTLX_TEXTURE_FILE_NODE_CATEGORY);
+
+    mx::InputPtr uriInput = nodeDef->addInput("uri", mx::STRING_TYPE_STRING);
+    uriInput->setValueString(mx::EMPTY_STRING);
+    uriInput->setIsUniform(true);
+
+    mx::InputPtr valueInput = nodeDef->addInput("value", mx::FILENAME_TYPE_STRING);
+    valueInput->setValueString(mx::EMPTY_STRING);
+    valueInput->setIsUniform(true);
+
+    nodeDef->getOutput("out")->setIsUniform(true);
+
+    mx::ImplementationPtr impl = doc->addImplementation("IM_GTL_texture_file_filename_genmdl");
+    impl->setNodeDef(nodeDef);
+    impl->setTarget("genmdl");
+    impl->setAttribute("sourcecode", "{{value}}");
+  }
+
+  // Adds a NodeDef for scalar parameters to the document. Its uniform 'parameter' input carries
+  // the name of the scene data entry, which the implementation reads from the material's
+  // parameter buffer.
+  bool _AddScalarParameterNodeDef(mx::DocumentPtr doc, const std::string& type)
+  {
+    struct TypeDescription
+    {
+      const char* type;
+      const char* sourceCode;
+    };
+
+    const static std::vector<TypeDescription> TYPE_DESCRIPTIONS = {
+      { "float", "scene::data_lookup_float({{parameter}}, 0.0)" },
+      { "integer", "scene::data_lookup_int({{parameter}}, 0)" },
+      { "vector2", "scene::data_lookup_float2({{parameter}}, float2(0.0))" },
+      { "vector3", "scene::data_lookup_float3({{parameter}}, float3(0.0))" },
+      { "vector4", "scene::data_lookup_float4({{parameter}}, float4(0.0))" },
+      { "color3", "scene::data_lookup_color({{parameter}}, color(0.0))" },
+      { "color4", "mk_color4(scene::data_lookup_float4({{parameter}}, float4(0.0)))" }
+    };
+
+    auto typeDescriptionIt = std::find_if(TYPE_DESCRIPTIONS.begin(), TYPE_DESCRIPTIONS.end(),
+                                          [&type](const TypeDescription& description)
+    {
+      return type == description.type;
+    });
+
+    if (typeDescriptionIt == TYPE_DESCRIPTIONS.end())
+    {
+      return false;
+    }
+
+    const std::string nodeDefName = GB_FMT("ND_GTL_scalar_parameter_{}", type);
+
+    if (doc->getNodeDef(nodeDefName))
+    {
+      return true;
+    }
+
+    mx::NodeDefPtr nodeDef = doc->addNodeDef(nodeDefName, type, gtl::MC_MTLX_SCALAR_PARAMETER_NODE_CATEGORY);
+
+    mx::InputPtr parameterInput = nodeDef->addInput("parameter", mx::STRING_TYPE_STRING);
+    parameterInput->setValueString(mx::EMPTY_STRING);
+    parameterInput->setIsUniform(true);
+
+    mx::ImplementationPtr impl = doc->addImplementation(GB_FMT("IM_GTL_scalar_parameter_{}_genmdl", type));
+    impl->setNodeDef(nodeDef);
+    impl->setTarget("genmdl");
+    impl->setAttribute("sourcecode", typeDescriptionIt->sourceCode);
+
+    return true;
+  }
+
+  bool _IsParameterizableInput(const mx::NodePtr& node, const mx::InputPtr& input)
+  {
+    const std::string& category = node->getCategory();
+
+    // These nodes are structural and must not be turned into material parameters.
+    if (category == "geompropvalue" || category == "geompropvalueuniform" || category == "texcoord" ||
+        category == "time" || category == "frame")
+    {
+      return false;
+    }
+
+    // Connections through node graph outputs are not followed by the topological hash.
+    if (input->getConnectedOutput())
+    {
+      return false;
+    }
+
+    if (!input->hasValue())
+    {
+      return false;
+    }
+
+    if (_IsTextureFileInput(node, input))
+    {
+      return !input->getValueString().empty();
+    }
+
+    // Inputs declared uniform by the node definition can only be connected to uniform nodes.
+    // Since geompropvalueuniform only exists for string and filename types, varying
+    // geompropvalue nodes would produce type mismatches in the generated MDL.
+    mx::NodeDefPtr nodeDef = node->getNodeDef();
+    mx::InputPtr inputDef = nodeDef ? nodeDef->getActiveInput(input->getName()) : nullptr;
+    if (inputDef && inputDef->getIsUniform())
+    {
+      return false;
+    }
+
+    uint32_t componentCount;
+    return _GetParameterComponentCount(input->getType(), componentCount);
+  }
+
+  std::optional<McOpacityClassification> _EstimateNodeOpacityFromInput(mx::NodePtr node,
+                                                                       const std::string& category,
+                                                                       const std::string& inputName,
+                                                                       mx::ValuePtr defaultValue)
+  {
+    if (!node || node->getCategory() != category)
+    {
+      return std::nullopt;
+    }
+
+    if (node->getConnectedNode(inputName) != nullptr)
+    {
+      return McOpacityClassification::NonBinary; // custom logic hooked up
+    }
+
+    mx::ValuePtr inputValue = node->getInputValue(inputName);
+    float floatEps = 0.0001f;
+
+    if (inputValue && inputValue->isA<float>() && defaultValue->isA<float>())
+    {
+      return (std::fabs(inputValue->asA<float>() - defaultValue->asA<float>()) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
+    }
+
+    if (inputValue && inputValue->isA<mx::Color3>() && defaultValue->isA<mx::Color3>())
+    {
+      mx::Color3 diff = inputValue->asA<mx::Color3>() - defaultValue->asA<mx::Color3>();
+      return (std::fabs(diff[0]) < floatEps && std::fabs(diff[1]) < floatEps && std::fabs(diff[2]) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
+    }
+
+    if (inputValue && inputValue->isA<int>() && defaultValue->isA<int>())
+    {
+      return (inputValue->asA<int>() == defaultValue->asA<int>()) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
+    }
+
+    return std::nullopt;
+  }
+
+  struct OpacityInputDescription
+  {
+    const char* nodeCategory;
+    const char* inputName;
+    mx::ValuePtr defaultValue;
+  };
+
+  const static std::vector<OpacityInputDescription> NONBINARY_OPACITY_INPUT_DESCRIPTIONS = {
+    { "UsdPreviewSurface", "opacity", mx::Value::createValue(1.0f) },
+    { "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f)) },
+    { "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* Opaque */) },
+    { "open_pbr_surface", "geometry_opacity", mx::Value::createValue(1.0f) }
+  };
+
+  mx::NodePtr _FindSurfaceShader(const mx::DocumentPtr& doc, const char* name)
+  {
+    // Find material in document
+    auto materialNodes = doc->getMaterialNodes();
+
+    if (materialNodes.size() != 1)
+    {
+      // HdMtlx generates a new document for each material; there should be a single material
+      GB_ERROR("unexpected material count in mtlx document for material {}", name ? name : "<unnamed>");
+      return nullptr;
+    }
+
+    mx::NodePtr materialNode = materialNodes[0];
+
+    // Extract surface shader node
+    auto surfaceShaderNodes = mx::getShaderNodes(materialNode, mx::SURFACE_SHADER_TYPE_STRING);
+
+    mx::TypedElementPtr renderableElement = materialNode;
+    if (!surfaceShaderNodes.empty())
+    {
+      renderableElement = *surfaceShaderNodes.begin();
+
+      if (surfaceShaderNodes.size() > 1)
+      {
+        GB_WARN("found multiple surface shaders for material {}; choosing first", name ? name : "<unnamed>");
+      }
+    }
+
+    mx::ElementPtr surfaceElement = doc->getDescendant(renderableElement->getNamePath());
+    if (!surfaceElement)
+    {
+      GB_WARN("could not find surface shader for material {}", name ? name : "<unnamed>");
+      return nullptr;
+    }
+
+    GB_DEBUG("found surface shader: {}", surfaceElement->getName());
+    return surfaceElement->asA<mx::Node>();
+  }
+
+  McOpacityClassification _ClassifySurfaceShaderOpacity(const mx::NodePtr& surfaceShader)
+  {
+    if (!surfaceShader)
+    {
+      return McOpacityClassification::Opaque;
+    }
+
+    mx::NodePtr node = surfaceShader;
+
+    // Detect alpha cutout
+    if (node->getCategory() == "UsdPreviewSurface")
+    {
+      mx::ValuePtr inputValue = node->getInputValue("opacityThreshold");
+
+      if (inputValue && inputValue->isA<float>() && inputValue->asA<float>() > 0.0f)
+      {
+        return McOpacityClassification::Cutout;
+      }
+    }
+    else if (node->getCategory() == "gltf_pbr")
+    {
+      mx::ValuePtr inputValue = node->getInputValue("alpha_mode");
+
+      if (inputValue && inputValue->isA<int>() && inputValue->asA<int>() == 1 /*MASK*/)
+      {
+        return McOpacityClassification::Cutout;
+      }
+    }
+
+    // Otherwise decide between opaque and non-binary opacity
+    for (const auto& inputDesc : NONBINARY_OPACITY_INPUT_DESCRIPTIONS)
+    {
+      std::optional<McOpacityClassification> opacity = _EstimateNodeOpacityFromInput(node, inputDesc.nodeCategory, inputDesc.inputName, inputDesc.defaultValue);
+
+      if (opacity.has_value())
+      {
+        return *opacity;
+      }
+    }
+
+    // Use MaterialX helper function as fallback and assume worst case (not accurate, has false positives)
+    return mx::isTransparentSurface(surfaceShader) ? McOpacityClassification::NonBinary : McOpacityClassification::Opaque;
+  }
+
+  std::vector<gtl::McMtlxNetworkParameter> _ParameterizeNetwork(const mx::DocumentPtr& doc,
+                                                                const mx::NodePtr& surfaceShader,
+                                                                uint32_t maxParameterCount)
+  {
+    std::vector<gtl::McMtlxNetworkParameter> parameters;
+
+    bool maxParameterCountWarned = false;
+
+    std::unordered_set<mx::NodePtr> visitedNodes;
+    std::function<void(const mx::NodePtr&)> visitNode;
+
+    visitNode = [&](const mx::NodePtr& node)
+    {
+      if (!node || !visitedNodes.insert(node).second)
+      {
+        return;
+      }
+
+      // Sort inputs so that parameter naming is stable across materials with
+      // the same network topology.
+      std::vector<mx::InputPtr> inputs = node->getActiveInputs();
+      std::sort(inputs.begin(), inputs.end(), [](const mx::InputPtr& a, const mx::InputPtr& b)
+      {
+        return a->getName() < b->getName();
+      });
+
+      for (const mx::InputPtr& input : inputs)
+      {
+        mx::NodePtr upstreamNode = input->getConnectedNode();
+        if (upstreamNode)
+        {
+          visitNode(upstreamNode);
+          continue;
+        }
+
+        if (!_IsParameterizableInput(node, input))
+        {
+          continue;
+        }
+
+        if (parameters.size() >= maxParameterCount)
+        {
+          if (!maxParameterCountWarned)
+          {
+            GB_WARN("max material parameter count exceeded; remaining inputs stay constant");
+            maxParameterCountWarned = true;
+          }
+          continue;
+        }
+
+        uint32_t componentCount = 0;
+        std::vector<uint8_t> data;
+
+        bool isTexture = _IsTextureFileInput(node, input);
+        gtl::McMtlxTextureNetworkParameter textureParameter;
+
+        std::string parameterIndex = std::to_string(parameters.size() + 1);
+        std::string parameterName = std::string(PARAMETER_SCENE_DATA_PREFIX) + parameterIndex;
+        std::string nodeName = std::string(PARAMETER_NODE_PREFIX) + parameterIndex;
+
+        if (isTexture)
+        {
+          // The URI input carries the texture file path. At MDL compile time, the texture is
+          // bound to the uniform texture parameter generated from the value input.
+          std::string uri = input->getValueString();
+
+          _AddTextureFileNodeDef(doc);
+
+          textureParameter = gtl::McMtlxTextureNetworkParameter{
+            .name = parameterName,
+            .uri = uri,
+            .filePath = _UnsanitizeFilePath(uri)
+          };
+        }
+        else
+        {
+          _GetParameterComponentCount(input->getType(), componentCount);
+
+          if (!_ExtractParameterData(input->getValue(), componentCount, data) ||
+              !_AddScalarParameterNodeDef(doc, input->getType()))
+          {
+            continue;
+          }
+        }
+
+        const char* nodeCategory = isTexture ? gtl::MC_MTLX_TEXTURE_FILE_NODE_CATEGORY : gtl::MC_MTLX_SCALAR_PARAMETER_NODE_CATEGORY;
+        const std::string& parameterType = input->getType();
+
+        mx::NodePtr parameterNode;
+        mx::GraphElementPtr parentGraph = node->getParent()->asA<mx::GraphElement>();
+        assert(parentGraph);
+        parameterNode = parentGraph->addNode(nodeCategory, nodeName, parameterType);
+
+        const char* inputName = isTexture ? "uri" : "parameter";
+        mx::InputPtr parameterInput = parameterNode->addInput(inputName, mx::STRING_TYPE_STRING);
+        parameterInput->setValueString(isTexture ? textureParameter.uri : parameterName);
+
+        input->setConnectedNode(parameterNode);
+        input->removeAttribute(mx::ValueElement::VALUE_ATTRIBUTE);
+
+        if (isTexture)
+        {
+          textureParameter.mdlParameterName = parameterNode->getName() + "_value";
+          parameters.push_back(std::move(textureParameter));
+        }
+        else
+        {
+          parameters.push_back(gtl::McMtlxScalarNetworkParameter{
+            .name = parameterName,
+            .data = std::move(data),
+            .componentCount = componentCount
+          });
+        }
+      }
+    };
+
+    visitNode(surfaceShader);
+
+    return parameters;
+  }
+}
+
 namespace gtl
 {
   McMtlxDocumentPatcher::McMtlxDocumentPatcher([[maybe_unused]] const mx::DocumentPtr mtlxStdLib,
@@ -787,7 +1309,10 @@ namespace gtl
 #endif
   }
 
-  mx::DocumentPtr McMtlxDocumentPatcher::patch(const mx::DocumentPtr document, [[maybe_unused]] bool usdPreviewSurfacePresenceOverride)
+  McMtlxMaterialDoc McMtlxDocumentPatcher::patch(const mx::DocumentPtr& document,
+                                                 const char* materialName,
+                                                 [[maybe_unused]] bool usdPreviewSurfacePresenceOverride,
+                                                 uint32_t maxParameterCount)
   {
     mx::DocumentPtr docCopy = document->copy();
 
@@ -860,6 +1385,26 @@ namespace gtl
     }
 #endif
 
-    return docCopy;
+    mx::NodePtr surfaceShader = _FindSurfaceShader(docCopy, materialName);
+    if (!surfaceShader)
+    {
+      return {};
+    }
+
+    // Opacity classification inspects the authored constant values of the surface shader
+    // (e.g. opacityThreshold, opacity) and whether opacity is connected to a node. Parameterization
+    // replaces these constants with GTL_scalar_parameter nodes and removes their values, after
+    // which the heuristics would fall back to nodedef defaults and misclassify the material.
+    // Classification therefore has to happen on the unparameterized document.
+    McOpacityClassification opacityClass = _ClassifySurfaceShaderOpacity(surfaceShader);
+
+    std::vector<McMtlxNetworkParameter> parameters = _ParameterizeNetwork(docCopy, surfaceShader, maxParameterCount);
+
+    return McMtlxMaterialDoc{
+      .doc = docCopy,
+      .surfaceShader = surfaceShader,
+      .opacityClass = opacityClass,
+      .parameters = std::move(parameters)
+    };
   }
 }

@@ -52,6 +52,7 @@ namespace gtl
       std::string glslSource;
       std::vector<McTextureDescription> textureDescriptions;
       std::vector<std::string> stringConstants;
+      std::vector<McTextureParameterBinding> textureParameterBindings;
       BuiltinSceneDataIndices builtinSceneDataIndices;
       uint32_t maxSceneDataId;
     };
@@ -104,7 +105,9 @@ namespace gtl
       uint32_t maxSceneDataId;
       std::string_view dfGlsl;
       uint32_t textureIndexOffset;
-      bool hasUdimTextures;
+      bool useTextureIndexLut;
+      bool hasTextureParameters;
+      uint32_t textureParameterSlotBase;
     };
 
     struct AnyHitShaderParams
@@ -118,7 +121,9 @@ namespace gtl
       bool shadowTest;
       uint32_t textureIndexOffset;
       bool isAnimated;
-      bool hasUdimTextures;
+      bool useTextureIndexLut;
+      bool hasTextureParameters;
+      uint32_t textureParameterSlotBase;
     };
 
     bool generateRgenSpirv(std::string_view fileName, const RaygenShaderParams& params, std::vector<uint8_t>& spv);

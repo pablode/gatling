@@ -19,6 +19,7 @@
 
 #include "MdlRuntime.h"
 #include "MdlEntityResolver.h"
+#include "MdlMaterial.h"
 
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
@@ -41,6 +42,22 @@ namespace
   {
     uint32_t uniqueId = ++s_idCounter;
     return GB_FMT("::gatling::{}_{}", uniqueId, identifier);
+  }
+
+  // MaterialX names function parameters after the node and input. For the texture file node
+  // 'GTL_gp_1' these are 'GTL_gp_1_uri' (string) and 'GTL_gp_1_value' (texture).
+  std::string _GetUriParameterName(std::string_view textureParameterName)
+  {
+    constexpr std::string_view TEXTURE_PARAMETER_SUFFIX = "_value";
+    constexpr std::string_view URI_PARAMETER_SUFFIX = "_uri";
+
+    if (!textureParameterName.ends_with(TEXTURE_PARAMETER_SUFFIX))
+    {
+      return {};
+    }
+
+    return std::string(textureParameterName.substr(0, textureParameterName.size() - TEXTURE_PARAMETER_SUFFIX.size())) +
+           std::string(URI_PARAMETER_SUFFIX);
   }
 
   mi::base::Handle<mi::neuraylib::IValue> _TranslateParameterValue(mi::neuraylib::IMdl_execution_context* context,
@@ -135,7 +152,8 @@ namespace gtl
 
   bool McMdlMaterialCompiler::compileFromString(std::string_view srcStr,
                                                 std::string_view identifier,
-                                                mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
+                                                mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
+                                                std::vector<McMdlTextureParameter>& textureParameters)
   {
     std::string moduleName = _MakeModuleName(identifier);
 
@@ -144,7 +162,7 @@ namespace gtl
       return m_impExpApi->load_module_from_string(m_transaction.get(), moduleName.c_str(), srcStr.data(), context);
     };
 
-    return compile(identifier, moduleName, modCreateFunc, compiledMaterial);
+    return compile(identifier, moduleName, modCreateFunc, compiledMaterial, {}, &textureParameters);
   }
 
   bool McMdlMaterialCompiler::compileFromFile(const char* filePath,
@@ -165,14 +183,15 @@ namespace gtl
       return m_impExpApi->load_module(m_transaction.get(), moduleName.c_str(), context);
     };
 
-    return compile(identifier, moduleName, modCreateFunc, compiledMaterial, params);
+    return compile(identifier, moduleName, modCreateFunc, compiledMaterial, params, nullptr);
   }
 
   bool McMdlMaterialCompiler::compile(std::string_view identifier,
                                       std::string_view moduleName,
                                       std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
                                       mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
-                                      const McMaterialParameters& params)
+                                      const McMaterialParameters& params,
+                                      std::vector<McMdlTextureParameter>* textureParameters)
   {
     mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
     context->set_option("resolve_resources", false);
@@ -180,7 +199,7 @@ namespace gtl
     mi::Sint32 modCreateResult = modCreateFunc(context.get());
 
     bool compResult = (modCreateResult == 0 || modCreateResult == 1) &&
-      createCompiledMaterial(context.get(), moduleName.data(), identifier, compiledMaterial, params);
+      createCompiledMaterial(context.get(), moduleName.data(), identifier, compiledMaterial, params, textureParameters);
 
     m_logger->flushContextMessages(context.get());
 
@@ -191,7 +210,8 @@ namespace gtl
                                                      std::string_view moduleName,
                                                      std::string_view identifier,
                                                      mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
-                                                     const McMaterialParameters& params)
+                                                     const McMaterialParameters& params,
+                                                     std::vector<McMdlTextureParameter>* textureParameters)
   {
     mi::base::Handle<const mi::IString> moduleDbName(m_factory->get_db_module_name(moduleName.data()));
     assert(moduleDbName);
@@ -222,34 +242,102 @@ namespace gtl
       return false;
     }
 
-    mi::neuraylib::IExpression_list* paramList = nullptr;
-    if (!params.empty())
+    // Factories are not thread-safe, so create them per compilation.
+    mi::base::Handle<mi::neuraylib::IType_factory> tf(m_factory->create_type_factory(m_transaction.get()));
+    mi::base::Handle<mi::neuraylib::IValue_factory> vf(m_factory->create_value_factory(m_transaction.get()));
+    mi::base::Handle<mi::neuraylib::IExpression_factory> ef(m_factory->create_expression_factory(m_transaction.get()));
+
+    mi::base::Handle<mi::neuraylib::IExpression_list> paramList(ef->create_expression_list());
+
+    for (const auto& nameValuePair : params)
     {
-      // Factories are not thread-safe, so create them per compilation.
-      mi::base::Handle<mi::neuraylib::IType_factory> tf(m_factory->create_type_factory(m_transaction.get()));
-      mi::base::Handle<mi::neuraylib::IValue_factory> vf(m_factory->create_value_factory(m_transaction.get()));
-      mi::base::Handle<mi::neuraylib::IExpression_factory> ef(m_factory->create_expression_factory(m_transaction.get()));
+      mi::base::Handle<mi::neuraylib::IValue> value = _TranslateParameterValue(context, m_transaction, m_factory, tf, vf, nameValuePair.second);
 
-      paramList = ef->create_expression_list();
-
-      for (const auto& nameValuePair : params)
+      if (!value)
       {
-        mi::base::Handle<mi::neuraylib::IValue> value = _TranslateParameterValue(context, m_transaction, m_factory, tf, vf, nameValuePair.second);
+        continue;
+      }
 
-        if (!value)
+      mi::base::Handle<mi::neuraylib::IExpression> expr(ef->create_constant(value.get()));
+
+      const std::string& name = nameValuePair.first;
+      paramList->add_expression(name.c_str(), expr.get());
+    }
+
+    if (textureParameters)
+    {
+      // Texture parameters of generated MDL materials are uniform texture parameters which
+      // have a corresponding URI parameter carrying the texture file path.
+      mi::base::Handle<const mi::neuraylib::IExpression_list> defaults(materialDefinition->get_defaults());
+      mi::base::Handle<const mi::neuraylib::IType_list> types(materialDefinition->get_parameter_types());
+
+      for (mi::Size i = 0; defaults && types && i < materialDefinition->get_parameter_count(); i++)
+      {
+        const char* textureParameterName = materialDefinition->get_parameter_name(i);
+        if (!textureParameterName)
         {
           continue;
         }
 
-        mi::base::Handle<mi::neuraylib::IExpression> expr(ef->create_constant(value.get()));
+        // Resolve aliases, which are used to store type modifiers such as 'uniform'.
+        mi::base::Handle<const mi::neuraylib::IType> type(types->get_type(textureParameterName));
+        while (type)
+        {
+          mi::base::Handle<const mi::neuraylib::IType_alias> alias(type->get_interface<mi::neuraylib::IType_alias>());
+          if (!alias)
+          {
+            break;
+          }
 
-        const std::string& name = nameValuePair.first;
-        paramList->add_expression(name.c_str(), expr.get());
+          type = mi::base::Handle<const mi::neuraylib::IType>(alias->get_aliased_type());
+        }
+
+        mi::base::Handle<const mi::neuraylib::IType_texture> textureType(
+          type ? type->get_interface<mi::neuraylib::IType_texture>() : nullptr);
+
+        if (!textureType || textureType->get_shape() != mi::neuraylib::IType_texture::TS_2D)
+        {
+          continue;
+        }
+
+        std::string uriParameterName = _GetUriParameterName(textureParameterName);
+        if (uriParameterName.empty())
+        {
+          continue;
+        }
+
+        mi::base::Handle<const mi::neuraylib::IExpression> uriExpr(defaults->get_expression(uriParameterName.c_str()));
+        mi::base::Handle<const mi::neuraylib::IExpression_constant> constExpr(
+          uriExpr ? uriExpr->get_interface<mi::neuraylib::IExpression_constant>() : nullptr);
+        mi::base::Handle<const mi::neuraylib::IValue_string> stringValue(
+          constExpr ? constExpr->get_value<mi::neuraylib::IValue_string>() : nullptr);
+
+        if (!stringValue || !stringValue->get_value() || stringValue->get_value()[0] == '\0')
+        {
+          continue;
+        }
+
+        std::string path(stringValue->get_value());
+
+        mi::base::Handle<mi::neuraylib::IValue_texture> texture(m_factory->create_texture(
+          m_transaction.get(), path.c_str(), mi::neuraylib::IType_texture::TS_2D, 1.0f, nullptr, false, context));
+
+        if (!texture)
+        {
+          GB_ERROR("failed to create texture {}", path);
+          continue;
+        }
+
+        mi::base::Handle<mi::neuraylib::IExpression> textureExpr(ef->create_constant(texture.get()));
+        paramList->add_expression(textureParameterName, textureExpr.get());
+
+        textureParameters->push_back({ textureParameterName, texture });
       }
     }
 
     mi::Sint32 result;
-    mi::base::Handle<mi::neuraylib::IFunction_call> materialInstance(materialDefinition->create_function_call(paramList, &result));
+    mi::base::Handle<mi::neuraylib::IFunction_call> materialInstance(
+      materialDefinition->create_function_call(paramList->get_size() > 0 ? paramList.get() : nullptr, &result));
     if (result != 0 || !materialInstance)
     {
       return false;

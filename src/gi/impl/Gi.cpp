@@ -20,6 +20,7 @@
 #endif
 
 #include "Gi.h"
+#include "MaterialManager.h"
 #include "TextureManager.h"
 #include "Turbo.h"
 #include "AssetReader.h"
@@ -56,8 +57,6 @@
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
-#include <gtl/mc/MtlxDocOps.h>
-#include <gtl/mc/MtlxDocPatch.h>
 #include <gtl/gb/Fmt.h>
 #include <gtl/gb/Log.h>
 #include <gtl/gb/Enum.h>
@@ -67,8 +66,6 @@
 #include <MaterialXCore/Document.h>
 
 #include <blosc2.h>
-
-#include <offsetAllocator.hpp>
 
 namespace mx = MaterialX;
 
@@ -101,10 +98,10 @@ namespace gtl
     CgpuTlas   tlas;
   };
 
-  struct GiImageBinding
+  struct GiMaterial
   {
-    GiImagePtr image;
-    uint32_t index;
+    GiScene* scene = nullptr;
+    GiBaseMaterial base;
   };
 
   struct GiShaderCache
@@ -121,27 +118,6 @@ namespace gtl
     CgpuBuffer                     textureInfos;
     GiScene*                       scene;
     bool                           resetSampleOffset = true;
-  };
-
-  struct GiMaterialGpuData
-  {
-    CgpuShader closestHit;
-    std::vector<CgpuShader> anyHits; // optional
-    OffsetAllocator::Allocation texOffsetAllocation;
-    std::vector<GiImagePtr> images;
-    std::vector<std::string> stringConstants;
-    std::vector<rp::TextureInfo> textureInfos;
-    bool hasUdimTextures = false;
-  };
-
-  struct GiMaterial
-  {
-    McMaterial* mcMat = nullptr;
-    std::string name;
-    GiScene* scene;
-    std::optional<GiMaterialGpuData> gpuData;
-    GbHash topoHash;
-    CgpuBuffer parameterBuffer;
   };
 
   struct GiMesh
@@ -225,7 +201,7 @@ namespace gtl
     CgpuImage fallbackDomeLightTexture;
     CgpuImage uniformDomeLightTexture;
     std::unordered_set<GiMesh*> meshes;
-    std::unordered_set<GiMaterial*> materials;
+    std::unique_ptr<GiMaterialManager> materialManager;
     std::mutex mutex;
     GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::All;
     GiShaderCache* shaderCache = nullptr;
@@ -257,8 +233,6 @@ namespace gtl
   std::unique_ptr<GiGlslShaderGen> s_shaderGen;
   std::unique_ptr<McRuntime> s_mcRuntime;
   std::unique_ptr<McFrontend> s_mcFrontend;
-  std::unique_ptr<McMtlxDocumentParser> s_mtlxDocParser;
-  std::unique_ptr<McMtlxDocumentPatcher> s_mtlxDocPatcher;
   std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
   std::unique_ptr<GiTextureManager> s_texSys;
@@ -439,9 +413,7 @@ namespace gtl
       goto fail;
     }
 
-    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, *s_mcRuntime);
-    s_mtlxDocParser = std::make_unique<McMtlxDocumentParser>(mtlxStdLib);
-    s_mtlxDocPatcher = std::make_unique<McMtlxDocumentPatcher>(mtlxStdLib, params.mtlxCustomNodesPath);
+    s_mcFrontend = std::make_unique<McFrontend>(mtlxStdLib, params.mtlxCustomNodesPath, *s_mcRuntime);
 
     s_shaderGen = std::make_unique<GiGlslShaderGen>();
     if (!s_shaderGen->init(shaderPath, *s_mcRuntime))
@@ -519,8 +491,6 @@ fail:
     }
     s_threadPool.reset();
     s_mcFrontend.reset();
-    s_mtlxDocPatcher.reset();
-    s_mtlxDocParser.reset();
     s_mcRuntime.reset();
   }
 
@@ -531,7 +501,7 @@ fail:
 
   GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc, bool usdPreviewSurfacePresenceOverride)
   {
-    mx::DocumentPtr doc = s_mtlxDocParser->parse(mtlxSrc);
+    mx::DocumentPtr doc = s_mcFrontend->parseMtlxDoc(mtlxSrc);
     if (!doc)
     {
       return nullptr;
@@ -543,60 +513,61 @@ fail:
   GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc, bool usdPreviewSurfacePresenceOverride)
   {
     mx::DocumentPtr resolvedDoc = std::static_pointer_cast<mx::Document>(doc);
-    if (!doc)
+    if (!resolvedDoc)
     {
       return nullptr;
     }
 
-    mx::DocumentPtr patchedDoc = s_mtlxDocPatcher->patch(resolvedDoc, usdPreviewSurfacePresenceOverride);
-    if (!patchedDoc)
+    // Reserve some scene data slots for actual mesh primvars.
+    constexpr uint32_t MAX_MATERIAL_PARAMETER_COUNT = rp::MAX_SCENE_DATA_COUNT - 8;
+
+    McMtlxMaterialDoc materialDoc = s_mcFrontend->patchMtlxDoc(resolvedDoc, name, usdPreviewSurfacePresenceOverride, MAX_MATERIAL_PARAMETER_COUNT);
+    if (!materialDoc.doc)
     {
       return nullptr;
     }
 
-    mx::NodePtr surfaceShader = McMtlxFindSurfaceShader(patchedDoc, name);
-    if (!surfaceShader)
-    {
-      return nullptr;
-    }
+    GbHash topoHash = McHashMtlxNetworkTopological(materialDoc.doc, materialDoc.surfaceShader);
+    GB_DEBUG("material {} topoHash: {} ({} parameters)", name, topoHash.val, materialDoc.parameters.size());
 
-    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(patchedDoc, surfaceShader);
+    McMaterial* mcMat = s_mcFrontend->createFromMtlxDoc(materialDoc.doc, materialDoc.surfaceShader, materialDoc.opacityClass);
     if (!mcMat)
     {
       return nullptr;
     }
 
-    std::string debugName = GB_FMT("MaterialParams_{}", name);
+    size_t paramBufferSize = std::max<size_t>(materialDoc.parameters.size(), 1) * rp::SCENE_DATA_ALIGNMENT;
 
-    CgpuBuffer paramBuffer;
-    if (!cgpuCreateBuffer(s_ctx, {
-                            .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::TransferDst,
-                            .memoryProperties = CgpuMemoryProperties::DeviceLocal,
-                            .size = 1024,
-                            .debugName = debugName.c_str()
-                          }, &paramBuffer))
+    // The parameter buffer contents are prepared here, but the GPU buffer is created lazily
+    // on the render thread (cgpu's VMA allocator requires external synchronization).
+    std::vector<uint8_t> paramData(paramBufferSize, 0);
+    for (size_t i = 0; i < materialDoc.parameters.size(); i++)
     {
-      delete mcMat;
-      GB_ERROR("failed to allocate material parameter buffer");
-      return nullptr;
+      const McMtlxScalarNetworkParameter* scalarParameter = std::get_if<McMtlxScalarNetworkParameter>(&materialDoc.parameters[i]);
+      if (!scalarParameter)
+      {
+        continue; // texture parameters store their value outside of the parameter buffer
+      }
+
+      memcpy(paramData.data() + i * rp::SCENE_DATA_ALIGNMENT,
+             scalarParameter->data.data(),
+             scalarParameter->data.size());
     }
 
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
-
-    GbHash topoHash = McHashMtlxNetworkTopological(patchedDoc, surfaceShader);
-    GB_DEBUG("material {} topoHash: {}", name, topoHash.val);
-
     GiMaterial* mat = new GiMaterial {
-      .mcMat = mcMat,
-      .name = name,
       .scene = scene,
-      .topoHash = topoHash,
-      .parameterBuffer = paramBuffer
+      .base = {
+        .mcMat = mcMat,
+        .name = name,
+        .topoHash = topoHash,
+        .parameterData = std::move(paramData),
+        .networkParameters = std::move(materialDoc.parameters)
+      }
     };
 
     {
       std::lock_guard guard(scene->mutex);
-      scene->materials.insert(mat);
+      scene->materialManager->addMaterial(&mat->base);
     }
     return mat;
   }
@@ -609,52 +580,23 @@ fail:
       return nullptr;
     }
 
-    std::string debugName = GB_FMT("MaterialParams_{}", name);
-
-    CgpuBuffer paramBuffer;
-    if (!cgpuCreateBuffer(s_ctx, {
-                            .usage = CgpuBufferUsage::ShaderDeviceAddress | CgpuBufferUsage::TransferDst,
-                            .memoryProperties = CgpuMemoryProperties::DeviceLocal,
-                            .size = 1024,
-                            .debugName = debugName.c_str()
-                          }, &paramBuffer))
-    {
-      delete mcMat;
-      GB_ERROR("failed to allocate material parameter buffer");
-      return nullptr;
-    }
-
-    scene->dirtyFlags |= GiSceneDirtyFlags::DirtySceneParams; // texture count change
+    std::vector<uint8_t> paramData(rp::SCENE_DATA_ALIGNMENT, 0);
 
     GiMaterial* mat = new GiMaterial {
-      .mcMat = mcMat,
-      .name = name,
       .scene = scene,
-      .topoHash = GbHash{},
-      .parameterBuffer = paramBuffer
+      .base = {
+        .mcMat = mcMat,
+        .name = name,
+        .topoHash = GbHash{},
+        .parameterData = std::move(paramData)
+      }
     };
 
     {
       std::lock_guard guard(scene->mutex);
-      scene->materials.insert(mat);
+      scene->materialManager->addMaterial(&mat->base);
     }
     return mat;
-  }
-
-  void giDestroyMaterialGpuData(GiScene* scene, GiMaterialGpuData& gpuData)
-  {
-    if (gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-    {
-      scene->texAllocator.free(gpuData.texOffsetAllocation);
-    }
-    if (gpuData.closestHit.handle)
-    {
-      cgpuDestroyShader(s_ctx, gpuData.closestHit);
-    }
-    for (CgpuShader shader : gpuData.anyHits)
-    {
-      cgpuDestroyShader(s_ctx, shader);
-    }
   }
 
   void giDestroyMaterial(GiMaterial* mat)
@@ -663,17 +605,7 @@ fail:
     {
       std::lock_guard guard(scene->mutex);
 
-      if (mat->parameterBuffer.handle)
-      {
-        cgpuDestroyBuffer(s_ctx, mat->parameterBuffer);
-      }
-
-      if (mat->gpuData)
-      {
-        giDestroyMaterialGpuData(scene, *mat->gpuData);
-      }
-
-      scene->materials.erase(mat);
+      scene->materialManager->removeMaterial(&mat->base);
 
       for (GiMesh* m : scene->meshes)
       {
@@ -684,8 +616,27 @@ fail:
       }
     }
 
-    delete mat->mcMat;
+    delete mat->base.mcMat;
     delete mat;
+  }
+
+  uint32_t _MakeSceneDataInfo(uint32_t offset, uint32_t componentCount, GiPrimvarInterpolation interpolation)
+  {
+    assert(componentCount >= 1 && componentCount <= 4);
+    static_assert(int(GiPrimvarInterpolation::COUNT) <= 8, "Enum exceeds 3 bits");
+
+    return offset |
+           ((componentCount - 1) << rp::SCENE_DATA_STRIDE_OFFSET) |
+           (uint32_t(interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
+  }
+
+  uint32_t _MakeMaterialSceneDataInfo(uint32_t parameterIndex, uint32_t componentCount)
+  {
+    assert(componentCount >= 1 && componentCount <= 4);
+
+    return parameterIndex |
+           ((componentCount - 1) << rp::SCENE_DATA_STRIDE_OFFSET) |
+           rp::SCENE_DATA_MATERIAL_FLAG;
   }
 
   uint64_t giAlignBuffer(uint64_t alignment, uint64_t bufferSize, uint64_t* totalSize)
@@ -786,8 +737,8 @@ fail:
 
   void giSetMeshMaterial(GiMesh* mesh, GiMaterial* mat)
   {
-    McMaterial* newMcMat = mat->mcMat;
-    McMaterial* oldMcMat = mesh->material ? mesh->material->mcMat : nullptr;
+    McMaterial* newMcMat = mat->base.mcMat;
+    McMaterial* oldMcMat = mesh->material ? mesh->material->base.mcMat : nullptr;
 
     bool transparencyChanged = bool(newMcMat) ^ bool(oldMcMat);
     bool primvarsChanged = bool(newMcMat) ^ bool(oldMcMat);
@@ -880,6 +831,14 @@ fail:
     blasPayloads.reserve(meshCount);
     instanceIds.reserve(meshCount);
 
+    // Maps materials to their SBT index.
+    std::unordered_map<const GiMaterial*, uint32_t> materialIndices;
+    materialIndices.reserve(shaderCache->materials.size());
+    for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
+    {
+      materialIndices.emplace(shaderCache->materials[i], i);
+    }
+
     for (auto it = scene->meshes.begin(); it != scene->meshes.end(); ++it)
     {
       GiMesh* mesh = *it;
@@ -890,23 +849,15 @@ fail:
         continue;
       }
 
-      // Find material for SBT index (FIXME: find a better solution)
       const GiMaterial* material = mesh->material;
 
-      uint32_t materialIndex = UINT32_MAX;
-      for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
+      auto materialIt = materialIndices.find(material);
+      if (materialIt == materialIndices.end())
       {
-          if (shaderCache->materials[i] == material)
-          {
-              materialIndex = i;
-              break;
-          }
+        GB_ERROR("invalid BLAS material");
+        continue;
       }
-      if (materialIndex == UINT32_MAX)
-      {
-          GB_ERROR("invalid BLAS material");
-          continue;
-      }
+      uint32_t materialIndex = materialIt->second;
 
       // Build mesh BLAS & buffers if they don't exist yet
       if (!mesh->gpuData.has_value())
@@ -973,21 +924,82 @@ fail:
         // Prepare scene data & preamble
         std::vector<const GiPrimvarData*> primvars;
 
+        struct MaterialSceneData
+        {
+          uint32_t sceneDataIndex;
+          uint32_t parameterIndex;
+          uint32_t componentCount;
+        };
+        std::vector<MaterialSceneData> materialSceneData;
+
         if (material)
         {
-          const std::vector<const char*>& sceneDataNames = material->mcMat->sceneDataNames;
-          const std::vector<std::string>& stringConstants = material->gpuData->stringConstants;
+          assert(material->base.gpuData);
 
-          size_t sceneDataCount = sceneDataNames.size();
+          const std::vector<const char*>& sceneDataNames = material->base.mcMat->sceneDataNames;
+          const std::vector<std::string>& stringConstants = material->base.gpuData->stringConstants;
+
+          size_t sceneDataCount = std::min(sceneDataNames.size(), size_t(rp::MAX_SCENE_DATA_COUNT));
+          if (sceneDataNames.size() > rp::MAX_SCENE_DATA_COUNT)
+          {
+            GB_WARN("material {} references {} scene data entries; only the first {} are supported",
+                    material->base.name, sceneDataNames.size(), rp::MAX_SCENE_DATA_COUNT);
+          }
+
           if (sceneDataCount > 0)
           {
-            GB_DEBUG("scene data for mesh {} with material {}:", mesh->name, material->name);
+            GB_DEBUG("scene data for mesh {} with material {}:", mesh->name, material->base.name);
           }
 
           primvars.resize(rp::MAX_SCENE_DATA_COUNT, nullptr);
           for (size_t i = 0; i < sceneDataCount; i++)
           {
             const char* sceneDataName = sceneDataNames[i];
+
+            auto stringConstantIt = std::find(stringConstants.begin(), stringConstants.end(), sceneDataName);
+            if (stringConstantIt == stringConstants.end())
+            {
+              // Apparently this can happen when scene data usage is optimized away
+              GB_DEBUG("> no string constant found for {}:{}", material->base.name, sceneDataName);
+              continue;
+            }
+
+            int index = int(stringConstantIt - stringConstants.begin());
+            if (index >= int(rp::MAX_SCENE_DATA_COUNT))
+            {
+              continue;
+            }
+
+            // Values that vary across material instances are backed by the material's
+            // parameter buffer instead of the mesh payload buffer.
+            const McMtlxScalarNetworkParameter* scalarParameter = nullptr;
+            for (size_t j = 0; j < material->base.networkParameters.size(); j++)
+            {
+              const McMtlxNetworkParameter& parameter = material->base.networkParameters[j];
+              if (McMtlxGetNetworkParameterName(parameter) != sceneDataName)
+              {
+                continue;
+              }
+
+              scalarParameter = std::get_if<McMtlxScalarNetworkParameter>(&parameter);
+              if (!scalarParameter)
+              {
+                continue; // texture parameters are not read as scene data
+              }
+
+              materialSceneData.push_back({
+                .sceneDataIndex = uint32_t(index),
+                .parameterIndex = uint32_t(j),
+                .componentCount = scalarParameter->componentCount
+              });
+              break;
+            }
+
+            if (scalarParameter)
+            {
+              GB_DEBUG("> [{}] {} (material parameter)", index, sceneDataName);
+              continue;
+            }
 
             // FIXME: we should check if scene data and primvar types match to prevent crashes
             const GiPrimvarData* primvar = nullptr;
@@ -1006,24 +1018,6 @@ fail:
                 primvar = &p;
                 break;
               }
-            }
-
-            int index = -1;
-            for (size_t j = 0; j < stringConstants.size(); j++)
-            {
-              if (std::string(sceneDataName) != stringConstants[j])
-              {
-                continue;
-              }
-              index = j;
-              break;
-            }
-
-            if (index == -1)
-            {
-              // Apparently this can happen when scene data usage is optimized away
-              GB_DEBUG("> no string constant found for {}:{}", material->name, sceneDataName);
-              continue;
             }
 
             if (!primvar)
@@ -1047,12 +1041,20 @@ fail:
 
         rp::BlasPayloadBufferPreamble preamble
         {
+          .paramBufferAddress = material ? cgpuGetBufferGpuAddress(s_ctx, material->base.parameterBuffer) : 0,
           .objectId = mesh->id,
-          .faceIdsInfo = (faceIdStride << rp::FACE_ID_STRIDE_OFFSET) | uint32_t(faceIdsBufferOffset)
+          .faceIdsInfo = (faceIdStride << rp::FACE_ID_STRIDE_OFFSET) | uint32_t(faceIdsBufferOffset),
+          .materialId = material ? materialIndex : 0
         };
         for (size_t i = 0; i < rp::MAX_SCENE_DATA_COUNT; i++)
         {
           preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
+        }
+
+        for (const MaterialSceneData& data : materialSceneData)
+        {
+          preamble.sceneDataInfos[data.sceneDataIndex] =
+            _MakeMaterialSceneDataInfo(data.parameterIndex, data.componentCount);
         }
 
         std::vector<uint32_t> sceneDataBufferOffsets(primvars.size());
@@ -1074,52 +1076,42 @@ fail:
             continue;
           }
 
-          uint32_t sceneDataOffset = bufferOffset / rp::SCENE_DATA_ALIGNMENT;
+          uint32_t sceneDataOffset = uint32_t(bufferOffset / rp::SCENE_DATA_ALIGNMENT);
           if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset)
           {
             GB_ERROR("max scene data offset exceeded");
             continue;
           }
 
-          uint32_t index = i;//sceneDataIndices[i];
-          assert(index != -1); // every scene data has a string constant
-
           payloadBufferSize = newPayloadBufferSize;
           sceneDataBufferOffsets[i] = uint32_t(bufferOffset);
 
-          uint32_t stride = 0;
+          uint32_t componentCount = 0;
           switch (primvar->type)
           {
           case GiPrimvarType::Float:
           case GiPrimvarType::Int:
-            stride = 1;
+            componentCount = 1;
             break;
           case GiPrimvarType::Int2:
           case GiPrimvarType::Vec2:
-            stride = 2;
+            componentCount = 2;
             break;
           case GiPrimvarType::Int3:
           case GiPrimvarType::Vec3:
-            stride = 3;
+            componentCount = 3;
             break;
           case GiPrimvarType::Int4:
           case GiPrimvarType::Vec4:
-            stride = 4;
+            componentCount = 4;
             break;
           default:
             assert(false);
             GB_ERROR("coding error: unhandled type size!");
             continue;
           }
-          stride -= 1; // [0, 3] range -> 2 bit
 
-          assert(stride < 4);
-          static_assert(int(GiPrimvarInterpolation::COUNT) <= 8, "Enum exceeds 3 bits");
-
-          uint32_t info = uint32_t(sceneDataOffset) |
-                          (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
-                          (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
-          preamble.sceneDataInfos[index] = info;
+          preamble.sceneDataInfos[i] = _MakeSceneDataInfo(uint32_t(sceneDataOffset), componentCount, primvar->interpolation);
         }
 
         // Upload GPU data
@@ -1192,7 +1184,13 @@ fail:
             continue;
           }
 
+          if (preamble.sceneDataInfos[i] & rp::SCENE_DATA_MATERIAL_FLAG)
+          {
+            continue; // backed by the material parameter buffer
+          }
+
           const GiPrimvarData* s = primvars[i];
+          assert(s);
 
           if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer, sceneDataBufferOffsets[i]))
           {
@@ -1206,7 +1204,7 @@ fail:
         // Build BLAS
         {
           const GiMaterial* material = shaderCache->materials[materialIndex];
-          bool isOpaque = (material->mcMat->opacityClass != McOpacityClassification::Cutout); // does not require any-hit invocation
+          bool isOpaque = (material->base.mcMat->opacityClass != McOpacityClassification::Cutout); // does not require any-hit invocation
 
           bool blasCreated = cgpuCreateBlas(s_ctx, {
                                               .vertexPosBuffer = tmpPositionBuffer,
@@ -1232,10 +1230,9 @@ fail:
         // Append BLAS payload data
         {
           uint64_t payloadBufferAddress = cgpuGetBufferGpuAddress(s_ctx, payloadBuffer);
-          uint64_t paramBufferAddress = cgpuGetBufferGpuAddress(s_ctx, material->parameterBuffer);
-          if (payloadBufferAddress == 0 || paramBufferAddress == 0)
+          if (payloadBufferAddress == 0)
           {
-            GB_ERROR("failed to get BLAS payload buffer addresses");
+            GB_ERROR("failed to get BLAS payload buffer address");
             goto fail_cleanup;
           }
 
@@ -1247,11 +1244,10 @@ fail:
 
           uint64_t vertexBufferSize = (vertexBufferOffset/* account for align */ - indexBufferOffset/* account for preamble */);
           payload = rp::BlasPayload{
-            .paramBufferAddress = paramBufferAddress,
             .bufferAddress = payloadBufferAddress,
             .vertexOffset = uint32_t(vertexBufferSize / sizeof(rp::FVertex)), // offset to skip index buffer
             .bitfield = bitfield,
-            .topoHash = material->topoHash.val
+            .topoHash = material->base.topoHash.val
           };
         }
 
@@ -1443,23 +1439,8 @@ cleanup:
 
   GiShaderCache* _giCreateShaderCache(const GiRenderParams& params)
   {
-    struct HitShaderCompInfo
-    {
-      std::vector<uint8_t> spv;
-      std::vector<uint8_t> shadowSpv;
-    };
-    struct HitGroupCompInfo
-    {
-      GiMaterial* material = nullptr;
-      GiGlslShaderGen::MaterialGenInfo genInfo;
-
-      HitShaderCompInfo closestHitInfo;
-      std::optional<HitShaderCompInfo> anyHitInfo;
-    };
-
     const GiRenderSettings& renderSettings = params.renderSettings;
     GiScene* scene = params.scene;
-    OffsetAllocator::Allocator& texAllocator = scene->texAllocator;
 
     uint32_t aovMask = 0;
     for (const GiAovBinding& binding : params.aovBindings)
@@ -1483,8 +1464,18 @@ cleanup:
     }
 
     std::vector<GiMaterial*> materials(materialSet.begin(), materialSet.end());
+    std::sort(materials.begin(), materials.end(), [](const GiMaterial* a, const GiMaterial* b)
+    {
+      return a->base.name < b->base.name;
+    });
 
-    GB_LOG("material count: {}", materials.size());
+    std::vector<GiBaseMaterial*> baseMaterials;
+    baseMaterials.reserve(materials.size());
+    for (GiMaterial* material : materials)
+    {
+      baseMaterials.push_back(&material->base);
+    }
+
     GB_LOG("creating shader cache..");
     fflush(stdout);
 
@@ -1492,14 +1483,10 @@ cleanup:
     CgpuPipeline pipeline;
     std::array<CgpuBindSet, 3> bindSets;
     CgpuShader rgenShader;
-    std::vector<GiMaterialGpuData> newMaterialGpuDatas;
     std::vector<CgpuRtHitGroup> hitGroups;
     std::vector<CgpuShader> missShaders;
-    std::vector<McTextureDescription> textureDescriptions;
     std::vector<GiImageBinding> imageBindings;
     std::vector<std::pair<uint32_t, rp::TextureInfo>> textureInfoEntries;
-    std::vector<HitGroupCompInfo> hitGroupCompInfos;
-    std::vector<const GiMaterial*> cachedMaterials;
     CgpuBuffer textureInfoBuffer;
 
     uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
@@ -1519,318 +1506,48 @@ cleanup:
 
     bool needsAuxOutput = bool(aovMask & (1 << int(GiAovId::Albedo)));
 
-    // Create per-material hit shaders.
+    bool disableDeduplication = getenv("GTL_DISABLE_MATERIAL_DEDUPLICATION") != nullptr;
+
+    GiMaterialCompileResult compileResult;
+    if (!scene->materialManager->compileMaterials(baseMaterials,
+                                                  commonParams,
+                                                  maxRayPayloadSize,
+                                                  maxRayHitAttributeSize,
+                                                  renderSettings.nextEventEstimation,
+                                                  needsAuxOutput,
+                                                  disableDeduplication,
+                                                  compileResult))
     {
-      // 1. Generate GLSL from MDL in parallel
-      std::mutex cachedMaterialsMutex;
-      std::mutex hitGroupCompInfoMutex;
-      hitGroupCompInfos.reserve(materials.size());
-
-      std::atomic_bool threadWorkFailed = false;
-      s_threadPool->parallelFor((uint32_t) materials.size(), [&](uint32_t i) {
-        GiMaterial* material = materials[i];
-        if (material->gpuData)
-        {
-          std::lock_guard guard(cachedMaterialsMutex);
-          cachedMaterials.push_back(material);
-          return;
-        }
-
-        GiGlslShaderGen::MaterialGenInfo genInfo;
-        if (!s_shaderGen->generateMaterialInfo(*material->mcMat, genInfo, needsAuxOutput))
-        {
-          GB_ERROR("failed to generate code for material {}", material->name);
-          threadWorkFailed = true;
-          return;
-        }
-
-        HitGroupCompInfo groupInfo;
-        groupInfo.material = material;
-        groupInfo.genInfo = genInfo;
-
-        if (material->mcMat->opacityClass == McOpacityClassification::Cutout)
-        {
-          groupInfo.anyHitInfo = HitShaderCompInfo{};
-        }
-
-        std::lock_guard guard(hitGroupCompInfoMutex);
-        hitGroupCompInfos.push_back(groupInfo);
-      });
-      if (threadWorkFailed)
-      {
-        goto cleanup;
-      }
-
-      // 2. Allocate texture indices for new shaders & collect textures to load.
-      for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
-      {
-        GiMaterial* material = groupInfo.material;
-        assert(material);
-
-        const GiGlslShaderGen::MaterialGenInfo& genInfo = groupInfo.genInfo;
-        for (const McTextureDescription& tr : genInfo.textureDescriptions)
-        {
-          textureDescriptions.push_back(tr);
-        }
-      }
-
-      // 3. Upload textures and assign images to new material GPU data.
-      std::vector<GiTextureResource> textureResources;
-      if (textureDescriptions.size() > 0 && !s_texSys->loadTextureDescriptions(textureDescriptions, textureResources))
-      {
-        goto cleanup;
-      }
-
-      uint32_t resourceCounter = 0;
-      newMaterialGpuDatas.reserve(hitGroupCompInfos.size());
-      for (HitGroupCompInfo& groupInfo : hitGroupCompInfos)
-      {
-        GiMaterial* material = groupInfo.material;
-        assert(material);
-
-        const GiGlslShaderGen::MaterialGenInfo& genInfo = groupInfo.genInfo;
-        auto resourceCount = uint32_t(genInfo.textureDescriptions.size());
-        uint32_t resourceStart = resourceCounter;
-        resourceCounter += resourceCount;
-
-        uint32_t imageCount = 0;
-        for (uint32_t r = 0; r < resourceCount; r++)
-        {
-          const GiTextureResource& resource = textureResources[resourceStart + r];
-          imageCount += resource.uvtileWidth > 0 ? resource.uvtileWidth * resource.uvtileHeight : 1;
-        }
-
-        GiMaterialGpuData gpuData;
-        gpuData.stringConstants = genInfo.stringConstants;
-        gpuData.textureInfos.resize(resourceCount);
-
-        if (imageCount > 0)
-        {
-          gpuData.texOffsetAllocation = texAllocator.allocate(imageCount);
-
-          GB_EXPECT(gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE, "max number of textures exceeded");
-        }
-
-        uint32_t imageOffset = 0;
-        for (uint32_t r = 0; r < resourceCount; r++)
-        {
-          const GiTextureResource& resource = textureResources[resourceStart + r];
-
-          rp::TextureInfo& texInfo = gpuData.textureInfos[r];
-          uint32_t imageIndex = gpuData.texOffsetAllocation.offset + imageOffset;
-
-          if (resource.uvtileWidth > 0)
-          {
-            gpuData.hasUdimTextures = true;
-          }
-
-          assert(imageIndex <= rp::TEXTURE_INFO_IMAGE_INDEX_MASK);
-          assert(resource.uvtileMinU >= INT8_MIN && resource.uvtileMinU <= INT8_MAX);
-          assert(resource.uvtileMinV >= INT8_MIN && resource.uvtileMinV <= INT8_MAX);
-          assert(resource.uvtileWidth <= rp::TEXTURE_INFO_UVTILE_SIZE_MASK);
-          assert(resource.uvtileHeight <= rp::TEXTURE_INFO_UVTILE_SIZE_MASK);
-
-          texInfo.imageIndexAndUvtileMin =
-            imageIndex |
-            (uint32_t(resource.uvtileMinU & 0xFF) << rp::TEXTURE_INFO_UVTILE_MIN_U_SHIFT) |
-            (uint32_t(resource.uvtileMinV & 0xFF) << rp::TEXTURE_INFO_UVTILE_MIN_V_SHIFT);
-
-          texInfo.uvtileWidthAndHeight =
-            resource.uvtileWidth | (resource.uvtileHeight << rp::TEXTURE_INFO_UVTILE_HEIGHT_SHIFT);
-
-          uint32_t slotCount = resource.uvtileWidth > 0 ? resource.uvtileWidth * resource.uvtileHeight : 1;
-          assert(resource.images.size() == slotCount);
-
-          for (uint32_t s = 0; s < slotCount; s++)
-          {
-            gpuData.images.push_back(resource.images[s]);
-          }
-
-          imageOffset += slotCount;
-        }
-
-        newMaterialGpuDatas.push_back(gpuData);
-      }
-
-      // 4. Generate final hit shader GLSL sources.
-      s_threadPool->parallelFor((uint32_t) hitGroupCompInfos.size(), [&](uint32_t i) {
-        HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
-
-        GiMaterial* material = compInfo.material;
-        const McMaterial* mcMat = material->mcMat;
-
-        uint32_t texOffset = newMaterialGpuDatas[i].texOffsetAllocation.offset;
-        bool hasUdimTextures = newMaterialGpuDatas[i].hasUdimTextures;
-
-        // Closest hit
-        {
-          bool evaluateOpacity = (mcMat->opacityClass == McOpacityClassification::NonBinary);
-
-          GiGlslShaderGen::ClosestHitShaderParams hitParams = {
-            .baseFileName = "rp_main.chit",
-            .commonParams = commonParams,
-            .directionalBias = mcMat->directionalBias,
-            .enableSceneTransforms = mcMat->requiresSceneTransforms,
-            .builtinSceneDataIndices = compInfo.genInfo.builtinSceneDataIndices,
-            .hasBackfaceBsdf = mcMat->hasBackfaceBsdf,
-            .hasBackfaceEdf = mcMat->hasBackfaceEdf,
-            .evaluateOpacity = evaluateOpacity,
-            .hasVolumeAbsorptionCoeff = mcMat->hasVolumeAbsorptionCoeff,
-            .hasVolumeScatteringCoeff = mcMat->hasVolumeScatteringCoeff,
-            .isAnimated = mcMat->isAnimated,
-            .isEmissive = mcMat->isEmissive,
-            .isThinWalled = mcMat->isThinWalled,
-            .nextEventEstimation = renderSettings.nextEventEstimation,
-            .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
-            .dfGlsl = compInfo.genInfo.glslSource,
-            .textureIndexOffset = texOffset,
-            .hasUdimTextures = hasUdimTextures
-          };
-
-          if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
-          {
-            threadWorkFailed = true;
-            return;
-          }
-        }
-
-        assert(!compInfo.anyHitInfo || mcMat->opacityClass == McOpacityClassification::Cutout);
-
-        // Any hit
-        if (compInfo.anyHitInfo)
-        {
-          GiGlslShaderGen::AnyHitShaderParams hitParams = {
-            .baseFileName = "rp_main.ahit",
-            .commonParams = commonParams,
-            .enableSceneTransforms = mcMat->requiresSceneTransforms,
-            .builtinSceneDataIndices = compInfo.genInfo.builtinSceneDataIndices,
-            .dfGlsl = compInfo.genInfo.glslSource,
-            .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
-            .textureIndexOffset = texOffset,
-            .isAnimated = mcMat->isAnimated,
-            .hasUdimTextures = hasUdimTextures
-          };
-
-          hitParams.shadowTest = false;
-          if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->spv))
-          {
-            threadWorkFailed = true;
-            return;
-          }
-
-          hitParams.shadowTest = true;
-          if (!s_shaderGen->generateAnyHitSpirv(hitParams, compInfo.anyHitInfo->shadowSpv))
-          {
-            threadWorkFailed = true;
-            return;
-          }
-        }
-      });
-      if (threadWorkFailed)
-      {
-        goto cleanup;
-      }
-
-      // 5. Compile & assign back the shaders.
-      auto hitGroupCount = (uint32_t) hitGroupCompInfos.size();
-
-      std::vector<CgpuShaderCreateInfo> createInfos;
-      createInfos.reserve(hitGroupCount * 2);
-
-      for (uint32_t i = 0; i < hitGroupCount; i++)
-      {
-        const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
-
-        // regular hit group
-        {
-          const std::vector<uint8_t>& cSpv = compInfo.closestHitInfo.spv;
-          createInfos.push_back({ .size = cSpv.size(), .source = cSpv.data(), .stageFlags = CgpuShaderStage::ClosestHit,
-                                  .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
-
-          if (compInfo.anyHitInfo)
-          {
-            const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->spv;
-            createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
-                                    .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
-          }
-        }
-
-        // shadow hit group
-        if (compInfo.anyHitInfo)
-        {
-          const std::vector<uint8_t>& aSpv = compInfo.anyHitInfo->shadowSpv;
-          createInfos.push_back({ .size = aSpv.size(), .source = aSpv.data(), .stageFlags = CgpuShaderStage::AnyHit,
-                                  .maxRayPayloadSize = maxRayPayloadSize, .maxRayHitAttributeSize = maxRayHitAttributeSize, });
-        }
-      }
-
-      std::vector<CgpuShader> hitShaders(createInfos.size());
-      if (!cgpuCreateShadersParallel(s_ctx, (uint32_t) createInfos.size(), createInfos.data(), hitShaders.data()))
-      {
-        goto cleanup;
-      }
-
-      for (uint32_t i = 0, hitShaderCounter = 0; i < hitGroupCount; i++)
-      {
-        const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
-        GiMaterialGpuData& gpuData = newMaterialGpuDatas[i];
-
-        // regular hit group
-        {
-          gpuData.closestHit = hitShaders[hitShaderCounter++];
-
-          if (compInfo.anyHitInfo)
-          {
-            gpuData.anyHits.push_back(hitShaders[hitShaderCounter++]);
-          }
-        }
-
-        // shadow hit group
-        if (compInfo.anyHitInfo)
-        {
-            gpuData.anyHits.push_back(hitShaders[hitShaderCounter++]);
-        }
-      }
+      goto cleanup;
     }
 
-    // Collect hit shader groups.
-    hitGroups.reserve(materials.size());
+    // Assemble hit groups. Deduplicated materials share the same GPU shaders.
+    hitGroups.reserve(materials.size() * 2);
+    for (const GiMaterial* material : materials)
     {
-      std::unordered_map<const GiMaterial*, const GiMaterialGpuData*> gpuDatas; // material indices are important for SBT addressing
+      const GiMaterialGpuData& gpuData = *material->base.gpuData;
 
-      for (const GiMaterial* material : cachedMaterials)
+      // regular hit group
+      CgpuRtHitGroup hitGroup;
+      hitGroup.closestHitShader = gpuData.closestHit;
+      if (!gpuData.anyHits.empty())
       {
-        gpuDatas[material] = &(*material->gpuData);
+        hitGroup.anyHitShader = gpuData.anyHits[0];
       }
-      for (size_t i = 0; i < hitGroupCompInfos.size(); i++)
+      hitGroups.push_back(hitGroup);
+
+      // shadow hit group
+      CgpuRtHitGroup shadowHitGroup;
+      if (!gpuData.anyHits.empty())
       {
-        const HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
-        GiMaterialGpuData& gpuData = newMaterialGpuDatas[i];
-        gpuDatas[compInfo.material] = &gpuData;
+        shadowHitGroup.anyHitShader = gpuData.anyHits[1];
       }
-
-      for (size_t i = 0; i < materials.size(); i++)
-      {
-        const GiMaterialGpuData& gpuData = *gpuDatas[materials[i]];
-
-        // regular hit group
-        CgpuRtHitGroup hitGroup;
-        hitGroup.closestHitShader = gpuData.closestHit;
-        if (!gpuData.anyHits.empty())
-        {
-          hitGroup.anyHitShader = gpuData.anyHits[0];
-        }
-        hitGroups.push_back(hitGroup);
-
-        // shadow hit group
-        CgpuRtHitGroup shadowHitGroup;
-        if (!gpuData.anyHits.empty())
-        {
-          shadowHitGroup.anyHitShader = gpuData.anyHits[1];
-        }
-        hitGroups.push_back(shadowHitGroup);
-      };
+      hitGroups.push_back(shadowHitGroup);
     }
+
+    imageBindings = std::move(compileResult.imageBindings);
+    textureInfoEntries = std::move(compileResult.textureInfoEntries);
+    maxTextureIndex = compileResult.maxTextureIndex;
 
     // Create ray generation shader.
     {
@@ -1936,40 +1653,6 @@ cleanup:
       cgpuCreateBindSets(s_ctx, pipeline, bindSets.data(), (uint32_t) bindSets.size());
     }
 
-    // Assign GPU data to materials.
-    for (size_t i = 0; i < hitGroupCompInfos.size(); i++)
-    {
-      HitGroupCompInfo& compInfo = hitGroupCompInfos[i];
-      compInfo.material->gpuData = newMaterialGpuDatas[i];
-    }
-
-    // Collect image bindings and texture resource infos.
-    for (size_t i = 0, j = 0; i < materials.size(); i++)
-    {
-      const GiMaterial* material = materials[i];
-      const GiMaterialGpuData& gpuData = *material->gpuData;
-      uint32_t texOffset = gpuData.texOffsetAllocation.offset;
-
-      uint32_t texCount = 0;
-      for (const GiImagePtr& img : gpuData.images)
-      {
-        uint32_t index = texOffset + texCount;
-        imageBindings.push_back({ .image = img, .index = index });
-        if (index > maxTextureIndex)
-        {
-          maxTextureIndex = index;
-        }
-        texCount++;
-      }
-
-      for (uint32_t r = 0; r < gpuData.textureInfos.size(); r++)
-      {
-        uint32_t textureIndex = texOffset + r;
-        textureInfoEntries.push_back({ textureIndex, gpuData.textureInfos[r] });
-        maxTextureIndex = std::max(maxTextureIndex, textureIndex);
-      }
-    }
-
     // Upload texture resource infos, required for mapping texture indices to image array indices.
     {
       size_t textureInfoCount = std::max<size_t>(size_t(maxTextureIndex) + 1, 1); // size > 0
@@ -2039,10 +1722,6 @@ cleanup:
       {
         cgpuDestroyBindSets(s_ctx, bindSets.data(), (uint32_t) bindSets.size());
         cgpuDestroyPipeline(s_ctx, pipeline);
-      }
-      for (GiMaterialGpuData& gpuData : newMaterialGpuDatas)
-      {
-        giDestroyMaterialGpuData(scene, gpuData);
       }
     }
     return cache;
@@ -2202,6 +1881,9 @@ cleanup:
     GiScene* scene = params.scene;
     const GiRenderSettings& renderSettings = params.renderSettings;
 
+    // Drain GPU resources whose destruction was requested from other threads.
+    scene->materialManager->housekeep();
+
     // Textures are decoded during shader cache creation, so update settings.
     s_texSys->setGreyscaleChannelToRgb(renderSettings.greyscaleChannelToRgb);
 
@@ -2265,28 +1947,8 @@ cleanup:
 
     if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyShadersHit))
     {
-      for (GiMaterial* mat : scene->materials)
+      for (GiBaseMaterial* mat : scene->materialManager->materials())
       {
-        if (!mat->gpuData)
-        {
-          continue;
-        }
-
-        GiMaterialGpuData& gpuData = *mat->gpuData;
-
-        if (gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-        {
-          scene->texAllocator.free(gpuData.texOffsetAllocation);
-        }
-        if (gpuData.closestHit.handle)
-        {
-          cgpuDestroyShader(s_ctx, gpuData.closestHit);
-        }
-        for (CgpuShader shader : gpuData.anyHits)
-        {
-          cgpuDestroyShader(s_ctx, shader);
-        }
-
         mat->gpuData.reset();
       }
 
@@ -2539,7 +2201,8 @@ cleanup:
         rp::BINDING_INDEX_AOV_INSTANCE_ID,
         rp::BINDING_INDEX_AOV_DOUBLE_SIDED,
         rp::BINDING_INDEX_AOV_ALBEDO,
-        rp::BINDING_INDEX_AOV_TOPOHASH
+        rp::BINDING_INDEX_AOV_TOPOHASH,
+        rp::BINDING_INDEX_AOV_MATERIAL_ID
       };
 
       for (const GiAovBinding& binding : params.aovBindings)
@@ -2787,11 +2450,22 @@ cleanup:
     scene->domeLightsAllocation = scene->texAllocator.allocate(2); // primary + fallback
       GB_EXPECT(scene->domeLightsAllocation.offset != OffsetAllocator::Allocation::NO_SPACE, "max number of textures exceeded");
 
+    scene->materialManager = std::make_unique<GiMaterialManager>(s_ctx,
+                                                                 *s_shaderGen,
+                                                                 *s_texSys,
+                                                                 *s_stager,
+                                                                 *s_deleteQueue,
+                                                                 *s_threadPool,
+                                                                 scene->texAllocator);
+
     return scene;
   }
 
   void giDestroyScene(GiScene* scene)
   {
+    // Destroy deferred GPU resources while the scene's allocator is still alive.
+    scene->materialManager->destroy();
+
     if (scene->bvh)
     {
       _giDestroyBvh(scene->bvh);
@@ -2810,6 +2484,7 @@ cleanup:
     }
     cgpuDestroyImage(s_ctx, scene->fallbackDomeLightTexture);
     cgpuDestroyImage(s_ctx, scene->uniformDomeLightTexture);
+    scene->materialManager.reset();
     delete scene;
   }
 

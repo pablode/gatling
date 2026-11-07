@@ -5,6 +5,18 @@
 
 // See also: https://github.com/NVIDIA/MDL-SDK/blob/master/examples/mdl_sdk/dxr/content/mdl_renderer_runtime.hlsl
 
+// Buffer references to read different data types
+layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefInt { int data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefFloat { float data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 8 /* largest type */) buffer BufferRefVec2 { vec2 data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 16/* largest type */) buffer BufferRefVec4 { vec4 data[]; };
+
+#if defined(USE_TEXTURE_INDEX_LUT) && defined(TEXTURE_PARAMETER_SLOT_BASE)
+// Set up in setup_mdl_shading_state(). Texture parameters are uniform values, so
+// reading them from a per-invocation global is safe.
+uint64_t tex_parameter_buffer_address;
+#endif
+
 float apply_wrap_and_crop(float coord, int wrap, vec2 crop, int res)
 {
     if (wrap == TEX_WRAP_REPEAT)
@@ -42,10 +54,24 @@ bool tex_texture_isvalid(int tex)
     return tex != 0;
 }
 
+int tex_get_texture_info_index(int tex)
+{
+#if defined(USE_TEXTURE_INDEX_LUT) && defined(TEXTURE_PARAMETER_SLOT_BASE)
+    BufferRefInt ref = BufferRefInt(tex_parameter_buffer_address);
+    int slot = TEXTURE_PARAMETER_SLOT_BASE + tex - 1;
+    int lutIndex = ref.data[slot * int(SCENE_DATA_ALIGNMENT / 4)];
+    if (lutIndex >= 0)
+    {
+        return lutIndex;
+    }
+#endif
+    return TEXTURE_INDEX_OFFSET + tex - 1;
+}
+
 int tex_get_image_index(int tex)
 {
-#if defined(HAS_UDIM_TEXTURES)
-    return int(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1].imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
+#if defined(USE_TEXTURE_INDEX_LUT)
+    return int(textureInfos[tex_get_texture_info_index(tex)].imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
 #else
     return TEXTURE_INDEX_OFFSET + tex - 1;
 #endif
@@ -185,8 +211,8 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
     bool isUvTile = false;
     int image_idx;
 
-#if defined(HAS_UDIM_TEXTURES)
-    TextureInfo info = textureInfos[TEXTURE_INDEX_OFFSET + tex - 1];
+#if defined(USE_TEXTURE_INDEX_LUT)
+    TextureInfo info = textureInfos[tex_get_texture_info_index(tex)];
     isUvTile = (info.uvtileWidthAndHeight & TEXTURE_INFO_UVTILE_SIZE_MASK) != 0;
 
     if (isUvTile)
@@ -252,8 +278,8 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
     }
 
     int image_idx;
-#if defined(HAS_UDIM_TEXTURES)
-    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1], uv_tile);
+#if defined(USE_TEXTURE_INDEX_LUT)
+    image_idx = tex_get_uvtile_image_index(textureInfos[tex_get_texture_info_index(tex)], uv_tile);
 #else
     image_idx = tex_get_image_index(tex);
 #endif
@@ -303,8 +329,8 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
     }
 
     int image_idx;
-#if defined(HAS_UDIM_TEXTURES)
-    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1], uv_tile);
+#if defined(USE_TEXTURE_INDEX_LUT)
+    image_idx = tex_get_uvtile_image_index(textureInfos[tex_get_texture_info_index(tex)], uv_tile);
 #else
     image_idx = tex_get_image_index(tex);
 #endif
@@ -357,12 +383,6 @@ vec3 mdl_adapt_normal(State state, vec3 normal)
     return new_normal;
 }
 
-// Buffer references to read different data types
-layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefInt { int data[]; };
-layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefFloat { float data[]; };
-layout(buffer_reference, std430, buffer_reference_align = 8 /* largest type */) buffer BufferRefVec2 { vec2 data[]; };
-layout(buffer_reference, std430, buffer_reference_align = 16/* largest type */) buffer BufferRefVec4 { vec4 data[]; };
-
 bool scene_data_isvalid(inout State state, int scene_data_id)
 {
 #ifdef MAX_SCENE_DATA_ID
@@ -377,8 +397,13 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
     return false;
 }
 
+bool scene_data_is_material(uint sceneDataInfo)
+{
+  return (sceneDataInfo & SCENE_DATA_MATERIAL_FLAG) != 0;
+}
+
 #ifdef MAX_SCENE_DATA_ID
-uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uniformLookup)
+uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo)
 {
   // see Gi.h GiPrimvarInterpolation enum
   uint interpolation = (sceneDataInfo & SCENE_DATA_INTERPOLATION_MASK) >> SCENE_DATA_INTERPOLATION_OFFSET;
@@ -409,6 +434,13 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo, bool uni
 }
 #endif
 
+uint64_t get_scene_data_buffer_address(mdl_renderer_state rs, uint sceneDataInfo)
+{
+  uint64_t address = scene_data_is_material(sceneDataInfo) ? rs.paramBufferAddress : rs.sceneDataBufferAddress;
+  address += (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+  return address;
+}
+
 vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default_value, bool uniform_lookup)
 {
 #ifdef MAX_SCENE_DATA_ID
@@ -417,11 +449,11 @@ vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint64_t address = get_scene_data_buffer_address(rs, sceneDataInfo);
         uint stride = (((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1) >> 2/* / 4 floats */;
         BufferRefVec4 ref = BufferRefVec4(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo) * stride;
         vec4 val0 = ref.data[indices[0]];
         vec4 val1 = ref.data[indices[1]];
         vec4 val2 = ref.data[indices[2]];
@@ -448,11 +480,11 @@ vec3 scene_data_lookup_float3(inout State state, int scene_data_id, vec3 default
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint64_t address = get_scene_data_buffer_address(rs, sceneDataInfo);
         uint stride = ((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1;
         BufferRefFloat ref = BufferRefFloat(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo) * stride;
         vec3 val0 = vec3(ref.data[indices[0] + 0], ref.data[indices[0] + 1], ref.data[indices[0] + 2]);
         vec3 val1 = vec3(ref.data[indices[1] + 0], ref.data[indices[1] + 1], ref.data[indices[1] + 2]);
         vec3 val2 = vec3(ref.data[indices[2] + 0], ref.data[indices[2] + 1], ref.data[indices[2] + 2]);
@@ -478,11 +510,11 @@ vec2 scene_data_lookup_float2(inout State state, int scene_data_id, vec2 default
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint64_t address = get_scene_data_buffer_address(rs, sceneDataInfo);
         uint stride = (((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1) >> 1/* / 2 floats */;
         BufferRefVec2 ref = BufferRefVec2(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo) * stride;
         vec2 val0 = ref.data[indices[0]];
         vec2 val1 = ref.data[indices[1]];
         vec2 val2 = ref.data[indices[2]];
@@ -509,11 +541,11 @@ float scene_data_lookup_float(inout State state, int scene_data_id, float defaul
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint64_t address = get_scene_data_buffer_address(rs, sceneDataInfo);
         uint stride = ((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1;
         BufferRefFloat ref = BufferRefFloat(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride;
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo) * stride;
         vec3 val = vec3(ref.data[indices[0]], ref.data[indices[1]], ref.data[indices[2]]);
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);
@@ -531,11 +563,11 @@ int scene_data_lookup_int(inout State state, int scene_data_id, int index_offset
         mdl_renderer_state rs = state.renderer_state;
 
         uint sceneDataInfo = rs.sceneDataInfos[scene_data_id - 1];
-        uint64_t address = rs.sceneDataBufferAddress + (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
+        uint64_t address = get_scene_data_buffer_address(rs, sceneDataInfo);
         uint stride = ((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1;
         BufferRefInt ref = BufferRefInt(address);
 
-        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo, uniform_lookup) * stride + index_offset;
+        uvec3 indices = get_scene_data_indices(rs, sceneDataInfo) * stride + index_offset;
         ivec3 val = ivec3(ref.data[indices[0]], ref.data[indices[1]], ref.data[indices[2]]);
 
         vec3 bc = vec3(1.0 - rs.hitBarycentrics.x - rs.hitBarycentrics.y, rs.hitBarycentrics.x, rs.hitBarycentrics.y);

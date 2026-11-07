@@ -20,6 +20,7 @@
 #define AOV_ID_DEBUG_DOUBLE_SIDED 15
 #define AOV_ID_ALBEDO 16
 #define AOV_ID_TOPOHASH 17
+#define AOV_ID_MATERIAL_ID 18
 
 // Mask bits.
 #define AOV_BIT_COLOR (1 << 0)
@@ -40,5 +41,6 @@
 #define AOV_BIT_DEBUG_DOUBLE_SIDED (1 << 15)
 #define AOV_BIT_ALBEDO (1 << 16)
 #define AOV_BIT_TOPOHASH (1 << 17)
+#define AOV_BIT_MATERIAL_ID (1 << 18)
 
 #endif

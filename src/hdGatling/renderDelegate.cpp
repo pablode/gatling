@@ -254,7 +254,8 @@ HdAovDescriptor HdGatlingRenderDelegate::GetDefaultAovDescriptor(const TfToken& 
   }
   else if (name == HdAovTokens->primId ||
            name == HdAovTokens->elementId ||
-           name == HdAovTokens->instanceId)
+           name == HdAovTokens->instanceId ||
+           name == HdGatlingAovTokens->debugMaterialId)
   {
     return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
   }

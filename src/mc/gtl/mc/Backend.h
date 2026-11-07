@@ -32,7 +32,6 @@ namespace gtl
 
   struct McTextureDescription
   {
-    uint32_t binding;
     bool is3dImage;
     bool isFloat;
     uint32_t width;
@@ -42,11 +41,18 @@ namespace gtl
     std::string filePath;
   };
 
+  struct McTextureParameterBinding
+  {
+    std::string parameterName; // name of the MDL material function parameter
+    uint32_t textureIndex;     // index in the target code's texture table
+  };
+
   struct McGlslGenResult
   {
     std::string source;
     std::vector<McTextureDescription> textureDescriptions;
     std::vector<std::string> stringConstants;
+    std::vector<McTextureParameterBinding> textureParameterBindings;
   };
 
   enum class McDf

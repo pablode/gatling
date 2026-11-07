@@ -76,6 +76,9 @@ layout(binding = BINDING_INDEX_AOV_ALBEDO, std430) buffer AlbedoBuffer { vec3 Al
 #if (AOV_MASK & AOV_BIT_TOPOHASH) != 0
 layout(binding = BINDING_INDEX_AOV_TOPOHASH, std430) writeonly buffer TopoHashBuffer { vec3 TopoHashAov[]; };
 #endif
+#if (AOV_MASK & AOV_BIT_MATERIAL_ID) != 0
+layout(binding = BINDING_INDEX_AOV_MATERIAL_ID, std430) writeonly buffer MaterialIdBuffer { int MaterialIdAov[]; };
+#endif
 
 layout(set = 1, binding = BINDING_INDEX_TEXTURES) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
 

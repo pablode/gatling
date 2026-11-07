@@ -5,7 +5,6 @@ add_library(
   gtl/mc/Hash.h
   gtl/mc/Material.h
   gtl/mc/MaterialParameters.h
-  gtl/mc/MtlxDocOps.h
   gtl/mc/MtlxDocPatch.h
   gtl/mc/Runtime.h
   impl/Backend.cpp
@@ -24,7 +23,6 @@ add_library(
   impl/MdlNeurayLoader.h
   impl/MdlRuntime.cpp
   impl/MdlRuntime.h
-  impl/MtlxDocOps.cpp
   impl/MtlxDocPatch.cpp
   impl/MtlxMdlCodeGen.cpp
   impl/MtlxMdlCodeGen.h

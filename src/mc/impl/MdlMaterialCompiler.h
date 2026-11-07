@@ -33,6 +33,7 @@
 
 #include "MaterialParameters.h"
 #include "MdlLogger.h"
+#include "MdlMaterial.h"
 
 namespace gtl
 {
@@ -46,7 +47,8 @@ namespace gtl
   public:
     bool compileFromString(std::string_view srcStr,
                            std::string_view identifier,
-                           mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial);
+                           mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
+                           std::vector<McMdlTextureParameter>& textureParameters);
 
     bool compileFromFile(const char* filePath,
                          std::string_view identifier,
@@ -58,13 +60,15 @@ namespace gtl
                  std::string_view moduleName,
                  std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
                  mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
-                 const McMaterialParameters& params = {});
+                 const McMaterialParameters& params,
+                 std::vector<McMdlTextureParameter>* textureParameters);
 
     bool createCompiledMaterial(mi::neuraylib::IMdl_execution_context* context,
                                 std::string_view moduleName,
                                 std::string_view identifier,
                                 mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
-                                const McMaterialParameters& params = {});
+                                const McMaterialParameters& params,
+                                std::vector<McMdlTextureParameter>* textureParameters);
 
   private:
     mi::base::Handle<McMdlLogger> m_logger;

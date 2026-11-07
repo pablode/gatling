@@ -267,7 +267,7 @@ void main()
     /* 4. Output auxialiary AOVs */
     if (bounce == 0)
     {
-#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0 || (AOV_MASK & AOV_BIT_FACE_ID) != 0
+#if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0 || (AOV_MASK & AOV_BIT_FACE_ID) != 0 || (AOV_MASK & AOV_BIT_MATERIAL_ID) != 0
         IndexBuffer indices = IndexBuffer(payload.bufferAddress);
         BlasPayloadBufferPreamble preamble = indices.preamble;
 #endif
@@ -312,14 +312,15 @@ void main()
         InstanceIdAov[pixelIndex] = instanceId;
 #endif
 #if (AOV_MASK & AOV_BIT_TOPOHASH) != 0
-        uint64_t topoHash = payload.topoHash;
-        uint lower16Bit = uint(topoHash & 0xFFFFu);
-        uvec3 colorI = uvec3(
-          uint(topoHash >> 48) & 0xFFFFu,
-          uint(topoHash >> 32) & 0xFFFFu,
-          uint(topoHash >> 16) & 0xFFFFu
-        ) ^ lower16Bit;
-        TopoHashAov[pixelIndex] = vec3(colorI) / float(UINT16_MAX);
+        uint topoHash = uint(payload.topoHash);
+        TopoHashAov[pixelIndex] = vec3(
+          float(topoHash % 2u) / 2.0,
+          float(topoHash % 4u) / 4.0,
+          float(topoHash % 8u) / 8.0
+        );
+#endif
+#if (AOV_MASK & AOV_BIT_MATERIAL_ID) != 0
+        MaterialIdAov[pixelIndex] = int(preamble.materialId);
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
         DoubleSidedAov[pixelIndex] = isDoubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);

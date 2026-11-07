@@ -76,6 +76,7 @@ PXR_NAMESPACE_OPEN_SCOPE
   ((debugThinWalled, "debug:thinWalled"))            \
   ((debugDoubleSided, "debug:doubleSided"))          \
   ((debugTopoHash, "debug:topoHash"))                \
+  ((debugMaterialId, "debug:materialId"))            \
   (albedo)
 
 #define HD_GATLING_COMMAND_TOKENS                    \

@@ -21,11 +21,16 @@
 #include "MdlMaterial.h"
 #include "MdlMaterialCompiler.h"
 #include "MdlRuntime.h"
+#include "MtlxDocPatch.h"
 #include "MtlxMdlCodeGen.h"
 #include "Runtime.h"
 
 #include <filesystem>
 #include <assert.h>
+
+#include <MaterialXFormat/Util.h>
+
+namespace mx = MaterialX;
 
 namespace
 {
@@ -188,21 +193,49 @@ namespace
 
 namespace gtl
 {
-  McFrontend::McFrontend(const MaterialX::DocumentPtr mtlxStdLib, McRuntime& runtime)
+  McFrontend::McFrontend(const MaterialX::DocumentPtr mtlxStdLib,
+                         const std::string& customMtlxNodesPath,
+                         McRuntime& runtime)
   {
+    m_mtlxStdLib = mtlxStdLib;
+
     McMdlRuntime& mdlRuntime = runtime.getMdlRuntime();
     m_mdlMaterialCompiler = std::make_shared<McMdlMaterialCompiler>(mdlRuntime);
     m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib);
+    m_mtlxDocPatcher = std::make_shared<McMtlxDocumentPatcher>(mtlxStdLib, customMtlxNodesPath);
+  }
+
+  mx::DocumentPtr McFrontend::parseMtlxDoc(std::string_view mtlxSrc)
+  {
+    try
+    {
+      mx::DocumentPtr doc = mx::createDocument();
+      doc->importLibrary(m_mtlxStdLib);
+      mx::readFromXmlString(doc, mtlxSrc.data());
+      return doc;
+    }
+    catch (const std::exception&)
+    {
+      return nullptr;
+    }
+  }
+
+  McMtlxMaterialDoc McFrontend::patchMtlxDoc(const mx::DocumentPtr& doc,
+                                             const char* materialName,
+                                             bool usdPreviewSurfacePresenceOverride,
+                                             uint32_t maxParameterCount)
+  {
+    return m_mtlxDocPatcher->patch(doc, materialName, usdPreviewSurfacePresenceOverride, maxParameterCount);
   }
 
   McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
-                                            const MaterialX::NodePtr& surfaceShader)
+                                            const MaterialX::NodePtr& surfaceShader,
+                                            McOpacityClassification opacityClass)
   {
     std::string mdlSrc;
     std::string subIdentifier;
-    McOpacityClassification opacityClass;
     bool isAnimated;
-    if (!m_mtlxMdlCodeGen->translate(doc, surfaceShader, mdlSrc, subIdentifier, opacityClass, isAnimated))
+    if (!m_mtlxMdlCodeGen->translate(doc, surfaceShader, mdlSrc, subIdentifier, isAnimated))
     {
       return nullptr;
     }
@@ -241,16 +274,21 @@ namespace gtl
     };
   }
 
-  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, McOpacityClassification opacityClass, bool isAnimated)
+  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc,
+                                           std::string_view subIdentifier,
+                                           McOpacityClassification opacityClass,
+                                           bool isAnimated)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
+    std::vector<McMdlTextureParameter> textureParameters;
+    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial, textureParameters))
     {
       return nullptr;
     }
 
     auto mdlMaterial = std::make_shared<McMdlMaterial>();
     mdlMaterial->compiledMaterial = compiledMaterial;
+    mdlMaterial->textureParameters = std::move(textureParameters);
 
     return new McMaterial{
       .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),

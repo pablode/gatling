@@ -24,16 +24,33 @@
 namespace ocio = OCIO_NAMESPACE;
 #endif
 
-#include <memory>
+#include <stdint.h>
+#include <vector>
+
+#include "Material.h"
 
 namespace gtl
 {
+  // A MaterialX document which has been patched for Gatling's requirements and parameterized for
+  // material deduplication, together with the derived properties needed to compile it and to
+  // build its GPU parameter buffer.
+  struct McMtlxMaterialDoc
+  {
+    MaterialX::DocumentPtr doc;
+    MaterialX::NodePtr surfaceShader;
+    McOpacityClassification opacityClass;
+    std::vector<McMtlxNetworkParameter> parameters;
+  };
+
   class McMtlxDocumentPatcher
   {
   public:
     McMtlxDocumentPatcher(const MaterialX::DocumentPtr mtlxStdLib, const std::string& customNodesPath);
 
-    MaterialX::DocumentPtr patch(const MaterialX::DocumentPtr document, [[maybe_unused]] bool usdPreviewSurfacePresenceOverride);
+    McMtlxMaterialDoc patch(const MaterialX::DocumentPtr& document,
+                            const char* materialName,
+                            bool usdPreviewSurfacePresenceOverride,
+                            uint32_t maxParameterCount);
 
   private:
     MaterialX::DocumentPtr m_customNodesDoc;

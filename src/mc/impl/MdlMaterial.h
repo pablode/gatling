@@ -18,13 +18,22 @@
 #pragma once
 
 #include <mi/neuraylib/icompiled_material.h>
+#include <mi/neuraylib/ivalue.h>
 
 #include <string>
+#include <vector>
 
 namespace gtl
 {
+  struct McMdlTextureParameter
+  {
+    std::string parameterName;
+    mi::base::Handle<mi::neuraylib::IValue_texture> value;
+  };
+
   struct McMdlMaterial
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
+    std::vector<McMdlTextureParameter> textureParameters;
   };
 }
