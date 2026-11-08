@@ -21,6 +21,8 @@
 
 #include <Gi.h>
 
+#include "SceneDataCache.h"
+
 namespace gtl
 {
   struct GiMeshBuffer
@@ -34,8 +36,7 @@ namespace gtl
   {
     std::string name;
     GiPrimvarType type;
-    GiPrimvarInterpolation interpolation;
-    GiMeshBuffer buffer;
+    GiSceneDataPtr sceneData;
   };
 
   struct GiMeshData
@@ -51,11 +52,22 @@ namespace gtl
   GiMeshData giProcessMeshData(const std::vector<GiFace>& faces,
                                const std::vector<int>& faceIds,
                                const std::vector<GiVertex>& vertices,
-                               const std::vector<GiPrimvarData>& primvars);
+                               const std::vector<GiPrimvarData>& primvars,
+                               GiSceneDataCache& sceneDataCache);
 
   void giDecompressMeshData(const GiMeshData& cmd,
                             std::vector<GiFace>& faces,
                             std::vector<int>& faceIds,
                             std::vector<GiVertex>& vertices,
-                            std::vector<GiPrimvarData>& primvars);
+                            std::vector<GiPrimvarData>& primvars,
+                            std::vector<GiSceneDataPtr>& primvarSceneData);
+
+  uint32_t giPrimvarTypeSize(GiPrimvarType type);
+
+  bool giPrimvarCanBeConstant(const std::vector<uint8_t>& data, uint32_t typeSize);
+
+  bool giPrimvarCanBeUniform(GiPrimvarInterpolation interpolation,
+                             const std::vector<GiFace>& faces,
+                             const std::vector<uint8_t>& data,
+                             uint32_t typeSize);
 }

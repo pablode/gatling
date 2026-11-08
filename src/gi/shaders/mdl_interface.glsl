@@ -432,14 +432,19 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint sceneDataInfo)
   ASSERT(interpolation == 0, "Error: unhandled primvar interpolation");
   return uvec3(0);
 }
-#endif
 
 uint64_t get_scene_data_buffer_address(mdl_renderer_state rs, uint sceneDataInfo)
 {
-  uint64_t address = scene_data_is_material(sceneDataInfo) ? rs.paramBufferAddress : rs.sceneDataBufferAddress;
-  address += (sceneDataInfo & SCENE_DATA_OFFSET_MASK) * SCENE_DATA_ALIGNMENT;
-  return address;
+  uint addressIndex = sceneDataInfo & SCENE_DATA_ADDRESS_MASK;
+
+  if (scene_data_is_material(sceneDataInfo))
+  {
+    return rs.paramBufferAddress + addressIndex * SCENE_DATA_ALIGNMENT;
+  }
+
+  return sceneDataAddresses[addressIndex];
 }
+#endif
 
 vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default_value, bool uniform_lookup)
 {

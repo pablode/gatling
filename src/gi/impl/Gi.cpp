@@ -21,6 +21,7 @@
 
 #include "Gi.h"
 #include "MaterialManager.h"
+#include "SceneDataCache.h"
 #include "TextureManager.h"
 #include "Turbo.h"
 #include "AssetReader.h"
@@ -87,6 +88,7 @@ namespace gtl
   {
     CgpuBlas blas;
     CgpuBuffer payloadBuffer;
+    std::vector<GiSceneDataPtr> sceneData;
     rp::BlasPayload payload;
   };
 
@@ -235,6 +237,7 @@ namespace gtl
   std::unique_ptr<McFrontend> s_mcFrontend;
   std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
+  std::unique_ptr<GiSceneDataCache> s_sceneDataCache;
   std::unique_ptr<GiTextureManager> s_texSys;
   std::shared_ptr<GgpuBumpAllocator> s_bumpAlloc;
   std::atomic_bool s_forceShaderCacheInvalid = false;
@@ -407,6 +410,12 @@ namespace gtl
 
     s_deleteQueue = std::make_unique<GgpuDeleteQueue>(s_ctx);
 
+    s_sceneDataCache = std::make_unique<GiSceneDataCache>(s_ctx, *s_stager, *s_deleteQueue);
+    if (!s_sceneDataCache->initialize())
+    {
+      goto fail;
+    }
+
     s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath, params.mdlSearchPaths));
     if (!s_mcRuntime)
     {
@@ -468,6 +477,11 @@ fail:
       s_texSys.reset();
     }
     s_shaderGen.reset();
+    if (s_sceneDataCache)
+    {
+      s_sceneDataCache->destroy();
+      s_sceneDataCache.reset();
+    }
     if (s_stager)
     {
       s_stager->flush();
@@ -620,18 +634,20 @@ fail:
     delete mat;
   }
 
-  uint32_t _MakeSceneDataInfo(uint32_t offset, uint32_t componentCount, GiPrimvarInterpolation interpolation)
+  uint32_t _MakeSceneDataInfo(uint32_t addressIndex, uint32_t componentCount, GiPrimvarInterpolation interpolation)
   {
+    assert(addressIndex <= rp::SCENE_DATA_ADDRESS_MASK);
     assert(componentCount >= 1 && componentCount <= 4);
     static_assert(int(GiPrimvarInterpolation::COUNT) <= 8, "Enum exceeds 3 bits");
 
-    return offset |
+    return addressIndex |
            ((componentCount - 1) << rp::SCENE_DATA_STRIDE_OFFSET) |
            (uint32_t(interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
   }
 
   uint32_t _MakeMaterialSceneDataInfo(uint32_t parameterIndex, uint32_t componentCount)
   {
+    assert(parameterIndex <= rp::SCENE_DATA_ADDRESS_MASK);
     assert(componentCount >= 1 && componentCount <= 4);
 
     return parameterIndex |
@@ -661,7 +677,7 @@ fail:
       .doubleSided = desc.isDoubleSided,
       .id = desc.id,
       .scene = scene,
-      .cpuData = giProcessMeshData(desc.faces, desc.faceIds, desc.vertices, desc.primvars),
+      .cpuData = giProcessMeshData(desc.faces, desc.faceIds, desc.vertices, desc.primvars, *s_sceneDataCache),
       .name = desc.name,
       .maxFaceId = desc.maxFaceId
     };
@@ -716,6 +732,7 @@ fail:
   {
     std::lock_guard guard(s_resourceDestroyerMutex); // Hydra sync is parallel
     s_deleteQueue->pushBack(gpuData.blas, gpuData.payloadBuffer);
+    gpuData.sceneData.clear();
   }
 
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars)
@@ -866,7 +883,8 @@ fail:
         std::vector<int> meshFaceIds;
         std::vector<GiVertex> meshVertices;
         std::vector<GiPrimvarData> meshPrimvars;
-        giDecompressMeshData(mesh->cpuData, meshFaces, meshFaceIds, meshVertices, meshPrimvars);
+        std::vector<GiSceneDataPtr> meshPrimvarSceneData;
+        giDecompressMeshData(mesh->cpuData, meshFaces, meshFaceIds, meshVertices, meshPrimvars, meshPrimvarSceneData);
 
         if (meshFaces.empty())
         {
@@ -922,7 +940,13 @@ fail:
         }
 
         // Prepare scene data & preamble
-        std::vector<const GiPrimvarData*> primvars;
+        struct SceneDataPrimvar
+        {
+          const GiPrimvarData* primvar = nullptr;
+          const GiSceneDataPtr* cachedSceneData = nullptr;
+          bool hasFaceTopology = false;
+        };
+        std::vector<SceneDataPrimvar> primvars;
 
         struct MaterialSceneData
         {
@@ -951,7 +975,7 @@ fail:
             GB_DEBUG("scene data for mesh {} with material {}:", mesh->name, material->base.name);
           }
 
-          primvars.resize(rp::MAX_SCENE_DATA_COUNT, nullptr);
+          primvars.resize(rp::MAX_SCENE_DATA_COUNT);
           for (size_t i = 0; i < sceneDataCount; i++)
           {
             const char* sceneDataName = sceneDataNames[i];
@@ -1003,6 +1027,9 @@ fail:
 
             // FIXME: we should check if scene data and primvar types match to prevent crashes
             const GiPrimvarData* primvar = nullptr;
+            const GiSceneDataPtr* cachedSceneData = nullptr;
+            bool hasFaceTopology = false;
+
             for (const GiPrimvarData& p : mesh->instancerPrimvars)
             {
               if (p.name == sceneDataName && !p.data.empty())
@@ -1011,11 +1038,14 @@ fail:
                 break;
               }
             }
-            for (const GiPrimvarData& p : meshPrimvars) // override instancer primvars
+            for (size_t k = 0; k < meshPrimvars.size(); k++) // override instancer primvars
             {
+              const GiPrimvarData& p = meshPrimvars[k];
               if (p.name == sceneDataName && !p.data.empty())
               {
                 primvar = &p;
+                cachedSceneData = &meshPrimvarSceneData[k];
+                hasFaceTopology = true;
                 break;
               }
             }
@@ -1028,7 +1058,7 @@ fail:
             }
 
             GB_DEBUG("> [{}] {}", index, sceneDataName);
-            primvars[index] = primvar;
+            primvars[index] = { .primvar = primvar, .cachedSceneData = cachedSceneData, .hasFaceTopology = hasFaceTopology };
           }
         }
 
@@ -1057,61 +1087,29 @@ fail:
             _MakeMaterialSceneDataInfo(data.parameterIndex, data.componentCount);
         }
 
-        std::vector<uint32_t> sceneDataBufferOffsets(primvars.size());
+        std::vector<GiSceneDataPtr> sceneData;
         for (size_t i = 0; i < primvars.size(); i++)
         {
-          const GiPrimvarData* primvar = primvars[i];
-
+          const GiPrimvarData* primvar = primvars[i].primvar;
           if (!primvar)
           {
             continue;
           }
 
-          uint64_t newPayloadBufferSize = payloadBufferSize;
-          uint64_t bufferOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
-
-          if (bufferOffset >= UINT32_MAX)
+          GiSceneDataPtr data = primvars[i].cachedSceneData ? *primvars[i].cachedSceneData : nullptr;
+          if (!data && !primvars[i].hasFaceTopology)
           {
-            GB_ERROR("scene data too large");
+            data = s_sceneDataCache->addPrimvar(*primvar, nullptr, 0);
+          }
+          if (!data || !s_sceneDataCache->upload(data))
+          {
+            GB_ERROR("failed to prepare scene data for {}", primvar->name);
             continue;
           }
 
-          uint32_t sceneDataOffset = uint32_t(bufferOffset / rp::SCENE_DATA_ALIGNMENT);
-          if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset)
-          {
-            GB_ERROR("max scene data offset exceeded");
-            continue;
-          }
-
-          payloadBufferSize = newPayloadBufferSize;
-          sceneDataBufferOffsets[i] = uint32_t(bufferOffset);
-
-          uint32_t componentCount = 0;
-          switch (primvar->type)
-          {
-          case GiPrimvarType::Float:
-          case GiPrimvarType::Int:
-            componentCount = 1;
-            break;
-          case GiPrimvarType::Int2:
-          case GiPrimvarType::Vec2:
-            componentCount = 2;
-            break;
-          case GiPrimvarType::Int3:
-          case GiPrimvarType::Vec3:
-            componentCount = 3;
-            break;
-          case GiPrimvarType::Int4:
-          case GiPrimvarType::Vec4:
-            componentCount = 4;
-            break;
-          default:
-            assert(false);
-            GB_ERROR("coding error: unhandled type size!");
-            continue;
-          }
-
-          preamble.sceneDataInfos[i] = _MakeSceneDataInfo(uint32_t(sceneDataOffset), componentCount, primvar->interpolation);
+          uint32_t componentCount = giPrimvarTypeSize(primvar->type) / 4;
+          preamble.sceneDataInfos[i] = _MakeSceneDataInfo(data->addressIndex, componentCount, data->interpolation);
+          sceneData.push_back(std::move(data));
         }
 
         // Upload GPU data
@@ -1177,28 +1175,6 @@ fail:
           goto fail_cleanup;
         }
 
-        for (size_t i = 0; i < primvars.size(); i++)
-        {
-          if (preamble.sceneDataInfos[i] == rp::SCENE_DATA_INVALID)
-          {
-            continue;
-          }
-
-          if (preamble.sceneDataInfos[i] & rp::SCENE_DATA_MATERIAL_FLAG)
-          {
-            continue; // backed by the material parameter buffer
-          }
-
-          const GiPrimvarData* s = primvars[i];
-          assert(s);
-
-          if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer, sceneDataBufferOffsets[i]))
-          {
-            GB_ERROR("failed to stage BLAS primvar");
-            goto fail_cleanup;
-          }
-        }
-
         s_stager->flush();
 
         // Build BLAS
@@ -1254,6 +1230,7 @@ fail:
         mesh->gpuData = GiMeshGpuData{
           .blas = blas,
           .payloadBuffer = payloadBuffer,
+          .sceneData = std::move(sceneData),
           .payload = payload
         };
 
@@ -1336,6 +1313,8 @@ fail_cleanup:
     CgpuBuffer instanceIdsBuffer;
 
     _giBuildGeometryStructures(scene, renderSettings, shaderCache, blasInstances, blasPayloads, instanceIds, indicesSize, verticesSize);
+
+    s_sceneDataCache->logStatsAndReset();
 
     GB_LOG("BLAS builds finished");
     GB_LOG("> {} unique BLAS", blasPayloads.size());
@@ -2212,6 +2191,7 @@ cleanup:
       }
 
       buffers.push_back({ .binding = rp::BINDING_INDEX_TEXTURE_INFOS, .buffer = shaderCache->textureInfos });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_SCENE_DATA_ADDRESSES, .buffer = s_sceneDataCache->addressBuffer() });
 
       size_t imageCount = shaderCache->imageBindings.size() + 2/* dome lights */;
 

@@ -18,6 +18,7 @@
 #include "MeshProcessing.h"
 
 #include <meshoptimizer.h>
+#include <xxhash.h>
 #include <blosc2.h>
 
 #include <gtl/gb/Log.h>
@@ -26,33 +27,6 @@ using namespace gtl;
 
 namespace
 {
-  uint32_t _PrimvarTypeSize(GiPrimvarType type)
-  {
-    switch (type)
-    {
-    case GiPrimvarType::Float:
-    case GiPrimvarType::Int:
-      return 4;
-
-    case GiPrimvarType::Int2:
-    case GiPrimvarType::Vec2:
-      return 2 * 4;
-
-    case GiPrimvarType::Int3:
-    case GiPrimvarType::Vec3:
-      return 3 * 4;
-
-    case GiPrimvarType::Int4:
-    case GiPrimvarType::Vec4:
-      return 4 * 4;
-
-    default:
-      assert(false);
-      GB_ERROR("coding error: unhandled type size!");
-      return 0;
-    }
-  }
-
   template<typename T>
   GiMeshBuffer _CompressMeshBuffer(const std::vector<T>& data)
   {
@@ -94,7 +68,81 @@ namespace
     return std::move(data);
   }
 
-  bool _CanConvertToConstantPrimvar(const std::vector<uint8_t>& data, uint32_t typeSize)
+  GiMeshData _CompressData(const std::vector<GiFace>& faces,
+                           const std::vector<int>& faceIds,
+                           const std::vector<GiVertex>& vertices,
+                           const std::vector<GiPrimvarData>& primvars,
+                           GiSceneDataCache& sceneDataCache)
+  {
+    auto logBufferCompression = [](const std::string_view name, const GiMeshBuffer& buf)
+    {
+      if (!buf.isCompressed)
+      {
+        return;
+      }
+
+      GB_DEBUG("compressed {} ({} bytes -> {} bytes, {:.1f}x)", name, buf.uncompressedSize,
+        buf.data.size(), float(buf.uncompressedSize) / float(buf.data.size()));
+    };
+
+    GiMeshData m;
+    m.faces = _CompressMeshBuffer(faces);
+    m.faceIds = _CompressMeshBuffer(faceIds);
+    m.vertices = _CompressMeshBuffer(vertices);
+
+    logBufferCompression("faces", m.faces);
+    logBufferCompression("faceIds", m.faceIds);
+    logBufferCompression("vertices", m.vertices);
+
+    uint64_t topologyHash = faces.empty() ? 0 : XXH64(faces.data(), faces.size() * sizeof(GiFace), 0);
+
+    m.primvars.resize(primvars.size());
+    for (size_t i = 0; i < primvars.size(); i++)
+    {
+      const auto& p = primvars[i];
+
+      auto& o = m.primvars[i];
+      o.name = p.name;
+      o.type = p.type;
+      o.sceneData = sceneDataCache.addPrimvar(p, &faces, topologyHash);
+    }
+
+    m.faceCount = faces.size();
+    m.vertexCount = vertices.size();
+    return m;
+  }
+}
+
+namespace gtl
+{
+  uint32_t giPrimvarTypeSize(GiPrimvarType type)
+  {
+    switch (type)
+    {
+    case GiPrimvarType::Float:
+    case GiPrimvarType::Int:
+      return 4;
+
+    case GiPrimvarType::Int2:
+    case GiPrimvarType::Vec2:
+      return 2 * 4;
+
+    case GiPrimvarType::Int3:
+    case GiPrimvarType::Vec3:
+      return 3 * 4;
+
+    case GiPrimvarType::Int4:
+    case GiPrimvarType::Vec4:
+      return 4 * 4;
+
+    default:
+      assert(false);
+      GB_ERROR("coding error: unhandled type size!");
+      return 0;
+    }
+  }
+
+  bool giPrimvarCanBeConstant(const std::vector<uint8_t>& data, uint32_t typeSize)
   {
     assert((data.size() % typeSize) == 0);
 
@@ -109,10 +157,10 @@ namespace
     return true;
   }
 
-  bool _CanConvertToUniformPrimvar(GiPrimvarInterpolation interpolation,
-                                   const std::vector<GiFace>& faces,
-                                   const std::vector<uint8_t>& data,
-                                   uint32_t typeSize)
+  bool giPrimvarCanBeUniform(GiPrimvarInterpolation interpolation,
+                             const std::vector<GiFace>& faces,
+                             const std::vector<uint8_t>& data,
+                             uint32_t typeSize)
   {
     assert((data.size() % typeSize) == 0);
     assert(interpolation == GiPrimvarInterpolation::Vertex || interpolation == GiPrimvarInterpolation::FaceVarying);
@@ -147,95 +195,11 @@ namespace
     return true;
   }
 
-  GiMeshData _CompressData(const std::vector<GiFace>& faces,
-                           const std::vector<int>& faceIds,
-                           const std::vector<GiVertex>& vertices,
-                           const std::vector<GiPrimvarData>& primvars)
-  {
-    auto logBufferCompression = [](const std::string_view name, const GiMeshBuffer& buf)
-    {
-      if (!buf.isCompressed)
-      {
-        return;
-      }
-
-      GB_DEBUG("compressed {} ({} bytes -> {} bytes, {:.1f}x)", name, buf.uncompressedSize,
-        buf.data.size(), float(buf.uncompressedSize) / float(buf.data.size()));
-    };
-
-    GiMeshData m;
-    m.faces = _CompressMeshBuffer(faces);
-    m.faceIds = _CompressMeshBuffer(faceIds);
-    m.vertices = _CompressMeshBuffer(vertices);
-
-    logBufferCompression("faces", m.faces);
-    logBufferCompression("faceIds", m.faceIds);
-    logBufferCompression("vertices", m.vertices);
-
-    m.primvars.resize(primvars.size());
-    for (size_t i = 0; i < primvars.size(); i++)
-    {
-      const auto& p = primvars[i];
-      uint32_t typeSize = _PrimvarTypeSize(p.type);
-
-      auto& o = m.primvars[i];
-      o.name = p.name;
-      o.type = p.type;
-
-      if (p.interpolation != GiPrimvarInterpolation::Constant && _CanConvertToConstantPrimvar(p.data, typeSize))
-      {
-        std::vector<uint8_t> newData(typeSize);
-        memcpy(&newData[0], &p.data[0], typeSize);
-
-        o.interpolation = GiPrimvarInterpolation::Constant;
-        o.buffer = GiMeshBuffer {
-          .isCompressed = false,
-          .uncompressedSize = typeSize,
-          .data = std::move(newData)
-        };
-
-        float savedMb = (p.data.size() <= typeSize) ? 0.0f : (p.data.size() - typeSize) / (1024.0f * 1024.0f);
-        GB_DEBUG("converted {} to constant interpolation (saved {:.2f} MB)", p.name, savedMb);
-      }
-      else if ((p.interpolation == GiPrimvarInterpolation::Vertex || p.interpolation == GiPrimvarInterpolation::FaceVarying) &&
-                _CanConvertToUniformPrimvar(p.interpolation, faces, p.data, typeSize))
-      {
-        std::vector<uint8_t> newData(faces.size() * 3 * typeSize);
-        for (size_t i = 0; i < faces.size(); i++)
-        {
-          uint32_t s0 = (p.interpolation == GiPrimvarInterpolation::Vertex) ? faces[i].v_i[0] : (i * 3);
-          memcpy(&newData[i * typeSize], &p.data[s0 * typeSize], typeSize);
-        }
-
-        o.interpolation = GiPrimvarInterpolation::Uniform;
-        o.buffer = _CompressMeshBuffer(newData);
-
-        float savedMb = float(newData.size() * 2.0f) / (1024.0f * 1024.0f);
-        GB_DEBUG("converted {} to uniform interpolation (saved {:.2f} MB)", p.name, savedMb);
-
-        logBufferCompression(p.name, o.buffer);
-      }
-      else
-      {
-        o.interpolation = p.interpolation;
-        o.buffer = _CompressMeshBuffer(p.data);
-
-        logBufferCompression(p.name, o.buffer);
-      }
-    }
-
-    m.faceCount = faces.size();
-    m.vertexCount = vertices.size();
-    return m;
-  }
-}
-
-namespace gtl
-{
   GiMeshData giProcessMeshData(const std::vector<GiFace>& faces,
                                const std::vector<int>& faceIds,
                                const std::vector<GiVertex>& vertices,
-                               const std::vector<GiPrimvarData>& primvars)
+                               const std::vector<GiPrimvarData>& primvars,
+                               GiSceneDataCache& sceneDataCache)
   {
     // Remap vertices & compress data.
 
@@ -244,7 +208,7 @@ namespace gtl
 
     if (vertexCount < 16)
     {
-      return _CompressData(faces, faceIds, vertices, primvars);
+      return _CompressData(faces, faceIds, vertices, primvars, sceneDataCache);
     }
 
     std::vector<meshopt_Stream> streams;
@@ -257,7 +221,7 @@ namespace gtl
       {
         continue;
       }
-      uint32_t sizeAndStride = _PrimvarTypeSize(p.type);
+      uint32_t sizeAndStride = giPrimvarTypeSize(p.type);
       streams.push_back(meshopt_Stream{ (void*) &p.data[0], sizeAndStride, sizeAndStride });
     }
 
@@ -267,7 +231,7 @@ namespace gtl
 
     if (newVertexCount == vertexCount)
     {
-      return _CompressData(faces, faceIds, vertices, primvars);
+      return _CompressData(faces, faceIds, vertices, primvars, sceneDataCache);
     }
     else
     {
@@ -293,36 +257,41 @@ namespace gtl
       }
 
       auto& n = newPrimvars[i];
-      uint32_t typeSize = _PrimvarTypeSize(o.type);
+      uint32_t typeSize = giPrimvarTypeSize(o.type);
 
       n.data.resize(typeSize * vertexCount);
       meshopt_remapVertexBuffer(&n.data[0], &o.data[0], vertexCount, typeSize, remap.data());
     }
 
-    return _CompressData(newFaces, faceIds, newVertices, newPrimvars);
+    return _CompressData(newFaces, faceIds, newVertices, newPrimvars, sceneDataCache);
   }
 
   void giDecompressMeshData(const GiMeshData& cmd,
                             std::vector<GiFace>& faces,
                             std::vector<int>& faceIds,
                             std::vector<GiVertex>& vertices,
-                            std::vector<GiPrimvarData>& primvars)
+                            std::vector<GiPrimvarData>& primvars,
+                            std::vector<GiSceneDataPtr>& primvarSceneData)
   {
     faces = _DecompressMeshBuffer<GiFace>(cmd.faces);
     faceIds = _DecompressMeshBuffer<int>(cmd.faceIds);
     vertices = _DecompressMeshBuffer<GiVertex>(cmd.vertices);
 
     primvars.resize(cmd.primvars.size());
+    primvarSceneData.resize(cmd.primvars.size());
+
     for (size_t i = 0; i < primvars.size(); i++)
     {
       const auto& p = cmd.primvars[i];
+      const GiSceneDataPtr& sceneData = p.sceneData;
 
       primvars[i] = GiPrimvarData {
         .name = p.name,
         .type = p.type,
-        .interpolation = p.interpolation,
-        .data = _DecompressMeshBuffer<uint8_t>(p.buffer)
+        .interpolation = sceneData ? sceneData->interpolation : GiPrimvarInterpolation::Constant,
+        .data = sceneData ? sceneData->decompress() : std::vector<uint8_t>{}
       };
+      primvarSceneData[i] = sceneData;
     }
   }
 }
