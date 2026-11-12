@@ -267,7 +267,15 @@ namespace gtl
     _sgGenerateCommonDefines(stitcher, params.commonParams);
     _sgGenerateSceneDataDefines(stitcher, params.builtinSceneDataIndices);
 
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
+    if (params.useTextureInfoLut)
+    {
+      stitcher.appendDefine("USE_TEXTURE_INFO_LUT");
+      stitcher.appendDefine("TEXTURE_INFO_OFFSET", (int32_t) params.textureInfoOffset);
+    }
+    else
+    {
+      stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
+    }
     stitcher.appendDefine("MEDIUM_DIRECTIONAL_BIAS", params.directionalBias);
 
     if (params.maxSceneDataId > 0)
@@ -314,10 +322,6 @@ namespace gtl
     {
       stitcher.appendDefine("SCENE_TRANSFORMS");
     }
-    if (params.useTextureInfoLut)
-    {
-      stitcher.appendDefine("USE_TEXTURE_INFO_LUT");
-    }
 
     fs::path filePath = m_shaderPath / params.baseFileName;
     if (!stitcher.appendSourceFile(filePath))
@@ -339,7 +343,15 @@ namespace gtl
     _sgGenerateCommonDefines(stitcher, params.commonParams);
     _sgGenerateSceneDataDefines(stitcher, params.builtinSceneDataIndices);
 
-    stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
+    if (params.useTextureInfoLut)
+    {
+      stitcher.appendDefine("USE_TEXTURE_INFO_LUT");
+      stitcher.appendDefine("TEXTURE_INFO_OFFSET", (int32_t) params.textureInfoOffset);
+    }
+    else
+    {
+      stitcher.appendDefine("TEXTURE_INDEX_OFFSET", (int32_t) params.textureIndexOffset);
+    }
 
     if (params.maxSceneDataId > 0)
     {
@@ -356,10 +368,6 @@ namespace gtl
     if (params.isAnimated)
     {
       stitcher.appendDefine("IS_ANIMATED");
-    }
-    if (params.useTextureInfoLut)
-    {
-      stitcher.appendDefine("USE_TEXTURE_INFO_LUT");
     }
 
     fs::path filePath = m_shaderPath / params.baseFileName;

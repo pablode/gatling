@@ -20,6 +20,7 @@
 #endif
 
 #include "Gi.h"
+#include "TextureHeap.h"
 #include "TextureManager.h"
 #include "Turbo.h"
 #include "AssetReader.h"
@@ -68,8 +69,6 @@
 #include <MaterialXCore/Document.h>
 
 #include <blosc2.h>
-
-#include <offsetAllocator.hpp>
 
 namespace mx = MaterialX;
 
@@ -121,7 +120,6 @@ namespace gtl
     std::vector<CgpuShader>        missShaders;
     CgpuPipeline                   pipeline;
     CgpuShader                     rgenShader;
-    CgpuBuffer                     textureInfos;
     GiScene*                       scene;
     bool                           resetSampleOffset = true;
   };
@@ -130,10 +128,10 @@ namespace gtl
   {
     CgpuShader closestHit;
     std::vector<CgpuShader> anyHits; // optional
-    OffsetAllocator::Allocation texOffsetAllocation;
+    GiTextureHeapAllocation texOffsetAllocation;
+    GiTextureHeapAllocation textureInfoOffsetAllocation;
     std::vector<GiImagePtr> images;
     std::vector<std::string> stringConstants;
-    std::vector<rp::TextureInfo> textureInfos;
     bool useTextureInfoLut = false;
   };
 
@@ -217,7 +215,7 @@ namespace gtl
 
   struct GiScene
   {
-    OffsetAllocator::Allocation domeLightsAllocation;
+    GiTextureHeapAllocation domeLightsAllocation;
     GgpuDenseDataStore sphereLights;
     GgpuDenseDataStore distantLights;
     GgpuDenseDataStore rectLights;
@@ -236,7 +234,6 @@ namespace gtl
     GiRenderParams oldRenderParams = {};
     CgpuBuffer aovDefaultValues;
     uint32_t sampleOffset = 0;
-    OffsetAllocator::Allocator texAllocator{rp::MAX_TEXTURE_COUNT};
   };
 
   struct GiRenderBuffer
@@ -267,6 +264,7 @@ namespace gtl
   std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
   std::unique_ptr<GiSceneDataPool> s_sceneDataPool;
+  std::unique_ptr<GiTextureHeap> s_textureHeap;
   std::unique_ptr<GiTextureManager> s_texSys;
   std::shared_ptr<GgpuBumpAllocator> s_bumpAlloc;
   std::atomic_bool s_forceShaderCacheInvalid = false;
@@ -446,6 +444,12 @@ namespace gtl
 
     s_sceneDataPool = std::make_unique<GiSceneDataPool>(s_ctx, *s_stager, *s_deleteQueue);
 
+    s_textureHeap = std::make_unique<GiTextureHeap>(s_ctx, *s_stager);
+    if (!s_textureHeap->initialize())
+    {
+      goto fail;
+    }
+
     s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath, params.mdlSearchPaths));
     if (!s_mcRuntime)
     {
@@ -507,6 +511,11 @@ fail:
     {
       s_texSys->destroy();
       s_texSys.reset();
+    }
+    if (s_textureHeap)
+    {
+      s_textureHeap->destroy();
+      s_textureHeap.reset();
     }
     if (s_sceneDataPool)
     {
@@ -661,12 +670,11 @@ fail:
     return mat;
   }
 
-  void giDestroyMaterialGpuData(GiScene* scene, GiMaterialGpuData& gpuData)
+  void giDestroyMaterialGpuData(GiMaterialGpuData& gpuData)
   {
-    if (gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-    {
-      scene->texAllocator.free(gpuData.texOffsetAllocation);
-    }
+    s_textureHeap->freeTextures(gpuData.texOffsetAllocation);
+    s_textureHeap->freeTextureInfos(gpuData.textureInfoOffsetAllocation);
+
     if (gpuData.closestHit.handle)
     {
       cgpuDestroyShader(s_ctx, gpuData.closestHit);
@@ -690,7 +698,7 @@ fail:
 
       if (mat->gpuData)
       {
-        giDestroyMaterialGpuData(scene, *mat->gpuData);
+        giDestroyMaterialGpuData(*mat->gpuData);
       }
 
       scene->materials.erase(mat);
@@ -1461,7 +1469,6 @@ cleanup:
 
     const GiRenderSettings& renderSettings = params.renderSettings;
     GiScene* scene = params.scene;
-    OffsetAllocator::Allocator& texAllocator = scene->texAllocator;
 
     uint32_t aovMask = 0;
     for (const GiAovBinding& binding : params.aovBindings)
@@ -1499,10 +1506,8 @@ cleanup:
     std::vector<CgpuShader> missShaders;
     std::vector<McTextureDescription> textureDescriptions;
     std::vector<GiImageBinding> imageBindings;
-    std::vector<std::pair<uint32_t, rp::TextureInfo>> textureInfoEntries;
     std::vector<HitGroupCompInfo> hitGroupCompInfos;
     std::vector<const GiMaterial*> cachedMaterials;
-    CgpuBuffer textureInfoBuffer;
 
     uint32_t maxRayPayloadSize = _GetRpMainMaxRayPayloadSize(renderSettings.mediumStackSize);
     uint32_t maxRayHitAttributeSize = _GetRpMainMaxRayHitAttributeSize();
@@ -1604,13 +1609,16 @@ cleanup:
 
         GiMaterialGpuData gpuData;
         gpuData.stringConstants = genInfo.stringConstants;
-        gpuData.textureInfos.resize(resourceCount);
+
+        std::vector<rp::TextureInfo> textureInfos(resourceCount);
 
         if (imageCount > 0)
         {
-          gpuData.texOffsetAllocation = texAllocator.allocate(imageCount);
-
-          GB_EXPECT(gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE, "max number of textures exceeded");
+          gpuData.texOffsetAllocation = s_textureHeap->allocateTextures(imageCount);
+        }
+        if (resourceCount > 0)
+        {
+          gpuData.textureInfoOffsetAllocation = s_textureHeap->allocateTextureInfos(resourceCount);
         }
 
         uint32_t imageOffset = 0;
@@ -1618,7 +1626,7 @@ cleanup:
         {
           const GiTextureResource& resource = textureResources[resourceStart + r];
 
-          rp::TextureInfo& texInfo = gpuData.textureInfos[r];
+          rp::TextureInfo& texInfo = textureInfos[r];
           uint32_t imageIndex = gpuData.texOffsetAllocation.offset + imageOffset;
 
           if (resource.uvtileWidth > 0)
@@ -1652,6 +1660,13 @@ cleanup:
         }
 
         newMaterialGpuDatas.push_back(gpuData);
+
+        if (resourceCount > 0 &&
+            !s_textureHeap->updateTextureInfos(gpuData.textureInfoOffsetAllocation, textureInfos))
+        {
+          GB_ERROR("failed to update texture infos");
+          goto cleanup;
+        }
       }
 
       // 4. Generate final hit shader GLSL sources.
@@ -1662,6 +1677,7 @@ cleanup:
         const McMaterial* mcMat = material->mcMat;
 
         uint32_t texOffset = newMaterialGpuDatas[i].texOffsetAllocation.offset;
+        uint32_t texInfoOffset = newMaterialGpuDatas[i].textureInfoOffsetAllocation.offset;
         bool useTextureInfoLut = newMaterialGpuDatas[i].useTextureInfoLut;
 
         // Closest hit
@@ -1686,6 +1702,7 @@ cleanup:
             .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .dfGlsl = compInfo.genInfo.glslSource,
             .textureIndexOffset = texOffset,
+            .textureInfoOffset = texInfoOffset,
             .useTextureInfoLut = useTextureInfoLut
           };
 
@@ -1709,6 +1726,7 @@ cleanup:
             .dfGlsl = compInfo.genInfo.glslSource,
             .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .textureIndexOffset = texOffset,
+            .textureInfoOffset = texInfoOffset,
             .isAnimated = mcMat->isAnimated,
             .useTextureInfoLut = useTextureInfoLut
           };
@@ -1945,10 +1963,9 @@ cleanup:
       compInfo.material->gpuData = newMaterialGpuDatas[i];
     }
 
-    // Collect image bindings and texture resource infos.
-    for (size_t i = 0, j = 0; i < materials.size(); i++)
+    // Collect image bindings.
+    for (const GiMaterial* material : materials)
     {
-      const GiMaterial* material = materials[i];
       const GiMaterialGpuData& gpuData = *material->gpuData;
       uint32_t texOffset = gpuData.texOffsetAllocation.offset;
 
@@ -1962,44 +1979,6 @@ cleanup:
           maxTextureIndex = index;
         }
         texCount++;
-      }
-
-      for (uint32_t r = 0; r < gpuData.textureInfos.size(); r++)
-      {
-        uint32_t textureIndex = texOffset + r;
-        textureInfoEntries.push_back({ textureIndex, gpuData.textureInfos[r] });
-        maxTextureIndex = std::max(maxTextureIndex, textureIndex);
-      }
-    }
-
-    // Upload texture resource infos, required for mapping texture indices to image array indices.
-    {
-      size_t textureInfoCount = std::max<size_t>(size_t(maxTextureIndex) + 1, 1); // size > 0
-      std::vector<rp::TextureInfo> textureInfos(textureInfoCount);
-
-      for (const auto& entry : textureInfoEntries)
-      {
-        textureInfos[entry.first] = entry.second;
-      }
-
-      uint64_t textureInfoBufferSize = uint64_t(textureInfos.size()) * sizeof(rp::TextureInfo);
-
-      if (!cgpuCreateBuffer(s_ctx, {
-                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferDst,
-                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
-                              .size = textureInfoBufferSize,
-                              .debugName = "TextureInfos"
-                            }, &textureInfoBuffer))
-      {
-        GB_ERROR("failed to create texture info buffer");
-        goto cleanup;
-      }
-
-      if (!s_stager->stageToBuffer((const uint8_t*) textureInfos.data(), textureInfoBufferSize, textureInfoBuffer) ||
-          !s_stager->flush())
-      {
-        GB_ERROR("failed to stage texture infos");
-        goto cleanup;
       }
     }
 
@@ -2017,7 +1996,6 @@ cleanup:
     cache->missShaders = missShaders;
     cache->pipeline = pipeline;
     cache->rgenShader = rgenShader;
-    cache->textureInfos = textureInfoBuffer;
     cache->scene = scene;
 
 cleanup:
@@ -2025,10 +2003,6 @@ cleanup:
     // compilation errors is that we want shader hotloading to not bloat resource usage.
     if (!cache)
     {
-      if (textureInfoBuffer.handle)
-      {
-        cgpuDestroyBuffer(s_ctx, textureInfoBuffer);
-      }
       if (rgenShader.handle)
       {
         cgpuDestroyShader(s_ctx, rgenShader);
@@ -2044,7 +2018,7 @@ cleanup:
       }
       for (GiMaterialGpuData& gpuData : newMaterialGpuDatas)
       {
-        giDestroyMaterialGpuData(scene, gpuData);
+        giDestroyMaterialGpuData(gpuData);
       }
     }
     return cache;
@@ -2061,7 +2035,6 @@ cleanup:
     }
     cgpuDestroyBindSets(s_ctx, cache->bindSets.data(), (uint32_t) cache->bindSets.size());
     cgpuDestroyPipeline(s_ctx, cache->pipeline);
-    cgpuDestroyBuffer(s_ctx, cache->textureInfos);
     delete cache;
   }
 
@@ -2276,10 +2249,8 @@ cleanup:
 
         GiMaterialGpuData& gpuData = *mat->gpuData;
 
-        if (gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-        {
-          scene->texAllocator.free(gpuData.texOffsetAllocation);
-        }
+        s_textureHeap->freeTextures(gpuData.texOffsetAllocation);
+        s_textureHeap->freeTextureInfos(gpuData.textureInfoOffsetAllocation);
         if (gpuData.closestHit.handle)
         {
           cgpuDestroyShader(s_ctx, gpuData.closestHit);
@@ -2549,7 +2520,7 @@ cleanup:
         buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
       }
 
-      buffers.push_back({ .binding = rp::BINDING_INDEX_TEXTURE_INFOS, .buffer = shaderCache->textureInfos });
+      buffers.push_back({ .binding = rp::BINDING_INDEX_TEXTURE_INFOS, .buffer = s_textureHeap->textureInfoBuffer() });
 
       size_t imageCount = shaderCache->imageBindings.size() + 2/* dome lights */;
 
@@ -2785,8 +2756,7 @@ cleanup:
       .uniformDomeLightTexture = uniformDomeLightTexture,
     };
 
-    scene->domeLightsAllocation = scene->texAllocator.allocate(2); // primary + fallback
-      GB_EXPECT(scene->domeLightsAllocation.offset != OffsetAllocator::Allocation::NO_SPACE, "max number of textures exceeded");
+    scene->domeLightsAllocation = s_textureHeap->allocateTextures(2); // primary + fallback
 
     return scene;
   }
@@ -2811,6 +2781,7 @@ cleanup:
     }
     cgpuDestroyImage(s_ctx, scene->fallbackDomeLightTexture);
     cgpuDestroyImage(s_ctx, scene->uniformDomeLightTexture);
+    s_textureHeap->freeTextures(scene->domeLightsAllocation);
     delete scene;
   }
 

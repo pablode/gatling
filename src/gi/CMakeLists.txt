@@ -16,6 +16,8 @@ add_library(
   impl/MeshProcessing.cpp
   impl/SceneDataPool.h
   impl/SceneDataPool.cpp
+  impl/TextureHeap.h
+  impl/TextureHeap.cpp
   impl/TextureManager.h
   impl/TextureManager.cpp
   impl/Turbo.h

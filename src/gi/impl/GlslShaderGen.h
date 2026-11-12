@@ -104,6 +104,7 @@ namespace gtl
       uint32_t maxSceneDataId;
       std::string_view dfGlsl;
       uint32_t textureIndexOffset;
+      uint32_t textureInfoOffset;
       bool useTextureInfoLut;
     };
 
@@ -117,6 +118,7 @@ namespace gtl
       uint32_t maxSceneDataId;
       bool shadowTest;
       uint32_t textureIndexOffset;
+      uint32_t textureInfoOffset;
       bool isAnimated;
       bool useTextureInfoLut;
     };

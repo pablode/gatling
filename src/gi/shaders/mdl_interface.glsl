@@ -45,7 +45,7 @@ bool tex_texture_isvalid(int tex)
 int tex_get_image_index(int tex)
 {
 #if defined(USE_TEXTURE_INFO_LUT)
-    return int(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1].imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
+    return int(textureInfos[TEXTURE_INFO_OFFSET + tex - 1].imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
 #else
     return TEXTURE_INDEX_OFFSET + tex - 1;
 #endif
@@ -186,7 +186,7 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
     int image_idx;
 
 #if defined(USE_TEXTURE_INFO_LUT)
-    TextureInfo info = textureInfos[TEXTURE_INDEX_OFFSET + tex - 1];
+    TextureInfo info = textureInfos[TEXTURE_INFO_OFFSET + tex - 1];
     isUvTile = (info.uvtileWidthAndHeight & TEXTURE_INFO_UVTILE_SIZE_MASK) != 0;
 
     if (isUvTile)
@@ -253,7 +253,7 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
 
     int image_idx;
 #if defined(USE_TEXTURE_INFO_LUT)
-    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1], uv_tile);
+    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INFO_OFFSET + tex - 1], uv_tile);
 #else
     image_idx = tex_get_image_index(tex);
 #endif
@@ -304,7 +304,7 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
 
     int image_idx;
 #if defined(USE_TEXTURE_INFO_LUT)
-    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INDEX_OFFSET + tex - 1], uv_tile);
+    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INFO_OFFSET + tex - 1], uv_tile);
 #else
     image_idx = tex_get_image_index(tex);
 #endif
