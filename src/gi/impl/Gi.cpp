@@ -134,7 +134,7 @@ namespace gtl
     std::vector<GiImagePtr> images;
     std::vector<std::string> stringConstants;
     std::vector<rp::TextureInfo> textureInfos;
-    bool hasUdimTextures = false;
+    bool useTextureInfoLut = false;
   };
 
   struct GiMaterial
@@ -1623,7 +1623,7 @@ cleanup:
 
           if (resource.uvtileWidth > 0)
           {
-            gpuData.hasUdimTextures = true;
+            gpuData.useTextureInfoLut = true;
           }
 
           assert(imageIndex <= rp::TEXTURE_INFO_IMAGE_INDEX_MASK);
@@ -1662,7 +1662,7 @@ cleanup:
         const McMaterial* mcMat = material->mcMat;
 
         uint32_t texOffset = newMaterialGpuDatas[i].texOffsetAllocation.offset;
-        bool hasUdimTextures = newMaterialGpuDatas[i].hasUdimTextures;
+        bool useTextureInfoLut = newMaterialGpuDatas[i].useTextureInfoLut;
 
         // Closest hit
         {
@@ -1686,7 +1686,7 @@ cleanup:
             .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .dfGlsl = compInfo.genInfo.glslSource,
             .textureIndexOffset = texOffset,
-            .hasUdimTextures = hasUdimTextures
+            .useTextureInfoLut = useTextureInfoLut
           };
 
           if (!s_shaderGen->generateClosestHitSpirv(hitParams, compInfo.closestHitInfo.spv))
@@ -1710,7 +1710,7 @@ cleanup:
             .maxSceneDataId = compInfo.genInfo.maxSceneDataId,
             .textureIndexOffset = texOffset,
             .isAnimated = mcMat->isAnimated,
-            .hasUdimTextures = hasUdimTextures
+            .useTextureInfoLut = useTextureInfoLut
           };
 
           hitParams.shadowTest = false;
