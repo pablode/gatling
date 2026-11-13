@@ -1088,8 +1088,10 @@ fail:
 
         rp::BlasPayloadBufferPreamble preamble
         {
+          .faceIdsInfo = (faceIdStride << rp::FACE_ID_STRIDE_OFFSET) | uint32_t(faceIdsBufferOffset),
           .objectId = mesh->id,
-          .faceIdsInfo = (faceIdStride << rp::FACE_ID_STRIDE_OFFSET) | uint32_t(faceIdsBufferOffset)
+          .materialInstance = 0,
+          .padding = 0
         };
         for (size_t i = 0; i < rp::MAX_SCENE_DATA_COUNT; i++)
         {

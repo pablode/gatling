@@ -87,6 +87,7 @@ namespace gtl
     Uniform,
     Vertex,
     FaceVarying,
+    MaterialInstance,
     COUNT
   };
 

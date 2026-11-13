@@ -5,6 +5,7 @@ struct mdl_renderer_state
 {
   uvec3 hitIndices;
   vec2 hitBarycentrics;
+  uint materialInstance;
 
   uint64_t sceneDataInfos[MAX_SCENE_DATA_ID];
 };

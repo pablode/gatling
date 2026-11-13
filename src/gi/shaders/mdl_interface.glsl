@@ -382,6 +382,11 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint64_t sceneDataInfo, bool
 {
   uint interpolation = uint((sceneDataInfo & SCENE_DATA_INTERPOLATION_MASK) >> SCENE_DATA_INTERPOLATION_OFFSET);
 
+  if (interpolation == 5/*materialInstance*/)
+  {
+    return uvec3(rs.materialInstance);
+  }
+
   if (interpolation == 4/*faceVarying*/)
   {
     return uvec3(gl_PrimitiveID * 3) + uvec3(0, 1, 2);

@@ -143,7 +143,7 @@ const GI_UINT64 SCENE_DATA_STRIDE_OFFSET = 54;
 const GI_UINT64 SCENE_DATA_INTERPOLATION_MASK = 0x0700000000000000UL; // 0000 0111 0000 ...
 const GI_UINT64 SCENE_DATA_INTERPOLATION_OFFSET = 56;
 
-const GI_UINT MAX_SCENE_DATA_COUNT = 31;
+const GI_UINT MAX_SCENE_DATA_COUNT = 30;
 const GI_UINT MAX_TEXTURE_COUNT = 65535;
 
 const GI_UINT TEXTURE_INFO_IMAGE_INDEX_MASK = 0xFFFFu;
@@ -166,6 +166,8 @@ struct BlasPayloadBufferPreamble
   GI_UINT64 sceneDataInfos[MAX_SCENE_DATA_COUNT];
   GI_UINT faceIdsInfo;
   GI_INT objectId;
+  GI_UINT materialInstance;
+  GI_UINT padding;
 };
 #ifdef __cplusplus
 static_assert((sizeof(BlasPayloadBufferPreamble) % 32) == 0);
