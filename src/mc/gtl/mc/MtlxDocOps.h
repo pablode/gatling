@@ -21,6 +21,9 @@
 
 #include <gtl/gb/Hash.h>
 
+#include <string>
+#include <vector>
+
 namespace gtl
 {
   class McMtlxDocumentParser
@@ -34,7 +37,16 @@ namespace gtl
     MaterialX::DocumentPtr m_stdLib;
   };
 
+  struct McMtlxNetworkDiff
+  {
+    MaterialX::InputPtr input;
+    MaterialX::ValuePtr value;
+  };
+
   MaterialX::NodePtr McMtlxFindSurfaceShader(const MaterialX::DocumentPtr& doc, const char* name = nullptr);
 
   GbHash McMtlxHashNetworkTopological(const MaterialX::NodePtr& surfaceShader);
+
+  std::vector<McMtlxNetworkDiff> McMtlxDiffTopoEqualNetworks(const MaterialX::NodePtr& referenceSurfaceShader,
+                                                             const MaterialX::NodePtr& otherSurfaceShader);
 }

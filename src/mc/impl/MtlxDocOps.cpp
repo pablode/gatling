@@ -44,6 +44,23 @@ namespace
 
     return selection;
   }
+
+  mx::InputPtr _ResolveInterfaceInput(const mx::InputPtr& input)
+  {
+    mx::InputPtr resolvedInput = input;
+    std::unordered_set<mx::InputPtr> visitedInputs;
+
+    while (mx::InputPtr interfaceInput = resolvedInput->getInterfaceInput())
+    {
+      if (!visitedInputs.insert(interfaceInput).second)
+      {
+        break;
+      }
+      resolvedInput = interfaceInput;
+    }
+
+    return resolvedInput;
+  }
 }
 
 namespace gtl
@@ -145,20 +162,9 @@ namespace gtl
         return a->getName() < b->getName();
       });
 
-      std::unordered_set<mx::InputPtr> visitedInputs;
       for (mx::InputPtr input : inputs)
       {
-        visitedInputs.clear();
-
-        mx::InputPtr connectionInput = input;
-        while (mx::InputPtr interfaceInput = connectionInput->getInterfaceInput())
-        {
-          if (!visitedInputs.insert(interfaceInput).second)
-          {
-            break;
-          }
-          connectionInput = interfaceInput;
-        }
+        mx::InputPtr connectionInput = _ResolveInterfaceInput(input);
 
         hash = GbHashAppend(hash, input->getName());
         hash = GbHashAppend(hash, input->getType());
@@ -207,5 +213,64 @@ namespace gtl
     };
 
     return hashNode(surfaceShader);
+  }
+
+  std::vector<McMtlxNetworkDiff> McMtlxDiffTopoEqualNetworks(const mx::NodePtr& referenceSurfaceShader,
+                                                             const mx::NodePtr& otherSurfaceShader)
+  {
+    std::vector<McMtlxNetworkDiff> diff;
+    std::unordered_set<mx::NodePtr> visitedNodes;
+
+    std::function<void(const mx::NodePtr&, const mx::NodePtr&)> diffNode;
+
+    diffNode = [&](const mx::NodePtr& referenceNode, const mx::NodePtr& otherNode)
+    {
+      if (!visitedNodes.insert(referenceNode).second)
+      {
+        return;
+      }
+
+      std::vector<mx::InputPtr> referenceInputs = referenceNode->getActiveInputs();
+      std::sort(referenceInputs.begin(), referenceInputs.end(), [](const mx::InputPtr& a, const mx::InputPtr& b)
+      {
+        return a->getName() < b->getName();
+      });
+
+      for (const mx::InputPtr& referenceInput : referenceInputs)
+      {
+        mx::InputPtr otherInput = otherNode->getActiveInput(referenceInput->getName());
+        if (!otherInput)
+        {
+          continue;
+        }
+
+        mx::InputPtr referenceConnection = _ResolveInterfaceInput(referenceInput);
+        mx::InputPtr otherConnection = _ResolveInterfaceInput(otherInput);
+
+        mx::NodePtr referenceUpstreamNode = referenceConnection->getConnectedNode();
+        mx::NodePtr otherUpstreamNode = otherConnection->getConnectedNode();
+
+        if (referenceUpstreamNode && otherUpstreamNode)
+        {
+          diffNode(referenceUpstreamNode, otherUpstreamNode);
+          continue;
+        }
+
+        mx::ValuePtr referenceValue = referenceConnection->getValue();
+        mx::ValuePtr otherValue = otherConnection->getValue();
+
+        bool valuesEqual = (!referenceValue && !otherValue) ||
+                           (referenceValue && otherValue && referenceValue->isEqual(otherValue));
+
+        if (!valuesEqual)
+        {
+          diff.push_back({ referenceConnection, otherValue });
+        }
+      }
+    };
+
+    diffNode(referenceSurfaceShader, otherSurfaceShader);
+
+    return diff;
   }
 }
