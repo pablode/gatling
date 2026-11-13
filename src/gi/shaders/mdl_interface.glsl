@@ -372,7 +372,7 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
     }
 
     mdl_renderer_state rs = state.renderer_state;
-    return rs.sceneDataInfos[scene_data_id - 1] != SCENE_DATA_INVALID;
+    return rs.sceneDataInfos[scene_data_id - 1] != SCENE_INFO_INVALID;
 #endif
     return false;
 }
@@ -380,7 +380,7 @@ bool scene_data_isvalid(inout State state, int scene_data_id)
 #ifdef MAX_SCENE_DATA_ID
 uvec3 get_scene_data_indices(mdl_renderer_state rs, uint64_t sceneDataInfo, bool uniformLookup)
 {
-  uint interpolation = uint((sceneDataInfo & SCENE_DATA_INTERPOLATION_MASK) >> SCENE_DATA_INTERPOLATION_OFFSET);
+  uint interpolation = uint((sceneDataInfo & SCENE_INFO_INTERPOLATION_MASK) >> SCENE_INFO_INTERPOLATION_OFFSET);
 
   if (interpolation == 5/*materialInstance*/)
   {
@@ -414,8 +414,8 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint64_t sceneDataInfo, bool
 
 void get_scene_data_address_and_stride(uint64_t sceneDataInfo, out uint64_t address, out uint stride)
 {
-  address = (sceneDataInfo & SCENE_DATA_ADDRESS_MASK) << SCENE_DATA_ADDRESS_SHIFT;
-  stride = uint((sceneDataInfo & SCENE_DATA_STRIDE_MASK) >> SCENE_DATA_STRIDE_OFFSET) + 1;
+  address = (sceneDataInfo & SCENE_INFO_ADDRESS_MASK) << SCENE_INFO_ADDRESS_SHIFT;
+  stride = uint((sceneDataInfo & SCENE_INFO_STRIDE_MASK) >> SCENE_INFO_STRIDE_OFFSET) + 1;
 }
 #endif
 

@@ -731,14 +731,14 @@ fail:
 
   uint64_t _MakeSceneDataInfo(uint64_t address, uint32_t stride, GiPrimvarInterpolation interpolation)
   {
-    assert((address % rp::SCENE_DATA_ALIGNMENT) == 0);
+    assert((address % rp::SCENE_INFO_ALIGNMENT) == 0);
 
-    uint64_t shiftedAddress = address >> rp::SCENE_DATA_ADDRESS_SHIFT;
-    assert((shiftedAddress & ~rp::SCENE_DATA_ADDRESS_MASK) == 0);
+    uint64_t shiftedAddress = address >> rp::SCENE_INFO_ADDRESS_SHIFT;
+    assert((shiftedAddress & ~rp::SCENE_INFO_ADDRESS_MASK) == 0);
 
     return shiftedAddress |
-           (uint64_t(stride) << rp::SCENE_DATA_STRIDE_OFFSET) |
-           (uint64_t(interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
+           (uint64_t(stride) << rp::SCENE_INFO_STRIDE_OFFSET) |
+           (uint64_t(interpolation) << rp::SCENE_INFO_INTERPOLATION_OFFSET);
   }
 
   GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc)
@@ -1024,7 +1024,7 @@ fail:
             GB_DEBUG("scene data for mesh {} with material {}:", mesh->name, material->name);
           }
 
-          primvars.resize(rp::MAX_SCENE_DATA_COUNT, nullptr);
+          primvars.resize(rp::MAX_SCENE_INFO_COUNT, nullptr);
           for (size_t i = 0; i < sceneDataCount; i++)
           {
             const char* sceneDataName = sceneDataNames[i];
@@ -1092,9 +1092,9 @@ fail:
           .materialInstance = 0,
           .padding = 0
         };
-        for (size_t i = 0; i < rp::MAX_SCENE_DATA_COUNT; i++)
+        for (size_t i = 0; i < rp::MAX_SCENE_INFO_COUNT; i++)
         {
-          preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
+          preamble.sceneDataInfos[i] = rp::SCENE_INFO_INVALID;
         }
 
         std::vector<GiSceneDataPtr> sceneData;
