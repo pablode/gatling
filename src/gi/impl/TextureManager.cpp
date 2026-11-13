@@ -25,6 +25,8 @@
 #include <gtl/ggpu/Stager.h>
 #include <gtl/imgio/Imgio.h>
 
+#include "interface/rp_main.h"
+
 #include <xxhash.h>
 
 #include <assert.h>
@@ -320,6 +322,8 @@ namespace
 
 namespace gtl
 {
+  namespace rp = shader_interface::rp_main;
+
   GiTextureManager::GiTextureManager(CgpuContext* ctx, GiAssetReader& assetReader, GgpuStager& stager,
                                      GgpuDeleteQueue& deleteQueue, GbThreadPool& threadPool)
     : m_ctx(ctx)
@@ -564,6 +568,17 @@ namespace gtl
       info.uvtileMinV = minV;
       info.uvtileWidth = uint32_t(maxU - minU + 1);
       info.uvtileHeight = uint32_t(maxV - minV + 1);
+
+      // The texture info stores tile coordinates in 8 bits and dimensions in 11 bits.
+      if (info.uvtileWidth > rp::TEXTURE_INFO_UVTILE_SIZE_MASK ||
+          info.uvtileHeight > rp::TEXTURE_INFO_UVTILE_SIZE_MASK ||
+          minU < INT8_MIN || maxU > INT8_MAX ||
+          minV < INT8_MIN || maxV > INT8_MAX)
+      {
+        GB_ERROR("uv-tile set \"{}\" exceeds the supported coordinate range", textureDescription.filePath);
+        info = {};
+        continue;
+      }
 
       // Guard against pathological tile layouts (UVTILE0/UVTILE1 indices are unbounded).
       constexpr static const uint32_t MAX_UVTILE_COUNT = 4096;

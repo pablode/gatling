@@ -5,6 +5,18 @@
 
 // See also: https://github.com/NVIDIA/MDL-SDK/blob/master/examples/mdl_sdk/dxr/content/mdl_renderer_runtime.hlsl
 
+// Buffer references to read different data types
+layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefInt { int data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefFloat { float data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 8 /* largest type */) buffer BufferRefVec2 { vec2 data[]; };
+layout(buffer_reference, std430, buffer_reference_align = 16/* largest type */) buffer BufferRefVec4 { vec4 data[]; };
+
+#if defined(USE_TEXTURE_INFO_LUT)
+// Set up in setup_mdl_shading_state(). Texture parameters are uniform values, so
+// reading them from a per-invocation global is safe.
+uint64_t tex_parameter_buffer_address;
+#endif
+
 float apply_wrap_and_crop(float coord, int wrap, vec2 crop, int res)
 {
     if (wrap == TEX_WRAP_REPEAT)
@@ -42,10 +54,30 @@ bool tex_texture_isvalid(int tex)
     return tex != 0;
 }
 
+#if defined(USE_TEXTURE_INFO_LUT)
+int tex_get_texture_info_index(int tex)
+{
+    TextureInfo info = textureInfos[TEXTURE_INFO_OFFSET + tex - 1];
+    uint parameterSlot = (info.uvtileSizeAndParamSlot >> TEXTURE_INFO_PARAMETER_SLOT_SHIFT) & TEXTURE_INFO_PARAMETER_SLOT_MASK;
+    if (parameterSlot != TEXTURE_INFO_PARAMETER_SLOT_INVALID)
+    {
+        uint64_t address = tex_parameter_buffer_address +
+                           uint64_t(parameterSlot) * uint64_t(MAX_MATERIAL_INSTANCE_COUNT) * SCENE_INFO_PARAMETER_ALIGNMENT;
+        BufferRefInt ref = BufferRefInt(address);
+        int textureInfoIndex = ref.data[0];
+        if (textureInfoIndex >= 0)
+        {
+            return textureInfoIndex;
+        }
+    }
+    return TEXTURE_INFO_OFFSET + tex - 1;
+}
+#endif
+
 int tex_get_image_index(int tex)
 {
 #if defined(USE_TEXTURE_INFO_LUT)
-    return int(textureInfos[TEXTURE_INFO_OFFSET + tex - 1].imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
+    return int(textureInfos[tex_get_texture_info_index(tex)].imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
 #else
     return TEXTURE_INDEX_OFFSET + tex - 1;
 #endif
@@ -53,7 +85,7 @@ int tex_get_image_index(int tex)
 
 int tex_get_uvtile_image_index(TextureInfo info, ivec2 uv_tile)
 {
-    int uvtile_width = int(info.uvtileWidthAndHeight & TEXTURE_INFO_UVTILE_SIZE_MASK);
+    int uvtile_width = int(info.uvtileSizeAndParamSlot & TEXTURE_INFO_UVTILE_SIZE_MASK);
     int image_index = int(info.imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
 
     if (uvtile_width == 0)
@@ -67,7 +99,7 @@ int tex_get_uvtile_image_index(TextureInfo info, ivec2 uv_tile)
     uvtile_min_v = uvtile_min_v >= 128 ? uvtile_min_v - 256 : uvtile_min_v;
 
     ivec2 tile = uv_tile - ivec2(uvtile_min_u, uvtile_min_v);
-    int uvtile_height = int(info.uvtileWidthAndHeight >> TEXTURE_INFO_UVTILE_HEIGHT_SHIFT);
+    int uvtile_height = int((info.uvtileSizeAndParamSlot >> TEXTURE_INFO_UVTILE_HEIGHT_SHIFT) & TEXTURE_INFO_UVTILE_SIZE_MASK);
 
     if (tile.x < 0 || tile.y < 0 ||
         tile.x >= uvtile_width || tile.y >= uvtile_height)
@@ -82,7 +114,7 @@ int tex_get_uvtile_image_index(TextureInfo info, ivec2 uv_tile)
 // local to that image. Note that wrap and crop modes are ignored for uv-tile sets (MDL spec 20.3).
 int tex_get_uvtile_image_index_and_update_uv(TextureInfo info, inout vec2 coord)
 {
-    if ((info.uvtileWidthAndHeight & TEXTURE_INFO_UVTILE_SIZE_MASK) == 0)
+    if ((info.uvtileSizeAndParamSlot & TEXTURE_INFO_UVTILE_SIZE_MASK) == 0)
     {
         return int(info.imageIndexAndUvtileMin & TEXTURE_INFO_IMAGE_INDEX_MASK);
     }
@@ -186,8 +218,8 @@ vec4 tex_lookup_float4_2d(int tex, vec2 coord, int wrap_u, int wrap_v, vec2 crop
     int image_idx;
 
 #if defined(USE_TEXTURE_INFO_LUT)
-    TextureInfo info = textureInfos[TEXTURE_INFO_OFFSET + tex - 1];
-    isUvTile = (info.uvtileWidthAndHeight & TEXTURE_INFO_UVTILE_SIZE_MASK) != 0;
+    TextureInfo info = textureInfos[tex_get_texture_info_index(tex)];
+    isUvTile = (info.uvtileSizeAndParamSlot & TEXTURE_INFO_UVTILE_SIZE_MASK) != 0;
 
     if (isUvTile)
     {
@@ -253,7 +285,7 @@ vec4 tex_texel_float4_2d(int tex, ivec2 coord, ivec2 uv_tile, float frame)
 
     int image_idx;
 #if defined(USE_TEXTURE_INFO_LUT)
-    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INFO_OFFSET + tex - 1], uv_tile);
+    image_idx = tex_get_uvtile_image_index(textureInfos[tex_get_texture_info_index(tex)], uv_tile);
 #else
     image_idx = tex_get_image_index(tex);
 #endif
@@ -304,7 +336,7 @@ ivec2 tex_resolution_2d(int tex, ivec2 uv_tile, float frame)
 
     int image_idx;
 #if defined(USE_TEXTURE_INFO_LUT)
-    image_idx = tex_get_uvtile_image_index(textureInfos[TEXTURE_INFO_OFFSET + tex - 1], uv_tile);
+    image_idx = tex_get_uvtile_image_index(textureInfos[tex_get_texture_info_index(tex)], uv_tile);
 #else
     image_idx = tex_get_image_index(tex);
 #endif
@@ -357,12 +389,6 @@ vec3 mdl_adapt_normal(State state, vec3 normal)
     return new_normal;
 }
 
-// Buffer references to read different data types
-layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefInt { int data[]; };
-layout(buffer_reference, std430, buffer_reference_align = 4 /* largest type */) buffer BufferRefFloat { float data[]; };
-layout(buffer_reference, std430, buffer_reference_align = 8 /* largest type */) buffer BufferRefVec2 { vec2 data[]; };
-layout(buffer_reference, std430, buffer_reference_align = 16/* largest type */) buffer BufferRefVec4 { vec4 data[]; };
-
 bool scene_data_isvalid(inout State state, int scene_data_id)
 {
 #ifdef MAX_SCENE_DATA_ID
@@ -411,16 +437,16 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint64_t sceneDataInfo, bool
   ASSERT(interpolation == 0, "Error: unhandled primvar interpolation");
   return uvec3(0);
 }
+#endif
 
 void get_scene_data_address_and_stride(uint64_t sceneDataInfo, out uint64_t address, out uint stride)
 {
   uint interpolation = uint((sceneDataInfo & SCENE_INFO_INTERPOLATION_MASK) >> SCENE_INFO_INTERPOLATION_OFFSET);
-  uint addressShift = (interpolation == 5/*materialInstance*/) ? SCENE_INFO_PARAMETER_ADDRESS_SHIFT : SCENE_INFO_ADDRESS_SHIFT;
+  uint addressShift = (interpolation == 5/*materialInstance*/) ? uint(SCENE_INFO_PARAMETER_ADDRESS_SHIFT) : uint(SCENE_INFO_ADDRESS_SHIFT);
 
   address = (sceneDataInfo & SCENE_INFO_ADDRESS_MASK) << addressShift;
   stride = uint((sceneDataInfo & SCENE_INFO_STRIDE_MASK) >> SCENE_INFO_STRIDE_OFFSET) + 1;
 }
-#endif
 
 vec4 scene_data_lookup_float4(inout State state, int scene_data_id, vec4 default_value, bool uniform_lookup)
 {

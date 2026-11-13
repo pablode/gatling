@@ -42,11 +42,18 @@ namespace gtl
     std::string filePath;
   };
 
+  struct McTextureParameterBinding
+  {
+    std::string parameterName;
+    uint32_t textureIndex;
+  };
+
   struct McGlslGenResult
   {
     std::string source;
     std::vector<McTextureDescription> textureDescriptions;
     std::vector<std::string> stringConstants;
+    std::vector<McTextureParameterBinding> textureParameterBindings;
   };
 
   enum class McDf

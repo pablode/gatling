@@ -24,8 +24,11 @@
 #include "MtlxMdlCodeGen.h"
 #include "Runtime.h"
 
+#include <gtl/gb/Log.h>
+
 #include <filesystem>
-#include <assert.h>
+
+namespace mx = MaterialX;
 
 namespace
 {
@@ -195,8 +198,9 @@ namespace gtl
     m_mtlxMdlCodeGen = std::make_shared<McMtlxMdlCodeGen>(mtlxStdLib);
   }
 
-  McMaterial* McFrontend::createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
-                                            const MaterialX::NodePtr& surfaceShader)
+  McMaterial* McFrontend::createMtlxTemplate(const MaterialX::DocumentPtr& doc,
+                                             const MaterialX::NodePtr& surfaceShader,
+                                             std::vector<McMtlxTextureParameter> textureParameters)
   {
     std::string mdlSrc;
     std::string subIdentifier;
@@ -207,7 +211,7 @@ namespace gtl
       return nullptr;
     }
 
-    return createFromMdlStr(mdlSrc, subIdentifier, opacityClass, isAnimated);
+    return createFromMdlStr(mdlSrc, subIdentifier, opacityClass, isAnimated, std::move(textureParameters));
   }
 
   McMaterial* McFrontend::createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& params)
@@ -241,16 +245,30 @@ namespace gtl
     };
   }
 
-  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, McOpacityClassification opacityClass, bool isAnimated)
+  McMaterial* McFrontend::createFromMdlStr(std::string_view mdlSrc,
+                                           std::string_view subIdentifier,
+                                           McOpacityClassification opacityClass,
+                                           bool isAnimated,
+                                           std::vector<McMtlxTextureParameter> textureParameters)
   {
     mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial;
-    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial))
+    std::vector<McMdlTextureParameter> mdlTextureParameters;
+    mdlTextureParameters.reserve(textureParameters.size());
+    for (McMtlxTextureParameter& textureParameter : textureParameters)
+    {
+      mdlTextureParameters.push_back({ textureParameter.mdlParameterName,
+                                       textureParameter.parameterName,
+                                       textureParameter.filePath });
+    }
+
+    if (!m_mdlMaterialCompiler->compileFromString(mdlSrc, subIdentifier, compiledMaterial, mdlTextureParameters))
     {
       return nullptr;
     }
 
     auto mdlMaterial = std::make_shared<McMdlMaterial>();
     mdlMaterial->compiledMaterial = compiledMaterial;
+    mdlMaterial->textureParameters = std::move(mdlTextureParameters);
 
     return new McMaterial{
       .hasBackfaceBsdf = _HasCompiledMaterialBackfaceBsdf(compiledMaterial),

@@ -260,6 +260,11 @@ namespace gtl
     mx::ShaderStage pixelStage = shader->getStage(mx::Stage::PIXEL);
     mdlSrc = pixelStage.getSourceCode();
 
+    // The MDL generator does not import the scene module used by our custom NodeDef.
+    size_t versionLineEnd = mdlSrc.find('\n');
+    size_t insertPos = versionLineEnd == std::string::npos ? 0 : versionLineEnd + 1;
+    mdlSrc.insert(insertPos, "\nimport ::scene::*;\n");
+
     if (getenv("GTL_DUMP_MDL"))
     {
       GB_LOG("MDL source: \n{}", mdlSrc);

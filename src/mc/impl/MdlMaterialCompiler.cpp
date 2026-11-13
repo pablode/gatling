@@ -137,7 +137,8 @@ namespace gtl
 
   bool McMdlMaterialCompiler::compileFromString(std::string_view srcStr,
                                                 std::string_view identifier,
-                                                mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial)
+                                                mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
+                                                std::vector<McMdlTextureParameter>& textureParameters)
   {
     std::string moduleName = _MakeModuleName(identifier);
 
@@ -146,7 +147,7 @@ namespace gtl
       return m_impExpApi->load_module_from_string(m_transaction.get(), moduleName.c_str(), srcStr.data(), context);
     };
 
-    return compile(identifier, moduleName, modCreateFunc, compiledMaterial);
+    return compile(identifier, moduleName, modCreateFunc, compiledMaterial, {}, &textureParameters);
   }
 
   bool McMdlMaterialCompiler::compileFromFile(const char* filePath,
@@ -175,7 +176,8 @@ namespace gtl
                                       std::string_view moduleName,
                                       std::function<mi::Sint32(mi::neuraylib::IMdl_execution_context*)> modCreateFunc,
                                       mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
-                                      const McMaterialParameters& params)
+                                      const McMaterialParameters& params,
+                                      std::vector<McMdlTextureParameter>* textureParameters)
   {
     mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
     GB_EXPECT(!context->set_option("resolve_resources", false), MDL_OPTION_ERROR);
@@ -183,7 +185,7 @@ namespace gtl
     mi::Sint32 modCreateResult = modCreateFunc(context.get());
 
     bool compResult = (modCreateResult == 0 || modCreateResult == 1) &&
-      createCompiledMaterial(context.get(), moduleName.data(), identifier, compiledMaterial, params);
+      createCompiledMaterial(context.get(), moduleName.data(), identifier, compiledMaterial, params, textureParameters);
 
     m_logger->flushContextMessages(context.get());
 
@@ -194,7 +196,8 @@ namespace gtl
                                                      std::string_view moduleName,
                                                      std::string_view identifier,
                                                      mi::base::Handle<mi::neuraylib::ICompiled_material>& compiledMaterial,
-                                                     const McMaterialParameters& params)
+                                                     const McMaterialParameters& params,
+                                                     std::vector<McMdlTextureParameter>* textureParameters)
   {
     mi::base::Handle<const mi::IString> moduleDbName(m_factory->get_db_module_name(moduleName.data()));
     assert(moduleDbName);
@@ -226,7 +229,8 @@ namespace gtl
     }
 
     mi::neuraylib::IExpression_list* paramList = nullptr;
-    if (!params.empty())
+    bool hasTextureParameters = textureParameters && !textureParameters->empty();
+    if (!params.empty() || hasTextureParameters)
     {
       // Factories are not thread-safe, so create them per compilation.
       mi::base::Handle<mi::neuraylib::IType_factory> tf(m_factory->create_type_factory(m_transaction.get()));
@@ -248,6 +252,26 @@ namespace gtl
 
         const std::string& name = nameValuePair.first;
         paramList->add_expression(name.c_str(), expr.get());
+      }
+
+      const auto& textureShape = mi::neuraylib::IType_texture::TS_2D;
+      const char* textureSelector = nullptr; // no UDIM tile selector
+      bool textureShared = false; // create new DB elements
+      float textureGamma = 1.0f;
+
+      if (textureParameters)
+      {
+        for (McMdlTextureParameter& textureParameter : *textureParameters)
+        {
+          mi::base::Handle<mi::neuraylib::IValue_texture> texture(m_factory->create_texture(
+            m_transaction.get(), textureParameter.filePath.c_str(), textureShape, textureGamma, textureSelector, textureShared, context
+          ));
+          assert(texture); // the image is read at a later point
+
+          mi::base::Handle<mi::neuraylib::IExpression> expr(ef->create_constant(texture.get()));
+          paramList->add_expression(textureParameter.mdlParameterName.c_str(), expr.get());
+          textureParameter.value = texture;
+        }
       }
     }
 

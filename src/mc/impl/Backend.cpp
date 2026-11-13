@@ -66,10 +66,12 @@ namespace gtl
     }
 
     bool generateGlslWithDfs(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
+                             const std::vector<McMdlTextureParameter>& textureParameters,
                              std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                              std::string& glslSrc,
                              std::vector<McTextureDescription>& textureDescriptions,
                              std::vector<std::string>& stringConstants,
+                             std::vector<McTextureParameterBinding>& textureParameterBindings,
                              bool needsAuxOutput)
     {
       // Backends are not thread-safe, so create one per generation. Creation is not expensive.
@@ -87,17 +89,19 @@ namespace gtl
       // Pre-normal evaluation results (displacement, cutout opacity) need at least one slot.
       GB_EXPECT(!backend->set_option("num_texture_results", "1"), MDL_OPTION_ERROR);
 
-      return _generateGlslWithDfs(*backend, compiledMaterial, genFunctions, glslSrc,
-                                  textureDescriptions, stringConstants);
+      return _generateGlslWithDfs(*backend, compiledMaterial, textureParameters, genFunctions, glslSrc,
+                                  textureDescriptions, stringConstants, textureParameterBindings);
     }
 
   private:
     bool _generateGlslWithDfs(mi::neuraylib::IMdl_backend& backend,
                               mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial,
+                              const std::vector<McMdlTextureParameter>& textureParameters,
                               std::vector<mi::neuraylib::Target_function_description>& genFunctions,
                               std::string& glslSrc,
                               std::vector<McTextureDescription>& textureDescriptions,
-                              std::vector<std::string>& stringConstants)
+                              std::vector<std::string>& stringConstants,
+                              std::vector<McTextureParameterBinding>& textureParameterBindings)
     {
       // Create a separate execution context for each thread.
       mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
@@ -136,9 +140,35 @@ namespace gtl
 
       extractTextureInfos(targetCode, textureDescriptions);
       extractStringConstants(targetCode, stringConstants);
+      extractTextureParameterBindings(targetCode, textureParameters, textureParameterBindings);
       glslSrc = targetCode->get_code();
 
       return true;
+    }
+
+    // Resolves the texture indices that the generated code uses for the material's texture
+    // parameters. The MDL SDK does not expose the ordering of the texture table, but resources
+    // that were known at code generation time can be mapped to their index directly.
+    void extractTextureParameterBindings(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
+                                         const std::vector<McMdlTextureParameter>& textureParameters,
+                                         std::vector<McTextureParameterBinding>& textureParameterBindings)
+    {
+      for (const McMdlTextureParameter& textureParameter : textureParameters)
+      {
+        if (!textureParameter.value)
+        {
+          continue;
+        }
+
+        mi::Uint32 textureIndex = targetCode->get_known_resource_index(m_transaction.get(), textureParameter.value.get());
+        if (textureIndex == 0)
+        {
+          // Textures of unused network branches are not part of the resource table.
+          continue;
+        }
+
+        textureParameterBindings.push_back({ textureParameter.networkParameterName, uint32_t(textureIndex) });
+      }
     }
 
     void extractStringConstants(mi::base::Handle<const mi::neuraylib::ITarget_code> targetCode,
@@ -329,7 +359,7 @@ namespace gtl
       fDescs.push_back(mi::neuraylib::Target_function_description(DF_NAMES[size_t(kv.first)], kv.second));
     }
 
-    return m_impl->generateGlslWithDfs(material.compiledMaterial, fDescs, result.source,
-                                       result.textureDescriptions, result.stringConstants, needsAuxOutput);
+    return m_impl->generateGlslWithDfs(material.compiledMaterial, material.textureParameters, fDescs, result.source,
+                                       result.textureDescriptions, result.stringConstants, result.textureParameterBindings, needsAuxOutput);
   }
 }

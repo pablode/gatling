@@ -321,14 +321,24 @@ namespace gtl
     return diff;
   }
 
-  mx::DocumentPtr McMtlxInsertParameterNodes(const mx::NodePtr& sourceNetwork,
-                                             const std::vector<McMtlxNetworkDiff>& diff)
+  std::string McMtlxGetParameterName(const mx::InputPtr& input)
   {
-    mx::DocumentPtr doc = sourceNetwork->getDocument()->copy();
-    if (!doc->getDescendant(sourceNetwork->getNamePath()))
+    return _MakeParameterName(input);
+  }
+
+  bool McMtlxInsertParameterNodes(const mx::NodePtr& sourceNetwork,
+                                  const std::vector<McMtlxNetworkDiff>& diff,
+                                  mx::DocumentPtr& outDoc,
+                                  std::vector<McMtlxTextureParameter>& outTextureParameters)
+  {
+    mx::DocumentPtr sourceDoc = sourceNetwork->getDocument();
+
+    if (!sourceDoc->getDescendant(sourceNetwork->getNamePath()))
     {
-      return nullptr;
+      return false;
     }
+
+    outDoc = sourceDoc->copy();
 
     for (const McMtlxNetworkDiff& networkDiff : diff)
     {
@@ -338,7 +348,7 @@ namespace gtl
         continue;
       }
 
-      mx::ElementPtr element = doc->getDescendant(sourceInput->getNamePath());
+      mx::ElementPtr element = outDoc->getDescendant(sourceInput->getNamePath());
       mx::InputPtr input = element ? element->asA<mx::Input>() : nullptr;
       if (!input)
       {
@@ -358,9 +368,9 @@ namespace gtl
         continue;
       }
 
-      _AddParameterNodeDef(doc, input->getType(), sourceCodeIt->second);
+      _AddParameterNodeDef(outDoc, input->getType(), sourceCodeIt->second);
 
-      const std::string parameterName = _MakeParameterName(sourceInput);
+      const std::string parameterName = McMtlxGetParameterName(sourceInput);
       std::string nodeName = "GTL_parameter_" + parameterName;
 
       uint32_t suffix = 0;
@@ -374,10 +384,15 @@ namespace gtl
       mx::InputPtr parameterInput = parameterNode->addInput("parameter", mx::STRING_TYPE_STRING);
       parameterInput->setValueString(parameterName);
 
+      if (input->getType() == mx::FILENAME_TYPE_STRING)
+      {
+        outTextureParameters.push_back({ parameterName, nodeName + "_value", sourceInput->getValueString() });
+      }
+
       input->setConnectedNode(parameterNode);
       input->removeAttribute(mx::ValueElement::VALUE_ATTRIBUTE);
     }
 
-    return doc;
+    return true;
   }
 }

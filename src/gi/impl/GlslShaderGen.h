@@ -52,6 +52,7 @@ namespace gtl
       std::string glslSource;
       std::vector<McTextureDescription> textureDescriptions;
       std::vector<std::string> stringConstants;
+      std::vector<McTextureParameterBinding> textureParameterBindings;
       BuiltinSceneDataIndices builtinSceneDataIndices;
       uint32_t maxSceneDataId;
     };

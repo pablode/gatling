@@ -45,6 +45,13 @@ namespace gtl
     MaterialX::ValuePtr value;
   };
 
+  struct McMtlxTextureParameter
+  {
+    std::string parameterName;
+    std::string mdlParameterName;
+    std::string filePath;
+  };
+
   MaterialX::NodePtr McMtlxFindSurfaceShader(const MaterialX::DocumentPtr& doc, const char* name = nullptr);
 
   GbHash McMtlxHashNetworkTopological(const MaterialX::NodePtr& surfaceShader);
@@ -52,6 +59,10 @@ namespace gtl
   std::vector<McMtlxNetworkDiff> McMtlxDiffTopoEqualNetworks(const MaterialX::NodePtr& referenceSurfaceShader,
                                                              const MaterialX::NodePtr& otherSurfaceShader);
 
-  MaterialX::DocumentPtr McMtlxInsertParameterNodes(const MaterialX::NodePtr& sourceNetwork,
-                                                    const std::vector<McMtlxNetworkDiff>& diff);
+  std::string McMtlxGetParameterName(const MaterialX::InputPtr& input);
+
+  bool McMtlxInsertParameterNodes(const MaterialX::NodePtr& sourceNetwork,
+                                  const std::vector<McMtlxNetworkDiff>& diff,
+                                  MaterialX::DocumentPtr& outDoc,
+                                  std::vector<McMtlxTextureParameter>& outTextureParameters);
 }

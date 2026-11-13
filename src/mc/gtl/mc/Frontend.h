@@ -19,6 +19,8 @@
 
 #include <MaterialXCore/Document.h>
 
+#include <gtl/mc/MtlxDocOps.h>
+
 #include <string>
 #include <vector>
 
@@ -27,7 +29,6 @@
 
 namespace gtl
 {
-  struct McMaterial;
   class McMdlMaterialCompiler;
   class McRuntime;
   class McMtlxMdlCodeGen;
@@ -38,13 +39,18 @@ namespace gtl
     McFrontend(const MaterialX::DocumentPtr mtlxStdLib, McRuntime& mdlRuntime);
 
   public:
-    McMaterial* createFromMtlxDoc(const MaterialX::DocumentPtr& doc,
-                                  const MaterialX::NodePtr& surfaceShader);
+    McMaterial* createMtlxTemplate(const MaterialX::DocumentPtr& doc,
+                                   const MaterialX::NodePtr& surfaceShader,
+                                   std::vector<McMtlxTextureParameter> textureParameters);
 
     McMaterial* createFromMdlFile(const char* filePath, std::string_view subIdentifier, const McMaterialParameters& parameters = {});
 
   private:
-    McMaterial* createFromMdlStr(std::string_view mdlSrc, std::string_view subIdentifier, McOpacityClassification opacityClass, bool isAnimated);
+    McMaterial* createFromMdlStr(std::string_view mdlSrc,
+                                 std::string_view subIdentifier,
+                                 McOpacityClassification opacityClass,
+                                 bool isAnimated,
+                                 std::vector<McMtlxTextureParameter> textureParameters);
 
   private:
     std::shared_ptr<McMdlMaterialCompiler> m_mdlMaterialCompiler;

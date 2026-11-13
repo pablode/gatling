@@ -226,6 +226,7 @@ namespace gtl
       .glslSource = glslSource,
       .textureDescriptions = textureDescriptions,
       .stringConstants = codeGenResult.stringConstants,
+      .textureParameterBindings = codeGenResult.textureParameterBindings,
       .builtinSceneDataIndices = bsdIndices,
       .maxSceneDataId = maxSceneDataId
     };

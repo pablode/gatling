@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <stdint.h>
 #include <string>
 #include <memory>
 #include <vector>
@@ -24,6 +25,13 @@
 namespace gtl
 {
   struct McMdlMaterial;
+
+  struct McParameter
+  {
+    std::vector<std::string> names;
+    std::vector<uint8_t> data; // 16 bytes per parameter
+    std::vector<std::string> stringValues;
+  };
 
   enum class McOpacityClassification
   {
