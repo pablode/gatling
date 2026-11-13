@@ -54,7 +54,6 @@
 #ifdef GI_SHADER_HOTLOADING
 #include <efsw/efsw.hpp>
 #endif
-#include <gtl/mc/Hash.h>
 #include <gtl/mc/Material.h>
 #include <gtl/mc/Frontend.h>
 #include <gtl/mc/Runtime.h>
@@ -614,7 +613,7 @@ fail:
       return nullptr;
     }
 
-    GbHash topoHash = McHashMtlxNetworkTopological(patchedDoc, surfaceShader);
+    GbHash topoHash = McMtlxHashNetworkTopological(surfaceShader);
     GB_DEBUG("material {} topoHash: {}", name, topoHash.val);
 
     GiMaterial* mat = new GiMaterial {

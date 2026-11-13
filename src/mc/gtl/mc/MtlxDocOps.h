@@ -19,6 +19,8 @@
 
 #include <MaterialXCore/Document.h>
 
+#include <gtl/gb/Hash.h>
+
 namespace gtl
 {
   class McMtlxDocumentParser
@@ -33,4 +35,6 @@ namespace gtl
   };
 
   MaterialX::NodePtr McMtlxFindSurfaceShader(const MaterialX::DocumentPtr& doc, const char* name = nullptr);
+
+  GbHash McMtlxHashNetworkTopological(const MaterialX::NodePtr& surfaceShader);
 }

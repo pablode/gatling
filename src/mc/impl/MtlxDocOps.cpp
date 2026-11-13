@@ -22,7 +22,29 @@
 
 #include <gtl/gb/Log.h>
 
+#include <algorithm>
+#include <functional>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
 namespace mx = MaterialX;
+
+namespace
+{
+  std::string _GetGraphOutputSelection(const mx::OutputPtr& graphOutput,
+                                       const mx::NodePtr& outputNode)
+  {
+    std::string selection = graphOutput->getOutputString();
+
+    if (selection.empty() && outputNode && !outputNode->getOutputs().empty())
+    {
+      selection = outputNode->getOutputs()[0]->getName();
+    }
+
+    return selection;
+  }
+}
 
 namespace gtl
 {
@@ -83,5 +105,107 @@ namespace gtl
 
     GB_DEBUG("found surface shader: {}", surfaceElement->getName());
     return surfaceElement->asA<mx::Node>();
+  }
+
+  GbHash McMtlxHashNetworkTopological(const MaterialX::NodePtr& surfaceShader)
+  {
+    std::unordered_map<mx::NodePtr, GbHash> topoHashes;
+    std::unordered_set<mx::NodePtr> nodesInProgress;
+
+    // We don't use topolical sorting, but instead traverse the graph. this culls nodes
+    // from the document and also disregards node graph boundaries.
+
+    std::function<GbHash(const mx::NodePtr& node)> hashNode;
+
+    hashNode = [&](const mx::NodePtr& node)
+    {
+      auto topoHashIt = topoHashes.find(node);
+      if (topoHashIt != topoHashes.end())
+      {
+        return topoHashIt->second;
+      }
+
+      if (nodesInProgress.count(node) > 0)
+      {
+        return GbHashAppend(GbHash(), node->getName());
+      }
+
+      nodesInProgress.insert(node);
+
+      GbHash hash;
+
+      mx::NodeDefPtr nodeDef = node->getNodeDef();
+      hash = GbHashAppend(hash, nodeDef ? nodeDef->getName() : node->getCategory());
+      hash = GbHashAppend(hash, node->getType());
+
+      // Increase chance of deduplication with deterministic sort order
+      std::vector<mx::InputPtr> inputs = node->getActiveInputs();
+      std::sort(inputs.begin(), inputs.end(), [](const mx::InputPtr& a, const mx::InputPtr& b)
+      {
+        return a->getName() < b->getName();
+      });
+
+      std::unordered_set<mx::InputPtr> visitedInputs;
+      for (mx::InputPtr input : inputs)
+      {
+        visitedInputs.clear();
+
+        mx::InputPtr connectionInput = input;
+        while (mx::InputPtr interfaceInput = connectionInput->getInterfaceInput())
+        {
+          if (!visitedInputs.insert(interfaceInput).second)
+          {
+            break;
+          }
+          connectionInput = interfaceInput;
+        }
+
+        hash = GbHashAppend(hash, input->getName());
+        hash = GbHashAppend(hash, input->getType());
+
+        if (connectionInput->hasColorSpace())
+        {
+          hash = GbHashAppend(hash, connectionInput->getColorSpace());
+        }
+        if (connectionInput->hasUnit())
+        {
+          hash = GbHashAppend(hash, connectionInput->getUnit());
+        }
+
+        mx::NodePtr upstreamNode = connectionInput->getConnectedNode();
+        mx::OutputPtr upstreamOutput = connectionInput->getConnectedOutput();
+
+        if (upstreamOutput)
+        {
+          mx::ElementPtr outputParent = upstreamOutput->getParent();
+
+          if (outputParent && outputParent->isA<mx::NodeGraph>())
+          {
+            hash = GbHashAppend(hash, _GetGraphOutputSelection(upstreamOutput, upstreamNode));
+          }
+          else
+          {
+            hash = GbHashAppend(hash, upstreamOutput->getName());
+          }
+        }
+
+        if (upstreamNode)
+        {
+          hash = GbHashCombine(hash, hashNode(upstreamNode));
+        }
+      }
+
+      if (node->hasColorSpace())
+      {
+        hash = GbHashAppend(hash, node->getColorSpace());
+      }
+
+      topoHashes[node] = hash;
+      nodesInProgress.erase(node);
+
+      return hash;
+    };
+
+    return hashNode(surfaceShader);
   }
 }
