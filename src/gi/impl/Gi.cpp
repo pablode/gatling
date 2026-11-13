@@ -731,7 +731,7 @@ fail:
 
   uint64_t _MakeSceneDataInfo(uint64_t address, uint32_t stride, GiPrimvarInterpolation interpolation)
   {
-    assert((address % rp::SCENE_INFO_ALIGNMENT) == 0);
+    assert((address % rp::SCENE_INFO_BUFFER_ALIGNMENT) == 0);
 
     uint64_t shiftedAddress = address >> rp::SCENE_INFO_ADDRESS_SHIFT;
     assert((shiftedAddress & ~rp::SCENE_INFO_ADDRESS_MASK) == 0);

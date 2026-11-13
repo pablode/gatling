@@ -414,7 +414,10 @@ uvec3 get_scene_data_indices(mdl_renderer_state rs, uint64_t sceneDataInfo, bool
 
 void get_scene_data_address_and_stride(uint64_t sceneDataInfo, out uint64_t address, out uint stride)
 {
-  address = (sceneDataInfo & SCENE_INFO_ADDRESS_MASK) << SCENE_INFO_ADDRESS_SHIFT;
+  uint interpolation = uint((sceneDataInfo & SCENE_INFO_INTERPOLATION_MASK) >> SCENE_INFO_INTERPOLATION_OFFSET);
+  uint addressShift = (interpolation == 5/*materialInstance*/) ? SCENE_INFO_PARAMETER_ADDRESS_SHIFT : SCENE_INFO_ADDRESS_SHIFT;
+
+  address = (sceneDataInfo & SCENE_INFO_ADDRESS_MASK) << addressShift;
   stride = uint((sceneDataInfo & SCENE_INFO_STRIDE_MASK) >> SCENE_INFO_STRIDE_OFFSET) + 1;
 }
 #endif

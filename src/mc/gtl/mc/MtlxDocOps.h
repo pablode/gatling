@@ -26,6 +26,8 @@
 
 namespace gtl
 {
+  constexpr const char* MC_MTLX_GTL_PARAMETER_NODE_CATEGORY = "GTL_parameter";
+
   class McMtlxDocumentParser
   {
   public:
@@ -49,4 +51,7 @@ namespace gtl
 
   std::vector<McMtlxNetworkDiff> McMtlxDiffTopoEqualNetworks(const MaterialX::NodePtr& referenceSurfaceShader,
                                                              const MaterialX::NodePtr& otherSurfaceShader);
+
+  MaterialX::DocumentPtr McMtlxInsertParameterNodes(const MaterialX::NodePtr& sourceNetwork,
+                                                    const std::vector<McMtlxNetworkDiff>& diff);
 }

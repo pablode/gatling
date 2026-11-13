@@ -61,6 +61,53 @@ namespace
 
     return resolvedInput;
   }
+
+  static const std::unordered_map<std::string, std::string> PARAMETER_SOURCE_CODES = {
+    { "filename", "{{value}}" },
+    { "float", "scene::data_lookup_float({{parameter}}, 0.0)" },
+    { "integer", "scene::data_lookup_int({{parameter}}, 0)" },
+    { "vector2", "scene::data_lookup_float2({{parameter}}, float2(0.0))" },
+    { "vector3", "scene::data_lookup_float3({{parameter}}, float3(0.0))" },
+    { "vector4", "scene::data_lookup_float4({{parameter}}, float4(0.0))" },
+    { "color3", "scene::data_lookup_color({{parameter}}, color(0.0))" },
+    { "color4", "mk_color4(scene::data_lookup_float4({{parameter}}, float4(0.0)))" }
+  };
+
+  std::string _MakeParameterName(const mx::InputPtr& input)
+  {
+    gtl::GbHash hash;
+    hash = gtl::GbHashAppend(hash, input->getNamePath());
+    return std::string("GTL_param_") + std::to_string(hash.val);
+  }
+
+  void _AddParameterNodeDef(const mx::DocumentPtr& doc, const std::string& type, const std::string& sourceCode)
+  {
+    const std::string nodeDefName = "ND_GTL_parameter_" + type;
+    if (doc->getNodeDef(nodeDefName))
+    {
+      return;
+    }
+
+    mx::NodeDefPtr nodeDef = doc->addNodeDef(nodeDefName, type, gtl::MC_MTLX_GTL_PARAMETER_NODE_CATEGORY);
+
+    mx::InputPtr parameterInput = nodeDef->addInput("parameter", mx::STRING_TYPE_STRING);
+    parameterInput->setValueString(mx::EMPTY_STRING);
+    parameterInput->setIsUniform(true);
+
+    if (type == mx::FILENAME_TYPE_STRING)
+    {
+      mx::InputPtr valueInput = nodeDef->addInput("value", mx::FILENAME_TYPE_STRING);
+      valueInput->setValueString(mx::EMPTY_STRING);
+      valueInput->setIsUniform(true);
+
+      nodeDef->getOutput("out")->setIsUniform(true);
+    }
+
+    mx::ImplementationPtr impl = doc->addImplementation("IM_GTL_parameter_" + type + "_genmdl");
+    impl->setNodeDef(nodeDef);
+    impl->setTarget("genmdl");
+    impl->setAttribute("sourcecode", sourceCode);
+  }
 }
 
 namespace gtl
@@ -272,5 +319,65 @@ namespace gtl
     diffNode(referenceSurfaceShader, otherSurfaceShader);
 
     return diff;
+  }
+
+  mx::DocumentPtr McMtlxInsertParameterNodes(const mx::NodePtr& sourceNetwork,
+                                             const std::vector<McMtlxNetworkDiff>& diff)
+  {
+    mx::DocumentPtr doc = sourceNetwork->getDocument()->copy();
+    if (!doc->getDescendant(sourceNetwork->getNamePath()))
+    {
+      return nullptr;
+    }
+
+    for (const McMtlxNetworkDiff& networkDiff : diff)
+    {
+      mx::InputPtr sourceInput = networkDiff.input;
+      if (!sourceInput)
+      {
+        continue;
+      }
+
+      mx::ElementPtr element = doc->getDescendant(sourceInput->getNamePath());
+      mx::InputPtr input = element ? element->asA<mx::Input>() : nullptr;
+      if (!input)
+      {
+        continue;
+      }
+
+      mx::NodePtr node = input->getParent()->asA<mx::Node>();
+      mx::GraphElementPtr graph = node ? node->getParent()->asA<mx::GraphElement>() : nullptr;
+      if (!graph)
+      {
+        continue;
+      }
+
+      auto sourceCodeIt = PARAMETER_SOURCE_CODES.find(input->getType());
+      if (sourceCodeIt == PARAMETER_SOURCE_CODES.end())
+      {
+        continue;
+      }
+
+      _AddParameterNodeDef(doc, input->getType(), sourceCodeIt->second);
+
+      const std::string parameterName = _MakeParameterName(sourceInput);
+      std::string nodeName = "GTL_parameter_" + parameterName;
+
+      uint32_t suffix = 0;
+      while (graph->getChild(nodeName))
+      {
+        nodeName = "GTL_parameter_" + parameterName + "_" + std::to_string(++suffix);
+      }
+
+      mx::NodePtr parameterNode = graph->addNode(MC_MTLX_GTL_PARAMETER_NODE_CATEGORY, nodeName, input->getType());
+
+      mx::InputPtr parameterInput = parameterNode->addInput("parameter", mx::STRING_TYPE_STRING);
+      parameterInput->setValueString(parameterName);
+
+      input->setConnectedNode(parameterNode);
+      input->removeAttribute(mx::ValueElement::VALUE_ATTRIBUTE);
+    }
+
+    return doc;
   }
 }

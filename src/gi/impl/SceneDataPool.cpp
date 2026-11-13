@@ -80,7 +80,7 @@ namespace gtl
 
     std::string debugName = GB_FMT("SceneData_{}", hash);
 
-    uint64_t bufferSize = data.size() + rp::SCENE_INFO_ALIGNMENT - 1;
+    uint64_t bufferSize = data.size() + rp::SCENE_INFO_BUFFER_ALIGNMENT - 1;
 
     CgpuBuffer buffer;
     if (!cgpuCreateBuffer(m_gpuCtx, {
@@ -88,7 +88,7 @@ namespace gtl
                             .memoryProperties = CgpuMemoryProperties::DeviceLocal,
                             .size = bufferSize,
                             .debugName = debugName.c_str(),
-                            .alignment = uint32_t(rp::SCENE_INFO_ALIGNMENT)
+                            .alignment = uint32_t(rp::SCENE_INFO_BUFFER_ALIGNMENT)
                           }, &buffer))
     {
       GB_ERROR("failed to create scene data buffer");
@@ -96,7 +96,7 @@ namespace gtl
     }
 
     uint64_t bufferAddress = cgpuGetBufferGpuAddress(m_gpuCtx, buffer);
-    uint64_t address = (bufferAddress + rp::SCENE_INFO_ALIGNMENT - 1) & ~(rp::SCENE_INFO_ALIGNMENT - 1);
+    uint64_t address = (bufferAddress + rp::SCENE_INFO_BUFFER_ALIGNMENT - 1) & ~(rp::SCENE_INFO_BUFFER_ALIGNMENT - 1);
     uint64_t dataOffset = address - bufferAddress;
 
     if (!m_stager.stageToBuffer(data.data(), data.size(), buffer, dataOffset))
