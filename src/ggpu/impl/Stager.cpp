@@ -169,7 +169,10 @@ fail:
 
     while (rowsStaged < rowCount)
     {
-      uint64_t remainingSpace = BUFFER_HALF_SIZE - m_stagedBytes;
+      // Account for the alignment padding applied by 'stage', otherwise a row group
+      // that barely fits would be split across staging buffer flushes.
+      uint64_t padding = (bpp - (m_stagedBytes % bpp)) % bpp;
+      uint64_t remainingSpace = BUFFER_HALF_SIZE - m_stagedBytes - padding;
       uint32_t maxCopyRowCount = uint32_t(remainingSpace / rowSize); // truncate
 
       if (maxCopyRowCount == 0)
@@ -224,14 +227,23 @@ fail:
     while (bytesToStage > 0)
     {
       uint64_t bytesAlreadyCopied = size - bytesToStage;
-      uint64_t requiredSpace = (bytesToStage + offsetAlign - 1) / offsetAlign * offsetAlign;
 
-      uint64_t availableSpace = BUFFER_HALF_SIZE - m_stagedBytes;
-      uint64_t memcpyByteCount = std::min(requiredSpace, availableSpace);
-      bytesToStage -= memcpyByteCount;
+      uint64_t halfBase = m_writeableHalf * BUFFER_HALF_SIZE;
+      uint64_t dstOffset = (halfBase + m_stagedBytes + offsetAlign - 1) / offsetAlign * offsetAlign;
+      uint64_t padding = dstOffset - halfBase - m_stagedBytes;
 
-      uint64_t dstOffset = m_writeableHalf * BUFFER_HALF_SIZE + m_stagedBytes;
-      dstOffset = (dstOffset + offsetAlign - 1) / offsetAlign * offsetAlign;
+      if ((m_stagedBytes + padding) >= BUFFER_HALF_SIZE)
+      {
+        if (!flush())
+        {
+          return false;
+        }
+        continue;
+      }
+
+      m_stagedBytes += padding;
+
+      uint64_t memcpyByteCount = std::min(bytesToStage, BUFFER_HALF_SIZE - m_stagedBytes);
 
       memcpy(&m_mappedMem[dstOffset], &src[bytesAlreadyCopied], memcpyByteCount);
 
@@ -239,18 +251,12 @@ fail:
 
       m_commandsPending = true;
       m_stagedBytes += memcpyByteCount;
+      bytesToStage -= memcpyByteCount;
 
-      if (m_stagedBytes != BUFFER_HALF_SIZE)
+      if (m_stagedBytes == BUFFER_HALF_SIZE && !flush())
       {
-        continue;
+        return false;
       }
-
-      if (flush())
-      {
-        continue;
-      }
-
-      return false;
     }
 
     return true;
