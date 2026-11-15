@@ -83,9 +83,13 @@ jobs:
     name: Build for Blender 5.0
     uses: ./.github/workflows/build-blender50.yml
 
+  build-blender53:
+    name: Build for Blender 5.3
+    uses: ./.github/workflows/build-blender53.yml
+
   deploy-release:
     name: Deploy Release
-    needs: [build-usd2605, build-usd2603, build-usd2511, build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender50]
+    needs: [build-usd2605, build-usd2603, build-usd2511, build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender50, build-blender53]
     runs-on: ubuntu-latest
 
     steps:

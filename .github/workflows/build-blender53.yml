@@ -1,0 +1,86 @@
+name: Build for Blender 5.3
+
+on:
+  workflow_call:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build-plugin:
+    name: Build gatling
+
+    env:
+      archive-name: gatling_Blender5.3_Windows_x64
+
+    # NOTE: make sure to adjust occurrence below
+    runs-on: windows-2022
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v7
+      with:
+        submodules: recursive
+        show-progress: false
+
+    - name: Make dirs
+      run: mkdir -p BUILD INSTALL
+
+    - name: Check out deps
+      run: |
+        git clone --filter=blob:none --no-checkout --depth 1 --sparse --branch blender-v5.3-release https://projects.blender.org/blender/lib-windows_x64 DEPS
+        cd DEPS
+        git sparse-checkout init --cone
+        git sparse-checkout add imath MaterialX opensubdiv python tbb usd vulkan
+        git checkout
+
+    - name: Apply patches
+      run: |
+        patch --binary DEPS/usd/pxrConfig.cmake .github/patches/blender53/pxrConfig.cmake.patch
+        patch --binary DEPS/usd/cmake/pxrTargets.cmake .github/patches/blender53/pxrTargets.cmake.patch
+        patch --binary DEPS/MaterialX/lib/cmake/MaterialX/MaterialXConfig.cmake .github/patches/blender53/MaterialXConfig.cmake.patch
+
+    - name: Fetch & unpack MDL SDK binaries
+      run: |
+        curl "https://github.com/NVIDIA/MDL-SDK/releases/download/2026.0.0/MDL-SDK-2026.0.0-391700.996-nt-x86-64.zip" -L --progress-bar -o MDL_SDK.zip
+        mkdir -p MDL-SDK
+        unzip MDL_SDK.zip -d MDL-SDK
+        mv MDL-SDK/*/* MDL-SDK/.
+
+    - name: Generate build system files using CMake
+      working-directory: BUILD
+      run: |
+        MaterialX_DIR=../DEPS/MaterialX/lib/cmake/MaterialX \
+        VulkanHeaders_DIR=../DEPS/vulkan/share/cmake/VulkanHeaders \
+        Imath_DIR=../DEPS/imath \
+        cmake .. \
+          -DCMAKE_CXX_FLAGS="-D_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR" \
+          -DPython3_ROOT_DIR="$PWD/../DEPS/python/313" \
+          -DPython3_EXECUTABLE="$PWD/../DEPS/python/313/bin/python.exe" \
+          -DPython3_LIBRARY="$PWD/../DEPS/python/313/libs/python313.lib" \
+          -DPXR_CMAKE_DIR=../DEPS/usd \
+          -DTBB_ROOT=../DEPS/tbb \
+          -DUSD_ROOT=../DEPS/usd \
+          -DMDL_ROOT=../MDL-SDK \
+          -DCMAKE_INSTALL_PREFIX="$PWD/../INSTALL/render_delegate" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -G"Visual Studio 17 2022" \
+          -Ax64
+
+    - name: Compile gatling
+      working-directory: BUILD
+      run: |
+        cmake --build . --target hdGatling -j 2 --config Release
+        cmake --install . --component hdGatling --config Release
+
+    - name: Copy plugin files
+      run: cp -r dist/blender/* INSTALL
+
+    - name: Upload archive
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.archive-name }}
+        path: INSTALL/*
+        if-no-files-found: error
+        retention-days: 7

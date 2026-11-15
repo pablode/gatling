@@ -1,0 +1,106 @@
+75c75
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+77c77
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+92c92
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+94c94
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+101c101
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+103c103
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+150c150
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+152c152
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+167c167
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+169c169
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+184c184
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+186c186
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+201c201
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+203c203
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+210c210
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../python/313/include"
+212c212
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/python/include"
+---
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../python/313/include"
+515,517c515,517
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/opensubdiv/include"
+<   INTERFACE_LINK_LIBRARIES "tf;gf;vt;C:/db/build/S/VS1764R/Release/opensubdiv/lib/osdCPU.lib"
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/opensubdiv/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../opensubdiv/include"
+>   INTERFACE_LINK_LIBRARIES "tf;gf;vt;${_IMPORT_PREFIX}/../opensubdiv/lib/osdCPU.lib"
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../opensubdiv/include"
+557c557
+<   INTERFACE_LINK_LIBRARIES "arch;hgi;tf;trace;Vulkan::Headers;Vulkan::UtilityHeaders;GPUOpen::VulkanMemoryAllocator"
+---
+>   INTERFACE_LINK_LIBRARIES "arch;hgi;tf;trace;Vulkan::Headers"
+612,614c612,613
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/openvdb/include"
+<   INTERFACE_LINK_LIBRARIES "ar;gf;hio;tf;usd;Imath::Imath;C:/db/build/S/VS1764R/Release/openvdb/lib/openvdb.lib"
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/openvdb/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
+>   INTERFACE_LINK_LIBRARIES "ar;gf;hio;tf;usd;Imath::Imath"
+621,623c620,622
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/opensubdiv/include"
+<   INTERFACE_LINK_LIBRARIES "hio;garch;glf;hd;hdsi;hgiGL;hgiInterop;sdr;tf;trace;hdMtlx;TBB::tbb;C:/db/build/S/VS1764R/Release/opensubdiv/lib/osdCPU.lib;C:/db/build/S/VS1764R/Release/opensubdiv/lib/osdGPU.lib;MaterialXGenShader;MaterialXRender;MaterialXCore;MaterialXFormat;MaterialXGenGlsl"
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/opensubdiv/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../opensubdiv/include"
+>   INTERFACE_LINK_LIBRARIES "hio;garch;glf;hd;hdsi;hgiGL;hgiInterop;sdr;tf;trace;hdMtlx;TBB::tbb;${_IMPORT_PREFIX}/../opensubdiv/lib/osdCPU.lib;${_IMPORT_PREFIX}/../opensubdiv/lib/osdGPU.lib;MaterialXGenShader;MaterialXRender;MaterialXCore;MaterialXFormat;MaterialXGenGlsl"
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../opensubdiv/include"
+638,640c637,639
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/opensubdiv/include"
+<   INTERFACE_LINK_LIBRARIES "plug;tf;trace;vt;work;hd;hdSt;C:/db/build/S/VS1764R/Release/opensubdiv/lib/osdCPU.lib;C:/db/build/S/VS1764R/Release/opensubdiv/lib/osdGPU.lib"
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/opensubdiv/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;${_IMPORT_PREFIX}/../opensubdiv/include"
+>   INTERFACE_LINK_LIBRARIES "plug;tf;trace;vt;work;hd;hdSt;${_IMPORT_PREFIX}/../opensubdiv/lib/osdCPU.lib;${_IMPORT_PREFIX}/../opensubdiv/lib/osdGPU.lib"
+>   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/../opensubdiv/include"
+647,649c646,647
+<   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include;C:/db/build/S/VS1764R/Release/openimageio/include"
+<   INTERFACE_LINK_LIBRARIES "ar;arch;gf;hio;tf;C:/db/build/S/VS1764R/Release/openimageio/lib/OpenImageIO.lib;C:/db/build/S/VS1764R/Release/openimageio/lib/OpenImageIO_Util.lib;Imath::Imath"
+<   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "C:/db/build/S/VS1764R/Release/openimageio/include"
+---
+>   INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"
+>   INTERFACE_LINK_LIBRARIES "ar;arch;gf;hio;tf;Imath::Imath"

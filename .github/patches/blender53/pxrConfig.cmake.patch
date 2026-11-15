@@ -1,0 +1,10 @@
+132,137d131
+<         if (NOT DEFINED VulkanUtilityLibraries_DIR AND NOT [[C:/db/build/S/VS1764R/Release/vulkan_headers/lib/cmake/VulkanUtilityLibraries]] STREQUAL "")
+<             set(VulkanUtilityLibraries_DIR [[C:/db/build/S/VS1764R/Release/vulkan_headers/lib/cmake/VulkanUtilityLibraries]])
+<         endif()
+<         if (NOT DEFINED VulkanMemoryAllocator_DIR AND NOT [[C:/db/build/S/VS1764R/Release/vulkan_memory_allocator/share/cmake/VulkanMemoryAllocator]] STREQUAL "")
+<             set(VulkanMemoryAllocator_DIR [[C:/db/build/S/VS1764R/Release/vulkan_memory_allocator/share/cmake/VulkanMemoryAllocator]])
+<         endif()
+139,140d132
+<         find_dependency(VulkanUtilityLibraries CONFIG)
+<         find_dependency(VulkanMemoryAllocator CONFIG)
