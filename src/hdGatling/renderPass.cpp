@@ -144,6 +144,10 @@ namespace
     time = -1.0;
     frame = 0.0;
 
+#if PXR_VERSION < 2408
+    return; // GetCurrentFrame() not part of schema yet
+#endif
+
     HdSceneIndexBaseRefPtr terminalSi = renderIndex->GetTerminalSceneIndex();
     if (!terminalSi)
     {
