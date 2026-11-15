@@ -35,6 +35,8 @@ namespace
 {
   using namespace gtl;
 
+  const static char* MDL_OPTION_ERROR = "error setting option";
+
   std::atomic_uint32_t s_idCounter(0);
 
   std::string _MakeModuleName(std::string_view identifier)
@@ -160,7 +162,8 @@ namespace gtl
       mi::base::Handle<McMdlEntityResolverUserData> userData(new McMdlEntityResolverUserData());
       userData->dirPrefix = fileDir;
 
-      context->set_option("user_data", userData.get()); // pass to entity resolver
+      // pass to entity resolver
+      GB_EXPECT(!context->set_option("user_data", userData.get()), MDL_OPTION_ERROR);
 
       return m_impExpApi->load_module(m_transaction.get(), moduleName.c_str(), context);
     };
@@ -175,7 +178,7 @@ namespace gtl
                                       const McMaterialParameters& params)
   {
     mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
-    context->set_option("resolve_resources", false);
+    GB_EXPECT(!context->set_option("resolve_resources", false), MDL_OPTION_ERROR);
 
     mi::Sint32 modCreateResult = modCreateFunc(context.get());
 

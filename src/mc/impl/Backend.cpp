@@ -25,6 +25,7 @@
 
 #include <gtl/gb/SmallVector.h>
 #include <gtl/gb/Fmt.h>
+#include <gtl/gb/Log.h>
 
 #include "MdlMaterial.h"
 #include "MdlLogger.h"
@@ -35,6 +36,8 @@ namespace fs = std::filesystem;
 
 namespace gtl
 {
+  const static char* MDL_OPTION_ERROR = "error setting option";
+
   const static std::array<const char*, size_t(McDf::COUNT)> DF_NAMES = {
     "surface.scattering",
     "surface.emission.emission",
@@ -78,11 +81,11 @@ namespace gtl
         return false;
       }
 
-      backend->set_option("enable_exceptions", "off");
-      backend->set_option("use_renderer_adapt_normal", "on");
-      backend->set_option("enable_auxiliary", needsAuxOutput ? "on" : "off");
+      GB_EXPECT(!backend->set_option("enable_exceptions", "off"), MDL_OPTION_ERROR);
+      GB_EXPECT(!backend->set_option("use_renderer_adapt_normal", "on"), MDL_OPTION_ERROR);
+      GB_EXPECT(!backend->set_option("enable_auxiliary", needsAuxOutput ? "on" : "off"), MDL_OPTION_ERROR);
       // Pre-normal evaluation results (displacement, cutout opacity) need at least one slot.
-      backend->set_option("num_texture_results", "1");
+      GB_EXPECT(!backend->set_option("num_texture_results", "1"), MDL_OPTION_ERROR);
 
       return _generateGlslWithDfs(*backend, compiledMaterial, genFunctions, glslSrc,
                                   textureDescriptions, stringConstants);
@@ -98,7 +101,7 @@ namespace gtl
     {
       // Create a separate execution context for each thread.
       mi::base::Handle<mi::neuraylib::IMdl_execution_context> context(m_factory->create_execution_context());
-      context->set_option("resolve_resources", false);
+      GB_EXPECT(!context->set_option("resolve_resources", false), MDL_OPTION_ERROR);
 
       mi::base::Handle<mi::neuraylib::ILink_unit> linkUnit(backend.create_link_unit(m_transaction.get(), context.get()));
       m_logger->flushContextMessages(context.get());
