@@ -46,7 +46,7 @@ jobs:
 
     - name: Fetch & unpack MDL SDK binaries
       run: |
-        curl "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-nt-x86-64.zip" -L --progress-bar -o MDL_SDK.zip
+        curl "https://github.com/NVIDIA/MDL-SDK/releases/download/2026.0.0/MDL-SDK-2026.0.0-391700.996-nt-x86-64.zip" -L --progress-bar -o MDL_SDK.zip
         mkdir -p MDL-SDK
         unzip MDL_SDK.zip -d MDL-SDK
         mv MDL-SDK/*/* MDL-SDK/.

@@ -33,7 +33,7 @@ jobs:
         include:
         - name: Ubuntu (GCC)
           image: ubuntu-24.04
-          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-linux-x86-64.tgz"
+          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2026.0.0/MDL-SDK-2026.0.0-391700.996-linux-x86-64.tgz"
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
@@ -44,7 +44,7 @@ jobs:
 
         - name: Ubuntu (clang)
           image: ubuntu-24.04
-          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-linux-x86-64.tgz"
+          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2026.0.0/MDL-SDK-2026.0.0-391700.996-linux-x86-64.tgz"
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Linux_x64.tar.gz"
           usd-install-path: "/home/runner/work/USD/USD/INSTALL"
           # Don't upload clang build results -- we already have GCC's
@@ -55,7 +55,7 @@ jobs:
 
         - name: Windows (MSVC)
           image: windows-2022
-          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2024.1.4/MDL-SDK-2024.1.4-381500.6583-nt-x86-64.zip"
+          mdl-download-url: "https://github.com/NVIDIA/MDL-SDK/releases/download/2026.0.0/MDL-SDK-2026.0.0-391700.996-nt-x86-64.zip"
           usd-download-url: "https://github.com/pablode/USD/releases/download/v${{ inputs.usd-version }}-ci-release/USD${{ inputs.usd-version }}_Windows_x64.tar.gz"
           usd-install-path: "C:/INSTALL"
           upload-install-artifacts: ${{ inputs.upload-install-artifacts }}
