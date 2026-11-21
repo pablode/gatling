@@ -55,7 +55,6 @@ namespace gtl
     void pushBack(CgpuImage handle);
     void pushBack(CgpuPipeline handle);
     void pushBack(CgpuSemaphore handle);
-    void pushBack(CgpuCommandBuffer handle);
     void pushBack(CgpuBlas handle);
     void pushBack(CgpuTlas handle);
 

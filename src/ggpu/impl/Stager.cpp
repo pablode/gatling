@@ -62,17 +62,17 @@ namespace gtl
     if (!bufferCreated)
       goto fail;
 
-    if (!cgpuCreateCommandBuffer(m_ctx, &m_commandBuffers[0]) ||
-        !cgpuCreateCommandBuffer(m_ctx, &m_commandBuffers[1]))
-      goto fail;
+    m_commandPools[0] = cgpuCreateCommandPool(m_ctx);
+    m_commandPools[1] = cgpuCreateCommandPool(m_ctx);
+    cgpuResetCommandPool(m_ctx, m_commandPools[0]);
+    cgpuResetCommandPool(m_ctx, m_commandPools[1]);
 
     if (!cgpuCreateSemaphore(m_ctx, &m_semaphore))
       goto fail;
 
     m_mappedMem = (uint8_t*) cgpuGetBufferCpuPtr(m_ctx, m_stagingBuffer);
 
-    if (!cgpuBeginCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]))
-      goto fail;
+    m_commandBuffers[m_writeableHalf] = cgpuBeginCommandBuffer(m_ctx, m_commandPools[m_writeableHalf]);
 
     return true;
 
@@ -87,9 +87,10 @@ fail:
     cgpuWaitSemaphores(m_ctx, 1, &waitSemaphoreInfo);
     cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
     cgpuDestroySemaphore(m_ctx, m_semaphore);
-    cgpuDestroyCommandBuffer(m_ctx, m_commandBuffers[0]);
-    cgpuDestroyCommandBuffer(m_ctx, m_commandBuffers[1]);
     cgpuDestroyBuffer(m_ctx, m_stagingBuffer);
+    cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
+    cgpuDestroyCommandPool(m_ctx, m_commandPools[0]);
+    cgpuDestroyCommandPool(m_ctx, m_commandPools[1]);
   }
 
   bool GgpuStager::flush()
@@ -115,8 +116,8 @@ fail:
     m_commandsPending = false;
     m_writeableHalf = (m_writeableHalf == 0) ? 1 : 0;
 
-    if (!cgpuBeginCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]))
-      return false;
+    cgpuResetCommandPool(m_ctx, m_commandPools[m_writeableHalf]);
+    m_commandBuffers[m_writeableHalf] = cgpuBeginCommandBuffer(m_ctx, m_commandPools[m_writeableHalf]);
 
     return true;
   }

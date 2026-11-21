@@ -245,6 +245,8 @@ namespace gtl
   std::unique_ptr<GbThreadPool> s_threadPool;
   CgpuDeviceFeatures s_ctxFeatures;
   CgpuDeviceProperties s_ctxProperties;
+  CgpuCommandPool s_commandPools[2];
+  uint32_t s_commandPoolIndex = 0;
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
   std::mutex s_resourceDestroyerMutex;
@@ -409,6 +411,11 @@ namespace gtl
     s_ctxFeatures = cgpuGetDeviceFeatures(s_ctx);
     s_ctxProperties = cgpuGetDeviceProperties(s_ctx);
 
+    s_commandPools[0] = cgpuCreateCommandPool(s_ctx);
+    s_commandPools[1] = cgpuCreateCommandPool(s_ctx);
+    cgpuResetCommandPool(s_ctx, s_commandPools[0]);
+    cgpuResetCommandPool(s_ctx, s_commandPools[1]);
+
     if (!cgpuCreateSampler(s_ctx, {
                             .addressModeU = CgpuSamplerAddressMode::Repeat,
                             .addressModeV = CgpuSamplerAddressMode::Repeat,
@@ -493,6 +500,12 @@ fail:
       s_stager->free();
       s_stager.reset();
     }
+    for (CgpuCommandPool& commandPool : s_commandPools)
+    {
+      cgpuDestroyCommandPool(s_ctx, commandPool);
+      commandPool = {};
+    }
+    s_commandPoolIndex = 0;
     if (s_texSampler.handle)
     {
       cgpuDestroySampler(s_ctx, s_texSampler);
@@ -2428,16 +2441,15 @@ cleanup:
     uint32_t imageHeight = params.aovBindings[0].renderBuffer->height;
 
     // Start command buffer.
-    CgpuCommandBuffer commandBuffer;
-    CgpuSemaphore semaphore;
+    CgpuSemaphore semaphore = {};
     CgpuSignalSemaphoreInfo signalSemaphoreInfo;
     CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
-    if (!cgpuCreateCommandBuffer(s_ctx, &commandBuffer))
-      goto cleanup;
+    uint32_t commandPoolIndex = s_commandPoolIndex;
+    s_commandPoolIndex = (s_commandPoolIndex == 0) ? 1 : 0;
 
-    if (!cgpuBeginCommandBuffer(s_ctx, commandBuffer))
-      goto cleanup;
+    cgpuResetCommandPool(s_ctx, s_commandPools[commandPoolIndex]);
+    CgpuCommandBuffer commandBuffer = cgpuBeginCommandBuffer(s_ctx, s_commandPools[commandPoolIndex]);
 
     // Update descriptor sets if needed
     if (bool(scene->dirtyFlags & GiSceneDirtyFlags::DirtyBindSets))
@@ -2683,8 +2695,8 @@ cleanup:
     result = GiStatus::Ok;
 
 cleanup:
-    cgpuDestroySemaphore(s_ctx, semaphore);
-    cgpuDestroyCommandBuffer(s_ctx, commandBuffer);
+    if (semaphore.handle)
+      cgpuDestroySemaphore(s_ctx, semaphore);
 
     return result;
   }

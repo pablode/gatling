@@ -83,12 +83,6 @@ namespace gtl
     enqueueDestroyFunc([this, handle]() { cgpuDestroySemaphore(m_ctx, handle); });
   }
 
-  void GgpuDeleteQueue::pushBack(CgpuCommandBuffer handle)
-  {
-    assert(handle.handle);
-    enqueueDestroyFunc([this, handle]() { cgpuDestroyCommandBuffer(m_ctx, handle); });
-  }
-
   void GgpuDeleteQueue::pushBack(CgpuBlas handle)
   {
     assert(handle.handle);

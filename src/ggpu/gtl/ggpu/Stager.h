@@ -56,6 +56,7 @@ namespace gtl
 
     uint32_t m_writeableHalf = 0;
     CgpuBuffer m_stagingBuffer;
+    CgpuCommandPool m_commandPools[2];
     CgpuCommandBuffer m_commandBuffers[2];
     CgpuSemaphore m_semaphore;
     uint32_t m_semaphoreCounter = 0;
