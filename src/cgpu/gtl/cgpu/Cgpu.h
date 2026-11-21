@@ -28,6 +28,7 @@ namespace gtl
   constexpr static const uint64_t CGPU_WHOLE_SIZE = ~0ULL;
   constexpr static const uint32_t CGPU_MAX_TIMESTAMP_QUERIES = 32;
   constexpr static const uint32_t CGPU_MAX_DESCRIPTOR_SET_COUNT = 6;
+  constexpr static const uint32_t CGPU_COMMAND_POOL_SIZE = 32;
   constexpr static const uint32_t CGPU_MAX_BUFFER_UPDATE_SIZE = 65535;
   constexpr static const uint32_t CGPU_MIN_UNIFORM_BUFFER_SIZE = 16384;
 
@@ -121,6 +122,7 @@ namespace gtl
   struct CgpuShader        { uint64_t handle = 0; };
   struct CgpuPipeline      { uint64_t handle = 0; };
   struct CgpuSemaphore     { uint64_t handle = 0; };
+  struct CgpuCommandPool   { uint64_t handle = 0; };
   struct CgpuCommandBuffer { uint64_t handle = 0; };
   struct CgpuSampler       { uint64_t handle = 0; };
   struct CgpuBlas          { uint64_t handle = 0; };
@@ -469,12 +471,26 @@ namespace gtl
     const CgpuBindings* bindings
   );
 
-  bool cgpuCreateCommandBuffer(
-    CgpuContext* ctx,
-    CgpuCommandBuffer* commandBuffer
+  CgpuCommandPool cgpuCreateCommandPool(
+    CgpuContext* ctx
   );
 
-  bool cgpuBeginCommandBuffer(
+  void cgpuDestroyCommandPool(
+    CgpuContext* ctx,
+    CgpuCommandPool commandPool
+  );
+
+  void cgpuResetCommandPool(
+    CgpuContext* ctx,
+    CgpuCommandPool commandPool
+  );
+
+  CgpuCommandBuffer cgpuBeginCommandBuffer(
+    CgpuContext* ctx,
+    CgpuCommandPool commandPool
+  );
+
+  void cgpuEndCommandBuffer(
     CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer
   );
@@ -544,16 +560,6 @@ namespace gtl
     uint64_t dstOffset = 0,
     uint64_t size = CGPU_WHOLE_SIZE,
     uint8_t data = 0
-  );
-
-  void cgpuEndCommandBuffer(
-    CgpuContext* ctx,
-    CgpuCommandBuffer commandBuffer
-  );
-
-  void cgpuDestroyCommandBuffer(
-    CgpuContext* ctx,
-    CgpuCommandBuffer commandBuffer
   );
 
   bool cgpuCreateSemaphore(

@@ -156,7 +156,6 @@ namespace gtl
   struct CgpuICommandBuffer
   {
     MTL4::CommandBuffer* commandBuffer;
-    MTL4::CommandAllocator* commandAllocator;
     MTL::ResidencySet* auxResidencySet;
 
     // following member's memory is not owned:
@@ -164,8 +163,13 @@ namespace gtl
     std::vector<MTL::ResidencySet*> residencySets;
 
     CgpuPipeline pipeline;
-    MTL4::CommitOptions* commitOptions;
-    MTL4::CommandBufferOptions* commandBufferOptions;
+  };
+
+  struct CgpuICommandPool
+  {
+    MTL4::CommandAllocator* commandAllocator;
+    CgpuICommandBuffer* commandBuffers; // heap pointer, stable
+    uint32_t nextIndex;
   };
 
   struct CgpuIBlas
@@ -201,7 +205,7 @@ namespace gtl
     GbLinearDataStore<CgpuIShader, 32> ishaderStore;
     GbLinearDataStore<CgpuIPipeline, 8> ipipelineStore;
     GbLinearDataStore<CgpuISemaphore, 16> isemaphoreStore;
-    GbLinearDataStore<CgpuICommandBuffer, 16> icommandBufferStore;
+    GbLinearDataStore<CgpuICommandPool, 8> icommandPoolStore;
     GbLinearDataStore<CgpuISampler, 8> isamplerStore;
     GbLinearDataStore<CgpuIBlas, 1024> iblasStore;
     GbLinearDataStore<CgpuITlas, 1> itlasStore;
@@ -259,11 +263,17 @@ namespace gtl
   CGPU_RESOLVE_HANDLE(       Shader,        CgpuShader,        CgpuIShader,        ishaderStore)
   CGPU_RESOLVE_HANDLE(     Pipeline,      CgpuPipeline,      CgpuIPipeline,      ipipelineStore)
   CGPU_RESOLVE_HANDLE(    Semaphore,     CgpuSemaphore,     CgpuISemaphore,     isemaphoreStore)
-  CGPU_RESOLVE_HANDLE(CommandBuffer, CgpuCommandBuffer, CgpuICommandBuffer, icommandBufferStore)
+  CGPU_RESOLVE_HANDLE(  CommandPool,   CgpuCommandPool,   CgpuICommandPool,   icommandPoolStore)
   CGPU_RESOLVE_HANDLE(      Sampler,       CgpuSampler,       CgpuISampler,       isamplerStore)
   CGPU_RESOLVE_HANDLE(         Blas,          CgpuBlas,          CgpuIBlas,          iblasStore)
   CGPU_RESOLVE_HANDLE(         Tlas,          CgpuTlas,          CgpuITlas,          itlasStore)
   CGPU_RESOLVE_HANDLE(      BindSet,       CgpuBindSet,       CgpuIBindSet,       ibindSetStore)
+
+  CGPU_INLINE static bool cgpuResolveCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer handle, CgpuICommandBuffer** idata) \
+  {                                                                                                                        \
+    *idata = (CgpuICommandBuffer*) handle.handle;                                                                          \
+    return bool(idata);                                                                                                    \
+  }
 
 #define CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, ITYPE, RESOLVE_FUNC) \
   ITYPE* VAR_NAME;                                                       \
@@ -276,11 +286,12 @@ namespace gtl
 #define CGPU_RESOLVE_SHADER(CTX, HANDLE, VAR_NAME)         CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIShader, cgpuResolveShader)
 #define CGPU_RESOLVE_PIPELINE(CTX, HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIPipeline, cgpuResolvePipeline)
 #define CGPU_RESOLVE_SEMAPHORE(CTX, HANDLE, VAR_NAME)      CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuISemaphore, cgpuResolveSemaphore)
-#define CGPU_RESOLVE_COMMAND_BUFFER(CTX, HANDLE, VAR_NAME) CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuICommandBuffer, cgpuResolveCommandBuffer)
+#define CGPU_RESOLVE_COMMAND_POOL(CTX, HANDLE, VAR_NAME)   CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuICommandPool, cgpuResolveCommandPool)
 #define CGPU_RESOLVE_SAMPLER(CTX, HANDLE, VAR_NAME)        CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuISampler, cgpuResolveSampler)
 #define CGPU_RESOLVE_BLAS(CTX, HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBlas, cgpuResolveBlas)
 #define CGPU_RESOLVE_TLAS(CTX, HANDLE, VAR_NAME)           CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuITlas, cgpuResolveTlas)
 #define CGPU_RESOLVE_BIND_SET(CTX, HANDLE, VAR_NAME)       CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuIBindSet, cgpuResolveBindSet)
+#define CGPU_RESOLVE_COMMAND_BUFFER(CTX, HANDLE, VAR_NAME) CGPU_RESOLVE_OR_EXIT(CTX, HANDLE, VAR_NAME, CgpuICommandBuffer, cgpuResolveCommandBuffer)
 
   /* Helper methods */
 
@@ -1825,57 +1836,102 @@ namespace gtl
     residencySet->requestResidency();
   }
 
-  bool cgpuCreateCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer* commandBuffer)
+  CgpuCommandPool cgpuCreateCommandPool(CgpuContext* ctx)
   {
     CgpuIDevice* idevice = &ctx->idevice;
 
-    uint64_t handle = ctx->icommandBufferStore.allocate();
+    uint64_t handle = ctx->icommandPoolStore.allocate();
 
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, { handle }, icommandBuffer);
+    CGPU_RESOLVE_COMMAND_POOL(ctx, { handle }, icommandPool);
 
-    uint32_t initialCapacity = 32;
-    MTL::ResidencySet* auxResidencySet = cgpuCreateResidencySet(idevice->device, initialCapacity);
+    icommandPool->commandAllocator = idevice->device->newCommandAllocator();
+    CGPU_CHK_NP(icommandPool->commandAllocator);
 
-    MTL4::CommandAllocator* commandAllocator = idevice->device->newCommandAllocator();
-    CGPU_CHK_NP(commandAllocator);
-    MTL4::CommandBuffer* mtlCommandBuffer = idevice->device->newCommandBuffer();
-    CGPU_CHK_NP(mtlCommandBuffer);
+    icommandPool->commandBuffers = new CgpuICommandBuffer[CGPU_COMMAND_POOL_SIZE];
 
-    icommandBuffer->commandAllocator = commandAllocator;
-    icommandBuffer->commandBuffer = mtlCommandBuffer;
-    icommandBuffer->commitOptions = idevice->commitOptions;
-    icommandBuffer->commandBufferOptions = idevice->commandBufferOptions;
-    icommandBuffer->auxResidencySet = auxResidencySet;
-    icommandBuffer->deviceResidencySet = idevice->residencySet;
+    for (uint32_t i = 0; i < CGPU_COMMAND_POOL_SIZE; i++)
+    {
+      CgpuICommandBuffer* commandBuffer = &icommandPool->commandBuffers[i];
 
-    commandBuffer->handle = handle;
-    return true;
+      commandBuffer->commandBuffer = idevice->device->newCommandBuffer();
+      CGPU_CHK_NP(commandBuffer->commandBuffer);
+
+      commandBuffer->auxResidencySet = cgpuCreateResidencySet(idevice->device, 32);
+      commandBuffer->deviceResidencySet = idevice->residencySet;
+    }
+
+    return { handle };
   }
 
-  void cgpuDestroyCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
+  void cgpuDestroyCommandPool(CgpuContext* ctx, CgpuCommandPool commandPool)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_COMMAND_POOL(ctx, commandPool, icommandPool);
 
-    icommandBuffer->commandBuffer->release();
-    icommandBuffer->commandAllocator->release();
-    icommandBuffer->auxResidencySet->release();
+    for (uint32_t i = 0; i < CGPU_COMMAND_POOL_SIZE; i++)
+    {
+      CgpuICommandBuffer* commandBuffer = &icommandPool->commandBuffers[i];
 
-    ctx->icommandBufferStore.free(commandBuffer.handle);
+      commandBuffer->commandBuffer->release();
+      commandBuffer->auxResidencySet->release();
+    }
+
+    delete[] icommandPool->commandBuffers;
+    icommandPool->commandAllocator->release();
+
+    ctx->icommandPoolStore.free(commandPool.handle);
   }
 
-  bool cgpuBeginCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
+  void cgpuResetCommandPool(CgpuContext* ctx, CgpuCommandPool commandPool)
   {
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_COMMAND_POOL(ctx, commandPool, icommandPool);
 
-    icommandBuffer->auxResidencySet->removeAllAllocations();
-    icommandBuffer->residencySets.clear();
+    icommandPool->commandAllocator->reset();
+    icommandPool->nextIndex = 0;
+
+    for (uint32_t i = 0; i < CGPU_COMMAND_POOL_SIZE; i++)
+    {
+      CgpuICommandBuffer* icommandBuffer = &icommandPool->commandBuffers[i];
+
+      icommandBuffer->pipeline = {};
+      icommandBuffer->auxResidencySet->removeAllAllocations();
+      icommandBuffer->residencySets.clear();
+    }
+  }
+
+  CgpuCommandBuffer cgpuBeginCommandBuffer(CgpuContext* ctx, CgpuCommandPool commandPool)
+  {
+    CGPU_RESOLVE_COMMAND_POOL(ctx, commandPool, icommandPool);
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    if (icommandPool->nextIndex >= CGPU_COMMAND_POOL_SIZE)
+    {
+      GB_FATAL("command pool exhausted"); // must be avoided by user space
+    }
+
+    CgpuICommandBuffer* icommandBuffer = &icommandPool->commandBuffers[icommandPool->nextIndex++];
 
     icommandBuffer->commandBuffer->beginCommandBuffer(
-      icommandBuffer->commandAllocator,
-      icommandBuffer->commandBufferOptions
+      icommandPool->commandAllocator,
+      idevice->commandBufferOptions
     );
 
-    return true;
+    return { (uint64_t) icommandBuffer }; // special handle
+  }
+
+  void cgpuEndCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
+  {
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+
+    icommandBuffer->deviceResidencySet->commit();
+    icommandBuffer->residencySets.push_back(icommandBuffer->deviceResidencySet);
+
+    icommandBuffer->auxResidencySet->commit();
+    icommandBuffer->residencySets.push_back(icommandBuffer->auxResidencySet);
+
+    icommandBuffer->commandBuffer->useResidencySets(icommandBuffer->residencySets.data(),
+                                                    icommandBuffer->residencySets.size());
+
+    icommandBuffer->commandBuffer->endCommandBuffer();
   }
 
   void cgpuCmdBindPipeline(CgpuContext* ctx,
@@ -2120,22 +2176,6 @@ namespace gtl
     encoder->fillBuffer(ibuffer->buffer, range, data);
 
     encoder->endEncoding();
-  }
-
-  void cgpuEndCommandBuffer(CgpuContext* ctx, CgpuCommandBuffer commandBuffer)
-  {
-    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
-
-    icommandBuffer->deviceResidencySet->commit();
-    icommandBuffer->residencySets.push_back(icommandBuffer->deviceResidencySet);
-
-    icommandBuffer->auxResidencySet->commit();
-    icommandBuffer->residencySets.push_back(icommandBuffer->auxResidencySet);
-
-    icommandBuffer->commandBuffer->useResidencySets(icommandBuffer->residencySets.data(),
-                                                    icommandBuffer->residencySets.size());
-
-    icommandBuffer->commandBuffer->endCommandBuffer();
   }
 
   bool cgpuCreateSemaphore(CgpuContext* ctx, CgpuSemaphore* semaphore, uint64_t initialValue)
