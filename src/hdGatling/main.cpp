@@ -600,10 +600,19 @@ public:
 class SimpleGraphicalTestFixture : public GraphicalTestFixture
 {
 public:
-  SimpleGraphicalTestFixture()
+  SimpleGraphicalTestFixture(const char* sceneFileName = "scene.usd")
   {
-    GraphicalTestContext context(_GetTestInputDir() / "scene.usd");
+    GraphicalTestContext context(_GetTestInputDir() / sceneFileName);
     context.performTest();
+  }
+};
+
+class SimpleUsdzGraphicalTestFixture : public SimpleGraphicalTestFixture
+{
+public:
+  SimpleUsdzGraphicalTestFixture()
+    : SimpleGraphicalTestFixture("scene.usdz")
+  {
   }
 };
 
@@ -650,6 +659,10 @@ TEST_SUITE("Graphical")
   }
 
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Render.Empty1x1")
+  {
+  }
+
+  TEST_CASE_FIXTURE(SimpleUsdzGraphicalTestFixture, "Usdz.AssetResolution")
   {
   }
 
