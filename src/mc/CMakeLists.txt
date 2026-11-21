@@ -1,5 +1,4 @@
-add_library(
-  mc STATIC
+set(MC_SRCS
   gtl/mc/Backend.h
   gtl/mc/Frontend.h
   gtl/mc/Material.h
@@ -27,29 +26,42 @@ add_library(
   impl/Runtime.cpp
 )
 
-target_include_directories(
+function(configure_target TARGET)
+  target_include_directories(
+    ${TARGET}
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE
+      gtl/mc
+      impl
+      ${MDL_INCLUDE_DIR}
+  )
+
+  target_link_libraries(
+    ${TARGET}
+    PRIVATE
+      gb
+      MaterialXCore
+      MaterialXFormat
+      MaterialXGenMdl
+  )
+
+  if(TARGET OpenColorIO::OpenColorIO)
+    target_link_libraries(${TARGET} PRIVATE OpenColorIO::OpenColorIO)
+    target_compile_definitions(${TARGET} PRIVATE OCIO)
+  endif()
+endfunction()
+
+add_library(mc STATIC ${MC_SRCS})
+set_target_properties(
   mc
-  PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-  PRIVATE
-    gtl/mc
-    impl
-    ${MDL_INCLUDE_DIR}
+  PROPERTIES
+    # Required since library is linked into hdGatling DSO
+    POSITION_INDEPENDENT_CODE ON
 )
+configure_target(mc)
 
-target_link_libraries(
-  mc
-  PRIVATE
-    gb
-    MaterialXCore
-    MaterialXFormat
-    MaterialXGenMdl
-)
-
-if(TARGET OpenColorIO::OpenColorIO)
-  target_link_libraries(mc PRIVATE OpenColorIO::OpenColorIO)
-  target_compile_definitions(mc PRIVATE OCIO)
-endif()
-
-# Required since library is linked into hdGatling DSO
-set_target_properties(mc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_executable(mc_test ${MC_SRCS} impl/main.cpp)
+target_compile_definitions(mc_test PRIVATE MC_TEST_EXECUTABLE=1)
+target_link_libraries(mc_test PRIVATE gt doctest)
+configure_target(mc_test)

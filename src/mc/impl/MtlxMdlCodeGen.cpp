@@ -34,6 +34,10 @@
 #include <MaterialXGenMdl/MdlShaderGenerator.h>
 #include <gtl/gb/Log.h>
 
+#ifdef MC_TEST_EXECUTABLE
+#include <doctest/doctest.h>
+#endif
+
 namespace mx = MaterialX;
 
 namespace
@@ -304,3 +308,26 @@ namespace gtl
     return true;
   }
 }
+
+#ifdef MC_TEST_EXECUTABLE
+namespace
+{
+  TEST_CASE("MtlxMdlCodeGen.HasDocumentTimeNode")
+  {
+    {
+      mx::DocumentPtr doc = mx::createDocument();
+      CHECK_FALSE(_HasDocumentTimeNode(doc));
+    }
+    {
+      mx::DocumentPtr doc = mx::createDocument();
+      doc->addNodeGraph("NG")->addNode("constant", "C", "float");
+      CHECK_FALSE(_HasDocumentTimeNode(doc));
+    }
+    {
+      mx::DocumentPtr doc = mx::createDocument();
+      doc->addNodeGraph("NG")->addNode("time", "T", "float");
+      CHECK(_HasDocumentTimeNode(doc));
+    }
+  }
+}
+#endif

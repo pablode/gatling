@@ -141,7 +141,7 @@ jobs:
 
     - name: Build gatling
       working-directory: BUILD
-      run: cmake --build . --config ${{ inputs.build-config }} -j 2 --target hdGatling gatling imgio_test
+      run: cmake --build . --config ${{ inputs.build-config }} -j 2 --target hdGatling gatling imgio_test mc_test
 
     - name: Build hdGatling_test
       working-directory: BUILD
@@ -151,6 +151,10 @@ jobs:
     - name: Run imgio_test
       working-directory: BUILD
       run: ./bin/imgio_test${{ inputs.executable-suffix }}
+
+    - name: Run mc_test
+      working-directory: BUILD
+      run: ./bin/mc_test${{ inputs.executable-suffix }}
 
     - name: Run hdGatling_test
       working-directory: BUILD
