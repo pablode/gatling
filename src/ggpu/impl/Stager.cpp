@@ -107,8 +107,6 @@ fail:
 
     cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
 
-    uint32_t halfOffset = m_writeableHalf * BUFFER_HALF_SIZE;
-
     CgpuSignalSemaphoreInfo signalSemaphoreInfo{ .semaphore = m_semaphore, .value = m_semaphoreCounter };
     cgpuSubmitCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf], 1, &signalSemaphoreInfo);
 
@@ -155,6 +153,8 @@ fail:
 
   bool GgpuStager::stageToImage(const uint8_t* src, uint64_t size, CgpuImage dst, uint32_t width, uint32_t height, uint32_t depth, uint32_t bpp)
   {
+    assert(size > 0 && width > 0 && height > 0 && bpp > 0);
+
     uint32_t rowCount = height;
     uint64_t rowSize = size / rowCount;
 

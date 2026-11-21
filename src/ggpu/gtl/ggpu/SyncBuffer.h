@@ -53,7 +53,7 @@ namespace gtl
     template<typename T>
     T* read(uint64_t offset, uint64_t range)
     {
-      return (T*) write(offset * m_elementSize, range * m_elementSize);
+      return (T*) read(offset * m_elementSize, range * m_elementSize);
     }
 
     template<typename T>
