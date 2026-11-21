@@ -44,90 +44,110 @@ namespace
 {
   using namespace gtl;
 
-  std::optional<McOpacityClassification> _EstimateNodeOpacityFromInput(mx::NodePtr node,
-                                                                       const std::string& category,
-                                                                       const std::string& inputName,
-                                                                       mx::ValuePtr defaultValue)
+  bool _IsNodeInputModified(mx::NodePtr node, const char* inputName, mx::ValuePtr defaultValue)
   {
-    if (!node || node->getCategory() != category)
-    {
-      return std::nullopt;
-    }
-
     if (node->getConnectedNode(inputName) != nullptr)
     {
-      return McOpacityClassification::Transparent; // custom logic hooked up
+      return true; // custom logic hooked up
     }
 
     mx::ValuePtr inputValue = node->getInputValue(inputName);
-    float floatEps = 0.0001f;
-
-    if (inputValue && inputValue->isA<float>() && defaultValue->isA<float>())
+    if (!inputValue)
     {
-      return (fabs(inputValue->asA<float>() - defaultValue->asA<float>()) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::Transparent;
+      return false;
     }
 
-    if (inputValue && inputValue->isA<mx::Color3>() && defaultValue->isA<mx::Color3>())
+    auto isApproxEqual = [](float a, float b) { return fabs(a - b) < 0.0001f; };
+
+    if (inputValue->isA<float>() && defaultValue->isA<float>())
     {
-      mx::Color3 diff = inputValue->asA<mx::Color3>() - defaultValue->asA<mx::Color3>();
-      return (fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::Transparent;
+      return !isApproxEqual(inputValue->asA<float>(), defaultValue->asA<float>());
     }
 
-    if (inputValue && inputValue->isA<int>() && defaultValue->isA<int>())
+    if (inputValue->isA<mx::Color3>() && defaultValue->isA<mx::Color3>())
     {
-      return (inputValue->asA<int>() == defaultValue->asA<int>()) ? McOpacityClassification::Opaque : McOpacityClassification::Transparent;
+      mx::Color3 value = inputValue->asA<mx::Color3>();
+      mx::Color3 defaultColor = defaultValue->asA<mx::Color3>();
+
+      return !isApproxEqual(value[0], defaultColor[0]) ||
+             !isApproxEqual(value[1], defaultColor[1]) ||
+             !isApproxEqual(value[2], defaultColor[2]);
     }
 
-    return std::nullopt;
+    if (inputValue->isA<int>() && defaultValue->isA<int>())
+    {
+      return inputValue->asA<int>() != defaultValue->asA<int>();
+    }
+
+    return false;
   }
-
-  struct OpacityInputDescription
-  {
-    const char* nodeCategory;
-    const char* inputName;
-    mx::ValuePtr defaultValue;
-  };
-
-  const static std::vector<OpacityInputDescription> TRANSPARENCY_INPUT_DESCRIPTIONS = {
-    { "UsdPreviewSurface", "opacity", mx::Value::createValue(1.0f) },
-    { "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f)) },
-    { "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* Opaque */) },
-    { "open_pbr_surface", "geometry_opacity", mx::Value::createValue(1.0f) }
-  };
 
   McOpacityClassification _ClassifySurfaceShaderOpacity(mx::TypedElementPtr element)
   {
     mx::NodePtr node = element->asA<mx::Node>();
+    const std::string& category = node->getCategory();
 
-    // Detect alpha cutout
-    if (node->getCategory() == "UsdPreviewSurface")
-    {
-      mx::ValuePtr inputValue = node->getInputValue("opacityThreshold");
-
-      if (inputValue && inputValue->isA<float>() && inputValue->asA<float>() > 0.0f)
-      {
-        return McOpacityClassification::Cutout;
-      }
-    }
-    else if (node->getCategory() == "gltf_pbr")
+    // Accurate detection for known uber-BSDFs
+    if (category == "gltf_pbr")
     {
       mx::ValuePtr inputValue = node->getInputValue("alpha_mode");
+      int alphaMode = (inputValue && inputValue->isA<int>()) ? inputValue->asA<int>() : 0;
 
-      if (inputValue && inputValue->isA<int>() && inputValue->asA<int>() == 1 /*MASK*/)
+      if (alphaMode == 1 /*MASK*/)
       {
         return McOpacityClassification::Cutout;
       }
-    }
-
-    // Otherwise decide between opaque and non-binary opacity
-    for (const auto& inputDesc : TRANSPARENCY_INPUT_DESCRIPTIONS)
-    {
-      std::optional<McOpacityClassification> opacity = _EstimateNodeOpacityFromInput(node, inputDesc.nodeCategory, inputDesc.inputName, inputDesc.defaultValue);
-
-      if (opacity.has_value())
+      if (alphaMode == 2 /*BLEND*/ ||
+          _IsNodeInputModified(node, "transmission", mx::Value::createValue(0.0f)))
       {
-        return *opacity;
+        return McOpacityClassification::Transparent;
       }
+
+      return McOpacityClassification::Opaque;
+    }
+    else if (category == "UsdPreviewSurface")
+    {
+      bool opacityModified = _IsNodeInputModified(node, "opacity", mx::Value::createValue(1.0f));
+      bool presenceMode = _IsNodeInputModified(node, "opacityMode", mx::Value::createValue(0 /* TRANSPARENT */));
+
+      // A threshold or presence mode turns opacity into a cutout; otherwise it transmits.
+      if (_IsNodeInputModified(node, "opacityThreshold", mx::Value::createValue(0.0f)) ||
+          (presenceMode && opacityModified))
+      {
+        return McOpacityClassification::Cutout;
+      }
+      if (opacityModified)
+      {
+        return McOpacityClassification::Transparent;
+      }
+
+      return McOpacityClassification::Opaque;
+    }
+    else if (category == "standard_surface")
+    {
+      if (_IsNodeInputModified(node, "transmission", mx::Value::createValue(0.0f)) ||
+          _IsNodeInputModified(node, "subsurface", mx::Value::createValue(0.0f)))
+      {
+        return McOpacityClassification::Transparent;
+      }
+      if (_IsNodeInputModified(node, "opacity", mx::Value::createValue(mx::Color3(1.0f))))
+      {
+        return McOpacityClassification::Cutout;
+      }
+      return McOpacityClassification::Opaque;
+    }
+    else if (category == "open_pbr_surface")
+    {
+      if (_IsNodeInputModified(node, "transmission_weight", mx::Value::createValue(0.0f)) ||
+          _IsNodeInputModified(node, "subsurface_weight", mx::Value::createValue(0.0f)))
+      {
+        return McOpacityClassification::Transparent;
+      }
+      if (_IsNodeInputModified(node, "geometry_opacity", mx::Value::createValue(1.0f)))
+      {
+        return McOpacityClassification::Cutout;
+      }
+      return McOpacityClassification::Opaque;
     }
 
     // Use MaterialX helper function as fallback and assume worst case (not accurate, has false positives)
