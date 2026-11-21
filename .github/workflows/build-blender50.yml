@@ -14,7 +14,6 @@ jobs:
     env:
       archive-name: gatling_Blender5.0_Windows_x64
 
-    # NOTE: make sure to adjust occurrence below
     runs-on: windows-2022
 
     steps:

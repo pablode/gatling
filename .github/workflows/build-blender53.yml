@@ -7,14 +7,14 @@ defaults:
   run:
     shell: bash
 
+env:
+  archive-name: gatling_Blender5.3_Windows_x64
+  mesa-version: 25.2.8
+
 jobs:
   build-plugin:
     name: Build gatling
 
-    env:
-      archive-name: gatling_Blender5.3_Windows_x64
-
-    # NOTE: make sure to adjust occurrence below
     runs-on: windows-2022
 
     steps:
@@ -84,3 +84,82 @@ jobs:
         path: INSTALL/*
         if-no-files-found: error
         retention-days: 7
+
+  test-plugin:
+    name: Test gatling in Blender
+    needs: build-plugin
+
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v7
+      with:
+        show-progress: false
+
+    - name: Download plugin
+      uses: actions/download-artifact@v8
+      with:
+        name: ${{ env.archive-name }}
+        path: PLUGIN
+
+    - name: Install Blender
+      run: |
+        choco install vulkan-sdk -y
+        choco install blender --version=5.3.0 -y --no-progress
+
+    - name: Install OpenImageIO tools
+      run: |
+        python -m pip install --only-binary :all: --disable-pip-version-check --no-cache-dir OpenImageIO
+        oiiotool --version
+
+    - name: Fetch and unpack Mesa
+      run: |
+        curl -L --progress-bar -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/${{ env.mesa-version }}/mesa3d-${{ env.mesa-version }}-release-mingw.7z"
+        mkdir -p MESA
+        7z x mesa.7z -oMESA -y > /dev/null
+
+    - name: Set up Vulkan environment
+      run: |
+        ICD=$(find MESA -iname "lvp_icd*.json" -print -quit)
+        ICD_WIN=$(cygpath -wa "$ICD")
+
+        # The loader ignores VK_DRIVER_FILES when the process is elevated; write to registry
+        MSYS_NO_PATHCONV=1 reg.exe add "HKLM\SOFTWARE\Khronos\Vulkan\Drivers" /v "$ICD_WIN" /t REG_DWORD /d 0 /f
+
+        BLENDER=$(ls -d "/c/Program Files/Blender Foundation/Blender"*/blender.exe 2>/dev/null | head -n 1)
+        echo "BLENDER=$BLENDER" >> $GITHUB_ENV
+
+    - name: Install plugin
+      run: |
+        EXTENSION_DIR="$APPDATA/Blender Foundation/Blender/5.3/extensions/user_default/hydra_gatling"
+        mkdir -p "$EXTENSION_DIR"
+        cp -r PLUGIN/* "$EXTENSION_DIR"/
+
+    - name: Render test scene
+      run: |
+        mkdir -p TEST
+        cd TEST
+        "$BLENDER" \
+          --background \
+          --factory-startup \
+          --addons bl_ext.user_default.hydra_gatling \
+          --python-exit-code 1 \
+          --python ../.github/tests/blender53/script.py \
+          2>&1 | tee blender.log
+
+    - name: Compare images
+      run: |
+        idiff -fail 0.05 -failpercent 1 -v \
+          -o TEST/diff.png -abs -scale 4 \
+          .github/tests/blender53/ref.png TEST/test.png
+
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v7
+      with:
+        name: test-artifacts-${{ env.archive-name }}
+        path: TEST/
+        retention-days: 7
+        if-no-files-found: ignore
