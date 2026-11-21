@@ -56,7 +56,7 @@ namespace
 
     if (node->getConnectedNode(inputName) != nullptr)
     {
-      return McOpacityClassification::NonBinary; // custom logic hooked up
+      return McOpacityClassification::Transparent; // custom logic hooked up
     }
 
     mx::ValuePtr inputValue = node->getInputValue(inputName);
@@ -64,18 +64,18 @@ namespace
 
     if (inputValue && inputValue->isA<float>() && defaultValue->isA<float>())
     {
-      return (fabs(inputValue->asA<float>() - defaultValue->asA<float>()) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
+      return (fabs(inputValue->asA<float>() - defaultValue->asA<float>()) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::Transparent;
     }
 
     if (inputValue && inputValue->isA<mx::Color3>() && defaultValue->isA<mx::Color3>())
     {
       mx::Color3 diff = inputValue->asA<mx::Color3>() - defaultValue->asA<mx::Color3>();
-      return (fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
+      return (fabs(diff[0]) < floatEps && fabs(diff[1]) < floatEps && fabs(diff[2]) < floatEps) ? McOpacityClassification::Opaque : McOpacityClassification::Transparent;
     }
 
     if (inputValue && inputValue->isA<int>() && defaultValue->isA<int>())
     {
-      return (inputValue->asA<int>() == defaultValue->asA<int>()) ? McOpacityClassification::Opaque : McOpacityClassification::NonBinary;
+      return (inputValue->asA<int>() == defaultValue->asA<int>()) ? McOpacityClassification::Opaque : McOpacityClassification::Transparent;
     }
 
     return std::nullopt;
@@ -88,7 +88,7 @@ namespace
     mx::ValuePtr defaultValue;
   };
 
-  const static std::vector<OpacityInputDescription> NONBINARY_OPACITY_INPUT_DESCRIPTIONS = {
+  const static std::vector<OpacityInputDescription> TRANSPARENCY_INPUT_DESCRIPTIONS = {
     { "UsdPreviewSurface", "opacity", mx::Value::createValue(1.0f) },
     { "standard_surface", "opacity", mx::Value::createValue(mx::Color3(1.0f)) },
     { "gltf_pbr", "alpha_mode", mx::Value::createValue(0 /* Opaque */) },
@@ -120,7 +120,7 @@ namespace
     }
 
     // Otherwise decide between opaque and non-binary opacity
-    for (const auto& inputDesc : NONBINARY_OPACITY_INPUT_DESCRIPTIONS)
+    for (const auto& inputDesc : TRANSPARENCY_INPUT_DESCRIPTIONS)
     {
       std::optional<McOpacityClassification> opacity = _EstimateNodeOpacityFromInput(node, inputDesc.nodeCategory, inputDesc.inputName, inputDesc.defaultValue);
 
@@ -131,7 +131,7 @@ namespace
     }
 
     // Use MaterialX helper function as fallback and assume worst case (not accurate, has false positives)
-    return mx::isTransparentSurface(element) ? McOpacityClassification::NonBinary : McOpacityClassification::Opaque;
+    return mx::isTransparentSurface(element) ? McOpacityClassification::Transparent : McOpacityClassification::Opaque;
   }
 
   bool _HasDocumentTimeNode(mx::DocumentPtr doc)

@@ -1616,7 +1616,7 @@ cleanup:
 
         // Closest hit
         {
-          bool evaluateOpacity = (mcMat->opacityClass == McOpacityClassification::NonBinary);
+          bool evaluateOpacity = (mcMat->opacityClass == McOpacityClassification::Transparent);
 
           GiGlslShaderGen::ClosestHitShaderParams hitParams = {
             .baseFileName = "rp_main.chit",

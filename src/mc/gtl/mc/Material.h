@@ -29,7 +29,7 @@ namespace gtl
   {
     Opaque,
     Cutout,
-    NonBinary
+    Transparent
   };
 
   struct McMaterial

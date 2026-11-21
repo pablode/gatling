@@ -115,7 +115,7 @@ namespace
     }
 
     // case TRANSPARENT and UNKNOWN (need to assume worst case)
-    return McOpacityClassification::NonBinary;
+    return McOpacityClassification::Transparent;
   }
 
   bool _HasCompiledMaterialBackfaceBsdf(mi::base::Handle<mi::neuraylib::ICompiled_material> compiledMaterial)
