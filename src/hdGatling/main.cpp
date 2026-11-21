@@ -637,20 +637,21 @@ TEST_SUITE("Graphical")
   {
   }
 
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.CutoutOpacity")
+  {
+  }
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MdlSimpleTextured")
   {
   }
-
-  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxColorSpaces")
   {
   }
-#if PXR_VERSION >= 2603
+#if PXR_VERSION >= 2603 // Frame node requires HdsiSceneGlobalsSceneIndex added in USD v26.03
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxFrame")
   {
   }
 #endif
-
-  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "MaterialX.ColorSpaces")
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
   {
   }
 
@@ -667,10 +668,6 @@ TEST_SUITE("Graphical")
   }
 
   TEST_CASE_FIXTURE(SimpleUsdzGraphicalTestFixture, "Usdz.AssetResolution")
-  {
-  }
-
-  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.CutoutOpacity")
   {
   }
 }
