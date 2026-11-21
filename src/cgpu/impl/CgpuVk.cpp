@@ -1241,7 +1241,7 @@ namespace gtl
     idevice->table.vkDestroyDevice(idevice->logicalDevice, nullptr);
   }
 
-  CgpuContext* cgpuCreateContext(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
+  CgpuContext* cgpuCreateContext(const char* appName)
   {
     // refcount Volk initialization
     {
@@ -1319,9 +1319,9 @@ namespace gtl
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pNext = nullptr,
       .pApplicationName = appName,
-      .applicationVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
+      .applicationVersion = VK_MAKE_API_VERSION(versionVariant, CGPU_VERSION_MAJOR, CGPU_VERSION_MINOR, CGPU_VERSION_PATCH),
       .pEngineName = appName,
-      .engineVersion = VK_MAKE_API_VERSION(versionVariant, versionMajor, versionMinor, versionPatch),
+      .engineVersion = VK_MAKE_API_VERSION(versionVariant, CGPU_VERSION_MAJOR, CGPU_VERSION_MINOR, CGPU_VERSION_PATCH),
       .apiVersion = CGPU_MIN_VK_API_VERSION,
     };
 

@@ -37,6 +37,14 @@ else()
   )
 endif()
 
+target_compile_definitions(
+  cgpu
+  PRIVATE
+    CGPU_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    CGPU_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    CGPU_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+)
+
 target_link_libraries(
   cgpu
   PRIVATE

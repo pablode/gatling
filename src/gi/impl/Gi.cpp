@@ -403,7 +403,7 @@ namespace gtl
 
     _PrintInitInfo(params);
 
-    s_ctx = cgpuCreateContext("gatling", GI_VERSION_MAJOR, GI_VERSION_MINOR, GI_VERSION_PATCH);
+    s_ctx = cgpuCreateContext("gatling");
     if (!s_ctx)
       goto fail;
 

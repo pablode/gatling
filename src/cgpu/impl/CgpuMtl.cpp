@@ -576,7 +576,7 @@ namespace gtl
     return spvc;
   }
 
-  CgpuContext* cgpuCreateContext(const char* appName, uint32_t versionMajor, uint32_t versionMinor, uint32_t versionPatch)
+  CgpuContext* cgpuCreateContext(const char* appName)
   {
     CgpuIDevice idevice;
     if (!cgpuCreateIDevice(&idevice))
