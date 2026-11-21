@@ -88,7 +88,6 @@ fail:
     cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
     cgpuDestroySemaphore(m_ctx, m_semaphore);
     cgpuDestroyBuffer(m_ctx, m_stagingBuffer);
-    cgpuEndCommandBuffer(m_ctx, m_commandBuffers[m_writeableHalf]);
     cgpuDestroyCommandPool(m_ctx, m_commandPools[0]);
     cgpuDestroyCommandPool(m_ctx, m_commandPools[1]);
   }

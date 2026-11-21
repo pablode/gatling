@@ -2802,8 +2802,8 @@ namespace gtl
 
     bool areAllBlasOpaque = true;
     {
-      uint8_t* mapped_mem;
-      if (vmaMapMemory(idevice->allocator, instances.allocation, (void**) &mapped_mem) != VK_SUCCESS)
+      uint8_t* mappedMem;
+      if (vmaMapMemory(idevice->allocator, instances.allocation, (void**) &mappedMem) != VK_SUCCESS)
       {
         GB_FATAL("failed to map buffer memory");
       }
@@ -2826,7 +2826,7 @@ namespace gtl
           flags |= VK_GEOMETRY_INSTANCE_TRIANGLE_FLIP_FACING_BIT_KHR;
         }
 
-        VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mapped_mem[i * sizeof(VkAccelerationStructureInstanceKHR)];
+        VkAccelerationStructureInstanceKHR* asInstance = (VkAccelerationStructureInstanceKHR*) &mappedMem[i * sizeof(VkAccelerationStructureInstanceKHR)];
         memcpy(&asInstance->transform, &instanceDesc.transform, sizeof(VkTransformMatrixKHR));
         asInstance->instanceCustomIndex = instanceCustomIndex;
         asInstance->mask = 0xFF;
@@ -3130,7 +3130,7 @@ namespace gtl
       &icommandPool->commandPool
     ), "failed to create command pool");
 
-    icommandPool->commandBuffers = (CgpuICommandBuffer*) malloc(sizeof(CgpuICommandBuffer) * CGPU_COMMAND_POOL_SIZE);
+    icommandPool->commandBuffers = new CgpuICommandBuffer[CGPU_COMMAND_POOL_SIZE];
 
     VkCommandBufferAllocateInfo bufferAllocateInfo = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -3174,8 +3174,7 @@ namespace gtl
       CGPU_COMMAND_POOL_SIZE,
       bufferHandles
     );
-
-    free(icommandPool->commandBuffers);
+    delete[] icommandPool->commandBuffers;
 
     idevice->table.vkDestroyCommandPool(idevice->logicalDevice, icommandPool->commandPool, nullptr);
 

@@ -57,7 +57,11 @@ namespace gtl
     uint32_t index = uint32_t(handle);
     uint32_t version = uint32_t(handle >> 32ul);
 
-    return version > 0 && index <= m_maxIndex && m_versions[index] == version;
+    if (version > 0 && index <= m_maxIndex && m_versions[index] == version) [[likely]]
+    {
+      return true;
+    }
+    return false;
   }
 
   void GbHandleStore::freeHandle(uint64_t handle)
