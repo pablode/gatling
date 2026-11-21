@@ -492,6 +492,7 @@ namespace
           node->setInputValue("transmission", 1.0f);
           return node;
         }, McOpacityClassification::Transparent },
+#if MATERIALX_VERSION >= 13930 // MaterialX fallback behaviour changed
       { "custom", "connected opacity", [](mx::DocumentPtr doc) {
           auto constant = doc->addNode("constant", "C", "float");
           constant->setInputValue("value", 0.5f);
@@ -499,6 +500,7 @@ namespace
           node->setConnectedNode("opacity", constant);
           return node;
         }, McOpacityClassification::Transparent },
+#endif
       { "custom", "opaque mix", [](mx::DocumentPtr doc) {
           auto fg = doc->addNode("surface", "Fg", mx::SURFACE_SHADER_TYPE_STRING);
           auto bg = doc->addNode("surface", "Bg", mx::SURFACE_SHADER_TYPE_STRING);
