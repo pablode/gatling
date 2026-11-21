@@ -262,3 +262,231 @@ fail:
     return true;
   }
 }
+
+#ifdef GGPU_TEST_EXECUTABLE
+#include <doctest/doctest.h>
+#include <memory>
+#include <vector>
+
+namespace
+{
+  using namespace gtl;
+
+  const uint32_t DEFAULT_BUFFER_SIZE = 1024 * 1024;
+  const uint32_t SMALL_BUFFER_SIZE = 128;
+  const uint8_t INITIAL_READBACK_VALUE = 0xCC;
+
+  struct StagerTestFixture
+  {
+    CgpuContext* ctx;
+    std::unique_ptr<GgpuStager> stager;
+    uint8_t* readbackData;
+    CgpuBuffer readbackBuffer;
+
+    void initialize(uint32_t stagerBufferSize = DEFAULT_BUFFER_SIZE, bool hasSharedMem = false)
+    {
+      ctx = cgpuCreateContext("ggpu_test");
+      REQUIRE(ctx);
+
+      stager = std::make_unique<GgpuStager>(ctx, hasSharedMem, stagerBufferSize);
+      REQUIRE(stager->allocate());
+
+      CgpuBufferCreateInfo readbackCreateInfo = {
+        .usage = CgpuBufferUsage::TransferDst,
+        .memoryProperties = CgpuMemoryProperties::HostVisible,
+        .size = DEFAULT_BUFFER_SIZE,
+        .debugName = "Stager test readback"
+      };
+      REQUIRE(cgpuCreateBuffer(ctx, readbackCreateInfo, &readbackBuffer));
+
+      readbackData = (uint8_t*) cgpuGetBufferCpuPtr(ctx, readbackBuffer);
+      REQUIRE(readbackData);
+    }
+
+    ~StagerTestFixture()
+    {
+      stager->flush();
+      stager->free();
+      cgpuDestroyBuffer(ctx, readbackBuffer);
+      cgpuDestroyContext(ctx);
+    }
+
+    void submitAndWait(CgpuCommandPool commandPool, CgpuCommandBuffer commandBuffer)
+    {
+      CgpuSemaphore semaphore;
+      REQUIRE(cgpuCreateSemaphore(ctx, &semaphore));
+
+      CgpuSignalSemaphoreInfo signalInfo = {
+        .semaphore = semaphore,
+        .value = 1
+      };
+      cgpuSubmitCommandBuffer(ctx, commandBuffer, 1, &signalInfo);
+
+      CgpuWaitSemaphoreInfo waitInfo = {
+        .semaphore = semaphore,
+        .value = 1
+      };
+      REQUIRE(cgpuWaitSemaphores(ctx, 1, &waitInfo));
+
+      cgpuDestroySemaphore(ctx, semaphore);
+      cgpuDestroyCommandPool(ctx, commandPool);
+    }
+
+    void fullFlush()
+    {
+      REQUIRE(stager->flush());
+
+      CgpuCommandPool commandPool = cgpuCreateCommandPool(ctx);
+      CgpuCommandBuffer commandBuffer = cgpuBeginCommandBuffer(ctx, commandPool);
+      cgpuEndCommandBuffer(ctx, commandBuffer);
+
+      submitAndWait(commandPool, commandBuffer);
+    }
+
+    void copyImageToBuffer(CgpuImage image, uint32_t width, uint32_t height)
+    {
+      CgpuCommandPool commandPool = cgpuCreateCommandPool(ctx);
+      CgpuCommandBuffer commandBuffer = cgpuBeginCommandBuffer(ctx, commandPool);
+
+      CgpuBufferImageCopyDesc desc = {
+        .texelExtentX = width,
+        .texelExtentY = height,
+        .texelExtentZ = 1
+      };
+      cgpuCmdCopyImageToBuffer(ctx, commandBuffer, image, readbackBuffer, &desc);
+
+      cgpuEndCommandBuffer(ctx, commandBuffer);
+
+      submitAndWait(commandPool, commandBuffer);
+    }
+  };
+
+  struct SimpleStagerTestFixture : StagerTestFixture
+  {
+    SimpleStagerTestFixture() { initialize(); }
+  };
+
+  void _StageToBufferAlignsCopies(StagerTestFixture& fixture)
+  {
+    const uint64_t bufferSize = 32;
+    const uint64_t copyOffset = 16;
+
+    memset(fixture.readbackData, INITIAL_READBACK_VALUE, bufferSize);
+
+    const uint8_t first[] = { 1, 2, 3, 4, 5 };
+    const uint8_t second[] = { 6, 7, 8, 9 };
+
+    CHECK(fixture.stager->stageToBuffer(first, sizeof(first), fixture.readbackBuffer, 0));
+    CHECK(fixture.stager->stageToBuffer(second, sizeof(second), fixture.readbackBuffer, copyOffset));
+    fixture.fullFlush();
+
+    CHECK(memcmp(fixture.readbackData, first, sizeof(first)) == 0);
+    CHECK(memcmp(fixture.readbackData + copyOffset, second, sizeof(second)) == 0);
+  }
+
+  void _StageToBufferSpansHalves(StagerTestFixture& fixture)
+  {
+    const uint64_t dataSize = (DEFAULT_BUFFER_SIZE / 2) + 16;
+
+    std::vector<uint8_t> data(dataSize);
+    for (size_t i = 0; i < data.size(); i++)
+    {
+      data[i] = uint8_t(i);
+    }
+
+    CHECK(fixture.stager->stageToBuffer(data.data(), data.size(), fixture.readbackBuffer));
+    fixture.fullFlush();
+
+    CHECK(memcmp(fixture.readbackData, data.data(), data.size()) == 0);
+  }
+
+  void _StageToBufferMovesMisalignedCopyToNextHalf(StagerTestFixture& fixture)
+  {
+    const uint64_t fillSize = (DEFAULT_BUFFER_SIZE / 2) - 2;
+
+    std::vector<uint8_t> fill(fillSize, 170);
+    CHECK(fixture.stager->stageToBuffer(fill.data(), fill.size(), fixture.readbackBuffer));
+
+    const uint8_t data[] = { 1, 2, 3, 4 };
+    CHECK(fixture.stager->stageToBuffer(data, sizeof(data), fixture.readbackBuffer));
+    fixture.fullFlush();
+
+    CHECK(memcmp(fixture.readbackData, data, sizeof(data)) == 0);
+  }
+
+  void _StageToImage(StagerTestFixture& fixture, uint32_t width, uint32_t height)
+  {
+    const uint32_t bpp = 4;
+
+    CgpuImage image = {};
+    CgpuImageCreateInfo imageInfo = {
+      .width = width,
+      .height = height,
+      .format = CgpuImageFormat::R8G8B8A8Unorm,
+      .usage = CgpuImageUsage::TransferSrc | CgpuImageUsage::TransferDst
+    };
+    REQUIRE(cgpuCreateImage(fixture.ctx, imageInfo, &image));
+
+    std::vector<uint8_t> pixels(width * height * bpp);
+    for (size_t i = 0; i < pixels.size(); i++)
+    {
+      pixels[i] = uint8_t(i);
+    }
+
+    CHECK(fixture.stager->stageToImage(pixels.data(), pixels.size(), image, width, height, 1, bpp));
+    fixture.fullFlush();
+    fixture.copyImageToBuffer(image, width, height);
+
+    CHECK(memcmp(fixture.readbackData, pixels.data(), pixels.size()) == 0);
+
+    cgpuDestroyImage(fixture.ctx, image);
+  }
+}
+
+TEST_CASE_FIXTURE(SimpleStagerTestFixture, "Stager.StageToBufferAlignsCopies")
+{
+  _StageToBufferAlignsCopies(*this);
+}
+
+TEST_CASE_FIXTURE(StagerTestFixture, "Stager.StageToBufferAlignsCopiesSharedMem")
+{
+  bool hasSharedMem = true;
+  initialize(DEFAULT_BUFFER_SIZE, hasSharedMem);
+
+  _StageToBufferAlignsCopies(*this);
+}
+
+TEST_CASE_FIXTURE(SimpleStagerTestFixture, "Stager.StageToBufferSpansHalves")
+{
+  _StageToBufferSpansHalves(*this);
+}
+
+TEST_CASE_FIXTURE(StagerTestFixture, "Stager.StageToBufferSpansHalvesSharedMem")
+{
+  bool hasSharedMem = true;
+  initialize(DEFAULT_BUFFER_SIZE, hasSharedMem);
+
+  _StageToBufferSpansHalves(*this);
+}
+
+TEST_CASE_FIXTURE(SimpleStagerTestFixture, "Stager.StageToBufferMovesMisalignedCopyToNextHalf")
+{
+  _StageToBufferMovesMisalignedCopyToNextHalf(*this);
+}
+
+TEST_CASE_FIXTURE(SimpleStagerTestFixture, "Stager.StageToImage")
+{
+  uint32_t width = 2;
+  uint32_t height = 4;
+  _StageToImage(*this, width, height);
+}
+
+TEST_CASE_FIXTURE(StagerTestFixture, "Stager.StageToImageChunks")
+{
+  initialize(SMALL_BUFFER_SIZE);
+
+  uint32_t width = 13; // primes on purpose
+  uint32_t height = 9;
+  _StageToImage(*this, width, height);
+}
+#endif
