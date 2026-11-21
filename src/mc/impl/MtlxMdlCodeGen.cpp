@@ -36,6 +36,8 @@
 
 #ifdef MC_TEST_EXECUTABLE
 #include <doctest/doctest.h>
+#include <functional>
+#include <string_view>
 #endif
 
 namespace mx = MaterialX;
@@ -332,6 +334,202 @@ namespace gtl
 #ifdef MC_TEST_EXECUTABLE
 namespace
 {
+  TEST_CASE("MtlxMdlCodeGen.ClassifySurfaceShaderOpacity")
+  {
+    struct ClassificationCase
+    {
+      std::string_view baseName;
+      std::string_view testName;
+      std::function<mx::NodePtr(mx::DocumentPtr)> createShader;
+      McOpacityClassification expected;
+    };
+
+    const static ClassificationCase testCases[] = {
+      // UsdPreviewSurface
+      { "UsdPreviewSurface", "default", [](mx::DocumentPtr doc) {
+          return doc->addNode("UsdPreviewSurface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+        }, McOpacityClassification::Opaque },
+      { "UsdPreviewSurface", "opaque", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("UsdPreviewSurface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", 1.0f);
+          return node;
+        }, McOpacityClassification::Opaque },
+      { "UsdPreviewSurface", "blend", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("UsdPreviewSurface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", 0.5f);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "UsdPreviewSurface", "connected opacity", [](mx::DocumentPtr doc) {
+          auto constant = doc->addNode("constant", "C", "float");
+          constant->setInputValue("value", 0.5f);
+          auto node = doc->addNode("UsdPreviewSurface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setConnectedNode("opacity", constant);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "UsdPreviewSurface", "cutout", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("UsdPreviewSurface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", 0.5f);
+          node->setInputValue("opacityThreshold", 0.5f);
+          return node;
+        }, McOpacityClassification::Cutout },
+      { "UsdPreviewSurface", "presence", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("UsdPreviewSurface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", 0.5f);
+          node->setInputValue("opacityMode", 1);
+          return node;
+        }, McOpacityClassification::Cutout },
+      { "UsdPreviewSurface", "presence opaque", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("UsdPreviewSurface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacityMode", 1);
+          return node;
+        }, McOpacityClassification::Opaque },
+
+      // standard_surface
+      { "standard_surface", "opaque", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("standard_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", mx::Color3(1.0f));
+          return node;
+        }, McOpacityClassification::Opaque },
+      { "standard_surface", "blend", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("standard_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", mx::Color3(0.5f));
+          return node;
+        }, McOpacityClassification::Cutout },
+      { "standard_surface", "connected opacity", [](mx::DocumentPtr doc) {
+          auto constant = doc->addNode("constant", "C", "color3");
+          constant->setInputValue("value", mx::Color3(1.0f));
+          auto node = doc->addNode("standard_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setConnectedNode("opacity", constant);
+          return node;
+        }, McOpacityClassification::Cutout },
+      { "standard_surface", "transmission", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("standard_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("transmission", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "standard_surface", "subsurface", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("standard_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("subsurface", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "standard_surface", "opaque opacity with transmission", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("standard_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", mx::Color3(1.0f));
+          node->setInputValue("transmission", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+
+      // gltf_pbr
+      { "gltf_pbr", "opaque", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("gltf_pbr", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("alpha_mode", 0);
+          return node;
+        }, McOpacityClassification::Opaque },
+      { "gltf_pbr", "mask", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("gltf_pbr", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("alpha_mode", 1);
+          return node;
+        }, McOpacityClassification::Cutout },
+      { "gltf_pbr", "blend", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("gltf_pbr", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("alpha_mode", 2);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "gltf_pbr", "transmission", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("gltf_pbr", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("transmission", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+
+      // open_pbr_surface
+      { "open_pbr_surface", "opaque", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("open_pbr_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("geometry_opacity", 1.0f);
+          return node;
+        }, McOpacityClassification::Opaque },
+      { "open_pbr_surface", "blend", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("open_pbr_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("geometry_opacity", 0.5f);
+          return node;
+        }, McOpacityClassification::Cutout },
+      { "open_pbr_surface", "connected opacity", [](mx::DocumentPtr doc) {
+          auto constant = doc->addNode("constant", "C", "float");
+          constant->setInputValue("value", 0.5f);
+          auto node = doc->addNode("open_pbr_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setConnectedNode("geometry_opacity", constant);
+          return node;
+        }, McOpacityClassification::Cutout },
+      { "open_pbr_surface", "transmission", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("open_pbr_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("transmission_weight", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "open_pbr_surface", "subsurface", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("open_pbr_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("subsurface_weight", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "open_pbr_surface", "opaque opacity with transmission", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("open_pbr_surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("geometry_opacity", 1.0f);
+          node->setInputValue("transmission_weight", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+
+      // Custom graphs
+      { "custom", "simple opaque surface", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", 1.0f);
+          return node;
+        }, McOpacityClassification::Opaque },
+      { "custom", "simple transparent surface", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("opacity", 0.5f);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "custom", "simple transmissive surface", [](mx::DocumentPtr doc) {
+          auto node = doc->addNode("surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setInputValue("transmission", 1.0f);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "custom", "connected opacity", [](mx::DocumentPtr doc) {
+          auto constant = doc->addNode("constant", "C", "float");
+          constant->setInputValue("value", 0.5f);
+          auto node = doc->addNode("surface", "S", mx::SURFACE_SHADER_TYPE_STRING);
+          node->setConnectedNode("opacity", constant);
+          return node;
+        }, McOpacityClassification::Transparent },
+      { "custom", "opaque mix", [](mx::DocumentPtr doc) {
+          auto fg = doc->addNode("surface", "Fg", mx::SURFACE_SHADER_TYPE_STRING);
+          auto bg = doc->addNode("surface", "Bg", mx::SURFACE_SHADER_TYPE_STRING);
+          auto mix = doc->addNode("mix", "Mix", mx::SURFACE_SHADER_TYPE_STRING);
+          mix->setConnectedNode("fg", fg);
+          mix->setConnectedNode("bg", bg);
+          return mix;
+        }, McOpacityClassification::Opaque },
+      { "custom", "transparent mix", [](mx::DocumentPtr doc) {
+          auto fg = doc->addNode("surface", "Fg", mx::SURFACE_SHADER_TYPE_STRING);
+          fg->setInputValue("opacity", 0.5f);
+          auto bg = doc->addNode("surface", "Bg", mx::SURFACE_SHADER_TYPE_STRING);
+          auto mix = doc->addNode("mix", "Mix", mx::SURFACE_SHADER_TYPE_STRING);
+          mix->setConnectedNode("fg", fg);
+          mix->setConnectedNode("bg", bg);
+          return mix;
+        }, McOpacityClassification::Transparent },
+    };
+
+    for (const ClassificationCase& testCase : testCases)
+    {
+      mx::DocumentPtr doc = mx::createDocument();
+      mx::NodePtr shader = testCase.createShader(doc);
+      REQUIRE(shader);
+
+      McOpacityClassification actual = _ClassifySurfaceShaderOpacity(shader);
+      CHECK_MESSAGE(actual == testCase.expected, "opacity classification mismatch: ",
+        testCase.baseName, " / ", testCase.testName);
+    }
+  }
+
   TEST_CASE("MtlxMdlCodeGen.HasDocumentTimeNode")
   {
     {
