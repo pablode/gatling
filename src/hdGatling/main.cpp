@@ -651,6 +651,11 @@ TEST_SUITE("Graphical")
   {
   }
 #endif
+#if MATERIALX_VERSION >= 13900 // Surface thin_walled was added in MaterialX 1.39
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxThinWalled")
+  {
+  }
+#endif
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxViewDirection")
   {
   }
