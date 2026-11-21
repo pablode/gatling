@@ -21,18 +21,16 @@
 #include <string.h>
 #include <algorithm>
 
-const static uint64_t BUFFER_SIZE = 64 * 1024 * 1024;
-const static uint64_t BUFFER_HALF_SIZE = BUFFER_SIZE / 2;
 const static uint64_t BUFFER_STAGING_OPT_THRESHOLD = 256 * 1024;
 
 namespace gtl
 {
-  GgpuStager::GgpuStager(CgpuContext* ctx)
+  GgpuStager::GgpuStager(CgpuContext* ctx, bool hasSharedMem, uint32_t bufferSize)
     : m_ctx(ctx)
+    , m_hasSharedMem(hasSharedMem)
+    , m_bufferSize(bufferSize)
   {
-    const CgpuDeviceFeatures& features = cgpuGetDeviceFeatures(ctx);
-
-    m_hasSharedMem = features.sharedMemory;
+    assert(bufferSize > 0);
   }
 
   GgpuStager::~GgpuStager()
@@ -46,7 +44,7 @@ namespace gtl
     CgpuBufferCreateInfo createInfo = {
       .usage = CgpuBufferUsage::TransferSrc,
       .memoryProperties = CgpuMemoryProperties::DeviceLocal | CgpuMemoryProperties::HostVisible,
-      .size = BUFFER_SIZE,
+      .size = m_bufferSize,
       .debugName = "Staging"
     };
 
@@ -154,13 +152,14 @@ fail:
   {
     assert(size > 0 && width > 0 && height > 0 && bpp > 0);
 
+    uint64_t halfSize = m_bufferSize / 2;
     uint32_t rowCount = height;
     uint64_t rowSize = size / rowCount;
 
     rowSize = rowSize / bpp * bpp; // truncate for Vulkan alignment requirements
     rowCount = size / rowSize;
 
-    if (rowSize > BUFFER_HALF_SIZE)
+    if (rowSize > halfSize)
     {
       return false;
     }
@@ -172,7 +171,7 @@ fail:
       // Account for the alignment padding applied by 'stage', otherwise a row group
       // that barely fits would be split across staging buffer flushes.
       uint64_t padding = (bpp - (m_stagedBytes % bpp)) % bpp;
-      uint64_t remainingSpace = BUFFER_HALF_SIZE - m_stagedBytes - padding;
+      uint64_t remainingSpace = halfSize - m_stagedBytes - padding;
       uint32_t maxCopyRowCount = uint32_t(remainingSpace / rowSize); // truncate
 
       if (maxCopyRowCount == 0)
@@ -182,7 +181,7 @@ fail:
           return false;
         }
 
-        maxCopyRowCount = uint32_t(BUFFER_HALF_SIZE / rowSize); // truncate
+        maxCopyRowCount = uint32_t(halfSize / rowSize); // truncate
       }
 
       uint32_t remainingRowCount = rowCount - rowsStaged;
@@ -222,17 +221,18 @@ fail:
 
   bool GgpuStager::stage(const uint8_t* src, uint64_t size, CopyFunc copyFunc, uint32_t offsetAlign)
   {
+    uint64_t halfSize = m_bufferSize / 2;
     uint64_t bytesToStage = size;
 
     while (bytesToStage > 0)
     {
       uint64_t bytesAlreadyCopied = size - bytesToStage;
 
-      uint64_t halfBase = m_writeableHalf * BUFFER_HALF_SIZE;
+      uint64_t halfBase = m_writeableHalf * halfSize;
       uint64_t dstOffset = (halfBase + m_stagedBytes + offsetAlign - 1) / offsetAlign * offsetAlign;
       uint64_t padding = dstOffset - halfBase - m_stagedBytes;
 
-      if ((m_stagedBytes + padding) >= BUFFER_HALF_SIZE)
+      if ((m_stagedBytes + padding) >= halfSize)
       {
         if (!flush())
         {
@@ -243,7 +243,7 @@ fail:
 
       m_stagedBytes += padding;
 
-      uint64_t memcpyByteCount = std::min(bytesToStage, BUFFER_HALF_SIZE - m_stagedBytes);
+      uint64_t memcpyByteCount = std::min(bytesToStage, halfSize - m_stagedBytes);
 
       memcpy(&m_mappedMem[dstOffset], &src[bytesAlreadyCopied], memcpyByteCount);
 
@@ -253,7 +253,7 @@ fail:
       m_stagedBytes += memcpyByteCount;
       bytesToStage -= memcpyByteCount;
 
-      if (m_stagedBytes == BUFFER_HALF_SIZE && !flush())
+      if (m_stagedBytes == halfSize && !flush())
       {
         return false;
       }

@@ -30,7 +30,7 @@ namespace gtl
   public:
     GB_DECLARE_NONCOPY(GgpuStager);
 
-    GgpuStager(CgpuContext* ctx);
+    GgpuStager(CgpuContext* ctx, bool hasSharedMem, uint32_t bufferSize);
 
     ~GgpuStager();
 
@@ -52,7 +52,8 @@ namespace gtl
   private:
     CgpuContext* m_ctx;
 
-    bool m_hasSharedMem;
+    const bool m_hasSharedMem;
+    const uint32_t m_bufferSize;
 
     uint32_t m_writeableHalf = 0;
     CgpuBuffer m_stagingBuffer;

@@ -72,6 +72,7 @@ namespace mx = MaterialX;
 namespace gtl
 {
   constexpr static const float BYTES_TO_MIB = 1.0f / (1024.0f * 1024.0f);
+  constexpr static uint32_t STAGER_BUFFER_SIZE = 64 * 1024 * 1024;
 
   namespace rp = shader_interface::rp_main;
 
@@ -425,7 +426,7 @@ namespace gtl
       goto fail;
     }
 
-    s_stager = std::make_unique<GgpuStager>(s_ctx);
+    s_stager = std::make_unique<GgpuStager>(s_ctx, s_ctxFeatures.sharedMemory, STAGER_BUFFER_SIZE);
     if (!s_stager->allocate())
     {
       goto fail;
