@@ -529,6 +529,14 @@ namespace gtl
     const CgpuBufferImageCopyDesc* desc
   );
 
+  void cgpuCmdCopyImageToBuffer(
+    CgpuContext* ctx,
+    CgpuCommandBuffer commandBuffer,
+    CgpuImage image,
+    CgpuBuffer buffer,
+    const CgpuBufferImageCopyDesc* desc
+  );
+
   void cgpuCmdDispatch(
     CgpuContext* ctx,
     CgpuCommandBuffer commandBuffer,

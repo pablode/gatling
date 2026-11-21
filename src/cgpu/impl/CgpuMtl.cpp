@@ -2071,6 +2071,46 @@ namespace gtl
     encoder->endEncoding();
   }
 
+  void cgpuCmdCopyImageToBuffer(CgpuContext* ctx,
+                                CgpuCommandBuffer commandBuffer,
+                                CgpuImage image,
+                                CgpuBuffer buffer,
+                                const CgpuBufferImageCopyDesc* desc)
+  {
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_IMAGE(ctx, image, iimage);
+    CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
+
+    uint32_t bytesPerPixel = cgpuGetImageFormatBpp(iimage->format);
+
+    MTL::Size srcSize(desc->texelExtentX, desc->texelExtentY, desc->texelExtentZ);
+    uint32_t srcSlice = 0;
+    uint32_t srcMipmapLevel = 0;
+    MTL::Origin srcOrigin(desc->texelOffsetX, desc->texelOffsetY, desc->texelOffsetZ);
+
+    uint32_t dstBytesPerRow = iimage->width * bytesPerPixel;
+    uint32_t dstBytesPerImage = (iimage->depth == 1) ? 0 : (iimage->height * dstBytesPerRow);
+
+    MTL4::ComputeCommandEncoder* encoder = icommandBuffer->commandBuffer->computeCommandEncoder();
+
+    encoder->copyFromTexture(
+      iimage->texture,
+      srcSlice,
+      srcMipmapLevel,
+      srcOrigin,
+      srcSize,
+      ibuffer->buffer,
+      desc->bufferOffset,
+      dstBytesPerRow,
+      dstBytesPerImage
+    );
+
+    icommandBuffer->auxResidencySet->addAllocation(ibuffer->buffer);
+    icommandBuffer->auxResidencySet->addAllocation(iimage->texture);
+
+    encoder->endEncoding();
+  }
+
   void cgpuCmdDispatch(CgpuContext* ctx,
                        CgpuCommandBuffer commandBuffer,
                        uint32_t wgCountX,

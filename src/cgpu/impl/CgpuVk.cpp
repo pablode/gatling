@@ -3526,6 +3526,57 @@ namespace gtl
     );
   }
 
+  void cgpuCmdCopyImageToBuffer(CgpuContext* ctx,
+                                CgpuCommandBuffer commandBuffer,
+                                CgpuImage image,
+                                CgpuBuffer buffer,
+                                const CgpuBufferImageCopyDesc* desc)
+  {
+    CGPU_RESOLVE_COMMAND_BUFFER(ctx, commandBuffer, icommandBuffer);
+    CGPU_RESOLVE_IMAGE(ctx, image, iimage);
+    CGPU_RESOLVE_BUFFER(ctx, buffer, ibuffer);
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    assert(iimage->layout == VK_IMAGE_LAYOUT_GENERAL);
+
+    VkImageSubresourceLayers layers = {
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .mipLevel = 0,
+      .baseArrayLayer = 0,
+      .layerCount = 1,
+    };
+
+    VkOffset3D offset = {
+      .x = desc->texelOffsetX,
+      .y = desc->texelOffsetY,
+      .z = desc->texelOffsetZ,
+    };
+
+    VkExtent3D extent = {
+      .width = desc->texelExtentX,
+      .height = desc->texelExtentY,
+      .depth = desc->texelExtentZ,
+    };
+
+    VkBufferImageCopy region = {
+      .bufferOffset = desc->bufferOffset,
+      .bufferRowLength = 0,
+      .bufferImageHeight = 0,
+      .imageSubresource = layers,
+      .imageOffset = offset,
+      .imageExtent = extent,
+    };
+
+    idevice->table.vkCmdCopyImageToBuffer(
+      icommandBuffer->commandBuffer,
+      iimage->image,
+      iimage->layout,
+      ibuffer->buffer,
+      1,
+      &region
+    );
+  }
+
   void cgpuCmdDispatch(CgpuContext* ctx,
                        CgpuCommandBuffer commandBuffer,
                        uint32_t wgCountX,
