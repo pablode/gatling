@@ -75,7 +75,6 @@ void setup_mdl_shading_state(in vec2 hit_bc, out State state, out bool isFrontFa
     {
       rendererState.sceneDataInfos[i] = preamble.sceneDataInfos[i];
     }
-    rendererState.sceneDataBufferAddress = payload.bufferAddress;
 #endif
 
     // State
