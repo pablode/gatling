@@ -66,7 +66,7 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev libsm-dev libice-dev libx11-dev libxext-dev
+        sudo apt-get install -y libgl1-mesa-dev libsm-dev libice-dev libx11-dev libxt-dev libxext-dev
 
     - name: Install Mesa & Vulkan packages
       if: ${{ runner.os == 'Linux' && inputs.run-graphical-tests }}

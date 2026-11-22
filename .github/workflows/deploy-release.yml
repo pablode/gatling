@@ -19,6 +19,14 @@ on:
         type: boolean
 
 jobs:
+  build-usd2608:
+    name: Build for USD v26.08
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 26.08
+      upload-install-artifacts: true
+      run-graphical-tests: true
+
   build-usd2605:
     name: Build for USD v26.05
     uses: ./.github/workflows/build-usd.yml
@@ -89,7 +97,7 @@ jobs:
 
   deploy-release:
     name: Deploy Release
-    needs: [build-usd2605, build-usd2603, build-usd2511, build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender50, build-blender53]
+    needs: [build-usd2608, build-usd2605, build-usd2603, build-usd2511, build-usd2508, build-usd2505, build-usd2502, build-usd2411, build-houdini20, build-blender50, build-blender53]
     runs-on: ubuntu-latest
 
     steps:

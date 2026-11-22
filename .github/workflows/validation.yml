@@ -20,6 +20,14 @@ jobs:
     name: Build for Blender 5.3
     uses: ./.github/workflows/build-blender53.yml
 
+  build-2608:
+    name: Build for USD v26.08
+    uses: ./.github/workflows/build-usd.yml
+    with:
+      usd-version: 26.08
+      run-graphical-tests: true
+      upload-test-artifacts: true
+
   build-2605:
     name: Build for USD v26.05
     uses: ./.github/workflows/build-usd.yml
