@@ -664,6 +664,10 @@ TEST_SUITE("Graphical")
   {
   }
 
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Mesh.InstancerPrimvar")
+  {
+  }
+
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Render.AOVs")
   {
   }
