@@ -657,6 +657,18 @@ fail:
     return offset;
   }
 
+  uint64_t _MakeSceneDataInfo(uint64_t address, uint32_t stride, GiPrimvarInterpolation interpolation)
+  {
+    assert((address % rp::SCENE_DATA_ALIGNMENT) == 0);
+
+    uint64_t shiftedAddress = address >> rp::SCENE_DATA_ADDRESS_SHIFT;
+    assert((shiftedAddress & ~rp::SCENE_DATA_ADDRESS_MASK) == 0);
+
+    return shiftedAddress |
+           (uint64_t(stride) << rp::SCENE_DATA_STRIDE_OFFSET) |
+           (uint64_t(interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
+  }
+
   GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc)
   {
     GiMesh* mesh = new GiMesh {
@@ -1029,13 +1041,6 @@ fail:
             continue;
           }
 
-          uint32_t sceneDataOffset = bufferOffset / rp::SCENE_DATA_ALIGNMENT;
-          if ((sceneDataOffset & rp::SCENE_DATA_OFFSET_MASK) != sceneDataOffset)
-          {
-            GB_ERROR("max scene data offset exceeded");
-            continue;
-          }
-
           uint32_t index = i;//sceneDataIndices[i];
           assert(index != -1); // every scene data has a string constant
 
@@ -1071,11 +1076,10 @@ fail:
           assert(stride < 4);
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 8, "Enum exceeds 3 bits");
 
-          uint32_t info = uint32_t(sceneDataOffset) |
-                          (stride << rp::SCENE_DATA_STRIDE_OFFSET) |
-                          (uint32_t(primvar->interpolation) << rp::SCENE_DATA_INTERPOLATION_OFFSET);
-          preamble.sceneDataInfos[index] = info;
+          preamble.sceneDataInfos[index] = _MakeSceneDataInfo(bufferOffset, stride, primvar->interpolation);
         }
+
+        payloadBufferSize += rp::SCENE_DATA_ALIGNMENT - 1; // account for aligning scene data offsets to the buffer base
 
         // Upload GPU data
         CgpuBlas blas;
@@ -1083,6 +1087,8 @@ fail:
         CgpuBuffer tmpIndexBuffer;
         CgpuBuffer payloadBuffer;
         rp::BlasPayload payload;
+        uint64_t payloadBufferAddress = 0;
+        uint64_t sceneDataAddressShift = 0;
 
         uint64_t tmpIndexBufferSize = indicesSize;
         uint64_t tmpPositionBufferSize = positionData.size() * sizeof(float);
@@ -1097,6 +1103,23 @@ fail:
         {
           GB_ERROR("failed to allocate BLAS payload buffer memory");
           goto fail_cleanup;
+        }
+
+        payloadBufferAddress = cgpuGetBufferGpuAddress(s_ctx, payloadBuffer);
+        if (payloadBufferAddress == 0)
+        {
+          GB_ERROR("failed to get BLAS payload buffer address");
+          goto fail_cleanup;
+        }
+        sceneDataAddressShift = (rp::SCENE_DATA_ALIGNMENT - (payloadBufferAddress & (rp::SCENE_DATA_ALIGNMENT - 1))) &
+                                (rp::SCENE_DATA_ALIGNMENT - 1);
+
+        for (uint64_t& sceneDataInfo : preamble.sceneDataInfos)
+        {
+          if (sceneDataInfo != rp::SCENE_DATA_INVALID)
+          {
+            sceneDataInfo += (payloadBufferAddress + sceneDataAddressShift) >> rp::SCENE_DATA_ADDRESS_SHIFT;
+          }
         }
 
         if (!cgpuCreateBuffer(s_ctx, {
@@ -1149,7 +1172,8 @@ fail:
 
           const GiPrimvarData* s = primvars[i];
 
-          if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer, sceneDataBufferOffsets[i]))
+          if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer,
+                                       sceneDataAddressShift + sceneDataBufferOffsets[i]))
           {
             GB_ERROR("failed to stage BLAS primvar");
             goto fail_cleanup;
@@ -1186,13 +1210,6 @@ fail:
 
         // Append BLAS payload data
         {
-          uint64_t payloadBufferAddress = cgpuGetBufferGpuAddress(s_ctx, payloadBuffer);
-          if (payloadBufferAddress == 0)
-          {
-            GB_ERROR("failed to get index-vertex buffer address");
-            goto fail_cleanup;
-          }
-
           uint32_t bitfield = 0;
           if (mesh->doubleSided)
           {
