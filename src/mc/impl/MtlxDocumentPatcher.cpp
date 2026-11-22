@@ -141,7 +141,7 @@ void _PatchBoolValueMismatches(mx::DocumentPtr document)
     const mx::ValuePtr& value = input->getValue();
     if (!value || !value->isA<int>())
     {
-      return;
+      continue;
     }
 
     input->setValue(bool(value->asA<int>()));
