@@ -119,6 +119,12 @@ mx::string _GetPortType(mx::PortElementPtr port)
   return portInterface ? portInterface->getType() : port->getType();
 }
 
+bool _IsVectorOrColorType(const mx::string& type)
+{
+  return type == "color3" || type == "color4" ||
+         type == "vector2" || type == "vector3" || type == "vector4";
+}
+
 void _PatchBoolValueMismatches(mx::DocumentPtr document)
 {
   for (auto treeIt = document->traverseTree(); treeIt != mx::TreeIterator::end(); ++treeIt)
@@ -177,20 +183,29 @@ void _PatchImplicitTypeConversions(mx::DocumentPtr document)
       continue;
     }
 
-    std::string conversionND = GB_FMT("ND_convert_{}_{}", inputType, outputType);
-    if (!document->getNodeDef(conversionND))
+    std::string conversionND = GB_FMT("ND_convert_{}_{}", outputType, inputType);
+
+    std::string nodeCategory;
+    if (document->getNodeDef(conversionND))
+    {
+      nodeCategory = "convert";
+    }
+    else if (inputType == "float" && _IsVectorOrColorType(outputType))
+    {
+      nodeCategory = "extract";
+    }
+    else
     {
       GB_WARN("invalid connection types between {} ({}) -> {} ({})",
         input->getName(), inputType, output->getName(), outputType);
       continue;
     }
 
-    std::string nodeCategory = "convert";
     std::string nodeName = mx::EMPTY_STRING; // auto-assign
     std::string nodeType = inputType;
     mx::NodePtr node = document->addNode(nodeCategory, nodeName, nodeType);
 
-    mx::InputPtr convertInput = node->addInput("in");
+    mx::InputPtr convertInput = node->addInput("in", outputType);
     convertInput->setConnectedOutput(output);
 
     // Can't clear because we need to preserve other attributes like 'colorspace'.
