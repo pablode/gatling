@@ -40,7 +40,6 @@ namespace gtl
     bool translate(std::string_view mtlxStr, const char* name, std::string& mdlSrc, std::string& subIdentifier, McOpacityClassification& opacityClass, bool& isAnimated, bool usdPreviewSurfacePresenceOverride);
 
   private:
-    MaterialX::FileSearchPath m_mtlxSearchPath;
     MaterialX::ShaderGeneratorPtr m_shaderGen;
     MaterialX::DocumentPtr m_baseDoc;
     std::shared_ptr<McMtlxDocumentPatcher> m_docPatcher;
