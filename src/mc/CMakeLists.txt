@@ -47,8 +47,8 @@ function(configure_target TARGET)
   )
 
   if(TARGET OpenColorIO::OpenColorIO)
-    target_link_libraries(${TARGET} PRIVATE OpenColorIO::OpenColorIO)
-    target_compile_definitions(${TARGET} PRIVATE OCIO)
+    target_link_libraries(${TARGET} PUBLIC OpenColorIO::OpenColorIO)
+    target_compile_definitions(${TARGET} PUBLIC OCIO)
   endif()
 endfunction()
 
