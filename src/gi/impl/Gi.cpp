@@ -25,6 +25,7 @@
 #include "AssetReader.h"
 #include "GlslShaderGen.h"
 #include "MeshProcessing.h"
+#include "SceneDataPool.h"
 #include "interface/rp_main.h"
 
 #include <stdlib.h>
@@ -88,6 +89,7 @@ namespace gtl
   {
     CgpuBlas blas;
     CgpuBuffer payloadBuffer;
+    std::vector<GiSceneDataPtr> sceneData;
     rp::BlasPayload payload;
   };
 
@@ -257,6 +259,7 @@ namespace gtl
   std::unique_ptr<McFrontend> s_mcFrontend;
   std::unique_ptr<GiMmapAssetReader> s_mmapAssetReader;
   std::unique_ptr<GiAggregateAssetReader> s_aggregateAssetReader;
+  std::unique_ptr<GiSceneDataPool> s_sceneDataPool;
   std::unique_ptr<GiTextureManager> s_texSys;
   std::shared_ptr<GgpuBumpAllocator> s_bumpAlloc;
   std::atomic_bool s_forceShaderCacheInvalid = false;
@@ -434,6 +437,8 @@ namespace gtl
 
     s_deleteQueue = std::make_unique<GgpuDeleteQueue>(s_ctx);
 
+    s_sceneDataPool = std::make_unique<GiSceneDataPool>(s_ctx, *s_stager, *s_deleteQueue);
+
     s_mcRuntime = std::unique_ptr<McRuntime>(McLoadRuntime(params.mdlRuntimePath, params.mdlSearchPaths));
     if (!s_mcRuntime)
     {
@@ -493,6 +498,11 @@ fail:
     {
       s_texSys->destroy();
       s_texSys.reset();
+    }
+    if (s_sceneDataPool)
+    {
+      s_sceneDataPool->destroy();
+      s_sceneDataPool.reset();
     }
     s_shaderGen.reset();
     if (s_stager)
@@ -732,6 +742,7 @@ fail:
   {
     std::lock_guard guard(s_resourceDestroyerMutex); // Hydra sync is parallel
     s_deleteQueue->pushBack(gpuData.blas, gpuData.payloadBuffer);
+    gpuData.sceneData.clear();
   }
 
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars)
@@ -1022,7 +1033,8 @@ fail:
           preamble.sceneDataInfos[i] = rp::SCENE_DATA_INVALID;
         }
 
-        std::vector<uint32_t> sceneDataBufferOffsets(primvars.size());
+        std::vector<GiSceneDataPtr> sceneData;
+
         for (size_t i = 0; i < primvars.size(); i++)
         {
           const GiPrimvarData* primvar = primvars[i];
@@ -1031,21 +1043,6 @@ fail:
           {
             continue;
           }
-
-          uint64_t newPayloadBufferSize = payloadBufferSize;
-          uint64_t bufferOffset = giAlignBuffer(rp::SCENE_DATA_ALIGNMENT, primvar->data.size(), &newPayloadBufferSize);
-
-          if (bufferOffset >= UINT32_MAX)
-          {
-            GB_ERROR("scene data too large");
-            continue;
-          }
-
-          uint32_t index = i;//sceneDataIndices[i];
-          assert(index != -1); // every scene data has a string constant
-
-          payloadBufferSize = newPayloadBufferSize;
-          sceneDataBufferOffsets[i] = uint32_t(bufferOffset);
 
           uint32_t stride = 0;
           switch (primvar->type)
@@ -1076,10 +1073,16 @@ fail:
           assert(stride < 4);
           static_assert(int(GiPrimvarInterpolation::COUNT) <= 8, "Enum exceeds 3 bits");
 
-          preamble.sceneDataInfos[index] = _MakeSceneDataInfo(bufferOffset, stride, primvar->interpolation);
-        }
+          GiSceneDataPtr primvarSceneData = s_sceneDataPool->acquire(primvar->data);
+          if (!primvarSceneData)
+          {
+            GB_ERROR("failed to allocate scene data for {}", primvar->name);
+            continue;
+          }
 
-        payloadBufferSize += rp::SCENE_DATA_ALIGNMENT - 1; // account for aligning scene data offsets to the buffer base
+          preamble.sceneDataInfos[i] = _MakeSceneDataInfo(primvarSceneData->address, stride, primvar->interpolation);
+          sceneData.push_back(std::move(primvarSceneData));
+        }
 
         // Upload GPU data
         CgpuBlas blas;
@@ -1087,8 +1090,6 @@ fail:
         CgpuBuffer tmpIndexBuffer;
         CgpuBuffer payloadBuffer;
         rp::BlasPayload payload;
-        uint64_t payloadBufferAddress = 0;
-        uint64_t sceneDataAddressShift = 0;
 
         uint64_t tmpIndexBufferSize = indicesSize;
         uint64_t tmpPositionBufferSize = positionData.size() * sizeof(float);
@@ -1103,23 +1104,6 @@ fail:
         {
           GB_ERROR("failed to allocate BLAS payload buffer memory");
           goto fail_cleanup;
-        }
-
-        payloadBufferAddress = cgpuGetBufferGpuAddress(s_ctx, payloadBuffer);
-        if (payloadBufferAddress == 0)
-        {
-          GB_ERROR("failed to get BLAS payload buffer address");
-          goto fail_cleanup;
-        }
-        sceneDataAddressShift = (rp::SCENE_DATA_ALIGNMENT - (payloadBufferAddress & (rp::SCENE_DATA_ALIGNMENT - 1))) &
-                                (rp::SCENE_DATA_ALIGNMENT - 1);
-
-        for (uint64_t& sceneDataInfo : preamble.sceneDataInfos)
-        {
-          if (sceneDataInfo != rp::SCENE_DATA_INVALID)
-          {
-            sceneDataInfo += (payloadBufferAddress + sceneDataAddressShift) >> rp::SCENE_DATA_ADDRESS_SHIFT;
-          }
         }
 
         if (!cgpuCreateBuffer(s_ctx, {
@@ -1163,23 +1147,6 @@ fail:
           goto fail_cleanup;
         }
 
-        for (size_t i = 0; i < primvars.size(); i++)
-        {
-          if (preamble.sceneDataInfos[i] == rp::SCENE_DATA_INVALID)
-          {
-            continue;
-          }
-
-          const GiPrimvarData* s = primvars[i];
-
-          if (!s_stager->stageToBuffer(&s->data[0], s->data.size(), payloadBuffer,
-                                       sceneDataAddressShift + sceneDataBufferOffsets[i]))
-          {
-            GB_ERROR("failed to stage BLAS primvar");
-            goto fail_cleanup;
-          }
-        }
-
         s_stager->flush();
 
         // Build BLAS
@@ -1210,6 +1177,13 @@ fail:
 
         // Append BLAS payload data
         {
+          uint64_t payloadBufferAddress = cgpuGetBufferGpuAddress(s_ctx, payloadBuffer);
+          if (payloadBufferAddress == 0)
+          {
+            GB_ERROR("failed to get index-vertex buffer address");
+            goto fail_cleanup;
+          }
+
           uint32_t bitfield = 0;
           if (mesh->doubleSided)
           {
@@ -1227,6 +1201,7 @@ fail:
         mesh->gpuData = GiMeshGpuData{
           .blas = blas,
           .payloadBuffer = payloadBuffer,
+          .sceneData = std::move(sceneData),
           .payload = payload
         };
 
@@ -1309,6 +1284,8 @@ fail_cleanup:
     CgpuBuffer instanceIdsBuffer;
 
     _giBuildGeometryStructures(scene, renderSettings, shaderCache, blasInstances, blasPayloads, instanceIds, indicesSize, verticesSize);
+
+    s_sceneDataPool->logStats();
 
     GB_LOG("BLAS builds finished");
     GB_LOG("> {} unique BLAS", blasPayloads.size());
