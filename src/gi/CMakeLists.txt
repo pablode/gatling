@@ -14,6 +14,8 @@ add_library(
   impl/Mmap.cpp
   impl/MeshProcessing.h
   impl/MeshProcessing.cpp
+  impl/SceneDataPool.h
+  impl/SceneDataPool.cpp
   impl/TextureManager.h
   impl/TextureManager.cpp
   impl/Turbo.h
