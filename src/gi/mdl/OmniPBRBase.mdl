@@ -1,30 +1,7 @@
-/***************************************************************************************************
- * Copyright 2022 NVIDIA Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- **************************************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2022-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 
 mdl 1.7;
 
@@ -36,14 +13,19 @@ import ::tex::*;
 import ::anno::*;
 import ::anno::*;
 
-export float3 HemiOctahedronToUnitVector( float2 Oct )
+export float3 HemiOctahedronToUnitVector( float2 Oct ) [[
+	anno::hidden()
+]]
 {
     Oct = float2( Oct.x + Oct.y, Oct.x - Oct.y ) * 0.5;
     float3 N = float3( Oct.x, Oct.y, 1.0 - math::dot( float2(1.0), math::abs(Oct) ) );
     return math::normalize(N);
 }
 
-export struct NormalData {
+export struct NormalData  [[
+	anno::hidden()
+]]
+{
 	float3 normal;
 	float2 roughness;
 };
@@ -96,6 +78,7 @@ export NormalData tangent_space_normal_roughness_texture(
 )
 [[
     anno::description("Interprets the color values of a bitmap as a vector in tangent space"),
+	anno::hidden(),
     anno::noinline()
 ]]
 {
@@ -221,7 +204,8 @@ export material OmniPBRBase(
 	float specular_reflection_roughness = float(0.0) [[
 		anno::display_name("Roughness"),
 		anno::description("Higher roughness values lead to more blurry reflections"),
-		anno::in_group("Reflectivity")
+		anno::in_group("Reflectivity"),
+		anno::hard_range(0.0, 1.0)
 	]],
 	float2 specular_reflection_aniso_roughness = float2(0.0, 0.0) [[
 		anno::display_name("Aniso roughness"),
@@ -233,20 +217,20 @@ export material OmniPBRBase(
 		anno::display_name("Metalness"),
 		anno::description("Bias towards pure specular reflection"),
 		anno::in_group("Reflectivity"),
-		anno::hard_range(float(0.0), float(1.0))
+		anno::hard_range(0.0, 1.0)
 	]],	
 	float specular_level = float(0.5) [[
 		anno::display_name("Specular"),
 		anno::description("The specular level (intensity) of the material"),
 		anno::in_group("Reflectivity"),
-		anno::soft_range(float(0.0), float(1.0))
+		anno::soft_range(0.0, 1.0)
 	]],
 
 
 	//  Emission  //
 	
 	uniform bool enable_emission = false [[
-        	anno::display_name("Enable Emission"),
+		anno::display_name("Enable Emission"),
 		anno::description("Enables the emission of light from the material"),
 		anno::in_group("Emissive")
 	]],
@@ -260,6 +244,7 @@ export material OmniPBRBase(
 		anno::display_name("Emissive Intensity"),    
 		anno::description("Intensity of the emission"),
 		anno::in_group("Emissive"),
+		anno::soft_range(0.0, 1000.0),
 		anno::enable_if("enable_emission == true")
 	]],
 
@@ -275,14 +260,14 @@ export material OmniPBRBase(
 		anno::display_name("Opacity Amount"),    
 		anno::description("Opacity value between 0 and 1, when Opacity Map is not valid"),
 		anno::in_group("Opacity"),
-		anno::hard_range(float(0.0), float(1.0))
+		anno::hard_range(0.0, 1.0)
 	]],
 	uniform float geometry_opacity_threshold = 0.f
 	[[
-		anno::hard_range(0.0, 1.0),
 		anno::display_name("Opacity Threshold"),
 		anno::description("If 0, use fractional opacity values 'as is'; if > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
-		anno::in_group("Opacity")
+		anno::in_group("Opacity"),
+		anno::hard_range(0.0, 1.0)
 	]],
 
 	
@@ -297,7 +282,7 @@ export material OmniPBRBase(
 		anno::display_name("Clearcoat Weight"),
 		anno::description("Sets the weight for coat layer"),
 		anno::in_group("Clearcoat"),
-		anno::hard_range(float(0.0), float(1.0))
+		anno::hard_range(0.0, 1.0)
 	]],
 	color coat_color = color(1.0) [[
 		anno::display_name("Clearcoat Tint"),
@@ -308,12 +293,13 @@ export material OmniPBRBase(
 		anno::display_name("Clearcoat Transparency"),
 		anno::description("Adjusts the transparency of the coat. Can be turned into a fully opaque coat covering the underlying layer"),
 		anno::in_group("Clearcoat"),
-		anno::hard_range(float(0.0), float(1.0))
+		anno::hard_range(0.0, 1.0)
 	]],
 	float coat_roughness = float(0.0) [[
 		anno::display_name("Clearcoat Roughness"),
 		anno::description("Higher roughness values lead to more blurry reflections"),
-		anno::in_group("Clearcoat")
+		anno::in_group("Clearcoat"),
+		anno::hard_range(0.0, 1.0)
 	]],
 	float2 coat_aniso_roughness = float2(0.0, 0.0) [[
 		anno::display_name("Clearcoat aniso roughness"),
@@ -325,7 +311,7 @@ export material OmniPBRBase(
 		anno::display_name("Clearcoat IOR"),
 		anno::description("Sets the Index of refraction for the coat layer"),
 		anno::in_group("Clearcoat"),
-		anno::soft_range(float(0.0), float(4.0))
+		anno::soft_range(0.0, 4.0)
 	]],
     float3 clearcoat_geometry_normal = state::normal() [[
         anno::display_name("Clearcoat Normal"),
@@ -336,6 +322,25 @@ export material OmniPBRBase(
 
 	//  Geometry  //
 
+    uniform float round_edges_radius = float(0.0) [[
+        anno::display_name("Round Edge Radius"),
+        anno::description("Influence radius around the edges in meters"),
+        anno::in_group("Geometry"),
+        anno::soft_range(0.0, 1.0)
+    ]],
+    uniform float round_edges_roundness = float(1.0) [[
+        anno::display_name("Round Edge Roundness"),
+        anno::description("Determines how round the edge will look"),
+        anno::in_group("Geometry"),
+        anno::hard_range(0.0, 1.0)
+    ]],
+    uniform bool round_edges_across_materials = false [[
+        anno::display_name("Round Edge Across Materials"),
+        anno::description("Normal smoothing happens only between facets of equal material, \n"
+                          "\t\tunless this parameter is set true, in which case the smoothing \n"
+                          "\t\thappens between facets irrespective of their materials"),
+        anno::in_group("Geometry")
+    ]],
     float3 geometry_normal = state::normal() [[
         anno::display_name("Geometry Normal"),
         anno::in_group("Geometry"),
@@ -346,7 +351,7 @@ export material OmniPBRBase(
 [[
 	anno::display_name("OmniPBR Base"),
 	anno::description("OmniPBR Base with support for clear coat, opacity and ORM textures."),
- 	anno::in_group("Base"),
+ 	anno::in_group("Omni Materials"),
 	anno::version( 2, 1, 1),
 	anno::author("NVIDIA CORPORATION"), 
 	anno::key_words(string[]("omni", "PBR", "opacity", "omniverse", "generic"))
@@ -366,7 +371,7 @@ export material OmniPBRBase(
 			        roughness:  float(0.0)
                 ),
 		base:   bsdf(),
-		normal: enable_coat ? geometry_normal : state::normal()
+		normal: geometry_normal
 	);
 
 	//  Glossy Reflection Bsdf  //
@@ -389,7 +394,7 @@ export material OmniPBRBase(
 		weight:	              specular_level,
 		layer:                ggx_smith_bsdf,
 		base:	              diffuse_bsdf,
-		normal:               enable_coat ? geometry_normal : state::normal()
+		normal:               geometry_normal
 	);
 	
 	bsdf directional_factor_bsdf = df::tint(base_color, ggx_smith_bsdf);
@@ -398,7 +403,7 @@ export material OmniPBRBase(
         weight:     metalness,
         layer:	    directional_factor_bsdf,
 		base:	    custom_curve_layer_bsdf,
-		normal:     enable_coat ? geometry_normal : state::normal() 
+		normal:     geometry_normal
 	);
 	
 	//  Clear Coat  // 
@@ -451,7 +456,11 @@ export material OmniPBRBase(
 		                            );
 
     material_geometry geometry = material_geometry(
-                                    normal: enable_coat ? state::normal(): geometry_normal,
+                                    normal: state::rounded_corner_normal(
+                                        radius: round_edges_radius,
+                                        across_materials: round_edges_across_materials,
+                                        roundness: round_edges_roundness
+                                    ),
                                     cutout_opacity: cutout_opacity
                                     );
 

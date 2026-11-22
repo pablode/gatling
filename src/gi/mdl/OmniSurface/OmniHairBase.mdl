@@ -1,31 +1,9 @@
-/***************************************************************************************************
- * Copyright 2020 NVIDIA Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- **************************************************************************************************/
- 
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+
 // Implementation of OmniHairBase material
 
 mdl 1.7;
@@ -44,7 +22,7 @@ color compute_absorption_from_melanin_deon(float eumelanin, float pheomelanin) [
 ]]
 {
     return math::max(
-        eumelanin * color(0.419, 0.697, 1.37) + pheomelanin * color(0.187, 0.4, 1.05), 
+        eumelanin * color(0.419, 0.697, 1.37) + pheomelanin * color(0.187, 0.4, 1.05),
         color(0.0));
 }
 
@@ -52,7 +30,7 @@ color compute_absorption_from_melanin_deon(float eumelanin, float pheomelanin) [
 color compute_absorption_from_melanin(float eumelanin, float pheomelanin)
 {
     return math::max(
-        eumelanin * color(0.506, 0.841, 1.653) + pheomelanin * color(0.343, 0.733, 1.924), 
+        eumelanin * color(0.506, 0.841, 1.653) + pheomelanin * color(0.343, 0.733, 1.924),
         color(0.0));
 }
 
@@ -60,11 +38,11 @@ color compute_absorption_from_color(color c, float betaN)
 {
     float betaN2 = betaN * betaN;
     float betaN4 = betaN2 * betaN2;
-    float roughness_fac = 
-        5.969f - 
-        (0.215f * betaN) + 
+    float roughness_fac =
+        5.969f -
+        (0.215f * betaN) +
         (2.532f * betaN2) -
-        (10.73f * betaN2 * betaN) + 
+        (10.73f * betaN2 * betaN) +
         (5.574f * betaN4) +
         (0.245f * betaN4 * betaN);
 
@@ -109,7 +87,7 @@ export material OmniHairBase(
 
     //Color
     //
-    float base_color_weight = float(1.0) [[ 
+    float base_color_weight = float(1.0) [[
         anno::display_name("Base Color Weight"),
         anno::in_group("Color"),
         anno::hard_range(0.0f, 1.0f)
@@ -122,26 +100,26 @@ export material OmniHairBase(
 
     //Melanin
     //
-    uniform ::OmniSurface::OmniShared::melanin_concentration_presets melanin_concentration_preset = 
+    uniform ::OmniSurface::OmniShared::melanin_concentration_presets melanin_concentration_preset =
         ::OmniSurface::OmniShared::melanin_concentration_custom [[
         anno::display_name("Melanin Presets"),
         anno::in_group("Color")
     ]],
 
-    float melanin_concentration = float(1.0) [[ 
+    float melanin_concentration = float(1.0) [[
         anno::display_name("Melanin"),
         anno::in_group("Color"),
         anno::soft_range(0.0f, 1.0f),
         anno::hard_range(0.0f, 1.5f)
     ]],
 
-    float melanin_redness = float(0.5) [[ 
+    float melanin_redness = float(0.5) [[
         anno::display_name("Melanin Redness (Pheomelanin)"),
         anno::in_group("Color"),
         anno::soft_range(0.0f, 1.0f)
     ]],
 
-    float melanin_concentration_randomize = float(0.0) [[ 
+    float melanin_concentration_randomize = float(0.0) [[
         anno::display_name("Melanin Randomize"),
         anno::in_group("Color"),
         anno::unused(),
@@ -150,32 +128,32 @@ export material OmniHairBase(
 
     //Specular
     //
-    float specular_reflection_roughness = float(0.1) [[ 
+    float specular_reflection_roughness = float(0.1) [[
         anno::display_name("Roughness"),
         anno::in_group("Specular"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    uniform bool specular_reflection_anisotropic_roughness = false [[ 
+    uniform bool specular_reflection_anisotropic_roughness = false [[
         anno::display_name("Anisotropic Roughness"),
         anno::in_group("Specular")
     ]],
 
-    float specular_reflection_azimuthal_roughness = float(0.2) [[ 
+    float specular_reflection_azimuthal_roughness = float(0.2) [[
         anno::display_name("Azimuthal Roughness"),
         anno::in_group("Specular"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    uniform float specular_reflection_ior = float(1.55) [[ 
-        anno::display_name("IOR"),    
+    uniform float specular_reflection_ior = float(1.55) [[
+        anno::display_name("IOR"),
         anno::in_group("Specular"),
         anno::soft_range(0.0f, 5.0f),
         anno::hard_range(0.0f, limits::FLOAT_MAX)
     ]],
 
-    float specular_reflection_shift = float(3.0) [[ 
-        anno::display_name("Shift (degree)"),    
+    float specular_reflection_shift = float(3.0) [[
+        anno::display_name("Shift (degree)"),
         anno::in_group("Specular"),
         anno::soft_range(0.0f, 20.0f),
         anno::hard_range(-90.0f, 90.0f)
@@ -183,7 +161,7 @@ export material OmniHairBase(
 
     //Diffuse Reflection
     //
-    float diffuse_reflection_weight = float(0.0) [[ 
+    float diffuse_reflection_weight = float(0.0) [[
         anno::display_name("Weight"),
         anno::in_group("Diffuse"),
         anno::hard_range(0.0f, 1.0f)
@@ -196,18 +174,18 @@ export material OmniHairBase(
 
     //Emission
     //
-    float emission_weight = float(0.0) [[ 
+    float emission_weight = float(0.0) [[
         anno::display_name("Weight"),
         anno::in_group("Emission"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    uniform ::OmniSurface::OmniShared::emission_mode emission_mode = 
+    uniform ::OmniSurface::OmniShared::emission_mode emission_mode =
         ::OmniSurface::OmniShared::emission_lx [[
         anno::display_name("Emission Mode"),
         anno::in_group("Emission")
     ]],
-    
+
     float emission_intensity = float(1.0) [[
         anno::display_name("Intensity"),
         anno::in_group("Emission"),
@@ -219,7 +197,7 @@ export material OmniHairBase(
         anno::in_group("Emission")
     ]],
 
-    uniform bool emission_use_temperature = false [[ 
+    uniform bool emission_use_temperature = false [[
         anno::display_name("Use Temperature"),
         anno::in_group("Emission")
     ]],
@@ -262,28 +240,29 @@ export material OmniHairBase(
         anno::in_group("Geometry")
     ]]
 )
-[[  
+[[
     anno::display_name("OmniHairBase"),
     anno::description("A base material for modeling a variety of hairs, furs, and fibers."),
-    anno::author("NVIDIA Corporation"), 
+    anno::in_group("Omni Materials"),
+    anno::author("NVIDIA Corporation"),
     anno::key_words(string[]("generic", "hair", "fur", "fiber")),
+    anno::thumbnail(".thumbs/OmniHairBase.png"),
     anno::version(1, 0, 0, "")
-
 ]] = let {
 
     //Emission
-    uniform float emission_unit_intensity = 
-        (emission_mode == ::OmniSurface::OmniShared::emission_lx) ? 
-            1.0f : 
+    uniform float emission_unit_intensity =
+        (emission_mode == ::OmniSurface::OmniShared::emission_lx) ?
+            1.0f :
             math::PI;
 
-    color emission_final_color = 
-        emission_use_temperature ? 
-            math::blackbody(emission_temperature): 
+    color emission_final_color =
+        emission_use_temperature ?
+            math::blackbody(emission_temperature):
             emission_color;
 
-    color emission_final_intensity = 
-        emission_weight * emission_intensity * emission_unit_intensity * 
+    color emission_final_intensity =
+        emission_weight * emission_intensity * emission_unit_intensity *
         emission_final_color;
 
     material_emission emission = material_emission(
@@ -299,10 +278,10 @@ export material OmniHairBase(
 
     //Back Surface
     material_surface back_surface = material_surface(
-        scattering: bsdf(), 
+        scattering: bsdf(),
         emission: material_emission(
-            emission: edf(), 
-            intensity: color(0.0), 
+            emission: edf(),
+            intensity: color(0.0),
             mode: intensity_radiant_exitance
         )
     );
@@ -310,10 +289,10 @@ export material OmniHairBase(
     //Geometry
     material_geometry geometry = material_geometry(
         displacement: geometry_displacement,
-        cutout_opacity: enable_opacity ? 
-            geometry_opacity_threshold == 0.0f ? 
-                geometry_opacity : 
-                (geometry_opacity  >= geometry_opacity_threshold ? 1.0f : 0.0f) : 
+        cutout_opacity: enable_opacity ?
+            geometry_opacity_threshold == 0.0f ?
+                geometry_opacity :
+                (geometry_opacity  >= geometry_opacity_threshold ? 1.0f : 0.0f) :
             1.0f,
         normal: geometry_normal
     );
@@ -326,47 +305,47 @@ export material OmniHairBase(
 
     //! \todo: We should pass hair id.
     //float random_id = 1.0f;
-    //float melanin_concentration_randomized_by_id = 
+    //float melanin_concentration_randomized_by_id =
     //    2.0f * (random_id - 0.5) * melanin_concentration_randomize + 1.0f;
     //
     float melanin_gamma = 2.4f;
     float melanin = melanin_concentration_value * melanin_concentration_value * melanin_gamma;
     float eumelanin = melanin * (1.0f - melanin_redness);
-    float pheomelanin = melanin * melanin_redness;  
+    float pheomelanin = melanin * melanin_redness;
     color melanin_sigma_a = compute_absorption_from_melanin(eumelanin, pheomelanin);
 
     //Specular Reflection
     float longitudinal_roughness = compute_v(specular_reflection_roughness);
 
-    float azimuthal_roughness = 
-        specular_reflection_anisotropic_roughness ? 
-            compute_s(specular_reflection_azimuthal_roughness) : 
+    float azimuthal_roughness =
+        specular_reflection_anisotropic_roughness ?
+            compute_s(specular_reflection_azimuthal_roughness) :
             longitudinal_roughness;
 
     float2 roughness_r = float2(longitudinal_roughness, azimuthal_roughness);
 
     float2 roughness_tt_multi = float2(0.6, 0.8); //based on heuristic
     float2 roughness_tt = roughness_r * roughness_tt_multi;
-    
+
     float2 roughness_trt_multi = float2(1.5); //based on heuristic
     float2 roughness_trt = roughness_r * roughness_trt_multi;
 
     float cuticle_angle_in_radian = specular_reflection_shift * -0.0174533f;
 
     //Base Color
-    color base_color_sigma_a = 
+    color base_color_sigma_a =
         compute_absorption_from_color(
-            base_color * base_color_weight * melanin_gamma, 
-            specular_reflection_anisotropic_roughness ? 
-                specular_reflection_azimuthal_roughness : 
+            base_color * base_color_weight * melanin_gamma,
+            specular_reflection_anisotropic_roughness ?
+                specular_reflection_azimuthal_roughness :
                 longitudinal_roughness
         );
 
-    color absorption_coefficient = 
+    color absorption_coefficient =
         base_color == color(1.0) && base_color_weight == 1.0f ?
             melanin_sigma_a :
             math::lerp(
-                base_color_sigma_a, 
+                base_color_sigma_a,
                 melanin_sigma_a,
                 math::sqrt(melanin_concentration_value)
             );
@@ -380,7 +359,7 @@ export material OmniHairBase(
         cuticle_angle: cuticle_angle_in_radian,
         absorption_coefficient: absorption_coefficient,
         ior: math::max(specular_reflection_ior, 1.0f + 1.e-5));
-     
+
 } in material(
     thin_walled: true,
     ior: color(1.0),

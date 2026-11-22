@@ -1,38 +1,17 @@
-/***************************************************************************************************
- * Copyright 2022 NVIDIA Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- **************************************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 
 // The "//group ... //endgroup" comments are used during the
 // procedural creation of this module's documentation.
-mdl 1.6;
+mdl 1.8;
 
 import ::df::*;
 import ::state::*;
 import ::math::*;
+import ::limits::*;
 import ::base::*;
 import ::tex::*;
 import ::anno::*;
@@ -41,13 +20,34 @@ export using ::base import mono_mode;
 export using ::base import color_layer_mode;
 import support_definitions::*;
 module [[
-    anno::version( 2, 0, 2),
+    anno::version( 2, 2, 0),
     anno::display_name("NVIDIA core definitions")
 ]];
+
+export annotation icon(string path);
 
 const string COPYRIGHT = "Copyright 2023 NVIDIA Corporation. All rights reserved.";
 
 //some local functions, dont document
+
+// https://www.shadertoy.com/view/4djSRW
+float2 hash22(float2 p)
+{
+    float3 p3 = math::frac(float3(p.x, p.y, p.x) * float3(0.1031, 0.1030, 0.0973));
+    p3 += math::dot(p3, float3(p3.y, p3.z, p3.x) + 33.33);
+    return math::frac((float2(p3.x, p3.x) + float2(p3.y, p3.z)) * float2(p3.z, p3.y));
+}
+
+// Christophe Schlick. “Fast Alternatives to Perlin’s Bias and Gain Functions”.
+// In Graphics Gems IV, Morgan Kaufmann, 1994, pages 401–403.
+// https://dept-info.labri.fr/~schlick/DOC/gem2.html
+float schlick_gain(float x, float r)
+{
+    float rr = math::clamp(r, 0.001, 0.999);  // to avoid glitch
+    float a = (1.0 / rr - 2.0) * (1.0 - 2.0 * x);
+    return (x < 0.5) ? x / (a + 1.0) : (a - x) / (a - 1.0);
+}
+
 // blend two normals, similar to
 // http://blog.selfshadow.com/publications/blending-in-detail/
 export float3 blend_normals(
@@ -74,7 +74,8 @@ export float3 blend_normals(
     anno::description("Blend two normals or apply a detail normal map"),
     anno::display_name("Blend normals"),
     anno::thumbnail(".thumbs/blend_normals.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Blend"),
+    icon(".icons/generic_blend.svg"),
     anno::ui_order(33),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)]]
@@ -153,6 +154,82 @@ float3 blend_3_normals(
         n * n_t.z);
 }
 
+// blend 3 normals by blending the gradients
+// Morten S. Mikkelsen, Surface Gradient–Based Bump Mapping Framework, Journal of
+// Computer Graphics Techniques (JCGT), vol. 9, no. 3, 60–90, 2020
+// http://jcgt.org/published/0009/03/04/
+float3 gradient_blend_3_normals(
+    float3 normal1 = state::normal(),
+    float normal1_weight = 1.0,
+    float3 normal2 = state::normal(),
+    float normal2_weight = 1.0,
+    float3 normal3 = state::normal(),
+    float normal3_weight = 1.0
+)
+{
+    float w1 = math::saturate(normal1_weight);
+    float w2 = math::saturate(normal2_weight);
+    float w3 = math::saturate(normal3_weight);
+
+    // normal to gradient
+    float3 n = state::normal();
+    float d1 = math::dot(n, normal1);
+    float d2 = math::dot(n, normal2);
+    float d3 = math::dot(n, normal3);
+    float3 g1 = (d1 * n - normal1) / math::max(limits::FLOAT_MIN, math::abs(d1));
+    float3 g2 = (d2 * n - normal2) / math::max(limits::FLOAT_MIN, math::abs(d2));
+    float3 g3 = (d3 * n - normal3) / math::max(limits::FLOAT_MIN, math::abs(d3));
+
+    // blend
+    float3 gg = w1 * g1 + w2 * g2 + w3 * g3;
+
+    // gradient to normal
+    return math::normalize(n - gg);
+}
+
+struct complex_ior
+{
+    color n; //refractive index
+    color k; //extinction coefficient
+};
+
+
+//[Gulbrandsen2014] Ole Gulbrandsen, 2014. Artist friendly metallic fresnel.
+complex_ior artistic_metal_to_complex_ior(
+    color reflectivity,
+    color edge_tint)
+{
+    float epsilon = 1.e-2;
+    color r = math::lerp(color(epsilon), color(1.0 - epsilon), reflectivity);
+    color g = edge_tint;
+
+    color r_sqrt = math::sqrt(r);
+    color n_min = (1.0f - r) / (1.0f + r);
+    color n_max = (1.0f + r_sqrt) / (1.0f - r_sqrt);
+
+    color n = math::lerp(n_max, n_min, g);
+
+    color k2 = ((n + 1.0f) * (n + 1.0f) * r - (n - 1.0f) * (n - 1.0f)) / (1.0f - r);
+    k2 = math::max(k2, 0.0f);
+    color k = math::sqrt(k2);
+
+    return complex_ior(n, k);
+}
+
+
+
+float3x3 axis_rotation_matrix(float3 a, float r)
+{
+    float[2] sc = math::sincos(r);
+    float s = sc[0];
+    float c = sc[1];
+    float omc = 1.0 - c;
+    return float3x3(
+        a.x * a.x * omc + c,        a.x * a.y * omc - a.z * s,  a.x * a.z * omc + a.y * s,
+        a.y * a.x * omc + a.z * s,  a.y * a.y * omc + c,        a.y * a.z * omc - a.x * s,
+        a.z * a.x * omc - a.y * s,  a.z * a.y * omc + a.x * s,  a.z * a.z * omc + c
+    );
+}
 float3 transform_rotate(float3 p, float3 r)
 {
     // Euler rotation matrix  xyz order to stay compatible with ::base
@@ -242,7 +319,77 @@ export enum cell_base
         [[ anno::description("Diamond base") ]]
 };
 
+export enum displacement_vector_space
+[[
+    anno::display_name("Displacement mode"),
+    anno::description("Displacement Mode"),
+    anno::hidden()
+]]
+{
+    // displacement_height = 0  // reserve this for now
+    //     [[ anno::display_name("Height") ]],
+
+    displacement_vector_tangent_space = 1
+        [[ anno::display_name("Vector, Tangent Space") ]],
+
+    displacement_vector_object_space = 2
+        [[ anno::display_name("Vector, Object Space") ]],
+
+    displacement_vector_world_space = 3
+        [[ anno::display_name("Vector, World Space") ]]
+};
+
 //endgroup
+
+float3 transform_displacement_vector(
+    float3 displacement = float3(0.0)
+        [[ anno::description("Displacement vector") ]],
+    uniform displacement_vector_space space = displacement_vector_tangent_space
+        [[ anno::description("Space of the displacement vector") ]],
+    float scale = 1.0f
+        [[ anno::description("Displacement scale") ]]
+)
+[[
+    anno::description("Transform input displacement vector to dispacement offset"),
+    anno::hidden()
+]]
+{
+    float3 result;
+    switch (space)
+    {
+        // case displacement_height:
+        //     result = state::normal() * displacement * scale;
+        //     break;
+
+        case displacement_vector_tangent_space:
+            result = state::texture_tangent_u(0) * displacement[0] * scale +
+                     state::texture_tangent_v(0) * displacement[2] * scale +
+                     state::normal() * displacement[1] * scale;
+            break;
+
+        case displacement_vector_object_space:
+            result = state::transform_point(
+                state::coordinate_internal,
+                state::coordinate_object,
+                displacement * scale
+            );
+            break;
+
+        case displacement_vector_world_space:
+            result = state::transform_point(
+                state::coordinate_internal,
+                state::coordinate_world,
+                displacement * scale
+            );
+            break;
+
+        default:
+            result = state::position();
+            break;
+    }
+
+    return result;
+}
 
 float4x4 rotation_translation_scale(
     float3 rotation = float3(0.)
@@ -283,7 +430,9 @@ export annotation dimension(float3 dimension);
 
 //group Texturing functions
 
-export texture_return blend_colors(
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+blend_colors(
     color color_1 = color(0.0)
     [[ anno::display_name("Color 1") ]],
     color color_2 = color(1.0)
@@ -309,7 +458,8 @@ export texture_return blend_colors(
     anno::display_name("Blend colors"),
     anno::description("Allows combining textures and colors in varied ways"),
     anno::thumbnail(".thumbs/blend_colors.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Blend"),
+    icon(".icons/generic_blend.svg"),
     anno::ui_order(33),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -330,11 +480,14 @@ export texture_return blend_colors(
     return linear_blend? r: texture_return(math::pow(r.tint,2.2),math::pow(r.mono,2.2));
 }
 
-export texture_return file_texture(
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+file_texture(
     uniform texture_2d texture
     [[
         anno::display_name("Bitmap file"),
         anno::in_group("Bitmap parameters"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(0)
     ]],
     uniform mono_mode mono_source = mono_average
@@ -342,12 +495,14 @@ export texture_return file_texture(
         anno::display_name("Scalar mode"),
         anno::description("Defines how the texture applies to scalar parameters"),
         anno::in_group("Bitmap parameters"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(1)
     ]],
     uniform float brightness = 1.
     [[
         anno::display_name("Brightness"),
         anno::in_group("Bitmap parameters"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(2),
         anno::soft_range(0.0,1.0)
     ]],
@@ -355,6 +510,7 @@ export texture_return file_texture(
     [[
         anno::display_name("Contrast"),
         anno::in_group("Bitmap parameters"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(3),
         anno::soft_range(0.0,1.0)
     ]],
@@ -363,6 +519,7 @@ export texture_return file_texture(
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(8)
     ]],
     float2 translation = float2(0.)
@@ -370,6 +527,7 @@ export texture_return file_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(7)
     ]],
     float rotation = 0.
@@ -377,6 +535,7 @@ export texture_return file_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(6),
         anno::soft_range(0.0,360.0)
     ]],
@@ -385,6 +544,7 @@ export texture_return file_texture(
         anno::description("If set to true, texture will not repeat. Outside of the texture, color will be black and the scalar value will be 0."),
         anno::display_name("Clip"),
         anno::in_group("Placement"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(9)
     ]],
     uniform int texture_space = 0
@@ -393,6 +553,7 @@ export texture_return file_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(5)
     ]],
     uniform bool invert = false
@@ -400,6 +561,7 @@ export texture_return file_texture(
         anno::description("Invert image"),
         anno::display_name("Invert image"),
         anno::in_group("Bitmap parameters"),
+        icon(".icons/bitmap_texture.svg"),
         anno::ui_order(4)
     ]]
 )
@@ -407,7 +569,8 @@ export texture_return file_texture(
     anno::display_name("Bitmap texture"),
     anno::description("Allows texturing using image files of various file formats"),
     anno::thumbnail(".thumbs/file_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing"),
+    icon(".icons/bitmap_texture.svg"),
     anno::ui_order(30),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -450,13 +613,16 @@ export color triplanar_file_texture(
     [[
         anno::display_name("Bitmap file"),
         anno::in_group("1st Bitmap parameters"),
-        anno::ui_order(0)
+        icon(".icons/triplanar_texture.svg"),
+        anno::ui_order(0),
+        anno::description("Primary texture used for triplanar projection (X axis, and fallback for missing optional textures).")
     ]],
     float2 scaling_1 = float2(1.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("1st Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(1)
     ]],
     float2 translation_1 = float2(0.)
@@ -464,6 +630,7 @@ export color triplanar_file_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("1st Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(2)
     ]],
     float rotation_1 = 0.
@@ -471,6 +638,7 @@ export color triplanar_file_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("1st Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(3),
         anno::soft_range(0.0,360.0)
     ]],
@@ -478,13 +646,16 @@ export color triplanar_file_texture(
     [[
         anno::display_name("Bitmap file"),
         anno::in_group("2nd Bitmap parameters"),
-        anno::ui_order(4)
+        icon(".icons/triplanar_texture.svg"),
+        anno::ui_order(4),
+        anno::description("Optional texture used for the second triplanar projection axis (Y axis).")
     ]],
     float2 scaling_2 = float2(1.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_2)" ),
         anno::ui_order(5)
     ]],
@@ -493,6 +664,7 @@ export color triplanar_file_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_2)" ),
         anno::ui_order(6)
     ]],
@@ -501,6 +673,7 @@ export color triplanar_file_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(7),
         anno::enable_if( "tex::texture_isvalid(texture_2)" ),
         anno::soft_range(0.0,360.0)
@@ -509,13 +682,16 @@ export color triplanar_file_texture(
     [[
         anno::display_name("Bitmap file"),
         anno::in_group("3rd Bitmap parameters"),
-        anno::ui_order(8)
+        icon(".icons/triplanar_texture.svg"),
+        anno::ui_order(8),
+        anno::description("Optional texture used for the third triplanar projection axis (Z axis).")
     ]],
     float2 scaling_3 = float2(1.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_3)" ),
         anno::ui_order(9)
     ]],
@@ -524,6 +700,7 @@ export color triplanar_file_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_3)" ),
         anno::ui_order(10)
     ]],
@@ -532,6 +709,7 @@ export color triplanar_file_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(11),
         anno::enable_if( "tex::texture_isvalid(texture_3)" ),
         anno::soft_range(0.0,360.0)
@@ -541,6 +719,7 @@ export color triplanar_file_texture(
         anno::description("Defines the size of the transition area. 0 means hard transition, 1 means blending happens very softly."),
         anno::display_name("Blend range"),
         anno::in_group("Common parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(14),
         anno::hard_range(0.0,1.0)
     ]],
@@ -549,6 +728,7 @@ export color triplanar_file_texture(
         anno::description("Allows tweaking of the blend function. A value of 0 disables the function."),
         anno::display_name("Mean color"),
         anno::in_group("Common parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(15),
         anno::hard_range(color(0.0),color(1.0))
     ]],
@@ -557,6 +737,7 @@ export color triplanar_file_texture(
         anno::description("Allows manual alignment of the projection with an object"),
         anno::display_name("Rotation of origin"),
         anno::in_group("Placement"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(13),
         anno::soft_range(float3(0.0),float3(360.0))
     ]],
@@ -565,6 +746,7 @@ export color triplanar_file_texture(
         anno::description("If off, world space will be used for generating texture coordinates. If on, object space will apply."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(12)
     ]]
 )
@@ -572,7 +754,8 @@ export color triplanar_file_texture(
     anno::display_name("Triplanar Bitmap texture"),
     anno::description("Allows texturing using image files of various file formats"),
     anno::thumbnail(".thumbs/file_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Triplanar"),
+    icon(".icons/triplanar_texture.svg"),
     anno::ui_order(30),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -626,17 +809,21 @@ export color triplanar_file_texture(
                 support_definitions::biased_color_blend(weights.x,c1,weights.y,c2,weights.z,c3,mean);
 }
 
-export texture_return perlin_noise_texture(
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+perlin_noise_texture(
     color color1 = color(1.)
     [[
         anno::display_name("Color 1"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(1)
     ]],
     color color2 = color(0.)
     [[
         anno::display_name("Color 2"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(2)
     ]],
     uniform bool object_space = true
@@ -644,6 +831,7 @@ export texture_return perlin_noise_texture(
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(7)
     ]],
     uniform int noise_levels = 3
@@ -652,12 +840,14 @@ export texture_return perlin_noise_texture(
         anno::display_name("Levels"),
         anno::hard_range(1,6),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(3)
     ]],
     uniform bool absolute_noise = false
     [[
         anno::display_name("Billowing appearance"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(4)
     ]],
     uniform float noise_threshold_high = 1.
@@ -666,6 +856,7 @@ export texture_return perlin_noise_texture(
         anno::description("Lowering this value will create bigger areas uniformly colored with Color 1"),
         anno::display_name("Upper threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(6)
     ]],
     uniform float noise_threshold_low = 0.
@@ -674,6 +865,7 @@ export texture_return perlin_noise_texture(
         anno::description("Increasing this value will create bigger areas uniformly colored with Color 2"),
         anno::display_name("Lower threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(5)
     ]],
     float3 scaling = float3(10.)
@@ -681,6 +873,7 @@ export texture_return perlin_noise_texture(
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(11)
     ]],
     float3 translation = float3(0.)
@@ -688,6 +881,7 @@ export texture_return perlin_noise_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(10)
     ]],
     float3 rotation = float3(0.)
@@ -695,6 +889,7 @@ export texture_return perlin_noise_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(9)
     ]],
     uniform int texture_space = 0
@@ -703,6 +898,7 @@ export texture_return perlin_noise_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(8)
     ]]
 )
@@ -710,7 +906,8 @@ export texture_return perlin_noise_texture(
     anno::display_name("Perlin noise texture"),
     anno::description("Enable texturing with a random noise pattern"),
     anno::thumbnail(".thumbs/perlin_noise_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Noise", "Perlin"),
+    icon(".icons/perlin_noise_texture.svg"),
     anno::ui_order(34),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -742,14 +939,17 @@ export float3 perlin_noise_bump_texture(
     [[
         anno::display_name("Bump strength"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(0),
-        anno::soft_range(0.0,5.0)
+        anno::soft_range(0.0,5.0),
+        anno::description("Overall bump intensity applied to the generated Perlin noise normal perturbation.")
     ]],
     float3 scaling = float3(10.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(9)
     ]],
     uniform int noise_levels = 1
@@ -758,6 +958,7 @@ export float3 perlin_noise_bump_texture(
         anno::display_name("Levels"),
         anno::hard_range(1,6),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(1)
     ]],
     uniform bool object_space = true
@@ -765,13 +966,16 @@ export float3 perlin_noise_bump_texture(
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(5)
     ]],
     uniform bool absolute_noise = false
     [[
         anno::display_name("Billowing appearance"),
         anno::in_group("Noise parameters"),
-        anno::ui_order(2)
+        icon(".icons/perlin_noise_texture.svg"),
+        anno::ui_order(2),
+        anno::description("Enables billowing noise by folding negative noise values into the positive range.")
     ]],
     uniform float noise_threshold_high = 1.
     [[
@@ -779,6 +983,7 @@ export float3 perlin_noise_bump_texture(
         anno::description("Lowering this value will create bigger areas uniformly colored with Color 1"),
         anno::display_name("Upper threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(4)
     ]],
     uniform float noise_threshold_low = 0.
@@ -787,6 +992,7 @@ export float3 perlin_noise_bump_texture(
         anno::description("Increasing this value will create bigger areas uniformly colored with Color 2"),
         anno::display_name("Lower threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(3)
     ]],
     float3 translation = float3(0.)
@@ -794,6 +1000,7 @@ export float3 perlin_noise_bump_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(8)
     ]],
     float3 rotation = float3(0.)
@@ -801,6 +1008,7 @@ export float3 perlin_noise_bump_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(7)
     ]],
     uniform int texture_space = 0
@@ -809,6 +1017,7 @@ export float3 perlin_noise_bump_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/perlin_noise_texture.svg"),
         anno::ui_order(6)
     ]]
 )
@@ -816,7 +1025,8 @@ export float3 perlin_noise_bump_texture(
     anno::display_name("Perlin noise texture -- bump mapping"),
     anno::description("Enable bump-map texturing with a random noise pattern"),
     anno::thumbnail(".thumbs/perlin_noise_bump_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Noise", "Perlin"),
+    icon(".icons/perlin_noise_texture.svg"),
     anno::ui_order(35),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -841,17 +1051,21 @@ export float3 perlin_noise_bump_texture(
     );
 }
 
-export texture_return worley_noise_texture(
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+worley_noise_texture(
     color color1 = color(1.)
     [[
         anno::display_name("Color 1"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(0)
     ]],
     color color2 = color(0.)
     [[
         anno::display_name("Color 2"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(1)
     ]],
     uniform bool object_space = true
@@ -859,6 +1073,7 @@ export texture_return worley_noise_texture(
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space") ,
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(6)
     ]],
     uniform int texture_space = 0
@@ -867,6 +1082,7 @@ export texture_return worley_noise_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(7)
     ]],
     uniform cell_type mode = simple_cells
@@ -874,6 +1090,7 @@ export texture_return worley_noise_texture(
         anno::display_name("Cell type") ,
         anno::description("Cell pattern type"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(2)
     ]],
     uniform cell_base metric = circular_cells
@@ -881,6 +1098,7 @@ export texture_return worley_noise_texture(
         anno::display_name("Cell shape") ,
         anno::description("The shape of the cell form"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(3)
     ]],
     uniform float noise_threshold_high = 1.
@@ -889,6 +1107,7 @@ export texture_return worley_noise_texture(
         anno::description("Lowering this value will create bigger areas uniformly colored with Color 1"),
         anno::display_name("Upper threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(5)
     ]],
     uniform float noise_threshold_low = 0.
@@ -897,6 +1116,7 @@ export texture_return worley_noise_texture(
         anno::description("Increasing this value will create bigger areas uniformly colored with Color 2"),
         anno::display_name("Lower threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(4)
     ]],
     float3 scaling = float3(10.)
@@ -904,6 +1124,7 @@ export texture_return worley_noise_texture(
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(10)
     ]],
     float3 translation = float3(0.)
@@ -911,6 +1132,7 @@ export texture_return worley_noise_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(9)
     ]],
     float3 rotation = float3(0.)
@@ -918,13 +1140,15 @@ export texture_return worley_noise_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(8)
     ]])
 [[
     anno::display_name("Cellular noise texture"),
     anno::description("Allow texturing with a cell forming pattern"),
     anno::thumbnail(".thumbs/worley_noise_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Noise", "Worley"),
+    icon(".icons/cellular_noise_texture.svg"),
     anno::ui_order(36),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -955,14 +1179,17 @@ export float3 worley_noise_bump_texture(
     [[
         anno::display_name("Bump strength"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(0),
-        anno::soft_range(0.0,1.0)
+        anno::soft_range(0.0,1.0),
+        anno::description("Overall bump intensity applied to the generated Worley noise normal perturbation.")
     ]],
     uniform cell_base metric = circular_cells
     [[
         anno::display_name("Cell shape") ,
         anno::description("The shape of the cell form"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(1)
     ]],
     uniform bool object_space = true
@@ -970,6 +1197,7 @@ export float3 worley_noise_bump_texture(
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(4)
     ]],
     uniform int texture_space = 0
@@ -978,6 +1206,7 @@ export float3 worley_noise_bump_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(5)
     ]],
     uniform float noise_threshold_high = 1.
@@ -986,6 +1215,7 @@ export float3 worley_noise_bump_texture(
         anno::description("Lowering this value will create bigger areas uniformly colored with Color 1"),
         anno::display_name("Upper threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(3)
     ]],
     uniform float noise_threshold_low = 0.
@@ -994,6 +1224,7 @@ export float3 worley_noise_bump_texture(
         anno::description("Increasing this value will create bigger areas uniformly colored with Color 2"),
         anno::display_name("Lower threshold"),
         anno::in_group("Noise parameters"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(2)
     ]],
     float3 scaling = float3(10.)
@@ -1001,6 +1232,7 @@ export float3 worley_noise_bump_texture(
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(8)
     ]],
     float3 translation = float3(0.)
@@ -1008,6 +1240,7 @@ export float3 worley_noise_bump_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(7)
     ]],
     float3 rotation = float3(0.)
@@ -1015,13 +1248,15 @@ export float3 worley_noise_bump_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/cellular_noise_texture.svg"),
         anno::ui_order(6)
     ]])
 [[
     anno::display_name("Cellular noise texture -- bump mapping"),
     anno::description("Allow texturing with a cell forming pattern"),
     anno::thumbnail(".thumbs/worley_noise_bump_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Noise", "Worley"),
+    icon(".icons/cellular_noise_texture.svg"),
     anno::ui_order(37),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1045,17 +1280,21 @@ export float3 worley_noise_bump_texture(
     );
 }
 
-export texture_return flow_noise_texture(
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+flow_noise_texture(
     color color1 = color(1.)
     [[
         anno::display_name("Color 1"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(0)
     ]],
     color color2 = color(0.)
     [[
         anno::display_name("Color 2"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(1)
     ]],
     uniform bool object_space = false
@@ -1063,6 +1302,7 @@ export texture_return flow_noise_texture(
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(10)
     ]],
     uniform int texture_space = 0
@@ -1071,6 +1311,7 @@ export texture_return flow_noise_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(11)
     ]],
     uniform int noise_levels = 3
@@ -1079,6 +1320,7 @@ export texture_return flow_noise_texture(
         anno::display_name("Levels"),
         anno::hard_range(1,6),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(3)
 
     ]],
@@ -1086,6 +1328,7 @@ export texture_return flow_noise_texture(
     [[
         anno::display_name("Billowing appearance"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(4)
 
     ]],
@@ -1094,6 +1337,7 @@ export texture_return flow_noise_texture(
         anno::display_name("Phase offset"),
         anno::description("Controls the third dimension of the function"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(5),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1102,6 +1346,7 @@ export texture_return flow_noise_texture(
         anno::display_name("Level intensity gain"),
         anno::description("If multiple levels are used, this parameter specifies a weighting factor for subsequent levels"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(6),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1110,6 +1355,7 @@ export texture_return flow_noise_texture(
         anno::display_name("Level scaling"),
         anno::description("If multiple levels are used, this parameter specifies a global scaling factor for subsequent levels"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(7),
         anno::soft_range(0.0,4.0)
     ]],
@@ -1118,6 +1364,7 @@ export texture_return flow_noise_texture(
         anno::display_name("Progressive u scale"),
         anno::description("If multiple levels are used, this parameter specifies an additional scaling factor in the \"u\" direction"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(8),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1126,6 +1373,7 @@ export texture_return flow_noise_texture(
         anno::display_name("Progressive v offset"),
         anno::description("If multiple levels are used, this parameter specifies an offset for subsequent levels in the \"v\" direction"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(9),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1134,6 +1382,7 @@ export texture_return flow_noise_texture(
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(15)
     ]],
     float3 translation = float3(0.)
@@ -1141,6 +1390,7 @@ export texture_return flow_noise_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(14)
     ]],
     float3 rotation = float3(0.)
@@ -1148,13 +1398,15 @@ export texture_return flow_noise_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(13)
     ]])
 [[
     anno::display_name("Flow noise texture"),
     anno::description("Allow texturing with a 2D noise pattern suitable for waves"),
     anno::thumbnail(".thumbs/flow_noise_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Noise", "Flow"),
+    icon(".icons/flow_noise_texture.svg"),
     anno::ui_order(38),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1188,14 +1440,17 @@ export float3 flow_noise_bump_texture(
     [[
         anno::display_name("Bump strength"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(0),
-        anno::soft_range(0.0,1.0)
+        anno::soft_range(0.0,1.0),
+        anno::description("Overall bump intensity applied to the generated flow-noise normal perturbation.")
     ]],
     float3 scaling = float3(10.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(12)
     ]],
     uniform int noise_levels = 1
@@ -1204,6 +1459,7 @@ export float3 flow_noise_bump_texture(
         anno::display_name("Levels"),
         anno::hard_range(1,6),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(1)
     ]],
     uniform bool object_space = false
@@ -1211,6 +1467,7 @@ export float3 flow_noise_bump_texture(
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(8)
     ]],
     uniform int texture_space = 0
@@ -1219,19 +1476,23 @@ export float3 flow_noise_bump_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(9)
     ]],
     uniform bool absolute_noise = false
     [[
         anno::display_name("Billowing appearance"),
         anno::in_group("Noise parameters"),
-        anno::ui_order(2)
+        icon(".icons/flow_noise_texture.svg"),
+        anno::ui_order(2),
+        anno::description("Enables billowing noise by folding negative noise values into the positive range.")
     ]],
     uniform float phase = 0.0
     [[
         anno::display_name("Phase offset"),
         anno::description("Controls the 3rd dimension of the function"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(3),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1240,6 +1501,7 @@ export float3 flow_noise_bump_texture(
         anno::display_name("Level intensity gain"),
         anno::description("If multiple levels are used, this parameter specifies a weighting factor for subsequent levels"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(4),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1248,6 +1510,7 @@ export float3 flow_noise_bump_texture(
         anno::display_name("Level scaling"),
         anno::description("If multiple levels are used, this parameter specifies a global scaling factor for subsequent levels"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(5),
         anno::soft_range(0.0,4.0)
     ]],
@@ -1256,6 +1519,7 @@ export float3 flow_noise_bump_texture(
         anno::display_name("Progressive u scale"),
         anno::description("If multiple levels are used, this parameter specifies an additional scaling factor in the \"u\" direction"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(6),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1264,6 +1528,7 @@ export float3 flow_noise_bump_texture(
         anno::display_name("Progressive v offset"),
         anno::description("If multiple levels are used, this parameter specifies an offset for subsequent levels in the \"v\" direction"),
         anno::in_group("Noise parameters"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(7),
         anno::soft_range(0.0,1.0)
     ]],
@@ -1272,6 +1537,7 @@ export float3 flow_noise_bump_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(11)
     ]],
     float3 rotation = float3(0.)
@@ -1279,13 +1545,16 @@ export float3 flow_noise_bump_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/flow_noise_texture.svg"),
         anno::ui_order(10)
-    ]])
+    ]]
+)
 [[
     anno::display_name("Flow noise texture -- bump mapping"),
     anno::description("Allow texturing with a 2D noise pattern suitable for waves"),
     anno::thumbnail(".thumbs/flow_noise_bump_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Noise", "Flow"),
+    icon(".icons/flow_noise_texture.svg"),
     anno::ui_order(39),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1313,17 +1582,21 @@ export float3 flow_noise_bump_texture(
     );
 }
 
-export texture_return checker_texture(
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+checker_texture(
     color color1 = color(1.)
     [[
         anno::display_name("Color 1"),
         anno::in_group("Checker parameters"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(0)
     ]],
     color color2 = color(0.)
     [[
         anno::display_name("Color 2"),
         anno::in_group("Checker parameters"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(1)
     ]],
     float3 scaling = float3(10.)
@@ -1331,6 +1604,7 @@ export texture_return checker_texture(
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(7)
     ]],
     float3 translation = float3(0.)
@@ -1338,6 +1612,7 @@ export texture_return checker_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(6)
     ]],
     uniform bool object_space = false
@@ -1345,6 +1620,7 @@ export texture_return checker_texture(
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(3)
     ]],
     uniform float blur = 0
@@ -1352,6 +1628,7 @@ export texture_return checker_texture(
         anno::hard_range(0.0,1.0),
         anno::display_name("Blur"),
         anno::in_group("Checker parameters"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(2)
     ]],
     float3 rotation = float3(0.)
@@ -1359,6 +1636,7 @@ export texture_return checker_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(5)
     ]],
     uniform int texture_space = 0
@@ -1367,6 +1645,7 @@ export texture_return checker_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(4)
     ]]
 )
@@ -1374,7 +1653,8 @@ export texture_return checker_texture(
     anno::display_name("3D checker texture"),
     anno::description("Allows texturing a checkerboard pattern"),
     anno::thumbnail(".thumbs/checker_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Checker"),
+    icon(".icons/checker_3d_texture.svg"),
     anno::ui_order(40),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1402,21 +1682,26 @@ export float3 checker_bump_texture(
     [[
         anno::display_name("Bump strength"),
         anno::in_group("Checker parameters"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(0),
-        anno::soft_range(0.0,1.0)
+        anno::soft_range(0.0,1.0),
+        anno::description("Overall bump intensity applied to the checker pattern.")
     ]],
     uniform float blur = 0
     [[
         anno::hard_range(0.0,1.0),
         anno::display_name("Blur"),
         anno::in_group("Checker parameters"),
-        anno::ui_order(1)
+        icon(".icons/checker_3d_texture.svg"),
+        anno::ui_order(1),
+        anno::description("Amount of softening applied to checker cell boundaries.")
     ]],
     uniform bool object_space = false
     [[
         anno::description("If off, UV space will be used. If on, 3D texturing in object space will apply. For applications that do not support object space, world space will be used."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(2)
     ]],
     float3 scaling = float3(10.)
@@ -1424,6 +1709,7 @@ export float3 checker_bump_texture(
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(6)
     ]],
     float3 translation = float3(0.)
@@ -1431,6 +1717,7 @@ export float3 checker_bump_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(5)
     ]],
     float3 rotation = float3(0.)
@@ -1438,6 +1725,7 @@ export float3 checker_bump_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(4)
     ]],
     uniform int texture_space = 0
@@ -1446,6 +1734,7 @@ export float3 checker_bump_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/checker_3d_texture.svg"),
         anno::ui_order(3)
     ]]
 )
@@ -1453,7 +1742,8 @@ export float3 checker_bump_texture(
     anno::display_name("3D checker texture -- bump mapping"),
     anno::description("Allows texturing a checkerboard pattern"),
     anno::thumbnail(".thumbs/checker_bump_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Checker"),
+    icon(".icons/checker_3d_texture.svg"),
     anno::ui_order(41),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1481,7 +1771,8 @@ export float3 file_bump_texture(
         anno::display_name("Bitmap file"),
         anno::in_group("Bitmap parameters"),
         anno::usage("normal"),
-        anno::ui_order(1)
+        anno::ui_order(1),
+        anno::description("Bitmap texture used as the bump source.")
     ]],
     uniform mono_mode bump_source = mono_average
     [[
@@ -1525,7 +1816,8 @@ export float3 file_bump_texture(
         anno::display_name("Bump strength"),
         anno::in_group("Bitmap parameters"),
         anno::ui_order(3),
-        anno::soft_range(0.0,1.0)
+        anno::soft_range(0.0,1.0),
+        anno::description("Overall bump intensity applied to the sampled bitmap bump values.")
     ]],
     uniform int texture_space = 0
     [[
@@ -1540,7 +1832,8 @@ export float3 file_bump_texture(
     anno::display_name("Bitmap texture, bump"),
     anno::description("Allows texturing using image files of various file formats"),
     anno::thumbnail(".thumbs/file_bump_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing"),
+    icon(".icons/bitmap_texture.svg"),
     anno::ui_order(31),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1569,14 +1862,17 @@ export float3 normalmap_texture(
     [[
         anno::display_name("Normalmap file"),
         anno::in_group("Normalmap parameters"),
+        icon(".icons/normal_map_texture.svg"),
         anno::usage("normal"),
-        anno::ui_order(1)
+        anno::ui_order(1),
+        anno::description("Tangent-space normal map texture.")
     ]],
     float2 scaling = float2(1.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("Placement"),
+        icon(".icons/normal_map_texture.svg"),
         anno::ui_order(8)
     ]],
     float2 translation = float2(0.)
@@ -1584,6 +1880,7 @@ export float3 normalmap_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("Placement"),
+        icon(".icons/normal_map_texture.svg"),
         anno::ui_order(7)
     ]],
     float rotation = 0.
@@ -1591,6 +1888,7 @@ export float3 normalmap_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("Placement"),
+        icon(".icons/normal_map_texture.svg"),
         anno::ui_order(6),
         anno::soft_range(0.0,360.0)
     ]],
@@ -1599,6 +1897,7 @@ export float3 normalmap_texture(
         anno::description("If set to true, texture will not repeat. Outside of the texture the surface will be flat."),
         anno::display_name("Clip"),
         anno::in_group("Placement"),
+        icon(".icons/normal_map_texture.svg"),
         anno::ui_order(4)
 
     ]],
@@ -1606,8 +1905,10 @@ export float3 normalmap_texture(
     [[
         anno::display_name("Strength"),
         anno::in_group("Normal map parameters"),
+        icon(".icons/normal_map_texture.svg"),
         anno::ui_order(2),
-        anno::soft_range(0.0,1.0)
+        anno::soft_range(0.0,1.0),
+        anno::description("Strength multiplier applied to the sampled normal-map perturbation.")
     ]],
     uniform int texture_space = 0
     [[
@@ -1615,6 +1916,7 @@ export float3 normalmap_texture(
         anno::display_name("UV space index"),
         anno::hard_range(0,3),
         anno::in_group("Placement"),
+        icon(".icons/normal_map_texture.svg"),
         anno::ui_order(3)
     ]],
     uniform bool flip = false
@@ -1622,6 +1924,7 @@ export float3 normalmap_texture(
         anno::description("Flip handedness of the tangent space"),
         anno::display_name("Flip V"),
         anno::in_group("Placement"),
+        icon(".icons/normal_map_texture.svg"),
         anno::ui_order(6)
     ]]
 )
@@ -1629,7 +1932,8 @@ export float3 normalmap_texture(
     anno::display_name("Normal map texture"),
     anno::description("Allows the use of tangent space normal maps"),
     anno::thumbnail(".thumbs/normalmap_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing"),
+    icon(".icons/normal_map_texture.svg"),
     anno::ui_order(32),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1658,13 +1962,16 @@ export float3 triplanar_normalmap_texture(
         anno::usage("normal"),
         anno::display_name("Bitmap file"),
         anno::in_group("1st Bitmap parameters"),
-        anno::ui_order(0)
+        icon(".icons/triplanar_texture.svg"),
+        anno::ui_order(0),
+        anno::description("Primary normal map used for triplanar projection (X axis, and fallback for missing optional textures).")
     ]],
     float2 scaling_1 = float2(1.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("1st Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(1)
     ]],
     float2 translation_1 = float2(0.)
@@ -1672,6 +1979,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("1st Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(2)
     ]],
     float rotation_1 = 0.
@@ -1679,6 +1987,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("1st Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(3),
         anno::soft_range(0.0,360.0)
     ]],
@@ -1687,20 +1996,24 @@ export float3 triplanar_normalmap_texture(
         anno::description("Flip handedness of the tangent space"),
         anno::display_name("Flip V"),
         anno::in_group("1st Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(4)
     ]],
     uniform texture_2d texture_2 = texture_2d()
     [[
         anno::display_name("Bitmap file"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::usage("normal"),
-        anno::ui_order(4)
+        anno::ui_order(4),
+        anno::description("Optional normal map used for the second triplanar projection axis (Y axis).")
     ]],
     float2 scaling_2 = float2(1.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_2)" ),
         anno::ui_order(5)
     ]],
@@ -1709,6 +2022,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_2)" ),
         anno::ui_order(6)
     ]],
@@ -1717,6 +2031,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(7),
         anno::enable_if( "tex::texture_isvalid(texture_2)" ),
         anno::soft_range(0.0,360.0)
@@ -1726,20 +2041,24 @@ export float3 triplanar_normalmap_texture(
         anno::description("Flip handedness of the tangent space"),
         anno::display_name("Flip V"),
         anno::in_group("2nd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(8)
     ]],
     uniform texture_2d texture_3 = texture_2d()
     [[
         anno::display_name("Bitmap file"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(8),
-        anno::usage("normal")
+        anno::usage("normal"),
+        anno::description("Optional normal map used for the third triplanar projection axis (Z axis).")
     ]],
     float2 scaling_3 = float2(1.)
     [[
         anno::description("Controls the scale of the texture on the object"),
         anno::display_name("Tiling"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_3)" ),
         anno::ui_order(9)
     ]],
@@ -1748,6 +2067,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Controls position of the texture on the object"),
         anno::display_name("Offset"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::enable_if( "tex::texture_isvalid(texture_3)" ),
         anno::ui_order(10)
     ]],
@@ -1756,6 +2076,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Rotation angle of the texture in degrees"),
         anno::display_name("Rotation"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(11),
         anno::enable_if( "tex::texture_isvalid(texture_3)" ),
         anno::soft_range(0.0,360.0)
@@ -1765,6 +2086,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Flip handedness of the tangent space"),
         anno::display_name("Flip V"),
         anno::in_group("3rd Bitmap parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(12)
     ]],
     float blend_range = 0.5
@@ -1772,6 +2094,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Defines the size of the transition area. 0 means hard transition, 1 means blending happens very softly."),
         anno::display_name("Blend range"),
         anno::in_group("Common parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(13),
         anno::hard_range(0.0,1.0)
     ]],
@@ -1780,6 +2103,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Overall strength of the normalmap"),
         anno::display_name("Strength"),
         anno::in_group("Common parameters"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(14),
         anno::soft_range(0.0,10.0)
     ]],
@@ -1788,6 +2112,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("Allows manual alignment of the projection with an object"),
         anno::display_name("Rotation of origin"),
         anno::in_group("Placement"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(16),
         anno::soft_range(float3(0.0),float3(360.0))
     ]],
@@ -1796,6 +2121,7 @@ export float3 triplanar_normalmap_texture(
         anno::description("If off, world space will be used for generating texture coordinates. If on, object space will apply."),
         anno::display_name("Use object space"),
         anno::in_group("Placement"),
+        icon(".icons/triplanar_texture.svg"),
         anno::ui_order(15)
     ]]
 )
@@ -1803,7 +2129,8 @@ export float3 triplanar_normalmap_texture(
     anno::display_name("Triplanar Normalmap texture"),
     anno::description("Allows texturing using image files of various file formats"),
     anno::thumbnail(".thumbs/file_texture.png"),
-    anno::in_group("Texturing, high level"),
+    anno::in_group("Texturing", "Triplanar"),
+    icon(".icons/triplanar_texture.svg"),
     anno::ui_order(32),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT)
@@ -1834,7 +2161,7 @@ export float3 triplanar_normalmap_texture(
     float2 st1 = normal.x>0.0?float2(-position.z,position.y):float2(-position.z,-position.y);
     float3 ts = math::normalize(math::cross(state::normal(),tz));
     float3 tt1 = math::normalize(math::cross(state::normal(),ts));
-    
+
     float2 st2 = normal.y>0?float2(-position.z,-position.x):float2(-position.z,position.x);
 
     float2 st3 = normal.z>0?float2(-position.y,position.x):float2(-position.y,-position.x);
@@ -1844,44 +2171,498 @@ export float3 triplanar_normalmap_texture(
     tt3 = ( (tex::texture_isvalid(texture_3) && flip_3) || flip_1)? -tt3: tt3;
     float3 tt2 = ( (tex::texture_isvalid(texture_2) && flip_2) || flip_1)? -tt1: tt1;
     tt1 = flip_1? -tt1: tt1;
-    
+
+    float rotation_1_rad = math::radians(rotation_1);
+    float3x3 tan_rotation_mat_1 = axis_rotation_matrix(state::normal(), -rotation_1_rad);
     float3 n1 = weights.x>0 && tex::texture_isvalid(texture_1)?
         (support_definitions::lookup_float3(
             texture_1,
-            support_definitions::transform_st(math::radians(rotation_1),translation_1,scaling_1,st1))- float3(0.5)) * (2.0 * strength)
-        :float3(0.,0.,1.);
+            support_definitions::transform_st(rotation_1_rad,translation_1,scaling_1,st1))- float3(0.5)) * (2.0 * strength)
+        :float3(0.,0.,strength);
     n1 = math::normalize(
-        ts * n1.x +
-        tt1 * n1.y +
+        ts * tan_rotation_mat_1 * n1.x +
+        tt1 * tan_rotation_mat_1 * n1.y +
         state::normal() * (n1.z + (1.0 - strength)));
 
+    float rotation_2_rad = math::radians(rotation_2);
+    float3x3 tan_rotation_mat_2 = tex::texture_isvalid(texture_2)
+        ? axis_rotation_matrix(state::normal(), -rotation_2_rad)
+        : tan_rotation_mat_1;
     float3 n2 = weights.y>0? tex::texture_isvalid(texture_2)?
         (support_definitions::lookup_float3(
             texture_2,
-            support_definitions::transform_st(math::radians(rotation_2),translation_2,scaling_2,st2))- float3(0.5)) * (2.0 * strength)
+            support_definitions::transform_st(rotation_2_rad,translation_2,scaling_2,st2))- float3(0.5)) * (2.0 * strength)
         :tex::texture_isvalid(texture_1)?(support_definitions::lookup_float3(
             texture_1,
-            support_definitions::transform_st(math::radians(rotation_1),translation_1,scaling_1,st2))- float3(0.5)) * (2.0 * strength)
-        :float3(0.,0.,1.):float3(0.,0.,1.);
+            support_definitions::transform_st(rotation_1_rad,translation_1,scaling_1,st2))- float3(0.5)) * (2.0 * strength)
+        :float3(0.,0.,strength):float3(0.,0.,strength);
     n2 = math::normalize(
-        ts * n2.x +
-        tt2 * n2.y +
+        ts * tan_rotation_mat_2 * n2.x +
+        tt2 * tan_rotation_mat_2 * n2.y +
         state::normal() * (n2.z + (1.0 - strength)));
 
+    float rotation_3_rad = math::radians(rotation_3);
+    float3x3 tan_rotation_mat_3 = tex::texture_isvalid(texture_3)
+        ? axis_rotation_matrix(state::normal(), -rotation_3_rad)
+        : tan_rotation_mat_1;
     float3 n3 = weights.z>0? tex::texture_isvalid(texture_3)?
         (support_definitions::lookup_float3(
             texture_3,
-            support_definitions::transform_st(math::radians(rotation_3),translation_3,scaling_3,st3))- float3(0.5)) * (2.0 * strength)
+            support_definitions::transform_st(rotation_3_rad,translation_3,scaling_3,st3))- float3(0.5)) * (2.0 * strength)
         :tex::texture_isvalid(texture_1)?(support_definitions::lookup_float3(
             texture_1,
-            support_definitions::transform_st(math::radians(rotation_1),translation_1,scaling_1,st3))- float3(0.5)) * (2.0 * strength)
-        :float3(0.,0.,1.):float3(0.,0.,1.);
+            support_definitions::transform_st(rotation_1_rad,translation_1,scaling_1,st3))- float3(0.5)) * (2.0 * strength)
+        :float3(0.,0.,strength):float3(0.,0.,strength);
     n3 = math::normalize(
-        ts3 * n3.x +
-        tt3 * n3.y +
+        ts3 * tan_rotation_mat_3 * n3.x +
+        tt3 * tan_rotation_mat_3 * n3.y +
         state::normal() * (n3.z + (1.0 - strength)));
 
     return  blend_3_normals(n1,weights.x,n2,weights.y,n3,weights.z);
+}
+
+// Morten S. Mikkelsen, Practical Real-Time Hex-Tiling, Journal of Computer Graphics
+// Techniques (JCGT), vol. 11, no. 2, 77-94, 2022
+// http://jcgt.org/published/0011/03/05/
+struct hextile_data {
+    float2 coord1;
+    float2 coord2;
+    float2 coord3;
+    float3 weights;
+    float3x3 tangent_rot_mat1;
+    float3x3 tangent_rot_mat2;
+    float3x3 tangent_rot_mat3;
+};
+
+hextile_data hextile_coord(
+    float2 coord,
+    float rotation,
+    float2 rotation_range,
+    float scale,
+    float2 scale_range,
+    float offset,
+    float2 offset_range)
+{
+    float sqrt3_2 = math::sqrt(3.0) * 2.0;
+
+    // scale coord to maintain the original fit
+    float2 st = coord * sqrt3_2;
+
+    // skew input space into simplex triangle grid
+    // (1, 0, -tan(30), 2*tan(30))
+    float2x2 to_skewed = float2x2(1.0, 0.0, -0.57735027, 1.15470054);
+    float2 st_skewed = to_skewed * st;
+
+    // barycentric weights
+    float2 st_frac = math::frac(st_skewed);
+    float3 temp = float3(st_frac.x, st_frac.y, 0.0);
+    temp.z = 1.0 - temp.x - temp.y;
+
+    float s = math::step(0.0, -temp.z);
+    float s2 = 2.0 * s - 1.0;
+
+    float w1 = -temp.z * s2;
+    float w2 = s - temp.y * s2;
+    float w3 = s - temp.x * s2;
+
+    // vertex IDs
+    int2 base_id = int2(math::floor(st_skewed));
+    int si = int(s);
+    int2 id1 = base_id + int2(si, si);
+    int2 id2 = base_id + int2(si, 1 - si);
+    int2 id3 = base_id + int2(1 - si, si);
+
+    // tile center
+    float2x2 inv_skewed = float2x2(1.0, 0.0, 0.5, 1.0 / 1.15470054);
+    float2 ctr1 = inv_skewed * float2(id1) / float2(sqrt3_2);
+    float2 ctr2 = inv_skewed * float2(id2) / float2(sqrt3_2);
+    float2 ctr3 = inv_skewed * float2(id3) / float2(sqrt3_2);
+
+    // reuse hash for performance
+    float2 seed_offset = float2(0.12345);  // to avoid some zeros
+    float2 rand1 = hash22(float2(id1) + seed_offset);
+    float2 rand2 = hash22(float2(id2) + seed_offset);
+    float2 rand3 = hash22(float2(id3) + seed_offset);
+
+    // randomized rotation matrix
+    float2 rr = math::radians(rotation_range);
+    float rrr1 = math::lerp(rr.x, rr.y, rand1.x * rotation);
+    float rrr2 = math::lerp(rr.x, rr.y, rand2.x * rotation);
+    float rrr3 = math::lerp(rr.x, rr.y, rand3.x * rotation);
+    float[2] sc1 = math::sincos(rrr1);
+    float[2] sc2 = math::sincos(rrr2);
+    float[2] sc3 = math::sincos(rrr3);
+    float2x2 rm1 = float2x2(sc1[1], -sc1[0], sc1[0], sc1[1]);
+    float2x2 rm2 = float2x2(sc2[1], -sc2[0], sc2[0], sc2[1]);
+    float2x2 rm3 = float2x2(sc3[1], -sc3[0], sc3[0], sc3[1]);
+
+    // rotation matrix for tangent vectors
+    float3x3 trm1 = axis_rotation_matrix(state::normal(), -rrr1);
+    float3x3 trm2 = axis_rotation_matrix(state::normal(), -rrr2);
+    float3x3 trm3 = axis_rotation_matrix(state::normal(), -rrr3);
+
+    // randomized scale
+    float2 sr = scale_range;
+    float2 scale1 = math::lerp(1.0, math::lerp(sr.x, sr.y, rand1.y), scale);
+    float2 scale2 = math::lerp(1.0, math::lerp(sr.x, sr.y, rand2.y), scale);
+    float2 scale3 = math::lerp(1.0, math::lerp(sr.x, sr.y, rand3.y), scale);
+
+    // randomized offset
+    float2 offset1 = math::lerp(float2(offset_range.x), float2(offset_range.y), rand1 * offset);
+    float2 offset2 = math::lerp(float2(offset_range.x), float2(offset_range.y), rand2 * offset);
+    float2 offset3 = math::lerp(float2(offset_range.x), float2(offset_range.y), rand3 * offset);
+
+    // get coord
+    float2 st1 = ((coord - ctr1) * rm1 / scale1) + ctr1 + offset1;
+    float2 st2 = ((coord - ctr2) * rm2 / scale2) + ctr2 + offset2;
+    float2 st3 = ((coord - ctr3) * rm3 / scale3) + ctr3 + offset3;
+
+    hextile_data tile_data = hextile_data(st1, st2, st3, float3(w1, w2, w3), trm1, trm2, trm3);
+
+    return tile_data;
+}
+
+export color hextiling_file_texture(
+    uniform texture_2d texture
+    [[
+        anno::display_name("Bitmap file"),
+        anno::in_group("Bitmap parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(0),
+        anno::description("Bitmap texture sampled by the hextiling algorithm.")
+    ]],
+    uniform int texture_space = 0
+    [[
+        anno::display_name("UV space index"),
+        anno::in_group("Bitmap parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(1),
+        anno::description("UV set index used for texture-coordinate lookup.")
+    ]],
+    color default_color = color(0.0)
+    [[
+        anno::display_name("Default color"),
+        anno::in_group("Bitmap parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(2),
+        anno::description("Fallback color returned when no valid texture is provided.")
+    ]],
+    float2 repeat = float2(1.0, 1.0)
+    [[
+        anno::display_name("Tiling"),
+        anno::in_group("Placement"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(3),
+        anno::description("UV tiling multiplier applied before hextiling.")
+    ]],
+    float rotation = 1.0
+    [[
+        anno::display_name("Rotation"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(4),
+        anno::description("Random rotation amount; 0 disables random rotation and 1 uses the full rotation range.")
+    ]],
+    float2 rotation_range = float2(0.0, 360.0)
+    [[
+        anno::display_name("Rotation Range"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(5),
+        anno::description("Minimum and maximum random rotation in degrees.")
+    ]],
+    float scale = 1.0
+    [[
+        anno::display_name("Scale"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(6),
+        anno::description("Random scale amount; 0 disables random scaling and 1 uses the full scale range.")
+    ]],
+    float2 scale_range = float2(0.5, 2.0)
+    [[
+        anno::display_name("Scale Range"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(7),
+        anno::description("Minimum and maximum random tile scale.")
+    ]],
+    float offset = 1.0
+    [[
+        anno::display_name("Offset"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(8),
+        anno::description("Random offset amount; 0 disables random offsets and 1 uses the full offset range.")
+    ]],
+    float2 offset_range = float2(0.0, 1.0)
+    [[
+        anno::display_name("Offset Range"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(9),
+        anno::description("Minimum and maximum random UV offset applied per tile.")
+    ]],
+    float falloff = 0.5
+    [[
+        anno::display_name("Falloff"),
+        anno::in_group("Blending"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(10),
+        anno::description("Controls how quickly tile blending transitions between neighboring tiles.")
+    ]],
+    float falloff_contrast = 0.5
+    [[
+        anno::display_name("Falloff Contrast"),
+        anno::in_group("Blending"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(11),
+        anno::description("Controls how strongly luminance influences blending weights.")
+    ]]
+)
+[[
+    anno::display_name("Hextiling Bitmap texture"),
+    anno::description("Allows infinite texturing without obvious repeat patterns."),
+    anno::thumbnail(".thumbs/file_texture.png"),
+    anno::in_group("Texturing", "Hextiling"),
+    icon(".icons/hextiling.svg"),
+    anno::ui_order(32),
+    anno::author("NVIDIA Corporation"),
+    anno::copyright_notice(COPYRIGHT)
+]]
+{
+    if (!tex::texture_isvalid(texture))
+        return default_color;
+
+
+    float3 uvw = state::texture_coordinate(texture_space);
+    float2 coord = float2(uvw.x, uvw.y) * repeat;
+
+    // get triangle coord
+    hextile_data tile_data = hextile_coord(
+        coord: coord,
+        rotation: rotation,
+        rotation_range: rotation_range,
+        scale: scale,
+        scale_range: scale_range,
+        offset: offset,
+        offset_range: offset_range
+    );
+
+    // lookup texture
+    color c1 = tex::lookup_color(texture, tile_data.coord1);
+    color c2 = tex::lookup_color(texture, tile_data.coord2);
+    color c3 = tex::lookup_color(texture, tile_data.coord3);
+
+    // luminance as weight
+    float3 cw = float3(math::luminance(c1), math::luminance(c2), math::luminance(c3));
+    cw = math::lerp(float3(1.0), cw, float3(falloff_contrast));
+
+    // blend weights
+    float3 w = cw * math::pow(tile_data.weights, 7.0);
+    w /= (w.x + w.y + w.z);
+
+    // apply s-curve gain
+    if (falloff != 0.5)
+    {
+        w.x = schlick_gain(w.x, falloff);
+        w.y = schlick_gain(w.y, falloff);
+        w.z = schlick_gain(w.z, falloff);
+        w /= (w.x + w.y + w.z);
+    }
+
+    // blend
+    color out_color = w.x * c1 + w.y * c2 + w.z * c3;
+
+    return out_color;
+}
+
+export float3 hextiling_normalmap_texture(
+    uniform texture_2d texture
+    [[
+        anno::usage("normal"),
+        anno::display_name("Bitmap file"),
+        anno::in_group("Bitmap parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(0),
+        anno::description("Normal map texture sampled by the hextiling algorithm.")
+    ]],
+    uniform int texture_space = 0
+    [[
+        anno::display_name("UV space index"),
+        anno::in_group("Bitmap parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(1),
+        anno::description("UV set index used for texture-coordinate lookup.")
+    ]],
+    float3 default_normal = state::normal()
+    [[
+        anno::display_name("Default normal"),
+        anno::in_group("Bitmap parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(2),
+        anno::description("Fallback normal returned when no valid normal map is provided.")
+    ]],
+    float2 repeat = float2(1.0, 1.0)
+    [[
+        anno::display_name("Tiling"),
+        anno::in_group("Placement"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(3),
+        anno::description("UV tiling multiplier applied before hextiling.")
+    ]],
+    float rotation = 1.0
+    [[
+        anno::display_name("Rotation"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(4),
+        anno::description("Random rotation amount; 0 disables random rotation and 1 uses the full rotation range.")
+    ]],
+    float2 rotation_range = float2(0.0, 360.0)
+    [[
+        anno::display_name("Rotation Range"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(5),
+        anno::description("Minimum and maximum random rotation in degrees.")
+    ]],
+    float scale = 1.0
+    [[
+        anno::display_name("Scale"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(6),
+        anno::description("Random scale amount; 0 disables random scaling and 1 uses the full scale range.")
+    ]],
+    float2 scale_range = float2(0.5, 2.0)
+    [[
+        anno::display_name("Scale Range"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(7),
+        anno::description("Minimum and maximum random tile scale.")
+    ]],
+    float offset = 1.0
+    [[
+        anno::display_name("Offset"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(8),
+        anno::description("Random offset amount; 0 disables random offsets and 1 uses the full offset range.")
+    ]],
+    float2 offset_range = float2(0.0, 1.0)
+    [[
+        anno::display_name("Offset Range"),
+        anno::in_group("Randomization"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(9),
+        anno::description("Minimum and maximum random UV offset applied per tile.")
+    ]],
+    float falloff = 0.5
+    [[
+        anno::display_name("Falloff"),
+        anno::in_group("Blending"),
+        icon(".icons/hextiling.svg"),
+        anno::soft_range(0.0, 1.0),
+        anno::ui_order(10),
+        anno::description("Controls how quickly tile blending transitions between neighboring tiles.")
+    ]],
+    float strength = 1.0
+    [[
+        anno::display_name("Strength"),
+        anno::in_group("Normal map parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(11),
+        anno::soft_range(0.0, 1.0),
+        anno::description("Strength multiplier applied to sampled normal-map perturbations.")
+    ]],
+    uniform bool flip_g = false
+    [[
+        anno::display_name("Flip V"),
+        anno::in_group("Normal map parameters"),
+        icon(".icons/hextiling.svg"),
+        anno::ui_order(12),
+        anno::description("Flips the green (Y) channel of the sampled normal maps.")
+    ]]
+)
+[[
+    anno::display_name("Hextiling Normalmap texture"),
+    anno::description("Allows infinite texturing without obvious repeat patterns."),
+    anno::thumbnail(".thumbs/file_texture.png"),
+    anno::in_group("Texturing", "Hextiling"),
+    icon(".icons/hextiling.svg"),
+    anno::ui_order(32),
+    anno::author("NVIDIA Corporation"),
+    anno::copyright_notice(COPYRIGHT)
+]]
+{
+    if (!tex::texture_isvalid(texture))
+        return default_normal;
+
+
+    float3 uvw = state::texture_coordinate(texture_space);
+    float2 coord = float2(uvw.x, uvw.y) * repeat;
+
+    // get triangle coord
+    hextile_data tile_data = hextile_coord(
+        coord: coord,
+        rotation: rotation,
+        rotation_range: rotation_range,
+        scale: scale,
+        scale_range: scale_range,
+        offset: offset,
+        offset_range: offset_range
+    );
+
+    // lookup normalmap
+    float3 nm1 = tex::lookup_float3(texture, tile_data.coord1);
+    float3 nm2 = tex::lookup_float3(texture, tile_data.coord2);
+    float3 nm3 = tex::lookup_float3(texture, tile_data.coord3);
+    nm1.y = flip_g ? 1.0 - nm1.y : nm1.y;
+    nm2.y = flip_g ? 1.0 - nm2.y : nm2.y;
+    nm3.y = flip_g ? 1.0 - nm3.y : nm3.y;
+
+    // transform to geometry normals
+    nm1 = 2.0 * nm1 - 1.0;
+    nm2 = 2.0 * nm2 - 1.0;
+    nm3 = 2.0 * nm3 - 1.0;
+    float3 sn = state::normal();
+    float3 tu1 = state::texture_tangent_u(0) * tile_data.tangent_rot_mat1 * strength;
+    float3 tu2 = state::texture_tangent_u(0) * tile_data.tangent_rot_mat2 * strength;
+    float3 tu3 = state::texture_tangent_u(0) * tile_data.tangent_rot_mat3 * strength;
+    float3 tv1 = state::texture_tangent_v(0) * tile_data.tangent_rot_mat1 * strength;
+    float3 tv2 = state::texture_tangent_v(0) * tile_data.tangent_rot_mat2 * strength;
+    float3 tv3 = state::texture_tangent_v(0) * tile_data.tangent_rot_mat3 * strength;
+    float3 n1 = math::normalize(tu1 * nm1.x + tv1 * nm1.y + sn * nm1.z);
+    float3 n2 = math::normalize(tu2 * nm2.x + tv2 * nm2.y + sn * nm2.z);
+    float3 n3 = math::normalize(tu3 * nm3.x + tv3 * nm3.y + sn * nm3.z);
+
+    // belnd weights
+    float3 w = math::pow(tile_data.weights, 7.0);
+    w /= (w.x + w.y + w.z);
+
+    // apply s-curve gain
+    if (falloff != 0.5)
+    {
+        w.x = schlick_gain(w.x, falloff);
+        w.y = schlick_gain(w.y, falloff);
+        w.z = schlick_gain(w.z, falloff);
+        w /= (w.x + w.y + w.z);
+    }
+
+    // blend
+    float3 out_normal = gradient_blend_3_normals(n1, w.x, n2, w.y, n3, w.z);
+
+    return out_normal;
 }
 
 //endgroup
@@ -1912,7 +2693,7 @@ export material diffuse(
     anno::display_name("Simple diffuse"),
     anno::description("A basic diffuse material"),
     anno::thumbnail(".thumbs/diffuse.png"),
-    anno::in_group("Materials"),
+    anno::in_group("Materials", "Diffuse"),
     anno::ui_order(0),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -1933,40 +2714,88 @@ export material diffuse(
     )
 );
 
+export material dusty_diffuse(
+    color diffuse_color = color(.8)
+    [[
+        anno::display_name("Color"),
+        anno::description("The color of the material")
+    ]],
+    float3 normal = state::normal()
+    [[
+        anno::display_name("Bumps"),
+        anno::description("Attach bump or normal maps here")
+    ]]
+)
+[[
+    anno::display_name("Dusty diffuse"),
+    anno::description("A dusty diffuse material"),
+    anno::thumbnail(".thumbs/diffuse.png"),
+    anno::in_group("Materials", "Diffuse"),
+    anno::ui_order(1),
+    anno::author("NVIDIA Corporation"),
+    anno::copyright_notice(COPYRIGHT),
+    type_of_material(simple_material),
+    anno::key_words(string[]("generic"))
+]]
+ =  material(
+    thin_walled: true,
+    surface: material_surface(
+        scattering: df::weighted_layer(
+            weight: 1.,
+            normal: normal,
+            layer: df::dusty_diffuse_reflection_bsdf(
+                    tint: diffuse_color
+            )
+        )
+    )
+);
+
 export material scratched_metal_v2(
     color metal_color = color(.9)
     [[
         anno::display_name("Color"),
+        anno::ui_order(1),
         anno::description("The color of the metal")
     ]],
     float roughness = 0.2
     [[
         anno::display_name("Roughness"),
+        anno::ui_order(3),
         anno::hard_range(0.0,1.),
         anno::description("Higher roughness values lead to bigger highlights and blurry reflections")
     ]],
     float glossy_weight = .9
     [[
         anno::display_name("Reflection weight"),
+        anno::ui_order(4),
         anno::hard_range(0.0,1.),
         anno::description("Intensity of highlights and glossy reflections and highlights")
     ]],
     float anisotropy = 0.0
     [[
         anno::display_name("Anisotropy"),
+        anno::ui_order(5),
         anno::hard_range(0.0,1.),
         anno::description("Higher values will stretch the highlight")
     ]],
     float anisotropy_rotation = 0.0
     [[
         anno::display_name("Anisotropy rotation"),
+        anno::ui_order(6),
         anno::hard_range(0.0,1.),
         anno::description("Changes the orientation of the anisotropy. A value of 1 will rotate the orientation 360 degrees.")
     ]],
     float3 normal = state::normal()
     [[
         anno::display_name("Bumps"),
+        anno::ui_order(7),
         anno::description("Attach bump or normal maps here")
+    ]],
+    color edge_color = color(1.0)
+    [[
+        anno::display_name("Edge color"),
+        anno::ui_order(2),
+        anno::description("The color of the metal towards the edge")
     ]]
 )
 [[
@@ -1986,12 +2815,17 @@ export material scratched_metal_v2(
         anisotropy: anisotropy,
         anisotropy_rotation: anisotropy_rotation
     );
-    bsdf glossy_bsdf = df::microfacet_ggx_smith_bsdf(
-        mode: df::scatter_reflect,
-        tint: metal_color,
-        roughness_u: anisotropy_values.roughness_u,
-        roughness_v: anisotropy_values.roughness_v,
-        tangent_u: anisotropy_values.tangent_u
+    complex_ior ior = artistic_metal_to_complex_ior(metal_color, edge_color);
+    bsdf glossy_bsdf = df::fresnel_factor(
+        ior: ior.n,
+        extinction_coefficient: ior.k,
+        base: df::microfacet_ggx_smith_bsdf(
+            mode: df::scatter_reflect,
+            tint: color(1.),
+            roughness_u: anisotropy_values.roughness_u,
+            roughness_v: anisotropy_values.roughness_v,
+            tangent_u: anisotropy_values.tangent_u
+        )
     );
 } in material(
     thin_walled: true,
@@ -2405,7 +3239,7 @@ export material thin_glass_v2(
     anno::display_name("Thin glass"),
     anno::description("A basic transmissive dielectric without refraction or volume"),
     anno::thumbnail(".thumbs/thin_glass.png"),
-    anno::in_group("Materials"),
+    anno::in_group("Materials", "Glass"),
     anno::ui_order(6),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -2478,7 +3312,7 @@ export material thin_translucent_v2(
     anno::display_name("Thin translucent"),
     anno::description("A diffuse transmissive dielectric material"),
     anno::thumbnail(".thumbs/thin_translucent.png"),
-    anno::in_group("Materials"),
+    anno::in_group("Materials", "Translucent"),
     anno::ui_order(7),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -2571,7 +3405,7 @@ export material thick_glass_v2(
     anno::display_name("Thick glass"),
     anno::description("A basic transmissive dielectric with refraction and coloring in the volume"),
     anno::thumbnail(".thumbs/thick_glass.png"),
-    anno::in_group("Materials"),
+    anno::in_group("Materials", "Glass"),
     anno::ui_order(8),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -2676,7 +3510,7 @@ export material thick_translucent_v2(
     anno::display_name("Thick translucent"),
     anno::description("A subsurface scattering material"),
     anno::thumbnail(".thumbs/thick_translucent.png"),
-    anno::in_group("Materials"),
+    anno::in_group("Materials", "Translucent"),
     anno::ui_order(9),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -2739,29 +3573,90 @@ export material blend(
     ]]
 )
 [[
-    anno::display_name("Surface blender"),
-    anno::description("Blend surface characteristics of 2 materials or mask them using a texture"),
+    anno::display_name("Blend materials"),
+    anno::description("Blend characteristics of 2 materials or mask them using a texture"),
     anno::thumbnail(".thumbs/blend.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Blend"),
+    icon(".icons/generic_blend.svg"),
     anno::ui_order(15),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(combiner_material),
     anno::key_words(string[]("combiner","generic"))
 ]]
- =  material(
+ = let {
+    float inv_weight = 1.0f - weight;
+} in material(
     surface: material_surface(
         scattering: df::weighted_layer(
             weight: weight,
             layer: blend.surface.scattering,
             base: base.surface.scattering
         ),
-        emission: base.surface.emission
+        emission: material_emission(
+            mode: base.surface.emission.mode, //cant vary
+            intensity: math::lerp(base.surface.emission.intensity,blend.surface.emission.intensity, weight),
+            emission: df::unbounded_mix(
+                df::edf_component[]
+                (
+                    df::edf_component(inv_weight,base.surface.emission.emission),
+                    df::edf_component(weight,blend.surface.emission.emission)
+                )
+            )
+        )
     ),
-    volume: base.volume,
-    ior: base.ior,
-    thin_walled: base.thin_walled,
-    geometry: base.geometry
+    volume: material_volume(
+        scattering: df::unbounded_mix(
+                df::vdf_component[]
+                (
+                    df::vdf_component(inv_weight,base.volume.scattering),
+                    df::vdf_component(weight,blend.volume.scattering)
+                )
+            ),
+        absorption_coefficient: math::lerp(base.volume.absorption_coefficient,base.volume.absorption_coefficient,weight),
+        scattering_coefficient: math::lerp(base.volume.scattering_coefficient,base.volume.scattering_coefficient,weight),
+        emission_intensity: math::lerp(base.volume.emission_intensity,blend.volume.emission_intensity, weight)
+
+    ),
+    ior: base.ior, //can't vary
+    thin_walled: base.thin_walled, //can't vary
+    geometry: material_geometry(
+        displacement: math::lerp(base.geometry.displacement, blend.geometry.displacement, weight),
+        cutout_opacity: math::lerp(base.geometry.cutout_opacity, blend.geometry.cutout_opacity, weight),
+        normal: blend_normals(base.geometry.normal, inv_weight, blend.geometry.normal, weight)
+    )
+);
+
+export material twosided(
+    material front = scratched_plastic_v2()
+    [[
+        anno::display_name("Front material"),
+        anno::description("The material on the front faces.")
+    ]],
+    material back = scratched_metal_v2()
+    [[
+        anno::display_name("Back material"),
+        anno::description("The material on the back faces.")
+    ]]
+)
+[[
+    anno::display_name("Two-sided materials"),
+    anno::description("Allows you to apply a material to front and back surfaces."),
+    anno::thumbnail(".thumbs/twosided.png"),
+    anno::in_group("Material modifiers"),
+    icon(".icons/two_sided_materials.svg"),
+    anno::ui_order(15),
+    anno::author("NVIDIA Corporation"),
+    anno::copyright_notice(COPYRIGHT),
+    type_of_material(combiner_material),
+    anno::key_words(string[]("combiner","generic"))
+]]
+ = material(
+    thin_walled: true,
+    ior: front.ior,
+    surface: front.surface,
+    backface: back.surface,
+    geometry: front.geometry
 );
 
 export material surface_falloff(
@@ -2798,7 +3693,8 @@ export material surface_falloff(
     anno::display_name("Surface falloff"),
     anno::description("Blend surface characteristics of 2 materials or mask them using a texture"),
     anno::thumbnail(".thumbs/surface_falloff.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Blend"),
+    icon(".icons/surface_falloff.svg"),
     anno::ui_order(15),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -2869,7 +3765,8 @@ export material apply_clearcoat_v2(
     anno::description("Apply clear coat to an existing material"),
     anno::author("NVIDIA Corporation"),
     anno::thumbnail(".thumbs/apply_clearcoat.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Coating"),
+    icon(".icons/apply_clear_coating.svg"),
     anno::ui_order(16),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(modifier_material),
@@ -2916,12 +3813,14 @@ export material apply_thinfilm(
         anno::display_name("Thickness"),
         anno::soft_range(10.0,5000.0),
         anno::description("Thickness of the thin film in nm")
-    ]])
+    ]]
+)
 [[
     anno::display_name("Apply thin film"),
     anno::description("Apply thin film to an existing material"),
     anno::thumbnail(".thumbs/apply_thinfilm.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Coating"),
+    icon(".icons/apply_thin_film.svg"),
     anno::ui_order(17),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -2981,7 +3880,8 @@ export material apply_metalcoat_v2(
     anno::display_name("Apply thin metal coating"),
     anno::description("Apply metal coat to an existing material"),
     anno::thumbnail(".thumbs/apply_metalcoat.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Coating"),
+    icon(".icons/apply_thin_metal_coating.svg"),
     anno::ui_order(18),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -3043,7 +3943,8 @@ export material apply_dustcover(
     anno::display_name("Apply a cover of dust"),
     anno::description("Apply a diffuse cover of dust or dirt"),
     anno::thumbnail(".thumbs/apply_dustcover.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Coating"),
+    icon(".icons/apply_dust_cover.svg"),
     anno::ui_order(19),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -3110,7 +4011,8 @@ export material apply_colorfalloff_v2(
     anno::description("Makes the color view dependent"),
     anno::thumbnail(".thumbs/apply_colorfalloff.png"),
     anno::author("NVIDIA Corporation"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers"),
+    icon(".icons/apply_color_falloff.svg"),
     anno::ui_order(20),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(modifier_material),
@@ -3141,7 +4043,6 @@ export material apply_metallicflakes(
         anno::display_name("Color"),
         anno::description("The color of the flakes")
     ]],
-
     float roughness = 0.0
     [[
         anno::display_name("Roughness"),
@@ -3175,7 +4076,8 @@ export material apply_metallicflakes(
     anno::display_name("Apply flake coating"),
     anno::description("Apply layer of metallic flakes to an existing material"),
     anno::thumbnail(".thumbs/apply_metallicflakes.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Coating"),
+    icon(".icons/apply_flake_coating.svg"),
     anno::ui_order(21),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -3255,7 +4157,7 @@ export material flake_paint(
         anno::display_name("Flake orientation randomness"),
         anno::description("Larger numbers will increase the sparkle radius around highlights")
     ]],
-        uniform float ior = 1.6
+    uniform float ior = 1.6
     [[
         anno::display_name("IOR"),
         anno::soft_range(1.0,4.0),
@@ -3272,7 +4174,6 @@ export material flake_paint(
         anno::display_name("Coat bump"),
         anno::description("Attach bump or normal maps here")
     ]]
-
 )
 [[
     anno::display_name("Flaky paint"),
@@ -3336,7 +4237,8 @@ export material add_cutout(
     anno::display_name("Add cut-outs"),
     anno::description("Adds cut-outs to existing materials. Also forces material to be thin-walled. Good for modeling leaves, grass or fences."),
     anno::thumbnail(".thumbs/add_cutout.png"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers"),
+    icon(".icons/add_cutouts.svg"),
     anno::ui_order(22),
     anno::author("NVIDIA Corporation"),
     anno::copyright_notice(COPYRIGHT),
@@ -3406,7 +4308,8 @@ export material add_simple_sticker(
     anno::description("A quick way for adding simple stickers to a material. The sticker is a simple dielectric and needs a mask to define its extent."),
     anno::thumbnail(".thumbs/add_simple_sticker.png"),
     anno::author("NVIDIA Corporation"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers"),
+    icon(".icons/add_simple_sticker.svg"),
     anno::ui_order(23),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(modifier_material),
@@ -3450,7 +4353,8 @@ export material add_globalbump(
     anno::description("Adds global bumpmap to existing materials. Local bump map of the base material is preserved."),
     anno::thumbnail(".thumbs/add_globalbump.png"),
     anno::author("NVIDIA Corporation"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers"),
+    icon(".icons/add_global_bumpmap.svg"),
     anno::ui_order(24),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(modifier_material),
@@ -3488,7 +4392,8 @@ export material add_displacement(
     anno::description("Adds displacement to existing materials"),
     anno::thumbnail(".thumbs/add_displacement.png"),
     anno::author("NVIDIA Corporation"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Displacement"),
+    icon(".icons/add_displacement.svg"),
     anno::ui_order(25),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(modifier_material),
@@ -3501,6 +4406,100 @@ export material add_displacement(
     geometry: material_geometry(
         displacement: displacement*displacement_scale*state::scene_units_per_meter()*state::normal(),
         normal: base.geometry.normal,
+        cutout_opacity: base.geometry.cutout_opacity
+    )
+);
+
+export material add_vector_displacement(
+    material base = scratched_plastic_v2()
+    [[
+        anno::display_name("Base material"),
+        anno::description("The material that will get displacement")
+    ]],
+    float3 displacement = float3(0.0)
+    [[
+        anno::display_name("Displacement amount"),
+        anno::description("Attach displacement texture here. Note that the object needs to be set up correctly to have good displacement results")
+    ]],
+    uniform displacement_vector_space space = displacement_vector_tangent_space
+    [[
+        anno::display_name("Displacement vector mode"),
+        anno::description("Specify the space of the vector dispacement map")
+    ]],
+    uniform float displacement_scale = 1.0
+    [[
+        anno::display_name("Displacement scale"),
+        anno::description("A global scale factor for the displacement amount")
+    ]]
+) [[
+    anno::display_name("Add vector displacement"),
+    anno::description("Adds vector displacement to existing materials"),
+    anno::thumbnail(".thumbs/add_displacement.png"),
+    anno::author("NVIDIA Corporation"),
+    anno::in_group("Material modifiers", "Displacement"),
+    icon(".icons/add_vector_displacement.svg"),
+    anno::ui_order(25),
+    anno::copyright_notice(COPYRIGHT),
+    type_of_material(modifier_material),
+    anno::key_words(string[]("modifier","generic"))
+]] = material(
+    surface: base.surface,
+    volume: base.volume,
+    ior: base.ior,
+    thin_walled: base.thin_walled,
+    geometry: material_geometry(
+        displacement: state::scene_units_per_meter()*transform_displacement_vector(displacement, space, displacement_scale),
+        normal: base.geometry.normal,
+        cutout_opacity: base.geometry.cutout_opacity
+    )
+);
+
+export material add_round_edges(
+    material base = scratched_plastic_v2()
+    [[
+        anno::display_name("Base material"),
+        anno::description("The material that will get round edges")
+    ]],
+    uniform float round_edges_radius = 0.02
+    [[
+        anno::display_name("Round edge radius"),
+        anno::description("Influence radius around the edges in meters")
+    ]],
+    uniform float round_edges_roundness = 1.0
+    [[
+        anno::display_name("Round edge roundness"),
+        anno::description("Determines how round the edge will look"),
+        anno::hard_range(0.0, 1.0)
+    ]],
+    uniform bool round_edges_across_materials = false
+    [[
+        anno::display_name("Round edge across materials"),
+        anno::description("Normal smoothing happens only between facets of equal material, unless
+                           this parameter is set true, in which case the smoothing happens between
+                           facets irrespective of their materials")
+    ]]
+) [[
+    anno::display_name("Add round edges"),
+    anno::description("Adds round edges to existing materials"),
+    anno::author("NVIDIA Corporation"),
+    anno::in_group("Material modifiers"),
+    icon(".icons/add_round_edges.svg"),
+    anno::ui_order(25),
+    anno::copyright_notice(COPYRIGHT),
+    type_of_material(modifier_material),
+    anno::key_words(string[]("modifier","generic"))
+]] = material(
+    surface: base.surface,
+    volume: base.volume,
+    ior: base.ior,
+    thin_walled: base.thin_walled,
+    geometry: material_geometry(
+        displacement: base.geometry.displacement,
+        normal: state::rounded_corner_normal(
+            radius: round_edges_radius,
+            roundness: round_edges_roundness,
+            across_materials: round_edges_across_materials
+        ),
         cutout_opacity: base.geometry.cutout_opacity
     )
 );
@@ -3537,7 +4536,8 @@ export material add_emission(
     anno::description("Adds emission to a material"),
     anno::thumbnail(".thumbs/add_emission.png"),
     anno::author("NVIDIA Corporation"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Emission"),
+    icon(".icons/add_emission.svg"),
     anno::ui_order(26),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(modifier_material),
@@ -3589,7 +4589,8 @@ export material add_thermal_emission(
     anno::description("Adds emission to a material, color is based on a \"color temperature\""),
     anno::thumbnail(".thumbs/add_thermal_emission.png"),
     anno::author("NVIDIA Corporation"),
-    anno::in_group("Materials, modifiers"),
+    anno::in_group("Material modifiers", "Emission"),
+    icon(".icons/add_thermal_emission.svg"),
     anno::ui_order(27),
     anno::copyright_notice(COPYRIGHT),
     type_of_material(modifier_material),

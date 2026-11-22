@@ -1,0 +1,106 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+mdl 1.7;
+
+
+import ::anno::*;
+import ::math::*;
+import ::tex::*;
+import ::state::*;
+import ::df::diffuse_edf;
+import ::nvidia::support_definitions::texture_coordinate_2d;
+
+
+// OM-44796: scale emission such that its value is the same as the exposed pixel value with our default camera exposure settings.
+// ToDo: this should be a library function as it's used in multiple shaders
+color emissiveColorToNits(color c_In, bool compensate_camera_exposure)
+{
+    // Match HdStrom: scale by inverse of rendering camera exposure * PI (nits)
+    float cameraExposureInv = compensate_camera_exposure ? 1133.6f : 1.0f;
+    return c_In * math::PI * cameraExposureInv;
+}
+
+
+export material OmniEmissive(
+	color emissive_color = color(1.0, 0.1, 0.1) [[
+		anno::display_name("Emissive Color"),
+		anno::in_group("Emissive"),
+		anno::description("The emissive color. This parameter is ignored if Emissive Color Map is used.")
+	]],
+    uniform texture_2d emissive_color_texture = texture_2d() [[
+		anno::display_name("Emissive Color Map"),
+        anno::in_group("Emissive"),
+		anno::description("The emissive color texture. Alpha is used as cutout if applicable.")
+    ]],
+	float emission_intensity = 1.f [[
+		anno::display_name("Emission Intensity"),
+        anno::in_group("Emissive"),
+		anno::description("Emission Intensity Scale")
+	]],
+	uniform bool backface_emission = false [[
+		anno::display_name("Backface Emission"),
+		anno::in_group("Emissive"),
+		anno::description("Set whether surface emits light from the backface.")
+	]],
+	uniform bool compensate_camera_exposure = true [[
+		anno::display_name("Compensate Camera Exposure"),
+		anno::in_group("Emissive"),
+		anno::description("Set whether should compensate camera exposure.")
+	]]
+)
+[[
+	anno::display_name("OmniEmissive"),
+	anno::description("Emissive shader."),
+    anno::in_group("Base"),
+	anno::version(1, 1, 0),
+	anno::author("NVIDIA CORPORATION"),
+	anno::key_words(string[]("omni", "omniverse", "emissive", "emission"))
+]]
+= let {
+	bool use_texture = tex::texture_isvalid(emissive_color_texture);
+
+	// look up input emissive color map
+	float4 emissive_texture_result = use_texture ?
+		tex::lookup_float4(
+			tex: emissive_color_texture,
+			coord: nvidia::support_definitions::texture_coordinate_2d(0),
+			wrap_u: tex::wrap_clamp,
+			wrap_v: tex::wrap_clamp,
+			crop_u: float2(0.0, 1.0),
+			crop_v: float2(0.0, 1.0),
+			frame: 0.0
+		) :
+		float4(0.0, 0.0, 0.0, 1.0);
+
+	color emissive_color_result = use_texture ?
+		color(emissive_texture_result.x, emissive_texture_result.y, emissive_texture_result.z) :
+		emissive_color;
+	float emissive_alpha = use_texture ? emissive_texture_result.w : 1.0;
+
+	color emissiveAsNits = emissiveColorToNits(emissive_color_result, compensate_camera_exposure);
+
+	// construct shader
+	material_surface main(
+		scattering: bsdf(),
+		emission: material_emission(
+			emission: df::diffuse_edf(""),
+			intensity: emissiveAsNits * emission_intensity,
+			mode: intensity_radiant_exitance
+		)
+	);
+	material_geometry geometry(
+		displacement: float3(0.f),
+		cutout_opacity: emissive_alpha,
+		// normal: state::normal()
+		normal: float3(0.f)
+	);
+}
+in material(
+	thin_walled: backface_emission ? true : false,
+	surface: main,
+	backface: backface_emission ? main : material_surface(),
+	geometry: geometry
+);

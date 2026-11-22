@@ -1,30 +1,7 @@
-/***************************************************************************************************
- * Copyright 2020 NVIDIA Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- **************************************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 
 // Implementation of OmniSurfaceLiteBase material
 
@@ -44,18 +21,18 @@ export material OmniSurfaceLiteBase(
 
     //Diffuse reflection
     //
-    float diffuse_reflection_weight = float(0.8) [[ 
+    float diffuse_reflection_weight = float(0.8) [[
         anno::display_name("Weight"),
         anno::in_group("Base"),
         anno::hard_range(0.0f, 1.0f)
     ]],
-    
+
     color diffuse_reflection_color = color(1.0) [[
         anno::display_name("Color"),
         anno::in_group("Base")
     ]],
-    
-    float diffuse_reflection_roughness = float(0.0) [[ 
+
+    float diffuse_reflection_roughness = float(0.0) [[
         anno::display_name("Diffuse Roughness"),
         anno::in_group("Base"),
         anno::hard_range(0.0f, 1.0f)
@@ -63,7 +40,7 @@ export material OmniSurfaceLiteBase(
 
     //Metalness
     //
-    float metalness = float(0.0) [[ 
+    float metalness = float(0.0) [[
         anno::display_name("Metalness"),
         anno::in_group("Base"),
         anno::hard_range(0.0f, 1.0f)
@@ -71,7 +48,7 @@ export material OmniSurfaceLiteBase(
 
     //Specular reflection
     //
-    float specular_reflection_weight = float(1.0) [[ 
+    float specular_reflection_weight = float(1.0) [[
         anno::display_name("Weight"),
         anno::in_group("Specular"),
         anno::hard_range(0.0f, 1.0f)
@@ -82,32 +59,32 @@ export material OmniSurfaceLiteBase(
         anno::in_group("Specular")
     ]],
 
-    float specular_reflection_roughness = float(0.2) [[ 
+    float specular_reflection_roughness = float(0.2) [[
         anno::display_name("Roughness"),
         anno::in_group("Specular"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    uniform ::OmniSurface::OmniShared::ior_presets specular_reflection_ior_preset = 
+    uniform ::OmniSurface::OmniShared::ior_presets specular_reflection_ior_preset =
         ::OmniSurface::OmniShared::ior_custom [[
         anno::display_name("IOR Preset"),
         anno::in_group("Specular")
     ]],
-    
-    uniform float specular_reflection_ior = float(1.5) [[ 
-        anno::display_name("IOR"),    
+
+    uniform float specular_reflection_ior = float(1.5) [[
+        anno::display_name("IOR"),
         anno::in_group("Specular"),
         anno::soft_range(1.0f, 5.0f),
         anno::hard_range(0.0f, limits::FLOAT_MAX)
     ]],
 
-    float specular_reflection_anisotropy = float(0.0) [[ 
+    float specular_reflection_anisotropy = float(0.0) [[
         anno::display_name("Anisotropy"),
         anno::in_group("Specular"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    float specular_reflection_anisotropy_rotation = float(0.0) [[ 
+    float specular_reflection_anisotropy_rotation = float(0.0) [[
         anno::display_name("Rotation (radian)"),
         anno::in_group("Specular"),
         anno::soft_range(0.0f, 1.0f)
@@ -115,7 +92,7 @@ export material OmniSurfaceLiteBase(
 
     //Coat
     //
-    float coat_weight = float(0.0) [[ 
+    float coat_weight = float(0.0) [[
         anno::display_name("Weight"),
         anno::in_group("Coat"),
         anno::hard_range(0.0f, 1.0f)
@@ -126,32 +103,32 @@ export material OmniSurfaceLiteBase(
         anno::in_group("Coat")
     ]],
 
-    float coat_roughness = float(0.1) [[ 
+    float coat_roughness = float(0.1) [[
         anno::display_name("Roughness"),
         anno::in_group("Coat"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    uniform ::OmniSurface::OmniShared::ior_presets coat_ior_preset = 
+    uniform ::OmniSurface::OmniShared::ior_presets coat_ior_preset =
         ::OmniSurface::OmniShared::ior_custom [[
         anno::display_name("IOR Preset"),
         anno::in_group("Coat")
     ]],
 
-    uniform float coat_ior = float(1.5) [[ 
-        anno::display_name("IOR"),    
+    uniform float coat_ior = float(1.5) [[
+        anno::display_name("IOR"),
         anno::in_group("Coat"),
         anno::soft_range(1.0f, 5.0f),
         anno::hard_range(1.0f, limits::FLOAT_MAX)
     ]],
 
-    float coat_anisotropy = float(0.0) [[ 
+    float coat_anisotropy = float(0.0) [[
         anno::display_name("Anisotropy"),
         anno::in_group("Coat"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    float coat_anisotropy_rotation = float(0.0) [[ 
+    float coat_anisotropy_rotation = float(0.0) [[
         anno::display_name("Rotation (radian)"),
         anno::in_group("Coat"),
         anno::soft_range(0.0f, 1.0f)
@@ -177,18 +154,18 @@ export material OmniSurfaceLiteBase(
 
     //Emission
     //
-    float emission_weight = float(0.0) [[ 
+    float emission_weight = float(0.0) [[
         anno::display_name("Weight"),
         anno::in_group("Emission"),
         anno::hard_range(0.0f, 1.0f)
     ]],
 
-    uniform ::OmniSurface::OmniShared::emission_mode emission_mode = 
+    uniform ::OmniSurface::OmniShared::emission_mode emission_mode =
         ::OmniSurface::OmniShared::emission_lx [[
         anno::display_name("Emission Mode"),
         anno::in_group("Emission")
     ]],
-    
+
     float emission_intensity = float(1.0) [[
         anno::display_name("Intensity"),
         anno::in_group("Emission"),
@@ -200,7 +177,7 @@ export material OmniSurfaceLiteBase(
         anno::in_group("Emission")
     ]],
 
-    uniform bool emission_use_temperature = false [[ 
+    uniform bool emission_use_temperature = false [[
         anno::display_name("Use Temperature"),
         anno::in_group("Emission")
     ]],
@@ -238,7 +215,7 @@ export material OmniSurfaceLiteBase(
         anno::hard_range(0.0f, 1.0f)
 	]],
 
-    float2 geometry_normal_roughness = float2(0.0) [[ 
+    float2 geometry_normal_roughness = float2(0.0) [[
         anno::display_name("Geometry Normal Roughness"),
         anno::in_group("Geometry")
     ]],
@@ -254,40 +231,42 @@ export material OmniSurfaceLiteBase(
         anno::in_group("Geometry")
     ]]
 )
-[[  
+[[
     anno::display_name("OmniSurfaceLiteBase"),
     anno::description("A base material for modeling a variety of surfaces."),
+    anno::in_group("Omni Materials", "OmniSurface"),
     anno::author("NVIDIA Corporation"),
     anno::key_words(string[]("generic", "surface")),
+    anno::thumbnail(".thumbs/OmniSurfaceLiteBase.png"),
     anno::version(1, 0, 0, "")
-    
+
 ]] = let {
 
     //Coat - Dielectric microfacet BRDF
     float coat_roughness_2 = coat_roughness * coat_roughness;
-    float2 coat_roughness_anisotropy = 
+    float2 coat_roughness_anisotropy =
         coat_anisotropy != 0.0f ?
             ::OmniSurface::OmniShared::compute_anisotropy(coat_roughness_2, coat_anisotropy):
             float2(coat_roughness_2);
 
-    float coat_roughness_u = coat_roughness_anisotropy.x; 
-    float coat_roughness_v = coat_roughness_anisotropy.y; 
-    float3 coat_tangent_u = 
-        coat_roughness_anisotropy != 0.0f ? 
+    float coat_roughness_u = coat_roughness_anisotropy.x;
+    float coat_roughness_v = coat_roughness_anisotropy.y;
+    float3 coat_tangent_u =
+        coat_roughness_anisotropy != 0.0f ?
             coat_anisotropy_rotation != 0.0f ?
                 ::OmniSurface::OmniShared::rotate_tangent(
-                    state::texture_tangent_u(0), 
+                    state::texture_tangent_u(0),
                     coat_anisotropy_rotation):
-                state::texture_tangent_u(0): 
+                state::texture_tangent_u(0):
             state::texture_tangent_u(0);
 
     float coat_ior_value = ::OmniSurface::OmniShared::ior_preset_to_value(
-        coat_ior_preset, 
+        coat_ior_preset,
         coat_ior);
 
-    ::OmniSurface::OmniShared::fresnel_reflectivity coat_fresnel_reflectivity = 
+    ::OmniSurface::OmniShared::fresnel_reflectivity coat_fresnel_reflectivity =
         ::OmniSurface::OmniShared::approximate_fresnel(
-            coat_ior_value, 
+            coat_ior_value,
             coat_roughness_2);
 
     color coat_multiscatter_tint = color(0.92); //heuristic
@@ -301,19 +280,19 @@ export material OmniSurfaceLiteBase(
         mode: df::scatter_reflect);
 
     //Specular reflection - Dielectric microfacet BRDF
-    float specular_reflection_roughness_2 = 
+    float specular_reflection_roughness_2 =
         specular_reflection_roughness * specular_reflection_roughness;
 
-    float coat_affect_roughness_coefficient = 
+    float coat_affect_roughness_coefficient =
         (coat_weight * coat_roughness_2 * coat_affect_roughness);
 
-    float specular_reflection_roughness_coefficient = 
+    float specular_reflection_roughness_coefficient =
         math::lerp(specular_reflection_roughness_2, 1.0f, coat_affect_roughness_coefficient);
 
-    float2 specular_reflection_roughness_anisotropy = 
+    float2 specular_reflection_roughness_anisotropy =
         specular_reflection_anisotropy != 0.0f ?
             ::OmniSurface::OmniShared::compute_anisotropy(
-                specular_reflection_roughness_coefficient, 
+                specular_reflection_roughness_coefficient,
                 specular_reflection_anisotropy):
             float2(specular_reflection_roughness_coefficient);
 
@@ -321,29 +300,29 @@ export material OmniSurfaceLiteBase(
         specular_reflection_roughness_anisotropy.x +
         geometry_normal_roughness.x * geometry_normal_roughness.x * geometry_normal_roughness_strength;
 
-    float specular_reflection_roughness_v = 
+    float specular_reflection_roughness_v =
         specular_reflection_roughness_anisotropy.y +
         geometry_normal_roughness.y * geometry_normal_roughness.y * geometry_normal_roughness_strength;
 
-    float3 specular_reflection_tangent_u = 
-        specular_reflection_roughness_anisotropy != 0.0f ? 
+    float3 specular_reflection_tangent_u =
+        specular_reflection_roughness_anisotropy != 0.0f ?
             specular_reflection_anisotropy_rotation != 0.0f ?
                 ::OmniSurface::OmniShared::rotate_tangent(
                     state::texture_tangent_u(0),
                     specular_reflection_anisotropy_rotation):
-                state::texture_tangent_u(0): 
+                state::texture_tangent_u(0):
             state::texture_tangent_u(0);
 
     float specular_reflection_ior_value = ::OmniSurface::OmniShared::ior_preset_to_value(
-        specular_reflection_ior_preset, 
+        specular_reflection_ior_preset,
         specular_reflection_ior);
 
-    ::OmniSurface::OmniShared::fresnel_reflectivity specular_reflection_fresnel_reflectivity = 
+    ::OmniSurface::OmniShared::fresnel_reflectivity specular_reflection_fresnel_reflectivity =
         ::OmniSurface::OmniShared::approximate_fresnel(
-            specular_reflection_ior_value, 
+            specular_reflection_ior_value,
             specular_reflection_roughness_2);
 
-    color specular_reflection_multiscatter_tint = 
+    color specular_reflection_multiscatter_tint =
         specular_reflection_color * color(0.92); //heuristic
 
     bsdf specular_reflection_brdf = df::microfacet_ggx_smith_bsdf(
@@ -371,9 +350,9 @@ export material OmniSurfaceLiteBase(
 
     color metal_base_color = diffuse_reflection_color * diffuse_reflection_weight;
     color metal_edge_color = specular_reflection_color * specular_reflection_weight;
-    ::OmniSurface::OmniShared::metal_complex_ior metal_ior = 
+    ::OmniSurface::OmniShared::metal_complex_ior metal_ior =
         ::OmniSurface::OmniShared::compute_artistic_to_conductor_fresnel(
-            metal_base_color, 
+            metal_base_color,
             metal_edge_color);
 
     bsdf metal_brdf = df::fresnel_factor(
@@ -381,9 +360,9 @@ export material OmniSurfaceLiteBase(
         extinction_coefficient: metal_ior.k,
         base: metal_base_brdf);
 
-    //Diffuse reflection - Diffuse microfacet BRDF 
+    //Diffuse reflection - Diffuse microfacet BRDF
     float coat_gamma = 1.0f + coat_affect_color * math::clamp(coat_weight, 0.0f, 1.0f);
-    color diffuse_color = 
+    color diffuse_color =
         math::pow(diffuse_reflection_color * diffuse_reflection_weight, coat_gamma);
 
     bsdf diffuse_reflection_bsdf = df::diffuse_reflection_bsdf(
@@ -391,33 +370,33 @@ export material OmniSurfaceLiteBase(
         roughness: diffuse_reflection_roughness);
 
     //Emission - Diffuse emission
-    uniform float emission_unit_intensity = 
-        (emission_mode == ::OmniSurface::OmniShared::emission_lx) ? 
-            1.0f : 
+    uniform float emission_unit_intensity =
+        (emission_mode == ::OmniSurface::OmniShared::emission_lx) ?
+            1.0f :
             math::PI;
 
     color emission_coat_affect = math::lerp(color(1.0), coat_color, coat_weight);
 
-    color emission_final_color = 
-        emission_use_temperature ? 
-            math::blackbody(emission_temperature): 
+    color emission_final_color =
+        emission_use_temperature ?
+            math::blackbody(emission_temperature):
             emission_color;
 
-    color emission_final_intensity = 
-        emission_weight * emission_intensity * emission_unit_intensity * 
+    color emission_final_intensity =
+        emission_weight * emission_intensity * emission_unit_intensity *
         emission_final_color * emission_coat_affect;
 
     material_emission emission = material_emission(
-        emission: 
+        emission:
             df::directional_factor(
                 normal_tint: math::lerp(
-                    color(1.0), 
-                    color(1.0 - coat_fresnel_reflectivity.nr), 
+                    color(1.0),
+                    color(1.0 - coat_fresnel_reflectivity.nr),
                     coat_weight
                 ),
                 grazing_tint: math::lerp(
-                    color(1.0), 
-                    color(1.0 - coat_fresnel_reflectivity.gr), 
+                    color(1.0),
+                    color(1.0 - coat_fresnel_reflectivity.gr),
                     coat_weight
                 ),
                 exponent: 4.0f, //heuristic
@@ -429,7 +408,7 @@ export material OmniSurfaceLiteBase(
     //Layering
     //
     //Diffuse reflection | Specular reflection
-    bsdf specular_reflection_brdf_mix = df::custom_curve_layer( 
+    bsdf specular_reflection_brdf_mix = df::custom_curve_layer(
         weight: specular_reflection_weight,
         normal: geometry_normal,
         normal_reflectivity: specular_reflection_fresnel_reflectivity.nr,
@@ -459,7 +438,7 @@ export material OmniSurfaceLiteBase(
         weight: coat_weight,
         layer: coat_brdf,
         base: df::tint(
-            tint: math::lerp(color(1.0), coat_color, coat_weight), 
+            tint: math::lerp(color(1.0), coat_color, coat_weight),
             base: metal_brdf_mix
         ),
         normal: coat_normal
@@ -473,10 +452,10 @@ export material OmniSurfaceLiteBase(
 
     //Back Surface
     material_surface back_surface = material_surface(
-        scattering: bsdf(), 
+        scattering: bsdf(),
         emission: material_emission(
-            emission: edf(), 
-            intensity: color(0.0), 
+            emission: edf(),
+            intensity: color(0.0),
             mode: intensity_radiant_exitance
         )
     );
@@ -487,10 +466,10 @@ export material OmniSurfaceLiteBase(
     //Geometry
     material_geometry geometry = material_geometry(
         displacement: geometry_displacement,
-        cutout_opacity: enable_opacity ? 
-            geometry_opacity_threshold == 0.0f ? 
-                geometry_opacity : 
-                (geometry_opacity  >= geometry_opacity_threshold ? 1.0f : 0.0f) : 
+        cutout_opacity: enable_opacity ?
+            geometry_opacity_threshold == 0.0f ?
+                geometry_opacity :
+                (geometry_opacity  >= geometry_opacity_threshold ? 1.0f : 0.0f) :
             1.0f,
         normal: state::normal()
     );

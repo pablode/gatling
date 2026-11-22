@@ -1,30 +1,7 @@
-/***************************************************************************************************
- * Copyright 2020 NVIDIA Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- **************************************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 
 // Wrapper for OmniSurfaceBase material
 
@@ -753,6 +730,28 @@ export material OmniSurface(
         anno::description("If > 0, remap opacity values to 1 when >= threshold and to 0 otherwise"),
         anno::in_group("Geometry"),
         anno::hard_range(0.0f, 1.0f)
+    ]],
+
+    uniform float round_edges_radius = float(0.0) [[
+        anno::display_name("Round Edge Radius"),
+        anno::description("Influence radius around the edges in meters"),
+        anno::in_group("Geometry"),
+        anno::soft_range(0.0, 1.0)
+    ]],
+
+    uniform float round_edges_roundness = float(1.0) [[
+        anno::display_name("Round Edge Roundness"),
+        anno::description("Determines how round the edge will look"),
+        anno::in_group("Geometry"),
+        anno::hard_range(0.0, 1.0)
+    ]],
+
+    uniform bool round_edges_across_materials = false [[
+        anno::display_name("Round Edge Across Materials"),
+        anno::description("Normal smoothing happens only between facets of equal material, \n"
+                          "\t\tunless this parameter is set true, in which case the smoothing \n"
+                          "\t\thappens between facets irrespective of their materials"),
+        anno::in_group("Geometry")
     ]],
 
     uniform float geometry_normal_strength = float(1.0) [[ 
@@ -1608,6 +1607,12 @@ export material OmniSurface(
             geometry_opacity,
 
         geometry_opacity_threshold: geometry_opacity_threshold,
+
+        round_edges_radius: round_edges_radius,
+
+        round_edges_roundness: round_edges_roundness,
+
+        round_edges_across_materials: round_edges_across_materials,
 
         geometry_normal_roughness_strength: geometry_normal_roughness_strength,
 

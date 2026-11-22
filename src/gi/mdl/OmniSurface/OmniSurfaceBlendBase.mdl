@@ -1,30 +1,7 @@
-/***************************************************************************************************
- * Copyright 2020 NVIDIA Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- **************************************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
 
 // Implementation of OmniSurfaceBlendBase material
 
@@ -55,7 +32,7 @@ export material OmniSurfaceBlendBase(
         anno::in_group("Materials")
     ]],
 
-    float blend_weight = float(1.0) [[ 
+    float blend_weight = float(1.0) [[
         anno::display_name("Weight"),
         anno::in_group("Blending"),
         anno::hard_range(0.0f, 1.0f)
@@ -79,8 +56,10 @@ export material OmniSurfaceBlendBase(
 [[
     anno::display_name("OmniSurfaceBlendBase"),
     anno::description("Blend two materials."),
+    anno::in_group("Omni Materials", "OmniSurface"),
     anno::author("NVIDIA Corporation"),
     anno::key_words(string[]("generic", "utilities")),
+    anno::thumbnail(".thumbs/OmniSurfaceBlendBase.png"),
     anno::version(1, 0, 0, "")
 
 ]] = let {
@@ -130,10 +109,10 @@ export material OmniSurfaceBlendBase(
 
     //Back Surface
     material_surface back_surface = material_surface(
-        scattering: bsdf(), 
+        scattering: bsdf(),
         emission: material_emission(
-            emission: edf(), 
-            intensity: color(0.0), 
+            emission: edf(),
+            intensity: color(0.0),
             mode: intensity_radiant_exitance
         )
     );
@@ -153,7 +132,7 @@ export material OmniSurfaceBlendBase(
             )
         )
     );
-    
+
     color volume_scattering_coefficient_mix = base::blend_color_layers(
         base: base_material.volume.scattering_coefficient,
         layers: base::color_layer[](
@@ -176,7 +155,7 @@ export material OmniSurfaceBlendBase(
         )
     ).tint;
 
-    material_volume volume = (base_material.thin_walled || blend_material.thin_walled) ? 
+    material_volume volume = (base_material.thin_walled || blend_material.thin_walled) ?
         material_volume() :
         material_volume(
             scattering: volume_vdf_mix,
@@ -214,16 +193,16 @@ export material OmniSurfaceBlendBase(
     ).mono;
 
     float3 normal_blend = ::OmniSurface::OmniShared::add_detail_normal(
-        base_material.geometry.normal, 
+        base_material.geometry.normal,
         blend_material.geometry.normal
     );
 
     material_geometry geometry = material_geometry(
         displacement: displacement_blend,
-        cutout_opacity: enable_opacity ? 
-            geometry_opacity_threshold == 0.0f ? 
-                cutout_opacity_blend : 
-                (cutout_opacity_blend  >= geometry_opacity_threshold ? 1.0f : 0.0f) : 
+        cutout_opacity: enable_opacity ?
+            geometry_opacity_threshold == 0.0f ?
+                cutout_opacity_blend :
+                (cutout_opacity_blend  >= geometry_opacity_threshold ? 1.0f : 0.0f) :
             1.0f,
         normal: normal_blend
     );
