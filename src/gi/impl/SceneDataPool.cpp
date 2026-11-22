@@ -166,3 +166,127 @@ namespace gtl
     GB_LOG("> {:.2f} MiB", double(m_bytesStored) * BYTES_TO_MIB);
   }
 }
+
+#ifdef GI_TEST_EXECUTABLE
+#include <doctest/doctest.h>
+
+namespace
+{
+  using namespace gtl;
+
+  struct TestFixture
+  {
+    CgpuContext* ctx = nullptr;
+    std::unique_ptr<GgpuStager> stager;
+    std::unique_ptr<GgpuDeleteQueue> deleteQueue;
+    std::unique_ptr<GiSceneDataPool> pool;
+
+    TestFixture()
+    {
+      ctx = cgpuCreateContext("gi_test");
+      REQUIRE(ctx);
+
+      stager = std::make_unique<GgpuStager>(ctx, /*hasSharedMem=*/false, /*size=*/1024 * 1024);
+      REQUIRE(stager->allocate());
+
+      deleteQueue = std::make_unique<GgpuDeleteQueue>(ctx);
+      pool = std::make_unique<GiSceneDataPool>(ctx, *stager, *deleteQueue);
+    }
+
+    ~TestFixture()
+    {
+      pool->destroy();
+      stager->flush();
+      stager->free();
+      deleteQueue->destroyAll();
+      cgpuDestroyContext(ctx);
+    }
+  };
+
+  std::vector<uint8_t> _MakeSceneData(uint8_t seed)
+  {
+    return std::vector<uint8_t>(64, seed);
+  }
+}
+
+TEST_CASE_FIXTURE(TestFixture, "SceneDataPool.AcquireSameDataReturnsSameInstance")
+{
+  std::vector<uint8_t> data = _MakeSceneData(0x10);
+
+  GiSceneDataPtr first = pool->acquire(data);
+  REQUIRE(first);
+  GiSceneDataPtr second = pool->acquire(data);
+  REQUIRE(second);
+
+  CHECK_EQ(first.get(), second.get());
+  CHECK_EQ(first.use_count(), 2);
+}
+
+TEST_CASE_FIXTURE(TestFixture, "SceneDataPool.AcquireDifferentDataReturnsDifferentInstance")
+{
+  std::vector<uint8_t> firstData = _MakeSceneData(0x20);
+  std::vector<uint8_t> secondData = _MakeSceneData(0x40);
+
+  GiSceneDataPtr first = pool->acquire(firstData);
+  REQUIRE(first);
+  GiSceneDataPtr second = pool->acquire(secondData);
+  REQUIRE(second);
+
+  CHECK_NE(first.get(), second.get());
+  CHECK_NE(first->buffer.handle, second->buffer.handle);
+}
+
+TEST_CASE_FIXTURE(TestFixture, "SceneDataPool.AcquireEmptyDataReturnsNull")
+{
+  std::vector<uint8_t> data;
+  CHECK_FALSE(pool->acquire(data));
+}
+
+TEST_CASE_FIXTURE(TestFixture, "SceneDataPool.AcquiredBufferIsAligned")
+{
+  std::vector<uint8_t> data = _MakeSceneData(0x60);
+
+  GiSceneDataPtr sceneData = pool->acquire(data);
+  REQUIRE(sceneData);
+
+  CHECK(sceneData->buffer.handle);
+  CHECK_EQ(sceneData->address % rp::SCENE_DATA_ALIGNMENT, 0);
+  CHECK_EQ(sceneData->size, data.size());
+}
+
+TEST_CASE_FIXTURE(TestFixture, "SceneDataPool.KeepsInstanceWhileReferenced")
+{
+  std::vector<uint8_t> data = _MakeSceneData(0x80);
+
+  GiSceneDataPtr first = pool->acquire(data);
+  REQUIRE(first);
+  GiSceneDataPtr second = pool->acquire(data);
+  REQUIRE(second);
+
+  first.reset();
+
+  GiSceneDataPtr third = pool->acquire(data);
+  REQUIRE(third);
+
+  CHECK_EQ(second.get(), third.get());
+  CHECK_EQ(second.use_count(), 2);
+}
+
+TEST_CASE_FIXTURE(TestFixture, "SceneDataPool.ReleasesInstanceAfterLastReference")
+{
+  std::vector<uint8_t> data = _MakeSceneData(0xA0);
+
+  GiSceneDataPtr first = pool->acquire(data);
+  REQUIRE(first);
+
+  CgpuBuffer firstBuffer = first->buffer;
+  std::weak_ptr<GiSceneData> weakSceneData = first;
+
+  first.reset();
+  CHECK(weakSceneData.expired());
+
+  GiSceneDataPtr second = pool->acquire(data);
+  REQUIRE(second);
+  CHECK_NE(second->buffer.handle, firstBuffer.handle); // first buffer is still alive in queue
+}
+#endif
