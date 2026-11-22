@@ -41,6 +41,7 @@
 #include <pxr/usdImaging/usdImaging/delegate.h>
 
 #include <algorithm>
+#include <memory>
 
 #include "Argparse.h"
 #include "SimpleRenderTask.h"
@@ -148,15 +149,15 @@ int main(int argc, const char* argv[])
   printf("USD scene loaded (%.3fs)\n", loadTimer.GetSeconds());
   fflush(stdout);
 
-  HdRenderIndex* renderIndex = HdRenderIndex::New(renderDelegate, HdDriverVector());
-  TF_AXIOM(renderIndex);
+  std::unique_ptr<HdRenderIndex> renderIndex(HdRenderIndex::New(renderDelegate, HdDriverVector()));
+  TF_AXIOM(renderIndex.get());
 
-  std::unique_ptr<UsdImagingDelegate> sceneDelegate = std::make_unique<UsdImagingDelegate>(renderIndex, SdfPath::AbsoluteRootPath());
+  std::unique_ptr<UsdImagingDelegate> sceneDelegate = std::make_unique<UsdImagingDelegate>(renderIndex.get(), SdfPath::AbsoluteRootPath());
   sceneDelegate->Populate(stage->GetPseudoRoot());
   sceneDelegate->SetTime(0);
   sceneDelegate->SetRefineLevelFallback(4);
 
-  HdCamera* camera = _FindCamera(stage, renderIndex, settings.cameraPath);
+  HdCamera* camera = _FindCamera(stage, renderIndex.get(), settings.cameraPath);
   if (!camera)
   {
     fprintf(stderr, "Camera not found\n");
@@ -193,7 +194,7 @@ int main(int argc, const char* argv[])
   renderPassState->SetAovBindings(aovBindings);
 
   HdRprimCollection renderCollection(HdTokens->geometry, HdReprSelector(HdReprTokens->refined));
-  HdRenderPassSharedPtr renderPass = renderDelegate->CreateRenderPass(renderIndex, renderCollection);
+  HdRenderPassSharedPtr renderPass = renderDelegate->CreateRenderPass(renderIndex.get(), renderCollection);
 
   TfTokenVector renderTags{ HdRenderTagTokens->geometry, HdRenderTagTokens->render };
   auto renderTask = std::make_shared<SimpleRenderTask>(renderPass, renderPassState, renderTags);
@@ -206,7 +207,7 @@ int main(int argc, const char* argv[])
   renderTimer.Start();
 
   HdEngine engine;
-  engine.Execute(renderIndex, &tasks);
+  engine.Execute(renderIndex.get(), &tasks);
   renderBuffer->Resolve();
 
   renderTimer.Stop();
@@ -302,7 +303,7 @@ int main(int argc, const char* argv[])
   renderPass.reset();
   sceneDelegate.reset();
   stage.Reset();
-  delete renderIndex;
+  renderIndex.reset();
   plugin->DeleteRenderDelegate(renderDelegate);
 
   return EXIT_SUCCESS;
