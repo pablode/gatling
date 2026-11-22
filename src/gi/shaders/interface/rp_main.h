@@ -134,7 +134,7 @@ const GI_UINT FACE_ID_STRIDE_MASK = 0xC0000000;
 const GI_UINT FACE_ID_STRIDE_OFFSET = 30;
 
 const GI_UINT SCENE_DATA_INVALID = 0xFFFFFFFFu;
-const GI_UINT SCENE_DATA_ALIGNMENT = 32; // must be equal or larger largest type
+const GI_UINT SCENE_DATA_ALIGNMENT = 1024; // must be equal or larger largest type
 const GI_UINT SCENE_DATA_OFFSET_MASK = 0x03FFFFFFu; // (1 << 27) - 1
 const GI_UINT SCENE_DATA_STRIDE_MASK = 0x18000000u; // 0001 1000...
 const GI_UINT SCENE_DATA_STRIDE_OFFSET = 27;
@@ -161,9 +161,9 @@ static_assert(sizeof(TextureInfo) == 8);
 
 struct BlasPayloadBufferPreamble
 {
-  GI_INT objectId;
-  GI_UINT faceIdsInfo;
   GI_UINT sceneDataInfos[MAX_SCENE_DATA_COUNT];
+  GI_UINT faceIdsInfo;
+  GI_INT objectId;
 };
 #ifdef __cplusplus
 static_assert((sizeof(BlasPayloadBufferPreamble) % 32) == 0);
