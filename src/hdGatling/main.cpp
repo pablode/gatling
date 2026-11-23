@@ -601,6 +601,7 @@ public:
 
   ~GraphicalTestFixture()
   {
+    gbLogFlush();
     CHECK_EQ(m_errorCheckSink->get_error_count(), 0);
   }
 };
