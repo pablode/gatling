@@ -637,6 +637,10 @@ TEST_SUITE("Graphical")
   {
   }
 
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Camera.ClipPlanes")
+  {
+  }
+
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.CutoutOpacity")
   {
   }
