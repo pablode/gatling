@@ -214,6 +214,14 @@ int main(int argc, char** argv)
   PlugRegistry& plugRegistry = PlugRegistry::GetInstance();
   plugRegistry.RegisterPlugins(plugInfoDir);
 
+  // Verify plugin is valid and local
+  PlugPluginPtr plugin = plugRegistry.GetPluginWithName("hdGatling");
+  if (!plugin || !fs::equivalent(plugin->GetResourcePath(), plugInfoDir))
+  {
+    fprintf(stderr, "Failed to initialize local test plugin");
+    return EXIT_FAILURE;
+  }
+
   // Run tests
   doctest::Context context;
   context.applyCommandLine(argc, argv);
