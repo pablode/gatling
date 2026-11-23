@@ -184,10 +184,10 @@ def get_panels():
         'RENDER_PT_post_processing',
         'RENDER_PT_simplify',
         'SCENE_PT_audio',
-        'RENDER_PT_freestyle'
+        'RENDER_PT_freestyle',
+        'DATA_PT_preview'
     }
     include_eevee_panels = {
-        'MATERIAL_PT_preview',
         'EEVEE_MATERIAL_PT_context_material',
         'EEVEE_MATERIAL_PT_surface',
         'EEVEE_MATERIAL_PT_volume',

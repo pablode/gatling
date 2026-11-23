@@ -14,8 +14,8 @@ class GatlingHydraRenderEngine(bpy.types.HydraRenderEngine):
     bl_label = "Hydra Gatling"
     bl_info = "A cross-platform GPU path tracer with hardware ray tracing"
 
-    bl_use_preview = True
     bl_use_materialx = True
+    bl_use_preview = False # Don't use for material preview rendering
 
     bl_delegate_id = 'HdGatlingRendererPlugin'
 
