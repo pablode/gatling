@@ -647,6 +647,9 @@ TEST_SUITE("Graphical")
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MdlSimpleTextured")
   {
   }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MdlOmniPBR")
+  {
+  }
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxColorSpaces")
   {
   }
