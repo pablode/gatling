@@ -77,16 +77,21 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   }
 
   const HdMaterialNetworkMap& networkMap = resource.UncheckedGet<HdMaterialNetworkMap>();
-  bool isVolume = false;
 
+  bool isVolume = false;
   HdMaterialNetwork2 network = HdConvertToHdMaterialNetwork2(networkMap, &isVolume);
+
   if (isVolume)
   {
     TF_WARN("Volume %s unsupported", id.GetText());
-    return;
   }
 
-  _giMaterial = _materialNetworkCompiler.CompileNetwork(_giScene, id, network);
+  bool hasSurface = network.terminals.count(HdMaterialTerminalTokens->surface) != 0;
+
+  if (hasSurface)
+  {
+    _giMaterial = _materialNetworkCompiler.CompileNetwork(_giScene, id, network);
+  }
 }
 
 GiMaterial* HdGatlingMaterial::GetGiMaterial() const
