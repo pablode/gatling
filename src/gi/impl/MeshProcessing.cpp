@@ -134,11 +134,8 @@ namespace
         s2 = i * 3 + 2;
       }
 
-      int memCmpRes = 0;
-      memCmpRes += memcmp(&data[s0 * typeSize], &data[s1 * typeSize], typeSize);
-      memCmpRes += memcmp(&data[s0 * typeSize], &data[s2 * typeSize], typeSize);
-
-      if (memCmpRes != 0)
+      if (memcmp(&data[s0 * typeSize], &data[s1 * typeSize], typeSize) != 0 ||
+          memcmp(&data[s0 * typeSize], &data[s2 * typeSize], typeSize) != 0)
       {
         return false;
       }
