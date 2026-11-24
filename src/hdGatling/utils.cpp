@@ -24,6 +24,7 @@
 #include <pxr/base/gf/quath.h>
 #include <pxr/base/gf/quatf.h>
 #include <pxr/base/gf/quatd.h>
+#include <pxr/base/tf/diagnostic.h>
 #include <pxr/base/vt/array.h>
 #include <pxr/base/vt/types.h>
 
@@ -79,6 +80,79 @@ GiPrimvarType HdGatlingGetGiPrimvarType(HdType type)
   }
 }
 
+GiPrimvarInterpolation HdGatlingGetGiPrimvarInterpolation(HdInterpolation interpolation)
+{
+  switch (interpolation)
+  {
+  case HdInterpolationConstant:
+    return GiPrimvarInterpolation::Constant;
+  case HdInterpolationUniform:
+    return GiPrimvarInterpolation::Uniform;
+  case HdInterpolationVertex:
+  case HdInterpolationVarying:
+    return GiPrimvarInterpolation::Vertex;
+  case HdInterpolationFaceVarying:
+    return GiPrimvarInterpolation::FaceVarying;
+  case HdInterpolationInstance:
+    return GiPrimvarInterpolation::Instance;
+  default:
+    TF_CODING_ERROR("unhandled primvar interpolation");
+    return GiPrimvarInterpolation::Constant;
+  }
+}
+
+void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values)
+{
+  auto boolArray = values.Get<VtBoolArray>();
+  VtIntArray intArray(boolArray.size());
+
+  for (size_t i = 0; i < boolArray.size(); i++)
+  {
+    intArray[i] = boolArray[i] ? 1 : 0;
+  }
+
+  values = std::move(intArray);
+}
+
+std::optional<GiPrimvarData> HdGatlingMakeGiPrimvarData(const SdfPath& id,
+                                                        const TfToken& name,
+                                                        VtValue value,
+                                                        GiPrimvarInterpolation interpolation)
+{
+  if (value.IsEmpty())
+  {
+    return std::nullopt;
+  }
+
+  if (!HdGatlingIsPrimvarTypeSupported(value))
+  {
+    TF_WARN("type of primvar not supported: %s:%s", id.GetText(), name.GetText());
+    return std::nullopt;
+  }
+
+  HdTupleType tupleType = HdGetValueTupleType(value);
+
+  // Gi doesn't natively support bool primvars; convert them to ints
+  if (tupleType.type == HdTypeBool)
+  {
+    HdGatlingConvertVtBoolArrayToVtIntArray(value);
+    tupleType.type = HdTypeInt32;
+  }
+
+  uint32_t dataSize = HdDataSizeOfTupleType(tupleType);
+  TF_AXIOM(dataSize > 0);
+
+  std::vector<uint8_t> data(dataSize);
+  memcpy(data.data(), HdGetValueData(value), dataSize);
+
+  return GiPrimvarData{
+    .name = name.GetString(),
+    .type = HdGatlingGetGiPrimvarType(tupleType.type),
+    .interpolation = interpolation,
+    .data = std::move(data)
+  };
+}
+
 GiCullMode HdGatlingGetGiCullMode(HdCullStyle cullStyle)
 {
   switch (cullStyle)
@@ -99,19 +173,6 @@ GiCullMode HdGatlingGetGiCullMode(HdCullStyle cullStyle)
     TF_CODING_ERROR("unhandled cull style");
     return GiCullMode::DontCare;
   }
-}
-
-void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values)
-{
-  auto boolArray = values.Get<VtBoolArray>();
-  VtIntArray intArray(boolArray.size());
-
-  for (int i = 0; i < boolArray.size(); i++)
-  {
-    intArray[i] = boolArray[i] ? 1 : 0;
-  }
-
-  values = std::move(intArray);
 }
 
 bool HdGatlingUnboxPRSPrimvars(VtValue& boxedTranslations,

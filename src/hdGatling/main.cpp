@@ -52,7 +52,10 @@
 #include <pxr/usd/usdGeom/camera.h>
 #include <pxr/usd/usdRender/settings.h>
 #include <pxr/usd/usdRender/spec.h>
+#include <pxr/usd/usdGeom/primvarsAPI.h>
+#include <pxr/usd/usdShade/material.h>
 #include <pxr/usdImaging/usdImaging/delegate.h>
+#include <pxr/usdImaging/usdImaging/primvarUtils.h>
 
 #include <filesystem>
 #include <optional>
@@ -183,6 +186,42 @@ namespace
       .diffImg = _GetTestOutputDir() / (diffImgName + ".png"),
     };
   }
+
+  // Legacy UsdImagingDelegate does not expose primvars authored on material prims.
+  class _TestSceneDelegate final : public UsdImagingDelegate
+  {
+  public:
+    _TestSceneDelegate(HdRenderIndex* renderIndex, const UsdStageRefPtr& stage)
+      : UsdImagingDelegate(renderIndex, SdfPath::AbsoluteRootPath())
+      , _stage(stage)
+    {
+    }
+
+    HdPrimvarDescriptorVector GetPrimvarDescriptors(const SdfPath& id, HdInterpolation interpolation) override
+    {
+      HdPrimvarDescriptorVector descriptors = UsdImagingDelegate::GetPrimvarDescriptors(id, interpolation);
+
+      UsdPrim prim = _stage->GetPrimAtPath(id);
+      if (!prim || !prim.IsA<UsdShadeMaterial>())
+      {
+        return descriptors;
+      }
+
+      for (const UsdGeomPrimvar& primvar : UsdGeomPrimvarsAPI(prim).GetAuthoredPrimvars())
+      {
+        HdInterpolation primvarInterpolation = UsdImagingUsdToHdInterpolation(primvar.GetInterpolation());
+        if (primvarInterpolation == interpolation)
+        {
+          descriptors.emplace_back(primvar.GetPrimvarName(), primvarInterpolation);
+        }
+      }
+
+      return descriptors;
+    }
+
+  private:
+    UsdStageRefPtr _stage;
+  };
 }
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -283,7 +322,7 @@ public:
     m_renderIndex = HdRenderIndex::New(m_renderDelegate, HdDriverVector());
     REQUIRE(m_renderIndex);
 
-    m_sceneDelegate = std::make_unique<UsdImagingDelegate>(m_renderIndex, SdfPath::AbsoluteRootPath());
+    m_sceneDelegate = std::make_unique<_TestSceneDelegate>(m_renderIndex, m_stage);
     m_sceneDelegate->Populate(m_stage->GetPseudoRoot());
     m_sceneDelegate->SetTime(0);
     m_sceneDelegate->SetRefineLevelFallback(4);
@@ -676,6 +715,9 @@ TEST_SUITE("Graphical")
   {
   }
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.ParameterOverride")
+  {
+  }
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.PrimvarOverride")
   {
   }
 

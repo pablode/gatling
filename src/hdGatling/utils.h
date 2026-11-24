@@ -19,18 +19,28 @@
 
 #include <pxr/base/vt/value.h>
 #include <pxr/imaging/hd/types.h>
+#include <pxr/usd/sdf/path.h>
 
 #include <gtl/gi/Gi.h>
+
+#include <optional>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 bool HdGatlingIsPrimvarTypeSupported(const VtValue& value);
 
+void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values);
+
+std::optional<gtl::GiPrimvarData> HdGatlingMakeGiPrimvarData(const SdfPath& id,
+                                                             const TfToken& name,
+                                                             VtValue value,
+                                                             gtl::GiPrimvarInterpolation interpolation);
+
 gtl::GiPrimvarType HdGatlingGetGiPrimvarType(HdType type);
 
-gtl::GiCullMode HdGatlingGetGiCullMode(HdCullStyle cullStyle);
+gtl::GiPrimvarInterpolation HdGatlingGetGiPrimvarInterpolation(HdInterpolation interpolation);
 
-void HdGatlingConvertVtBoolArrayToVtIntArray(VtValue& values);
+gtl::GiCullMode HdGatlingGetGiCullMode(HdCullStyle cullStyle);
 
 bool HdGatlingUnboxPRSPrimvars(VtValue& boxedTranslations,
                                VtValue& boxedRotations,

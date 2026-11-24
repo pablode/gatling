@@ -150,27 +150,6 @@ std::vector<GiPrimvarData> HdGatlingInstancer::MakeGiPrimvars(const SdfPath& pro
 
       VtValue values = sceneDelegate->Get(id, primvar.name);
 
-      if (!HdGatlingIsPrimvarTypeSupported(values))
-      {
-        TF_WARN("type of primvar not supported: %s:%s", id.GetText(), name.GetText());
-        continue;
-      }
-
-      HdType type = HdGetValueTupleType(values).type;
-
-      // Gi doesn't natively support bool primvars; convert them to ints
-      if (type == HdTypeBool)
-      {
-        HdGatlingConvertVtBoolArrayToVtIntArray(values);
-        type = HdTypeInt32;
-      }
-
-      uint32_t dataSize = HdDataSizeOfTupleType(HdGetValueTupleType(values));
-
-      std::vector<uint8_t> data(dataSize);
-      const uint8_t* srcPtr = (uint8_t*) HdGetValueData(values);
-      memcpy(&data[0], srcPtr, data.size());
-
       // see https://openusd.org/dev/api/class_usd_geom_point_instancer.html#UsdGeomPointInstancer_primvars
       GiPrimvarInterpolation giInterpolation = GiPrimvarInterpolation::Instance;
       if (interpolation == HdInterpolationUniform || interpolation == HdInterpolationConstant)
@@ -178,12 +157,12 @@ std::vector<GiPrimvarData> HdGatlingInstancer::MakeGiPrimvars(const SdfPath& pro
         giInterpolation = GiPrimvarInterpolation::Constant;
       }
 
-      primvars.push_back(GiPrimvarData{
-        .name = name.GetString(),
-        .type = HdGatlingGetGiPrimvarType(type),
-        .interpolation = giInterpolation,
-        .data = data
-      });
+      std::optional<GiPrimvarData> primvarData = HdGatlingMakeGiPrimvarData(id, name, std::move(values), giInterpolation);
+
+      if (primvarData)
+      {
+        primvars.push_back(std::move(*primvarData));
+      }
     }
   }
 

@@ -655,12 +655,13 @@ std::optional<HdGatlingMesh::ProcessedPrimvar> HdGatlingMesh::_ProcessPrimvar(Hd
   const SdfPath& id = GetId();
 
   VtValue boxedValues = GetPrimvar(sceneDelegate, primvarDesc.name);
-  HdType type = HdGetValueTupleType(boxedValues).type;
 
   if (!HdGatlingIsPrimvarTypeSupported(boxedValues))
   {
     return std::nullopt;
   }
+
+  HdType type = HdGetValueTupleType(boxedValues).type;
 
   // Gi doesn't natively support bool primvars; convert them to ints
   if (type == HdTypeBool)
@@ -807,28 +808,10 @@ std::vector<GiPrimvarData> HdGatlingMesh::_CollectSecondaryPrimvars(const Primva
     const uint8_t* srcPtr = (uint8_t*) HdGetValueData(p.indexMatchingData);
     memcpy(&data[0], srcPtr, data.size());
 
-    GiPrimvarInterpolation interpolation;
-    if (p.interpolation == HdInterpolationConstant) {
-      interpolation = GiPrimvarInterpolation::Constant;
-    }
-    else if (p.interpolation == HdInterpolationInstance) {
-      interpolation = GiPrimvarInterpolation::Instance;
-    }
-    else if (p.interpolation == HdInterpolationUniform) {
-      interpolation = GiPrimvarInterpolation::Uniform;
-    }
-    else if (p.interpolation == HdInterpolationFaceVarying) {
-      interpolation = GiPrimvarInterpolation::FaceVarying;
-    }
-    else {
-      TF_AXIOM(p.interpolation == HdInterpolationVertex || p.interpolation == HdInterpolationVarying);
-      interpolation = GiPrimvarInterpolation::Vertex;
-    }
-
     result.push_back(GiPrimvarData{
       .name = name.GetString(),
       .type = HdGatlingGetGiPrimvarType(p.type),
-      .interpolation = interpolation,
+      .interpolation = HdGatlingGetGiPrimvarInterpolation(p.interpolation),
       .data = data
     });
   }

@@ -17,12 +17,51 @@
 
 #include "material.h"
 #include "materialNetworkCompiler.h"
+#include "utils.h"
 
 #include <gtl/gi/Gi.h>
+
+#include <pxr/imaging/hd/primvarsSchema.h>
+#include <pxr/imaging/hd/types.h>
 
 using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+namespace
+{
+  std::vector<GiPrimvarData> _GatherPrimvars(HdSceneDelegate* sceneDelegate, const SdfPath& id)
+  {
+    std::vector<GiPrimvarData> primvars;
+
+    for (int i = 0; i < int(HdInterpolationCount); i++)
+    {
+      const auto& descriptors = sceneDelegate->GetPrimvarDescriptors(id, (HdInterpolation) i);
+
+      for (const HdPrimvarDescriptor& descriptor : descriptors)
+      {
+        VtValue values = sceneDelegate->Get(id, descriptor.name);
+
+        if (values.IsEmpty()) // UsdImagingDelegate expects the 'primvars:' attribute name for lookups
+        {
+          TfToken attributeName(SdfPath::JoinIdentifier(HdPrimvarsSchemaTokens->primvars, descriptor.name));
+          values = sceneDelegate->Get(id, attributeName);
+        }
+
+        GiPrimvarInterpolation giInterpolation = HdGatlingGetGiPrimvarInterpolation(descriptor.interpolation);
+
+        std::optional<GiPrimvarData> primvar = HdGatlingMakeGiPrimvarData(id, descriptor.name, std::move(values), giInterpolation);
+
+        if (primvar)
+        {
+          primvars.push_back(std::move(*primvar));
+        }
+      }
+    }
+
+    return primvars;
+  }
+}
 
 HdGatlingMaterial::HdGatlingMaterial(const SdfPath& id,
                                      GiScene* scene,
@@ -44,7 +83,7 @@ void HdGatlingMaterial::Finalize(HdRenderParam* renderParam)
 
 HdDirtyBits HdGatlingMaterial::GetInitialDirtyBitsMask() const
 {
-  return DirtyBits::DirtyParams;
+  return DirtyBits::DirtyParams | DirtyBits::DirtyResource;
 }
 
 void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
@@ -53,7 +92,7 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
 {
   TF_UNUSED(renderParam);
 
-  bool pullMaterial = (*dirtyBits & DirtyBits::DirtyParams);
+  bool pullMaterial = (*dirtyBits & (DirtyBits::DirtyParams | DirtyBits::DirtyResource));
 
   *dirtyBits = DirtyBits::Clean;
 
@@ -91,6 +130,16 @@ void HdGatlingMaterial::Sync(HdSceneDelegate* sceneDelegate,
   if (hasSurface)
   {
     _giMaterial = _materialNetworkCompiler.CompileNetwork(_giScene, id, network);
+  }
+
+  if (_giMaterial)
+  {
+    std::vector<GiPrimvarData> primvars = _GatherPrimvars(sceneDelegate, id);
+
+    if (!primvars.empty())
+    {
+      giSetMaterialPrimvars(_giMaterial, primvars);
+    }
   }
 }
 

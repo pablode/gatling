@@ -222,6 +222,7 @@ namespace gtl
   GiMaterial* giCreateMaterialFromMtlxStr(GiScene* scene, const char* name, const char* mtlxSrc, bool usdPreviewSurfacePresenceOverride = false);
   GiMaterial* giCreateMaterialFromMtlxDoc(GiScene* scene, const char* name, const std::shared_ptr<void/*MaterialX::Document*/> doc, bool usdPreviewSurfacePresenceOverride = false);
   GiMaterial* giCreateMaterialFromMdlFile(GiScene* scene, const char* name, const char* filePath, const char* subIdentifier, const GiMaterialParameters& params = {});
+  void giSetMaterialPrimvars(GiMaterial* mat, const std::vector<GiPrimvarData>& primvars);
   void giDestroyMaterial(GiMaterial* mat);
 
   GiMesh* giCreateMesh(GiScene* scene, const GiMeshDesc& desc);

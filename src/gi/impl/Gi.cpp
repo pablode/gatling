@@ -139,6 +139,7 @@ namespace gtl
     McMaterial* mcMat = nullptr;
     std::string name;
     GiScene* scene;
+    std::vector<GiPrimvarData> primvars;
     std::optional<GiMaterialGpuData> gpuData;
   };
 
@@ -611,6 +612,18 @@ fail:
     return mat;
   }
 
+  void _DestroyMeshGpuData(GiMesh* mesh)
+  {
+    if (!mesh->gpuData.has_value())
+    {
+      return;
+    }
+
+    std::lock_guard guard(s_resourceDestroyerMutex); // Hydra sync is parallel
+    s_deleteQueue->pushBack(mesh->gpuData->blas, mesh->gpuData->payloadBuffer);
+    mesh->gpuData.reset();
+  }
+
   void giDestroyMaterialGpuData(GiScene* scene, GiMaterialGpuData& gpuData)
   {
     if (gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
@@ -627,11 +640,44 @@ fail:
     }
   }
 
+  void giSetMaterialPrimvars(GiMaterial* mat, const std::vector<GiPrimvarData>& primvars)
+  {
+    mat->primvars = primvars;
+
+    GiScene* scene = mat->scene;
+    {
+      std::lock_guard guard(scene->mutex);
+
+      for (GiMesh* mesh : scene->meshes)
+      {
+        if (mesh->material != mat)
+        {
+          continue;
+        }
+
+        _DestroyMeshGpuData(mesh);
+      }
+
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+    }
+  }
+
   void giDestroyMaterial(GiMaterial* mat)
   {
     GiScene* scene = mat->scene;
     {
       std::lock_guard guard(scene->mutex);
+
+      for (GiMesh* mesh : scene->meshes)
+      {
+        if (mesh->material != mat)
+        {
+          continue;
+        }
+
+        _DestroyMeshGpuData(mesh);
+        mesh->material = nullptr;
+      }
 
       if (mat->gpuData)
       {
@@ -639,14 +685,7 @@ fail:
       }
 
       scene->materials.erase(mat);
-
-      for (GiMesh* m : scene->meshes)
-      {
-        if (m->material == mat)
-        {
-          m->material = nullptr;
-        }
-      }
+      scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
 
     delete mat->mcMat;
@@ -738,78 +777,32 @@ fail:
     }
   }
 
-  void giDestroyMeshGpuData(GiMeshGpuData& gpuData)
-  {
-    std::lock_guard guard(s_resourceDestroyerMutex); // Hydra sync is parallel
-    s_deleteQueue->pushBack(gpuData.blas, gpuData.payloadBuffer);
-    gpuData.sceneData.clear();
-  }
-
   void giSetMeshInstancerPrimvars(GiMesh* mesh, const std::vector<GiPrimvarData>& instancerPrimvars)
   {
-    mesh->instancerPrimvars = instancerPrimvars;
-
-    if (mesh->gpuData.has_value())
-    {
-      giDestroyMeshGpuData(*mesh->gpuData);
-      mesh->gpuData.reset();
-    }
-
     GiScene* scene = mesh->scene;
     {
       std::lock_guard guard(scene->mutex);
+      mesh->instancerPrimvars = instancerPrimvars;
+      _DestroyMeshGpuData(mesh);
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
   }
 
   void giSetMeshMaterial(GiMesh* mesh, GiMaterial* mat)
   {
-    McMaterial* newMcMat = mat->mcMat;
-    McMaterial* oldMcMat = mesh->material ? mesh->material->mcMat : nullptr;
-
-    bool transparencyChanged = bool(newMcMat) ^ bool(oldMcMat);
-    bool primvarsChanged = bool(newMcMat) ^ bool(oldMcMat);
-
-    GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::DirtyPipeline;
-    if (oldMcMat && newMcMat)
-    {
-      // material data such as alpha is used in the BVH build
-      transparencyChanged |= (newMcMat->opacityClass != oldMcMat->opacityClass);
-
-      const auto& newPrimvarNames = newMcMat->sceneDataNames;
-      const auto& oldPrimvarNames = oldMcMat->sceneDataNames;
-
-      primvarsChanged |= newPrimvarNames.size() != oldPrimvarNames.size();
-
-      if (!primvarsChanged)
-      {
-        for (size_t i = 0; i < newPrimvarNames.size(); i++)
-        {
-          if (strcmp(newPrimvarNames[i], oldPrimvarNames[i]) != 0)
-          {
-            primvarsChanged = true;
-            break;
-          }
-        }
-      }
-    }
-
-    if (transparencyChanged || primvarsChanged)
-    {
-      dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
-
-      if (mesh->gpuData.has_value())
-      {
-        giDestroyMeshGpuData(*mesh->gpuData);
-        mesh->gpuData.reset();
-      }
-    }
-
-    mesh->material = mat;
-
     GiScene* scene = mesh->scene;
     {
       std::lock_guard guard(scene->mutex);
+
+      GiSceneDirtyFlags dirtyFlags = GiSceneDirtyFlags::DirtyPipeline;
+      if (mesh->material != mat)
+      {
+        // Material data such as alpha and primvars is used in the BVH build.
+        mesh->material = mat;
+        _DestroyMeshGpuData(mesh);
+        dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
+      }
+
       scene->dirtyFlags |= dirtyFlags;
     }
   }
@@ -827,21 +820,26 @@ fail:
 
   void giDestroyMesh(GiMesh* mesh)
   {
-    auto& gpuData = mesh->gpuData;
-
-    if (gpuData.has_value())
-    {
-      giDestroyMeshGpuData(*gpuData);
-      gpuData.reset();
-    }
-
     GiScene* scene = mesh->scene;
     {
       std::lock_guard guard(scene->mutex);
+      _DestroyMeshGpuData(mesh);
       scene->meshes.erase(mesh);
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyBvh;
     }
     delete mesh;
+  }
+
+  const GiPrimvarData* _FindPrimvar(const std::vector<GiPrimvarData>& primvars, const char* name)
+  {
+    for (const GiPrimvarData& p : primvars)
+    {
+      if (p.name == name && !p.data.empty())
+      {
+        return &p;
+      }
+    }
+    return nullptr;
   }
 
   void _giBuildGeometryStructures(GiScene* scene,
@@ -869,7 +867,7 @@ fail:
       }
 
       // Find material for SBT index (FIXME: find a better solution)
-      const GiMaterial* material = mesh->material;
+      GiMaterial* material = mesh->material;
 
       uint32_t materialIndex = UINT32_MAX;
       for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
@@ -968,22 +966,23 @@ fail:
             const char* sceneDataName = sceneDataNames[i];
 
             // FIXME: we should check if scene data and primvar types match to prevent crashes
+
+            // Material primvars are a fallback for the ones present on the geometry.
+            // See pxr/imaging/hdsi/materialPrimvarTransferSceneIndex.h:
+            // "Any matching primvar already present will have a stronger opinion."
             const GiPrimvarData* primvar = nullptr;
-            for (const GiPrimvarData& p : mesh->instancerPrimvars)
+
+            if (const GiPrimvarData* p = _FindPrimvar(material->primvars, sceneDataName))
             {
-              if (p.name == sceneDataName && !p.data.empty())
-              {
-                primvar = &p;
-                break;
-              }
+              primvar = p;
             }
-            for (const GiPrimvarData& p : meshPrimvars) // override instancer primvars
+            if (const GiPrimvarData* p = _FindPrimvar(mesh->instancerPrimvars, sceneDataName))
             {
-              if (p.name == sceneDataName && !p.data.empty())
-              {
-                primvar = &p;
-                break;
-              }
+              primvar = p;
+            }
+            if (const GiPrimvarData* p = _FindPrimvar(meshPrimvars, sceneDataName)) // stronger than instancer; matches Storm
+            {
+              primvar = p;
             }
 
             int index = -1;
@@ -1081,6 +1080,7 @@ fail:
           }
 
           preamble.sceneDataInfos[i] = _MakeSceneDataInfo(primvarSceneData->address, stride, primvar->interpolation);
+
           sceneData.push_back(std::move(primvarSceneData));
         }
 
@@ -2218,22 +2218,13 @@ cleanup:
           continue;
         }
 
-        GiMaterialGpuData& gpuData = *mat->gpuData;
-
-        if (gpuData.texOffsetAllocation.offset != OffsetAllocator::Allocation::NO_SPACE)
-        {
-          scene->texAllocator.free(gpuData.texOffsetAllocation);
-        }
-        if (gpuData.closestHit.handle)
-        {
-          cgpuDestroyShader(s_ctx, gpuData.closestHit);
-        }
-        for (CgpuShader shader : gpuData.anyHits)
-        {
-          cgpuDestroyShader(s_ctx, shader);
-        }
-
+        giDestroyMaterialGpuData(scene, *mat->gpuData);
         mat->gpuData.reset();
+      }
+
+      for (GiMesh* mesh : scene->meshes)
+      {
+        _DestroyMeshGpuData(mesh);
       }
 
       scene->dirtyFlags |= GiSceneDirtyFlags::DirtyPipeline;
