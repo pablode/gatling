@@ -30,6 +30,12 @@
 #include <fstream>
 #include <cassert>
 
+namespace
+{
+  constexpr const char* CAMERA_POSITION_SCENE_DATA_NAME = "CAMERA_POSITION";
+  constexpr const char* FRAME_SCENE_DATA_NAME = "FRAME";
+}
+
 namespace gtl
 {
   class McRuntime;
@@ -197,12 +203,12 @@ namespace gtl
       uint32_t id = i + 1; // 0 = invalid id
       const std::string& str = codeGenResult.stringConstants[i];
 
-      if (str == "CAMERA_POSITION")
+      if (str == CAMERA_POSITION_SCENE_DATA_NAME)
       {
         bsdIndices.cameraPosition = id;
         continue;
       }
-      else if (str == "FRAME")
+      else if (str == FRAME_SCENE_DATA_NAME)
       {
         bsdIndices.frame = id;
         continue;
@@ -257,6 +263,11 @@ namespace gtl
 
     return _MakeMaterialGenInfo(genResult, material.resourcePathPrefix, material.sceneDataNames,
                                 m_shaderPath, genInfo);
+  }
+
+  bool GiGlslShaderGen::IsBuiltinSceneData(std::string_view name)
+  {
+    return name == CAMERA_POSITION_SCENE_DATA_NAME || name == FRAME_SCENE_DATA_NAME;
   }
 
   bool GiGlslShaderGen::generateClosestHitSpirv(const ClosestHitShaderParams& params, std::vector<uint8_t>& spv)

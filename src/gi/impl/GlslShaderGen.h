@@ -58,6 +58,8 @@ namespace gtl
 
     bool generateMaterialInfo(const McMaterial& material, MaterialGenInfo& genInfo, bool needsAuxOutput);
 
+    static bool IsBuiltinSceneData(std::string_view name);
+
   public:
     struct CommonShaderParams
     {

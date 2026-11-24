@@ -107,20 +107,22 @@ namespace gtl
     uint32_t index;
   };
 
+  using MaterialIndexMap = std::unordered_map<const GiMaterial*, uint32_t>;
+
   struct GiShaderCache
   {
-    uint32_t                       aovMask;
-    std::array<CgpuBindSet, 3>     bindSets;
-    bool                           domeLightCameraVisible;
-    std::vector<GiImageBinding>    imageBindings;
-    std::vector<const GiMaterial*> materials;
-    uint32_t                       maxTextureIndex;
-    std::vector<CgpuShader>        missShaders;
-    CgpuPipeline                   pipeline;
-    CgpuShader                     rgenShader;
-    CgpuBuffer                     textureInfos;
-    GiScene*                       scene;
-    bool                           resetSampleOffset = true;
+    uint32_t                    aovMask;
+    std::array<CgpuBindSet, 3>  bindSets;
+    bool                        domeLightCameraVisible;
+    std::vector<GiImageBinding> imageBindings;
+    MaterialIndexMap            materialIndices;
+    uint32_t                    maxTextureIndex;
+    std::vector<CgpuShader>     missShaders;
+    CgpuPipeline                pipeline;
+    CgpuShader                  rgenShader;
+    CgpuBuffer                  textureInfos;
+    GiScene*                    scene;
+    bool                        resetSampleOffset = true;
   };
 
   struct GiMaterialGpuData
@@ -866,22 +868,19 @@ fail:
         continue;
       }
 
-      // Find material for SBT index (FIXME: find a better solution)
+      // Find material for SBT index
       GiMaterial* material = mesh->material;
-
       uint32_t materialIndex = UINT32_MAX;
-      for (uint32_t i = 0; i < shaderCache->materials.size(); i++)
+
+      if (auto materialIndexIt = shaderCache->materialIndices.find(material);
+          materialIndexIt != shaderCache->materialIndices.end())
       {
-          if (shaderCache->materials[i] == material)
-          {
-              materialIndex = i;
-              break;
-          }
+        materialIndex = materialIndexIt->second;
       }
-      if (materialIndex == UINT32_MAX)
+      else
       {
-          GB_ERROR("invalid BLAS material");
-          continue;
+        GB_ERROR("invalid BLAS material");
+        continue;
       }
 
       // Build mesh BLAS & buffers if they don't exist yet
@@ -965,7 +964,10 @@ fail:
           {
             const char* sceneDataName = sceneDataNames[i];
 
-            // FIXME: we should check if scene data and primvar types match to prevent crashes
+            if (GiGlslShaderGen::IsBuiltinSceneData(sceneDataName))
+            {
+              continue;
+            }
 
             // Material primvars are a fallback for the ones present on the geometry.
             // See pxr/imaging/hdsi/materialPrimvarTransferSceneIndex.h:
@@ -1005,7 +1007,6 @@ fail:
 
             if (!primvar)
             {
-              // TODO: check if reserved scene data
               GB_DEBUG("> [{}] {} (not found!)", index, sceneDataName);
               continue;
             }
@@ -1151,7 +1152,6 @@ fail:
 
         // Build BLAS
         {
-          const GiMaterial* material = shaderCache->materials[materialIndex];
           bool isOpaque = (material->mcMat->opacityClass != McOpacityClassification::Cutout); // does not require any-hit invocation
 
           bool blasCreated = cgpuCreateBlas(s_ctx, {
@@ -1953,10 +1953,9 @@ cleanup:
     cache->domeLightCameraVisible = renderSettings.domeLightCameraVisible;
     cache->imageBindings = std::move(imageBindings);
     cache->maxTextureIndex = maxTextureIndex;
-    cache->materials.resize(materials.size());
-    for (uint32_t i = 0; i < cache->materials.size(); i++)
+    for (uint32_t i = 0; i < materials.size(); i++)
     {
-      cache->materials[i] = materials[i];
+      cache->materialIndices[materials[i]] = i;
     }
     cache->missShaders = missShaders;
     cache->pipeline = pipeline;
