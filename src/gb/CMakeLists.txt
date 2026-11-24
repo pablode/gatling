@@ -8,12 +8,14 @@ add_library(
   gtl/gb/HandleStore.h
   gtl/gb/LinearDataStore.h
   gtl/gb/Log.h
+  gtl/gb/Mmap.h
   gtl/gb/ParamTypes.h
   gtl/gb/SmallVector.h
   gtl/gb/ThreadPool.h
   impl/HandleStore.cpp
   impl/LinearDataStore.cpp
   impl/Log.cpp
+  impl/Mmap.cpp
   impl/SmallVector.cpp
   impl/ThreadPool.cpp
 )

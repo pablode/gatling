@@ -9,8 +9,6 @@ set(GI_SRCS
   impl/GlslShaderGen.cpp
   impl/GlslStitcher.h
   impl/GlslStitcher.cpp
-  impl/Mmap.h
-  impl/Mmap.cpp
   impl/MeshProcessing.h
   impl/MeshProcessing.cpp
   impl/SceneDataPool.h

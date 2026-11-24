@@ -46,9 +46,9 @@ namespace
 
 namespace gtl
 {
-  struct GiFile
+  struct GbFile
   {
-    GiFileUsage usage;
+    GbFileUsage usage;
     size_t      size;
 #if defined(_WIN32)
     HANDLE      fileHandle;
@@ -61,7 +61,7 @@ namespace gtl
 
 #if defined (_WIN32)
 
-  bool giFileCreate(const char* path, size_t size, GiFile** file)
+  bool gbFileCreate(const char* path, size_t size, GbFile** file)
   {
     DWORD desiredAccess = GENERIC_READ | GENERIC_WRITE;
     DWORD shareMode = FILE_SHARE_WRITE;
@@ -108,8 +108,8 @@ namespace gtl
       return false;
     }
 
-    (*file) = new GiFile;
-    (*file)->usage = GiFileUsage::Write;
+    (*file) = new GbFile;
+    (*file)->usage = GbFileUsage::Write;
     (*file)->fileHandle = fileHandle;
     (*file)->mappingHandle = mappingHandle;
     (*file)->size = size;
@@ -117,18 +117,18 @@ namespace gtl
     return true;
   }
 
-  bool giFileOpen(const char* path, GiFileUsage usage, GiFile** file)
+  bool gbFileOpen(const char* path, GbFileUsage usage, GbFile** file)
   {
     DWORD desiredAccess;
     DWORD shareMode;
     DWORD protectionFlags;
-    if (usage == GiFileUsage::Read)
+    if (usage == GbFileUsage::Read)
     {
       desiredAccess = GENERIC_READ;
       shareMode = FILE_SHARE_READ;
       protectionFlags = PAGE_READONLY;
     }
-    else if (usage == GiFileUsage::Write)
+    else if (usage == GbFileUsage::Write)
     {
       desiredAccess = GENERIC_READ | GENERIC_WRITE;
       shareMode = FILE_SHARE_WRITE;
@@ -183,7 +183,7 @@ namespace gtl
       return false;
     }
 
-    (*file) = new GiFile;
+    (*file) = new GbFile;
     (*file)->usage = usage;
     (*file)->fileHandle = fileHandle;
     (*file)->mappingHandle = mappingHandle;
@@ -192,18 +192,18 @@ namespace gtl
     return true;
   }
 
-  bool giFileExists(const char* path)
+  bool gbFileExists(const char* path)
   {
     DWORD attributes = GetFileAttributesA(path);
     return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
   }
 
-  size_t giFileSize(GiFile* file)
+  size_t gbFileSize(GbFile* file)
   {
     return file->size;
   }
 
-  bool giFileClose(GiFile* file)
+  bool gbFileClose(GbFile* file)
   {
     bool closedMapping = CloseHandle(file->mappingHandle);
     bool closedFile = CloseHandle(file->fileHandle);
@@ -213,7 +213,7 @@ namespace gtl
     return closedMapping && closedFile;
   }
 
-  void* giMmap(GiFile* file, size_t offset, size_t size)
+  void* gbMmap(GbFile* file, size_t offset, size_t size)
   {
     if (size == 0)
     {
@@ -221,11 +221,11 @@ namespace gtl
     }
 
     DWORD desiredAccess;
-    if (file->usage == GiFileUsage::Write)
+    if (file->usage == GbFileUsage::Write)
     {
       desiredAccess = FILE_MAP_WRITE;
     }
-    else if (file->usage == GiFileUsage::Read)
+    else if (file->usage == GbFileUsage::Read)
     {
       desiredAccess = FILE_MAP_READ;
     }
@@ -249,14 +249,14 @@ namespace gtl
     return mappedAddr;
   }
 
-  bool giMunmap(GiFile* file, void* addr)
+  bool gbMunmap(GbFile* file, void* addr)
   {
     return UnmapViewOfFile(addr);
   }
 
 #else
 
-  bool giFileCreate(const char* path, size_t size, GiFile** file)
+  bool gbFileCreate(const char* path, size_t size, GbFile** file)
   {
     int openFlags = O_RDWR | O_CREAT | O_TRUNC;
     mode_t permissionFlags = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -275,23 +275,23 @@ namespace gtl
       return false;
     }
 
-    (*file) = new GiFile;
-    (*file)->usage = GiFileUsage::Write;
+    (*file) = new GbFile;
+    (*file)->usage = GbFileUsage::Write;
     (*file)->fileDescriptor = fileDescriptor;
     memset((*file)->mappedRanges, 0, MAX_MAPPED_MEM_RANGES * sizeof(_MappedPosixRange));
 
     return true;
   }
 
-  bool giFileOpen(const char* path, GiFileUsage usage, GiFile** file)
+  bool gbFileOpen(const char* path, GbFileUsage usage, GbFile** file)
   {
     int openFlags = 0;
 
-    if (usage == GiFileUsage::Write)
+    if (usage == GbFileUsage::Write)
     {
       openFlags = O_RDWR;
     }
-    else if (usage == GiFileUsage::Read)
+    else if (usage == GbFileUsage::Read)
     {
       openFlags = O_RDONLY;
     }
@@ -314,7 +314,7 @@ namespace gtl
       return false;
     }
 
-    (*file) = new GiFile;
+    (*file) = new GbFile;
     (*file)->usage = usage;
     (*file)->fileDescriptor = fileDescriptor;
     (*file)->size = fileStats.st_size;
@@ -323,18 +323,18 @@ namespace gtl
     return true;
   }
 
-  bool giFileExists(const char* path)
+  bool gbFileExists(const char* path)
   {
     struct stat fileStats;
     return stat(path, &fileStats) == 0 && S_ISREG(fileStats.st_mode);
   }
 
-  size_t giFileSize(GiFile* file)
+  size_t gbFileSize(GbFile* file)
   {
     return file->size;
   }
 
-  bool giFileClose(GiFile* file)
+  bool gbFileClose(GbFile* file)
   {
     int result = close(file->fileDescriptor);
 #ifndef NDEBUG
@@ -348,7 +348,7 @@ namespace gtl
     return !result;
   }
 
-  void* giMmap(GiFile* file, size_t offset, size_t size)
+  void* gbMmap(GbFile* file, size_t offset, size_t size)
   {
     if (size == 0)
     {
@@ -373,7 +373,7 @@ namespace gtl
     /* Map the memory. */
     int protectionFlags = PROT_READ;
 
-    if (file->usage == GiFileUsage::Write)
+    if (file->usage == GbFileUsage::Write)
     {
       protectionFlags |= PROT_WRITE;
     }
@@ -401,7 +401,7 @@ namespace gtl
     return mappedAddr;
   }
 
-  bool giMunmap(GiFile* file, void* addr)
+  bool gbMunmap(GbFile* file, void* addr)
   {
     for (uint32_t i = 0; i < MAX_MAPPED_MEM_RANGES; ++i)
     {

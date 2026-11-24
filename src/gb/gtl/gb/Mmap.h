@@ -22,21 +22,21 @@
 
 namespace gtl
 {
-  struct GiFile;
+  struct GbFile;
 
-  enum class GiFileUsage { Read, Write };
+  enum class GbFileUsage { Read, Write };
 
-  bool giFileCreate(const char* path, size_t size, GiFile** file);
+  bool gbFileCreate(const char* path, size_t size, GbFile** file);
 
-  bool giFileOpen(const char* path, GiFileUsage usage, GiFile** file);
+  bool gbFileOpen(const char* path, GbFileUsage usage, GbFile** file);
 
-  bool giFileExists(const char* path);
+  bool gbFileExists(const char* path);
 
-  size_t giFileSize(GiFile* file);
+  size_t gbFileSize(GbFile* file);
 
-  bool giFileClose(GiFile* file);
+  bool gbFileClose(GbFile* file);
 
-  void* giMmap(GiFile* file, size_t offset, size_t size);
+  void* gbMmap(GbFile* file, size_t offset, size_t size);
 
-  bool giMunmap(GiFile* file, void* addr);
+  bool gbMunmap(GbFile* file, void* addr);
 }

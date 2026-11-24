@@ -16,30 +16,30 @@
 //
 
 #include "AssetReader.h"
-#include "Mmap.h"
+#include <gtl/gb/Mmap.h>
 
 namespace gtl
 {
   struct GiMmapAsset
   {
-    GiFile* file;
+    GbFile* file;
     size_t size;
     void* data;
   };
 
   GiAsset* GiMmapAssetReader::open(const char* path)
   {
-    GiFile* file;
-    if (!giFileOpen(path, GiFileUsage::Read, &file))
+    GbFile* file;
+    if (!gbFileOpen(path, GbFileUsage::Read, &file))
     {
       return nullptr;
     }
 
-    size_t size = giFileSize(file);
-    void* data = giMmap(file, 0, size);
+    size_t size = gbFileSize(file);
+    void* data = gbMmap(file, 0, size);
     if (!data)
     {
-      giFileClose(file);
+      gbFileClose(file);
       return nullptr;
     }
 
@@ -52,7 +52,7 @@ namespace gtl
 
   bool GiMmapAssetReader::exists(const char* path)
   {
-    return giFileExists(path);
+    return gbFileExists(path);
   }
 
   size_t GiMmapAssetReader::size(const GiAsset* asset) const
@@ -70,8 +70,8 @@ namespace gtl
   void GiMmapAssetReader::close(GiAsset* asset)
   {
     auto iasset = (GiMmapAsset*)asset;
-    giMunmap(iasset->file, iasset->data);
-    giFileClose(iasset->file);
+    gbMunmap(iasset->file, iasset->data);
+    gbFileClose(iasset->file);
     delete iasset;
   }
 
