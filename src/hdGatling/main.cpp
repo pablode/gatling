@@ -650,7 +650,7 @@ TEST_SUITE("Graphical")
   {
   }
 
-  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.CutoutOpacity")
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MtlxCutoutOpacity")
   {
   }
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Materials.MdlSimpleTextured")
