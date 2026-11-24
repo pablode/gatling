@@ -683,6 +683,10 @@ TEST_SUITE("Graphical")
   {
   }
 
+  TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Mesh.MixedFaceVertexCounts")
+  {
+  }
+
   TEST_CASE_FIXTURE(SimpleGraphicalTestFixture, "Mesh.InstancerPrimvar")
   {
   }
