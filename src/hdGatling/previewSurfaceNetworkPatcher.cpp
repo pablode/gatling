@@ -21,6 +21,7 @@
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/imaging/hd/material.h>
 #include <pxr/usd/sdf/assetPath.h>
+#include <pxr/usd/sdf/schema.h>
 
 #include <memory>
 
@@ -53,6 +54,7 @@ TF_DEFINE_PRIVATE_TOKENS(
   (scale)
   (isSRGB)
   (sourceColorSpace)
+  (file)
   ((_auto, "auto"))
   (yes)
   (no)
@@ -516,6 +518,16 @@ void _PatchUsdUVTextureColorSpaceParam(HdMaterialNetwork2& network)
     {
       value = _tokens->raw;
     }
+
+#if PXR_VERSION >= 2603
+    // USD 26.03 renamed 'sourceColorSpace' to 'colorSpace:file'.
+    auto colorSpaceParamName = TfToken(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, _tokens->file));
+    if (parameters.find(colorSpaceParamName) == parameters.end())
+    {
+      parameters[colorSpaceParamName] = value;
+    }
+    parameters.erase(paramIt);
+#endif
   }
 }
 
