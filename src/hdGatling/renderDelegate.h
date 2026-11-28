@@ -40,6 +40,8 @@ public:
   ~HdGatlingRenderDelegate() override;
 
 public:
+  void SetDrivers(HdDriverVector const& drivers) override;
+
   HdRenderSettingDescriptorList GetRenderSettingDescriptors() const override;
 
   void SetRenderSetting(const TfToken& key, const VtValue& value) override;

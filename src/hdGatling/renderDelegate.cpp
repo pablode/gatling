@@ -29,7 +29,11 @@
 #include <pxr/imaging/hd/extComputation.h>
 #include <pxr/imaging/hd/resourceRegistry.h>
 #include <pxr/imaging/hd/camera.h>
+#include <pxr/imaging/hgi/hgi.h>
+#include <pxr/imaging/hgi/tokens.h>
 #include <pxr/base/gf/vec4f.h>
+
+#include <gtl/gb/Log.h>
 
 #include <memory>
 
@@ -148,6 +152,45 @@ HdGatlingRenderDelegate::~HdGatlingRenderDelegate()
 {
   giDestroyMaterial(_defaultMaterial);
   giDestroyScene(_giScene);
+}
+
+void HdGatlingRenderDelegate::SetDrivers(HdDriverVector const& drivers)
+{
+  auto* renderParam = static_cast<HdGatlingRenderParam*>(_renderParam.get());
+
+#if defined(HDGATLING_HGI_INTEROP_METAL)
+  const TfToken expectedApiName = HgiTokens->Metal;
+#endif
+
+  for (HdDriver* driver : drivers)
+  {
+    if (driver->name != HgiTokens->renderDriver || !driver->driver.IsHolding<Hgi*>())
+    {
+      continue;
+    }
+
+    Hgi* hgi = driver->driver.UncheckedGet<Hgi*>();
+    TfToken apiName = hgi->GetAPIName();
+
+#if defined(HDGATLING_HGI_INTEROP_METAL)
+    if (apiName != expectedApiName)
+    {
+      renderParam->SetHgi(nullptr);
+      GB_LOG("Hgi driver: {}, interop mode: CPU (unsupported backend)", apiName.GetText());
+      return;
+    }
+
+    renderParam->SetHgi(hgi);
+    GB_LOG("Hgi driver: {}, interop mode: {}", apiName.GetText(), apiName.GetText());
+#else
+    renderParam->SetHgi(nullptr);
+    GB_LOG("Hgi driver: {}, interop mode: CPU (not supported)", apiName.GetText());
+#endif
+    return;
+  }
+
+  renderParam->SetHgi(nullptr);
+  GB_LOG("interop mode: CPU (no Hgi driver)");
 }
 
 HdRenderSettingDescriptorList HdGatlingRenderDelegate::GetRenderSettingDescriptors() const
@@ -359,7 +402,8 @@ HdBprim* HdGatlingRenderDelegate::CreateBprim(const TfToken& typeId, const SdfPa
 {
   if (typeId == HdPrimTypeTokens->renderBuffer)
   {
-    return new HdGatlingRenderBuffer(bprimId);
+    Hgi* hgi = static_cast<HdGatlingRenderParam*>(_renderParam.get())->GetHgi();
+    return new HdGatlingRenderBuffer(bprimId, hgi);
   }
 
   return nullptr;

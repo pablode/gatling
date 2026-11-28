@@ -37,8 +37,10 @@ elseif(TARGET usd_m)
   set(USD_LIBS_PUBLIC usd_m)  # equal and after v25.11
 else()
   set(USD_LIBS_PUBLIC hd)
-  set(USD_LIBS_PRIVATE usdImaging usdMtlx hdMtlx glf)
+  set(USD_LIBS_PRIVATE usdImaging usdMtlx hdMtlx glf hgi)
 endif()
+
+option(HDGATLING_ENABLE_GPU_INTEROP "Render directly into Hgi textures instead of host memory." ON)
 
 function(configure_target TARGET)
   target_include_directories(
@@ -67,6 +69,10 @@ function(configure_target TARGET)
         # TODO: this feature causes artifacts on Metal which need to be investigated
         HDGATLING_DISABLE_VOLUME_SAMPLING=1
     )
+
+    if (HDGATLING_ENABLE_GPU_INTEROP)
+      target_compile_definitions(${TARGET} PRIVATE HDGATLING_HGI_INTEROP_METAL=1)
+    endif()
   endif()
 
   # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279

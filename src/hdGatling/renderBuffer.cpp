@@ -18,6 +18,11 @@
 #include "renderBuffer.h"
 
 #include <pxr/base/gf/vec3i.h>
+#include <pxr/base/tf/stringUtils.h>
+#include <pxr/imaging/hd/tokens.h>
+#include <pxr/imaging/hd/types.h>
+#include <pxr/imaging/hgi/hgi.h>
+#include <pxr/imaging/hgi/texture.h>
 
 #include <gtl/gi/Gi.h>
 
@@ -32,12 +37,44 @@ namespace
     { HdFormatFloat32, GiRenderBufferFormat::Float32 },
     { HdFormatFloat32Vec4, GiRenderBufferFormat::Float32Vec4 }
   };
+
+  static std::map<HdFormat, HgiFormat> s_supportedHgiRenderBufferFormats = {
+    { HdFormatInt32, HgiFormatInt32 },
+    { HdFormatFloat32, HgiFormatFloat32 },
+    { HdFormatFloat32Vec4, HgiFormatFloat32Vec4 }
+  };
+
+  static bool _IsDepthAov(const SdfPath& id)
+  {
+    std::string name = id.GetElementString();
+
+    if (TfStringStartsWith(name, "aov_"))
+    {
+      name = name.substr(4);
+    }
+
+    return name == HdAovTokens->depth.GetString();
+  }
+
+  static bool _GetExternalImageDesc(Hgi* hgi, const HgiTextureHandle& texture, uint32_t width, uint32_t height,
+                                    GiRenderBufferFormat format, GiExternalImageDesc* desc)
+  {
+    TF_UNUSED(hgi);
+
+    desc->width = width;
+    desc->height = height;
+    desc->format = format;
+    desc->nativeTexture = texture->GetRawResource();
+
+    return desc->nativeTexture != 0;
+  }
 }
 
-HdGatlingRenderBuffer::HdGatlingRenderBuffer(const SdfPath& id)
+HdGatlingRenderBuffer::HdGatlingRenderBuffer(const SdfPath& id, Hgi* hgi)
   : HdRenderBuffer(id)
+  , _isConverged(false)
+  , _hgi(hgi)
 {
-  _isConverged = false;
 }
 
 HdGatlingRenderBuffer::~HdGatlingRenderBuffer()
@@ -52,6 +89,11 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
   {
     giDestroyRenderBuffer(_renderBuffer);
     _renderBuffer = nullptr;
+  }
+
+  if (_hgiTexture)
+  {
+    _hgi->DestroyTexture(&_hgiTexture);
   }
 
   auto it = s_supportedRenderBufferFormats.find(format);
@@ -78,7 +120,42 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
   _format = format;
   _isMultiSampled = multiSampled;
 
-  _renderBuffer = giCreateRenderBuffer(_width, _height, it->second);
+  // Hydra uses the depth AOV as a depth attachment, which a float storage image
+  // is not.
+  bool useHgiTexture = _hgi && !_IsDepthAov(GetId());
+
+  if (useHgiTexture)
+  {
+    HgiTextureDesc desc;
+    desc.debugName = "hdGatling render buffer";
+    desc.usage = HgiTextureUsageBitsShaderRead | HgiTextureUsageBitsShaderWrite;
+    desc.format = s_supportedHgiRenderBufferFormats.at(_format);
+    desc.type = HgiTextureType2D;
+    desc.dimensions = GfVec3i(_width, _height, 1);
+    desc.layerCount = 1;
+    desc.mipLevels = 1;
+    desc.sampleCount = HgiSampleCount1;
+
+    _hgiTexture = _hgi->CreateTexture(desc);
+
+    GiExternalImageDesc externalImageDesc = {};
+    if (_hgiTexture && _GetExternalImageDesc(_hgi, _hgiTexture, _width, _height, it->second, &externalImageDesc))
+    {
+      _renderBuffer = giCreateRenderFromExternal(externalImageDesc);
+    }
+
+    if (!_renderBuffer && _hgiTexture)
+    {
+      TF_WARN("Failed to create GPU interop render buffer; falling back to host memory");
+      _hgi->DestroyTexture(&_hgiTexture);
+    }
+  }
+
+  if (!_renderBuffer)
+  {
+    _renderBuffer = giCreateRenderBuffer(_width, _height, it->second);
+  }
+
   if (!_renderBuffer)
   {
     TF_RUNTIME_ERROR("Failed to create render buffer!");
@@ -138,6 +215,13 @@ GiRenderBuffer* HdGatlingRenderBuffer::GetGiRenderBuffer() const
   return _renderBuffer;
 }
 
+VtValue HdGatlingRenderBuffer::GetResource(bool multiSampled) const
+{
+  TF_UNUSED(multiSampled);
+
+  return _hgiTexture ? VtValue(_hgiTexture) : VtValue();
+}
+
 void HdGatlingRenderBuffer::Unmap()
 {
 }
@@ -151,6 +235,12 @@ void HdGatlingRenderBuffer::_Deallocate()
   if (_renderBuffer)
   {
     giDestroyRenderBuffer(_renderBuffer);
+    _renderBuffer = nullptr;
+  }
+
+  if (_hgiTexture)
+  {
+    _hgi->DestroyTexture(&_hgiTexture);
   }
 }
 

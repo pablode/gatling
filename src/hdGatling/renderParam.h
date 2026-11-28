@@ -28,9 +28,15 @@ using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class Hgi;
+
 class HdGatlingRenderParam final : public HdRenderParam
 {
 public:
+  void SetHgi(Hgi* hgi);
+
+  Hgi* GetHgi() const;
+
   void AddDomeLight(GiDomeLight* domeLight);
 
   void SetDomeLightOverride(GiDomeLight* domeLight);
@@ -40,6 +46,7 @@ public:
   GiDomeLight* ActiveDomeLight() const;
 
 private:
+  Hgi* _hgi = nullptr;
   std::vector<GiDomeLight*> _domeLights;
   GiDomeLight* _domeLightOverride = nullptr;
 };

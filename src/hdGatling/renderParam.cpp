@@ -19,6 +19,16 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+void HdGatlingRenderParam::SetHgi(Hgi* hgi)
+{
+  _hgi = hgi;
+}
+
+Hgi* HdGatlingRenderParam::GetHgi() const
+{
+  return _hgi;
+}
+
 void HdGatlingRenderParam::AddDomeLight(GiDomeLight* domeLight)
 {
   _domeLights.push_back(domeLight);

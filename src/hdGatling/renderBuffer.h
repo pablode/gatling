@@ -18,6 +18,7 @@
 #pragma once
 
 #include <pxr/imaging/hd/renderBuffer.h>
+#include <pxr/imaging/hgi/texture.h>
 
 namespace gtl
 {
@@ -28,10 +29,12 @@ using namespace gtl;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class Hgi;
+
 class HdGatlingRenderBuffer final : public HdRenderBuffer
 {
 public:
-  HdGatlingRenderBuffer(const SdfPath& id);
+  HdGatlingRenderBuffer(const SdfPath& id, Hgi* hgi);
 
   ~HdGatlingRenderBuffer() override;
 
@@ -52,6 +55,8 @@ public:
   bool IsMultiSampled() const override;
 
   GiRenderBuffer* GetGiRenderBuffer() const;
+
+  VtValue GetResource(bool multiSampled) const override;
 
 public:
   bool IsConverged() const override;
@@ -76,6 +81,8 @@ private:
   HdFormat _format;
   bool _isMultiSampled;
   bool _isConverged;
+  Hgi* _hgi;
+  HgiTextureHandle _hgiTexture;
   GiRenderBuffer* _renderBuffer = nullptr;
 };
 
