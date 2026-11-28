@@ -1,5 +1,4 @@
-add_library(
-  hdGatling SHARED
+set(HDGATLING_SRCS
   instancer.cpp
   instancer.h
   light.cpp
@@ -32,6 +31,61 @@ add_library(
   utils.h
 )
 
+if(TARGET usd_ms)
+  set(USD_LIBS_PUBLIC usd_ms) # before v25.11
+elseif(TARGET usd_m)
+  set(USD_LIBS_PUBLIC usd_m)  # equal and after v25.11
+else()
+  set(USD_LIBS_PUBLIC hd)
+  set(USD_LIBS_PRIVATE usdImaging usdMtlx hdMtlx glf)
+endif()
+
+function(configure_target TARGET)
+  target_include_directories(
+    ${TARGET}
+    PUBLIC
+      "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    PRIVATE
+      src
+  )
+
+  target_compile_definitions(
+    ${TARGET}
+    PUBLIC
+      # Required for PLUG_THIS_PLUGIN macro
+      MFB_PACKAGE_NAME=hdGatling
+    PRIVATE
+      HDGATLING_LICENSE_FILE_NAME="LICENSE"
+      # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
+      "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
+  )
+
+  if (APPLE)
+    target_compile_definitions(
+      ${TARGET}
+      PRIVATE
+        # TODO: this feature causes artifacts on Metal which need to be investigated
+        HDGATLING_DISABLE_VOLUME_SAMPLING=1
+    )
+  endif()
+
+  # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
+  if(MSVC_VERSION GREATER_EQUAL 1920)
+    target_compile_options(${TARGET} PRIVATE "/Zc:inline-")
+  endif()
+
+  target_link_libraries(
+    ${TARGET}
+    PUBLIC
+      ${USD_LIBS_PUBLIC}
+    PRIVATE
+      gi gb
+      ${USD_LIBS_PRIVATE}
+  )
+endfunction()
+
+add_library(hdGatling SHARED ${HDGATLING_SRCS})
+
 set_target_properties(
   hdGatling
   PROPERTIES
@@ -42,56 +96,7 @@ set_target_properties(
     DEBUG_POSTFIX ""
 )
 
-target_include_directories(
-  hdGatling
-  PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}/include"
-  PRIVATE
-    src
-)
-
-target_compile_definitions(
-  hdGatling
-  PUBLIC
-    # Required for PLUG_THIS_PLUGIN macro
-    MFB_PACKAGE_NAME=hdGatling
-  PRIVATE
-    HDGATLING_LICENSE_FILE_NAME="LICENSE"
-    # Workaround for https://github.com/PixarAnimationStudios/USD/issues/1471#issuecomment-799813477
-    "$<$<OR:$<CONFIG:>,$<CONFIG:Debug>>:TBB_USE_DEBUG>"
-)
-
-if (APPLE)
-  target_compile_definitions(
-    hdGatling
-    PRIVATE
-      # TODO: this feature causes artifacts on Metal which need to be investigated
-      HDGATLING_DISABLE_VOLUME_SAMPLING=1
-  )
-endif()
-
-# Workaround for https://github.com/PixarAnimationStudios/USD/issues/1279
-if(MSVC_VERSION GREATER_EQUAL 1920)
-  target_compile_options(hdGatling PRIVATE "/Zc:inline-")
-endif()
-
-if(TARGET usd_ms)
-  set(USD_LIBS_PUBLIC usd_ms) # before v25.11
-elseif(TARGET usd_m)
-  set(USD_LIBS_PUBLIC usd_m)  # equal and after v25.11
-else()
-  set(USD_LIBS_PUBLIC hd)
-  set(USD_LIBS_PRIVATE usdImaging usdMtlx hdMtlx glf)
-endif()
-
-target_link_libraries(
-  hdGatling
-  PUBLIC
-    ${USD_LIBS_PUBLIC}
-  PRIVATE
-    gi gb
-    ${USD_LIBS_PRIVATE}
-)
+configure_target(hdGatling)
 
 # Allow custom prefix for houdini directory structure
 if(NOT DEFINED PLUGINFO_LIBPATH_PREFIX)
@@ -131,8 +136,16 @@ install(
     COMPONENT hdGatling
 )
 
-add_executable(hdGatling_test main.cpp tokens.h tokens.cpp)
-target_link_libraries(hdGatling_test gt gb hd hdsi hio usd usdGeom usdImaging usdRender)
+add_executable(
+  hdGatling_test
+  main.cpp
+  tokens.h
+  tokens.cpp
+  previewSurfaceNetworkPatcher.cpp
+  previewSurfaceNetworkPatcher.h
+)
+configure_target(hdGatling_test)
+target_link_libraries(hdGatling_test PRIVATE gt hdsi hio usd usdGeom usdImaging usdRender)
 
 add_dependencies(hdGatling_test hdGatling)
 
@@ -150,4 +163,5 @@ target_compile_definitions(
     HDGATLING_INSTALL_DIR="${HDGATLING_INSTALL_DIR}"
     HDGATLING_TESTENV_DIR="${CMAKE_CURRENT_SOURCE_DIR}/testenv"
     HDGATLING_TEST_OUTPUT_DIR="${GTL_TEST_OUTPUT_DIR}/hdGatling"
+    HDGATLING_TEST_EXECUTABLE=1
 )

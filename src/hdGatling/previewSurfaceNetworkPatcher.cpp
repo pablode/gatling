@@ -586,3 +586,582 @@ void PreviewSurfaceNetworkPatcher::Patch(HdMaterialNetwork2& network)
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#ifdef HDGATLING_TEST_EXECUTABLE
+#include <doctest/doctest.h>
+
+#include <pxr/base/tf/errorMark.h>
+
+#include <string>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+namespace
+{
+  HdMaterialNode2& _AddNode(HdMaterialNetwork2& network, const std::string& path, const TfToken& nodeTypeId)
+  {
+    HdMaterialNode2& node = network.nodes[SdfPath(path)];
+    node.nodeTypeId = nodeTypeId;
+    return node;
+  }
+
+  HdMaterialConnection2 _MakeConnection(const std::string& upstreamNodePath, const TfToken& upstreamOutputName)
+  {
+    return HdMaterialConnection2{
+      .upstreamNode = SdfPath(upstreamNodePath),
+      .upstreamOutputName = upstreamOutputName
+    };
+  }
+}
+
+TEST_CASE("PreviewSurfaceNetworkPatcher.DefaultParam")
+{
+  HdMaterialNetwork2 network;
+  TfErrorMark errorMark;
+
+  SUBCASE("Moves default parameter to fallback on supported nodes")
+  {
+    const TfToken nodeTypes[] = {
+      _tokens->UsdUVTexture,
+      _tokens->UsdPrimvarReader_float,
+      _tokens->UsdPrimvarReader_float2,
+      _tokens->UsdPrimvarReader_float3,
+      _tokens->UsdPrimvarReader_float4,
+      _tokens->UsdPrimvarReader_int,
+      _tokens->UsdPrimvarReader_string,
+      _tokens->UsdPrimvarReader_normal,
+      _tokens->UsdPrimvarReader_point,
+      _tokens->UsdPrimvarReader_vector,
+      _tokens->UsdPrimvarReader_matrix
+    };
+    const size_t nodeTypeCount = sizeof(nodeTypes) / sizeof(nodeTypes[0]);
+
+    for (size_t i = 0; i < nodeTypeCount; i++)
+    {
+      HdMaterialNode2& node = _AddNode(network, "/Node" + std::to_string(i), nodeTypes[i]);
+      node.parameters[_tokens->_default] = VtValue(1.0f);
+    }
+
+    _PatchDefaultParam(network);
+
+    REQUIRE(network.nodes.size() == nodeTypeCount);
+    for (auto& [path, node] : network.nodes)
+    {
+      CHECK(node.parameters.count(_tokens->_default) == 0);
+      REQUIRE(node.parameters.count(_tokens->fallback) == 1);
+      CHECK(node.parameters[_tokens->fallback] == VtValue(1.0f));
+    }
+  }
+
+  SUBCASE("Leaves default parameter on unsupported nodes")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    node.parameters[_tokens->_default] = VtValue(1.0f);
+
+    _PatchDefaultParam(network);
+
+    CHECK(node.parameters.count(_tokens->_default) == 1);
+    CHECK(node.parameters.count(_tokens->fallback) == 0);
+  }
+
+  SUBCASE("Adds no fallback parameter if default is missing")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+
+    _PatchDefaultParam(network);
+
+    CHECK(node.parameters.empty());
+  }
+
+  CHECK_MESSAGE(errorMark.IsClean(), "patching posted Tf errors");
+}
+
+TEST_CASE("PreviewSurfaceNetworkPatcher.UsdPreviewSurface")
+{
+  HdMaterialNetwork2 network;
+  TfErrorMark errorMark;
+
+  SUBCASE("Converts float glossiness parameter to roughness")
+  {
+    _AddNode(network, "/Reader", _tokens->UsdPrimvarReader_float);
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.parameters[_tokens->glossiness] = VtValue(0.25f);
+    surface.inputConnections[_tokens->glossiness].push_back(_MakeConnection("/Reader", TfToken("result")));
+
+    _PatchUsdPreviewSurfaceGlossiness(network);
+
+    CHECK(surface.parameters.count(_tokens->glossiness) == 0);
+    REQUIRE(surface.parameters.count(_tokens->roughness) == 1);
+    CHECK(surface.parameters[_tokens->roughness] == VtValue(0.75f));
+    CHECK(surface.inputConnections.count(_tokens->glossiness) == 1);
+    CHECK(surface.inputConnections.count(_tokens->roughness) == 0);
+  }
+
+  SUBCASE("Leaves non-float glossiness parameter untouched")
+  {
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.parameters[_tokens->glossiness] = VtValue(GfVec3f(1.0f));
+
+    _PatchUsdPreviewSurfaceGlossiness(network);
+
+    CHECK(surface.parameters.count(_tokens->roughness) == 0);
+    CHECK(surface.parameters[_tokens->glossiness].IsHolding<GfVec3f>());
+  }
+
+  SUBCASE("Converts glossiness input to roughness and adds texture scale and bias")
+  {
+    HdMaterialNode2& texture = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    HdMaterialNode2& reader = _AddNode(network, "/Reader", _tokens->UsdPrimvarReader_float);
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->glossiness].push_back(_MakeConnection("/Texture", _tokens->r));
+    surface.inputConnections[_tokens->glossiness].push_back(_MakeConnection("/Reader", TfToken("result")));
+
+    _PatchUsdPreviewSurfaceGlossiness(network);
+
+    CHECK(surface.inputConnections.count(_tokens->glossiness) == 0);
+    REQUIRE(surface.inputConnections.count(_tokens->roughness) == 1);
+    REQUIRE(surface.inputConnections[_tokens->roughness].size() == 2);
+    CHECK(surface.inputConnections[_tokens->roughness][0].upstreamNode == SdfPath("/Texture"));
+    CHECK(surface.inputConnections[_tokens->roughness][0].upstreamOutputName == _tokens->r);
+
+    REQUIRE(texture.parameters.count(_tokens->scale) == 1);
+    CHECK(texture.parameters[_tokens->scale] == VtValue(GfVec4f(-1.0f, -1.0f, -1.0f, -1.0f)));
+    REQUIRE(texture.parameters.count(_tokens->bias) == 1);
+    CHECK(texture.parameters[_tokens->bias] == VtValue(GfVec4f(1.0f, 1.0f, 1.0f, 0.0f)));
+
+    CHECK(reader.parameters.empty());
+  }
+
+  SUBCASE("Keeps existing scale and bias for glossiness input")
+  {
+    HdMaterialNode2& texture = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    texture.parameters[_tokens->scale] = VtValue(GfVec4f(0.5f));
+    texture.parameters[_tokens->bias] = VtValue(GfVec4f(0.25f));
+
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->glossiness].push_back(_MakeConnection("/Texture", _tokens->r));
+
+    _PatchUsdPreviewSurfaceGlossiness(network);
+
+    CHECK(texture.parameters[_tokens->scale] == VtValue(GfVec4f(0.5f)));
+    CHECK(texture.parameters[_tokens->bias] == VtValue(GfVec4f(0.25f)));
+  }
+
+  SUBCASE("Does nothing if glossiness is absent")
+  {
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+
+    _PatchUsdPreviewSurfaceGlossiness(network);
+
+    CHECK(surface.parameters.empty());
+    CHECK(surface.inputConnections.empty());
+  }
+
+  SUBCASE("Converts float specular parameter to specularColor")
+  {
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.parameters[_tokens->specular] = VtValue(0.5f);
+
+    _PatchUsdPreviewSurfaceSpecular(network);
+
+    CHECK(surface.parameters.count(_tokens->specular) == 0);
+    REQUIRE(surface.parameters.count(_tokens->specularColor) == 1);
+    CHECK(surface.parameters[_tokens->specularColor] == VtValue(GfVec3f(0.5f)));
+  }
+
+  SUBCASE("Leaves non-float specular parameter and input untouched")
+  {
+    _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.parameters[_tokens->specular] = VtValue(GfVec3f(1.0f, 0.0f, 0.0f));
+    surface.inputConnections[_tokens->specular].push_back(_MakeConnection("/Texture", _tokens->r));
+
+    _PatchUsdPreviewSurfaceSpecular(network);
+
+    CHECK(surface.parameters.count(_tokens->specularColor) == 0);
+    CHECK(surface.inputConnections.count(_tokens->specular) == 1);
+    CHECK(surface.inputConnections.count(_tokens->specularColor) == 0);
+  }
+
+  SUBCASE("Renames specular input and texture output")
+  {
+    _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    _AddNode(network, "/Reader", _tokens->UsdPrimvarReader_float);
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->specular].push_back(_MakeConnection("/Texture", _tokens->r));
+    surface.inputConnections[_tokens->specular].push_back(_MakeConnection("/Reader", TfToken("result")));
+
+    _PatchUsdPreviewSurfaceSpecular(network);
+
+    CHECK(surface.inputConnections.count(_tokens->specular) == 0);
+    REQUIRE(surface.inputConnections.count(_tokens->specularColor) == 1);
+    REQUIRE(surface.inputConnections[_tokens->specularColor].size() == 2);
+    CHECK(surface.inputConnections[_tokens->specularColor][0].upstreamOutputName == _tokens->rgb);
+    CHECK(surface.inputConnections[_tokens->specularColor][1].upstreamOutputName == TfToken("result"));
+  }
+
+  SUBCASE("Adds scale and bias to normal map textures")
+  {
+    HdMaterialNode2& texture = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->normal].push_back(_MakeConnection("/Texture", _tokens->rgb));
+    surface.parameters[_tokens->normal] = VtValue(GfVec3f(1.0f, 1.0f, 1.0f));
+
+    _PatchUsdPreviewSurfaceNormalMap(network);
+
+    CHECK(texture.parameters[_tokens->scale] == VtValue(GfVec4f(2.0f, 2.0f, 2.0f, 1.0f)));
+    CHECK(texture.parameters[_tokens->bias] == VtValue(GfVec4f(-1.0f, -1.0f, -1.0f, 0.0f)));
+    CHECK(surface.parameters.count(_tokens->normal) == 0);
+  }
+
+  SUBCASE("Replaces identity normal map scale and bias")
+  {
+    HdMaterialNode2& texture = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    texture.parameters[_tokens->scale] = VtValue(GfVec4f(1.0f));
+    texture.parameters[_tokens->bias] = VtValue(GfVec4f(0.0f));
+
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->normal].push_back(_MakeConnection("/Texture", _tokens->rgb));
+
+    _PatchUsdPreviewSurfaceNormalMap(network);
+
+    CHECK(texture.parameters[_tokens->scale] == VtValue(GfVec4f(2.0f, 2.0f, 2.0f, 1.0f)));
+    CHECK(texture.parameters[_tokens->bias] == VtValue(GfVec4f(-1.0f, -1.0f, -1.0f, 0.0f)));
+  }
+
+  SUBCASE("Keeps non-identity normal map scale and bias")
+  {
+    HdMaterialNode2& texture = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    texture.parameters[_tokens->scale] = VtValue(GfVec4f(0.5f));
+    texture.parameters[_tokens->bias] = VtValue(GfVec4f(0.25f));
+
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->normal].push_back(_MakeConnection("/Texture", _tokens->rgb));
+
+    _PatchUsdPreviewSurfaceNormalMap(network);
+
+    CHECK(texture.parameters[_tokens->scale] == VtValue(GfVec4f(0.5f)));
+    CHECK(texture.parameters[_tokens->bias] == VtValue(GfVec4f(0.25f)));
+  }
+
+  SUBCASE("Keeps non-vec4 normal map scale and bias")
+  {
+    HdMaterialNode2& texture = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    texture.parameters[_tokens->scale] = VtValue(1.0f);
+    texture.parameters[_tokens->bias] = VtValue(0.0f);
+
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->normal].push_back(_MakeConnection("/Texture", _tokens->rgb));
+
+    _PatchUsdPreviewSurfaceNormalMap(network);
+
+    CHECK(texture.parameters[_tokens->scale] == VtValue(1.0f));
+    CHECK(texture.parameters[_tokens->bias] == VtValue(0.0f));
+  }
+
+  SUBCASE("Does not patch normal input from non-texture nodes")
+  {
+    HdMaterialNode2& reader = _AddNode(network, "/Reader", _tokens->UsdPrimvarReader_float3);
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    surface.inputConnections[_tokens->normal].push_back(_MakeConnection("/Reader", TfToken("result")));
+
+    _PatchUsdPreviewSurfaceNormalMap(network);
+
+    CHECK(reader.parameters.empty());
+  }
+
+  SUBCASE("Connects float inputs to the texture red channel")
+  {
+    const TfToken floatInputs[] = {
+      _tokens->metallic,
+      _tokens->roughness,
+      _tokens->clearcoat,
+      _tokens->clearcoatRoughness,
+      _tokens->opacity,
+      _tokens->opacityThreshold,
+      _tokens->ior,
+      _tokens->displacement,
+      _tokens->occlusion
+    };
+    const size_t floatInputCount = sizeof(floatInputs) / sizeof(floatInputs[0]);
+
+    _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    HdMaterialNode2& surface = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+
+    for (size_t i = 0; i < floatInputCount; i++)
+    {
+      surface.inputConnections[floatInputs[i]].push_back(_MakeConnection("/Texture", _tokens->rgb));
+    }
+    surface.inputConnections[_tokens->roughness].push_back(_MakeConnection("/Texture", TfToken("g")));
+
+    _PatchUsdPreviewSurfaceFloatInputTypeMismatches(network);
+
+    for (size_t i = 0; i < floatInputCount; i++)
+    {
+      REQUIRE(surface.inputConnections[floatInputs[i]].size() >= 1);
+      CHECK(surface.inputConnections[floatInputs[i]][0].upstreamOutputName == _tokens->r);
+    }
+    REQUIRE(surface.inputConnections[_tokens->roughness].size() == 2);
+    CHECK(surface.inputConnections[_tokens->roughness][1].upstreamOutputName == TfToken("g"));
+  }
+
+  SUBCASE("Ignores non-UsdPreviewSurface nodes")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->glossiness] = VtValue(0.25f);
+    node.parameters[_tokens->specular] = VtValue(0.5f);
+    node.parameters[_tokens->normal] = VtValue(GfVec3f(1.0f, 1.0f, 1.0f));
+    node.inputConnections[_tokens->roughness].push_back(_MakeConnection("/Texture", _tokens->rgb));
+
+    _PatchUsdPreviewSurfaceGlossiness(network);
+    _PatchUsdPreviewSurfaceSpecular(network);
+    _PatchUsdPreviewSurfaceNormalMap(network);
+    _PatchUsdPreviewSurfaceFloatInputTypeMismatches(network);
+
+    CHECK(node.parameters.count(_tokens->glossiness) == 1);
+    CHECK(node.parameters.count(_tokens->specular) == 1);
+    CHECK(node.parameters.count(_tokens->normal) == 1);
+    CHECK(node.inputConnections[_tokens->roughness][0].upstreamOutputName == _tokens->rgb);
+  }
+
+  CHECK_MESSAGE(errorMark.IsClean(), "patching posted Tf errors");
+}
+
+TEST_CASE("PreviewSurfaceNetworkPatcher.UsdUVTexture")
+{
+  HdMaterialNetwork2 network;
+  TfErrorMark errorMark;
+
+#if PXR_VERSION >= 2603
+  const TfToken colorSpaceFilePath(SdfPath::JoinIdentifier(SdfFieldKeys->ColorSpace, _tokens->file));
+#endif
+
+  SUBCASE("Maps isSRGB yes to sRGB")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->isSRGB] = VtValue(_tokens->yes);
+
+    _PatchUsdUVTextureIsSrgbParam(network);
+
+    CHECK(node.parameters.count(_tokens->isSRGB) == 0);
+    CHECK(node.parameters[_tokens->sourceColorSpace] == VtValue(_tokens->sRGB));
+  }
+
+  SUBCASE("Maps isSRGB no to raw")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->isSRGB] = VtValue(_tokens->no);
+
+    _PatchUsdUVTextureIsSrgbParam(network);
+
+    CHECK(node.parameters[_tokens->sourceColorSpace] == VtValue(_tokens->raw));
+  }
+
+  SUBCASE("Maps other isSRGB values to auto")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->isSRGB] = VtValue(_tokens->sRGB);
+
+    _PatchUsdUVTextureIsSrgbParam(network);
+
+    CHECK(node.parameters[_tokens->sourceColorSpace] == VtValue(_tokens->_auto));
+  }
+
+  SUBCASE("Lowercases RAW source color space")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->sourceColorSpace] = VtValue(_tokens->RAW);
+
+    _PatchUsdUVTextureIsSrgbParam(network); // no isSRGB parameter; must be a no-op
+    _PatchUsdUVTextureColorSpaceParam(network);
+
+#if PXR_VERSION >= 2603
+    CHECK(node.parameters.count(_tokens->sourceColorSpace) == 0);
+    REQUIRE(node.parameters.count(colorSpaceFilePath) == 1);
+    CHECK(node.parameters[colorSpaceFilePath] == VtValue(_tokens->raw));
+#else
+    CHECK(node.parameters[_tokens->sourceColorSpace] == VtValue(_tokens->raw));
+#endif
+  }
+
+  SUBCASE("Keeps other color spaces")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->sourceColorSpace] = VtValue(_tokens->sRGB);
+
+    _PatchUsdUVTextureColorSpaceParam(network);
+
+#if PXR_VERSION >= 2603
+    REQUIRE(node.parameters.count(colorSpaceFilePath) == 1);
+    CHECK(node.parameters[colorSpaceFilePath] == VtValue(_tokens->sRGB));
+#else
+    CHECK(node.parameters[_tokens->sourceColorSpace] == VtValue(_tokens->sRGB));
+#endif
+  }
+
+#if PXR_VERSION >= 2603
+  SUBCASE("Does not overwrite existing colorSpace:file")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->sourceColorSpace] = VtValue(_tokens->sRGB);
+    node.parameters[colorSpaceFilePath] = VtValue(_tokens->raw);
+
+    _PatchUsdUVTextureColorSpaceParam(network);
+
+    CHECK(node.parameters.count(_tokens->sourceColorSpace) == 0);
+    CHECK(node.parameters[colorSpaceFilePath] == VtValue(_tokens->raw));
+  }
+#endif
+
+  SUBCASE("Does nothing without texture parameters")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+
+    _PatchUsdUVTextureIsSrgbParam(network);
+    _PatchUsdUVTextureColorSpaceParam(network);
+
+    CHECK(node.parameters.empty());
+  }
+
+  SUBCASE("Ignores non-UVTexture nodes")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    node.parameters[_tokens->isSRGB] = VtValue(_tokens->yes);
+    node.parameters[_tokens->sourceColorSpace] = VtValue(_tokens->RAW);
+
+    _PatchUsdUVTextureIsSrgbParam(network);
+    _PatchUsdUVTextureColorSpaceParam(network);
+
+    CHECK(node.parameters[_tokens->isSRGB] == VtValue(_tokens->yes));
+    CHECK(node.parameters[_tokens->sourceColorSpace] == VtValue(_tokens->RAW));
+  }
+
+  CHECK_MESSAGE(errorMark.IsClean(), "patching posted Tf errors");
+}
+
+TEST_CASE("PreviewSurfaceNetworkPatcher.UsdPrimvarReader")
+{
+  HdMaterialNetwork2 network;
+  TfErrorMark errorMark;
+
+  const TfToken diffuseColor("diffuseColor");
+
+  auto addChain = [&network, &diffuseColor](const std::string& surfacePath, const TfToken& readerType, bool addVarname, const TfToken& varname) -> HdMaterialNode2&
+  {
+    HdMaterialNode2& reader = _AddNode(network, surfacePath + "/Reader", readerType);
+    if (addVarname)
+    {
+      reader.parameters[_tokens->varname] = VtValue(varname);
+    }
+
+    HdMaterialNode2& texture = _AddNode(network, surfacePath + "/Texture", _tokens->UsdUVTexture);
+    texture.inputConnections[_tokens->st].push_back(_MakeConnection(surfacePath + "/Reader", TfToken("result")));
+
+    HdMaterialNode2& surface = _AddNode(network, surfacePath, _tokens->UsdPreviewSurface);
+    surface.inputConnections[diffuseColor].push_back(_MakeConnection(surfacePath + "/Texture", _tokens->rgb));
+
+    return reader;
+  };
+
+  SUBCASE("Replaces UVmap varname with st")
+  {
+    HdMaterialNode2& reader = addChain("/M/Principled_BSDF", _tokens->UsdPrimvarReader_float2, true, _tokens->UVmap);
+
+    _PatchUsdPrimvarReaderUVmapVarname(network);
+
+    REQUIRE(reader.parameters.count(_tokens->varname) == 1);
+    CHECK(reader.parameters[_tokens->varname] == VtValue(_tokens->st));
+  }
+
+  SUBCASE("Keeps varname if it is not UVmap")
+  {
+    HdMaterialNode2& reader = addChain("/M/Principled_BSDF", _tokens->UsdPrimvarReader_float2, true, _tokens->st);
+
+    _PatchUsdPrimvarReaderUVmapVarname(network);
+
+    CHECK(reader.parameters[_tokens->varname] == VtValue(_tokens->st));
+  }
+
+  SUBCASE("Keeps reader without varname")
+  {
+    HdMaterialNode2& reader = addChain("/M/Principled_BSDF", _tokens->UsdPrimvarReader_float2, false, TfToken());
+
+    _PatchUsdPrimvarReaderUVmapVarname(network);
+
+    CHECK(reader.parameters.empty());
+  }
+
+  SUBCASE("Ignores readers of other types")
+  {
+    HdMaterialNode2& reader = addChain("/M/Principled_BSDF", _tokens->UsdPrimvarReader_float3, true, _tokens->UVmap);
+
+    _PatchUsdPrimvarReaderUVmapVarname(network);
+
+    CHECK(reader.parameters[_tokens->varname] == VtValue(_tokens->UVmap));
+  }
+
+  SUBCASE("Ignores surfaces not named Principled_BSDF")
+  {
+    HdMaterialNode2& reader = addChain("/M/Surface", _tokens->UsdPrimvarReader_float2, true, _tokens->UVmap);
+
+    _PatchUsdPrimvarReaderUVmapVarname(network);
+
+    CHECK(reader.parameters[_tokens->varname] == VtValue(_tokens->UVmap));
+  }
+
+  SUBCASE("Ignores texture inputs without reader")
+  {
+    HdMaterialNode2& texture = _AddNode(network, "/M/Principled_BSDF/Texture", _tokens->UsdUVTexture);
+    texture.inputConnections[_tokens->st].push_back(_MakeConnection("/M/Principled_BSDF/Transform", TfToken("result")));
+
+    HdMaterialNode2& surface = _AddNode(network, "/M/Principled_BSDF", _tokens->UsdPreviewSurface);
+    surface.inputConnections[diffuseColor].push_back(_MakeConnection("/M/Principled_BSDF/Texture", _tokens->rgb));
+
+    _PatchUsdPrimvarReaderUVmapVarname(network);
+
+    CHECK(texture.inputConnections[_tokens->st][0].upstreamOutputName == TfToken("result"));
+  }
+
+  CHECK_MESSAGE(errorMark.IsClean(), "patching posted Tf errors");
+}
+
+TEST_CASE("PreviewSurfaceNetworkPatcher.UsdTypes")
+{
+  HdMaterialNetwork2 network;
+  TfErrorMark errorMark;
+
+  SUBCASE("Replaces asset paths with resolved paths")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Texture", _tokens->UsdUVTexture);
+    node.parameters[_tokens->file] =
+      VtValue(SdfAssetPath("textures/albedo.png", "/resolved/textures/albedo.png"));
+
+    _PatchUsdTypes(network);
+
+    REQUIRE(node.parameters[_tokens->file].IsHolding<std::string>());
+    CHECK(node.parameters[_tokens->file].UncheckedGet<std::string>() == "/resolved/textures/albedo.png");
+  }
+
+  SUBCASE("Leaves other values untouched")
+  {
+    HdMaterialNode2& node = _AddNode(network, "/Surface", _tokens->UsdPreviewSurface);
+    node.parameters[_tokens->ior] = VtValue(1.5f);
+    node.parameters[_tokens->sourceColorSpace] = VtValue(_tokens->sRGB);
+
+    _PatchUsdTypes(network);
+
+    CHECK(node.parameters[_tokens->ior].IsHolding<float>());
+
+#if PXR_VERSION <= 2308
+    REQUIRE(node.parameters[_tokens->sourceColorSpace].IsHolding<std::string>());
+    CHECK(node.parameters[_tokens->sourceColorSpace].UncheckedGet<std::string>() == "sRGB");
+#else
+    CHECK(node.parameters[_tokens->sourceColorSpace].IsHolding<TfToken>());
+#endif
+  }
+
+  CHECK_MESSAGE(errorMark.IsClean(), "patching posted Tf errors");
+}
+
+PXR_NAMESPACE_CLOSE_SCOPE
+#endif
