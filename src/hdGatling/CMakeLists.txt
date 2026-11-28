@@ -69,9 +69,14 @@ function(configure_target TARGET)
         # TODO: this feature causes artifacts on Metal which need to be investigated
         HDGATLING_DISABLE_VOLUME_SAMPLING=1
     )
+  endif()
 
-    if (HDGATLING_ENABLE_GPU_INTEROP)
+  if (HDGATLING_ENABLE_GPU_INTEROP)
+    if (APPLE)
       target_compile_definitions(${TARGET} PRIVATE HDGATLING_HGI_INTEROP_METAL=1)
+    elseif (TARGET hgiVulkan)
+      target_compile_definitions(${TARGET} PRIVATE HDGATLING_HGI_INTEROP_VULKAN=1)
+      target_link_libraries(${TARGET} PRIVATE hgiVulkan)
     endif()
   endif()
 

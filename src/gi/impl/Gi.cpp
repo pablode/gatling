@@ -249,6 +249,7 @@ namespace gtl
     uint32_t height = 0;
     uint32_t size = 0;
     bool external = false;
+    bool mapped = false;
   };
 
   CgpuContext* s_ctx = nullptr;
@@ -257,6 +258,7 @@ namespace gtl
   CgpuDeviceProperties s_ctxProperties;
   CgpuCommandPool s_commandPools[2];
   uint32_t s_commandPoolIndex = 0;
+  CgpuCommandPool s_readbackCommandPool;
   CgpuSampler s_texSampler;
   std::unique_ptr<GgpuStager> s_stager;
   std::mutex s_resourceDestroyerMutex;
@@ -395,6 +397,116 @@ namespace gtl
       rgbaImg[i + 2] = (float) TURBO_SRGB_FLOATS[valIndex][2];
       rgbaImg[i + 3] = 255;
     }
+  }
+
+  // External render buffers have no host memory of their own, so the image is
+  // copied back on demand when the host application maps it.
+  bool _CopyRenderBufferToHost(GiRenderBuffer* renderBuffer)
+  {
+    bool success = false;
+    CgpuSemaphore semaphore = {};
+
+    if (!renderBuffer->hostMem.handle)
+    {
+      if (!cgpuCreateBuffer(s_ctx, {
+                              .usage = CgpuBufferUsage::TransferDst,
+                              .memoryProperties = CgpuMemoryProperties::HostVisible |
+                                                  CgpuMemoryProperties::HostCached,
+                              .size = renderBuffer->size,
+                              .debugName = "RenderBufferCpu"
+                            }, &renderBuffer->hostMem))
+      {
+        GB_ERROR("failed to allocate render buffer readback memory");
+        return false;
+      }
+
+      renderBuffer->mappedHostMem = cgpuGetBufferCpuPtr(s_ctx, renderBuffer->hostMem);
+    }
+
+    if (!s_readbackCommandPool.handle)
+    {
+      s_readbackCommandPool = cgpuCreateCommandPool(s_ctx);
+      cgpuResetCommandPool(s_ctx, s_readbackCommandPool);
+    }
+
+    CgpuCommandBuffer commandBuffer = cgpuBeginCommandBuffer(s_ctx, s_readbackCommandPool);
+
+    CgpuImageMemoryBarrier preImageBarrier = {
+      .image = renderBuffer->image,
+      .srcStageMask = CgpuPipelineStage::RayTracingShader,
+      .dstStageMask = CgpuPipelineStage::Transfer,
+      .accessMask = CgpuMemoryAccess::TransferRead
+    };
+
+    CgpuPipelineBarrier preBarrier = {
+      .imageBarrierCount = 1,
+      .imageBarriers = &preImageBarrier
+    };
+
+    cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &preBarrier);
+
+    CgpuBufferImageCopyDesc desc = {
+      .texelExtentX = renderBuffer->width,
+      .texelExtentY = renderBuffer->height,
+      .texelExtentZ = 1
+    };
+
+    cgpuCmdCopyImageToBuffer(s_ctx, commandBuffer, renderBuffer->image, renderBuffer->hostMem, &desc);
+
+    CgpuBufferMemoryBarrier postBufferBarrier = {
+      .buffer = renderBuffer->hostMem,
+      .srcStageMask = CgpuPipelineStage::Transfer,
+      .srcAccessMask = CgpuMemoryAccess::TransferWrite,
+      .dstStageMask = CgpuPipelineStage::Host,
+      .dstAccessMask = CgpuMemoryAccess::HostRead
+    };
+
+    CgpuImageMemoryBarrier postImageBarrier = {
+      .image = renderBuffer->image,
+      .srcStageMask = CgpuPipelineStage::Transfer,
+      .dstStageMask = CgpuPipelineStage::RayTracingShader,
+      .accessMask = CgpuMemoryAccess::ShaderRead | CgpuMemoryAccess::ShaderWrite
+    };
+
+    CgpuPipelineBarrier postBarrier = {
+      .bufferBarrierCount = 1,
+      .bufferBarriers = &postBufferBarrier,
+      .imageBarrierCount = 1,
+      .imageBarriers = &postImageBarrier
+    };
+
+    cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &postBarrier);
+
+    cgpuEndCommandBuffer(s_ctx, commandBuffer);
+
+    if (!cgpuCreateSemaphore(s_ctx, &semaphore))
+    {
+      GB_ERROR("failed to create render buffer readback semaphore");
+      goto cleanup;
+    }
+
+    {
+      CgpuSignalSemaphoreInfo signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+      cgpuSubmitCommandBuffer(s_ctx, commandBuffer, 1, &signalSemaphoreInfo);
+
+      CgpuWaitSemaphoreInfo waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
+      success = cgpuWaitSemaphores(s_ctx, 1, &waitSemaphoreInfo);
+
+      if (!success)
+      {
+        GB_ERROR("failed to read back render buffer");
+      }
+    }
+
+cleanup:
+    if (semaphore.handle)
+    {
+      cgpuDestroySemaphore(s_ctx, semaphore);
+    }
+
+    cgpuResetCommandPool(s_ctx, s_readbackCommandPool);
+
+    return success;
   }
 
   // IMPORTANT: this needs to match the rp_main* shaders. It is asserted in cgpu.
@@ -542,6 +654,11 @@ fail:
     {
       cgpuDestroyCommandPool(s_ctx, commandPool);
       commandPool = {};
+    }
+    if (s_readbackCommandPool.handle)
+    {
+      cgpuDestroyCommandPool(s_ctx, s_readbackCommandPool);
+      s_readbackCommandPool = {};
     }
     s_commandPoolIndex = 0;
     if (s_texSampler.handle)
@@ -2652,6 +2769,7 @@ cleanup:
 
         if (renderBuffer->external)
         {
+          renderBuffer->mapped = false;
           continue;
         }
 
@@ -3256,7 +3374,7 @@ cleanup:
       .external = external
     };
 
-    if (!cgpuCreateSemaphore(s_ctx, &renderBuffer->semaphore))
+    if (external && !cgpuCreateSemaphore(s_ctx, &renderBuffer->semaphore))
     {
       GB_FATAL("failed to create render buffer semaphore");
     }
@@ -3312,8 +3430,23 @@ cleanup:
     delete renderBuffer;
   }
 
-  void* giGetRenderBufferMem(GiRenderBuffer* renderBuffer)
+  void* giMapRenderBuffer(GiRenderBuffer* renderBuffer)
   {
+    if (renderBuffer->external && !renderBuffer->mapped)
+    {
+      if (!_CopyRenderBufferToHost(renderBuffer))
+      {
+        return nullptr;
+      }
+
+      renderBuffer->mapped = true;
+    }
+
     return renderBuffer->mappedHostMem;
+  }
+
+  void giUnmapRenderBuffer(GiRenderBuffer* renderBuffer)
+  {
+    renderBuffer->mapped = false;
   }
 }

@@ -17,12 +17,22 @@
 
 #include "renderBuffer.h"
 
+#if defined(_WIN32) && !defined(VK_USE_PLATFORM_WIN32_KHR)
+#define VK_USE_PLATFORM_WIN32_KHR
+#endif
+
 #include <pxr/base/gf/vec3i.h>
 #include <pxr/base/tf/stringUtils.h>
 #include <pxr/imaging/hd/tokens.h>
 #include <pxr/imaging/hd/types.h>
 #include <pxr/imaging/hgi/hgi.h>
 #include <pxr/imaging/hgi/texture.h>
+
+#if defined(HDGATLING_HGI_INTEROP_VULKAN)
+#include <pxr/imaging/hgiVulkan/device.h>
+#include <pxr/imaging/hgiVulkan/hgi.h>
+#include <pxr/imaging/hgiVulkan/texture.h>
+#endif
 
 #include <gtl/gi/Gi.h>
 
@@ -44,6 +54,8 @@ namespace
     { HdFormatFloat32Vec4, HgiFormatFloat32Vec4 }
   };
 
+  // Hydra render buffers are named after the AOV they hold, either as
+  // <controller>/aov_<name> or <engine>/AOVs/<name>.
   static bool _IsDepthAov(const SdfPath& id)
   {
     std::string name = id.GetElementString();
@@ -56,17 +68,74 @@ namespace
     return name == HdAovTokens->depth.GetString();
   }
 
+  static HgiTextureHandle _CreateHgiTexture(Hgi* hgi, const HgiTextureDesc& desc)
+  {
+#if defined(HDGATLING_HGI_INTEROP_VULKAN)
+    auto* hgiVulkan = static_cast<HgiVulkan*>(hgi);
+    return hgiVulkan->CreateTextureForInterop(desc, /*optimalTiling=*/ true);
+#else
+    return hgi->CreateTexture(desc);
+#endif
+  }
+
+#if defined(HDGATLING_HGI_INTEROP_VULKAN)
+  static bool _GetVulkanExternalImageDesc(Hgi* hgi, const HgiTextureHandle& texture, GiExternalImageDesc* desc)
+  {
+    auto* hgiVulkan = static_cast<HgiVulkan*>(hgi);
+    auto* hgiVulkanTexture = static_cast<HgiVulkanTexture*>(texture.Get());
+
+    HgiVulkanDevice* device = hgiVulkanTexture->GetDevice();
+    VmaAllocationInfo2 allocationInfo = hgiVulkanTexture->GetAllocationInfo();
+
+    desc->memoryOffset = allocationInfo.allocationInfo.offset;
+    desc->memorySize = allocationInfo.blockSize;
+    desc->memoryTypeIndex = allocationInfo.allocationInfo.memoryType;
+    desc->memoryDedicated = allocationInfo.dedicatedMemory;
+
+#if defined(_WIN32)
+    desc->memoryHandle = (uint64_t) device->GetWin32HandleForMemory(allocationInfo.allocationInfo.deviceMemory);
+    return desc->memoryHandle != 0;
+#else
+    if (!device->vkGetMemoryFdKHR)
+    {
+      return false;
+    }
+
+    VkMemoryGetFdInfoKHR getInfo = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR,
+      .pNext = nullptr,
+      .memory = allocationInfo.allocationInfo.deviceMemory,
+      .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT,
+    };
+
+    int fd = -1;
+    if (device->vkGetMemoryFdKHR(device->GetVulkanDevice(), &getInfo, &fd) != VK_SUCCESS)
+    {
+      return false;
+    }
+
+    desc->memoryHandle = (uint64_t) fd;
+    return true;
+#endif
+  }
+#endif
+
   static bool _GetExternalImageDesc(Hgi* hgi, const HgiTextureHandle& texture, uint32_t width, uint32_t height,
                                     GiRenderBufferFormat format, GiExternalImageDesc* desc)
   {
-    TF_UNUSED(hgi);
-
     desc->width = width;
     desc->height = height;
     desc->format = format;
-    desc->nativeTexture = texture->GetRawResource();
 
+#if defined(HDGATLING_HGI_INTEROP_METAL)
+    TF_UNUSED(hgi);
+    desc->nativeTexture = texture->GetRawResource();
     return desc->nativeTexture != 0;
+#elif defined(HDGATLING_HGI_INTEROP_VULKAN)
+    return _GetVulkanExternalImageDesc(hgi, texture, desc);
+#else
+    return false;
+#endif
   }
 }
 
@@ -121,7 +190,8 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
   _isMultiSampled = multiSampled;
 
   // Hydra uses the depth AOV as a depth attachment, which a float storage image
-  // is not.
+  // is not. It therefore stays in host memory and is converted to a depth
+  // texture by HdxAovInputTask.
   bool useHgiTexture = _hgi && !_IsDepthAov(GetId());
 
   if (useHgiTexture)
@@ -136,7 +206,7 @@ bool HdGatlingRenderBuffer::Allocate(const GfVec3i& dimensions,
     desc.mipLevels = 1;
     desc.sampleCount = HgiSampleCount1;
 
-    _hgiTexture = _hgi->CreateTexture(desc);
+    _hgiTexture = _CreateHgiTexture(_hgi, desc);
 
     GiExternalImageDesc externalImageDesc = {};
     if (_hgiTexture && _GetExternalImageDesc(_hgi, _hgiTexture, _width, _height, it->second, &externalImageDesc))
@@ -202,7 +272,7 @@ void HdGatlingRenderBuffer::SetConverged(bool converged)
 
 void* HdGatlingRenderBuffer::Map()
 {
-  return _renderBuffer ? giGetRenderBufferMem(_renderBuffer) : nullptr;
+  return _renderBuffer ? giMapRenderBuffer(_renderBuffer) : nullptr;
 }
 
 bool HdGatlingRenderBuffer::IsMapped() const
@@ -224,6 +294,10 @@ VtValue HdGatlingRenderBuffer::GetResource(bool multiSampled) const
 
 void HdGatlingRenderBuffer::Unmap()
 {
+  if (_renderBuffer)
+  {
+    giUnmapRenderBuffer(_renderBuffer);
+  }
 }
 
 void HdGatlingRenderBuffer::Resolve()

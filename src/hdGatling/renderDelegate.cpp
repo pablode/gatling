@@ -160,6 +160,8 @@ void HdGatlingRenderDelegate::SetDrivers(HdDriverVector const& drivers)
 
 #if defined(HDGATLING_HGI_INTEROP_METAL)
   const TfToken expectedApiName = HgiTokens->Metal;
+#elif defined(HDGATLING_HGI_INTEROP_VULKAN)
+  const TfToken expectedApiName = HgiTokens->Vulkan;
 #endif
 
   for (HdDriver* driver : drivers)
@@ -172,7 +174,7 @@ void HdGatlingRenderDelegate::SetDrivers(HdDriverVector const& drivers)
     Hgi* hgi = driver->driver.UncheckedGet<Hgi*>();
     TfToken apiName = hgi->GetAPIName();
 
-#if defined(HDGATLING_HGI_INTEROP_METAL)
+#if defined(HDGATLING_HGI_INTEROP_METAL) || defined(HDGATLING_HGI_INTEROP_VULKAN)
     if (apiName != expectedApiName)
     {
       renderParam->SetHgi(nullptr);

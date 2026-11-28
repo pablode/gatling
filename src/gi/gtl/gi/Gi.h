@@ -295,5 +295,6 @@ namespace gtl
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format);
   GiRenderBuffer* giCreateRenderFromExternal(const GiExternalImageDesc& desc);
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer);
-  void* giGetRenderBufferMem(GiRenderBuffer* renderBuffer);
+  void* giMapRenderBuffer(GiRenderBuffer* renderBuffer);
+  void giUnmapRenderBuffer(GiRenderBuffer* renderBuffer);
 }
