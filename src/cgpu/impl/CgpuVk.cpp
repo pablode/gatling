@@ -31,6 +31,10 @@
 #include <algorithm>
 #include <utility>
 
+#if defined(_WIN32) && !defined(VK_USE_PLATFORM_WIN32_KHR)
+#define VK_USE_PLATFORM_WIN32_KHR
+#endif
+
 #include <volk.h>
 
 #include <gtl/gb/Fmt.h>
@@ -110,6 +114,7 @@ namespace gtl
   struct CgpuIDeviceFeatures
   {
     bool driverProperties;
+    bool externalMemory;
     bool maintenance4;
     bool pageableDeviceLocalMemory;
     bool pipelineLibraries;
@@ -148,12 +153,14 @@ namespace gtl
     VkImage           image;
     VkImageView       imageView;
     VmaAllocation     allocation;
+    VkDeviceMemory    externalMemory;
     uint64_t          size;
     uint32_t          width;
     uint32_t          height;
     uint32_t          depth;
     VkImageLayout     layout;
     VkAccessFlags2KHR accessMask;
+    bool              external;
   };
 
   struct CgpuIPipeline
@@ -695,6 +702,14 @@ namespace gtl
 
   using CgpuExtensionVector = GbSmallVector<const char*, 16>;
 
+#if defined(_WIN32)
+  constexpr static const char* CGPU_EXTERNAL_MEMORY_EXTENSION = VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME;
+  constexpr static VkExternalMemoryHandleTypeFlagBits CGPU_EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
+  constexpr static const char* CGPU_EXTERNAL_MEMORY_EXTENSION = VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME;
+  constexpr static VkExternalMemoryHandleTypeFlagBits CGPU_EXTERNAL_MEMORY_HANDLE_TYPE = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
+
   static void cgpuAddFeatureExtensions(const CgpuDeviceFeatures& features,
                                        const CgpuIDeviceFeatures& internalFeatures,
                                        CgpuExtensionVector& extensions)
@@ -715,6 +730,11 @@ namespace gtl
     if (internalFeatures.driverProperties)
     {
       extensions.push_back(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME);
+    }
+    if (internalFeatures.externalMemory)
+    {
+      extensions.push_back(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+      extensions.push_back(CGPU_EXTERNAL_MEMORY_EXTENSION);
     }
     if (internalFeatures.maintenance4)
     {
@@ -903,6 +923,7 @@ namespace gtl
     c->internalFeatures =
     {
       .driverProperties = findExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME),
+      .externalMemory = findExtension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME) && findExtension(CGPU_EXTERNAL_MEMORY_EXTENSION),
       .maintenance4 = CGPU_ENABLE_FEATURE(maintenance4, maintenance4),
       .pageableDeviceLocalMemory = pageableDeviceLocalMemory,
       .pipelineLibraries = CGPU_ENABLE_FEATURE(groupHandles, pipelineLibraryGroupHandles),
@@ -1944,6 +1965,181 @@ namespace gtl
     iimage->depth = createInfo.is3d ? createInfo.depth : 1;
     iimage->layout = imageCreateInfo.initialLayout;
     iimage->accessMask = VK_ACCESS_2_NONE_KHR;
+    iimage->externalMemory = VK_NULL_HANDLE;
+    iimage->external = false;
+
+    image->handle = handle;
+    return true;
+  }
+
+  bool cgpuCreateImageFromExternal(CgpuContext* ctx,
+                                   CgpuExternalImageCreateInfo createInfo,
+                                   CgpuImage* image)
+  {
+    CgpuIDevice* idevice = &ctx->idevice;
+
+    if (!idevice->internalFeatures.externalMemory)
+    {
+      CGPU_RETURN_ERROR("external memory not supported");
+    }
+
+    if (!createInfo.memoryHandle || !createInfo.memorySize)
+    {
+      CGPU_RETURN_ERROR("invalid external memory handle");
+    }
+
+    uint64_t handle = ctx->iimageStore.allocate();
+
+    CGPU_RESOLVE_IMAGE(ctx, { handle }, iimage);
+
+    VkExternalMemoryImageCreateInfo externalMemoryImageCreateInfo = {
+      .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
+      .pNext = nullptr,
+      .handleTypes = CGPU_EXTERNAL_MEMORY_HANDLE_TYPE,
+    };
+
+    VkImageCreateInfo imageCreateInfo = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      .pNext = &externalMemoryImageCreateInfo,
+      .flags = 0,
+      .imageType = VK_IMAGE_TYPE_2D,
+      .format = (VkFormat) createInfo.format,
+      .extent = {
+        .width = createInfo.width,
+        .height = createInfo.height,
+        .depth = 1,
+      },
+      .mipLevels = 1,
+      .arrayLayers = 1,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .tiling = VK_IMAGE_TILING_OPTIMAL,
+      .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+      .queueFamilyIndexCount = 0,
+      .pQueueFamilyIndices = nullptr,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+
+    VkResult result = idevice->table.vkCreateImage(
+      idevice->logicalDevice,
+      &imageCreateInfo,
+      nullptr,
+      &iimage->image
+    );
+    if (result != VK_SUCCESS)
+    {
+      ctx->iimageStore.free(handle);
+      CGPU_RETURN_ERROR("failed to create image");
+    }
+
+    VkMemoryDedicatedAllocateInfo dedicatedAllocateInfo = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
+      .pNext = nullptr,
+      .image = iimage->image,
+      .buffer = VK_NULL_HANDLE,
+    };
+
+#if defined(_WIN32)
+    VkImportMemoryWin32HandleInfoKHR importInfo = {
+      .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR,
+      .pNext = createInfo.memoryDedicated ? &dedicatedAllocateInfo : nullptr,
+      .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT,
+      .handle = (HANDLE) createInfo.memoryHandle,
+      .name = nullptr,
+    };
+#else
+    VkImportMemoryFdInfoKHR importInfo = {
+      .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR,
+      .pNext = createInfo.memoryDedicated ? &dedicatedAllocateInfo : nullptr,
+      .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT,
+      .fd = (int) createInfo.memoryHandle,
+    };
+#endif
+
+    VkMemoryAllocateInfo memoryAllocateInfo = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .pNext = &importInfo,
+      .allocationSize = createInfo.memorySize,
+      .memoryTypeIndex = createInfo.memoryTypeIndex,
+    };
+
+    result = idevice->table.vkAllocateMemory(
+      idevice->logicalDevice,
+      &memoryAllocateInfo,
+      nullptr,
+      &iimage->externalMemory
+    );
+    if (result != VK_SUCCESS)
+    {
+      idevice->table.vkDestroyImage(idevice->logicalDevice, iimage->image, nullptr);
+      ctx->iimageStore.free(handle);
+      CGPU_RETURN_ERROR("failed to import memory");
+    }
+
+    result = idevice->table.vkBindImageMemory(
+      idevice->logicalDevice,
+      iimage->image,
+      iimage->externalMemory,
+      createInfo.memoryOffset
+    );
+    if (result != VK_SUCCESS)
+    {
+      idevice->table.vkFreeMemory(idevice->logicalDevice, iimage->externalMemory, nullptr);
+      idevice->table.vkDestroyImage(idevice->logicalDevice, iimage->image, nullptr);
+      ctx->iimageStore.free(handle);
+      CGPU_RETURN_ERROR("failed to bind imported memory");
+    }
+
+    VkImageViewCreateInfo imageViewCreateInfo = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .image = iimage->image,
+      .viewType = VK_IMAGE_VIEW_TYPE_2D,
+      .format = (VkFormat) createInfo.format,
+      .components = {
+        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+      },
+      .subresourceRange = {
+        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
+        .levelCount = 1,
+        .baseArrayLayer = 0,
+        .layerCount = 1,
+      },
+    };
+
+    result = idevice->table.vkCreateImageView(
+      idevice->logicalDevice,
+      &imageViewCreateInfo,
+      nullptr,
+      &iimage->imageView
+    );
+    if (result != VK_SUCCESS)
+    {
+      idevice->table.vkFreeMemory(idevice->logicalDevice, iimage->externalMemory, nullptr);
+      idevice->table.vkDestroyImage(idevice->logicalDevice, iimage->image, nullptr);
+      ctx->iimageStore.free(handle);
+      CGPU_RETURN_ERROR("failed to create image view");
+    }
+
+    if (ctx->debugUtilsEnabled && createInfo.debugName)
+    {
+      cgpuSetObjectName(idevice->logicalDevice, VK_OBJECT_TYPE_IMAGE, (uint64_t) iimage->image, createInfo.debugName);
+    }
+
+    iimage->allocation = VK_NULL_HANDLE;
+    iimage->size = createInfo.memorySize;
+    iimage->width = createInfo.width;
+    iimage->height = createInfo.height;
+    iimage->depth = 1;
+    // The image is owned by the producer, which performs the layout transitions.
+    iimage->layout = VK_IMAGE_LAYOUT_GENERAL;
+    iimage->accessMask = VK_ACCESS_2_NONE_KHR;
+    iimage->external = true;
 
     image->handle = handle;
     return true;
@@ -1960,7 +2156,16 @@ namespace gtl
       nullptr
     );
 
-    vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
+    if (iimage->external)
+    {
+      // Memory is only imported, ownership stays with the exporting allocation.
+      idevice->table.vkFreeMemory(idevice->logicalDevice, iimage->externalMemory, nullptr);
+      idevice->table.vkDestroyImage(idevice->logicalDevice, iimage->image, nullptr);
+    }
+    else
+    {
+      vmaDestroyImage(idevice->allocator, iimage->image, iimage->allocation);
+    }
 
     ctx->iimageStore.free(image.handle);
   }

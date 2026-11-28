@@ -142,6 +142,26 @@ namespace gtl
     const char* debugName = nullptr;
   };
 
+  // Image whose GPU memory is owned by another graphics API instance (i.e. Hgi).
+  // Metal exposes native texture objects, so the texture can be used directly.
+  // Vulkan requires importing the backing memory into cgpu's device.
+  struct CgpuExternalImageCreateInfo
+  {
+    uint32_t width;
+    uint32_t height;
+    CgpuImageFormat format = CgpuImageFormat::Undefined;
+
+    uint64_t nativeTexture = 0; // Metal
+
+    uint64_t memoryHandle = 0; // Vulkan: opaque fd or win32 handle
+    uint64_t memoryOffset = 0;
+    uint64_t memorySize = 0;
+    uint32_t memoryTypeIndex = 0;
+    bool memoryDedicated = false;
+
+    const char* debugName = nullptr;
+  };
+
   struct CgpuBufferCreateInfo
   {
     CgpuBufferUsage usage;
@@ -393,6 +413,12 @@ namespace gtl
   bool cgpuCreateImage(
     CgpuContext* ctx,
     CgpuImageCreateInfo createInfo,
+    CgpuImage* image
+  );
+
+  bool cgpuCreateImageFromExternal(
+    CgpuContext* ctx,
+    CgpuExternalImageCreateInfo createInfo,
     CgpuImage* image
   );
 

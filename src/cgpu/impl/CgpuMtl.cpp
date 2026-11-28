@@ -114,6 +114,7 @@ namespace gtl
     uint32_t height;
     uint32_t depth;
     CgpuImageFormat format;
+    bool external;
   };
 
   struct CgpuIBindSet
@@ -949,6 +950,31 @@ namespace gtl
     iimage->height = createInfo.height;
     iimage->depth = depth;
     iimage->format = createInfo.format;
+    iimage->external = false;
+
+    image->handle = handle;
+    return true;
+  }
+
+  bool cgpuCreateImageFromExternal(CgpuContext* ctx,
+                                   CgpuExternalImageCreateInfo createInfo,
+                                   CgpuImage* image)
+  {
+    if (!createInfo.nativeTexture)
+    {
+      CGPU_RETURN_ERROR("invalid external image handle");
+    }
+
+    uint64_t handle = ctx->iimageStore.allocate();
+
+    CGPU_RESOLVE_IMAGE(ctx, { handle }, iimage);
+
+    iimage->texture = reinterpret_cast<MTL::Texture*>(createInfo.nativeTexture);
+    iimage->width = createInfo.width;
+    iimage->height = createInfo.height;
+    iimage->depth = 1;
+    iimage->format = createInfo.format;
+    iimage->external = true;
 
     image->handle = handle;
     return true;
@@ -958,7 +984,10 @@ namespace gtl
   {
     CGPU_RESOLVE_IMAGE(ctx, image, iimage);
 
-    iimage->texture->release();
+    if (!iimage->external)
+    {
+      iimage->texture->release();
+    }
 
     ctx->iimageStore.free(image.handle);
   }
