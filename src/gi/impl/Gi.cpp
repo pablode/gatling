@@ -248,6 +248,7 @@ namespace gtl
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t size = 0;
+    bool external = false;
   };
 
   CgpuContext* s_ctx = nullptr;
@@ -375,6 +376,11 @@ namespace gtl
 
   void _EncodeRenderBufferAsHeatmap(GiRenderBuffer* renderBuffer)
   {
+    if (!renderBuffer->mappedHostMem)
+    {
+      return;
+    }
+
     int channelCount = renderBuffer->width * renderBuffer->height * 4;
     float* rgbaImg = (float*) renderBuffer->mappedHostMem;
 
@@ -2173,6 +2179,11 @@ cleanup:
     {
       GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
+      if (renderBuffer->external)
+      {
+        continue;
+      }
+
       if (renderBuffer->image.handle)
       {
         continue;
@@ -2638,6 +2649,11 @@ cleanup:
       for (const GiAovBinding& binding : params.aovBindings)
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
+
+        if (renderBuffer->external)
+        {
+          continue;
+        }
 
         preImageBarriers.push_back(CgpuImageMemoryBarrier {
           .image = renderBuffer->image,
@@ -3227,7 +3243,7 @@ cleanup:
     light->scene->dirtyFlags |= GiSceneDirtyFlags::DirtyFramebuffer;
   }
 
-  GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format)
+  GiRenderBuffer* _CreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format, bool external)
   {
     uint32_t stride = _GiRenderBufferFormatStride(format);
     uint32_t size = width * height * stride;
@@ -3236,12 +3252,44 @@ cleanup:
       .format = format,
       .width = width,
       .height = height,
-      .size = size
+      .size = size,
+      .external = external
     };
 
     if (!cgpuCreateSemaphore(s_ctx, &renderBuffer->semaphore))
     {
       GB_FATAL("failed to create render buffer semaphore");
+    }
+
+    return renderBuffer;
+  }
+
+  GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format)
+  {
+    return _CreateRenderBuffer(width, height, format, false);
+  }
+
+  GiRenderBuffer* giCreateRenderFromExternal(const GiExternalImageDesc& desc)
+  {
+    GiRenderBuffer* renderBuffer = _CreateRenderBuffer(desc.width, desc.height, desc.format, true);
+
+    bool success = cgpuCreateImageFromExternal(s_ctx, {
+                                                 .width = desc.width,
+                                                 .height = desc.height,
+                                                 .format = _GiRenderBufferFormatToImageFormat(desc.format),
+                                                 .nativeTexture = desc.nativeTexture,
+                                                 .memoryHandle = desc.memoryHandle,
+                                                 .memoryOffset = desc.memoryOffset,
+                                                 .memorySize = desc.memorySize,
+                                                 .memoryTypeIndex = desc.memoryTypeIndex,
+                                                 .memoryDedicated = desc.memoryDedicated,
+                                                 .debugName = "RenderBufferGpu"
+                                               }, &renderBuffer->image);
+
+    if (!success)
+    {
+      giDestroyRenderBuffer(renderBuffer);
+      return nullptr;
     }
 
     return renderBuffer;

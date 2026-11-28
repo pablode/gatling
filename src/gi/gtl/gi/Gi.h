@@ -182,6 +182,22 @@ namespace gtl
     GiRenderBuffer* renderBuffer;
   };
 
+  // Image whose GPU memory is owned by the host application's graphics API.
+  struct GiExternalImageDesc
+  {
+    uint32_t width;
+    uint32_t height;
+    GiRenderBufferFormat format;
+
+    uint64_t nativeTexture; // Metal
+
+    uint64_t memoryHandle; // Vulkan: opaque fd or win32 handle
+    uint64_t memoryOffset;
+    uint64_t memorySize;
+    uint32_t memoryTypeIndex;
+    bool memoryDedicated;
+  };
+
   struct GiRenderParams
   {
     std::vector<GiAovBinding> aovBindings;
@@ -277,6 +293,7 @@ namespace gtl
   void giSetDomeLightDiffuseSpecular(GiDomeLight* light, float diffuse, float specular);
 
   GiRenderBuffer* giCreateRenderBuffer(uint32_t width, uint32_t height, GiRenderBufferFormat format);
+  GiRenderBuffer* giCreateRenderFromExternal(const GiExternalImageDesc& desc);
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer);
   void* giGetRenderBufferMem(GiRenderBuffer* renderBuffer);
 }
