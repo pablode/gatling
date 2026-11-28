@@ -241,7 +241,9 @@ namespace gtl
   {
     CgpuImage image;
     CgpuBuffer hostMem;
+    CgpuSemaphore semaphore;
     void* mappedHostMem = nullptr;
+    uint64_t semaphoreValue = 0;
     GiRenderBufferFormat format = GiRenderBufferFormat::Float32Vec4;
     uint32_t width = 0;
     uint32_t height = 0;
@@ -2444,8 +2446,6 @@ cleanup:
 
     // Start command buffer.
     CgpuSemaphore semaphore = {};
-    CgpuSignalSemaphoreInfo signalSemaphoreInfo;
-    CgpuWaitSemaphoreInfo waitSemaphoreInfo;
 
     uint32_t commandPoolIndex = s_commandPoolIndex;
     s_commandPoolIndex = (s_commandPoolIndex == 0) ? 1 : 0;
@@ -2698,11 +2698,42 @@ cleanup:
     // Submit command buffer
     cgpuEndCommandBuffer(s_ctx, commandBuffer);
 
+    GbSmallVector<CgpuWaitSemaphoreInfo, 5> waitSemaphoreInfos;
+    GbSmallVector<CgpuSignalSemaphoreInfo, 5> signalSemaphoreInfos;
+    GbSmallVector<GiRenderBuffer*, 5> syncedRenderBuffers;
+    std::unordered_set<GiRenderBuffer*> syncedRenderBufferSet;
+
+    for (const GiAovBinding& binding : params.aovBindings)
+    {
+      GiRenderBuffer* renderBuffer = binding.renderBuffer;
+
+      if (!renderBuffer->semaphore.handle || !syncedRenderBufferSet.insert(renderBuffer).second)
+      {
+        continue;
+      }
+
+      if (renderBuffer->semaphoreValue > 0)
+      {
+        waitSemaphoreInfos.push_back({ .semaphore = renderBuffer->semaphore, .value = renderBuffer->semaphoreValue });
+      }
+
+      signalSemaphoreInfos.push_back({ .semaphore = renderBuffer->semaphore, .value = renderBuffer->semaphoreValue + 1 });
+      syncedRenderBuffers.push_back(renderBuffer);
+    }
+
+    CgpuWaitSemaphoreInfo waitSemaphoreInfo = {};
+
     if (!cgpuCreateSemaphore(s_ctx, &semaphore))
       goto cleanup;
 
-    signalSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
-    cgpuSubmitCommandBuffer(s_ctx, commandBuffer, 1, &signalSemaphoreInfo);
+    signalSemaphoreInfos.push_back({ .semaphore = semaphore, .value = 1 });
+    cgpuSubmitCommandBuffer(s_ctx, commandBuffer, (uint32_t) signalSemaphoreInfos.size(), signalSemaphoreInfos.data(),
+                            (uint32_t) waitSemaphoreInfos.size(), waitSemaphoreInfos.data());
+
+    for (GiRenderBuffer* renderBuffer : syncedRenderBuffers)
+    {
+      renderBuffer->semaphoreValue++;
+    }
 
     waitSemaphoreInfo = { .semaphore = semaphore, .value = 1 };
     if (!cgpuWaitSemaphores(s_ctx, 1, &waitSemaphoreInfo))
@@ -3201,12 +3232,19 @@ cleanup:
     uint32_t stride = _GiRenderBufferFormatStride(format);
     uint32_t size = width * height * stride;
 
-    return new GiRenderBuffer {
+    GiRenderBuffer* renderBuffer = new GiRenderBuffer {
       .format = format,
       .width = width,
       .height = height,
       .size = size
     };
+
+    if (!cgpuCreateSemaphore(s_ctx, &renderBuffer->semaphore))
+    {
+      GB_FATAL("failed to create render buffer semaphore");
+    }
+
+    return renderBuffer;
   }
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
@@ -3218,6 +3256,10 @@ cleanup:
     if (renderBuffer->hostMem.handle)
     {
       s_deleteQueue->pushBack(renderBuffer->hostMem);
+    }
+    if (renderBuffer->semaphore.handle)
+    {
+      cgpuDestroySemaphore(s_ctx, renderBuffer->semaphore);
     }
     delete renderBuffer;
   }
