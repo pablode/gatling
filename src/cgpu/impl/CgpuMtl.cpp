@@ -344,8 +344,12 @@ namespace gtl
       return MTL::PixelFormatRGBA8Unorm;
     case CgpuImageFormat::R16G16B16A16Sfloat:
       return MTL::PixelFormatRGBA16Float;
+    case CgpuImageFormat::R32Sint:
+      return MTL::PixelFormatR32Sint;
     case CgpuImageFormat::R32Sfloat:
       return MTL::PixelFormatR32Float;
+    case CgpuImageFormat::R32G32B32A32Sfloat:
+      return MTL::PixelFormatRGBA32Float;
     default:
       GB_FATAL("unhandled image format");
     }
@@ -356,10 +360,13 @@ namespace gtl
     switch (format)
     {
     case CgpuImageFormat::R8G8B8A8Unorm:
+    case CgpuImageFormat::R32Sint:
     case CgpuImageFormat::R32Sfloat:
       return 4;
     case CgpuImageFormat::R16G16B16A16Sfloat:
       return 8;
+    case CgpuImageFormat::R32G32B32A32Sfloat:
+      return 16;
     default:
       GB_FATAL("unhandled image format");
     }

@@ -70,7 +70,9 @@ namespace gtl
     R8G8B8A8Unorm = 37,
     R16G16B16Sfloat = 90,
     R16G16B16A16Sfloat = 97,
-    R32Sfloat = 100
+    R32Sint = 99,
+    R32Sfloat = 100,
+    R32G32B32A32Sfloat = 109
   };
 
   enum class CgpuMemoryAccess
