@@ -185,7 +185,7 @@ void main()
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
     if (bounce == 0)
     {
-      OpacityAov[rayPayload.pixelIndex] = colormap_viridis(opacity);
+      imageStore(OpacityAov, aovImageCoord(rayPayload.pixelIndex), vec4(colormap_viridis(opacity), 0.0));
     }
 #endif
 
@@ -199,7 +199,7 @@ void main()
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
     if (bounce == 0)
     {
-      OpacityAov[rayPayload.pixelIndex] = vec3(1.0, 0.0, 1.0); // magenta == solid opaque
+      imageStore(OpacityAov, aovImageCoord(rayPayload.pixelIndex), vec4(1.0, 0.0, 1.0, 0.0)); // magenta == solid opaque
     }
 #endif
 #endif
@@ -272,29 +272,30 @@ void main()
         BlasPayloadBufferPreamble preamble = indices.preamble;
 #endif
         uint pixelIndex = rayPayload.pixelIndex;
+        ivec2 coord = aovImageCoord(pixelIndex);
 #if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
-        TangentsAov[pixelIndex] = (shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+        imageStore(TangentsAov, coord, vec4((shading_state.tangent_u[0] + vec3(1.0, 1.0, 1.0)) * 0.5, 0.0));
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
-        BitangentsAov[pixelIndex] = (shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5;
+        imageStore(BitangentsAov, coord, vec4((shading_state.tangent_v[0] + vec3(1.0, 1.0, 1.0)) * 0.5, 0.0));
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
-        BarycentricsAov[pixelIndex] = vec3(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y);
+        imageStore(BarycentricsAov, coord, vec4(1.0 - hit_bc.x - hit_bc.y, hit_bc.x, hit_bc.y, 0.0));
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
-        TexcoordsAov[pixelIndex] = shading_state.text_coords[0];
+        imageStore(TexcoordsAov, coord, vec4(shading_state.text_coords[0], 0.0));
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
-        ThinWalledAov[pixelIndex] = thinWalled ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+        imageStore(ThinWalledAov, coord, thinWalled ? vec4(1.0, 0.0, 0.0, 0.0) : vec4(0.0, 1.0, 0.0, 0.0));
 #endif
 #if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
         int objectId = preamble.objectId;
-        ObjectIdAov[pixelIndex] = objectId;
+        imageStore(ObjectIdAov, coord, ivec4(objectId, 0, 0, 0));
 #endif
 #if (AOV_MASK & AOV_BIT_DEPTH) != 0
         vec2 clipRange = vec2(ubo.clipStart, ubo.clipEnd);
         float logDepth = 2.0 * log(gl_HitTEXT / clipRange.x) / log(clipRange.y / clipRange.x) - 1.0;
-        DepthAov[pixelIndex] = logDepth;
+        imageStore(DepthAov, coord, vec4(logDepth, 0.0, 0.0, 0.0));
 #endif
 #if (AOV_MASK & AOV_BIT_FACE_ID) != 0
         int faceIdStride = int((preamble.faceIdsInfo & FACE_ID_STRIDE_MASK) >> FACE_ID_STRIDE_OFFSET);
@@ -305,14 +306,14 @@ void main()
         int encodedFaceId = faceIdsBuffer.data[gl_PrimitiveID / invFaceIdStride];
 
         encodedFaceId >>= ((gl_PrimitiveID % invFaceIdStride) * 8);
-        FaceIdAov[pixelIndex] = encodedFaceId & (faceIdStride * 8 - 1);
+        imageStore(FaceIdAov, coord, ivec4(encodedFaceId & (faceIdStride * 8 - 1), 0, 0, 0));
 #endif
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
         int instanceId = InstanceIds[gl_InstanceID];
-        InstanceIdAov[pixelIndex] = instanceId;
+        imageStore(InstanceIdAov, coord, ivec4(instanceId, 0, 0, 0));
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
-        DoubleSidedAov[pixelIndex] = isDoubleSided ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+        imageStore(DoubleSidedAov, coord, isDoubleSided ? vec4(0.0, 1.0, 0.0, 0.0) : vec4(1.0, 0.0, 0.0, 0.0));
 #endif
 
         // Accumulating AOVs
@@ -322,10 +323,10 @@ void main()
 #ifdef PROGRESSIVE_ACCUMULATION
         if (ubo.sampleOffset > 0)
         {
-            prevNormal = NormalsAov[pixelIndex];
+            prevNormal = imageLoad(NormalsAov, coord).rgb;
         }
 #endif
-        NormalsAov[pixelIndex] = (prevNormal * ubo.sampleOffset + posNormal * ubo.spp) * ubo.invTotalSampleCount;
+        imageStore(NormalsAov, coord, vec4((prevNormal * ubo.sampleOffset + posNormal * ubo.spp) * ubo.invTotalSampleCount, 0.0));
 #endif
 
 #if (AOV_MASK & AOV_BIT_ALBEDO) != 0
@@ -357,10 +358,10 @@ void main()
 #ifdef PROGRESSIVE_ACCUMULATION
         if (ubo.sampleOffset > 0)
         {
-            prevAlbedo = AlbedoAov[pixelIndex];
+            prevAlbedo = imageLoad(AlbedoAov, coord).rgb;
         }
 #endif
-        AlbedoAov[pixelIndex] = (prevAlbedo * ubo.sampleOffset + albedo * ubo.spp) * ubo.invTotalSampleCount;
+        imageStore(AlbedoAov, coord, vec4((prevAlbedo * ubo.sampleOffset + albedo * ubo.spp) * ubo.invTotalSampleCount, 0.0));
 #endif
     }
 

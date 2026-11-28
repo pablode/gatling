@@ -239,9 +239,10 @@ namespace gtl
 
   struct GiRenderBuffer
   {
-    CgpuBuffer deviceMem;
+    CgpuImage image;
     CgpuBuffer hostMem;
     void* mappedHostMem = nullptr;
+    GiRenderBufferFormat format = GiRenderBufferFormat::Float32Vec4;
     uint32_t width = 0;
     uint32_t height = 0;
     uint32_t size = 0;
@@ -322,6 +323,21 @@ namespace gtl
     default:
       assert(false);
       return 0;
+    }
+  }
+
+  CgpuImageFormat _GiRenderBufferFormatToImageFormat(GiRenderBufferFormat format)
+  {
+    switch (format)
+    {
+    case GiRenderBufferFormat::Int32:
+      return CgpuImageFormat::R32Sint;
+    case GiRenderBufferFormat::Float32:
+      return CgpuImageFormat::R32Sfloat;
+    case GiRenderBufferFormat::Float32Vec4:
+      return CgpuImageFormat::R32G32B32A32Sfloat;
+    default:
+      GB_FATAL("coding error: unhandled case");
     }
   }
 
@@ -2155,17 +2171,18 @@ cleanup:
     {
       GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-      if (renderBuffer->deviceMem.handle)
+      if (renderBuffer->image.handle)
       {
         continue;
       }
 
-      if (!cgpuCreateBuffer(s_ctx, {
-                              .usage = CgpuBufferUsage::Storage | CgpuBufferUsage::TransferSrc,
-                              .memoryProperties = CgpuMemoryProperties::DeviceLocal,
-                              .size = renderBuffer->size,
+      if (!cgpuCreateImage(s_ctx, {
+                              .width = renderBuffer->width,
+                              .height = renderBuffer->height,
+                              .format = _GiRenderBufferFormatToImageFormat(renderBuffer->format),
+                              .usage = CgpuImageUsage::Storage | CgpuImageUsage::TransferSrc,
                               .debugName = "RenderBufferGpu"
-                            }, &renderBuffer->deviceMem))
+                            }, &renderBuffer->image))
       {
         GB_ERROR("failed to allocate render buffer");
         return GiStatus::Error;
@@ -2180,7 +2197,7 @@ cleanup:
                             }, &renderBuffer->hostMem))
       {
         GB_ERROR("failed to allocate render buffer");
-        cgpuDestroyBuffer(s_ctx, renderBuffer->deviceMem);
+        cgpuDestroyImage(s_ctx, renderBuffer->image);
         return GiStatus::Error;
       }
 
@@ -2444,6 +2461,9 @@ cleanup:
       std::vector<CgpuBufferBinding> buffers;
       buffers.reserve(16);
 
+      std::vector<CgpuImageBinding> aovImages;
+      aovImages.reserve(16);
+
       buffers.push_back({ .binding = rp::BINDING_INDEX_UNIFORM_DATA, .buffer = s_bumpAlloc->getBuffer(), .size = sizeof(rp::UniformData) });
 
       buffers.push_back({ .binding = rp::BINDING_INDEX_SPHERE_LIGHTS, .buffer = scene->sphereLights.buffer() });
@@ -2479,7 +2499,9 @@ cleanup:
       for (const GiAovBinding& binding : params.aovBindings)
       {
         uint32_t bindingIndex = aovBindingIndices[int(binding.aovId)];
-        buffers.push_back({ .binding = bindingIndex, .buffer = binding.renderBuffer->deviceMem });
+        GiRenderBuffer* renderBuffer = binding.renderBuffer;
+
+        aovImages.push_back({ .binding = bindingIndex, .image = renderBuffer->image });
       }
 
       buffers.push_back({ .binding = rp::BINDING_INDEX_TEXTURE_INFOS, .buffer = shaderCache->textureInfos });
@@ -2506,6 +2528,8 @@ cleanup:
       CgpuBindings bindings0 = {
         .bufferCount = (uint32_t) buffers.size(),
         .buffers = buffers.data(),
+        .imageCount = (uint32_t) aovImages.size(),
+        .images = aovImages.data(),
         .samplerCount = imageCount ? 1u : 0u,
         .samplers = &sampler,
         .tlasCount = 1u,
@@ -2516,6 +2540,11 @@ cleanup:
       CgpuBindings bindings2 = { .imageCount = (uint32_t) images.size(), .images = images.data() };
 
       GB_EXPECT(shaderCache->imageBindings.size() <= rp::MAX_TEXTURE_COUNT, "max number of textures exceeded");
+
+      if (!aovImages.empty())
+      {
+        cgpuCmdTransitionShaderImageLayouts(s_ctx, commandBuffer, shaderCache->rgenShader, 0, (uint32_t) aovImages.size(), aovImages.data());
+      }
 
       if (images.size() > 0)
       {
@@ -2601,54 +2630,69 @@ cleanup:
 
     // Copy device to host memory
     {
-      GbSmallVector<CgpuBufferMemoryBarrier, 5> preBarriers;
-      GbSmallVector<CgpuBufferMemoryBarrier, 5> postBarriers;
-
-      preBarriers.resize(params.aovBindings.size());
-      postBarriers.resize(params.aovBindings.size());
-
-      for (size_t i = 0; i < params.aovBindings.size(); i++)
-      {
-        const GiAovBinding& binding = params.aovBindings[i];
-        GiRenderBuffer* renderBuffer = binding.renderBuffer;
-
-        preBarriers[i] = CgpuBufferMemoryBarrier {
-          .buffer = renderBuffer->deviceMem,
-          .srcStageMask = CgpuPipelineStage::RayTracingShader,
-          .srcAccessMask = CgpuMemoryAccess::ShaderWrite,
-          .dstStageMask = CgpuPipelineStage::Transfer,
-          .dstAccessMask = CgpuMemoryAccess::TransferRead
-        };
-
-        postBarriers[i] = CgpuBufferMemoryBarrier {
-          .buffer = renderBuffer->hostMem,
-          .srcStageMask = CgpuPipelineStage::Transfer,
-          .srcAccessMask = CgpuMemoryAccess::TransferWrite,
-          .dstStageMask = CgpuPipelineStage::Host,
-          .dstAccessMask = CgpuMemoryAccess::HostRead
-        };
-      }
-
-      CgpuPipelineBarrier preBarrier = {
-        .bufferBarrierCount = (uint32_t) preBarriers.size(),
-        .bufferBarriers = preBarriers.data()
-      };
-
-      cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &preBarrier);
+      GbSmallVector<CgpuImageMemoryBarrier, 5> preImageBarriers;
+      GbSmallVector<CgpuBufferMemoryBarrier, 5> postBufferBarriers;
+      GbSmallVector<CgpuImageMemoryBarrier, 5> postImageBarriers;
+      GbSmallVector<GiRenderBuffer*, 5> hostCopyRenderBuffers;
 
       for (const GiAovBinding& binding : params.aovBindings)
       {
         GiRenderBuffer* renderBuffer = binding.renderBuffer;
 
-        cgpuCmdCopyBuffer(s_ctx, commandBuffer, renderBuffer->deviceMem, 0, renderBuffer->hostMem);
+        preImageBarriers.push_back(CgpuImageMemoryBarrier {
+          .image = renderBuffer->image,
+          .srcStageMask = CgpuPipelineStage::RayTracingShader,
+          .dstStageMask = CgpuPipelineStage::Transfer,
+          .accessMask = CgpuMemoryAccess::TransferRead
+        });
+
+        postBufferBarriers.push_back(CgpuBufferMemoryBarrier {
+          .buffer = renderBuffer->hostMem,
+          .srcStageMask = CgpuPipelineStage::Transfer,
+          .srcAccessMask = CgpuMemoryAccess::TransferWrite,
+          .dstStageMask = CgpuPipelineStage::Host,
+          .dstAccessMask = CgpuMemoryAccess::HostRead
+        });
+
+        postImageBarriers.push_back(CgpuImageMemoryBarrier {
+          .image = renderBuffer->image,
+          .srcStageMask = CgpuPipelineStage::Transfer,
+          .dstStageMask = CgpuPipelineStage::RayTracingShader,
+          .accessMask = CgpuMemoryAccess::ShaderRead | CgpuMemoryAccess::ShaderWrite
+        });
+
+        hostCopyRenderBuffers.push_back(renderBuffer);
       }
 
-      CgpuPipelineBarrier postBarrier = {
-        .bufferBarrierCount = (uint32_t) postBarriers.size(),
-        .bufferBarriers = postBarriers.data()
-      };
+      if (!hostCopyRenderBuffers.empty())
+      {
+        CgpuPipelineBarrier preBarrier = {
+          .imageBarrierCount = (uint32_t) preImageBarriers.size(),
+          .imageBarriers = preImageBarriers.data()
+        };
 
-      cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &postBarrier);
+        cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &preBarrier);
+
+        for (GiRenderBuffer* renderBuffer : hostCopyRenderBuffers)
+        {
+          CgpuBufferImageCopyDesc desc = {
+            .texelExtentX = renderBuffer->width,
+            .texelExtentY = renderBuffer->height,
+            .texelExtentZ = 1
+          };
+
+          cgpuCmdCopyImageToBuffer(s_ctx, commandBuffer, renderBuffer->image, renderBuffer->hostMem, &desc);
+        }
+
+        CgpuPipelineBarrier postBarrier = {
+          .bufferBarrierCount = (uint32_t) postBufferBarriers.size(),
+          .bufferBarriers = postBufferBarriers.data(),
+          .imageBarrierCount = (uint32_t) postImageBarriers.size(),
+          .imageBarriers = postImageBarriers.data()
+        };
+
+        cgpuCmdPipelineBarrier(s_ctx, commandBuffer, &postBarrier);
+      }
     }
 
     // Submit command buffer
@@ -3158,6 +3202,7 @@ cleanup:
     uint32_t size = width * height * stride;
 
     return new GiRenderBuffer {
+      .format = format,
       .width = width,
       .height = height,
       .size = size
@@ -3166,9 +3211,9 @@ cleanup:
 
   void giDestroyRenderBuffer(GiRenderBuffer* renderBuffer)
   {
-    if (renderBuffer->deviceMem.handle)
+    if (renderBuffer->image.handle)
     {
-      s_deleteQueue->pushBack(renderBuffer->deviceMem);
+      s_deleteQueue->pushBack(renderBuffer->image);
     }
     if (renderBuffer->hostMem.handle)
     {

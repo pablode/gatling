@@ -22,57 +22,66 @@ layout(binding = BINDING_INDEX_INSTANCE_IDS, std430) readonly buffer InstanceIds
 layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_F, std430) readonly buffer ClearValueBufferF { vec4 ClearValuesF[]; };
 layout(binding = BINDING_INDEX_AOV_CLEAR_VALUES_I, std430) readonly buffer ClearValueBufferI { ivec4 ClearValuesI[]; };
 
+// AOVs are storage images so that they can be consumed by Hydra without a
+// CPU copy. Writes to multi-component AOVs use rgba32f as there is no rgb32f
+// storage image format.
 #if (AOV_MASK & AOV_BIT_COLOR) != 0
-layout(binding = BINDING_INDEX_AOV_COLOR, std430) buffer Framebuffer { vec4 ColorAov[]; };
+layout(binding = BINDING_INDEX_AOV_COLOR, rgba32f) uniform image2D ColorAov;
 #endif
 #if (AOV_MASK & AOV_BIT_NORMAL) != 0
-layout(binding = BINDING_INDEX_AOV_NORMAL, std430) buffer NormalBuffer { vec3 NormalsAov[]; };
+layout(binding = BINDING_INDEX_AOV_NORMAL, rgba32f) uniform image2D NormalsAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_NEE) != 0
-layout(binding = BINDING_INDEX_AOV_NEE, std430) writeonly writeonly buffer NeeBuffer { vec3 NeeAov[]; };
+layout(binding = BINDING_INDEX_AOV_NEE, rgba32f) uniform writeonly image2D NeeAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BARYCENTRICS) != 0
-layout(binding = BINDING_INDEX_AOV_BARYCENTRICS, std430) writeonly buffer BarycentricsBuffer { vec3 BarycentricsAov[]; };
+layout(binding = BINDING_INDEX_AOV_BARYCENTRICS, rgba32f) uniform writeonly image2D BarycentricsAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TEXCOORDS) != 0
-layout(binding = BINDING_INDEX_AOV_TEXCOORDS, std430) writeonly buffer TexcoordsBuffer { vec3 TexcoordsAov[]; };
+layout(binding = BINDING_INDEX_AOV_TEXCOORDS, rgba32f) uniform writeonly image2D TexcoordsAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BOUNCES) != 0
-layout(binding = BINDING_INDEX_AOV_BOUNCES, std430) writeonly buffer BouncesBuffer { vec3 BouncesAov[]; };
+layout(binding = BINDING_INDEX_AOV_BOUNCES, rgba32f) uniform writeonly image2D BouncesAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_CLOCK_CYCLES) != 0
-layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, std430) writeonly buffer ClockCyclesBuffer { vec3 ClockCyclesAov[]; };
+layout(binding = BINDING_INDEX_AOV_CLOCK_CYCLES, rgba32f) uniform writeonly image2D ClockCyclesAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-layout(binding = BINDING_INDEX_AOV_OPACITY, std430) writeonly buffer OpacityBuffer { vec3 OpacityAov[]; };
+layout(binding = BINDING_INDEX_AOV_OPACITY, rgba32f) uniform writeonly image2D OpacityAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_TANGENTS) != 0
-layout(binding = BINDING_INDEX_AOV_TANGENTS, std430) writeonly buffer TangentsBuffer { vec3 TangentsAov[]; };
+layout(binding = BINDING_INDEX_AOV_TANGENTS, rgba32f) uniform writeonly image2D TangentsAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_BITANGENTS) != 0
-layout(binding = BINDING_INDEX_AOV_BITANGENTS, std430) writeonly buffer BitangentsBuffer { vec3 BitangentsAov[]; };
+layout(binding = BINDING_INDEX_AOV_BITANGENTS, rgba32f) uniform writeonly image2D BitangentsAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_THIN_WALLED) != 0
-layout(binding = BINDING_INDEX_AOV_THIN_WALLED, std430) writeonly buffer ThinWalledBuffer { vec3 ThinWalledAov[]; };
+layout(binding = BINDING_INDEX_AOV_THIN_WALLED, rgba32f) uniform writeonly image2D ThinWalledAov;
 #endif
 #if (AOV_MASK & AOV_BIT_OBJECT_ID) != 0
-layout(binding = BINDING_INDEX_AOV_OBJECT_ID, std430) writeonly buffer ObjectIdBuffer { int ObjectIdAov[]; };
+layout(binding = BINDING_INDEX_AOV_OBJECT_ID, r32i) uniform writeonly iimage2D ObjectIdAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEPTH) != 0
-layout(binding = BINDING_INDEX_AOV_DEPTH, std430) writeonly buffer DepthBuffer { float DepthAov[]; };
+layout(binding = BINDING_INDEX_AOV_DEPTH, r32f) uniform writeonly image2D DepthAov;
 #endif
 #if (AOV_MASK & AOV_BIT_FACE_ID) != 0
-layout(binding = BINDING_INDEX_AOV_FACE_ID, std430) writeonly buffer FaceIdBuffer { int FaceIdAov[]; };
+layout(binding = BINDING_INDEX_AOV_FACE_ID, r32i) uniform writeonly iimage2D FaceIdAov;
 #endif
 #if (AOV_MASK & AOV_BIT_INSTANCE_ID) != 0
-layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, std430) writeonly buffer InstanceIdBuffer { int InstanceIdAov[]; };
+layout(binding = BINDING_INDEX_AOV_INSTANCE_ID, r32i) uniform writeonly iimage2D InstanceIdAov;
 #endif
 #if (AOV_MASK & AOV_BIT_DEBUG_DOUBLE_SIDED) != 0
-layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, std430) writeonly buffer DoubleSidedBuffer { vec3 DoubleSidedAov[]; };
+layout(binding = BINDING_INDEX_AOV_DOUBLE_SIDED, rgba32f) uniform writeonly image2D DoubleSidedAov;
 #endif
 #if (AOV_MASK & AOV_BIT_ALBEDO) != 0
-layout(binding = BINDING_INDEX_AOV_ALBEDO, std430) buffer AlbedoBuffer { vec3 AlbedoAov[]; };
+layout(binding = BINDING_INDEX_AOV_ALBEDO, rgba32f) uniform image2D AlbedoAov;
 #endif
+
+ivec2 aovImageCoord(uint pixelIndex)
+{
+  uint imageWidth = ubo.imageDims & 0xFFFFu;
+  return ivec2(pixelIndex % imageWidth, pixelIndex / imageWidth);
+}
 
 layout(set = 1, binding = BINDING_INDEX_TEXTURES) uniform texture2D textures_2d[MAX_TEXTURE_COUNT];
 

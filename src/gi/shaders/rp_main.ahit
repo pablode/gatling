@@ -41,9 +41,8 @@ void main()
 
 #ifndef SHADOW_TEST
 #if (AOV_MASK & AOV_BIT_DEBUG_OPACITY) != 0
-  uint imageWidth = ubo.imageDims & 0xFFFFu;
   uint pixelIndex = rayPayload.pixelIndex;
-  OpacityAov[pixelIndex] = mix(vec3(1.0), vec3(0.0,1.0,1.0), opacity);
+  imageStore(OpacityAov, aovImageCoord(pixelIndex), vec4(mix(vec3(1.0), vec3(0.0,1.0,1.0), opacity), 0.0));
 #endif
 #endif
 
